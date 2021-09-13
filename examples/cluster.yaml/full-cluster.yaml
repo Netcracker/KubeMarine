@@ -1,0 +1,494 @@
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  username: "centos"
+
+vrrp_ips:
+- hosts:
+  - name: k8s-lb-1
+    priority: 254
+  - name: k8s-lb-2
+    priority: 253
+  id: d8efc729e4
+  interface: eth0
+  ip: 192.168.0.250
+  password: 11a1aabe
+  router_id: '250'
+
+nodes:
+  - name: "k8s-lb-1"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["balancer"]
+  - name: "k8s-lb-2"
+    address: "10.101.0.2"
+    internal_address: "192.168.0.2"
+    roles: ["balancer"]
+  - name: "k8s-master-1"
+    address: "10.101.0.3"
+    internal_address: "192.168.0.3"
+    roles: ["master"]
+  - name: "k8s-master-2"
+    address: "10.101.0.4"
+    internal_address: "192.168.0.4"
+    roles: ["master"]
+  - name: "k8s-master-3"
+    address: "10.101.0.5"
+    internal_address: "192.168.0.5"
+    roles: ["master"]
+  - name: "k8s-worker-1"
+    address: "10.101.0.6"
+    internal_address: "192.168.0.6"
+    roles: ["worker"]
+    taints:
+      - "node-role.kubernetes.io/remove-example:NoSchedule-"
+      - "node-role.kubernetes.io/add-example=add-example:NoSchedule"
+  - name: "k8s-worker-2"
+    address: "10.101.0.7"
+    internal_address: "192.168.0.7"
+    roles: ["worker"]
+    labels:
+      netcracker-infra: infra
+      region: europe
+  - name: "k8s-worker-3"
+    address: "10.101.0.8"
+    internal_address: "192.168.0.8"
+    roles: ["worker"]
+    labels:
+      netcracker-infra: infra
+      region: asia
+
+cluster_name: "k8s.example.com"
+public_cluster_ip: "10.101.0.1"
+
+services:
+
+  kubeadm:
+    kubernetesVersion: v1.16.3
+    controlPlaneEndpoint: 'k8s.example.com:6443'
+    imageRepository: artifactory.example.com:5443/k8s.gcr.io
+    networking:
+      podSubnet: 10.30.0.0/24
+      serviceSubnet: 172.30.0.0/24
+    apiServer:
+      certSANs:
+        - 10.101.0.1
+        - 10.101.0.2
+        - 10.101.0.3
+        - 10.101.0.4
+        - 10.101.0.5
+        - 10.101.0.6
+        - 10.101.0.7
+        - 10.101.0.8
+        - 192.168.0.1
+        - 192.168.0.2
+        - 192.168.0.3
+        - 192.168.0.4
+        - 192.168.0.5
+        - 192.168.0.6
+        - 192.168.0.7
+        - 192.168.0.8
+        - k8s-lb-1
+        - k8s-lb-2
+        - k8s-master-1
+        - k8s-master-2
+        - k8s-master-3
+        - k8s-worker-1
+        - k8s-worker-2
+        - k8s-worker-3
+      extraArgs:
+        enable-admission-plugins: NodeRestriction,PodNodeSelector
+
+  cri:
+    dockerConfig:
+      ipv6: True
+      log-driver: json-file
+      log-opts:
+        max-size: 128m
+        max-file: "5"
+      exec-opts:
+        - native.cgroupdriver=systemd
+      insecure-registries:
+        - artifactory.example.com:5443
+      registry-mirrors:
+        - https://artifactory.example.com:5443
+
+  resolv.conf:
+    search: default
+    nameservers:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+
+  etc_hosts:
+    1.1.1.1:
+      - example.com
+
+  ntp:
+    # For RHEL OS use chrony:
+    chrony:
+      servers:
+        - 0.de.pool.ntp.org iburst
+        - 1.de.pool.ntp.org iburst
+      makestep: 5 10
+      rtcsync: True
+    # For Debian OS use timesyncd:
+    timesyncd:
+      Time:
+        NTP:
+          - 0.de.pool.ntp.org
+          - 1.de.pool.ntp.org
+        FallbackNTP:
+          - 2.de.pool.ntp.org
+          - 3.de.pool.ntp.org
+        RootDistanceMaxSec: 10
+        PollIntervalMinSec: 64
+        PollIntervalMaxSec: 1024
+
+  thirdparties:
+    /usr/bin/kubeadm:
+      source: 'https://example.com/kubernetes/v1.16.3/bin/linux/amd64/kubeadm'
+      sha1: e5cdfcda337a5c8d59035da9db0c2b02913271d1
+      groups:
+        - master
+        - worker
+    /opt/cni/cni-plugins-linux.tgz:
+      source: 'https://example.com/cni-plugins/v0.8.3/cni-plugins-linux-amd64-v0.8.3.tgz'
+      sha1: f662ec5b648e114802276f8f353ad48a3376da47
+      unpack: '/opt/cni/bin'
+      group: master
+    /usr/bin/calicoctl:
+      source: 'https://example.com/calicoctl/v3.10.1/calicoctl-linux-amd64'
+
+  kernel_security:
+    # For RHEL OS use selinux:
+    selinux:
+      state: enforcing
+      policy: targeted
+      permissive:
+        - http_port_t
+        - http_cache_port_t
+        - commplex_main_port_t
+    # For Debian OS use apparmor:
+    apparmor:
+      complain:
+        - man_filter
+      disable:
+        - man_groff
+
+  modprobe:
+    - br_netfilter
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - ip6table_filter
+    - nf_conntrack_ipv6
+    - nf_nat_masquerade_ipv6
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+
+  sysctl:
+    net.bridge.bridge-nf-call-iptables: 1
+    net.ipv4.ip_forward: 1
+    net.ipv4.ip_nonlocal_bind: 1
+    net.bridge.bridge-nf-call-ip6tables: 1
+    net.ipv6.conf.all.forwarding: 1
+    net.ipv6.ip_nonlocal_bind: 1
+
+  loadbalancer:
+    haproxy:
+      config:
+        defaults:
+          timeout_connect: '10s'
+          timeout_client: '1m'
+          timeout_server: '1m'
+          timeout_tunnel: '60m'
+          timeout_client_fin: '1m'
+          maxconn: 10000
+
+  packages:
+    package_manager:
+      replace-repositories: true
+      # For RHEL OS use yum-like format:
+      repositories:
+        centos-sclo-haproxy18:
+          name: "CentOS SCLO rh-haproxy18"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "http://mirror.centos.org/centos/7/sclo/x86_64/rh/rh-haproxy18/"
+      # For Debian OS use apt-like format:
+      # repositories:
+      #   - "deb [arch=amd64 trusted=yes] http://example.com/deb/ubuntu/ focal main restricted"
+    associations:
+      haproxy:
+        executable_name: '/bin/haproxy'
+        package_name: 'haproxy'
+        service_name: 'haproxy'
+        config_location: '/etc/haproxy/haproxy.cfg'
+      docker:
+        package_name:
+          - 'docker-ce-19.03*'
+          - 'docker-ce-cli-19.03*'
+    install:
+      include:
+      - ethtool
+      - ebtables
+      - socat
+      - curl
+      - openssl
+      - unzip
+      - policycoreutils-python
+
+rbac:
+  account_defaults:
+    namespace: kube-system
+    configs:
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata: {}
+
+  accounts:
+    - name: superadmin
+      role: cluster-admin
+    - name: superadmin2
+      role: cluster-admin
+      namespace: kube-system
+
+  psp:
+    pod-security: enabled
+    oob-policies:
+      default: enabled
+      host-network: enabled
+      anyuid: enabled
+    custom-policies:
+      psp-list:
+      - apiVersion: policy/v1beta1
+        kind: PodSecurityPolicy
+        metadata:
+          name: most-restricted-psp
+          annotations:
+            seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+            seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+        spec:
+          privileged: false
+          # Allow core volume types.
+          hostPID: false
+          hostIPC: false
+          hostNetwork: false
+          volumes:
+            - 'configMap'
+            - 'emptyDir'
+            - 'projected'
+            - 'secret'
+            - 'downwardAPI'
+            - 'persistentVolumeClaim'
+          fsGroup:
+            rule: 'MustRunAs'
+            ranges:
+              - min: 1
+                max: 65535
+          readOnlyRootFilesystem: true
+          runAsUser:
+            rule: 'MustRunAsNonRoot'
+          supplementalGroups:
+            rule: 'MustRunAs'
+            ranges:
+              - min: 1
+                max: 65535
+          runAsGroup:
+            rule: 'MustRunAs'
+            ranges:
+              - min: 1
+                max: 65535
+          allowPrivilegeEscalation: false
+          seLinux:
+            rule: 'RunAsAny'
+          requiredDropCapabilities:
+            - ALL
+      roles-list:
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: most-restricted-psp-cr
+        rules:
+          - apiGroups: ['policy']
+            resources: ['podsecuritypolicies']
+            verbs:     ['use']
+            resourceNames:
+              - most-restricted-psp
+      bindings-list:
+      - kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: most-restricted-psp-crb
+        roleRef:
+          kind: ClusterRole
+          name: most-restricted-psp-cr
+          apiGroup: rbac.authorization.k8s.io
+        subjects:
+          - kind: ServiceAccount
+            # it is possible to bind to non-existing SA in non-existing namespace
+            name: sa-name
+            namespace: sa-namespace
+
+
+
+plugin_defaults:
+  installation:
+    registry: artifactory.example.com:5443
+
+plugins:
+
+  calico:
+    install: true
+    version: v3.10.1
+    installation:
+      priority: 0
+    mode: ipip
+    crossSubnet: true
+    natOutgoing: true
+    mtu: 1440
+    typha:
+      enabled: false
+      replicas: 2
+      image: calico/typha:v3.10.1
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+    cni:
+      image: calico/cni:v3.10.1
+      ipam:
+        assign_ipv4: true
+        assign_ipv6: false
+        ipv4_pools:
+          - 192.168.0.0/24
+          - default-ipv4-ippool
+        ipv6_pools:
+          - default-ipv6-ippool
+        type: calico-ipam
+    node:
+      image: calico/node:v3.10.1
+    kube-controllers:
+      image: calico/kube-controllers:v3.10.1
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+    flexvol:
+      image: calico/pod2daemon-flexvol:v3.10.1
+
+  flannel:
+    install: false
+    installation:
+      priority: 0
+    image: quay.io/coreos/flannel:v0.11.0-amd64
+
+  nginx-ingress-controller:
+    install: true
+    installation:
+      priority: 1
+    controller:
+      image: quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.1
+      ssl:
+        enableSslPassthrough: false
+        default-certificate:
+          paths:
+            cert: /path/to/cert
+            key: /path/to/key
+      nodeSelector:
+        kubernetes.io/os: linux
+
+  haproxy-ingress-controller:
+    install: false
+    installation:
+      priority: 1
+    controller:
+      image: haproxytech/kubernetes-ingress:1.2.7
+      nodeSelector:
+        kubernetes.io/os: linux
+    backend:
+      image: k8s.gcr.io/defaultbackend:1.0
+      nodeSelector:
+        kubernetes.io/os: linux
+
+  kubernetes-dashboard:
+    install: true
+    installation:
+      priority: 2
+    hostname: 'dashboard.k8s.example.com'
+    dashboard:
+      image: kubernetesui/dashboard:v2.0.0-rc2
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+    metrics-scraper:
+      image: kubernetesui/metrics-scraper:v1.0.2
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+    ingress:
+      metadata:
+        name: kubernetes-dashboard
+        namespace: kubernetes-dashboard
+        annotations:
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/rewrite-target: /
+          nginx.ingress.kubernetes.io/secure-backends: "true"
+          nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+      spec:
+        tls:
+          - hosts:
+            - '{{ plugins["kubernetes-dashboard"].hostname }}'
+        rules:
+          - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
+            http:
+              paths:
+                - path: /
+                  backend:
+                    serviceName: kubernetes-dashboard
+                    servicePort: 443
+
+  sock-shop:
+    install: true
+    installation:
+      procedures:
+        - template: templates/plugins/sock-shop.yaml.j2
+          expect:
+            pods:
+              - carts
+              - carts-db
+              - catalogue
+              - catalogue-db
+              - front-end
+              - orders
+              - orders-db
+              - payment
+              - queue-master
+              - rabbitmq
+              - shipping
+              - user
+              - user-db
+        - template: templates/plugins/sock-shop-ingress.yaml.j2
+    carts-db:
+      image: mongo
+    carts:
+      image: weaveworksdemos/carts:0.4.8
+    catalogue-db:
+      image: weaveworksdemos/catalogue-db:0.3.0
+    catalogue:
+      image: weaveworksdemos/catalogue:0.3.5
+    front-end:
+      image: weaveworksdemos/front-end:0.3.12
+    orders-db:
+      image: mongo
+    orders:
+      image: weaveworksdemos/orders:0.4.7
+    payment:
+      image: weaveworksdemos/payment:0.4.3
+    queue-master:
+      image: weaveworksdemos/queue-master:0.3.1
+    rabbitmq:
+      image: rabbitmq:3.6.8
+    shipping:
+      image: weaveworksdemos/shipping:0.4.8
+    user-db:
+      image: weaveworksdemos/user-db:0.4.0
+    user:
+      image: weaveworksdemos/user:0.4.7

@@ -1,0 +1,22 @@
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  username: "centos"
+
+vrrp_ips:
+- 192.168.0.250
+
+nodes:
+  - name: "k8s-master-1"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["balancer", "master", "worker"]
+  - name: "k8s-master-2"
+    address: "10.101.0.2"
+    internal_address: "192.168.0.2"
+    roles: ["balancer", "master", "worker"]
+  - name: "k8s-master-3"
+    address: "10.101.0.3"
+    internal_address: "192.168.0.3"
+    roles: ["balancer", "master", "worker"]
+
+cluster_name: "k8s.example.com"

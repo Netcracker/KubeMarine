@@ -1,0 +1,18 @@
+backup_location: /home/centos
+
+backup_plan:
+  etcd:
+    source_node: master-1
+    certificates:
+      cert: /etc/kubernetes/pki/etcd/server.crt
+      key: /etc/kubernetes/pki/etcd/server.key
+      cacert: /etc/kubernetes/pki/etcd/ca.crt
+  nodes:
+    /etc/resolv.conf: True
+    /root: True
+    /etc/hosts: False
+  kubernetes:
+    namespaced_resources:
+      namespaces: all
+      resources: all
+    nonnamespaced_resources: all

@@ -1,0 +1,113 @@
+# Source: https://raw.githubusercontent.com/Pharb/kubernetes-iperf3/master/iperf3.yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iperf3
+  namespace: default
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: iperf3-psp-rb
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oob-privileged-psp-cr
+subjects:
+- kind: ServiceAccount
+  name: iperf3
+  namespace: default
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf3-server-deployment
+  labels:
+    app: iperf3-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iperf3-server
+  template:
+    metadata:
+      labels:
+        app: iperf3-server
+    spec:
+      {% if plugins['iperf3']['nodeSelector'] is defined -%}
+      nodeSelector:
+        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+      {%- endif %}
+      {% if plugins['iperf3']['tolerations'] is defined -%}
+      tolerations:
+        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+      {%- endif %}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/role
+                operator: In
+                values:
+                - master
+      serviceAccountName: iperf3
+      containers:
+      - name: iperf3-server
+        image: networkstatic/iperf3
+        args: ['-s']
+        ports:
+        - containerPort: 5201
+          name: server
+      terminationGracePeriodSeconds: 0
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf3-server
+spec:
+  selector:
+    app: iperf3-server
+  ports:
+  - protocol: TCP
+    port: 5201
+    targetPort: server
+
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: iperf3-clients
+  labels:
+    app: iperf3-client
+spec:
+  selector:
+    matchLabels:
+      app: iperf3-client
+  template:
+    metadata:
+      labels:
+        app: iperf3-client
+    spec:
+      {% if plugins['iperf3']['nodeSelector'] is defined -%}
+      nodeSelector:
+        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+      {%- endif %}
+      {% if plugins['iperf3']['tolerations'] is defined -%}
+      tolerations:
+        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+      {%- endif %}
+      serviceAccountName: iperf3
+      containers:
+      - name: iperf3-client
+        image: networkstatic/iperf3
+        command: ['/bin/sh', '-c', 'sleep infinity']
+        # To benchmark manually: kubectl exec iperf3-clients-jlfxq -- /bin/sh -c 'iperf3 -c iperf3-server'
+      terminationGracePeriodSeconds: 0

@@ -1,0 +1,5 @@
+backup_plan:
+  nodes:
+    /etc/resolv.conf: True
+    /root: True
+    /etc/hosts: False

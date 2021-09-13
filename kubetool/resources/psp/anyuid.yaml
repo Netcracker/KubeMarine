@@ -1,0 +1,61 @@
+psp:
+  apiVersion: policy/v1beta1
+  kind: PodSecurityPolicy
+  metadata:
+    name: oob-anyuid-psp
+    annotations:
+      seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+      seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+  spec:
+    privileged: false
+    # Allow core volume types.
+    hostPID: false
+    hostIPC: false
+    hostNetwork: false
+    volumes:
+      - 'configMap'
+      - 'emptyDir'
+      - 'projected'
+      - 'secret'
+      - 'downwardAPI'
+      # Assume that persistentVolumes set up by the cluster admin are safe to use.
+      - 'persistentVolumeClaim'
+    fsGroup:
+      rule: 'RunAsAny'
+    readOnlyRootFilesystem: false
+    runAsUser:
+      rule: 'RunAsAny'
+    supplementalGroups:
+      rule: 'RunAsAny'
+    runAsGroup:
+      rule: 'RunAsAny'
+    allowPrivilegeEscalation: true
+    seLinux:
+      rule: 'RunAsAny'
+    # Default docker capabilities
+    allowedCapabilities:
+      - SETPCAP
+      - MKNOD
+      - AUDIT_WRITE
+      - CHOWN
+      - NET_RAW
+      - DAC_OVERRIDE
+      - FOWNER
+      - FSETID
+      - KILL
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+      - SYS_CHROOT
+      - SETFCAP
+role:
+  kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: oob-anyuid-psp-cr
+  rules:
+    - apiGroups: ['policy']
+      resources: ['podsecuritypolicies']
+      verbs:     ['use']
+      resourceNames:
+        - oob-anyuid-psp

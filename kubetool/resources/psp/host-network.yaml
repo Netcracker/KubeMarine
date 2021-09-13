@@ -1,0 +1,65 @@
+psp:
+  apiVersion: policy/v1beta1
+  kind: PodSecurityPolicy
+  metadata:
+    name: oob-host-network-psp
+    annotations:
+      seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+      seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+  spec:
+    privileged: false
+    # Allow core volume types.
+    hostPID: false
+    hostIPC: false
+    hostNetwork: true
+    hostPorts:
+      - min: 80
+        max: 65535
+    volumes:
+      - 'configMap'
+      - 'emptyDir'
+      - 'projected'
+      - 'secret'
+      - 'downwardAPI'
+      # Assume that persistentVolumes set up by the cluster admin are safe to use.
+      - 'persistentVolumeClaim'
+    fsGroup:
+      rule: 'MustRunAs'
+      ranges:
+        # Forbid adding the root group.
+        - min: 1
+          max: 65535
+    readOnlyRootFilesystem: false
+    runAsUser:
+      rule: 'MustRunAs'
+      ranges:
+        - min: 1
+          max: 65535
+    supplementalGroups:
+      rule: 'MustRunAs'
+      ranges:
+        # Forbid adding the root group.
+        - min: 1
+          max: 65535
+    runAsGroup:
+      rule: 'MustRunAs'
+      ranges:
+        # Forbid adding the root group.
+        - min: 1
+          max: 65535
+    allowPrivilegeEscalation: true
+    seLinux:
+      rule: 'RunAsAny'
+    allowedCapabilities:
+      - NET_BIND_SERVICE
+role:
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    name: oob-host-network-psp-cr
+  rules:
+    - apiGroups: ['policy']
+      resources: ['podsecuritypolicies']
+      verbs:     ['use']
+      resourceNames:
+        - oob-host-network-psp

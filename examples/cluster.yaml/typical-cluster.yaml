@@ -1,0 +1,104 @@
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  username: "centos"
+
+vrrp_ips:
+- 192.168.0.250
+
+nodes:
+  - name: "k8s-lb-1"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["balancer"]
+  - name: "k8s-lb-2"
+    address: "10.101.0.2"
+    internal_address: "192.168.0.2"
+    roles: ["balancer"]
+  - name: "k8s-master-1"
+    address: "10.101.0.3"
+    internal_address: "192.168.0.3"
+    roles: ["master"]
+  - name: "k8s-master-2"
+    address: "10.101.0.4"
+    internal_address: "192.168.0.4"
+    roles: ["master"]
+  - name: "k8s-master-3"
+    address: "10.101.0.5"
+    internal_address: "192.168.0.5"
+    roles: ["master"]
+  - name: "k8s-worker-1"
+    address: "10.101.0.6"
+    internal_address: "192.168.0.6"
+    roles: ["worker"]
+  - name: "k8s-worker-2"
+    address: "10.101.0.7"
+    internal_address: "192.168.0.7"
+    roles: ["worker"]
+  - name: "k8s-worker-3"
+    address: "10.101.0.8"
+    internal_address: "192.168.0.8"
+    roles: ["worker"]
+
+cluster_name: "k8s.example.com"
+
+services:
+  resolv.conf:
+    search: default
+    nameservers:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+
+  ntp:
+    # For RHEL OS use chrony:
+    chrony:
+      servers:
+        - 0.de.pool.ntp.org iburst
+        - 1.de.pool.ntp.org iburst
+      makestep: 5 10
+      rtcsync: True
+    # For Debian OS use timesyncd:
+    timesyncd:
+      Time:
+        NTP:
+          - 0.de.pool.ntp.org
+          - 1.de.pool.ntp.org
+        FallbackNTP:
+          - 2.de.pool.ntp.org
+          - 3.de.pool.ntp.org
+        RootDistanceMaxSec: 10
+        PollIntervalMinSec: 64
+        PollIntervalMaxSec: 1024
+
+  packages:
+    package_manager:
+      replace-repositories: true
+      # For RHEL OS use yum-like format:
+      repositories:
+        centos-sclo-haproxy18:
+          name: "CentOS SCLO rh-haproxy18"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "http://mirror.centos.org/centos/7/sclo/x86_64/rh/rh-haproxy18/"
+      # For Debian OS use apt-like format:
+      # repositories:
+      #   - "deb [arch=amd64 trusted=yes] http://example.com/deb/ubuntu/ focal main restricted"
+    install:
+      include:
+      - ethtool
+      - ebtables
+      - socat
+      - curl
+      - openssl
+      - unzip
+      - policycoreutils-python
+
+rbac:
+  accounts:
+    - name: superadmin
+      role: cluster-admin
+
+plugins:
+  kubernetes-dashboard:
+    install: true

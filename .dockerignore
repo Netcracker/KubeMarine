@@ -1,0 +1,11 @@
+documentation
+dump
+examples
+ansible-inventory.ini
+cluster.yaml
+build.sh
+.git
+Dockerfile
+.DS_Store
+.gitignore
+*.md

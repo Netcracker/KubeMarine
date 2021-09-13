@@ -1,0 +1,35 @@
+vrrp_script script_{{ item['id'] }} {
+    script       "/usr/local/bin/check_haproxy.sh"
+    interval 2
+    fall 2
+    rise 2
+}
+
+
+vrrp_instance balancer_{{ item['id'] }} {
+    state BACKUP
+    interface {{ interface }}
+    virtual_router_id {{ item['router_id'] }}
+    priority {{ priority }}
+    nopreempt
+    virtual_ipaddress {
+        {{ item['ip'] }} dev {{ interface }} label vip_{{ item['id'] }}
+    }
+
+    track_script {
+        script_{{ item['id'] }}
+    }
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ item['password'] }}
+    }
+{%- if peers | length > 0 %}
+    unicast_src_ip {{ source }}
+    unicast_peer {
+{%- for ip in peers %}
+        {{ ip }}
+{%- endfor %}
+    }
+{%- endif %}
+}
