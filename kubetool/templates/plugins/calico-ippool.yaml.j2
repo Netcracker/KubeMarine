@@ -1,0 +1,12 @@
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: {% if services.kubeadm.networking.podSubnet|isipv4 %}default-ipv4-ippool{% else %}default-ipv6-ippool{% endif %}
+spec:
+  cidr: {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4_pools'][0] }}{% else %}{{ plugins['calico']['cni']['ipam']['ipv6_pools'][0] }}{% endif %}
+  natOutgoing: {{ plugins['calico']['natOutgoing'] }}
+  nodeSelector: all()
+{% if services.kubeadm.networking.podSubnet|isipv4 %}
+  vxlanMode: {% if plugins.calico.mode == 'vxlan' and plugins['calico']['crossSubnet'] %}CrossSubnet{% elif plugins.calico.mode == 'vxlan' %}Always{% else %}Never{% endif %}
+  ipipMode: {% if plugins.calico.mode == 'ipip' and plugins['calico']['crossSubnet'] %}CrossSubnet{% elif plugins.calico.mode == 'ipip' %}Always{% else %}Never{% endif %}
+{% endif %}

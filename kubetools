@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# This env variable is used to force the stdout and stderr streams to be unbuffered in python.
+# By default we set this variable to true, because buffering sometimes causes very long output hanging => bad UX.
+# Users can override this variable and set it to false if unbuffered output causes any issues, but python output may start hanging again.
+if [ -z "${PYTHONUNBUFFERED}" ]; then
+  export PYTHONUNBUFFERED=TRUE
+fi
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+python3 "$SCRIPT_DIR"/kubetools.py $@

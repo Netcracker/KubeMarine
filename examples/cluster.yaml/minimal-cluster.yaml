@@ -1,0 +1,35 @@
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  username: "centos"
+
+nodes:
+  - name: "k8s-lb"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["balancer"]
+  - name: "k8s-master-1"
+    address: "10.101.0.2"
+    internal_address: "192.168.0.2"
+    roles: ["master"]
+  - name: "k8s-master-2"
+    address: "10.101.0.3"
+    internal_address: "192.168.0.3"
+    roles: ["master"]
+  - name: "k8s-master-3"
+    address: "10.101.0.4"
+    internal_address: "192.168.0.4"
+    roles: ["master"]
+  - name: "k8s-worker-1"
+    address: "10.101.0.5"
+    internal_address: "192.168.0.5"
+    roles: ["worker"]
+  - name: "k8s-worker-2"
+    address: "10.101.0.6"
+    internal_address: "192.168.0.6"
+    roles: ["worker"]
+  - name: "k8s-worker-3"
+    address: "10.101.0.7"
+    internal_address: "192.168.0.7"
+    roles: ["worker"]
+
+cluster_name: "k8s.example.com"

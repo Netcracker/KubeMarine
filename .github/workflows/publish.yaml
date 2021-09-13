@@ -1,0 +1,12 @@
+name: Publish Artifacts
+on:
+  release:
+    types: [created]
+jobs:
+  publish-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build . -t ghcr.io/netcracker-technology/kubetool:${{ github.event.release.tag_name }}
+      - run: echo ${{secrets.GITHUB_TOKEN}} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+      - run: docker push ghcr.io/netcracker-technology/kubetool:${{ github.event.release.tag_name }}

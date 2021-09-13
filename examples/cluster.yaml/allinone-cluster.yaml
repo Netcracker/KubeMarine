@@ -1,0 +1,11 @@
+node_defaults:
+  keyfile: "/home/username/.ssh/id_rsa"
+  username: "centos"
+
+nodes:
+  - name: "k8s-master"
+    address: "10.101.0.1"
+    internal_address: "192.168.0.1"
+    roles: ["master", "worker"]
+
+cluster_name: "k8s.example.com"

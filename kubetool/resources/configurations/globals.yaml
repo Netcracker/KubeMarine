@@ -1,0 +1,468 @@
+kubernetes_versions:
+  v1.16:
+    supported: false
+  v1.17:
+    supported: false
+  v1.18:
+    supported: true
+  v1.19:
+    supported: false
+  v1.20:
+    supported: true
+  v1.21:
+    supported: true
+
+connection:
+  defaults:
+    port: 22
+    username: root
+    timeout: 10
+  bad_connection_exceptions:
+    - Unable to connect to port
+    - timed out
+    - Network is unreachable
+    - Error reading SSH protocol banner
+    - Connection reset by peer
+    - Connect fail
+    - No existing session
+    - encountered RSA key
+    - Socket is closed
+    - WinError 10060
+etcd:
+  default_arguments:
+    cert: /etc/kubernetes/pki/etcd/server.crt
+    key: /etc/kubernetes/pki/etcd/server.key
+    cacert: /etc/kubernetes/pki/etcd/ca.crt
+    peer_cert: /etc/kubernetes/pki/etcd/peer.crt
+    peer_key: /etc/kubernetes/pki/etcd/peer.key
+    peer_cacert: /etc/kubernetes/pki/etcd/ca.crt
+  temporary_exceptions:
+    - leader changed
+    - "etcdserver: request timed out"
+kubernetes:
+  temporary_exceptions:
+    - has prevented the request from succeeding
+pods:
+  allowed_failures: 10
+  expect:
+    kubernetes:
+      timeout: 5
+      retries: 30
+    plugins:
+      timeout: 5
+      retries: 30
+  critical_states:
+    - Error
+    - ErrImagePull
+    - ImagePullBackOff
+    - RunContainerError
+    - InvalidImageName
+    - CrashLoopBackOff
+    - CreateContainerConfigError
+nodes:
+  expect:
+    kubernetes_version:
+      timeout: 10
+      retries: 30
+  ready:
+    retries: 15
+    timeout: 5
+  boot:
+    reboot_command: 'reboot 2>/dev/null >/dev/null &'
+    defaults:
+      timeout: 180
+      delay_period: 5
+  drain:
+    timeout: 10
+    grace_period: 60
+  remove:
+    check_active_timeout: 30
+error_handling:
+  failure_message: >
+    An unexpected error occurred. It is failed to solve the problem automatically.
+    Follow the instructions from the Troubleshooting Guide available to you.
+    If it is impossible to solve the problem, provide the dump and the technical information above to the support team.
+
+    You can restart the script from the last task with the following command:
+    %s --tasks="%s"
+keepalived:
+  restart_wait: 5
+  defaults:
+    priority:
+      max_value: 255
+      step: 1
+    label_size: 10
+    password_size: 8
+haproxy:
+  restart_wait: 5
+workaround:
+  retries: 10
+  delay_period: 5
+
+compatibility_map:
+  software:
+    docker:
+      v1.18.4:
+        version_rhel: 19.03*
+        version_debian: 5:19.03.*
+      v1.18.8:
+        version_rhel: 19.03*
+        version_debian: 5:19.03.*
+      v1.18.10:
+        version_rhel: 19.03*
+        version_debian: 5:19.03.*
+      v1.18.18:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.19.3:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.20.2:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.21.2:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+    containerd:
+      v1.18.4:
+        version_rhel: 1.4.6*
+        version_debian: 1.4.6*
+      v1.18.8:
+        version_rhel: 1.4.6*
+        version_debian: 1.4.6*
+      v1.18.10:
+        version_rhel: 1.4.6*
+        version_debian: 1.4.6*
+      v1.18.18:
+        version_rhel: 1.4.6*
+        version_rhel8: 1.4.8*
+        version_debian: 1.4.6*
+      v1.19.3:
+        version_rhel: 1.4.6*
+        version_rhel8: 1.4.8*
+        version_debian: 1.4.6*
+      v1.20.2:
+        version_rhel: 1.4.6*
+        version_rhel8: 1.4.8*
+        version_debian: 1.4.6*
+      v1.21.2:
+        version_rhel: 1.4.6*
+        version_rhel8: 1.4.8*
+        version_debian: 1.4.6*
+    podman:
+      v1.18.4:
+        version_rhel: 1.6.4*
+        version_debian: 100:3.1.2*
+      v1.18.8:
+        version_rhel: 1.6.4*
+        version_debian: 100:3.1.2*
+      v1.18.10:
+        version_rhel: 1.6.4*
+        version_debian: 100:3.1.2*
+      v1.18.18:
+        version_rhel: 1.6.4*
+        version_rhel8: 3.0.1*
+        version_debian: 100:3.1.2*
+      v1.19.3:
+        version_rhel: 1.6.4*
+        version_rhel8: 3.0.1*
+        version_debian: 100:3.1.2*
+      v1.20.2:
+        version_rhel: 1.6.4*
+        version_rhel8: 3.0.1*
+        version_debian: 100:3.1.2*
+      v1.21.2:
+        version_rhel: 1.6.4*
+        version_rhel8: 3.0.1*
+        version_debian: 100:3.1.2*
+    haproxy:
+      v1.18.4:
+        version_rhel: 1.8*
+        version_debian: 2.0.*
+      v1.18.8:
+        version_rhel: 1.8*
+        version_debian: 2.0.*
+      v1.18.10:
+        version_rhel: 1.8*
+        version_debian: 2.0.*
+      v1.18.18:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.19.3:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.20.2:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.21.2:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+    keepalived:
+      v1.18.4:
+        version_rhel: 1.3*
+        version_debian: 1:2.0.*
+      v1.18.8:
+        version_rhel: 1.3*
+        version_debian: 1:2.0.*
+      v1.18.10:
+        version_rhel: 1.3*
+        version_debian: 1:2.0.*
+      v1.18.18:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.19.3:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.20.2:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.21.2:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+    crictl:
+      v1.18.4:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.18.8:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.18.10:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.18.18:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.19.3:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.20.2:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.21.2:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+    kubeadm:
+      v1.18.4:
+        sha1: d17b585fe64fcb0bd21fad724a9f899d214e665f
+      v1.18.8:
+        sha1: f99912e8cf617f75011aa930078397115940dd7e
+      v1.18.10:
+        sha1: 9b4163970ea1236091927a528079e823e1f09843
+      v1.18.18:
+        sha1: fd7cc264070a71834bafbb39838ee24d26c5f0c5
+      v1.19.3:
+        sha1: 0db8a6e2493b8956259ea2d5f2d431cf5d38d971
+      v1.20.2:
+        sha1: 4c025ebf29eb7aa32012a1c8f81e7b85df2bf92f
+      v1.21.2:
+        sha1: cbb07d380de4ef73d43d594a1055839fa9753138
+    kubelet:
+      v1.18.4:
+        sha1: 5ca1b807bf7a4a8c8737c57437354cf7299eaa90
+      v1.18.8:
+        sha1: d77df7122b0669f152aa141bb839c34fc070c71f
+      v1.18.10:
+        sha1: 26bc249f9ac38a6ceb202a54e2cc1281bea41e5d
+      v1.18.18:
+        sha1: f8d0ba8941176cd7f9b263b3f533a0fd5ab17a2d
+      v1.19.3:
+        sha1: 4c6ff5ffa4b2e6f3f886f319c977c57905186f72
+      v1.20.2:
+        sha1: 25ca655cce261cdbeb7c3337185f669ee0b53cc3
+      v1.21.2:
+        sha1: 024e458aa0f74cba6b773401b779590437812fc6
+    kubectl:
+      v1.18.4:
+        sha1: 1351db2b0b92bb0c46d6e18eda7b3063e7e044bf
+      v1.18.8:
+        sha1: 74c282c9d8b7e4c59250f4775bff388eaa596878
+      v1.18.10:
+        sha1: 6bcc1d8434e4eba2680ee7399acaea5ad1008629
+      v1.18.18:
+        sha1: 6bcbf6f2cb7998e736d177bbd1f95f1305921d6c
+      v1.19.3:
+        sha1: 8790862689bd3b022ba012228c1734316c968d6a
+      v1.20.2:
+        sha1: 202e00c35fa2a4085135061e5d0965ebbffed19c
+      v1.21.2:
+        sha1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468
+    calico:
+      v1.18:
+        version: v3.16.1
+        sha1: 04a53f7bc08d7cb488a9939144ee5bfd606c6fff
+      v1.19:
+        version: v3.16.1
+        sha1: 04a53f7bc08d7cb488a9939144ee5bfd606c6fff
+      v1.20:
+        version: v3.19.1
+        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+      v1.21:
+        version: v3.19.1
+        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+    nginx-ingress-controller:
+      v1.18:
+        image-name: k8s-artifacts-prod/ingress-nginx/controller
+        version: v0.34.1
+        pod-name: ingress-nginx-controller
+      v1.19:
+        image-name: k8s.gcr.io/ingress-nginx/controller
+        version: v0.35.0
+        pod-name: ingress-nginx-controller
+      v1.20:
+        image-name: k8s.gcr.io/ingress-nginx/controller
+        version: v0.43.0
+        pod-name: ingress-nginx-controller
+      v1.21:
+        image-name: k8s.gcr.io/ingress-nginx/controller
+        version: v0.48.1
+        pod-name: ingress-nginx-controller
+    kubernetes-dashboard:
+      v1.18:
+        version: v2.0.1
+        metrics-scraper-version: v1.0.4
+      v1.19:
+        version: v2.0.4
+        metrics-scraper-version: v1.0.4
+      v1.20:
+        version: v2.1.0
+        metrics-scraper-version: v1.0.6
+      v1.21:
+        version: v2.3.1
+        metrics-scraper-version: v1.0.6
+    local-path-provisioner:
+      v1.18:
+        version: v0.0.19
+      v1.19:
+        version: v0.0.19
+      v1.20:
+        version: v0.0.19
+      v1.21:
+        version: v0.0.19
+  hardware:
+    minimal:
+      balancer:
+        amount: 1
+        vcpu: 1
+        ram: 1
+      master:
+        amount: 3
+        vcpu: 2
+        ram: 2
+      worker:
+        amount: 3
+        vcpu: 4
+        ram: 4
+      vip:
+        amount: 0
+      all:
+        amount: 3
+    recommended:
+      balancer:
+        amount: 2
+        vcpu: 2
+        ram: 1
+      master:
+        amount: 3
+        vcpu: 4
+        ram: 4
+      worker:
+        amount: 3
+        vcpu: 8
+        ram: 8
+      vip:
+        amount: 1
+      all:
+        amount: 8
+
+  distributives:
+    centos:
+      - os_family: 'rhel'
+        versions:
+          - '7.5'
+          - '7.6'
+          - '7.7'
+          - '7.8'
+          - '7.9'
+      - os_family: 'rhel8'
+        versions:
+          - '8.4'
+    rhel:
+      - os_family: 'rhel'
+        versions:
+          - '7.5'
+          - '7.6'
+          - '7.7'
+          - '7.8'
+          - '7.9'
+      - os_family: 'rhel8'
+        versions:
+          - '8.4'
+    ubuntu:
+      - os_family: 'debian'
+        versions:
+          - '20.04'
+    debian:
+      - os_family: 'debian'
+        versions:
+          - '10.9'
+          - '10.10'
+    ol:
+      - os_family: 'rhel'
+        versions:
+          - '7.5'
+          - '7.6'
+          - '7.7'
+          - '7.8'
+          - '7.9'
+      - os_family: 'rhel8'
+        versions:
+          - '8.4'
+
+  network:
+    connection:
+      latency:
+        single:
+          critical: 10000
+          recommended: 1000
+        multi:
+          critical: 15000
+          recommended: 2000
+    ports:
+      internal:
+        - 80
+        - 443
+        - 6443
+        - 2379
+        - 2380
+        - 10250
+        - 10251
+        - 10252
+        - [30000, 32767]
+      external:
+        - 80
+        - 443
+logging:
+  default_targets:
+    stdout:
+      level: debug
+      colorize: True
+      correct_newlines: True
+    dump:
+      level: verbose
+      format: "%(asctime)s %(process)s %(thread)s %(name)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"
+      colorize: False
+      correct_newlines: True
+
+prepull_group_size: 20
