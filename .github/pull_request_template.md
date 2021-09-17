@@ -6,8 +6,8 @@ Fixes # (issue)
 
 
 ### Type of change ###
-[ ] Bug fix (change which fixes an issue)
-[ ] New feature (change which adds functionality)
+- [ ] Bug fix (change which fixes an issue)
+- [ ] New feature (change which adds functionality)
 
 
 ### How it was fixed/implemented  ###
@@ -60,3 +60,4 @@ Indicate new or changed unit tests and what they do, if any.
 
 ### Reviewers: ###
 
+@koryaga @iLeonidze @zaborin @alexarefev @Yaroslav-Lahtachev
