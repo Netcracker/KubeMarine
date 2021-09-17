@@ -176,6 +176,11 @@ class RemoteExecutor:
             return None
         return executor.results[-1]
 
+    def check_on_failure(self):
+        for host, host_results in self.get_last_results().items():
+            if list(host_results.values())[0].exited != 0:
+                raise Exception(list(host_results.values())[0].stdout)
+
     def get_last_results_str(self):
         batched_results = self.get_last_results()
         if not batched_results:

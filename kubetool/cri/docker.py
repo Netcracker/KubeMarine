@@ -19,7 +19,7 @@ def install(group):
             node['connection'].sudo("rm -f %s && sudo systemctl restart %s"
                                 % (os_specific_associations['config_location'],
                                    os_specific_associations['service_name']))
-
+    exe.check_on_failure()
     return exe.get_last_results_str()
 
 
