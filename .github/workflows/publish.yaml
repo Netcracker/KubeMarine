@@ -2,8 +2,6 @@ name: Publish Artifacts
 on:
   release:
     types: [created]
-<<<<<<< HEAD
-=======
   push:
     branches:
       - 'main'
