@@ -19,6 +19,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
+  - [Changing Calico Settings](#changing-calico-settings)
 - [Common practice](#common-practice)
 
 # Prerequisites
@@ -1022,6 +1023,23 @@ prepull_group_size: 100
 The following kubetools procedures are available additionally: 
 - `version`      Print current release version
 - `do`           Execute shell command on cluster nodes
+## Changing Calico Settings
+	
+Sometimes, during the operation you have to change the parameters of the Calico plugin. To do this, you can use the standard Kubetools tools.
+	
+**Warning**: This procedure is performed on all nodes.
+	
+The parameters are changed using the command, **kubetools install --config='file' --tasks=deploy.plugins**.
+	
+Before the installation, you have to change the yaml file responsible for the cluster deployment:
+	
+```
+plugins:
+  calico:
+    install: true
+    version: v3.10.1
+	
+```
 
 # Common Practice
 
