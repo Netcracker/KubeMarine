@@ -10,6 +10,7 @@ USER root
 COPY . /opt/kubetools/
 WORKDIR /opt/kubetools/
 
+<<<<<<< HEAD
 RUN apt update && apt install -y wget && \
     if [ "$BUILD_TYPE" = "binary" ]; then \
       apt install -y zlib1g-dev upx-ucl binutils; \
@@ -24,4 +25,4 @@ RUN apt update && apt install -y wget && \
     rm -f /etc/apt/sources.list && \
     rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/bin/bash" "/opt/kubetools/kubetools"]
+ENTRYPOINT ["/bin/bash", "/opt/kubetools/kubetools"]
