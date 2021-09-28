@@ -13,6 +13,7 @@ WORKDIR /opt/kubetools/
 RUN apt update && apt install -y wget && \
     if [ "$BUILD_TYPE" = "binary" ]; then \
       apt install -y zlib1g-dev upx-ucl binutils; \
+      pip3 install --no-cache-dir -r /opt/kubetools/requirements.txt; \
       pip3 install pyinstaller;  \
       pyinstaller main.spec --noconfirm;  \
     else \  
