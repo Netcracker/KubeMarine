@@ -46,7 +46,7 @@ def install(group, include=None, exclude=None):
     command += f"; rpm -q {include}; if [ $? != 0 ]; then echo \"Failed to check version for some packages. " \
                f"Make sure packages are not already installed with higher versions. " \
                f"Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi "
-    install_result = group.sudo(command, warn=True)
+    install_result = group.sudo(command)
 
     return install_result
 

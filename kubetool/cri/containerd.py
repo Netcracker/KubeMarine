@@ -25,7 +25,6 @@ def install(group):
                                        os_specific_associations['service_name']))
 
             system.enable_service(node['connection'], os_specific_associations['service_name'], now=True)
-    exe.check_on_failure()
     return exe.get_last_results_str()
 
 

@@ -1,6 +1,6 @@
 import random
 import time
-from typing import Tuple, List, Dict, Callable, Any, Union
+from typing import Tuple, List, Dict, Callable, Any
 from contextvars import Token, ContextVar
 
 import fabric
@@ -14,8 +14,15 @@ GRE = ContextVar('KubetoolsGlobalRemoteExecutor', default=None)
 
 class RemoteExecutor:
 
-    def __init__(self, log, lazy=True, parallel=True, ignore_failed=False, enforce_children=False, timeout=None):
+    def __init__(self, log,
+                 warn=False,
+                 lazy=True,
+                 parallel=True,
+                 ignore_failed=False,
+                 enforce_children=False,
+                 timeout=None):
         self.log = log
+        self.warn = warn
         self.lazy = lazy
         self.parallel = parallel
         self.ignore_failed = ignore_failed
@@ -176,7 +183,10 @@ class RemoteExecutor:
             return None
         return executor.results[-1]
 
-    def check_on_failure(self):
+    def throw_on_failed(self):
+        executor = self._get_active_executor()
+        if executor.warn:
+            return
         for host, host_results in self.get_last_results().items():
             if list(host_results.values())[0].exited != 0:
                 raise Exception(list(host_results.values())[0].stdout)
@@ -252,5 +262,7 @@ class RemoteExecutor:
 
         executor.reset_queue()
         executor.results.append(batch_results)
+
+        self.throw_on_failed()
 
         return batch_results
