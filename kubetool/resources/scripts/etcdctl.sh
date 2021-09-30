@@ -70,7 +70,7 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
 
   if [ "$CONT_RUNTIME" == "podman" ]; then
     podman pull ${ETCD_IMAGE} &> /dev/null
-    podman run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   else
     docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   fi
