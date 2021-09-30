@@ -7,8 +7,8 @@ ARG BUILD_TYPE
 
 USER root
 
+# Used in Ansible plugin. See Ansible documentation for more details
 ENV ANSIBLE_HOST_KEY_CHECKING False
-# This parameter is used to work with Ansible
 
 COPY . /opt/kubetools/
 WORKDIR /opt/kubetools/
