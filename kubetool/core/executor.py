@@ -33,6 +33,7 @@ class RemoteExecutor:
         self.previous_context_token = Token.MISSING
         self.command_separator = ''.join(random.choice('=-_') for _ in range(32))
         self.results = []
+        self.connections_queue_history = []
 
     def __del__(self):
         pass
@@ -75,7 +76,8 @@ class RemoteExecutor:
         for host, result in results.items():
             conn_results = {}
             action, callbacks, tokens = batch_no_cnx[host]
-            if isinstance(result, fabric.runners.Result) and executor.command_separator in result.stdout and executor.command_separator in result.stderr:
+            if isinstance(result,
+                          fabric.runners.Result) and executor.command_separator in result.stdout and executor.command_separator in result.stderr:
                 stderrs = result.stderr.strip().split(executor.command_separator)
                 raw_stdouts = result.stdout.strip().split(executor.command_separator)
                 stdouts = []
@@ -83,16 +85,17 @@ class RemoteExecutor:
                 i = 0
                 while i < len(raw_stdouts):
                     stdouts.append(raw_stdouts[i].strip())
-                    if i+1 < len(raw_stdouts):
-                        exit_codes.append(int(raw_stdouts[i+1].strip()))
+                    if i + 1 < len(raw_stdouts):
+                        exit_codes.append(int(raw_stdouts[i + 1].strip()))
                     i += 2
                 exit_codes.append(result.exited)
                 for i, code in enumerate(exit_codes):
                     token = tokens[i]
-                    conn_results[token] = fabric.runners.Result(stdout=stdouts[i], stderr=stderrs[i], exited=code, connection=conns_by_host[host])
+                    conn_results[token] = fabric.runners.Result(stdout=stdouts[i], stderr=stderrs[i], exited=code,
+                                                                connection=conns_by_host[host])
             else:
                 conn_results[tokens[0]] = result
-            reparsed_results[host] = conn_results
+            reparsed_results[conns_by_host[host]] = conn_results
         # TODO: run and collect callbacks and wait for them
         return reparsed_results
 
@@ -183,13 +186,67 @@ class RemoteExecutor:
             return None
         return executor.results[-1]
 
+    def get_merged_nodegroup_results(self):
+        # TODO: get rid of this WA import, added to avoid circular import
+        from kubetool.core.group import NodeGroupResult
+        executor = self._get_active_executor()
+        group_results = NodeGroupResult()
+        for cxn, host_results in executor.get_last_results().items():
+            merged_result = {
+                "stdout": None,
+                "stderr": None,
+                "exited": 0
+            }
+            object_result = None
+            for token, result in host_results.items():
+                if isinstance(result, fabric.runners.Result):
+                    if result.stdout:
+                        if not merged_result['stdout']:
+                            merged_result['stdout'] = result.stdout
+                        else:
+                            merged_result['stdout'] = merged_result['stdout'] + '\n' + result.stdout
+                    if result.stderr:
+                        if not merged_result['stderr']:
+                            merged_result['stderr'] = result.stderr
+                        else:
+                            merged_result['stderr'] = merged_result['stderr'] + '\n\n' + result.stderr
+
+                    # Exit codes can not be merged, that's why they are assigned by priority:
+                    # 1. Most important code is 1, it should be assigned if any results contains it
+                    # 2. Non-zero exit code from last command
+                    # 3. Zero exit code, when all commands succeeded
+                    if result.exited == 1 or (
+                            merged_result['exited'] != 1 and result.exited != merged_result['exited']):
+                        merged_result['exited'] = result.exited
+                else:
+                    object_result = result
+
+            # Some command can produce non-parsed objects, like 'timeout'
+            # In that case it is impossible to merge something, and last such an "object" should be passed as a result
+            if object_result is not None:
+                group_results[cxn] = object_result
+            else:
+                group_results[cxn] = fabric.runners.Result(stdout=merged_result['stdout'],
+                                                           stderr=merged_result['stderr'],
+                                                           exited=merged_result['exited'],
+                                                           connection=cxn)
+        return group_results
+
     def throw_on_failed(self):
         executor = self._get_active_executor()
         if executor.warn:
             return
-        for host, host_results in self.get_last_results().items():
-            if list(host_results.values())[0].exited != 0:
-                raise Exception(list(host_results.values())[0].stdout)
+        group_results = executor.get_merged_nodegroup_results()
+        if len(group_results.failed) > 0:
+            raise fabric.group.GroupException(group_results)
+
+    def _get_connection_from_queue_history(self, host):
+        executor = self._get_active_executor()
+        if len(executor.connections_queue_history) > 0:
+            for conn, action in executor.connections_queue_history[-1].items():
+                if conn.host == host:
+                    return conn
+        return None
 
     def get_last_results_str(self):
         batched_results = self.get_last_results()
@@ -260,6 +317,7 @@ class RemoteExecutor:
                     for token, res in tokenized_results.items():
                         batch_results[host][token] = res
 
+        executor.connections_queue_history.append(executor.connections_queue)
         executor.reset_queue()
         executor.results.append(batch_results)
 

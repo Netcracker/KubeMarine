@@ -338,7 +338,7 @@ class NodeGroup:
                 raw_results = list(conn_results.values())
                 if len(raw_results) > 1:
                     raise Exception('Unexpected condition: not supported multiple results with non-lazy GRE')
-                simplified_results[cnx] = raw_results[0]
+                simplified_results[cnx.host] = raw_results[0]
             return simplified_results
 
         return results
