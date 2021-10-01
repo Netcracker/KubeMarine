@@ -238,7 +238,12 @@ class RemoteExecutor:
             return
         group_results = executor.get_merged_nodegroup_results()
         if len(group_results.failed) > 0:
-            raise fabric.group.GroupException(group_results)
+            # If any failed, then check is any command had warn=False to throw an exception
+            # If all commands had warn=True, then no exception should be thrown
+            for conn, result in group_results.failed.items():
+                for command in executor.connections_queue_history[-1][conn]:
+                    if not command[0][2].get('warn', False):
+                        raise fabric.group.GroupException(group_results)
 
     def _get_connection_from_queue_history(self, host):
         executor = self._get_active_executor()
