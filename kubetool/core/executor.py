@@ -201,15 +201,9 @@ class RemoteExecutor:
             for token, result in host_results.items():
                 if isinstance(result, fabric.runners.Result):
                     if result.stdout:
-                        if not merged_result['stdout']:
-                            merged_result['stdout'] = result.stdout
-                        else:
-                            merged_result['stdout'] = merged_result['stdout'] + '\n' + result.stdout
+                        merged_result['stdout'] = str(merged_result['stdout'] or '') + '\n\n' + result.stdout
                     if result.stderr:
-                        if not merged_result['stderr']:
-                            merged_result['stderr'] = result.stderr
-                        else:
-                            merged_result['stderr'] = merged_result['stderr'] + '\n\n' + result.stderr
+                        merged_result['stderr'] = str(merged_result['stderr'] or '') + '\n\n' + result.stderr
 
                     # Exit codes can not be merged, that's why they are assigned by priority:
                     # 1. Most important code is 1, it should be assigned if any results contains it
@@ -245,13 +239,6 @@ class RemoteExecutor:
                     if not command[0][2].get('warn', False):
                         raise fabric.group.GroupException(group_results)
 
-    def _get_connection_from_queue_history(self, host):
-        executor = self._get_active_executor()
-        if len(executor.connections_queue_history) > 0:
-            for conn, action in executor.connections_queue_history[-1].items():
-                if conn.host == host:
-                    return conn
-        return None
 
     def get_last_results_str(self):
         batched_results = self.get_last_results()
