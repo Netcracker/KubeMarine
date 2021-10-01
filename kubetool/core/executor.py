@@ -187,9 +187,15 @@ class RemoteExecutor:
         return executor.results[-1]
 
     def get_merged_nodegroup_results(self):
-        # TODO: get rid of this WA import, added to avoid circular import
+        """
+        Merges last tokenized results to NodeGroupResult
+        :return: None or NodeGroupResult
+        """
+        # TODO: get rid of this WA import, added to avoid circular import problem
         from kubetool.core.group import NodeGroupResult
         executor = self._get_active_executor()
+        if len(executor.results) == 0:
+            return None
         group_results = NodeGroupResult()
         for cxn, host_results in executor.get_last_results().items():
             merged_result = {
@@ -215,7 +221,7 @@ class RemoteExecutor:
                 else:
                     object_result = result
 
-            # Some command can produce non-parsed objects, like 'timeout'
+            # Some commands can produce non-parsed objects, like 'timeout'
             # In that case it is impossible to merge something, and last such an "object" should be passed as a result
             if object_result is not None:
                 group_results[cxn] = object_result
@@ -227,8 +233,12 @@ class RemoteExecutor:
         return group_results
 
     def throw_on_failed(self):
+        """
+        Throws an exception if last results has failed commands, when warning mode disabled
+        :return: None
+        """
         executor = self._get_active_executor()
-        if executor.warn:
+        if len(executor.results) == 0 or executor.warn:
             return
         group_results = executor.get_merged_nodegroup_results()
         if len(group_results.failed) > 0:
@@ -238,7 +248,6 @@ class RemoteExecutor:
                 for command in executor.connections_queue_history[-1][conn]:
                     if not command[0][2].get('warn', False):
                         raise fabric.group.GroupException(group_results)
-
 
     def get_last_results_str(self):
         batched_results = self.get_last_results()
