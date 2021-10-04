@@ -649,13 +649,13 @@ def detect_active_interface(group: NodeGroup):
     with RemoteExecutor(group.cluster.log) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             detect_interface_by_address(node['connection'], node['internal_address'])
-    for host, host_results in exe.get_last_results().items():
+    for cxn, host_results in exe.get_last_results().items():
         try:
             interface = list(host_results.values())[0].stdout.strip()
         except Exception:
             interface = None
-        group.cluster.context['nodes'][host]['online'] = True
-        group.cluster.context['nodes'][host]['active_interface'] = interface
+        group.cluster.context['nodes'][cxn.host]['online'] = True
+        group.cluster.context['nodes'][cxn.host]['active_interface'] = interface
 
     return exe.get_last_results_str()
 

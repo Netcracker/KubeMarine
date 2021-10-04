@@ -62,7 +62,6 @@ def install(group):
     patch_path = utils.get_resource_absolute_path("./resources/drop_ins/haproxy.conf", script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     enable(group)
-
     return exe.get_last_results_str()
 
 
