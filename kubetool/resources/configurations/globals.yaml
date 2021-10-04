@@ -4,7 +4,7 @@ kubernetes_versions:
   v1.17:
     supported: false
   v1.18:
-    supported: true
+    supported: false
   v1.19:
     supported: false
   v1.20:
@@ -276,8 +276,8 @@ compatibility_map:
         version: v1.20.0
         sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
       v1.22.2:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+        version: v1.22.0
+        sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
     kubeadm:
       v1.18.4:
         sha1: d17b585fe64fcb0bd21fad724a9f899d214e665f
@@ -343,8 +343,8 @@ compatibility_map:
         version: v3.19.1
         sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
       v1.22:
-        version: v3.20.1
-        sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
+        version: v3.19.1
+        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
     nginx-ingress-controller:
       v1.18:
         image-name: k8s-artifacts-prod/ingress-nginx/controller
@@ -364,7 +364,7 @@ compatibility_map:
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: k8s.gcr.io/ingress-nginx/controller
-        version: v0.49.2
+        version: v0.48.1
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
       v1.18:
