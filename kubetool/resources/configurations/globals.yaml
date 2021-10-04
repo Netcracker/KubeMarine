@@ -11,6 +11,8 @@ kubernetes_versions:
     supported: true
   v1.21:
     supported: true
+  v1.22:
+    supported: true
 
 connection:
   defaults:
@@ -127,6 +129,10 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
+      v1.22.2:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
     containerd:
       v1.18.4:
         version_rhel: 1.4.6*
@@ -150,6 +156,10 @@ compatibility_map:
         version_rhel8: 1.4.8*
         version_debian: 1.4.6*
       v1.21.2:
+        version_rhel: 1.4.6*
+        version_rhel8: 1.4.8*
+        version_debian: 1.4.6*
+      v1.22.2:
         version_rhel: 1.4.6*
         version_rhel8: 1.4.8*
         version_debian: 1.4.6*
@@ -179,6 +189,10 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: 3.0.1*
         version_debian: 100:3.1.2*
+      v1.22.2:
+        version_rhel: 1.6.4*
+        version_rhel8: 3.0.1*
+        version_debian: 100:3.1.2*
     haproxy:
       v1.18.4:
         version_rhel: 1.8*
@@ -205,6 +219,10 @@ compatibility_map:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
+      v1.22.2:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
     keepalived:
       v1.18.4:
         version_rhel: 1.3*
@@ -228,9 +246,13 @@ compatibility_map:
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
       v1.21.2:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.22.2:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
     crictl:
       v1.18.4:
         version: v1.20.0
@@ -253,6 +275,9 @@ compatibility_map:
       v1.21.2:
         version: v1.20.0
         sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+      v1.22.2:
+        version: v1.20.0
+        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
     kubeadm:
       v1.18.4:
         sha1: d17b585fe64fcb0bd21fad724a9f899d214e665f
@@ -268,6 +293,8 @@ compatibility_map:
         sha1: 4c025ebf29eb7aa32012a1c8f81e7b85df2bf92f
       v1.21.2:
         sha1: cbb07d380de4ef73d43d594a1055839fa9753138
+      v1.22.2:
+        sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
     kubelet:
       v1.18.4:
         sha1: 5ca1b807bf7a4a8c8737c57437354cf7299eaa90
@@ -283,6 +310,8 @@ compatibility_map:
         sha1: 25ca655cce261cdbeb7c3337185f669ee0b53cc3
       v1.21.2:
         sha1: 024e458aa0f74cba6b773401b779590437812fc6
+      v1.22.2:
+        sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
     kubectl:
       v1.18.4:
         sha1: 1351db2b0b92bb0c46d6e18eda7b3063e7e044bf
@@ -298,6 +327,8 @@ compatibility_map:
         sha1: 202e00c35fa2a4085135061e5d0965ebbffed19c
       v1.21.2:
         sha1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468
+      v1.22.2:
+        sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
     calico:
       v1.18:
         version: v3.16.1
@@ -311,6 +342,9 @@ compatibility_map:
       v1.21:
         version: v3.19.1
         sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+      v1.22:
+        version: v3.20.1
+        sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
     nginx-ingress-controller:
       v1.18:
         image-name: k8s-artifacts-prod/ingress-nginx/controller
@@ -328,6 +362,10 @@ compatibility_map:
         image-name: k8s.gcr.io/ingress-nginx/controller
         version: v0.48.1
         pod-name: ingress-nginx-controller
+      v1.22:
+        image-name: k8s.gcr.io/ingress-nginx/controller
+        version: v0.49.2
+        pod-name: ingress-nginx-controller
     kubernetes-dashboard:
       v1.18:
         version: v2.0.1
@@ -341,6 +379,9 @@ compatibility_map:
       v1.21:
         version: v2.3.1
         metrics-scraper-version: v1.0.6
+      v1.22:
+        version: v2.3.1
+        metrics-scraper-version: v1.0.6
     local-path-provisioner:
       v1.18:
         version: v0.0.19
@@ -349,6 +390,8 @@ compatibility_map:
       v1.20:
         version: v0.0.19
       v1.21:
+        version: v0.0.19
+      v1.22:
         version: v0.0.19
   hardware:
     minimal:
