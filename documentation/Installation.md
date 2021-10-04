@@ -1843,7 +1843,36 @@ services:
 The `containerRuntime` parameter configures a particular container runtime implementation used for kubernetes.
 The available values are `docker` and `containerd`. By default `containerd` is used.
 
-When docker is used as a container runtime, it is possible to additionally define the `dockerConfig` section, 
+When containerd is used as a container runtime, it is possible to additionally define the `containerdConfig` section,
+which contains the parameters passed to `config.toml`, for example:
+
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri":
+        sandbox_image: k8s.gcr.io/pause:3.2
+      plugins."io.containerd.grpc.v1.cri".registry.mirrors."artifactory.example.com:5443":
+        endpoint:
+        - https://artifactory.example.com:5443
+```
+
+Note how `containerdConfig` section reflects the toml format structure.
+For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/master/docs/cri/config.md](https://github.com/containerd/containerd/blob/master/docs/cri/config.md).
+By default, the following parameters are used for `containerdConfig`:
+
+```yaml
+services:
+  cri:
+    containerdConfig:
+      version: 2
+```
+
+**Note**: When containerd is used, `crictl` binary and `podman` package are also installed and configured as required.
+
+Alternatively, it is possible to use docker as a container runtime for kubernetes by setting `docker` value for `containerRuntime` parameter.
+When docker is used as a container runtime, it is possible to additionally define the `dockerConfig` section,
 which contains the parameters passed to `daemon.json`, for example:
 
 ```yaml
@@ -1862,34 +1891,7 @@ For more information about Docker daemon parameters, refer to the official docke
 
 **Note**: After applying the parameters, the docker is restarted on all nodes in the cluster.
 
-Alternatively, it is possible to use containerd as a container runtime for kubernetes by setting `containerd` value for `containerRuntime` parameter.
-When containerd is used as a container runtime, it is possible to additionally define the `containerdConfig` section,
-which contains the parameters passed to `config.toml`, for example:
-
-```yaml
-services:
-  cri:
-    containerRuntime: containerd
-    containerdConfig:
-      plugins."io.containerd.grpc.v1.cri":
-        sandbox_image: k8s.gcr.io/pause:3.2
-      plugins."io.containerd.grpc.v1.cri".registry.mirrors."artifactory.example.com:5443":
-        endpoint:
-        - https://artifactory.example.com:5443
-```
-
-Note how `containerdConfig` section reflects the toml format structure. 
-For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/master/docs/cri/config.md](https://github.com/containerd/containerd/blob/master/docs/cri/config.md).
-By default, the following parameters are used for `containerdConfig`:
-
-```yaml
-services:
-  cri:
-    containerdConfig:
-      version: 2
-```
-
-**Note**: When containerd is used, `crictl` binary and `podman` package are also installed and configured as required.
+**Note**: Do not omit the `containerRuntime` parameter in cluster.yaml if you include `dockerConfig` or `containerdConfig` in `cri` section
 
 #### modprobe
 
