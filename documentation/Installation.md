@@ -114,6 +114,7 @@ Ensure the following requirements are met:
 **Operating System**
 * Linux
 * MacOS
+* Windows
 
 **Preinstalled Software**
 * OpenSSL library
