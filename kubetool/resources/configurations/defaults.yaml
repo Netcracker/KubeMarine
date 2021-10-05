@@ -26,7 +26,7 @@ services:
       extraArgs:
         enable-admission-plugins: NodeRestriction
         profiling: "false"
-        audit-log-path: /var/log/apiserver/audit.log
+        audit-log-path: /var/log/audit.log
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"

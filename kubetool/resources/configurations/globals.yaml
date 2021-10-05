@@ -343,8 +343,8 @@ compatibility_map:
         version: v3.19.1
         sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
       v1.22:
-        version: v3.19.1
-        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+        version: v3.20.1
+        sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
     nginx-ingress-controller:
       v1.18:
         image-name: k8s-artifacts-prod/ingress-nginx/controller
@@ -364,7 +364,7 @@ compatibility_map:
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: k8s.gcr.io/ingress-nginx/controller
-        version: v0.48.1
+        version: v1.0.3
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
       v1.18:
