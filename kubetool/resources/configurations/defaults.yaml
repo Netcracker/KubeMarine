@@ -356,8 +356,8 @@ plugins:
       IP_AUTODETECTION_METHOD: first-found
       CALICO_IPV4POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
       CALICO_IPV4POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
-      CALICO_IPV4POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv4_pools"][0] }}'
-      CALICO_IPV6POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv6_pools"][0] }}'
+      CALICO_IPV4POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv4"]["ipv4_pools"][0] }}'
+      CALICO_IPV6POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv6"]["ipv6_pools"][0] }}'
       IP6: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
       IP6_AUTODETECTION_METHOD: first-found
       FELIX_IPV6SUPPORT: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
@@ -370,15 +370,19 @@ plugins:
     cni:
       image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
-        assign_ipv4: '{% if services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
-        assign_ipv6: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
-        ipv4_pools:
-          - '{% if services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}192.168.0.0/16{% endif %}'
-          - default-ipv4-ippool
-        ipv6_pools:
-          - '{% if not services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}fd02::/80{% endif %}'
-          - default-ipv6-ippool
-        type: calico-ipam
+        ipv4:
+          assign_ipv4: 'true'
+          ipv4_pools:
+            - '{% if services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}192.168.0.0/16{% endif %}'
+            - default-ipv4-ippool
+          type: calico-ipam
+        ipv6:
+          assign_ipv4: 'false'
+          assign_ipv6: 'true'
+          ipv6_pools:
+            - '{% if not services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}fd02::/80{% endif %}'
+            - default-ipv6-ippool
+          type: calico-ipam
     node:
       image: 'calico/node:{{ plugins.calico.version }}'
     kube-controllers:

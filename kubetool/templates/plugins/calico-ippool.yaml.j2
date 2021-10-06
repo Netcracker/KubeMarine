@@ -3,7 +3,7 @@ kind: IPPool
 metadata:
   name: {% if services.kubeadm.networking.podSubnet|isipv4 %}default-ipv4-ippool{% else %}default-ipv6-ippool{% endif %}
 spec:
-  cidr: {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4_pools'][0] }}{% else %}{{ plugins['calico']['cni']['ipam']['ipv6_pools'][0] }}{% endif %}
+  cidr: {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4']['ipv4_pools'][0] }}{% else %}{{ plugins['calico']['cni']['ipam']['ipv6']['ipv6_pools'][0] }}{% endif %}
   natOutgoing: {{ plugins['calico']['natOutgoing'] }}
   nodeSelector: all()
 {% if services.kubeadm.networking.podSubnet|isipv4 %}

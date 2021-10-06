@@ -358,14 +358,19 @@ plugins:
     cni:
       image: calico/cni:v3.10.1
       ipam:
-        assign_ipv4: true
-        assign_ipv6: false
-        ipv4_pools:
-          - 192.168.0.0/24
+        ipv4:
+          assign_ipv4: 'true'
+          ipv4_pools:
+          - 10.128.0.0/14
           - default-ipv4-ippool
-        ipv6_pools:
+          type: calico-ipam
+        ipv6:
+          assign_ipv4: 'false'
+          assign_ipv6: 'true'
+          ipv6_pools:
+          - fd02::/80
           - default-ipv6-ippool
-        type: calico-ipam
+          type: calico-ipam
     node:
       image: calico/node:v3.10.1
     kube-controllers:
