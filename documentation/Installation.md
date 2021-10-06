@@ -275,7 +275,7 @@ Mount point:
 ```
 /var/lib/etcd
 ```
-[General H/W recommendations](https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/hardware.md)
+[General H/W recommendations](https://etcd.io/docs/latest/op-guide/hardware/)
 
 # Inventory Preparation
 
