@@ -4479,10 +4479,10 @@ The tables below shows the correspondence of versions that are supported and is 
     <th rowspan="2">Note</th>
   </tr>
   <tr>
-    <th>CentOS RHEL<br>Oracle Linux 7.5+</th>
+    <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
-    <th>Oracle Linux 7.X</th>
+    <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
 <tbody>
@@ -4645,10 +4645,10 @@ The tables below shows the correspondence of versions that are supported and is 
     <th rowspan="2">Note</th>
   </tr>
   <tr>
-    <th>CentOS RHEL<br>Oracle Linux 7.5+</th>
+    <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
-    <th>Oracle Linux 7.X</th>
+    <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
 <tbody>
@@ -4809,10 +4809,10 @@ The tables below shows the correspondence of versions that are supported and is 
     <th rowspan="2">Note</th>
   </tr>
   <tr>
-    <th>CentOS RHEL<br>Oracle Linux 7.5+</th>
+    <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
-    <th>Oracle Linux 7.x</th>
+    <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
 <tbody>
