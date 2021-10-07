@@ -18,7 +18,7 @@ This library provides powerfull CLI commands, as well as can be customized via P
   - [manage_psp](documentation/Maintenance.md#manage-psp-procedure)
 - [Single cluster inventory](documentation/Installation.md#configuration) for all operations, highly customizable
 - Default values of all parameters in configurations with a minimum of required parameters
-- [Control plains balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP
+- [Control planes balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP
 - Ability to [resume or skip specific task](documentation/Installation.md#tasks-list-redefinition) without re-running entire pipeline
 - [Pre-built plugins](documentation/Installation.md#predefined-plugins) out of the box and [custom plugins](documentation/Installation.md#custom-plugins-installation-procedures) support
 - Support for [executing in closed environments](documentation/Installation.md#installation-without-internet-resources) with private registries
