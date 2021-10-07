@@ -287,7 +287,7 @@ spec:
           args:
             - /nginx-ingress-controller
             - --election-id=ingress-controller-leader
-            - --controller-class=k8s.io/ingress-nginx
+            - --ingress-class=k8s.io/ingress-nginx
              - --configmap=ingress-nginx/ingress-nginx-controller
             {% if plugins['nginx-ingress-controller']['controller']['ssl']['enableSslPassthrough'] is true -%}
             - --enable-ssl-passthrough
@@ -295,6 +295,7 @@ spec:
             {% if plugins['nginx-ingress-controller']['controller']['ssl']['default-certificate'] is defined -%}
             - --default-ssl-certificate=kube-system/default-ingress-cert
             {%- endif %}
+            - --watch-ingress-without-class=true
           securityContext:
             capabilities:
               drop:
@@ -347,3 +348,26 @@ spec:
         {{ plugins['nginx-ingress-controller']['controller']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
       {%- endif %}
       serviceAccountName: ingress-nginx
+      terminationGracePeriodSeconds: 300
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: ingress-nginx-admission
+---
+# Source: ingress-nginx/templates/controller-ingressclass.yaml
+# We don't support namespaced ingressClass yet
+# So a ClusterRole and a ClusterRoleBinding is required
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-4.0.4
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 1.0.3
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: nginx
+  namespace: ingress-nginx
+spec:
+  controller: k8s.io/ingress-nginx

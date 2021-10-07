@@ -356,7 +356,7 @@ compatibility_map:
         pod-name: ingress-nginx-controller
       v1.20:
         image-name: k8s.gcr.io/ingress-nginx/controller
-        version: v0.43.0
+        version: v1.0.3
         pod-name: ingress-nginx-controller
       v1.21:
         image-name: k8s.gcr.io/ingress-nginx/controller
