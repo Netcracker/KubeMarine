@@ -4461,15 +4461,15 @@ The tables below shows the correspondence of versions that are supported and is 
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.19.3
 
-<table style="undefined;table-layout: fixed; width: 1312px">
+<table style="undefined;table-layout: fixed; width: 1170px">
 <colgroup>
 <col style="width: 60px">
-<col style="width: 389px">
-<col style="width: 121px">
-<col style="width: 113px">
-<col style="width: 95px">
+<col style="width: 390px">
+<col style="width: 128px">
+<col style="width: 120px">
+<col style="width: 99px">
 <col style="width: 100px">
-<col style="width: 434px">
+<col style="width: 273px">
 </colgroup>
 <thead>
   <tr>
@@ -4604,26 +4604,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="3">0.35.0</td>
-    <td></td>
+    <td colspan="4">0.35.0</td>
     <td></td>
   </tr>
   <tr>
     <td>kubernetesui/dashboard</td>
-    <td colspan="3">v2.0.4</td>
-    <td></td>
+    <td colspan="4">v2.0.4</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>kubernetesui/metrics-scraper</td>
-    <td colspan="3">v1.0.4</td>
-    <td></td>
+    <td colspan="4">v1.0.4</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="3">v0.0.19</td>
-    <td></td>
+    <td colspan="4">v0.0.19</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
