@@ -49,6 +49,12 @@ class RemoteExecutor:
             GRE.reset(self.previous_context_token)
         if self.connections_queue:
             self.flush()
+            # Throw any exceptions ONLY when no handlers waits for results. For non-queued results any exceptions should
+            # handled via _do() or other parent error handling mechanism. When queue flushed inside RemoteExecutor
+            # context block, then nobody can handle results, so RemoteExecutor should throw an error by itself.
+            # TODO: merge results/exceptions handling with kubetool.core.group.NodeGroup._do_with_wa to avoid code dup
+            if not self.warn:
+                self.throw_on_failed()
 
     def _get_active_executor(self):
         executor = GRE.get()
@@ -234,11 +240,11 @@ class RemoteExecutor:
 
     def throw_on_failed(self):
         """
-        Throws an exception if last results has failed commands, when warning mode disabled
+        Throws an exception if last results has failed commands. Ignores enabled executor.warn option.
         :return: None
         """
         executor = self._get_active_executor()
-        if len(executor.results) == 0 or executor.warn:
+        if len(executor.results) == 0:
             return
         group_results = executor.get_merged_nodegroup_results()
         if len(group_results.failed) > 0:
@@ -321,7 +327,5 @@ class RemoteExecutor:
         executor.connections_queue_history.append(executor.connections_queue)
         executor.reset_queue()
         executor.results.append(batch_results)
-
-        self.throw_on_failed()
 
         return batch_results

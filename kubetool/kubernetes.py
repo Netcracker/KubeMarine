@@ -1051,7 +1051,8 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
-                images_prepull(nodes[node_i])
+                if node_i < len(nodes):
+                    images_prepull(nodes[node_i])
 
     return exe.get_last_results_str()
 
