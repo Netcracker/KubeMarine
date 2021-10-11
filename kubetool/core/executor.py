@@ -52,7 +52,7 @@ class RemoteExecutor:
             # Throw any exceptions ONLY when no handlers waits for results. For non-queued results any exceptions should
             # handled via _do() or other parent error handling mechanism. When queue flushed inside RemoteExecutor
             # context block, then nobody can handle results, so RemoteExecutor should throw an error by itself.
-            # TODO: merge results/exceptions handling with kubetool.core.group.NodeGroup._do_with_wa to avoid code dup
+            # TODO: Merge results/exceptions handling with kubetool.core.group.NodeGroup._do_with_wa to avoid code dup
             if not self.warn:
                 self.throw_on_failed()
 
@@ -102,7 +102,7 @@ class RemoteExecutor:
             else:
                 conn_results[tokens[0]] = result
             reparsed_results[conns_by_host[host]] = conn_results
-        # TODO: run and collect callbacks and wait for them
+        # TODO: In long term run, collect callbacks and wait for them
         return reparsed_results
 
     def _merge_actions(self, actions):
@@ -197,7 +197,7 @@ class RemoteExecutor:
         Merges last tokenized results to NodeGroupResult
         :return: None or NodeGroupResult
         """
-        # TODO: get rid of this WA import, added to avoid circular import problem
+        # TODO: Get rid of this WA import, added to avoid circular import problem
         from kubetool.core.group import NodeGroupResult
         executor = self._get_active_executor()
         if len(executor.results) == 0:

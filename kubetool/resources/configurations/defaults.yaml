@@ -428,7 +428,7 @@ plugins:
         hostPort: 443
         protocol: TCP
 
-  # todo: support hostPort for haproxy-ingress
+  # TODO: support hostPort for haproxy-ingress
   haproxy-ingress-controller:
     install: false
     installation:

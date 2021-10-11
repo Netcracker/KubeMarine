@@ -97,7 +97,7 @@ Check procedure execution form CLI can be started with the following command:
 ./kubetools check paas
 ```
 
-It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](/documentation/public/Installation.md#tasks-list-redefinition) in _Kubetools Installation Procedure_.
+It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubetools Installation Procedure_.
 
 ### Check Procedures
 

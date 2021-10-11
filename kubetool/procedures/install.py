@@ -120,7 +120,7 @@ def system_prepare_dns_resolv_conf(cluster):
 
 def system_prepare_dns_etc_hosts(cluster):
     config = system.generate_etc_hosts_config(cluster.inventory, cluster)
-    # TODO: here support custom hosts definition from cluster.yml
+
     utils.dump_file(cluster, config, 'etc_hosts')
     cluster.log.debug("\nUploading...")
 

@@ -385,11 +385,11 @@ A toleration "matches" a taint if the keys are the same and the effects are the 
 All the installation configurations for the cluster are in a single inventory file. It is recommended to name this file as **cluster.yaml**.
 
 For more information about the structure of the inventory and how to specify the values, refer to the following configuration examples:
-* [Minimal Full-HA Inventory Example](examples/cluster.yaml/minimal-cluster.yaml) - It provides the minimum set of parameters required to install a cluster out of the box.
-* [Typical Full-HA Inventory Example](examples/cluster.yaml/typical-cluster.yaml) - It provides a set of parameters that you probably want to configure.
-* [Full Full-HA Inventory Example](examples/cluster.yaml/full-cluster.yaml) - It provides almost all the possible parameters that you can configure.
-* [Minimal All-in-one Inventory Example](examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
-* [Minimal Mini-HA Inventory Example](examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
+* [Minimal Full-HA Inventory Example](../examples/cluster.yaml/minimal-cluster.yaml) - It provides the minimum set of parameters required to install a cluster out of the box.
+* [Typical Full-HA Inventory Example](../examples/cluster.yaml/typical-cluster.yaml) - It provides a set of parameters that you probably want to configure.
+* [Full Full-HA Inventory Example](../examples/cluster.yaml/full-cluster.yaml) - It provides almost all the possible parameters that you can configure.
+* [Minimal All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
+* [Minimal Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
 
 These files consists of the following sections.
 
@@ -481,7 +481,7 @@ nodes:
       region: europe
 ```
 
-The example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
 ### cluster_name
 
@@ -1296,7 +1296,7 @@ The following parameters are available:
 
 **Note**: Turning off and then turning on SELinux can lead to the loss of security rules, which were configured earlier.
 
-For more information about SELinux, refer to the _Official RedHat SELinux Configuration Documentation_ at [https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/4/html/Reference_Guide/s2-SELinux-files-etc.html](https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/4/html/Reference_Guide/s2-SELinux-files-etc.html).
+For more information about SELinux, refer to the _Official RedHat SELinux Configuration Documentation_ at [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/selinux_users_and_administrators_guide/index](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/selinux_users_and_administrators_guide/index).
 
 The procedure for applying SELinux settings is as follows:
 
@@ -1443,7 +1443,7 @@ You can choose any one action from the following types of actions:
 
 All these actions are performed in a sequence as described above. You can specify only some types of actions or all at once. Short and full configuration formats are available.
 
-**Warning**: Before you start working, ensure to check that you have all the necessary dependencies in the repositories you are using. You can configure the necessary repositories in the [yum](#yum) section of inventory.
+**Warning**: Before you start working, ensure to check that you have all the necessary dependencies in the repositories you are using. You can configure the necessary repositories in the [package_manager](#package_manager) section of inventory.
 
 **Warning**: This section is specific to different OS families. Ensure that you use the proper definition format for your OS distributive - it may differ from the presented examples in this document.
 
@@ -1860,7 +1860,7 @@ services:
 ```
 
 Note how `containerdConfig` section reflects the toml format structure.
-For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/master/docs/cri/config.md](https://github.com/containerd/containerd/blob/master/docs/cri/config.md).
+For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
 By default, the following parameters are used for `containerdConfig`:
 
 ```yaml
@@ -2052,7 +2052,7 @@ services:
         - ntp2.example.com iburst
 ```
 
-An example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
 Synchronization is configured with the` prepare.ntp.chrony` task. The task performs the following:
 * Generates the `chrony.conf` file and uploads it to the `/etc/chrony` directory on all cluster hosts. If dumping is enabled, the config dump is saved.
@@ -2230,9 +2230,9 @@ This produces the following result:
 This section contains the Configmap parameters that are applied to the Coredns service. By default the following configs are used:
 
 * Corefile - The main Coredns config, which is converted into a template in accordance with the specified parameters.
-* Hosts - Hosts file obtained in accordance with [etc_hosts inventory parameter](#etc_hosts). The contents of this file are automatically added to the inventory, if not specified manually.
+* Hosts - Hosts file obtained in accordance with [etc_hosts](#etc_hosts) inventory parameter. The contents of this file are automatically added to the inventory, if not specified manually.
 
-Before working with the Corefile, refer to the [official Coredns plugins documentation at https://coredns.io/plugins/](https://coredns.io/plugins/).
+Before working with the Corefile, refer to the official Coredns plugins documentation at [https://coredns.io/plugins/](https://coredns.io/plugins/).
 
 The Corefile consists of the settings applied for a specific destination. By default, all settings are applied for `.:53` destination. 
 For example:
@@ -2709,9 +2709,9 @@ plugins:
       image: calico/node:v3.10.1
 ```
 
-An example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
-**Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size). [More details](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost)
+**Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see mor details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
 
 **Note**: If the cluster size is more than 50 nodes, it is recommended to enable the Calico Typha daemon and adjust the size of its replicas.
 
@@ -2781,7 +2781,7 @@ plugins:
       image: quay.io/coreos/flannel:v0.11.0-amd64
 ```
 
-An example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
 The plugin configuration supports the `image` parameter. The `image` parameter specifies the string for the Flannel image. The default value is `quay.io/coreos/flannel:v0.11.0-amd64`.
 
@@ -2822,7 +2822,7 @@ plugins:
       image: k8s-artifacts-prod/ingress-nginx/controller:v0.34.1
 ```
 
-An example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
 The plugin configuration supports the following parameters:
 
@@ -2918,7 +2918,7 @@ plugins:
       image: k8s.gcr.io/defaultbackend:1.0
 ```
 
-An example is also available in [Full Inventory Example](examples/cluster.yaml/full-cluster.yaml).
+An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
 The plugin configuration supports the following parameters:
 
@@ -4184,7 +4184,7 @@ not need to consider the sequence for listing the tasks. You can do it in any se
 ## Logging
 
 Kubetools has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubetools Logging](documentation/public/Logging.md) section.
+For more information, refer to the [Configuring Kubetools Logging](Logging.md) section.
 
 ## Dump Files
 

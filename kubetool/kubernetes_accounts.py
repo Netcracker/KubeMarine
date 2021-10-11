@@ -59,7 +59,6 @@ def install(cluster):
         cluster.log.debug("Applying yaml...")
         cluster.nodes['master'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False)
 
-        # TODO: load all via api
         cluster.log.debug('Loading token...')
         load_tokens_cmd = 'kubectl -n kube-system get secret ' \
                           '$(sudo kubectl -n kube-system get sa %s -o \'jsonpath={.secrets[0].name}\') ' \
