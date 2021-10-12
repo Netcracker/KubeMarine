@@ -461,7 +461,7 @@ def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
 
 
 def get_reboot_history(group: NodeGroup):
-    return group.run('last reboot')
+    return group.sudo('last reboot')
 
 
 def perform_group_reboot(group: NodeGroup):
