@@ -1,5 +1,5 @@
 ---
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: front-end
@@ -7,9 +7,12 @@ metadata:
 spec:
   rules:
   - host: {{ cluster_name }}
-    http:
+      http:
       paths:
       - path: /
+        pathType: Prefix
         backend:
-          serviceName: front-end
-          servicePort: 80
+           service:
+             name: front-end
+             port:
+              number: 80
