@@ -66,17 +66,22 @@ def run(tasks,
     return cluster
 
 
+def create_empty_context(procedure=None):
+    return {
+        "execution_arguments": {},
+        "proceeded_tasks": [],
+        "nodes": {},
+        'initial_procedure': procedure
+    }
+
+
 def create_context(execution_arguments, procedure=None):
 
     if isinstance(execution_arguments, argparse.Namespace):
         execution_arguments = vars(execution_arguments)
 
-    context = {
-        "execution_arguments": deepcopy(execution_arguments),
-        "proceeded_tasks": [],
-        "nodes": {},
-        'initial_procedure': procedure
-    }
+    context = create_empty_context(procedure=procedure)
+    context["execution_arguments"] = deepcopy(execution_arguments)
 
     if context['execution_arguments'].get('exclude_cumulative_points_methods', '').strip() != '':
         context['execution_arguments']['exclude_cumulative_points_methods'] = \

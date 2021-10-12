@@ -24,6 +24,7 @@ This library provides powerfull CLI commands, as well as can be customized via P
 - Support for [executing in closed environments](documentation/Installation.md#installation-without-internet-resources) with private registries
 - Extended [logging](documentation/Logging.md), configs [dumping](documentation/Installation.md#dump-files)
 - Build supported as a package, container and binary
+- Package extension with [open extension API](documentation/PackageExtension.md)
 - Open source
 
 
