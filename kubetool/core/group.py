@@ -403,7 +403,7 @@ class NodeGroup:
             self.disconnect(list(left_nodes.keys()))
 
             self.cluster.log.verbose("Attempting to connect to nodes...")
-            results.update(self._do("run", left_nodes, True, "last reboot", timeout=delay_period))
+            results.update(self._do("sudo", left_nodes, True, "last reboot", timeout=delay_period))
             left_nodes = {host: left_nodes[host] for host, result in results.items()
                           if isinstance(result, Exception) or result == initial_boot_history.get(self.nodes[host])}
 
