@@ -43,6 +43,8 @@ The information about the procedures for nodes is described in the following sec
 
 ## Upgrade Procedure
 
+**Warning**: When upgrading to Kubernetes version 1.22 and higher, these api versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` no longer work, you will need to update your services to the new version of api `networking.k8s.io/v1`
+
 **Warning**: Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 
 **Warning**: The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21. For more information about `supported` versions, see [Lifecycle Policy](LifecyclePolicy.md#Supported-release-history).
