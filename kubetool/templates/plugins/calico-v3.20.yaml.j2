@@ -30,7 +30,7 @@ data:
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
-          "ipam": {{ plugins['calico']['cni']['ipam']|tojson|safe }},
+          "ipam": {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4']|tojson|safe }},{% else %}{{ plugins['calico']['cni']['ipam']['ipv6']|tojson|safe }},{% endif %}
           "policy": {
               "type": "k8s"
           },
