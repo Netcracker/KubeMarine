@@ -107,7 +107,7 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
     if cluster.context['initial_procedure'] == 'add_node':
         common_group = common_group.get_new_nodes()
 
-    # ! ATTENTION, in the further code there is no error and nothing is missing !
+    # ! In the further code there is no error and nothing is missing !
     # Here a long shell command is intentionally constructed and executed at once to speed up work
     # At the same time, in the middle of the construction of the command, a file may suddenly be uploaded and then
     # the command will be executed in two runs instead of single run
@@ -127,12 +127,12 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
         cluster.log.verbose('Installation via sftp upload detected')
         cluster.log.debug(common_group.sudo(remote_commands))
         remote_commands = ''
-        # todo: use sha1 from configfile instead of calculating if provided?
+        # TODO: Possible use SHA1 from inventory instead of calculating if provided?
         local_path = utils.get_resource_absolute_path(config['source'], script_relative=True)
         binary = bool(config.get('binary', True))
         common_group.put(local_path, destination, sudo=True, binary=binary)
 
-        # TODO: !!! HALT IF FILE ALREADY EXISTS ON REMOTE MACHINES !!!
+        # TODO: Do not upload local files if they already exists on remote machines
 
     remote_commands += 'sudo chmod %s %s' % (config['mode'], destination)
     remote_commands += ' && sudo chown %s %s' % (config['owner'], destination)

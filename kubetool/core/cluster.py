@@ -248,7 +248,7 @@ class KubernetesCluster(Environment):
 
     def finish(self):
         self.gather_facts('after')
-        # TODO: rewrite the following lines to deenrichment functions like enrichment mechanism
+        # TODO: rewrite the following lines as deenrichment functions like common enrichment mechanism
         from kubetool.procedures import remove_node
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)
         prepared_inventory = defaults.prepare_for_dump(prepared_inventory, copy=False)
@@ -270,7 +270,7 @@ class KubernetesCluster(Environment):
         if '{{' in value and '}}' in value and re.search(jinja_query_regex, value):
             matches = re.findall(jinja_query_regex, value)
             for match in matches:
-                # TODO: rewrite to correct way of match replacement: now it can lead to "{raw}{raw}xxx.." bug
+                # TODO: rewrite to correct way of match replacement: now it can cause "{raw}{raw}xxx.." circular bug
                 value = value.replace(match, '{% raw %}'+match+'{% endraw %}')
         return value
 

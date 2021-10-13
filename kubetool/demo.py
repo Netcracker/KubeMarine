@@ -36,7 +36,7 @@ class FakeShell:
         self.results.append(result)
 
     def find(self, do_type, args, kwargs):
-        # TODO: support kwargs
+        # TODO: Support kwargs
         if isinstance(args, tuple):
             args = list(args)
         for i, item in enumerate(self.results):
@@ -51,7 +51,7 @@ class FakeShell:
 
     # covered by test.test_demo.TestFakeShell.test_calculate_calls
     def history_find(self, do_type, args):
-        # TODO: support kwargs
+        # TODO: Support kwargs
         result = []
         if isinstance(args, tuple):
             args = list(args)

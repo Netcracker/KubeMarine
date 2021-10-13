@@ -152,7 +152,6 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
         detected_grouped_packages = {}
         for host, packages in detected_packages_results.items():
             if '\n' in packages:
-                # TODO: are we really need this???
                 # this is the test, when package name containes multiple names,
                 # e.g. docker-ce and docker-cli for "docker-ce-*" query
                 packages = packages.split('\n')

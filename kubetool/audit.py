@@ -17,7 +17,9 @@ def apply_audit_rules(group: NodeGroup) -> NodeGroupResult or None:
 
     log = group.cluster.log
 
-    # TODO: fix this - currently audit preinstalled only on Centos/RHEL, but not presented on Ubuntu/Debian
+    # TODO: Support audit configuration on Ubuntu/Debian
+    # TODO: Remove docker/containerd rules if it's not installed
+    # TODO: Remove audit rules from kubeapi config in inventory if audit is disabled
     if system.get_os_family(group.cluster) not in ['rhel', 'rhel8']:
         log.debug('Skipped - audit not supported on debian os family')
         return

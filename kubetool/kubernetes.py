@@ -464,7 +464,7 @@ def init_first_master(group):
     master_join_command = " ".join([x.replace("\\", "").strip() for x in master_lines])
     worker_join_command = " ".join([x.replace("\\", "").strip() for x in worker_lines])
 
-    # TODO: get rid of this code and use get_join_dict() method
+    # TODO: Get rid of this code and use get_join_dict() method
     args = master_join_command.split("--")
     join_dict = {}
     for arg in args:
@@ -580,7 +580,8 @@ def apply_labels(group):
     log = group.cluster.log
 
     log.debug("Applying additional labels for nodes")
-    # TODO: support "--overwrite" switch? maybe also add labels validation
+    # TODO: Add "--overwrite-labels" switch
+    # TODO: Add labels validation after applying
     with RemoteExecutor(log):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             if "labels" not in node:
@@ -595,7 +596,7 @@ def apply_labels(group):
 
     return group.cluster.nodes["master"].get_first_member() \
         .sudo("kubectl get nodes --show-labels")
-    # TODO: maybe wait for pods on workers?
+    # TODO: Add wait for pods on worker nodes
 
 
 def apply_taints(group):
@@ -1051,7 +1052,8 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
-                images_prepull(nodes[node_i])
+                if node_i < len(nodes):
+                    images_prepull(nodes[node_i])
 
     return exe.get_last_results_str()
 

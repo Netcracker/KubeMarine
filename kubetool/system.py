@@ -22,7 +22,7 @@ def verify_inventory(inventory, cluster):
              cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP')):
         raise Exception('chrony and timesyncd configured both at the same time')
 
-    # TODO: verify selinux and apparmor are not enabled at the same time
+    # TODO: Add validation that selinux and apparmor are not enabled at the same time
 
     return inventory
 
@@ -148,7 +148,6 @@ def get_system_packages(cluster):
 def detect_os_family(cluster, suppress_exceptions=False):
     group = cluster.nodes['all'].get_online_nodes()
     if cluster.context.get("initial_procedure") == "remove_node":
-        # TODO: get rid of this construction
         active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
         group = cluster.nodes['all'].wait_active_nodes(timeout=active_timeout)
 
@@ -209,8 +208,8 @@ def detect_os_family(cluster, suppress_exceptions=False):
             'family': os_family
         }
 
-    # todo: this is not good, we need to know if "old" nodes have different OS family
-    #   maybe we should not use global static OS and use group-wise calculated OS?
+    # TODO: We need to know if "old" nodes have different OS family,
+    #       maybe we should not use global static OS and use group-wise calculated OS?
     for node in group.get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
         os_family = group.cluster.context["nodes"][node['connect_to']]["os"]['family']
         if os_family == 'unknown' and not suppress_exceptions:
@@ -262,7 +261,7 @@ def update_resolv_conf(group, config=None):
     if config is None:
         raise Exception("Data can't be empty")
 
-    # TODO: use jinja template
+    # TODO: Use Jinja template
     buffer = io.StringIO()
     if config.get("search") is not None:
         buffer.write("search %s\n" % config["search"])
@@ -461,7 +460,7 @@ def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
 
 
 def get_reboot_history(group: NodeGroup):
-    return group.run('last reboot')
+    return group.sudo('last reboot')
 
 
 def perform_group_reboot(group: NodeGroup):
@@ -479,7 +478,7 @@ def reload_systemctl(group):
 
 
 def add_to_path(group, string):
-    # TODO: write to .bash_profile
+    # TODO: Also update PATH in ~/.bash_profile
     group.sudo("export PATH=$PATH:%s" % string)
 
 
@@ -649,13 +648,13 @@ def detect_active_interface(group: NodeGroup):
     with RemoteExecutor(group.cluster.log) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             detect_interface_by_address(node['connection'], node['internal_address'])
-    for host, host_results in exe.get_last_results().items():
+    for cxn, host_results in exe.get_last_results().items():
         try:
             interface = list(host_results.values())[0].stdout.strip()
         except Exception:
             interface = None
-        group.cluster.context['nodes'][host]['online'] = True
-        group.cluster.context['nodes'][host]['active_interface'] = interface
+        group.cluster.context['nodes'][cxn.host]['online'] = True
+        group.cluster.context['nodes'][cxn.host]['active_interface'] = interface
 
     return exe.get_last_results_str()
 

@@ -357,15 +357,6 @@ plugins:
         beta.kubernetes.io/os: linux
     cni:
       image: calico/cni:v3.10.1
-      ipam:
-        assign_ipv4: true
-        assign_ipv6: false
-        ipv4_pools:
-          - 192.168.0.0/24
-          - default-ipv4-ippool
-        ipv6_pools:
-          - default-ipv6-ippool
-        type: calico-ipam
     node:
       image: calico/node:v3.10.1
     kube-controllers:
