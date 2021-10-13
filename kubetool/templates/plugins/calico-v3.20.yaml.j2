@@ -513,6 +513,13 @@ spec:
                 description: 'BPFEnabled, if enabled Felix will use the BPF dataplane.
                   [Default: false]'
                 type: boolean
+
+
+
+
+
+
+
               bpfExternalServiceMode:
                 description: 'BPFExternalServiceMode in BPF mode, controls how connections
                   from outside the cluster to services (node ports and cluster IPs)
@@ -4009,6 +4016,8 @@ spec:
             - name: CALICO_IPV4POOL_CIDR
               value: "{{ plugins['calico']['env']['CALICO_IPV4POOL_CIDR'] }}"
 
+            - name: FELIX_IPV6SUPPORT
+              value: "{{ plugins['calico']['env']['FELIX_IPV6SUPPORT'] }}"
 {%- if not services.kubeadm.networking.podSubnet|isipv4 %}
             # IPv6 OPTIONS
             - name: CALICO_IPV6POOL_CIDR
