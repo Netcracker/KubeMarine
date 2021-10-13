@@ -141,7 +141,7 @@ def make_ansible_inventory(location, cluster):
                             if isinstance(config_value, dict) or isinstance(config_value, list):
                                 config_value = json.dumps(config_value)
                             config['cluster:vars'].append('%s_%s=%s' % (
-                                # todo: use regexp for replace
+                                # TODO: Rewrite replace using regex
                                 service_name.replace('-', '_').replace('.', '_').replace('/', '_'),
                                 config_name.replace('-', '_').replace('.', '_').replace('/', '_'),
                                 config_value))

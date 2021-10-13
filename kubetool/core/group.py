@@ -454,7 +454,7 @@ class NodeGroup:
         return False
 
     def get_local_file_sha1(self, filename):
-        # todo: use fabric instead of subprocess
+        # TODO: Possibly use fabric instead of subprocess to avoid possible permissions conflicts
         openssl_result = subprocess.check_output("openssl sha1 %s" % filename, shell=True)
         # process output is bytes and we have to decode it to utf-8
         return openssl_result.decode("utf-8").split("= ")[1].strip()

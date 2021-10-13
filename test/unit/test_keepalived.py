@@ -212,7 +212,7 @@ class TestKeepalivedInstallation(unittest.TestCase):
 class TestKeepalivedConfigGeneration(unittest.TestCase):
 
     def test_(self):
-        # TODO: !
+        # TODO: add test, where keepalived config generated, parsed and verified
         pass
 
 
