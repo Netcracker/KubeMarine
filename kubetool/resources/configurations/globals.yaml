@@ -1,10 +1,4 @@
 kubernetes_versions:
-  v1.16:
-    supported: false
-  v1.17:
-    supported: false
-  v1.18:
-    supported: false
   v1.19:
     supported: false
   v1.20:
@@ -104,19 +98,6 @@ workaround:
 compatibility_map:
   software:
     docker:
-      v1.18.4:
-        version_rhel: 19.03*
-        version_debian: 5:19.03.*
-      v1.18.8:
-        version_rhel: 19.03*
-        version_debian: 5:19.03.*
-      v1.18.10:
-        version_rhel: 19.03*
-        version_debian: 5:19.03.*
-      v1.18.18:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:19.03.*
       v1.19.3:
         version_rhel: 19.03*
         version_rhel8: 19.03*
@@ -134,19 +115,6 @@ compatibility_map:
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
     containerd:
-      v1.18.4:
-        version_rhel: 1.4.6*
-        version_debian: 1.4.6*
-      v1.18.8:
-        version_rhel: 1.4.6*
-        version_debian: 1.4.6*
-      v1.18.10:
-        version_rhel: 1.4.6*
-        version_debian: 1.4.6*
-      v1.18.18:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
       v1.19.3:
         version_rhel: 1.4.6*
         version_rhel8: 1.4.8*
@@ -164,19 +132,6 @@ compatibility_map:
         version_rhel8: 1.4.8*
         version_debian: 1.4.6*
     podman:
-      v1.18.4:
-        version_rhel: 1.6.4*
-        version_debian: 100:3.1.2*
-      v1.18.8:
-        version_rhel: 1.6.4*
-        version_debian: 100:3.1.2*
-      v1.18.10:
-        version_rhel: 1.6.4*
-        version_debian: 100:3.1.2*
-      v1.18.18:
-        version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
       v1.19.3:
         version_rhel: 1.6.4*
         version_rhel8: 3.0.1*
@@ -194,19 +149,6 @@ compatibility_map:
         version_rhel8: 3.0.1*
         version_debian: 100:3.1.2*
     haproxy:
-      v1.18.4:
-        version_rhel: 1.8*
-        version_debian: 2.0.*
-      v1.18.8:
-        version_rhel: 1.8*
-        version_debian: 2.0.*
-      v1.18.10:
-        version_rhel: 1.8*
-        version_debian: 2.0.*
-      v1.18.18:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.0.*
       v1.19.3:
         version_rhel: 1.8*
         version_rhel8: 1.8*
@@ -224,19 +166,6 @@ compatibility_map:
         version_rhel8: 1.8*
         version_debian: 2.2.*
     keepalived:
-      v1.18.4:
-        version_rhel: 1.3*
-        version_debian: 1:2.0.*
-      v1.18.8:
-        version_rhel: 1.3*
-        version_debian: 1:2.0.*
-      v1.18.10:
-        version_rhel: 1.3*
-        version_debian: 1:2.0.*
-      v1.18.18:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.0.*
       v1.19.3:
         version_rhel: 1.3*
         version_rhel8: 2.1*
@@ -254,21 +183,6 @@ compatibility_map:
         version_rhel8: 2.1*
         version_debian: 1:2.1.*
     crictl:
-      v1.18.4:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.18.8:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.18.10:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.18.18:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.19.3:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
       v1.20.2:
         version: v1.20.0
         sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
@@ -279,14 +193,6 @@ compatibility_map:
         version: v1.22.0
         sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
     kubeadm:
-      v1.18.4:
-        sha1: d17b585fe64fcb0bd21fad724a9f899d214e665f
-      v1.18.8:
-        sha1: f99912e8cf617f75011aa930078397115940dd7e
-      v1.18.10:
-        sha1: 9b4163970ea1236091927a528079e823e1f09843
-      v1.18.18:
-        sha1: fd7cc264070a71834bafbb39838ee24d26c5f0c5
       v1.19.3:
         sha1: 0db8a6e2493b8956259ea2d5f2d431cf5d38d971
       v1.20.2:
@@ -296,14 +202,6 @@ compatibility_map:
       v1.22.2:
         sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
     kubelet:
-      v1.18.4:
-        sha1: 5ca1b807bf7a4a8c8737c57437354cf7299eaa90
-      v1.18.8:
-        sha1: d77df7122b0669f152aa141bb839c34fc070c71f
-      v1.18.10:
-        sha1: 26bc249f9ac38a6ceb202a54e2cc1281bea41e5d
-      v1.18.18:
-        sha1: f8d0ba8941176cd7f9b263b3f533a0fd5ab17a2d
       v1.19.3:
         sha1: 4c6ff5ffa4b2e6f3f886f319c977c57905186f72
       v1.20.2:
@@ -313,14 +211,6 @@ compatibility_map:
       v1.22.2:
         sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
     kubectl:
-      v1.18.4:
-        sha1: 1351db2b0b92bb0c46d6e18eda7b3063e7e044bf
-      v1.18.8:
-        sha1: 74c282c9d8b7e4c59250f4775bff388eaa596878
-      v1.18.10:
-        sha1: 6bcc1d8434e4eba2680ee7399acaea5ad1008629
-      v1.18.18:
-        sha1: 6bcbf6f2cb7998e736d177bbd1f95f1305921d6c
       v1.19.3:
         sha1: 8790862689bd3b022ba012228c1734316c968d6a
       v1.20.2:
@@ -330,9 +220,6 @@ compatibility_map:
       v1.22.2:
         sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
     calico:
-      v1.18:
-        version: v3.16.1
-        sha1: 04a53f7bc08d7cb488a9939144ee5bfd606c6fff
       v1.19:
         version: v3.16.1
         sha1: 04a53f7bc08d7cb488a9939144ee5bfd606c6fff
@@ -346,10 +233,6 @@ compatibility_map:
         version: v3.20.1
         sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
     nginx-ingress-controller:
-      v1.18:
-        image-name: k8s-artifacts-prod/ingress-nginx/controller
-        version: v0.34.1
-        pod-name: ingress-nginx-controller
       v1.19:
         image-name: k8s.gcr.io/ingress-nginx/controller
         version: v0.35.0
@@ -367,9 +250,6 @@ compatibility_map:
         version: v1.0.3
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
-      v1.18:
-        version: v2.0.1
-        metrics-scraper-version: v1.0.4
       v1.19:
         version: v2.0.4
         metrics-scraper-version: v1.0.4
@@ -383,8 +263,6 @@ compatibility_map:
         version: v2.3.1
         metrics-scraper-version: v1.0.6
     local-path-provisioner:
-      v1.18:
-        version: v0.0.19
       v1.19:
         version: v0.0.19
       v1.20:
