@@ -140,17 +140,14 @@ def _migrate_cri(cluster, node_group):
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
         master["connection"].sudo(drain_cmd, is_async=False, hide=False)
-        # `kubectl drain` ignores system pod
+        # `kubectl drain` ignores system pod, delete them explicitly
         if "master" in node["roles"]:
-            kubectl_result = node["connection"].sudo(
-                    f"kubectl get pod -A -o wide | grep -i {node['name']} | grep 'kube-proxy' | awk '{{print $2}}'",
-                    is_async=False)
-            kube_proxy_pod = list(kubectl_result.values())[0].stdout.strip()
             node["connection"].sudo(f"kubectl -n kube-system delete pod etcd-{node['name']} "
                                     f"kube-apiserver-{node['name']} "
                                     f"kube-controller-manager-{node['name']} "
                                     f"kube-scheduler-{node['name']} "
-                                    f"{kube_proxy_pod}", is_async=False, hide=False).get_simple_out()
+                                    f"$(sudo kubectl get pod -A -o wide | grep -i {node['name']} | \
+                                      grep 'kube-proxy' | awk '{{print $2}}')", is_async=False, hide=False).get_simple_out()
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
