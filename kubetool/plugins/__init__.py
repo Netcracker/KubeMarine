@@ -258,12 +258,11 @@ def verify_expect(cluster, config):
 
 
 def apply_expect(cluster, config):
-    # TODO: support more expects?
+    # TODO: Add support for expect services and expect nodes
     if config.get('pods') is not None:
         expect_pods(cluster, config['pods']['list'],
                     timeout=config['pods'].get('timeout', cluster.globals['pods']['expect']['plugins']['timeout']),
-                    retries=config['pods'].get('retries', cluster.globals['pods']['expect']['plugins']['retries'])
-                    )
+                    retries=config['pods'].get('retries', cluster.globals['pods']['expect']['plugins']['retries']))
 
 
 # **** PYTHON ****

@@ -281,7 +281,7 @@ def recursive_apply_defaults(defaults, section):
                     node_config = deepcopy(section[key])
 
                     # update defaults with custom-defined node configs
-                    # TODO: deepmerge required here
+                    # TODO: Use deepmerge instead of update
                     node_config.update(v)
 
                     # replace old node config with merged one

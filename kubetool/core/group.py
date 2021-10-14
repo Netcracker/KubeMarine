@@ -403,7 +403,7 @@ class NodeGroup:
             self.disconnect(list(left_nodes.keys()))
 
             self.cluster.log.verbose("Attempting to connect to nodes...")
-            results.update(self._do("run", left_nodes, True, "last reboot", timeout=delay_period))
+            results.update(self._do("sudo", left_nodes, True, "last reboot", timeout=delay_period))
             left_nodes = {host: left_nodes[host] for host, result in results.items()
                           if isinstance(result, Exception) or result == initial_boot_history.get(self.nodes[host])}
 
@@ -454,7 +454,7 @@ class NodeGroup:
         return False
 
     def get_local_file_sha1(self, filename):
-        # todo: use fabric instead of subprocess
+        # TODO: Possibly use fabric instead of subprocess to avoid possible permissions conflicts
         openssl_result = subprocess.check_output("openssl sha1 %s" % filename, shell=True)
         # process output is bytes and we have to decode it to utf-8
         return openssl_result.decode("utf-8").split("= ")[1].strip()

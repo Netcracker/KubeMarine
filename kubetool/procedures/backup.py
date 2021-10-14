@@ -202,9 +202,7 @@ def select_etcd_node(cluster):
 
 
 def retrieve_etcd_image(cluster, etcd_node):
-    """
-    Todo: maybe take it from "/etc/kubernetes/manifests/etcd.yaml" ?
-    """
+    # TODO: Detect ETCD version via /etc/kubernetes/manifests/etcd.yaml config if presented, otherwise use containers
     node_name = etcd_node.get_nodes_names()[0]
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
         cont_inspect = "docker inspect $(sudo docker ps -a | grep etcd-%s | awk '{print $1; exit}')" % node_name

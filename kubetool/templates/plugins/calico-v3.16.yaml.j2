@@ -30,7 +30,7 @@ data:
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
-          "ipam": {{ plugins['calico']['cni']['ipam']|tojson|safe }},
+          "ipam": {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4']|tojson|safe }},{% else %}{{ plugins['calico']['cni']['ipam']['ipv6']|tojson|safe }},{% endif %}
           "policy": {
               "type": "k8s"
           },
@@ -3820,6 +3820,8 @@ spec:
             - name: CALICO_IPV4POOL_CIDR
               value: "{{ plugins['calico']['env']['CALICO_IPV4POOL_CIDR'] }}"
 
+            - name: FELIX_IPV6SUPPORT
+              value: "{{ plugins['calico']['env']['FELIX_IPV6SUPPORT'] }}"
 {%- if not services.kubeadm.networking.podSubnet|isipv4 %}
             # IPv6 OPTIONS
             - name: CALICO_IPV6POOL_CIDR
@@ -3828,8 +3830,6 @@ spec:
               value: "{{ plugins['calico']['env']['IP6'] }}"
             - name: IP6_AUTODETECTION_METHOD
               value: "{{ plugins['calico']['env']['IP6_AUTODETECTION_METHOD'] }}"
-            - name: FELIX_IPV6SUPPORT
-              value: "{{ plugins['calico']['env']['FELIX_IPV6SUPPORT'] }}"
             - name: CALICO_IPV6POOL_IPIP
               value: "{{ plugins['calico']['env']['CALICO_IPV6POOL_IPIP'] }}"
             - name: CALICO_IPV6POOL_VXLAN

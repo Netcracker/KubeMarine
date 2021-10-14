@@ -50,7 +50,7 @@ def install(group):
             haproxy_installed = False
 
     if haproxy_installed:
-        # TODO: return haproxy version
+        # TODO: Add Haproxy version output from previous command to method results
         group.cluster.log.debug("HAProxy already installed, nothing to install")
     else:
         with RemoteExecutor(group.cluster.log) as exe:
@@ -134,6 +134,6 @@ def override_haproxy18(group):
         group.cluster.log.debug('Haproxy18 override is not required')
         return
     package_associations = group.cluster.get_associations_for_os('rhel')['haproxy']
-    # TODO: do not replace the whole file, replace only parameter
+    # TODO: Do not replace the whole file, replace only parameter
     return group.put(io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
                      '/etc/sysconfig/%s' % package_associations['service_name'], backup=True, sudo=True)

@@ -74,7 +74,7 @@ def upgrade_plugins(cluster):
     upgrade_candidates = {}
     defined_plugins = cluster.procedure_inventory.get(upgrade_version, {}).get("plugins", {}).keys()
     for plugin in chain(defined_plugins, plugins.oob_plugins):
-        # todo: check for OOB plugins that the version has changed, so that we do not perform redundant installations
+        # TODO: use only OOB plugins that have changed version so that we do not perform redundant installations
         upgrade_candidates[plugin] = cluster.inventory["plugins"][plugin]
 
     plugins.install(cluster, upgrade_candidates)

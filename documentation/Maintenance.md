@@ -45,7 +45,7 @@ The information about the procedures for nodes is described in the following sec
 
 **Warning**: Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 
-**Warning**: The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21. For more information about `supported` versions, see [Lifecycle Policy](LifecyclePolicy.md#Supported-release-history).
+**Warning**: The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
 
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
@@ -128,7 +128,7 @@ This configuration replaces the configuration contained in the current `cluster.
 
 #### Kubernetes Upgrade Task
 
-This task is required to actually upgrade the Kubernetes cluster to the next version. The upgrade is performed node-by-node. On each node, the docker or containerd is upgraded, if required. For more information, see [Packages Upgrade Task](#packages-upgrade-task). After all the pods are drained from the node, the node is upgraded and finally returned to the cluster for scheduling.
+This task is required to actually upgrade the Kubernetes cluster to the next version. The upgrade is performed node-by-node. On each node, the docker or containerd is upgraded, if required. After all the pods are drained from the node, the node is upgraded and finally returned to the cluster for scheduling.
 
 By default, node drain is performed using `disable-eviction=True` to ignore the PodDisruptionBudget (PDB) rules. If you want to enforce PDB rules during the upgrade, set `disable-eviction` to False. However, in this case, the upgrade may fail if you are unable to drain the node due of PDB rules. `disable-eviction` works only for upgrades on Kubernetes versions >= 1.18. 
 An example configuration to enforce PDB rules is as follows:
@@ -286,7 +286,7 @@ backup-Jan-01-21-09-00-00.tar.gz
 
 ### Backup Procedure Parameters
 
-**Note**: There are some examples located in [examples/procedure.yaml](examples/procedure.yaml).
+**Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
 By default, no parameters are required. However, if necessary, you can specify custom.
 
@@ -442,7 +442,7 @@ After recovery, the procedure reboots all cluster nodes.
 
 ### Restore Procedure Parameters
 
-**Note**: There are some examples located in [examples/procedure.yaml](examples/procedure.yaml).
+**Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
 
@@ -677,7 +677,7 @@ To change the operating system on an already running cluster:
 
 **Warning**: It is necessary to complete the procedure and completely migrate all nodes to a single operating system. The cluster and services can exist on different operating systems, but if you need to immediately perform any maintenance procedure, Kubetools does not allow you to do this, since the cluster is in an inconsistent state with another maintenance procedure not yet completed.
 
-**Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](/documentation/public/Installation.md#associations) section in the _Kubetools Installation Procedure_.
+**Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](Installation.md#associations) section in the _Kubetools Installation Procedure_.
 
 ## Manage PSP Procedure
 
@@ -727,7 +727,7 @@ psp:
     host-network: disabled
 ```
 
-To configure `add-policies` and `delete-policies`, use the configuration format similar to `custom-policies`. For more information, refer to the [Configuring Custom Policies](/documentation/public/Installation.md#configuring-custom-policies) section in the _Kubetools Installation Procedure_.
+To configure `add-policies` and `delete-policies`, use the configuration format similar to `custom-policies`. For more information, refer to the [Configuring Custom Policies](Installation.md#configuring-custom-policies) section in the _Kubetools Installation Procedure_.
 
 **Note**: The OOB plugins use OOB policies, so disabling OOB policy breaks some OOB plugins. 
 To avoid this, you need to specify custom policy and bind it using `ClusterRoleBinding` to the `ServiceAccout` plugin.
@@ -810,7 +810,7 @@ nginx-ingress-controller:
 ```
 
 Similar to the plugin configuration, you can either use the data format or the paths format.
-For more information about these formats, refer to the [nginx-ingress-controller](/documentation/public/Installation.md#nginx-ingress-controller) section in the _Kubetools Installation Procedure_.
+For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubetools Installation Procedure_.
 
 #### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
 To update internal kubernetes certificates you can use the following configuration:
@@ -950,11 +950,11 @@ The following sections describe the execution of procedures using CLI.
 
 ## Procedure Execution from CLI
 
-The command line executive for maintenance procedures has the same parameters as the installation executive. For more details, refer to the [Installing Kubernetes Using CLI](/documentation/public/Installation.md#installing-kubernetes-using-cli) section in _Kubetools Installation Procedure_.
+The command line executive for maintenance procedures has the same parameters as the installation executive. For more details, refer to the [Installing Kubernetes Using CLI](Installation.md#installation-of-kubernetes-using-cli) section in _Kubetools Installation Procedure_.
 
 The following features described in the _Kubetools Installation Procedure_ are also available for maintenance procedures:
 
-* [Custom Configfile Location](Installation.md#custom-configfile-location)
+* [Custom Inventory File Location](Installation.md#custom-inventory-file-location)
 * [Tasks List Redefinition](Installation.md#tasks-list-redefinition)
 * [Ansible Inventory](Installation.md#ansible-inventory)
 * [Dump Files](Installation.md#dump-files)
@@ -988,7 +988,7 @@ An example for running the `add_node` procedure with overridden tasks is as foll
 ## Logging
 
 Kubetools has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubetools Logging](documentation/public/Logging.md) section.
+For more information, refer to the [Configuring Kubetools Logging](Logging.md) guide.
 
 
 ## Additional Parameters
