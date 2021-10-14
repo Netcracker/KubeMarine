@@ -140,7 +140,7 @@ def _migrate_cri(cluster, node_group):
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
         master["connection"].sudo(drain_cmd, is_async=False, hide=False)
-        # `kubectl drain` ignores system pod, delete them explicitly
+        # `kubectl drain` ignores system pods, delete them explicitly
         if "master" in node["roles"]:
             node["connection"].sudo(f"kubectl -n kube-system delete pod etcd-{node['name']} "
                                     f"kube-apiserver-{node['name']} "
