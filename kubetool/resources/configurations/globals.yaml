@@ -146,7 +146,7 @@ compatibility_map:
       v1.22.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.2.*
+        version_debian: 2.0.*
     keepalived:
       v1.20.2:
         version_rhel: 1.3*
