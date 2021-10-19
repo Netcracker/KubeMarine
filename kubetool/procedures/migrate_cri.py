@@ -146,8 +146,9 @@ def _migrate_cri(cluster, node_group):
                                     f"kube-apiserver-{node['name']} "
                                     f"kube-controller-manager-{node['name']} "
                                     f"kube-scheduler-{node['name']} "
-                                    f"$(kubectl describe node {node['name']} | grep -E 'kube-system\s+kube-proxy-[a-z,0-9]{5}' | \
-                                        awk '{{print $2}}')", is_async=False, hide=False).get_simple_out()
+                                    f"$(sudo kubectl describe node {node['name']} | \
+                                        grep -E 'kube-system\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')"
+                                    , is_async=False, hide=False).get_simple_out()
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
