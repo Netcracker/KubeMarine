@@ -86,6 +86,10 @@ services:
     containerRuntime: containerd
     containerdConfig:
       version: 2
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
+        runtime_type: "io.containerd.runc.v2"
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
+        SystemdCgroup: true
     dockerConfig:
       ipv6: False
       log-driver: json-file
