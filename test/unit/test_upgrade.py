@@ -82,14 +82,14 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
         return cluster
 
     def test_correct_inventory(self):
-        old_kubernetes_version = 'v1.22.4'
+        old_kubernetes_version = 'v1.22.2'
         new_kubernetes_version = 'v1.22.10'
         cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
         cluster._inventory = kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
         self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
     def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.22.4'
+        old_kubernetes_version = 'v1.22.2'
         new_kubernetes_version = 'v1.28.2'
         cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaises(Exception):
@@ -103,7 +103,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
             kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
 
     def test_incorrect_inventory_same_version(self):
-        old_kubernetes_version = 'v1.22.4'
+        old_kubernetes_version = 'v1.22.2'
         new_kubernetes_version = 'v1.22.4'
         cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaises(Exception):
