@@ -104,7 +104,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
     def test_incorrect_inventory_same_version(self):
         old_kubernetes_version = 'v1.22.2'
-        new_kubernetes_version = 'v1.22.4'
+        new_kubernetes_version = 'v1.22.2'
         cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaises(Exception):
             kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
