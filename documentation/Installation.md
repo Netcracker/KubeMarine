@@ -1828,6 +1828,10 @@ services:
     containerRuntime: containerd
     containerdConfig:
       version: 2
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
+        runtime_type: "io.containerd.runc.v2"
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
+        SystemdCgroup: true
     dockerConfig:
       ipv6: False
       log-driver: json-file
@@ -1868,6 +1872,10 @@ services:
   cri:
     containerdConfig:
       version: 2
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
+        runtime_type: "io.containerd.runc.v2"
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
+        SystemdCgroup: true
 ```
 
 **Note**: When containerd is used, `crictl` binary and `podman` package are also installed and configured as required.
@@ -4427,7 +4435,7 @@ kubeadm_controlPlaneEndpoint=k8s.example.com:6443
 # services.cri
 cri_containerRuntime=containerd
 cri_dockerConfig={"ipv6": false, "log-driver": "json-file", "log-opts": {"max-size": "64m", "max-file": "3"}, "exec-opts": ["native.cgroupdriver=systemd"], "icc": false, "live-restore": true, "userland-proxy": false}
-cri_containerdConfig={"version": 2, "plugins.\"io.containerd.grpc.v1.cri\"": {"sandbox_image": "k8s.gcr.io/pause:3.2"}, "plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"artifactory.example.com:5443\"": {"endpoint": ["https://artifactory.example.com:5443"]}}
+cri_containerdConfig={"version": 2, "plugins.\"io.containerd.grpc.v1.cri\"": {"sandbox_image": "k8s.gcr.io/pause:3.2"}, "plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"artifactory.example.com:5443\"": {"endpoint": ["https://artifactory.example.com:5443"]}, "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc": {"runtime_type": "io.containerd.runc.v2"}, "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc.options": {"SystemdCgroup": true}}
 ```
 
 **Note**: From the final variables list the following parameters are excluded:
