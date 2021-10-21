@@ -125,10 +125,6 @@ def apply_registry(inventory, cluster):
     # Patch kubeadm imageRepository
     if not inventory['services']['kubeadm'].get('imageRepository'):
         inventory['services']['kubeadm']["imageRepository"] = full_registry_address
-        if inventory['registry'].get('webserver', False):
-            # it is necessary to search in example.com:XXXX/k8s.gcr.io because images from other hubs located in
-            # directory with the hub name
-            inventory['services']['kubeadm']["imageRepository"] += "/k8s.gcr.io"
 
     # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/quay.io/xxx:v1
     if inventory.get('plugin_defaults') is None:

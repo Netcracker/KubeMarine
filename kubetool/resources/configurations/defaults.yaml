@@ -26,7 +26,7 @@ services:
       extraArgs:
         enable-admission-plugins: NodeRestriction
         profiling: "false"
-        audit-log-path: /var/log/apiserver/audit.log
+        audit-log-path: /var/log/audit.log
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
@@ -485,6 +485,7 @@ plugins:
         annotations:
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
       spec:
+        ingressClassName: nginx
         tls:
           # this section enables tls and ssl-redirect for dashboard
           # since certificate is not provided here, default controller certificate will be used
@@ -495,9 +496,12 @@ plugins:
             http:
               paths:
                 - path: /
+                  pathType: Prefix
                   backend:
-                    serviceName: kubernetes-dashboard
-                    servicePort: 443
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
 
   local-path-provisioner:
     install: false

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Source: https://raw.githubusercontent.com/kubernetes/dashboard/v2.1.0/aio/deploy/recommended.yaml
+# Source: https://raw.githubusercontent.com/kubernetes/dashboard/v2.4.0/aio/deploy/recommended.yaml
 
 apiVersion: v1
 kind: Namespace
@@ -268,9 +268,10 @@ spec:
     metadata:
       labels:
         k8s-app: dashboard-metrics-scraper
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: dashboard-metrics-scraper
           image: {% if plugins['kubernetes-dashboard']['installation']['registry'] is defined and plugins['kubernetes-dashboard']['installation']['registry']|length %}{{ plugins['kubernetes-dashboard']['installation']['registry'] }}/{% endif %}{{ plugins['kubernetes-dashboard']['metrics-scraper']['image'] }}

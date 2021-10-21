@@ -820,7 +820,7 @@ def verify_target_version(target_version):
         globals_yml = yaml.safe_load(stream)
         if target_version not in globals_yml["kubernetes_versions"]:
             raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-        if not globals_yml["kubernetes_versions"][target_version]["supported"]:
+        if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
             message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
             print(message)
             return message
