@@ -632,7 +632,7 @@ The `registry` parameter automatically completes the following parameters:
 |`services.cri.dockerConfig.insecure-registries`|Docker|List with addresses without a protocol.|```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it.|
 |`services.cri.dockerConfig.registry-mirrors`|Docker|List with addresses. Each address should contain a protocol.|```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for the container's images pull.|
 |`services.cri.containerdConfig.{{containerd-specific name}}`|Docker|Toml-like section with endpoints according to the containerd docs.|```https://example.com:5443```||
-|`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.20.11/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
+|`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.22.2/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
 |`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
@@ -661,13 +661,13 @@ services:
       - http://example.com:5443
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/webserver/repository/raw/projectcalico/calicoctl/v3.19.1/calicoctl-linux-amd64
+      source: http://example.com/webserver/repository/raw/projectcalico/calicoctl/v3.20.1/calicoctl-linux-amd64
     /usr/bin/kubeadm:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.20.11/bin/linux/amd64/kubeadm
+      source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.22.2/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubectl/v1.20.11/bin/linux/amd64/kubectl
+      source: http://example.com/webserver/repository/raw/kubernetes/kubectl/v1.22.2/bin/linux/amd64/kubectl
     /usr/bin/kubelet:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubelet/v1.20.11/bin/linux/amd64/kubelet
+      source: http://example.com/webserver/repository/raw/kubernetes/kubelet/v1.22.2/bin/linux/amd64/kubelet
 plugin_defaults:
   installation:
     registry: example.com:5443
@@ -887,7 +887,7 @@ By default, the `1.20.2` version of the Kubernetes is installed. See the table o
 ```yaml
 services:
   kubeadm:
-    kubernetesVersion: v1.20.11
+    kubernetesVersion: v1.22.2
 ```
 
 #### Cloud Provider Plugin
@@ -1805,7 +1805,7 @@ If necessary, you can redefine or add thirdparties. For example:
 services:
   thirdparties:
     /usr/bin/kubeadm:
-      source: https://example.com/kubernetes/kubeadm/v1.20.11/bin/linux/amd64/kubeadm
+      source: https://example.com/kubernetes/kubeadm/v1.22.2/bin/linux/amd64/kubeadm
 ```
 
 #### CRI
