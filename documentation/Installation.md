@@ -4461,7 +4461,7 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 The tables below shows the correspondence of versions that are supported and is used during the installation:
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.20.2
+## Default Dependent Components Versions for Kubernetes Versions v1.20.11
 
 <table style="undefined;table-layout: fixed; width: 1335px">
 <colgroup>
@@ -4491,7 +4491,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.20.2</td>
+    <td colspan="4" rowspan="3">v1.20.11</td>
     <td></td>
   </tr>
   <tr>
@@ -4551,7 +4551,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.20.2</td>
+    <td colspan="4" rowspan="4">v1.20.11</td>
     <td></td>
   </tr>
   <tr>
@@ -4625,7 +4625,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </tbody>
 </table>
 
-## Default Dependent Components Versions for Kubernetes Versions v1.21.2
+## Default Dependent Components Versions for Kubernetes Versions v1.21.5
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -4655,7 +4655,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.21.2</td>
+    <td colspan="4" rowspan="3">v1.21.5</td>
     <td>SHA1: cbb07d380de4ef73d43d594a1055839fa9753138</td>
   </tr>
   <tr>
@@ -4717,7 +4717,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.21.2</td>
+    <td colspan="4" rowspan="4">v1.21.5</td>
     <td></td>
   </tr>
   <tr>
@@ -4739,7 +4739,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.2</td>
+    <td colspan="4">3.4.1</td>
     <td></td>
   </tr>
   <tr>
