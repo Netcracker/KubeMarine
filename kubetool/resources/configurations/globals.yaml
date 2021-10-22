@@ -31,7 +31,7 @@ etcd:
     peer_key: /etc/kubernetes/pki/etcd/peer.key
     peer_cacert: /etc/kubernetes/pki/etcd/ca.crt
   temporary_exceptions:
-    - leader changed
+    - "etcdserver: leader changed"
     - "etcdserver: request timed out"
 kubernetes:
   temporary_exceptions:
