@@ -4823,20 +4823,20 @@ The tables below shows the correspondence of versions that are supported and is 
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
     <td colspan="4" rowspan="3">v1.22.2</td>
-    <td>SHA1: cbb07d380de4ef73d43d594a1055839fa9753138</td>
+    <td>SHA1: 190703cfe16ad00d0f91487d00bece9667cd5903</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 024e458aa0f74cba6b773401b779590437812fc6</td>
+    <td>SHA1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468</td>
+    <td>SHA1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1</td>
   </tr>
   <tr>
     <td>calicoctl</td>
     <td colspan="4">v3.20.1</td>
-    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
+    <td>SHA1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
