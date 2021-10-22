@@ -632,7 +632,7 @@ The `registry` parameter automatically completes the following parameters:
 |`services.cri.dockerConfig.insecure-registries`|Docker|List with addresses without a protocol.|```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it.|
 |`services.cri.dockerConfig.registry-mirrors`|Docker|List with addresses. Each address should contain a protocol.|```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for the container's images pull.|
 |`services.cri.containerdConfig.{{containerd-specific name}}`|Docker|Toml-like section with endpoints according to the containerd docs.|```https://example.com:5443```||
-|`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.20.2/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
+|`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.20.11/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
 |`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
@@ -663,11 +663,11 @@ services:
     /usr/bin/calicoctl:
       source: http://example.com/webserver/repository/raw/projectcalico/calicoctl/v3.19.1/calicoctl-linux-amd64
     /usr/bin/kubeadm:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.20.2/bin/linux/amd64/kubeadm
+      source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.20.11/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubectl/v1.20.2/bin/linux/amd64/kubectl
+      source: http://example.com/webserver/repository/raw/kubernetes/kubectl/v1.20.11/bin/linux/amd64/kubectl
     /usr/bin/kubelet:
-      source: http://example.com/webserver/repository/raw/kubernetes/kubelet/v1.20.2/bin/linux/amd64/kubelet
+      source: http://example.com/webserver/repository/raw/kubernetes/kubelet/v1.20.11/bin/linux/amd64/kubelet
 plugin_defaults:
   installation:
     registry: example.com:5443
@@ -887,7 +887,7 @@ By default, the `1.20.2` version of the Kubernetes is installed. See the table o
 ```yaml
 services:
   kubeadm:
-    kubernetesVersion: v1.20.2
+    kubernetesVersion: v1.20.11
 ```
 
 #### Cloud Provider Plugin
@@ -1805,7 +1805,7 @@ If necessary, you can redefine or add thirdparties. For example:
 services:
   thirdparties:
     /usr/bin/kubeadm:
-      source: https://example.com/kubernetes/kubeadm/v1.20.2/bin/linux/amd64/kubeadm
+      source: https://example.com/kubernetes/kubeadm/v1.20.11/bin/linux/amd64/kubeadm
 ```
 
 #### CRI
@@ -4469,7 +4469,7 @@ If the task is skipped, then it is not able to schedule the cumulative point. Fo
 The tables below shows the correspondence of versions that are supported and is used during the installation:
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.20.2
+## Default Dependent Components Versions for Kubernetes Versions v1.20.11
 
 <table style="undefined;table-layout: fixed; width: 1335px">
 <colgroup>
@@ -4499,7 +4499,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.20.2</td>
+    <td colspan="4" rowspan="3">v1.20.11</td>
     <td></td>
   </tr>
   <tr>
@@ -4559,7 +4559,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.20.2</td>
+    <td colspan="4" rowspan="4">v1.20.11</td>
     <td></td>
   </tr>
   <tr>
@@ -4633,7 +4633,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </tbody>
 </table>
 
-## Default Dependent Components Versions for Kubernetes Versions v1.21.2
+## Default Dependent Components Versions for Kubernetes Versions v1.21.5
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -4663,7 +4663,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.21.2</td>
+    <td colspan="4" rowspan="3">v1.21.5</td>
     <td>SHA1: cbb07d380de4ef73d43d594a1055839fa9753138</td>
   </tr>
   <tr>
@@ -4725,7 +4725,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.21.2</td>
+    <td colspan="4" rowspan="4">v1.21.5</td>
     <td></td>
   </tr>
   <tr>
@@ -4747,7 +4747,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.2</td>
+    <td colspan="4">3.4.1</td>
     <td></td>
   </tr>
   <tr>
@@ -4831,20 +4831,20 @@ The tables below shows the correspondence of versions that are supported and is 
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
     <td colspan="4" rowspan="3">v1.22.2</td>
-    <td>SHA1: cbb07d380de4ef73d43d594a1055839fa9753138</td>
+    <td>SHA1: 190703cfe16ad00d0f91487d00bece9667cd5903</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 024e458aa0f74cba6b773401b779590437812fc6</td>
+    <td>SHA1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468</td>
+    <td>SHA1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1</td>
   </tr>
   <tr>
     <td>calicoctl</td>
     <td colspan="4">v3.20.1</td>
-    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
+    <td>SHA1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
