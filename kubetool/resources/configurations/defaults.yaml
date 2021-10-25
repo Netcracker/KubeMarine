@@ -13,6 +13,7 @@ services:
     readOnlyPort: 0
     protectKernelDefaults: true
     podPidsLimit: 4096
+    cgroupDriver: systemd
   kubeadm:
     apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
