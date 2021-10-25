@@ -158,7 +158,7 @@ def apply_registry(inventory, cluster):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
         if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
-                f"{inventory['services']['kubeadm']['imageRepository']}/pause:3.2"
+                f"{inventory['services']['kubeadm']['imageRepository']}/pause:3.4"
 
     if inventory['registry'].get('webserver', False) and inventory['services'].get('thirdparties', []):
         for destination, config in inventory['services']['thirdparties'].items():
