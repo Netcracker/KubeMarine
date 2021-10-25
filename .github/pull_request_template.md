@@ -1,23 +1,23 @@
-### Description ###
+### Description
 Please include a summary of the change and describe issue. Please also include relevant motivation and context.
 * 
 
 Fixes # (issue)
 
 
-### Solution  ###
+### Solution
 Describe solution. List all changes that you made during implementation.
 * 
 
 
-### How to apply ###
+### How to apply
 Provide steps how to apply on top previous Kubetools version to execute on existing clusters
 * [Install task/s](documentation/Installation.md#installation-tasks-description)
 * Manual step 
 * [Upgrade procedure](documentation/Maintenance.md#upgrade-procedure)
 
 
-### How Has This Been Tested?
+### Test Cases
 Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce. Please also list any relevant details for your test configuration.
 
 **TestCase 1**
@@ -51,5 +51,5 @@ Results:
 Indicate new or changed unit tests and what they do, if any.
 
 
-### Reviewers ###
+### Reviewers
 @koryaga @iLeonidze @zaborin @alexarefev @Yaroslav-Lahtachev @dmyar21
