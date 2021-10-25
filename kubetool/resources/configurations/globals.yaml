@@ -243,8 +243,8 @@ compatibility_map:
         ram: 2
       worker:
         amount: 3
-        vcpu: 4
-        ram: 4
+        vcpu: 2
+        ram: 2
       vip:
         amount: 0
       all:
