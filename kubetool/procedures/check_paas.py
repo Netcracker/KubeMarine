@@ -11,6 +11,7 @@ import yaml
 import ruamel.yaml
 
 from kubetool import packages as pckgs, system, selinux
+from kubetool.core.cluster import KubernetesCluster
 from kubetool.procedures import check_iaas
 from kubetool.core import flow
 from kubetool.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -519,7 +520,14 @@ def nodes_pid_max(cluster):
         tc.success(results="pid_max correctly installed on all nodes")
 
 
-def verify_selinux_status(cluster):
+def verify_selinux_status(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must
+    be explicitly specified in the inventory. Otherwise, the test will fail. This test is applicable only for systems of
+    the RHEL family.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
     if system.get_os_family(cluster) == 'debian':
         return
 
@@ -567,7 +575,13 @@ def verify_selinux_status(cluster):
                                    f" to use \"enforcing\" policy only on the following nodes:{pretty_list}")
 
 
-def verify_selinux_config(cluster):
+def verify_selinux_config(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which compares the configuration of Selinux on the nodes with the configuration specified in
+    the inventory or with the one by default. If the configuration does not match, the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
     if system.get_os_family(cluster) == 'debian':
         return
 
@@ -588,7 +602,12 @@ def verify_selinux_config(cluster):
                                    f" via installation procedure.")
 
 
-def verify_firewalld_status(cluster):
+def verify_firewalld_status(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
     with TestCase(cluster.context['testsuite'], '215', "Security", "Firewalld status") as tc:
         group = cluster.nodes['all']
         firewalld_disabled, firewalld_result = system.is_firewalld_disabled(group)
@@ -602,7 +621,13 @@ def verify_firewalld_status(cluster):
                                    f"procedure.")
 
 
-def verify_swap_state(cluster):
+def verify_swap_state(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which verifies that swap is disabled on all nodes in the cluster, otherwise the test will
+    fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
     with TestCase(cluster.context['testsuite'], '216', "System", "Swap state") as tc:
         group = cluster.nodes['all']
         swap_disabled, swap_result = system.is_swap_disabled(group)
@@ -616,7 +641,13 @@ def verify_swap_state(cluster):
                                    f"procedure.")
 
 
-def verify_modprobe_rules(cluster):
+def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which compares the modprobe rules on the nodes with the rules specified in the inventory or
+    with default rules. If rules does not match, the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
     with TestCase(cluster.context['testsuite'], '217', "System", "Modprobe rules") as tc:
         group = cluster.nodes['all']
         modprobe_valid, modprobe_result = system.is_modprobe_valid(group)

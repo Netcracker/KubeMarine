@@ -44,6 +44,11 @@ This section provides information about the Kubecheck functionality.
       - [210 Nodes Condition - DiskPressure](#210-nodes-condition-diskpressure)
       - [210 Nodes Condition - PIDPressure](#210-nodes-condition-pidpressure)
       - [210 Nodes Condition - Ready](#210-nodes-condition-ready)
+    - [213 Selinux security policy](#213-selinux-security-policy)
+    - [214 Selinux configuration](#214-selinux-configuration)
+    - [215 Firewalld status](#215-firewalld-status)
+    - [216 Swap state](#216-swap-state)
+    - [217 Modprobe rules](#216-modprobe-rules)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -425,9 +430,44 @@ This test checks the condition `PIDPressure` of the Kubernetes nodes of the clus
 
 ###### 211 Nodes Condition - Ready
 
-*Task*: `kubernetes.nodes.condition.ready
+*Task*: `kubernetes.nodes.condition.ready`
 
 This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
+
+###### 213 Selinux security policy
+
+*Task*: `kubetool.procedures.check_paas.verify_selinux_status`
+
+The test checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must be explicitly specified
+in the inventory. Otherwise, the test will fail. This test is applicable only for systems of the RHEL family.
+
+###### 214 Selinux configuration
+
+*Task*: `kubetool.procedures.check_paas.verify_selinux_config`
+
+The test compares the configuration of Selinux on the nodes with the configuration specified in the inventory or with the
+one by default. If the configuration does not match, the test will fail.
+
+###### 215 Firewalld status
+
+*Task*: `kubetool.procedures.check_paas.verify_firewalld_status`
+
+The test verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
+
+###### 216 Swap state
+
+*Task*: `kubetool.procedures.check_paas.verify_swap_state`
+
+The test verifies that swap is disabled on all nodes in the cluster, otherwise the test will fail.
+
+###### 217 Modprobe rules
+
+*Task*: `kubetool.procedures.check_paas.verify_modprobe_rules`
+
+The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
+rules does not match, the test will fail.
+
+
 
 ### Report File Generation
 
