@@ -150,6 +150,8 @@ def apply_registry(inventory, cluster):
         inventory['services']['cri']['dockerConfig']["registry-mirrors"] = list(set(registry_mirrors))
     elif cri_impl == "containerd":
         registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{full_registry_address}"'
+        effective_kubernetes_version = ".".join(inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
+        pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]
         if not inventory['services']['cri']['containerdConfig'].get(registry_section):
             inventory['services']['cri']['containerdConfig'][registry_section] = {
                 'endpoint': ["%s://%s" % (protocol, full_registry_address)]
@@ -158,7 +160,7 @@ def apply_registry(inventory, cluster):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
         if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
-                f"{inventory['services']['kubeadm']['imageRepository']}/pause:3.4"
+                f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
     if inventory['registry'].get('webserver', False) and inventory['services'].get('thirdparties', []):
         for destination, config in inventory['services']['thirdparties'].items():
