@@ -235,12 +235,14 @@ def new_parser(cli_help):
 
 def schedule_cumulative_point(cluster, point_method):
 
+    point_fullname = point_method.__module__ + '.' + point_method.__qualname__
+
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
-        cluster.log.verbose('Method %s not scheduled - cumulative points disabled' % point_method.__qualname__)
+        cluster.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
         return
 
-    if point_method.__qualname__ in cluster.context['execution_arguments']['exclude_cumulative_points_methods']:
-        cluster.log.verbose('Method %s not scheduled - it set to be excluded' % point_method.__qualname__)
+    if point_fullname in cluster.context['execution_arguments']['exclude_cumulative_points_methods']:
+        cluster.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
         return
 
     scheduled_points = cluster.context.get('scheduled_cumulative_points', [])
@@ -248,9 +250,9 @@ def schedule_cumulative_point(cluster, point_method):
     if point_method not in scheduled_points:
         scheduled_points.append(point_method)
         cluster.context['scheduled_cumulative_points'] = scheduled_points
-        cluster.log.verbose('Method %s scheduled' % point_method.__qualname__)
+        cluster.log.verbose('Method %s scheduled' % point_fullname)
     else:
-        cluster.log.verbose('Method %s already scheduled' % point_method.__qualname__)
+        cluster.log.verbose('Method %s already scheduled' % point_fullname)
 
 
 def proceed_cumulative_point(cluster, points_list, point_task_path):
@@ -260,6 +262,7 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
 
     scheduled_methods = cluster.context.get('scheduled_cumulative_points', [])
 
+    results = {}
     for point_method_fullname, points_tasks_paths in points_list.items():
         if point_task_path in points_tasks_paths:
 
@@ -278,7 +281,9 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
 
             call_result = cluster.nodes["all"].get_new_nodes_or_self().call(func)
             cluster.context['scheduled_cumulative_points'].remove(func)
-            return call_result
+            results[point_method_fullname] = call_result
+
+    return results
 
 
 def add_task_to_proceeded_list(cluster, task_path):
