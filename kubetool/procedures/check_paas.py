@@ -120,13 +120,16 @@ def recommended_system_packages_versions(cluster):
                         if f"-{version}" in actual_pckg or f"={version}" in actual_pckg:
                             good_results.add(actual_pckg)
                         else:
-                            bad_results.append(f"{actual_pckg} is not recommended, recommended version is {version}")
+                            cluster.log.debug(f"Package {actual_pckg} is not recommended, recommended version is {version}")
+                            bad_results.append(actual_pckg)
                 if not is_found:
-                    bad_results.append(f"{expected_pckg} package is not found in inventory")
+                    cluster.log.debug(f"Package {expected_pckg} is not found in inventory")
+                    bad_results.append(expected_pckg)
 
         if bad_results:
-            bad_results = yaml.safe_dump(bad_results)
-            raise TestWarn("detected not recommended packages versions", hint=bad_results)
+            raise TestWarn("detected not recommended packages versions",
+                           hint=f'Check the list of recommended packages and what is listed in the inventory and fix'
+                                f'the inconsistencies of the following packages on the system: {bad_results}')
         cluster.log.debug(f"found packages: {good_results}")
         tc.success("all packages have recommended versions")
 
@@ -174,25 +177,30 @@ def check_packages_versions(cluster, tc, group, packages, warn_on_bad_result=Fal
     :param packages: list of packages to check
     :param warn_on_bad_result: if true then uses Warning instead of Failure. Default False.
     """
-    bad_results = {}
+    bad_results = []
     good_results = []
 
     packages_map = pckgs.detect_installed_packages_version_groups(group, packages)
     for package, version_map in packages_map.items():
         if len(version_map) != 1:
-            bad_results[f"package {package} has different versions"] = version_map
+            cluster.log.debug(f"Package {package} has different versions:")
+            cluster.log.debug(version_map)
+            bad_results.append(package)
 
         version = list(version_map.keys())[0]
         if "not installed" in version:
-            bad_results[f"package {package} is not installed on some nodes"] = version_map[version]
+            cluster.log.debug(f"Package {package} is not installed on some nodes:")
+            cluster.log.debug(version_map[version])
+            bad_results.append(package)
         else:
             good_results.append(version)
 
     if bad_results:
-        bad_results = yaml.safe_dump(bad_results)
+        hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
+                       f'system: {bad_results}'
         if warn_on_bad_result:
-            raise TestWarn("detected incorrect packages versions", hint=bad_results)
-        raise TestFailure("detected incorrect packages versions", hint=bad_results)
+            raise TestWarn("detected incorrect packages versions", hint=hint_message)
+        raise TestFailure("detected incorrect packages versions", hint=hint_message)
     cluster.log.debug(f"installed packages: {good_results}")
     tc.success("all packages have correct versions")
 
