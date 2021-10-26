@@ -1,3 +1,6 @@
+import io
+import json
+import time
 from kubetool.core.group import NodeGroup
 
 
@@ -32,3 +35,30 @@ def remove_members(group: NodeGroup):
             managing_master.sudo(command)
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
+
+def wait_for_health(cluster, connection):
+
+    log = cluster.log
+    timeout = cluster.globals['etcd']['health']['timeout']
+    retries = cluster.globals['etcd']['health']['retries']
+
+    while retries > 0:
+        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json'
+                                           , is_async=False, hide=False).get_simple_out()
+        etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
+
+        health = 0
+        for etcd_health in etcd_health_list:
+            if etcd_health.get('health'):
+                health += 1
+
+        if health == len(etcd_health_list):
+            log.debug('All ETCD members are healthy!')
+            return
+        else:
+            log.debug('Wait for ETCD cluster is recovering!')
+            time.sleep(timeout)
+            retries -= 1
+
+    raise Exception('ETCD cluster is still not healthy!')
+
