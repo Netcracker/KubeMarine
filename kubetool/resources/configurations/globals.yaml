@@ -231,6 +231,13 @@ compatibility_map:
         version: v0.0.19
       v1.22:
         version: v0.0.19
+    pause:
+      v1.20:
+        version: 3.2
+      v1.21:
+        version: 3.4.1
+      v1.22:
+        version: 3.5
   hardware:
     minimal:
       balancer:
