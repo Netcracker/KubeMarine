@@ -151,7 +151,7 @@ def apply_registry(inventory, cluster):
     elif cri_impl == "containerd":
         registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{full_registry_address}"'
         effective_kubernetes_version = ".".join(inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
-        pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]
+        pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]['version']
         if not inventory['services']['cri']['containerdConfig'].get(registry_section):
             inventory['services']['cri']['containerdConfig'][registry_section] = {
                 'endpoint': ["%s://%s" % (protocol, full_registry_address)]
