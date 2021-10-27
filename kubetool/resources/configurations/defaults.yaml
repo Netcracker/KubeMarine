@@ -16,7 +16,7 @@ services:
   kubeadm:
     apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
-    kubernetesVersion: v1.20.11
+    kubernetesVersion: v1.22.2
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     networking:
       podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/80{% endif %}'
