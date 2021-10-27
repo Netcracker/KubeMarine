@@ -1848,6 +1848,8 @@ services:
       userland-proxy: False
 ```
 
+**Note**: default value of `SystemdCgroup` = `true` only in case, when `cgroupDriver` from [kubelet config](#kubeadm_kubelet) is equal to `systemd`.
+
 The `containerRuntime` parameter configures a particular container runtime implementation used for kubernetes.
 The available values are `docker` and `containerd`. By default `containerd` is used.
 
