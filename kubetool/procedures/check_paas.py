@@ -556,9 +556,10 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         elif len(bad_ips) == 0:
             pretty_list = '\n - ' + ('\n - '.join(permissive_ips))
             raise TestWarn('permissive',
-                           hint=f"It is not recommended to use permissive state, but this is possible if you explicitly "
-                                f"specify this in your inventory, thereby assuming all risks. It is recommended to use "
-                                f"\"enforcing\" policy only on the following nodes:{pretty_list}")
+                           hint=f"It is not recommended to use permissive state, but this is possible if you "
+                                f"explicitly specify this in your inventory, thereby assuming all risks. Only "
+                                f"\"enforcing\" policy is recommended. Please use it on the following "
+                                f"nodes:{pretty_list}")
         else:
             bad_states = []
             pretty_list_ips = []
@@ -571,8 +572,9 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
                     pretty_list_ips.append(ip)
             pretty_list = '\n - ' + ('\n - '.join(pretty_list_ips))
             raise TestFailure(', '.join(bad_states),
-                              hint=f"Selinux is configured with wrong state, which is not recommended. It is recommended"
-                                   f" to use \"enforcing\" policy only on the following nodes:{pretty_list}")
+                              hint=f"Selinux is configured with wrong state, which is not recommended. Only "
+                                   f"\"enforcing\" policy is recommended. Please use it on the following "
+                                   f"nodes:{pretty_list}")
 
 
 def verify_selinux_config(cluster: KubernetesCluster) -> None:
