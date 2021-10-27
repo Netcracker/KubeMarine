@@ -51,15 +51,28 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
         return inventory_to_finalize
 
     nodes_for_removal = cluster.nodes['all'].get_nodes_for_removal()
+    final_nodes = cluster.nodes['all'].get_final_nodes()
 
     # check if there are no more hosts where keepalived installed - remove according vrrp_ips
-    for i, vrrp_ip in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
-        for j, host in enumerate(inventory_to_finalize['vrrp_ips'][i].get('hosts', [])):
-            if nodes_for_removal.has_node(host["name"]):
-                del inventory_to_finalize['vrrp_ips'][i]["hosts"][j]
-        if not bool(inventory_to_finalize['vrrp_ips'][i].get('hosts',
-                                                             keepalived.get_default_node_names(inventory_to_finalize))):
+    for i, item in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
+        if 'hosts' in item:
+            hosts = item['hosts']
+        else:
+            from kubetool import keepalived
+            hosts = keepalived.get_default_node_names(inventory_to_finalize)
+
+        for host in hosts:
+            host_name = host
+            if isinstance(host_name, dict):
+                host_name = host['name']
+            if final_nodes.get_first_member(apply_filter={"name": host_name}) is None:
+                hosts.remove(host)
+        if not hosts:
             del inventory_to_finalize['vrrp_ips'][i]
+        else:
+            if inventory_to_finalize['vrrp_ips'][i].get('hosts', []):
+                inventory_to_finalize['vrrp_ips'][i]['hosts'] = hosts
+
     # remove nodes from inventory if they in nodes for removal
     # todo deletion of elements from collection to iterate over!
     for i, node in enumerate(inventory_to_finalize['nodes']):
