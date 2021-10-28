@@ -53,14 +53,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
     nodes_for_removal = cluster.nodes['all'].get_nodes_for_removal()
     final_nodes = cluster.nodes['all'].get_final_nodes()
 
-    # remove nodes from inventory if they in nodes for removal
-    # todo deletion of elements from collection to iterate over!
-    for i, node in enumerate(inventory_to_finalize['nodes']):
-        if nodes_for_removal.has_node(node["name"]):
-            del inventory_to_finalize['nodes'][i]
-
     # check if there are no more hosts where keepalived installed - remove according vrrp_ips
-    # todo deletion of elements from collection to iterate over!
     for i, item in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
         if 'hosts' in item:
             hosts = item['hosts']
@@ -69,10 +62,22 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
             hosts = keepalived.get_default_node_names(inventory_to_finalize)
 
         for host in hosts:
-            if isinstance(host, dict):
-                host = host['name']
-            if final_nodes.get_first_member(apply_filter={"name": host}) is None:
-                del inventory_to_finalize['vrrp_ips'][i]
+            host_name = host
+            if isinstance(host_name, dict):
+                host_name = host['name']
+            if final_nodes.get_first_member(apply_filter={"name": host_name}) is None:
+                hosts.remove(host)
+        if not hosts:
+            del inventory_to_finalize['vrrp_ips'][i]
+        else:
+            if inventory_to_finalize['vrrp_ips'][i].get('hosts', []):
+                inventory_to_finalize['vrrp_ips'][i]['hosts'] = hosts
+
+    # remove nodes from inventory if they in nodes for removal
+    # todo deletion of elements from collection to iterate over!
+    for i, node in enumerate(inventory_to_finalize['nodes']):
+        if nodes_for_removal.has_node(node["name"]):
+            del inventory_to_finalize['nodes'][i]
 
     if inventory_to_finalize['services'].get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
         for node in nodes_for_removal.get_ordered_members_list(provide_node_configs=True):
