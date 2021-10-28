@@ -111,10 +111,6 @@ def parse_selinux_permissive_types(log, stdout):
 def get_selinux_status(group):
     log = group.cluster.log
 
-    # 2 commands in 1 run
-    # Seems not good at all, but:
-    # 1) This will reduce connections across all nodes
-    # 2) This will show in log all selinux settings in a single return
     result = group.sudo("sestatus && sudo semanage permissive -l")
 
     parsed_result = {}

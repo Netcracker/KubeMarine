@@ -10,7 +10,8 @@ from typing import List
 import yaml
 import ruamel.yaml
 
-from kubetool import packages as pckgs, system
+from kubetool import packages as pckgs, system, selinux
+from kubetool.core.cluster import KubernetesCluster
 from kubetool.procedures import check_iaas
 from kubetool.core import flow
 from kubetool.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -527,8 +528,172 @@ def nodes_pid_max(cluster):
         tc.success(results="pid_max correctly installed on all nodes")
 
 
+def verify_selinux_status(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must
+    be explicitly specified in the inventory. Otherwise, the test will fail. This test is applicable only for systems of
+    the RHEL family.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    if system.get_os_family(cluster) == 'debian':
+        return
+
+    with TestCase(cluster.context['testsuite'], '213', "Security", "Selinux security policy") as tc:
+        group = cluster.nodes['all']
+        selinux_configured, selinux_result, selinux_parsed_result = \
+            selinux.is_config_valid(group,
+                                    state=selinux.get_expected_state(cluster.inventory),
+                                    policy=selinux.get_expected_policy(cluster.inventory),
+                                    permissive=selinux.get_expected_permissive(cluster.inventory))
+        cluster.log.debug(selinux_result)
+        enforcing_ips = []
+        permissive_ips = []
+        bad_ips = []
+        for conn, results in selinux_parsed_result.items():
+            if results['mode'] == 'enforcing':
+                enforcing_ips.append(conn.host)
+            elif results['mode'] == 'permissive' and cluster.inventory.get('services', {})\
+                    .get('kernel_security', {}).get('selinux', {}).get('state') == 'permissive':
+                permissive_ips.append(conn.host)
+            else:
+                bad_ips.append([conn.host, results['mode']])
+
+        if group.nodes_amount() == len(enforcing_ips):
+            tc.success(results='enforcing')
+        elif len(bad_ips) == 0:
+            pretty_list = '\n - ' + ('\n - '.join(permissive_ips))
+            raise TestWarn('permissive',
+                           hint=f"It is not recommended to use permissive state, but this is possible if you "
+                                f"explicitly specify this in your inventory, thereby assuming all risks. Only "
+                                f"\"enforcing\" policy is recommended. Please use it on the following "
+                                f"nodes:{pretty_list}")
+        else:
+            bad_states = []
+            pretty_list_ips = []
+            for ip_state in bad_ips:
+                ip = ip_state[0]
+                state = ip_state[1]
+                if state not in bad_states:
+                    bad_states.append(state)
+                if ip not in pretty_list_ips:
+                    pretty_list_ips.append(ip)
+            pretty_list = '\n - ' + ('\n - '.join(pretty_list_ips))
+            raise TestFailure(', '.join(bad_states),
+                              hint=f"Selinux is configured with wrong state, which is not recommended. Only "
+                                   f"\"enforcing\" policy is recommended. Please use it on the following "
+                                   f"nodes:{pretty_list}")
+
+
+def verify_selinux_config(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which compares the configuration of Selinux on the nodes with the configuration specified in
+    the inventory or with the one by default. If the configuration does not match, the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    if system.get_os_family(cluster) == 'debian':
+        return
+
+    with TestCase(cluster.context['testsuite'], '214', "Security", "Selinux configuration") as tc:
+        group = cluster.nodes['all']
+        selinux_configured, selinux_result, selinux_parsed_result = \
+            selinux.is_config_valid(group,
+                                    state=selinux.get_expected_state(cluster.inventory),
+                                    policy=selinux.get_expected_policy(cluster.inventory),
+                                    permissive=selinux.get_expected_permissive(cluster.inventory))
+        cluster.log.debug(selinux_result)
+        if selinux_configured:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid',
+                              hint=f"Selinux is incorrectly configured - its configuration is different from the one "
+                                   f"specified in the inventory. Check the configuration and run the selinux setup task"
+                                   f" via installation procedure.")
+
+
+def verify_firewalld_status(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster.context['testsuite'], '215', "Security", "Firewalld status") as tc:
+        group = cluster.nodes['all']
+        firewalld_disabled, firewalld_result = system.is_firewalld_disabled(group)
+        cluster.log.debug(firewalld_result)
+        if firewalld_disabled:
+            tc.success(results='disabled')
+        else:
+            raise TestFailure('enabled',
+                              hint=f"FirewallD must be disabled as it is not supported and can create compatibility "
+                                   f"issues. To solve this problem, execute firewalld disable task in the installation "
+                                   f"procedure.")
+
+
+def verify_swap_state(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which verifies that swap is disabled on all nodes in the cluster, otherwise the test will
+    fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster.context['testsuite'], '216', "System", "Swap state") as tc:
+        group = cluster.nodes['all']
+        swap_disabled, swap_result = system.is_swap_disabled(group)
+        cluster.log.debug(swap_result)
+        if swap_disabled:
+            tc.success(results='disabled')
+        else:
+            raise TestFailure('enabled',
+                              hint=f"Swap must be disabled as it is not supported and can create performance "
+                                   f"issues. To solve this problem, execute swap disable task in the installation "
+                                   f"procedure.")
+
+
+def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which compares the modprobe rules on the nodes with the rules specified in the inventory or
+    with default rules. If rules does not match, the test will fail.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster.context['testsuite'], '217', "System", "Modprobe rules") as tc:
+        group = cluster.nodes['all']
+        modprobe_valid, modprobe_result = system.is_modprobe_valid(group)
+        cluster.log.debug(modprobe_result)
+        if modprobe_valid:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid',
+                              hint=f"Modprobe rules do not match those loaded in modprobe on cluster nodes. Check "
+                                   f"manually what the differences are and make changes on the appropriate nodes.")
+
+
 tasks = OrderedDict({
     'services': {
+        'security': {
+            'selinux': {
+                'status': verify_selinux_status,
+                'config': verify_selinux_config
+            },
+            # TODO: support apparmor validation
+            # 'apparmor': {
+            #     'status': None,
+            #     'config': None
+            # },
+            'firewalld': {
+                'status': verify_firewalld_status
+            }
+        },
+        'system': {
+            'swap': {
+                'status': verify_swap_state
+            },
+            'modprobe': {
+                'rules': verify_modprobe_rules
+            }
+        },
         'haproxy': {
             'status': lambda cluster: services_status(cluster, 'haproxy'),
         },
@@ -577,6 +742,7 @@ tasks = OrderedDict({
             },
         },
     },
+    # TODO: support ETCD health validation
     # 'etcd': {
     #     'health_status': etcd_health_status
     # }

@@ -93,12 +93,13 @@ class FlowTest(unittest.TestCase):
 
     def test_proceed_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
         cumulative_points = {
-            'core.test_flow.test_func': ['prepare.system.modprobe']
+            method_full_name: ['prepare.system.modprobe']
         }
         flow.schedule_cumulative_point(cluster, test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
-        self.assertIn(test_msg, str(res))
+        self.assertIn(test_msg, str(res.get(method_full_name)))
 
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))

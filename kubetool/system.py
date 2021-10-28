@@ -606,15 +606,15 @@ def verify_system(group):
         if not selinux_configured:
             raise Exception("Selinux is still not configured")
     else:
-        log.verbose('Selinux verification skipped - origin task was not completed')
+        log.debug('Selinux verification skipped - origin task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.setup_apparmor'):
         log.debug("Verifying Apparmor...")
-        # TODO
+        # TODO: support apparmor validation
         # if not apparmor_configured:
         #     raise Exception("Selinux is still not configured")
     else:
-        log.verbose('Apparmor verification skipped - origin task was not completed')
+        log.debug('Apparmor verification skipped - origin task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
@@ -623,7 +623,7 @@ def verify_system(group):
         if not firewalld_disabled:
             raise Exception("FirewallD is still enabled")
     else:
-        log.verbose('FirewallD verification skipped - origin disable task was not completed')
+        log.debug('FirewallD verification skipped - origin disable task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_swap'):
         log.debug("Verifying swap...")
@@ -632,16 +632,16 @@ def verify_system(group):
         if not swap_disabled:
             raise Exception("Swap is still enabled")
     else:
-        log.verbose('Swap verification skipped - origin disable task was not completed')
+        log.debug('Swap verification skipped - origin disable task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.modprobe'):
         log.debug("Verifying modprobe...")
-        modprobe_valid, swap_result = is_modprobe_valid(group)
-        log.debug(swap_result)
+        modprobe_valid, modprobe_result = is_modprobe_valid(group)
+        log.debug(modprobe_result)
         if not modprobe_valid:
             raise Exception("Required kernel modules are not presented")
     else:
-        log.verbose('Modprobe verification skipped - origin setup task was not completed')
+        log.debug('Modprobe verification skipped - origin setup task was not completed')
 
 
 def detect_active_interface(group: NodeGroup):
