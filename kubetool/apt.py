@@ -1,13 +1,15 @@
 import io
 
+from kubetool.core.group import NodeGroupResult
+
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
 
 
-def ls_repofiles(group):
+def ls_repofiles(group) -> NodeGroupResult:
     return group.sudo('ls -la /etc/apt/sources.list.d')
 
 
-def backup_repo(group, repo_filename="*"):
+def backup_repo(group, repo_filename="*") -> NodeGroupResult or None:
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
@@ -17,7 +19,7 @@ def backup_repo(group, repo_filename="*"):
         "find %s -type f -name '%s.list' | sudo xargs -iNAME mv -f NAME NAME.bak" % ("/etc/apt/", repo_filename))
 
 
-def add_repo(group, repo_data="", repo_filename="predefined"):
+def add_repo(group, repo_data="", repo_filename="predefined") -> NodeGroupResult:
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
@@ -27,11 +29,11 @@ def add_repo(group, repo_data="", repo_filename="predefined"):
     return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update')
 
 
-def clean(group):
+def clean(group) -> NodeGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean")
 
 
-def install(group, include=None, exclude=None):
+def install(group, include=None, exclude=None) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
 
@@ -50,7 +52,7 @@ def install(group, include=None, exclude=None):
     # thus we do not need additional checks here (in contrast to yum)
 
 
-def remove(group, include=None, exclude=None):
+def remove(group, include=None, exclude=None) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -66,7 +68,7 @@ def remove(group, include=None, exclude=None):
     return group.sudo(command)
 
 
-def upgrade(group, include=None, exclude=None):
+def upgrade(group, include=None, exclude=None) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 

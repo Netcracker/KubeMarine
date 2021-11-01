@@ -67,7 +67,8 @@ def main(cli_arguments=None):
     if args.exclude != '':
         defined_excludes = args.exclude.split(",")
 
-    context = flow.create_context(args, procedure='reboot')
+    context = flow.create_context(args, procedure='reboot',
+                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
     context['inventory_regenerate_required'] = False
 
     flow.run(

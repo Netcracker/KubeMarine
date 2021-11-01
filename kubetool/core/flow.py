@@ -28,17 +28,25 @@ def run(tasks,
     if cumulative_points is None:
         cumulative_points = {}
 
+    print("Excluded tasks:")
+    filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks)
+    if filtered_tasks == tasks:
+        print("\tNo excluded tasks")
+
+    if not context.get('scheduled_tasks'):
+        context['scheduled_tasks'] = {}
+    if context['scheduled_tasks'].get('included') is None:
+        context['scheduled_tasks']['included'] = tasks_filter
+    if context['scheduled_tasks'].get('excluded') is None:
+        context['scheduled_tasks']['excluded'] = excluded_tasks
+    context['scheduled_tasks']['final'] = final_list
+
     if not context['execution_arguments'].get('disable_dump', True):
         utils.prepare_dump_directory(context['execution_arguments'].get('dump_location'),
                                      reset_directory=not context['execution_arguments'].get('disable_dump_cleanup', False))
 
     cluster = load_inventory(inventory_filepath, context, procedure_inventory_filepath=procedure_inventory_filepath,
                              cluster_obj=cluster_obj)
-
-    cluster.log.debug("Excluded tasks:")
-    filtered_tasks = filter_flow(tasks, tasks_filter, excluded_tasks)
-    if filtered_tasks == tasks:
-        cluster.log.debug("\tNo excluded tasks")
 
     if 'ansible_inventory_location' in cluster.context['execution_arguments']:
         utils.make_ansible_inventory(cluster.context['execution_arguments']['ansible_inventory_location'], cluster)
@@ -70,12 +78,17 @@ def create_empty_context(procedure=None):
     return {
         "execution_arguments": {},
         "proceeded_tasks": [],
+        "scheduled_tasks": {
+            'included': [],
+            'excluded': [],
+            'final': []
+        },
         "nodes": {},
         'initial_procedure': procedure
     }
 
 
-def create_context(execution_arguments, procedure=None):
+def create_context(execution_arguments, procedure=None, included_tasks=None, excluded_tasks=None):
 
     if isinstance(execution_arguments, argparse.Namespace):
         execution_arguments = vars(execution_arguments)
@@ -90,6 +103,12 @@ def create_context(execution_arguments, procedure=None):
         #               ', '.join(context['execution_arguments']['exclude_cumulative_points_methods']))
     else:
         context['execution_arguments']['exclude_cumulative_points_methods'] = []
+
+    if included_tasks:
+        context['scheduled_tasks']['included'] = included_tasks
+
+    if excluded_tasks:
+        context['scheduled_tasks']['excluded'] = excluded_tasks
 
     return context
 
@@ -121,6 +140,7 @@ def load_inventory(inventory_filepath, context, silent=False, procedure_inventor
 
 def filter_flow(tasks, tasks_filter, excluded_tasks, _task_path='', flow_changed=False):
     filtered = {}
+    final_list = []
 
     # Remove any whitespaces from filters
     map(str.strip, tasks_filter)
@@ -146,14 +166,16 @@ def filter_flow(tasks, tasks_filter, excluded_tasks, _task_path='', flow_changed
         if allowed and (not excluded_tasks or __task_path not in excluded_tasks):
             if callable(task):
                 filtered[task_name] = task
+                final_list.append(__task_path)
             else:
-                filtered_flow = filter_flow(task, tasks_filter, excluded_tasks, __task_path, flow_changed)
+                filtered_flow, _final_list = filter_flow(task, tasks_filter, excluded_tasks, __task_path, flow_changed)
                 if filter_flow is not {}:
                     filtered[task_name] = filtered_flow
+                    final_list += _final_list
         else:
             print("\t%s" % __task_path)
 
-    return filtered
+    return filtered, final_list
 
 
 def run_flow(tasks, cluster, cumulative_points, _task_path=''):

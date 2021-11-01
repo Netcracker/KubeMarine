@@ -14,14 +14,14 @@ GRE = ContextVar('KubetoolsGlobalRemoteExecutor', default=None)
 
 class RemoteExecutor:
 
-    def __init__(self, log,
+    def __init__(self, cluster,
                  warn=False,
                  lazy=True,
                  parallel=True,
                  ignore_failed=False,
                  enforce_children=False,
                  timeout=None):
-        self.log = log
+        self.cluster = cluster
         self.warn = warn
         self.lazy = lazy
         self.parallel = parallel
@@ -170,7 +170,7 @@ class RemoteExecutor:
             target = list(target.values())
 
         if not target:
-            executor.log.verbose('Connections list is empty, nothing to queue')
+            executor.cluster.log.verbose('Connections list is empty, nothing to queue')
         else:
             for connection in target:
                 if not executor.connections_queue.get(connection):
@@ -202,7 +202,7 @@ class RemoteExecutor:
         executor = self._get_active_executor()
         if len(executor.results) == 0:
             return None
-        group_results = NodeGroupResult()
+        group_results = NodeGroupResult(self.cluster)
         for cxn, host_results in executor.get_last_results().items():
             merged_result = {
                 "stdout": None,
@@ -285,7 +285,7 @@ class RemoteExecutor:
         batch_results = {}
 
         if not executor.connections_queue:
-            executor.log.verbose('Queue is empty, nothing to perform')
+            executor.cluster.log.verbose('Queue is empty, nothing to perform')
             return batch_results
 
         callable_batches = executor._get_callables()
@@ -311,7 +311,7 @@ class RemoteExecutor:
                 for cxn, payload in batch.items():
                     action, callbacks, tokens = payload
                     do_type, args, kwargs = action
-                    executor.log.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
+                    executor.cluster.log.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
                     safe_exec(futures, cxn.host, lambda: TPE.submit(getattr(cxn, do_type), *args, **kwargs))
 
                 for host, future in futures.items():

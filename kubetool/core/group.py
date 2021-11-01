@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
 import io
 import os
@@ -36,6 +36,11 @@ fabric.runners.Result.__ne__ = lambda self, other: not _compare_fabric_results(s
 
 
 class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connection, _GenericResult]):
+
+    def __init__(self, cluster, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cluster = cluster
+
     def get_simple_out(self):
         if len(self) != 1:
             raise NotImplementedError("Simple output can be returned only for NodeGroupResult consisted of "
@@ -69,7 +74,10 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return output
 
     def print(self):
-        print(self)
+        self.cluster.log.debug(self)
+
+    def get_group(self):
+        return self.cluster.make_group(list(self.keys()))
 
     def is_any_has_code(self, code):
         for conn, result in self.items():
@@ -79,6 +87,28 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
 
     def is_any_failed(self):
         return self.is_any_has_code(1)
+
+    def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
+        failed_nodes: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if result.exited == 1:
+                failed_nodes.append(conn)
+        return failed_nodes
+
+    def get_failed_nodes_group(self) -> NodeGroup:
+        nodes_list = self.get_failed_nodes_list()
+        return self.cluster.make_group(nodes_list)
+
+    def get_nonzero_nodes_list(self) -> List[fabric.connection.Connection]:
+        failed_nodes: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if result.exited != 0:
+                failed_nodes.append(conn)
+        return failed_nodes
+
+    def get_nonzero_nodes_group(self) -> NodeGroup:
+        nodes_list = self.get_nonzero_nodes_list()
+        return self.cluster.make_group(nodes_list)
 
     def __eq__(self, other):
         if self is other:
@@ -116,7 +146,7 @@ class NodeGroup:
         self.nodes = connections
 
     def _make_result(self, results: _HostToResult) -> NodeGroupResult:
-        group_result = NodeGroupResult()
+        group_result = NodeGroupResult(self.cluster)
         for host, result in results.items():
             group_result[self.nodes[host]] = result
 
@@ -329,7 +359,7 @@ class NodeGroup:
 
         self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (do_type, args, list(nodes.keys()), kwargs))
 
-        executor = RemoteExecutor(self.cluster.log, lazy=False, parallel=is_async, timeout=execution_timeout)
+        executor = RemoteExecutor(self.cluster, lazy=False, parallel=is_async, timeout=execution_timeout)
         results = executor.queue(nodes, (do_type, args, kwargs))
 
         if not isinstance(results, int):
@@ -390,7 +420,7 @@ class NodeGroup:
         if initial_boot_history:
             self.cluster.log.verbose("Initial boot history:\n%s" % initial_boot_history)
         else:
-            initial_boot_history = NodeGroupResult()
+            initial_boot_history = NodeGroupResult(self.cluster)
 
         left_nodes = self.nodes
         results: _HostToResult = {}
@@ -570,46 +600,61 @@ class NodeGroup:
             result.append(node['name'])
         return result
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return not self.nodes
 
     def has_node(self, node_name):
         return self.get_first_member(apply_filter={"name": node_name}) is not None
 
-    def get_new_nodes(self):
+    def get_new_nodes(self) -> NodeGroup:
         return self.intersection_group(self.cluster.nodes.get('add_node'))
 
-    def get_new_nodes_or_self(self):
+    def get_new_nodes_or_self(self) -> NodeGroup:
         new_nodes = self.get_new_nodes()
         if not new_nodes.is_empty():
             return new_nodes
         return self
 
-    def get_nodes_for_removal(self):
+    def get_nodes_for_removal(self) -> NodeGroup:
         return self.intersection_group(self.cluster.nodes.get('remove_node'))
 
-    def get_nodes_for_removal_or_self(self):
+    def get_nodes_for_removal_or_self(self) -> NodeGroup:
         nodes_for_removal = self.get_nodes_for_removal()
         if not nodes_for_removal.is_empty():
             return nodes_for_removal
         return self
 
-    def get_changed_nodes(self):
+    def get_changed_nodes(self) -> NodeGroup:
         return self.get_new_nodes().include_group(self.get_nodes_for_removal())
 
-    def get_unchanged_nodes(self):
+    def get_unchanged_nodes(self) -> NodeGroup:
         return self.exclude_group(self.get_changed_nodes())
 
-    def get_final_nodes(self):
+    def get_final_nodes(self) -> NodeGroup:
         return self.exclude_group(self.cluster.nodes.get('remove_node'))
 
-    def get_initial_nodes(self):
+    def get_initial_nodes(self) -> NodeGroup:
         return self.exclude_group(self.cluster.nodes.get('add_node'))
 
-    def nodes_amount(self):
+    def nodes_amount(self) -> int:
         return len(self.nodes.keys())
 
-    def get_nodes_with_os(self, os_family):
+    def get_nodes_os(self, suppress_exceptions=False):
+        detected_os_family = None
+        for node in self.get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
+            os_family = self.cluster.context["nodes"][node['connect_to']]["os"]['family']
+            if os_family == 'unknown' and not suppress_exceptions:
+                raise Exception('OS family is unknown')
+            if not detected_os_family:
+                detected_os_family = os_family
+            elif detected_os_family != os_family:
+                detected_os_family = 'multiple'
+                if not suppress_exceptions:
+                    raise Exception(
+                        'OS families differ: detected %s and %s in same cluster' % (detected_os_family, os_family))
+        return detected_os_family
+
+    def get_nodes_with_os(self, os_family) -> NodeGroup:
         if os_family not in ['debian', 'rhel', 'rhel8']:
             raise Exception('Unsupported OS family provided')
         node_names = []

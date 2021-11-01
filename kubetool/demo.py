@@ -149,7 +149,7 @@ class FakeNodeGroup(group.NodeGroup):
                     found_result[host] = result.result
 
             # Remote Executor support code
-            gre = RemoteExecutor(self.cluster.log)
+            gre = RemoteExecutor(self.cluster)
             executor = gre._get_active_executor()
             batch_results = {}
             for host, result in found_result.items():
@@ -167,7 +167,7 @@ class FakeNodeGroup(group.NodeGroup):
         return
 
     def _make_result(self, results: _HostToResult) -> FakeNodeGroupResult:
-        group_result = FakeNodeGroupResult()
+        group_result = FakeNodeGroupResult(self.cluster)
         for host, result in results.items():
             group_result[self.nodes[host]] = result
 

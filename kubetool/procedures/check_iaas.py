@@ -507,7 +507,8 @@ Hot to use:
     if args.exclude != '':
         defined_excludes = args.exclude.split(",")
 
-    context = flow.create_context(args, procedure='iaas')
+    context = flow.create_context(args, procedure='iaas',
+                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
     context['testsuite'] = TestSuite()
 
     cluster = flow.run(

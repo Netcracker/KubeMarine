@@ -46,7 +46,7 @@ def configure(group):
 def prune(group, all_implementations=False):
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
-    result = NodeGroupResult()
+    result = NodeGroupResult(group.cluster)
     if cri_impl == "docker" or all_implementations:
         result.update(docker.prune(group))
 

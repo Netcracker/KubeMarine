@@ -4068,7 +4068,9 @@ The following is the installation tasks tree:
     * **disable_swap** - Forcibly disables swap in system.
     * **modprobe** - Configures Linux Kernel modules. For more information about parameters for this task, see [modprobe](#modprobe).
     * **sysctl** - Configures Linux Kernel parameters. For more information about parameters for this task, see [sysctl](#sysctl).
-    * **audit** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
+    * **audit**
+      * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
+      * **configure** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).

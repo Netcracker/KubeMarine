@@ -281,7 +281,7 @@ def is_available_master(master):
 def install(group):
     log = group.cluster.log
 
-    with RemoteExecutor(log):
+    with RemoteExecutor(group.cluster):
         log.debug("Making systemd unit...")
         group.sudo('rm -rf /etc/systemd/system/kubelet*')
         for node in group.cluster.inventory["nodes"]:
@@ -368,7 +368,7 @@ def join_master(group, node, join_dict):
 
     log.debug("Patching apiServer bind-address for master %s" % node['name'])
 
-    with RemoteExecutor(log):
+    with RemoteExecutor(group.cluster):
         node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
                                 "/etc/kubernetes/manifests/kube-apiserver.yaml" % node['internal_address'])
         node['connection'].sudo("systemctl restart kubelet")
@@ -582,7 +582,7 @@ def apply_labels(group):
     log.debug("Applying additional labels for nodes")
     # TODO: Add "--overwrite-labels" switch
     # TODO: Add labels validation after applying
-    with RemoteExecutor(log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             if "labels" not in node:
                 log.verbose("No additional labels found for %s" % node['name'])
@@ -603,7 +603,7 @@ def apply_taints(group):
     log = group.cluster.log
 
     log.debug("Applying additional taints for nodes")
-    with RemoteExecutor(log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             if "taints" not in node:
                 log.verbose("No additional taints found for %s" % node['name'])
@@ -1047,7 +1047,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     groups_amount = math.ceil(len(nodes) / group_size)
 
     log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (len(nodes), group_size, groups_amount))
-    with RemoteExecutor(cluster.log) as exe:
+    with RemoteExecutor(cluster) as exe:
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull

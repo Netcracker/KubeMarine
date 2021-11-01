@@ -137,15 +137,15 @@ services:
 
   audit:
     rules:
-      - -w /var/lib/docker -k docker
-      - -w /etc/docker -k docker
-      - -w /usr/lib/systemd/system/docker.service -k docker
-      - -w /usr/lib/systemd/system/docker.socket -k docker
-      - -w /etc/default/docker -k docker
-      - -w /etc/docker/daemon.json -k docker
-      - -w /usr/bin/containerd -k docker
-      - -w /usr/sbin/runc -k dockerks
-      - -w /usr/bin/dockerd -k docker
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.service -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.socket -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/default/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker/daemon.json -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/sbin/runc -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/bin/dockerd -k docker{% endif %}'
+      - '-w /usr/bin/containerd -k docker'
 
   coredns:
     deployment:

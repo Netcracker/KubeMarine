@@ -409,8 +409,13 @@ def compile_inventory(inventory, cluster):
 
 def compile_object(log, struct, root, ignore_jinja_escapes=True):
     if isinstance(struct, list):
+        new_struct = []
         for i, v in enumerate(struct):
             struct[i] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            # delete empty list entries, which can appear after jinja compilation
+            if struct[i] != '':
+                new_struct.append(struct[i])
+        struct = new_struct
     elif isinstance(struct, dict):
         for k, v in struct.items():
             struct[k] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
