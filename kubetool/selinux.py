@@ -125,6 +125,10 @@ def get_selinux_status(group):
 def is_config_valid(group, state=None, policy=None, permissive=None):
     log = group.cluster.log
 
+    if system.get_os_family(group.cluster) == 'debian':
+        log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
+        return
+
     log.verbose('Verifying selinux configs...')
 
     if state is None:

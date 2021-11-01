@@ -594,8 +594,9 @@ def is_modprobe_valid(group):
 
 def verify_system(group):
     log = group.cluster.log
+    os_family = get_os_family(group.cluster)
 
-    if group.cluster.is_task_completed('prepare.system.setup_selinux'):
+    if group.cluster.is_task_completed('prepare.system.setup_selinux') and os_family in ['rhel', 'rhel8']:
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
@@ -608,13 +609,13 @@ def verify_system(group):
     else:
         log.debug('Selinux verification skipped - origin task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.setup_apparmor'):
-        log.debug("Verifying Apparmor...")
-        # TODO: support apparmor validation
-        # if not apparmor_configured:
-        #     raise Exception("Selinux is still not configured")
-    else:
-        log.debug('Apparmor verification skipped - origin task was not completed')
+    # TODO: support apparmor validation
+    # if group.cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
+    #     log.debug("Verifying Apparmor...")
+    #     if not apparmor_configured:
+    #         raise Exception("Selinux is still not configured")
+    # else:
+    #     log.debug('Apparmor verification skipped - origin task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
