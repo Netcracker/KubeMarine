@@ -14,7 +14,7 @@ from kubetool.core.executor import RemoteExecutor
 from kubetool.core.group import NodeGroup
 
 version_coredns_path_breakage = "v1.21.2"
-
+fix_audit_log = "/var/log/audit.log"
 
 def add_node_enrichment(inventory, cluster):
     if cluster.context.get('initial_procedure') != 'add_node':
@@ -103,6 +103,11 @@ def enrich_inventory(inventory, cluster):
         if repository:
             inventory['services']['kubeadm']['dns'] = {}
             inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
+    if version_audit_wrong(inventory['services']['kubeadm']['kubernetesVersion'], fix_audit_log):
+        audit_logs = inventory['services']['kubeadm'].get('audit-log-path', "")
+        if audit_logs:
+            inventory['services']['kubeadm']['apiServer']['extraArgs'] = {}
+            inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'] = ("%s" % audit_logs)
     # if user redefined apiServer as, string, for example?
     if not isinstance(inventory["services"]["kubeadm"].get('apiServer'), dict):
         inventory["services"]["kubeadm"]['apiServer'] = {}
@@ -716,6 +721,24 @@ def patch_kubeadm_configmap(first_master, cluster):
     config_map = yaml.load(kubeadm_config_map)
     cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
     cluster_configuration = yaml.load(cluster_configuration_yaml)
+    cluster_configuration_yaml_audit = config_map["data"]["ClusterConfiguration"]["apiServer"]
+    cluster_configuration_audit = yaml.load(cluster_configuration_yaml_audit)
+    if version_audit_wrong(cluster.inventory['services']['kubeadm']['kubernetesVersion'], fix_audit_log):
+        if not cluster_configuration_audit.get("audit-log-path", {}):
+            cluster_configuration_audit["apiServer"]["extraArgs"] = {}
+            cluster_configuration_audit['apiServer']['extraArgs']['audit-log-path'] = (
+                        "%s" % cluster_configuration_audit["apiServer"]["extraArgs"])
+        else:
+            if not cluster_configuration_audit['extraArgs'].get('audit-log-path', ""):
+                cluster_configuration_audit['extraArgs']['audit-log-path'] = (
+                            "%s" % cluster_configuration_audit["apiServer"]["extraArgs"])
+        updated_config = io.StringIO()
+        kubelet_config = first_master["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
+        yaml.dump(cluster_configuration_audit, updated_config)
+        result_config = kubelet_config + "---\n" + updated_config.getvalue()
+        first_master["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
+        return True
+
     if version_higher_or_equal(cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                version_coredns_path_breakage):
         if not cluster_configuration.get("dns", {}):
