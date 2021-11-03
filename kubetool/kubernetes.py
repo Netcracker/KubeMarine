@@ -711,24 +711,30 @@ def patch_kubeadm_configmap(first_master, cluster):
     and the corresponding version of the CoreDNS path to the image.
     '''
     # TODO: get rid of this method after k8s 1.21 support stop
+    current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
     kubeadm_config_map = first_master["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
-    yaml = ruamel.yaml.YAML()
-    config_map = yaml.load(kubeadm_config_map)
+    ryaml = ruamel.yaml.YAML()
+    config_map = ryaml.load(kubeadm_config_map)
     cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
-    cluster_configuration = yaml.load(cluster_configuration_yaml)
-    current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    cluster_config = ryaml.load(cluster_configuration_yaml)
+
+    if not cluster_config.get("dns"):
+        cluster_config["dns"] = {}
 
     updated_config = io.StringIO()
-    cluster_configuration["apiServer"]["extraArgs"]["audit-log-path"] = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
+
+    cluster_config["apiServer"]["extraArgs"]["audit-log-path"] = \
+        cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
+
+    if cluster.context.get('patch_image_repo', False):
+        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace('/k8s.gcr.io', '')
 
     if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
-        if not cluster_configuration.get("dns"):
-            cluster_configuration["dns"] = {}
-        cluster_configuration['dns']['imageRepository'] = ("%s/coredns" % cluster_configuration["imageRepository"])
+        cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
     kubelet_config = first_master["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
-    yaml.dump(cluster_configuration, updated_config)
+    ryaml.dump(cluster_config, updated_config)
     result_config = kubelet_config + "---\n" + updated_config.getvalue()
     first_master["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
 
