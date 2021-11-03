@@ -707,32 +707,32 @@ def upgrade_other_masters(version, upgrade_group, cluster, drain_timeout=None, g
 
 def patch_kubeadm_configmap(first_master, cluster):
     '''
-    The method checks and patches the Kubeadm configuration for compliance with the current imageRepository
+    Сhecks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
     '''
+    # TODO: get rid of this method after k8s 1.21 support stop
     kubeadm_config_map = first_master["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
     yaml = ruamel.yaml.YAML()
     config_map = yaml.load(kubeadm_config_map)
     cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
     cluster_configuration = yaml.load(cluster_configuration_yaml)
-    if version_higher_or_equal(cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                               version_coredns_path_breakage):
-        if not cluster_configuration.get("dns", {}):
-            cluster_configuration["dns"] = {}
-            cluster_configuration['dns']['imageRepository'] = ("%s/coredns" % cluster_configuration["imageRepository"])
+    current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
 
-        else:
-            if not cluster_configuration['dns'].get('imageRepository', ""):
-                cluster_configuration['dns']['imageRepository'] = (
-                            "%s/coredns" % cluster_configuration["imageRepository"])
-        updated_config = io.StringIO()
-        kubelet_config = first_master["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
-        yaml.dump(cluster_configuration, updated_config)
-        result_config = kubelet_config + "---\n" + updated_config.getvalue()
-        first_master["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
-        return True
-    return False
+    updated_config = io.StringIO()
+    cluster_configuration["apiServer"]["extraArgs"]["audit-log-path"] = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
+
+    if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
+        if not cluster_configuration.get("dns"):
+            cluster_configuration["dns"] = {}
+        cluster_configuration['dns']['imageRepository'] = ("%s/coredns" % cluster_configuration["imageRepository"])
+
+    kubelet_config = first_master["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
+    yaml.dump(cluster_configuration, updated_config)
+    result_config = kubelet_config + "---\n" + updated_config.getvalue()
+    first_master["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
+
+    return True
 
 
 def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
