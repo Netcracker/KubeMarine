@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 def enrich_inventory(inventory, cluster):
 
     # By default we use calico, but have to find it out

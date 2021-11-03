@@ -7,21 +7,21 @@ from invoke import UnexpectedExit
 from kubetool.core import cluster, group, flow, executor
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.connections import Connections
-from kubetool.core.group import NodeGroup, _HostToResult
+from kubetool.core.group import NodeGroup, _HostToResult, NodeGroupResult
 from kubetool.core.executor import RemoteExecutor
 
 
 class FakeShell:
     def __init__(self, _cluster):
         self.cluster = _cluster
-        self.results: List[Dict[str, Union[_HostToResult, Any]]] = []
+        self.results: List[Dict[str, Union[NodeGroupResult, Any]]] = []
         self.history = []
 
     def reset(self):
         self.results = []
         self.history = []
 
-    def add(self, result: _HostToResult, do_type, args, usage_limit=0):
+    def add(self, result: NodeGroupResult, do_type, args, usage_limit=0):
         args.sort()
 
         result = {
@@ -167,10 +167,7 @@ class FakeNodeGroup(group.NodeGroup):
         return
 
     def _make_result(self, results: _HostToResult) -> FakeNodeGroupResult:
-        group_result = FakeNodeGroupResult(self.cluster)
-        for host, result in results.items():
-            group_result[self.nodes[host]] = result
-
+        group_result = FakeNodeGroupResult(self.cluster, results)
         return group_result
 
 
@@ -272,20 +269,20 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
     return inventory
 
 
-def create_exception_result(group_: NodeGroup, exception: Exception) -> _HostToResult:
-    return {host: exception for host in group_.nodes.keys()}
+def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
+    return NodeGroupResult(group_.cluster, {host: exception for host in group_.nodes.keys()})
 
 
-def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> _HostToResult:
+def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
     results = {}
     for host, cxn in group_.nodes.items():
         results[host] = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=cxn)
         if code == -1:
             results[host] = UnexpectedExit(results[host])
-    return results
+    return NodeGroupResult(group_.cluster, results)
 
 
-def empty_action(group):
+def empty_action(group: NodeGroup):
     pass
 
 

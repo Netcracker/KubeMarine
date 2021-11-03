@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import argparse
 import sys
 import time
@@ -156,8 +154,8 @@ def filter_flow(tasks, tasks_filter, excluded_tasks, _task_path='', flow_changed
         # if task_filter is not empty - smb specified filter argument
         if tasks_filter:
             allowed = False
-            # Проверяем если итерируемый подпуть находится разрешенных путях. То есть проверяем есть ли
-            # system_prepare.cri в разрешенном пути system_prepare.cri.docker
+            # Check if the iterable subpath is in allowed paths. For example we have to check if
+            # system_prepare.cri in allowed path system_prepare.cri.docker
             for task_path in tasks_filter:
                 if __task_path in task_path or task_path in __task_path:
                     allowed = True

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import re
 from importlib import import_module
 from copy import deepcopy

@@ -772,7 +772,7 @@ The following parameters are supported:
 |ip| |The IP address for virtual IP.|
 |floating_ip| |The floating IP address for virtual IP.|
 |interface|`eth0`|The interface on which the address must be listened.|
-|id|`md5({{ interface }} + {{ ip }})` сropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
+|id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
 
@@ -912,7 +912,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the СPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -4307,7 +4307,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. Аfter several installations, you can find the file and all its backups as in the following example:
+During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*

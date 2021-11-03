@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import re
 from copy import deepcopy
 from typing import Dict, List

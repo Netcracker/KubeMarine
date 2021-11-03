@@ -37,9 +37,19 @@ fabric.runners.Result.__ne__ = lambda self, other: not _compare_fabric_results(s
 
 class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connection, _GenericResult]):
 
-    def __init__(self, cluster, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, cluster, results: _HostToResult or NodeGroupResult = None):
+        super().__init__()
+
         self.cluster = cluster
+
+        if results is not None:
+            for host, result in results.items():
+                if isinstance(results, NodeGroupResult):
+                    host = host.host
+                connection = cluster.nodes['all'].nodes.get(host)
+                if connection is None:
+                    raise Exception(f'Host "{host}" was not found in provided cluster object')
+                self[connection] = result
 
     def get_simple_out(self):
         if len(self) != 1:
@@ -57,6 +67,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         output = ""
         for conn, result in self.items():
 
+            ## TODO: support print exceptions
             if isinstance(result, invoke.exceptions.UnexpectedExit):
                 result = result.result
 
@@ -77,7 +88,10 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         self.cluster.log.debug(self)
 
     def get_group(self):
-        return self.cluster.make_group(list(self.keys()))
+        hosts = []
+        for connection in list(self.keys()):
+            hosts.append(connection.host)
+        return self.cluster.make_group(hosts)
 
     def is_any_has_code(self, code):
         for conn, result in self.items():
@@ -85,12 +99,17 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 return True
         return False
 
+    def is_any_excepted(self):
+        ## TODO: support excepted
+        pass
+
     def is_any_failed(self):
-        return self.is_any_has_code(1)
+        return self.is_any_has_code(1) or self.is_any_excepted()
 
     def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
+            ## TODO: support excepted
             if result.exited == 1:
                 failed_nodes.append(conn)
         return failed_nodes
@@ -145,11 +164,33 @@ class NodeGroup:
         self.cluster: KubernetesCluster = cluster
         self.nodes = connections
 
-    def _make_result(self, results: _HostToResult) -> NodeGroupResult:
-        group_result = NodeGroupResult(self.cluster)
-        for host, result in results.items():
-            group_result[self.nodes[host]] = result
+    def __eq__(self, other):
+        if self is other:
+            return True
 
+        if not isinstance(other, NodeGroup):
+            return False
+
+        if self.cluster != other.cluster:
+            return False
+
+        if len(self.nodes.keys()) != len(other.nodes.keys()):
+            return False
+
+        for host, connection in self.nodes.items():
+            other_host_conn = other.nodes.get(host)
+            if other_host_conn is None:
+                return False
+            if other_host_conn != connection:
+                return False
+
+        return True
+
+    def __ne__(self, other):
+        return not self == other
+
+    def _make_result(self, results: _HostToResult) -> NodeGroupResult:
+        group_result = NodeGroupResult(self.cluster, results)
         return group_result
 
     def _make_result_or_fail(self, results: _HostToResult,
