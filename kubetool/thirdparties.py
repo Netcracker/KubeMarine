@@ -118,7 +118,7 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
     if is_curl:
         cluster.log.verbose('Installation via curl download detected')
         if config.get('sha1') is not None:
-            cluster.log.debug('SHA1 hash is defined, it will be used during installation')
+            cluster.log.verbose('SHA1 hash is defined, it will be used during installation')
             # if hash equal, then stop further actions immediately! unpack should not be performed too
             remote_commands += ' && FILE_HASH=$(sudo openssl sha1 %s | sed "s/^.* //"); ' \
                                '[ "%s" == "${FILE_HASH}" ] && exit 0 || true ' % (destination, config['sha1'])
