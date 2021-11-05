@@ -1,7 +1,8 @@
 import re
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
+import fabric
 import yaml
 
 from kubetool.core import log
@@ -11,6 +12,7 @@ from kubetool.core.group import NodeGroup
 
 jinja_query_regex = re.compile("{{ .* }}", re.M)
 
+_ConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
 
 class KubernetesCluster(Environment):
 
@@ -79,12 +81,20 @@ class KubernetesCluster(Environment):
     def log(self) -> log.EnhancedLogger:
         return self._log.logger
 
-    def make_group(self, ips: List[str] or List[NodeGroup]) -> NodeGroup:
+    def make_group(self, ips: List[_ConnectionTypes]) -> NodeGroup:
         connections: Connections = {}
         for ip in ips:
-            if isinstance(ip, NodeGroup):
-                ip = list(ip.nodes.keys())[0]
-            connections[ip] = self._connection_pool.get_connection(ip)
+            if isinstance(ip, fabric.connection.Connection):
+                ip = ip.host
+                connections[ip] = self._connection_pool.get_connection(ip)
+            elif isinstance(ip, NodeGroup):
+                for host, connection in ip.nodes.items():
+                    ip = connection.host
+                    connections[ip] = self._connection_pool.get_connection(ip)
+            elif isinstance(ip, str):
+                connections[ip] = self._connection_pool.get_connection(ip)
+            else:
+                raise Exception('Unsupported connection object type')
         return NodeGroup(connections, self)
 
     def get_addresses_from_node_names(self, node_names: List[str]) -> dict:

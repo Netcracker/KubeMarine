@@ -37,7 +37,7 @@ fabric.runners.Result.__ne__ = lambda self, other: not _compare_fabric_results(s
 
 class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connection, _GenericResult]):
 
-    def __init__(self, cluster, results: _HostToResult or NodeGroupResult = None):
+    def __init__(self, cluster, results: _HostToResult or NodeGroupResult = None) -> None:
         super().__init__()
 
         self.cluster = cluster
@@ -51,7 +51,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                     raise Exception(f'Host "{host}" was not found in provided cluster object')
                 self[connection] = result
 
-    def get_simple_out(self):
+    def get_simple_out(self) -> str:
         if len(self) != 1:
             raise NotImplementedError("Simple output can be returned only for NodeGroupResult consisted of "
                                       "exactly one node, but %s were provided." % list(self.keys()))
@@ -63,11 +63,11 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
 
         return res.stdout
 
-    def __str__(self):
+    def __str__(self) -> str:
         output = ""
         for conn, result in self.items():
 
-            ## TODO: support print exceptions
+            # TODO: support print other possible exceptions
             if isinstance(result, invoke.exceptions.UnexpectedExit):
                 result = result.result
 
@@ -84,33 +84,56 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 output += "\n\t\tSTDERR: %s" % result.stderr.replace("\n", "\n\t\t        ")
         return output
 
-    def print(self):
+    def print(self) -> None:
         self.cluster.log.debug(self)
 
-    def get_group(self):
+    def get_group(self) -> NodeGroup:
         hosts = []
         for connection in list(self.keys()):
             hosts.append(connection.host)
         return self.cluster.make_group(hosts)
 
-    def is_any_has_code(self, code):
+    def is_any_has_code(self, code) -> bool:
         for conn, result in self.items():
-            if str(result.exited) == str(code):
+            if isinstance(result, fabric.runners.Result) and str(result.exited) == str(code):
                 return True
         return False
 
-    def is_any_excepted(self):
-        ## TODO: support excepted
-        pass
+    def is_any_excepted(self) -> bool:
+        for conn, result in self.items():
+            if isinstance(result, Exception):
+                return True
+        return False
 
-    def is_any_failed(self):
+    def is_any_failed(self) -> bool:
         return self.is_any_has_code(1) or self.is_any_excepted()
+
+    def get_excepted_nodes_list(self) -> List[fabric.connection.Connection]:
+        failed_nodes: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if isinstance(result, Exception):
+                failed_nodes.append(conn)
+        return failed_nodes
+
+    def get_excepted_nodes_group(self) -> NodeGroup:
+        nodes_list = self.get_excepted_nodes_list()
+        return self.cluster.make_group(nodes_list)
+
+    def get_exited_nodes_list(self) -> List[fabric.connection.Connection]:
+        failed_nodes: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if isinstance(result, fabric.runners.Result):
+                failed_nodes.append(conn)
+        return failed_nodes
+
+    def get_exited_nodes_group(self) -> NodeGroup:
+        nodes_list = self.get_exited_nodes_list()
+        return self.cluster.make_group(nodes_list)
 
     def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
-            ## TODO: support excepted
-            if result.exited == 1:
+            if isinstance(result, Exception) or result.exited == 1:
                 failed_nodes.append(conn)
         return failed_nodes
 
@@ -121,7 +144,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
     def get_nonzero_nodes_list(self) -> List[fabric.connection.Connection]:
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
-            if result.exited != 0:
+            if isinstance(result, Exception) or result.exited != 0:
                 failed_nodes.append(conn)
         return failed_nodes
 
@@ -129,7 +152,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         nodes_list = self.get_nonzero_nodes_list()
         return self.cluster.make_group(nodes_list)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if self is other:
             return True
 
@@ -152,7 +175,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
 
         return True
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         return not self == other
 
 
