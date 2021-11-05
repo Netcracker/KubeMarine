@@ -12,7 +12,8 @@ from kubetool.core.group import NodeGroup
 
 jinja_query_regex = re.compile("{{ .* }}", re.M)
 
-_ConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
+_AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
+
 
 class KubernetesCluster(Environment):
 
@@ -81,7 +82,7 @@ class KubernetesCluster(Environment):
     def log(self) -> log.EnhancedLogger:
         return self._log.logger
 
-    def make_group(self, ips: List[_ConnectionTypes]) -> NodeGroup:
+    def make_group(self, ips: List[_AnyConnectionTypes]) -> NodeGroup:
         connections: Connections = {}
         for ip in ips:
             if isinstance(ip, fabric.connection.Connection):
