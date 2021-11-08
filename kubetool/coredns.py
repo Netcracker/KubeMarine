@@ -1,5 +1,4 @@
 import yaml
-import ruamel.yaml
 
 from kubetool import system
 from kubetool.core import utils
@@ -127,31 +126,14 @@ data:'''
 
 
 def apply_configmap(cluster, config):
-    if cluster.context.get('initial_procedure') == 'remove_node' or \
-            cluster.context.get('initial_procedure') == 'add_node':
-        config = merge_with_existed_cm(cluster, config)
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
+
     group = cluster.nodes['master'].include_group(cluster.nodes['worker']).get_final_nodes()
     group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True)
 
     return cluster.nodes['master'].get_final_nodes().get_first_member()\
         .sudo('kubectl apply -f /etc/kubernetes/coredns-configmap.yaml && '
              'sudo kubectl rollout restart -n kube-system deployment/coredns')
-
-
-def merge_with_existed_cm(cluster, config):
-    '''
-    The method merge new hosts into the already existing CoreDNS cm in case of add/remove node procedures.
-    '''
-    first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
-    coredns_config_map = first_master["connection"].sudo("kubectl get cm coredns -n kube-system -o yaml") \
-        .get_simple_out()
-    yaml = ruamel.yaml.YAML()
-    config_map = yaml.load(coredns_config_map)
-    config_map["data"]["Hosts"] = cluster.inventory['services']['coredns']['configmap'].get("Hosts", "")
-    updated_config = io.StringIO()
-    yaml.dump(config_map, updated_config)
-    return updated_config.getvalue()
 
 
 def apply_patch(cluster):
