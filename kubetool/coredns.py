@@ -127,6 +127,7 @@ data:'''
 
 def apply_configmap(cluster, config):
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
+
     group = cluster.nodes['master'].include_group(cluster.nodes['worker']).get_final_nodes()
     group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True)
 
