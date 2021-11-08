@@ -2902,7 +2902,7 @@ Before proceeding, refer to the [Official Documentation of the Kubernetes Ingres
 
 **Warning**: This plugin is experimental. It is not recommended to use it in production.
 
-NGINX Ingress Controller plugin is not installed by default. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
+HAProxy Ingress Controller plugin is not installed by default. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
 The following is an example to enable the plugin:
 
