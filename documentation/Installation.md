@@ -270,7 +270,7 @@ The recommended hardware requirements are as follows:
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (15 Gb size is recommended) on each Master before installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (2 Gb size at least is recommended) on each Master before installation.
 Mount point:
 
 ```
