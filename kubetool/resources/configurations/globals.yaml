@@ -284,11 +284,11 @@ compatibility_map:
         metrics-scraper-version: v1.0.7
     local-path-provisioner:
       v1.20:
-        version: v0.0.19
+        version: v0.0.20
       v1.21:
-        version: v0.0.19
+        version: v0.0.20
       v1.22:
-        version: v0.0.19
+        version: v0.0.20
     pause:
       v1.20:
         version: 3.2
