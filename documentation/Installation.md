@@ -153,7 +153,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 20.04
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L389).
+The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L335).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
