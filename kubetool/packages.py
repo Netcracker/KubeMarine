@@ -88,7 +88,13 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
         # in ubuntu it is much easier to parse package name
         package_name = package.split("=")[0]
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
-    return group.sudo(cmd, warn=warn)
+
+    # This is WA for RemoteExecutor, since any package failed others are not checked
+    # TODO: get rid of this WA and use warn=True in sudo
+    if warn:
+        cmd += ' || true'
+
+    return group.sudo(cmd)
 
 
 def detect_installed_packages_versions(group: NodeGroup, packages_list: List or str = None) -> Dict[str, NodeGroupResult]:
@@ -153,7 +159,7 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
         detected_grouped_packages = {}
         for host, packages in detected_packages_results.items():
             if '\n' in packages:
-                # this is the test, when package name containes multiple names,
+                # this is the test, when package name contains multiple names,
                 # e.g. docker-ce and docker-cli for "docker-ce-*" query
                 packages = packages.split('\n')
             else:
