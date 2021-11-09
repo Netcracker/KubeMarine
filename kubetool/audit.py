@@ -1,6 +1,6 @@
 """
 This module works with audit on remote systems.
-Using this module you can install audit and apply audit rules.
+Using this module you can install, enable audit and configure audit rules.
 """
 
 import io

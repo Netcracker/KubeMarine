@@ -27,7 +27,8 @@ class FakeShell:
         result = {
             'result': result,
             'do_type': do_type,
-            'args': args
+            'args': args,
+            'used_times': 0
         }
 
         if usage_limit > 0:
@@ -42,6 +43,7 @@ class FakeShell:
         for i, item in enumerate(self.results):
             if item['do_type'] == do_type and item['args'] == args:
                 self.history.append(item)
+                self.results[i]['used_times'] += 1
                 if item.get('usage_limit') is not None:
                     self.results[i]['usage_limit'] -= 1
                     if self.results[i]['usage_limit'] < 1:
@@ -59,6 +61,14 @@ class FakeShell:
             if item['do_type'] == do_type and item['args'] == args:
                 result.append(item)
         return result
+
+    def is_called(self, do_type, args):
+        found_entry = self.history_find(do_type, args)
+        if not found_entry:
+            raise Exception('Failed to found entry %s %s in history' % (do_type, str(args)))
+        elif len(found_entry) > 1:
+            raise Exception('Too many entries found for request in history: %s %s' % (do_type, str(args)))
+        return self.history_find(do_type, args)[0]['used_times'] > 0
 
 
 class FakeFS:
