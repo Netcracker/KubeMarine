@@ -31,4 +31,4 @@ To enable default certificate on already installed Nginx Ingress Controller, or 
 you could use `certs_renew` maintenance procedure, for details refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
 
 
-**Important:** the default certificate should be issues to wildcard hostnames, so that it could be used for all ingresses.
+**Important:** the default certificate should be issued to wildcard hostnames, so that it could be used for all ingresses.
