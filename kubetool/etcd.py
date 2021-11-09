@@ -4,7 +4,8 @@ import time
 from kubetool.core.group import NodeGroup
 
 
-# the method requires etcdctl.sh to be installed on all active master nodes during thirdparties task.
+# the methods requires etcdctl.sh to be installed on all active master nodes during thirdparties task.
+
 def remove_members(group: NodeGroup):
     log = group.cluster.log
 
@@ -36,6 +37,7 @@ def remove_members(group: NodeGroup):
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
+# the method check etcd endpoints health until all endpoints are healthy or retries are exhausted
 def wait_for_health(cluster, connection):
 
     log = cluster.log
@@ -44,7 +46,8 @@ def wait_for_health(cluster, connection):
 
     while retries > 0:
         etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json'
-                                           , is_async=False, hide=False).get_simple_out()
+                                           , is_async=False, hide=True).get_simple_out()
+        log.verbose(etcd_health_raw)
         etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
 
         health = 0
@@ -56,7 +59,7 @@ def wait_for_health(cluster, connection):
             log.debug('All ETCD members are healthy!')
             return
         else:
-            log.debug('Wait for ETCD cluster is recovering!')
+            log.debug('Wait for ETCD cluster is not healthy!')
             time.sleep(timeout)
             retries -= 1
 
