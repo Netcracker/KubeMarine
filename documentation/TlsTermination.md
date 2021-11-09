@@ -11,9 +11,11 @@ Nginx Ingress Controller uses default wildcard certificate to authenticate itsel
 To support multiple hostnames the certificate could use wildcard SANs.
 Nginx Ingress Controller contacts applications using HTTP connection.
 
+To read more about nginx ingress controller default certificate visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
+
 Pros:
 + Easy to manage only one certificate in one place.
-+ Used for all ingresses.
++ Used for all ingresses without explicit custom certificates.
 
 Cons:
 - Adding new hostname might require to re-issue certificate, if new hostname do not match any previous wildcard SANs.
