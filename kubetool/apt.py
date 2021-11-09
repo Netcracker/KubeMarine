@@ -14,20 +14,17 @@ def backup_repo(group, repo_filename="*"):
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
     return group.sudo(
-        "find %s -type f -name '%s.list' | sudo xargs -t -iNAME mv -f NAME NAME.bak" % ("/etc/apt/", repo_filename))
+        "find %s -type f -name '%s.list' | sudo xargs -iNAME mv -f NAME NAME.bak" % ("/etc/apt/", repo_filename))
 
 
 def add_repo(group, repo_data="", repo_filename="predefined"):
-    # flush ubuntu caches
-    # group.sudo('rm -f /etc/apt/sources.list && sudo rm -rf /var/lib/apt/lists/*')
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
         repo_data_str = str(repo_data)
     group.put(io.StringIO(repo_data_str), '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename), sudo=True)
-    group.sudo("ls -la /etc/apt/ ", warn=True, hide=False)
-    return group.sudo(DEBIAN_HEADERS + 'apt clean && ls -la /etc/apt/ && sudo apt update')
+    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update')
 
 
 def clean(group):
