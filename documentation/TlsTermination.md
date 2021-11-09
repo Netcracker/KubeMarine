@@ -19,7 +19,7 @@ Pros:
 
 Cons:
 - Adding new hostname might require to re-issue certificate, if new hostname do not match any previous wildcard SANs.
-- Insecure HTTP from nginx ingress controller to pods.
+- Insecure HTTP connection from nginx ingress controller to application pods.
 - L7 load balancing could be customized through "ingress" resources only.
 
 ### How to install
