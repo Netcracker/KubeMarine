@@ -152,6 +152,12 @@ For cluster machines, ensure the following requirements are met:
   * Oracle Linux 7.5+, 8.4
   * Ubuntu 20.04
 
+**Note**: In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubetools` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubetools` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
+    * You can find out the current status of the `cloud-init` using the command below:
+    ```bash
+    cloud-init status
+    ```
+
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L389).
 <!-- #GFCFilterMarkerEnd# -->
