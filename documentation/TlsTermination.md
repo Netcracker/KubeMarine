@@ -9,7 +9,7 @@ High-level overview of this approach is shown on the following diagram.
 Here, client creates HTTPS connection to HAProxy TCP Load Balancer, which in turn proxies the traffic to Nginx Ingress Controller without TLS termination.
 Nginx Ingress Controller uses default wildcard certificate to authenticate itself to a client and to terminate HTTPS connection.
 To support multiple hostnames the certificate could use wildcard SANs.
-Nginx Ingress Controller contacts applications using HTTP connection.
+Nginx Ingress Controller contacts applications using plain HTTP connection.
 
 To read more about nginx ingress controller default certificate visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
 
