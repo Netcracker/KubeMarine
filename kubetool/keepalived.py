@@ -230,7 +230,7 @@ def generate_config(inventory, node):
     return config
 
 
-def configure(group):
+def configure(group: NodeGroup) -> NodeGroupResult:
     log = group.cluster.log
     group_members = group.get_ordered_members_list(provide_node_configs=True)
 

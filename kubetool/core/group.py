@@ -350,7 +350,7 @@ class NodeGroup:
 
         return group_results
 
-    def _do_with_wa(self, do_type, *args, **kwargs):
+    def _do_with_wa(self, do_type, *args, **kwargs) -> _HostToResult or int:
         # by default all code is async, but can be set False forcibly
         is_async = kwargs.pop("is_async", True) is not False
 

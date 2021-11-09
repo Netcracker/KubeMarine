@@ -35,7 +35,7 @@ class KubernetesClusterTest(unittest.TestCase):
         ])
         self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to all masters group")
 
-    def test_make_group_from_any_types(self):
+    def test_make_group_from_mixed_types(self):
         all_nodes_group = self.cluster.nodes['all'].nodes
         actual_group = self.cluster.make_group([
             all_nodes_group['10.101.1.1'],

@@ -241,12 +241,12 @@ class TestKeepalivedConfigApply(unittest.TestCase):
                                ['systemctl restart %s' % package_associations['service_name']])
 
         # simulate daemon status
-        expected_result = demo.create_nodegroup_result(cluster.nodes['keepalived'], code=0)
-        cluster.fake_shell.add(expected_result, 'sudo', ['systemctl status %s' % package_associations['service_name']])
+        simulated_result = demo.create_nodegroup_result(cluster.nodes['keepalived'], code=0)
+        cluster.fake_shell.add(simulated_result, 'sudo', ['systemctl status %s' % package_associations['service_name']])
 
         actual_result = keepalived.configure(cluster.nodes['keepalived'])
 
-        expected_result = cluster.nodes["all"]._make_result(expected_result)
+        expected_result = cluster.nodes["all"]._make_result(simulated_result)
         self.assertEqual(expected_result, actual_result)
 
         # read placed data in FakeFS

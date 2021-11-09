@@ -143,7 +143,11 @@ class FakeNodeGroup(group.NodeGroup):
             if found_result is None:
                 raise Exception('Fake result not found for requested action type \'%s\' and args %s' % (do_type, args))
 
-            found_result = {host: result for host, result in found_result.items() if host in nodes.keys()}
+            found_result = {((isinstance(host, fabric.connection.Connection) and host.host) or host): result for host, result in found_result.items() if (isinstance(host, fabric.connection.Connection) and host.host in nodes.keys()) or host in nodes.keys()}
+
+            if not found_result:
+                raise Exception('Fake results were found, but all of them were filtered')
+
             for host, result in found_result.items():
                 if isinstance(result, UnexpectedExit) and kwargs.get('warn', False):
                     found_result[host] = result.result
