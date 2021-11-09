@@ -153,7 +153,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 20.04
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L389).
+The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L335).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -270,7 +270,7 @@ The recommended hardware requirements are as follows:
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (15 Gb size is recommended) on each Master before installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (2 Gb size at least is recommended) on each Master before installation.
 Mount point:
 
 ```
@@ -1208,8 +1208,11 @@ By default, the installer uses the following parameters:
 |protectKernelDefaults|true|
 |podPidsLimit|4096|
 |maxPods|110|
+|cgroupDriver|systemd|
 
 `pidsPidsLimit` the default value is chosen to prevent [Fork Bomb](https://en.wikipedia.org/wiki/Fork_bomb)
+
+`cgroupDriver` field defines which cgroup driver the kubelet controls. [Configuring the kubelet cgroup driver](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/#configuring-the-kubelet-cgroup-driver).
 
 **Warning**: If you want to change the values of variables `podPidsLimit` and `maxPods`, you have to update the value of the `pid_max` (this value should not less than result of next expression: `maxPods * podPidsLimit + 2048`), which can be done using task `prepare.system.sysctl`. To get more info about `pid_max` you can go to [sysctl](#sysctl) section.
 
@@ -1223,7 +1226,7 @@ services:
     protectKernelDefaults: true
     podPidsLimit: 2048
     maxPods: 100
-
+    cgroupDriver: systemd
 ```
 
 #### kernel_security
@@ -1844,6 +1847,8 @@ services:
       live-restore: True
       userland-proxy: False
 ```
+
+**Note**: default value of `SystemdCgroup` = `true` only in case, when `cgroupDriver` from [kubelet config](#kubeadm_kubelet) is equal to `systemd`.
 
 The `containerRuntime` parameter configures a particular container runtime implementation used for kubernetes.
 The available values are `docker` and `containerd`. By default `containerd` is used.
@@ -2897,7 +2902,7 @@ Before proceeding, refer to the [Official Documentation of the Kubernetes Ingres
 
 **Warning**: This plugin is experimental. It is not recommended to use it in production.
 
-NGINX Ingress Controller plugin is not installed by default. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
+HAProxy Ingress Controller plugin is not installed by default. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
 The following is an example to enable the plugin:
 

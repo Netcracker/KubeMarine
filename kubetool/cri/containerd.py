@@ -5,6 +5,7 @@ from io import StringIO
 import toml
 import yaml
 
+from distutils.util import strtobool
 from kubetool import system, packages
 from kubetool.core import utils
 from kubetool.core.executor import RemoteExecutor
@@ -38,11 +39,15 @@ def configure(group):
 
     config_string = ""
     # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
-    for key, value in group.cluster.inventory["services"]["cri"]['containerdConfig'].items():
+    containerd_config = group.cluster.inventory["services"]["cri"]['containerdConfig']
+    containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'] = \
+        bool(strtobool(
+            containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup']))
+    for key, value in containerd_config.items():
         # first we process all "simple" `key: value` pairs
         if not isinstance(value, dict):
             config_string += f"{toml.dumps({key: value})}"
-    for key, value in group.cluster.inventory["services"]["cri"]['containerdConfig'].items():
+    for key, value in containerd_config.items():
         # next we process all "complex" `key: dict_value` pairs, representing named sections
         if isinstance(value, dict):
             config_string += f"\n[{key}]\n{toml.dumps(value)}"
