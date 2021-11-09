@@ -259,6 +259,11 @@ services:
           package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
       rhel:
         docker:
           executable_name: 'docker'
@@ -285,6 +290,11 @@ services:
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
       rhel8:
         docker:
           executable_name: 'docker'
@@ -311,6 +321,11 @@ services:
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
  
 
 plugin_defaults:

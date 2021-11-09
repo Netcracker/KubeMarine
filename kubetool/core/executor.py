@@ -279,6 +279,10 @@ class RemoteExecutor:
 
         return output
 
+    def print_last_results(self):
+        results = self.get_last_results_str()
+        self.cluster.log.debug(results)
+
     def flush(self) -> dict:
         executor = self._get_active_executor()
 

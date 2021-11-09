@@ -68,7 +68,7 @@ def upgrade(group: NodeGroup, include=None, exclude=None) -> NodeGroupResult:
     return get_package_manager(group).upgrade(group, include, exclude)
 
 
-def detect_installed_package_version(group: NodeGroup, package: str, warn=False) -> NodeGroupResult:
+def detect_installed_package_version(group: NodeGroup, package: str, warn=True) -> NodeGroupResult:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found

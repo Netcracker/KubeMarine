@@ -129,7 +129,7 @@ def configure(group):
 
 
 def override_haproxy18(group):
-    rhel_nodes = group.get_nodes_with_os('rhel')
+    rhel_nodes = group.get_subgroup_with_os('rhel')
     if rhel_nodes.is_empty():
         group.cluster.log.debug('Haproxy18 override is not required')
         return

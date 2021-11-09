@@ -212,6 +212,11 @@ class NodeGroup:
     def __ne__(self, other):
         return not self == other
 
+    def __hash__(self):
+        # TODO: include cluster object and real connections into hash value
+        nodes_addresses = tuple(self.nodes.keys())
+        return hash(nodes_addresses)
+
     def _make_result(self, results: _HostToResult) -> NodeGroupResult:
         group_result = NodeGroupResult(self.cluster, results)
         return group_result
@@ -718,7 +723,10 @@ class NodeGroup:
                         'OS families differ: detected %s and %s in same cluster' % (detected_os_family, os_family))
         return detected_os_family
 
-    def get_nodes_with_os(self, os_family) -> NodeGroup:
+    def is_multi_os(self):
+        return self.get_nodes_os(suppress_exceptions=True) == 'multiple'
+
+    def get_subgroup_with_os(self, os_family) -> NodeGroup:
         if os_family not in ['debian', 'rhel', 'rhel8']:
             raise Exception('Unsupported OS family provided')
         node_names = []

@@ -196,15 +196,36 @@ class KubernetesCluster(Environment):
 
         return package_associations
 
-    def get_os_family_for_node(self, host):
+    def get_os_family_for_node(self, host: str) -> str:
         node_context = self.context['nodes'].get(host)
         if not node_context or not node_context.get('os', {}).get('family'):
             raise Exception('Node %s do not contain necessary context data' % host)
         return node_context['os']['family']
 
-    def get_associations_for_node(self, host):
+    def get_associations_for_node(self, host: str) -> dict:
         node_os_family = self.get_os_family_for_node(host)
         return self.get_associations_for_os(node_os_family)
+
+    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str:
+        associations = self.get_associations_for_node(host)
+        association_value = associations.get(package, {}).get(association_key)
+        if association_value is None:
+            raise Exception(f'Failed to get association "{association_key}" for package "{package}"')
+        return association_value
+
+    def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
+        results = {}
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            association_value = self.get_package_association_for_node(node['connect_to'], package, association_key)
+            results[node['connect_to']] = association_value
+        return results
+
+    def get_package_association_str_for_group(self, group: NodeGroup, package: str, association_key: str) -> str:
+        results = self.get_package_association_for_group(group, package, association_key)
+        results_values = list(set(results.values()))
+        if len(results_values) == 1:
+            return results_values[0]
+        raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
     def cache_package_versions(self):
         detected_packages = packages.detect_installed_packages_version_groups(self.nodes['all'].get_unchanged_nodes().get_online_nodes())
