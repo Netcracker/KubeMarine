@@ -28,7 +28,7 @@ To enable TLS termination on Nginx Ingress Controller using default certificate 
 This could be done during installation, for details refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
 
 To enable default certificate on already installed Nginx Ingress Controller, or to renew an existing certificate, 
-you could use `certs_renew` maintenance job, for details refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
+you could use `certs_renew` maintenance procedure, for details refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
 
 
 **Important:** the default certificate should be issues to wildcard hostnames, so that it could be used for all ingresses.
