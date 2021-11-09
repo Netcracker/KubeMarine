@@ -2352,6 +2352,9 @@ The following settings are supported:
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
+**Warning**: It is strongly discouraged to change the configuration of the CoreDNS manually, if you need to change the configuration, you must reflect them in the `cluster.yaml` and call the installation procedure with `--tasks="deploy.coredns"` argument. This will help keep the cluster configuration consistent.
+
+
 ##### deployment
 
 This section contains YAML settings that are applied to Coredns service via a patch. By default, this section contains the following data:
