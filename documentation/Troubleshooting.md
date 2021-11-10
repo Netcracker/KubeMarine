@@ -47,6 +47,36 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 * `/var/lib/etcd`:`/var/lib/etcd`
 * `/etc/kubernetes/pki`:`/etc/kubernetes/pki`
 
+## etcdctl compaction and defragmentation
+
+Compaction is performed automatically every 5 minutes. This value can be overridden using the `--etcd-compaction-interval` flag for kube-apiserver.
+
+After the compacting procedure leaves gaps in the etcd database. This fragmented space is available for use by etcd, but is not available to the host file system. You must defragment the etcd database to make this space available to the filesystem.
+
+You can run etcd defrag database sequentially for each cluster member. Defragmentation is issued on a per-member so that cluster-wide latency spikes may be avoided.
+To run defragmentation for etcd member use the following command:
+```
+# etcdctl defrag --endpoints=ENDPOINT_IP:2379
+```
+
+To run defragmentation for all cluster members list all endpoints sequentially
+```
+# etcdctl defrag --endpoints=ENDPOINT_IP1:2379, --endpoints=ENDPOINT_IP2:2379, --endpoints=ENDPOINT_IP3:2379
+```
+`ENDPOINT_IP` is the internal IP address of the etcd endpoint.
+
+> **_Note:_** that defragmentation to a live member blocks the system from reading and writing data while rebuilding its states. It is not recommended to run defragmentation for all etcd members at the same time.
+## etcdctl defrag return context deadline exceeded
+
+After running the defrag procedure for etcd database the following error may occur:
+```
+"error":"rpc error: code = DeadlineExceeded desc = context deadline exceeded"}
+Failed to defragment etcd member
+```
+If you get a similar error then use an additional `--command-timeout` flag to run the command:
+```
+# etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
+```
 # Troubleshooting Kubernetes Generic Issues
 
 This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubetools installation.
@@ -135,7 +165,7 @@ The maximum size cannot be changed, so `kubectl apply` is unable to apply large 
 * `--max-mutating-requests-inflight` is the maximum number of mutating requests. The default value is 200.
 
 `kube-apiserver` configration file is stored in /etc/kubernetes/manifests/kube-apiserver.yaml. This file should be changed 
-on all masters. Also, the configuration map `kubeadm-config`from kube-system namespace should have the same values 
+on all masters. Also, the configuration map `kubeadm-config` from kube-system namespace should have the same values 
 in `apiServer` section.
 
 ```yaml
@@ -151,6 +181,19 @@ data:
         ...
 
 ```
+
+## `kube-controller-manager` unable to sync caches for garbage collector
+
+**Symptoms**: The following errors in the `kube-controller-manager` logs:
+```
+E0402 10:52:00.858591 8 shared_informer.go:226] unable to sync caches for garbage collector
+E0402 10:52:00.858600 8 garbagecollector.go:233] timed out waiting for dependency graph builder sync during GC sync (attempt 16)
+I0402 10:52:00.883519 8 graph_builder.go:272] garbage controller monitor not yet synced 
+```
+ 
+**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects master API and etcd cluster and it also affects the garbage collector of the master controller manager tasks due to sync failure. 
+
+**Solution**: Increase resources for master nodes to match the load on the kube-api or reduce the load on the kube-api.
 
 # Troubleshooting Kubetools
 
