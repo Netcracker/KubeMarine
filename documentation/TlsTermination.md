@@ -15,7 +15,7 @@ To read more about nginx ingress controller default certificate visit [https://k
 
 **Limitations:**
 - Adding new hostname might require to re-issue certificate, if new hostname do not match any previous wildcard SANs.
-- Connections form nginx ingress controller to applications are HTTP, i.e. without encryption.
+- Connections from nginx ingress controller to applications are HTTP, i.e. without encryption.
 - L7 load balancing options could be customized through "ingress" resources only.
 
 ### How to install
