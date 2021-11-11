@@ -3113,7 +3113,7 @@ The following is an example to use custom provisioner and helper pod image:
 plugins:
   local-path-provisioner:
     install: true
-    image: rancher/local-path-provisioner:v0.0.18
+    image: rancher/local-path-provisioner:v0.0.20
     helper-pod-image: busybox:latest
 ```
 
@@ -4632,7 +4632,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4798,7 +4798,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4965,7 +4965,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
