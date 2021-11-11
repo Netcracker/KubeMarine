@@ -9,17 +9,14 @@ Here, client creates HTTPS connection to HAProxy TCP Load Balancer, which in tur
 Nginx Ingress Controller uses default wildcard certificate to authenticate itself to a client and to terminate HTTPS connection.
 To support multiple hostnames the certificate could use wildcard SANs.
 Nginx Ingress Controller contacts applications using plain HTTP connection.
+Thus, using this approach it is very easy to manage only one certificate in one place - TLS traffic will be terminated on nginx ingress controller using default certificate for all application ingresses.
 
 To read more about nginx ingress controller default certificate visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
 
-Pros:
-+ Easy to manage only one certificate in one place.
-+ Used for all ingresses without explicit custom certificates.
-
-Cons:
+**Limitations:**
 - Adding new hostname might require to re-issue certificate, if new hostname do not match any previous wildcard SANs.
-- Insecure HTTP connection from nginx ingress controller to application pods.
-- L7 load balancing could be customized through "ingress" resources only.
+- Connections form nginx ingress controller to applications are HTTP, i.e. without encryption.
+- L7 load balancing options could be customized through "ingress" resources only.
 
 ### How to install
 
