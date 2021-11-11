@@ -1,7 +1,6 @@
 ## TLS termination on Nginx Ingress Controller
 
-This is the default recommended approach to TLS termination on kubetool-installed environments.
-
+This is the default recommended approach to TLS termination on kubetool-installed environments. This approach is applicable when MTLS is not used in kubernetes and all the communications between pods are over plain HTTP.
 High-level overview of this approach is shown on the following diagram.
 
 ![](/documentation/images/tls-termination-nginx.png)
