@@ -105,10 +105,6 @@ services:
 
   modprobe:
     - br_netfilter
-    - ip_vs
-    - ip_vs_rr
-    - ip_vs_wrr
-    - ip_vs_sh
     - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
     - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack_ipv6{% endif %}'
     - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat_masquerade_ipv6{% endif %}'
