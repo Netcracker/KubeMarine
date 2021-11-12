@@ -2352,6 +2352,8 @@ The following settings are supported:
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
+**Warning**: It is strongly discouraged to change the configuration of the CoreDNS manually, if you need to change the configuration, you must reflect them in the `cluster.yaml` and call the installation procedure with `--tasks="deploy.coredns"` argument. This will help keep the cluster configuration consistent.
+
 ##### deployment
 
 This section contains YAML settings that are applied to Coredns service via a patch. By default, this section contains the following data:
@@ -3113,7 +3115,7 @@ The following is an example to use custom provisioner and helper pod image:
 plugins:
   local-path-provisioner:
     install: true
-    image: rancher/local-path-provisioner:v0.0.18
+    image: rancher/local-path-provisioner:v0.0.20
     helper-pod-image: busybox:latest
 ```
 
@@ -4632,7 +4634,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4798,7 +4800,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4965,7 +4967,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.19</td>
+    <td colspan="4">v0.0.20</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>

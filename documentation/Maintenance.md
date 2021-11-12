@@ -150,6 +150,8 @@ and plan the certificates' renewal accordingly.
 
 This task is executed to restore the required CoreDNS configuration.
 
+**Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
+
 #### Packages Upgrade Section and Task
 
 This inventory section contains the configuration to upgrade custom and system packages, such as docker, containerd, haproxy, and keepalived. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
@@ -528,6 +530,8 @@ Also pay attention to the following:
 
 **Note**: It is not possible to change a node's role by adding an existing node again with a new role. You have to remove the node and add it again.
 
+**Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
+
 ### Configuring Add Node Procedure
 
 The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubetools Inventory Nodes](Installation.md#nodes) section in _Kubetools Installation Procedure_.
@@ -618,6 +622,8 @@ Removing a node from a Kubernetes cluster is done in the following order:
 1. ETCD and Kubernetes data is deleted.
 1. Containers are stopped and deleted. Images are deleted and container runtime is entirely pruned. 
 1. Kubernetes node is deleted from the Kubernetes cluster.
+
+**Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
 
 ### Configuring Remove Node Procedure
 
