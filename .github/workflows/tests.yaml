@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" **/*.(py|sh|yaml|j2|css|conf)
+      - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" **/*.\(py|sh|yaml|j2|css|conf\)
       - run: cat kubetool/core/cluster.py
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
