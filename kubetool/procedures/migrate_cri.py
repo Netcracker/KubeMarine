@@ -180,7 +180,7 @@ def _migrate_cri(cluster, node_group):
                                 "sudo iptables -t raw -F && "
                                 "sudo iptables -t filter -F && "
                                 # start kubelet
-                                "sudo systemctl restart kubelet")
+                                "sudo systemctl restart kubelet")      
         master["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
         if "master" in node["roles"]:
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
@@ -191,6 +191,12 @@ def _migrate_cri(cluster, node_group):
                 packages_list.append(package_name)
         cluster.log.warning("The following packages will be removed: %s" % packages_list)
         packages.remove(node["connection"], include=packages_list)
+        # change annotation for cri-socket
+        master["connection"].sudo(f"sudo kubectl annotate node {node['name']} \
+                                    --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
+                                    , is_async=False, hide=True)
+        # delete docker socket
+        node["connection"].sudo("rm -rf /var/run/docker.sock")
 
 def edit_config(kubeadm_flags):
     kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")

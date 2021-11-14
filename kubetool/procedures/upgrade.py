@@ -22,6 +22,7 @@ def system_prepare_thirdparties(cluster):
 
 def prepull_images(cluster):
     cluster.log.debug("Prepulling Kubernetes images...")
+    #fix_cri_socket(cluster)
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
@@ -215,6 +216,21 @@ def verify_upgrade_plan(upgrade_plan):
 def preload_os_family(inventory_filepath):
     cluster = load_inventory(inventory_filepath, flow.create_context({'disable_dump': True}))
     return system.get_os_family(cluster)
+
+
+def fix_cri_socket(cluster):
+    """
+    This method fixs the issue with 'kubeadm.alpha.kubernetes.io/cri-socket' node annotation
+    and delete the docker socket if it exists
+    """
+
+    if cluster.inventory["services"]["cri"]["containerRuntime"] == "containerd":
+        master = cluster.nodes["master"].get_first_member(provide_node_configs=True)
+        master["connection"].sudo(f"sudo kubectl annotate nodes --all \
+                                     --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
+                                     , is_async=False, hide=True)
+        upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+        upgrade_group.sudo("rm -rf /var/run/docker.sock")
 
 
 if __name__ == '__main__':
