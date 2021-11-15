@@ -42,10 +42,12 @@ def remove_members(group: NodeGroup):
 def wait_for_health(cluster, connection):
 
     log = cluster.log
+    init_timeout = cluster.globals['etcd']['health']['init_timeout']
     timeout = cluster.globals['etcd']['health']['timeout']
     retries = cluster.globals['etcd']['health']['retries']
 
     is_healthy = False
+    time.sleep(init_timeout)
     while retries > 0:
         start_time = time.time()
         etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json'
@@ -53,9 +55,7 @@ def wait_for_health(cluster, connection):
         end_time = time.time()
         sudo_time = int(end_time - start_time)
         log.verbose(etcd_health_raw)
-        log.verbose(etcd_status_raw)
         etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
-        etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
 
         health = 0
         for etcd_health in etcd_health_list:
@@ -75,11 +75,13 @@ def wait_for_health(cluster, connection):
     if is_healthy:
         etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json'
                                            , is_async=False, hide=True).get_simple_out()
+        log.verbose(etcd_status_raw)
+        etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
         elected_leader = None
         for item in etcd_status_list:
             leader = item.get('status', {}).get('leader')
             if not leader:
-                rise Exception('ETCD member "%s" do not have leader' % item.get('endpoint'))
+                raise Exception('ETCD member "%s" do not have leader' % item.get('endpoint'))
             if not elected_leader:
                 elected_leader = leader
             elif elected_leader != leader:
