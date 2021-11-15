@@ -180,7 +180,7 @@ def _migrate_cri(cluster, node_group):
                                 "sudo iptables -t raw -F && "
                                 "sudo iptables -t filter -F && "
                                 # start kubelet
-                                "sudo systemctl restart kubelet") 
+                                "sudo systemctl restart kubelet")
         master["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
         if "master" in node["roles"]:
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
