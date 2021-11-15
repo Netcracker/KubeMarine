@@ -22,7 +22,7 @@ def system_prepare_thirdparties(cluster):
 
 def prepull_images(cluster):
     cluster.log.debug("Prepulling Kubernetes images...")
-    #fix_cri_socket(cluster)
+    fix_cri_socket(cluster)
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
