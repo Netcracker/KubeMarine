@@ -1,6 +1,6 @@
-# KubeMarine
+# Kubetools
 
-KubeMarine is an open source, lightweight and powerful management tool built for end-to-end Kubernetes cluster deployment and maintenance. It's applicable for many purposes like simple and quick onboarding Kubernetes on local and production environments in different HA schemes depending on your aims, budget and capabilities. Together with simplicity KubeMarine can be very flexible and customizable tool covering specific configurability cases on both deployment and maintenance stages. This library provides powerfull CLI commands, as well as can be customized via Python extension API.
+Kubetools is an open source, lightweight and powerful management tool built for end-to-end Kubernetes cluster deployment and maintenance. It's applicable for many purposes like simple and quick onboarding Kubernetes on local and production environments in different HA schemes depending on your aims, budget and capabilities. Together with simplicity KubeMarine can be very flexible and customizable tool covering specific configurability cases on both deployment and maintenance stages. This library provides powerfull CLI commands, as well as can be customized via Python extension API.
 
 ## Highlights
 - Easy to use
