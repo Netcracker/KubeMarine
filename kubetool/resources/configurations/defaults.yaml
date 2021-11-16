@@ -434,7 +434,6 @@ plugins:
         protocol: TCP
       - name: prometheus
         containerPort: 10254
-        hostport: 10254
         protocol: TCP
 
   # TODO: support hostPort for haproxy-ingress
