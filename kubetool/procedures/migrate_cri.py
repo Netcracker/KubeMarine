@@ -5,7 +5,7 @@ from collections import OrderedDict
 import io
 import ruamel.yaml
 
-from kubetool import kubernetes
+from kubetool import kubernetes, etcd
 from kubetool.core import flow
 from kubetool.cri import docker
 from kubetool.procedures import install
@@ -184,6 +184,8 @@ def _migrate_cri(cluster, node_group):
         master["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
         if "master" in node["roles"]:
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
+            # check ETCD health
+            etcd.wait_for_health(cluster, node["connection"])
 
         packages_list = []
         for package_name in docker_associations['package_name']:

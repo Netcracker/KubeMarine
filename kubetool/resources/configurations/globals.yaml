@@ -33,6 +33,10 @@ etcd:
   temporary_exceptions:
     - "etcdserver: leader changed"
     - "etcdserver: request timed out"
+  health:
+    init_timeout: 30
+    timeout: 2
+    retries: 20
 kubernetes:
   temporary_exceptions:
     - has prevented the request from succeeding

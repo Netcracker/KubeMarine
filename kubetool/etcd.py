@@ -1,7 +1,11 @@
+import io
+import json
+import time
 from kubetool.core.group import NodeGroup
 
 
-# the method requires etcdctl.sh to be installed on all active master nodes during thirdparties task.
+# the methods requires etcdctl.sh to be installed on all active master nodes during thirdparties task.
+
 def remove_members(group: NodeGroup):
     log = group.cluster.log
 
@@ -32,3 +36,58 @@ def remove_members(group: NodeGroup):
             managing_master.sudo(command)
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
+
+# the method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
+# if all member are healthy the method checks the leader
+def wait_for_health(cluster, connection):
+
+    log = cluster.log
+    init_timeout = cluster.globals['etcd']['health']['init_timeout']
+    timeout = cluster.globals['etcd']['health']['timeout']
+    retries = cluster.globals['etcd']['health']['retries']
+
+    is_healthy = False
+    time.sleep(init_timeout)
+    while retries > 0:
+        start_time = time.time()
+        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json'
+                                           , is_async=False, hide=True).get_simple_out()
+        end_time = time.time()
+        sudo_time = int(end_time - start_time)
+        log.verbose(etcd_health_raw)
+        etcd_health_list = json.load(io.StringIO(etcd_health_raw.strip()))
+
+        health = 0
+        for etcd_health in etcd_health_list:
+            if etcd_health.get('health'):
+                health += 1
+
+        if health == len(etcd_health_list):
+            log.debug('All ETCD members are healthy!')
+            is_healthy = True
+            break
+        else:
+            log.debug('Wait for ETCD cluster is not healthy!')
+            if sudo_time < timeout:
+                time.sleep(timeout - sudo_time)
+            retries -= 1
+
+    if is_healthy:
+        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json'
+                                           , is_async=False, hide=True).get_simple_out()
+        log.verbose(etcd_status_raw)
+        etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
+        elected_leader = None
+        for item in etcd_status_list:
+            leader = item.get('status', {}).get('leader')
+            if not leader:
+                raise Exception('ETCD member "%s" do not have leader' % item.get('endpoint'))
+            if not elected_leader:
+                elected_leader = leader
+            elif elected_leader != leader:
+                raise Exception('ETCD leaders are not the same')
+        log.debug('Leader "%s" elected' % elected_leader)
+    else:
+        raise Exception('ETCD cluster is still not healthy!')
+      
+    log.verbose('ETCD cluster is healthy!')
