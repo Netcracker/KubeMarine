@@ -166,6 +166,7 @@ The actual information about the supported versions can be found at [global.yaml
     * 6443
     * 2379-2380
     * 10250-10252
+    * 10254 - Prometheus port
     * 30000-32767
   * External communication:
     * 80
@@ -2897,6 +2898,8 @@ For example:
       X-Request-Start: t=${msec}
       X-Using-Nginx-Controller: "true"
 ```
+###### monitoring
+By default 10254 port is opened and provides Prometheus metrics.
 
 ##### haproxy-ingress-controller
 

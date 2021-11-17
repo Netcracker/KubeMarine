@@ -432,6 +432,9 @@ plugins:
         containerPort: 443
         hostPort: 443
         protocol: TCP
+      - name: prometheus
+        containerPort: 10254
+        protocol: TCP
 
   # TODO: support hostPort for haproxy-ingress
   haproxy-ingress-controller:
