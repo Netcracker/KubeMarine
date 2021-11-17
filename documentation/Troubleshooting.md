@@ -11,6 +11,7 @@ This section provides troubleshooting information for Kubetools and Kubernetes s
 - [Troubleshooting Kubetools](#troubleshooting-kubetools)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
+  - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
 
 # Trobleshooting Tools
 
@@ -397,3 +398,13 @@ num_logs = 5 <- Number of generated files
 Rules are deleted in predefined.rules, which is located on this path /etc/audit/rules.d 
 
 **After all the manipulations, you need to apply the new configuration with the command** `sudo service auditd restart`
+
+## Failing during installation on Ubuntu OS with cloud-init
+
+### Issues related to updating apt repositories list
+ 
+* In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubetools` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubetools` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
+    * You can find out the current status of `cloud-init` and wait on completion by using the command below:
+    ```bash
+    cloud-init status
+    ```
