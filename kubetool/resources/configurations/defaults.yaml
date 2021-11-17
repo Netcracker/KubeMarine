@@ -239,13 +239,13 @@ services:
           package_name:
             - 'docker-ce={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
             - 'docker-ce-cli={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
-            - 'containerd.io={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
+            - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'docker'
           config_location: '/etc/docker/daemon.json'
         containerd:
           executable_name: 'containerd'
           package_name:
-            - 'containerd.io={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
+            - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
             - 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
@@ -291,13 +291,13 @@ services:
           package_name:
             - 'docker-ce-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
             - 'docker-ce-cli-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-            - 'containerd.io-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'containerd-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'docker'
           config_location: '/etc/docker/daemon.json'
         containerd:
           executable_name: 'containerd'
           package_name:
-            - 'containerd.io-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'containerd-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
             - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
