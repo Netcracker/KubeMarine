@@ -4507,25 +4507,25 @@ The tables below shows the correspondence of versions that are supported and is 
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
     <td colspan="4" rowspan="3">v1.20.11</td>
-    <td></td>
+    <td>SHA1: 59f904f50ea10cbc69007891301a2169f42f3537</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td></td>
+    <td>SHA1: 00c0b6a8dda55616343baafee9e9aa2775bc3c22</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td></td>
+    <td>SHA1: 0feee9301e7f6cb6fba1d841a6fd8f378589145f</td>
   </tr>
   <tr>
     <td>calicoctl</td>
     <td colspan="4">v3.19.1</td>
-    <td>Required only if calico is installed.</td>
+    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
     <td colspan="4">v1.20.0</td>	  
-    <td>Required only if containerd is used as a container runtime.</td>
+    <td>SHA1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
