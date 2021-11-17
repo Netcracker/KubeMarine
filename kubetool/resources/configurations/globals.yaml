@@ -144,24 +144,24 @@ compatibility_map:
     podman:
       v1.20.2:
         version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.20.11:
         version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.21.2:
         version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.21.5:
         version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.22.2:
         version_rhel: 1.6.4*
-        version_rhel8: 3.0.1*
-        version_debian: 100:3.1.2*
+        version_rhel8: "*"
+        version_debian: "*"
     haproxy:
       v1.20.2:
         version_rhel: 1.8*
