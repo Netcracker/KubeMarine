@@ -2898,6 +2898,8 @@ For example:
       X-Request-Start: t=${msec}
       X-Using-Nginx-Controller: "true"
 ```
+###### monitoring
+By default 10254 port is opened and provides Prometheus metrics.
 
 ##### haproxy-ingress-controller
 
