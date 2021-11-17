@@ -13,7 +13,7 @@ from kubetool.core import utils, flow, defaults
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.group import NodeGroup
 from kubetool.procedures import install, backup
-from kubetool import system, kubernetes
+from kubetool import system, kubernetes, etcd
 
 
 def missing_or_empty(file):
@@ -210,34 +210,9 @@ def import_etcd(cluster: KubernetesCluster):
         etcd_instances += 1
 
     # After restore check db size equal, cluster health and leader elected
+    # Checks should be changed
     master_conn = cluster.nodes['master'].get_first_member()
-    cluster_health_raw = master_conn.sudo(f'etcdctl endpoint health --cluster -w json').get_simple_out()
-    cluster.log.verbose(cluster_health_raw)
-    cluster_status_raw = master_conn.sudo(f'etcdctl endpoint status --cluster -w json').get_simple_out()
-    cluster.log.verbose(cluster_status_raw)
-    cluster.nodes['master'].sudo(f"{cont_runtime} rm -f $(sudo {cont_runtime} ps -aq)")  # delete containers after all
-    cluster_health = json.load(io.StringIO(cluster_health_raw.strip()))
-    cluster_status = json.load(io.StringIO(cluster_status_raw.lower().strip()))
-
-    # Check all members are healthy
-    if len(cluster_health) != etcd_instances:
-        raise Exception('Some ETCD members are not healthy')
-    for item in cluster_health:
-        if not item.get('health'):
-            raise Exception('ETCD member "%s" is not healthy' % item.get('endpoint'))
-    cluster.log.debug('All ETCD members are healthy!')
-
-    # Check leader elected
-    elected_leader = None
-    for item in cluster_status:
-        leader = item.get('status', {}).get('leader')
-        if not leader:
-            raise Exception('ETCD member "%s" do not have leader' % item.get('endpoint'))
-        if not elected_leader:
-            elected_leader = leader
-        elif elected_leader != leader:
-            raise Exception('ETCD leaders are not the same')
-    cluster.log.debug('Leader "%s" elected' % elected_leader)
+    etcd.wait_for_health(cluster, cluster.nodes['master'])
 
     # Check DB size is correct
     backup_source = cluster.context['backup_descriptor'].get('etcd', {}).get('source')
