@@ -4519,16 +4519,18 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4" rowspan="3">v3.19.1</td>
+    <td colspan="4">v3.19.1</td>
     <td>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
+    <td colspan="4">v1.20.0</td>	  
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
+    <td colspan="4">19.03</td>	  
     <td></td>
   </tr>
   <tr>
