@@ -122,25 +122,25 @@ compatibility_map:
         version_debian: 5:19.03.*
     containerd:
       v1.20.2:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
       v1.20.11:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
       v1.21.2:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
       v1.21.5:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
       v1.22.2:
-        version_rhel: 1.4.6*
-        version_rhel8: 1.4.8*
-        version_debian: 1.4.6*
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
     podman:
       v1.20.2:
         version_rhel: 1.6.4*
