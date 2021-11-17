@@ -112,7 +112,7 @@ class NodeGroupResultsTest(unittest.TestCase):
         expected_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='restarted', code=0)
         cluster.fake_shell.add(expected_results, 'sudo', ['service %s restart' % package_name])
 
-        actual_results = audit.apply_audit_rules(cluster.nodes['master'])
+        actual_results = audit.apply_audit_rules(cluster.nodes['master'], now=True)
 
         self.assertEqual(expected_results, actual_results,
                          msg='Configuration task did not did not finished with restart result')

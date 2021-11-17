@@ -62,7 +62,14 @@ class FakeShell:
                 result.append(item)
         return result
 
-    def is_called(self, do_type, args):
+    def is_called(self, do_type: str, args: list) -> bool:
+        """
+        Returns true if the specified command has already been executed in FakeShell. If there is no such command in the
+        FakeShell expected ones, or if several commands are found, exceptions will be thrown.
+        :param do_type: The type of required command
+        :param args: Required command arguments
+        :return: Boolean
+        """
         found_entry = self.history_find(do_type, args)
         if not found_entry:
             raise Exception('Failed to found entry %s %s in history' % (do_type, str(args)))
@@ -296,7 +303,11 @@ def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> 
     return NodeGroupResult(group_.cluster, results)
 
 
-def empty_action(group: NodeGroup):
+def empty_action(*args, **kwargs) -> None:
+    """
+    A dummy method that does nothing
+    :return: None
+    """
     pass
 
 

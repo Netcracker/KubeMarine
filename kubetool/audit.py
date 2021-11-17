@@ -1,5 +1,5 @@
 """
-This module works with audit on remote systems.
+This module works with audit on remote nodes.
 Using this module you can install, enable audit and configure audit rules.
 """
 
@@ -7,20 +7,31 @@ import io
 
 from kubetool import system, packages
 from kubetool.core import utils
+from kubetool.core.annotations import restrict_multi_os_group
 from kubetool.core.executor import RemoteExecutor
 from kubetool.core.group import NodeGroup, NodeGroupResult
 
 
-def is_audit_rules_defined(inventory):
+def is_audit_rules_defined(inventory) -> bool:
+    """
+    Checks for the presence of the specified audit rules in the inventory
+    :param inventory: Cluster inventory, where the rules will be checked
+    :return: Boolean
+    """
     rules = inventory['services'].get('audit', {}).get('rules')
     return rules is not None
 
 
-def install(group: NodeGroup, enable_service=True, force=False) -> NodeGroupResult or None:
-    # This method does not support multi-os groups
-    if group.is_multi_os():
-        raise Exception('Audit installation is not supported on multi-os group')
-
+@restrict_multi_os_group
+def install(group: NodeGroup, enable_service: bool = True, force: bool = False) -> NodeGroupResult or None:
+    """
+    Automatically installs and enables the audit service for the specified nodes
+    :param group: Nodes group on which audit installation should be performed
+    :param enable_service: Flag, automatically enables the service after installation
+    :param force: A flag that causes a forced installation even on centos nodes and nodes where the audit is already
+    installed
+    :return: String with installation output from nodes or None, when audit installation was skipped
+    """
     cluster = group.cluster
     log = cluster.log
 
@@ -28,7 +39,7 @@ def install(group: NodeGroup, enable_service=True, force=False) -> NodeGroupResu
         log.debug('Skipped - no audit rules in inventory')
         return
 
-    # This method supports cluster with multiple os, exceptions should be suppressed
+    # This method handles cluster with multiple os, exceptions should be suppressed
     if not force and group.get_nodes_os(suppress_exceptions=True) in ['rhel', 'rhel8']:
         log.debug('Auditd installation is not required on RHEL nodes')
         return
@@ -61,37 +72,41 @@ def install(group: NodeGroup, enable_service=True, force=False) -> NodeGroupResu
     return exe.get_last_results_str()
 
 
-def enable(group, now=True):
-    # This method does not support multi-os groups
-    if group.is_multi_os():
-        raise Exception('Enabling Audit is not supported on a multi-os group')
-
+@restrict_multi_os_group
+def enable(group: NodeGroup, now: bool = True) -> NodeGroupResult:
+    """
+    Enables and optionally starts the audit service for the specified nodes
+    :param group: Nodes group, where audit service should be enabled
+    :param now: Flag indicating that the audit service should be started immediately
+    :return: NodeGroupResult of enabling output from nodes
+    """
     cluster = group.cluster
 
     service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
     return system.enable_service(group, name=service_name, now=now)
 
 
-def restart(group):
-    # This method does not support multi-os groups
-    if group.is_multi_os():
-        raise Exception('Audit restart is not supported on a multi-os group')
-
+@restrict_multi_os_group
+def restart(group: NodeGroup) -> NodeGroupResult:
+    """
+    Restarts the audit service for the specified nodes
+    :param group: Nodes group, where audit service should be restarted
+    :return: Service restart NodeGroupResult
+    """
     cluster = group.cluster
 
     service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
     return group.sudo(f'service {service_name} restart')
 
 
-def apply_audit_rules(group: NodeGroup) -> NodeGroupResult or None:
+@restrict_multi_os_group
+def apply_audit_rules(group: NodeGroup, now: bool = True) -> NodeGroupResult or None:
     """
-    Generates and applies audit rules to the group.
+    Generates and applies audit rules to the group
+    :param group: Nodes group, where audit service should be configured
+    :param now: Flag indicating that the audit service should be restarted immediately
+    :return: Service restart result or nothing if audit rules are non exists, or restart is not required
     """
-
-    # This method does not support multi-os groups
-    if group.is_multi_os():
-        raise Exception('Audit configuring is not supported on multi-os group')
-
     cluster = group.cluster
     log = cluster.log
 
@@ -108,4 +123,5 @@ def apply_audit_rules(group: NodeGroup) -> NodeGroupResult or None:
     group.put(io.StringIO(rules_content), rules_config_location,
               sudo=True, backup=True)
 
-    return restart(group)
+    if now:
+        return restart(group)

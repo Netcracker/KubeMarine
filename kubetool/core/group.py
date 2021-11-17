@@ -85,30 +85,56 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return output
 
     def print(self) -> None:
+        """
+        Prints debug message to log with results for each node
+        :return: None
+        """
         self.cluster.log.debug(self)
 
     def get_group(self) -> NodeGroup:
+        """
+        Forms and returns a new group from node results
+        :return: NodeGroup
+        """
         hosts = []
         for connection in list(self.keys()):
             hosts.append(connection.host)
         return self.cluster.make_group(hosts)
 
-    def is_any_has_code(self, code) -> bool:
+    def is_any_has_code(self, code: int or str) -> bool:
+        """
+        Returns true if some group result has an exit code equal to the given one. Exceptions and other objects in
+        results will be ignored.
+        :param code: The code with which the result codes will be compared
+        :return: Boolean
+        """
         for conn, result in self.items():
             if isinstance(result, fabric.runners.Result) and str(result.exited) == str(code):
                 return True
         return False
 
     def is_any_excepted(self) -> bool:
+        """
+        Returns true if at least one result in group is an execution
+        :return: Boolean
+        """
         for conn, result in self.items():
             if isinstance(result, Exception):
                 return True
         return False
 
     def is_any_failed(self) -> bool:
+        """
+        Returns true if at least one result in the group finished with code 1 or failed with an exception
+        :return: Boolean
+        """
         return self.is_any_has_code(1) or self.is_any_excepted()
 
     def get_excepted_nodes_list(self) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections, for which the result is an exception
+        :return: Boolean
+        """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
             if isinstance(result, Exception):
@@ -116,10 +142,19 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return failed_nodes
 
     def get_excepted_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes, for which the result is an exception
+        :return: Boolean
+        """
         nodes_list = self.get_excepted_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_exited_nodes_list(self) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections, for which the result is the completion of the command and the formation of
+        the Fabric Result
+        :return: Boolean
+        """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
             if isinstance(result, fabric.runners.Result):
@@ -127,10 +162,19 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return failed_nodes
 
     def get_exited_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes, for which the result is the completion of the command and the
+        formation of the Fabric Result
+        :return: Boolean
+        """
         nodes_list = self.get_exited_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections that either exited with an exception, or the exit code is equals 1
+        :return: Boolean
+        """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
             if isinstance(result, Exception) or result.exited == 1:
@@ -138,10 +182,18 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return failed_nodes
 
     def get_failed_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes that either exited with an exception, or the exit code is equals 1
+        :return: Boolean
+        """
         nodes_list = self.get_failed_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_nonzero_nodes_list(self) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections that exited with non-zero exit code
+        :return: Boolean
+        """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
             if isinstance(result, Exception) or result.exited != 0:
@@ -149,6 +201,10 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return failed_nodes
 
     def get_nonzero_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes that exited with non-zero exit code
+        :return: Boolean
+        """
         nodes_list = self.get_nonzero_nodes_list()
         return self.cluster.make_group(nodes_list)
 
@@ -168,7 +224,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 return False
 
             if not isinstance(result, fabric.runners.Result) or not isinstance(compared_result, fabric.runners.Result):
-                raise NotImplementedError('Currently only instances of fabric.runners.Result can be compared!')
+                raise NotImplementedError('Currently only instances of fabric.runners.Result can be compared')
 
             if result != compared_result:
                 return False
@@ -706,9 +762,20 @@ class NodeGroup:
         return self.exclude_group(self.cluster.nodes.get('add_node'))
 
     def nodes_amount(self) -> int:
+        """
+        Returns the number of nodes within a group
+        :return: Integer
+        """
         return len(self.nodes.keys())
 
-    def get_nodes_os(self, suppress_exceptions=False):
+    def get_nodes_os(self, suppress_exceptions: bool = False) -> str:
+        """
+        Returns the detected operating system family for group. If the families are different within the same group, or
+        the family is unknown, the exception will be thrown or a string result will be returned.
+        :param suppress_exceptions: Flag, deactivating exception. A string value "unknown" or "multiple" will be
+        returned instead.
+        :return: Detected OS family
+        """
         detected_os_family = None
         for node in self.get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
             os_family = self.cluster.context["nodes"][node['connect_to']]["os"]['family']
@@ -723,10 +790,19 @@ class NodeGroup:
                         'OS families differ: detected %s and %s in same cluster' % (detected_os_family, os_family))
         return detected_os_family
 
-    def is_multi_os(self):
+    def is_multi_os(self) -> bool:
+        """
+        Returns true if same group contains nodes with multiple OS families
+        :return: Boolean
+        """
         return self.get_nodes_os(suppress_exceptions=True) == 'multiple'
 
-    def get_subgroup_with_os(self, os_family) -> NodeGroup:
+    def get_subgroup_with_os(self, os_family: str) -> NodeGroup:
+        """
+        Forms and returns a new group from the nodes of the original group that have a specific OS family
+        :param os_family: The name of required OS family
+        :return: NodeGroup
+        """
         if os_family not in ['debian', 'rhel', 'rhel8']:
             raise Exception('Unsupported OS family provided')
         node_names = []

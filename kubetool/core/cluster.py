@@ -203,10 +203,22 @@ class KubernetesCluster(Environment):
         return node_context['os']['family']
 
     def get_associations_for_node(self, host: str) -> dict:
+        """
+        Returns all packages associations for specific node
+        :param host: The address of the node for which required to find the associations
+        :return: Dict with packages and their associations
+        """
         node_os_family = self.get_os_family_for_node(host)
         return self.get_associations_for_os(node_os_family)
 
     def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str:
+        """
+        Returns the specified association for the specified package from inventory for specific node
+        :param host: The address of the node for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association string value
+        """
         associations = self.get_associations_for_node(host)
         association_value = associations.get(package, {}).get(association_key)
         if association_value is None:
@@ -214,6 +226,13 @@ class KubernetesCluster(Environment):
         return association_value
 
     def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
+        """
+        Returns the specified association dict for the specified package from inventory for entire NodeGroup
+        :param group: NodeGroup for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association values for every host in group, e.g. { host -> value }
+        """
         results = {}
         for node in group.get_ordered_members_list(provide_node_configs=True):
             association_value = self.get_package_association_for_node(node['connect_to'], package, association_key)
@@ -221,6 +240,14 @@ class KubernetesCluster(Environment):
         return results
 
     def get_package_association_str_for_group(self, group: NodeGroup, package: str, association_key: str) -> str:
+        """
+        Returns the specified association string for the specified package from inventory for entire NodeGroup. If
+        association value is different between some nodes, an exception will be thrown.
+        :param group: NodeGroup for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association string value
+        """
         results = self.get_package_association_for_group(group, package, association_key)
         results_values = list(set(results.values()))
         if len(results_values) == 1:

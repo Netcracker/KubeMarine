@@ -279,7 +279,11 @@ class RemoteExecutor:
 
         return output
 
-    def print_last_results(self):
+    def print_last_results(self) -> None:
+        """
+        Prints debug message to log with last executed queued command results.
+        :return: None
+        """
         results = self.get_last_results_str()
         self.cluster.log.debug(results)
 
