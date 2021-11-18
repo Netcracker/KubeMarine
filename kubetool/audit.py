@@ -54,7 +54,7 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
         log.verbose(audit_installed_results)
 
         # Reduce nodes amount for installation
-        install_group = audit_installed_results.get_nonzero_nodes_group()
+        install_group = audit_installed_results.get_nodes_group_where_value_in_stderr("no packages found matching")
 
         if install_group.nodes_amount() == 0:
             log.debug('Auditd is already installed on all nodes')
