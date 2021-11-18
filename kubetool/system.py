@@ -151,7 +151,6 @@ def detect_os_family(cluster, suppress_exceptions=False):
         active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
         group = cluster.nodes['all'].wait_active_nodes(timeout=active_timeout)
 
-    detected_os_family = None
     '''
     For Red Hat, CentOS, Oracle Linux, and Ubuntu information in /etc/os-release /etc/redhat-release is sufficient but,
     Debian stores the full version in a special file. sed transforms version string, eg 10.10 becomes DEBIAN_VERSION="10.10"  
@@ -208,20 +207,7 @@ def detect_os_family(cluster, suppress_exceptions=False):
             'family': os_family
         }
 
-    # TODO: We need to know if "old" nodes have different OS family,
-    #       maybe we should not use global static OS and use group-wise calculated OS?
-    for node in group.get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
-        os_family = group.cluster.context["nodes"][node['connect_to']]["os"]['family']
-        if os_family == 'unknown' and not suppress_exceptions:
-            raise Exception('OS family is unknown')
-        if not detected_os_family:
-            detected_os_family = os_family
-        elif detected_os_family != os_family:
-            detected_os_family = 'multiple'
-            if not suppress_exceptions:
-                raise Exception('OS families differ: detected %s and %s in same cluster' % (detected_os_family, os_family))
-
-    group.cluster.context["os"] = detected_os_family
+    group.cluster.context["os"] = group.get_nodes_os(suppress_exceptions=suppress_exceptions)
 
     return results
 
@@ -440,7 +426,7 @@ def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
     log.verbose('Graceful reboot required')
 
     first_master = group.cluster.nodes['master'].get_first_member()
-    results = NodeGroupResult()
+    results = NodeGroupResult(group.cluster)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
         cordon_required = cordone_on_graceful and ('master' in node['roles'] or 'worker' in node['roles'])
@@ -594,9 +580,10 @@ def is_modprobe_valid(group):
 
 def verify_system(group):
     log = group.cluster.log
-    os_family = get_os_family(group.cluster)
+    # this method handles clusters with multiple is, suppress exceptions enabled
+    os_family = group.get_nodes_os(suppress_exceptions=True)
 
-    if group.cluster.is_task_completed('prepare.system.setup_selinux') and os_family in ['rhel', 'rhel8']:
+    if os_family in ['rhel', 'rhel8'] and group.cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
@@ -646,7 +633,7 @@ def verify_system(group):
 
 
 def detect_active_interface(group: NodeGroup):
-    with RemoteExecutor(group.cluster.log) as exe:
+    with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             detect_interface_by_address(node['connection'], node['internal_address'])
     for cxn, host_results in exe.get_last_results().items():

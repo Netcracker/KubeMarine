@@ -1,39 +1,127 @@
 """
-This module works with audit on remote systems.
-Using this module you can apply audit rules.
+This module works with audit on remote nodes.
+Using this module you can install, enable audit and configure audit rules.
 """
 
 import io
 
-from kubetool import system
+from kubetool import system, packages
 from kubetool.core import utils
+from kubetool.core.annotations import restrict_multi_os_group
+from kubetool.core.executor import RemoteExecutor
 from kubetool.core.group import NodeGroup, NodeGroupResult
 
 
-def apply_audit_rules(group: NodeGroup) -> NodeGroupResult or None:
+def is_audit_rules_defined(inventory) -> bool:
     """
-    Generates and applies audit rules to the group.
+    Checks for the presence of the specified audit rules in the inventory
+    :param inventory: Cluster inventory, where the rules will be checked
+    :return: Boolean
     """
+    rules = inventory['services'].get('audit', {}).get('rules')
+    return rules is not None
 
-    log = group.cluster.log
 
-    # TODO: Support audit configuration on Ubuntu/Debian
-    # TODO: Remove docker/containerd rules if it's not installed
-    # TODO: Remove audit rules from kubeapi config in inventory if audit is disabled
-    if system.get_os_family(group.cluster) not in ['rhel', 'rhel8']:
-        log.debug('Skipped - audit not supported on debian os family')
+@restrict_multi_os_group
+def install(group: NodeGroup, enable_service: bool = True, force: bool = False) -> NodeGroupResult or None:
+    """
+    Automatically installs and enables the audit service for the specified nodes
+    :param group: Nodes group on which audit installation should be performed
+    :param enable_service: Flag, automatically enables the service after installation
+    :param force: A flag that causes a forced installation even on centos nodes and nodes where the audit is already
+    installed
+    :return: String with installation output from nodes or None, when audit installation was skipped
+    """
+    cluster = group.cluster
+    log = cluster.log
+
+    if not is_audit_rules_defined(cluster.inventory):
+        log.debug('Skipped - no audit rules in inventory')
         return
 
-    rules = group.cluster.inventory['services'].get('audit', {}).get('rules')
-    if not rules:
+    # This method handles cluster with multiple os, exceptions should be suppressed
+    if not force and group.get_nodes_os(suppress_exceptions=True) in ['rhel', 'rhel8']:
+        log.debug('Auditd installation is not required on RHEL nodes')
+        return
+
+    install_group = group
+
+    if not force:
+        log.verbose('Searching for already installed auditd package...')
+        debian_group = group.get_subgroup_with_os('debian')
+        debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
+        audit_installed_results = packages.detect_installed_package_version(debian_group, debian_package_name)
+        log.verbose(audit_installed_results)
+
+        # Reduce nodes amount for installation
+        install_group = audit_installed_results.get_nonzero_nodes_group()
+
+        if install_group.nodes_amount() == 0:
+            log.debug('Auditd is already installed on all nodes')
+            return
+        else:
+            log.debug('Auditd package is not installed, installing...')
+
+    package_name = cluster.get_package_association_str_for_group(install_group, 'audit', 'package_name')
+
+    with RemoteExecutor(cluster) as exe:
+        packages.install(install_group, include=package_name)
+        if enable_service:
+            enable(install_group)
+
+    return exe.get_last_results_str()
+
+
+@restrict_multi_os_group
+def enable(group: NodeGroup, now: bool = True) -> NodeGroupResult:
+    """
+    Enables and optionally starts the audit service for the specified nodes
+    :param group: Nodes group, where audit service should be enabled
+    :param now: Flag indicating that the audit service should be started immediately
+    :return: NodeGroupResult of enabling output from nodes
+    """
+    cluster = group.cluster
+
+    service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
+    return system.enable_service(group, name=service_name, now=now)
+
+
+@restrict_multi_os_group
+def restart(group: NodeGroup) -> NodeGroupResult:
+    """
+    Restarts the audit service for the specified nodes
+    :param group: Nodes group, where audit service should be restarted
+    :return: Service restart NodeGroupResult
+    """
+    cluster = group.cluster
+
+    service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
+    return group.sudo(f'service {service_name} restart')
+
+
+@restrict_multi_os_group
+def apply_audit_rules(group: NodeGroup, now: bool = True) -> NodeGroupResult or None:
+    """
+    Generates and applies audit rules to the group
+    :param group: Nodes group, where audit service should be configured
+    :param now: Flag indicating that the audit service should be restarted immediately
+    :return: Service restart result or nothing if audit rules are non exists, or restart is not required
+    """
+    cluster = group.cluster
+    log = cluster.log
+
+    if not is_audit_rules_defined(group.cluster.inventory):
         log.debug('Skipped - no audit rules in inventory')
         return
 
     log.debug('Applying audit rules...')
-    rules_content = " \n".join(rules)
+    rules_content = " \n".join(group.cluster.inventory['services']['audit']['rules'])
 
-    utils.dump_file(group.cluster, rules_content, 'predefined.rules')
-    group.put(io.StringIO(rules_content), '/etc/audit/rules.d/predefined.rules',
+    rules_config_location = cluster.get_package_association_str_for_group(group, 'audit', 'config_location')
+
+    utils.dump_file(group.cluster, rules_content, 'audit.rules')
+    group.put(io.StringIO(rules_content), rules_config_location,
               sudo=True, backup=True)
 
-    return group.sudo('service auditd restart')
+    if now:
+        return restart(group)

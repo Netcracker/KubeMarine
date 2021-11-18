@@ -171,7 +171,7 @@ def uninstall(group):
 
 
 def restart(group):
-    results = NodeGroupResult()
+    results = NodeGroupResult(group.cluster)
     for node in group.get_ordered_members_list(provide_node_configs=True):
         os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
         package_associations = os_specific_associations['keepalived']
@@ -182,7 +182,7 @@ def restart(group):
 
 
 def enable(group):
-    with RemoteExecutor(group.cluster.log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
             system.enable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'],
@@ -190,7 +190,7 @@ def enable(group):
 
 
 def disable(group):
-    with RemoteExecutor(group.cluster.log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
             system.disable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'])
@@ -230,11 +230,11 @@ def generate_config(inventory, node):
     return config
 
 
-def configure(group):
+def configure(group: NodeGroup) -> NodeGroupResult:
     log = group.cluster.log
     group_members = group.get_ordered_members_list(provide_node_configs=True)
 
-    with RemoteExecutor(log):
+    with RemoteExecutor(group.cluster):
         for node in group_members:
 
             log.debug("Configuring keepalived on '%s'..." % node['name'])

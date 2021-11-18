@@ -133,15 +133,15 @@ services:
 
   audit:
     rules:
-      - -w /var/lib/docker -k docker
-      - -w /etc/docker -k docker
-      - -w /usr/lib/systemd/system/docker.service -k docker
-      - -w /usr/lib/systemd/system/docker.socket -k docker
-      - -w /etc/default/docker -k docker
-      - -w /etc/docker/daemon.json -k docker
-      - -w /usr/bin/containerd -k docker
-      - -w /usr/sbin/runc -k dockerks
-      - -w /usr/bin/dockerd -k docker
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.service -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.socket -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/default/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker/daemon.json -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/sbin/runc -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/bin/dockerd -k docker{% endif %}'
+      - '-w /usr/bin/containerd -k docker'
 
   coredns:
     deployment:
@@ -255,6 +255,11 @@ services:
           package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
       rhel:
         docker:
           executable_name: 'docker'
@@ -281,6 +286,11 @@ services:
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
       rhel8:
         docker:
           executable_name: 'docker'
@@ -307,6 +317,11 @@ services:
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'keepalived'
           config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
  
 
 plugin_defaults:

@@ -90,18 +90,18 @@ def system_prepare_system_modprobe(cluster):
     cluster.nodes['all'].get_new_nodes_or_self().call(system.setup_modprobe)
 
 
-def system_prepare_audit(cluster):
-    if 'worker' in cluster.roles:
-        group = cluster.nodes['master'].include_group(cluster.nodes['worker']).get_new_nodes_or_self()
-    else:
-        group = cluster.nodes['master'].get_new_nodes_or_self()
-        cluster.log.debug(f'Warning: You are creating a cluster from only one master')
+def system_install_audit(cluster):
+    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
+    cluster.log.debug(group.call(audit.install))
 
+
+def system_prepare_audit(cluster):
+    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
 
 def system_prepare_dns_hostname(cluster):
-    with RemoteExecutor(cluster.log):
+    with RemoteExecutor(cluster):
         for node in cluster.nodes['all'].get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
             cluster.log.debug("Changing hostname '%s' = '%s'" % (node["connect_to"], node["name"]))
             node["connection"].sudo("hostnamectl set-hostname %s" % node["name"])
@@ -265,7 +265,7 @@ def deploy_loadbalancer_haproxy_configure(cluster):
         cluster.log.debug('Skipped - no balancers to perform')
         return
 
-    with RemoteExecutor(cluster.log):
+    with RemoteExecutor(cluster):
         group.call_batch([
             haproxy.configure,
             haproxy.override_haproxy18,
@@ -357,7 +357,7 @@ def deploy_kubernetes_init(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node' and group.get_new_nodes().is_empty():
-        cluster.log.debug("No kubernetes nodes to perform")
+        cluster.log.debug("No kubernetes nodes for installation")
         return
 
     cluster.nodes['master'].get_new_nodes_or_self().call_batch([
@@ -445,7 +445,10 @@ tasks = OrderedDict({
             "disable_swap": system_prepare_system_disable_swap,
             "modprobe": system_prepare_system_modprobe,
             "sysctl": system_prepare_system_sysctl,
-            "audit": system_prepare_audit
+            "audit": {
+                "install": system_install_audit,
+                "configure": system_prepare_audit
+            }
         },
         "cri": {
             "install": system_cri_install,
@@ -545,7 +548,8 @@ def main(cli_arguments=None):
         defined_tasks,
         defined_excludes,
         args.config,
-        flow.create_context(args, procedure='install'),
+        flow.create_context(args, procedure='install',
+                            included_tasks=defined_tasks, excluded_tasks=defined_excludes),
         cumulative_points=cumulative_points
     )
     if verification_version_result:

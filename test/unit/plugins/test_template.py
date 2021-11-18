@@ -1,37 +1,36 @@
-import os
 import unittest
 
 from kubetool import demo
-from kubetool.core import utils
 from kubetool.plugins import verify_template, apply_template
 
 
 class TestTemplate(unittest.TestCase):
+
     def test_verify_template(self):
         test_cases = [
             {
                 "name": "One yaml template",
-                "source": "test/unit/plugins/test_templates/test_template1.yaml",
+                "source": "../test/unit/plugins/test_templates/test_template1.yaml",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching three yaml templates",
-                "source": "test/unit/plugins/test_templates/*.yaml",
+                "source": "../test/unit/plugins/test_templates/*.yaml",
                 "valid": True,
             },
             {
                 "name": "Directory wildcard path matching two yaml templates",
-                "source": "test/unit/plugins/test_templates/*",
+                "source": "../test/unit/plugins/test_templates/*",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching zero templates",
-                "source": "test/unit/plugins/test_templates/*.conf",
+                "source": "../test/unit/plugins/test_templates/*.conf",
                 "valid": False,
             },
             {
                 "name": "Path to non-existent template",
-                "source": "test/unit/plugins/test_templates/template.conf",
+                "source": "../test/unit/plugins/test_templates/template.conf",
                 "valid": False,
             },
         ]
@@ -53,33 +52,32 @@ class TestTemplate(unittest.TestCase):
                         None, config
                     )
 
-
     def test_apply_template(self):
         test_cases = [
             {
                 "name": "One yaml template",
                 "create_files": ["./test_templates/test_template.yaml"],
-                "source": "test/unit/plugins/test_templates/test_template1.yaml",
+                "source": "../test/unit/plugins/test_templates/test_template1.yaml",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching three yaml templates",
-                "source": "test/unit/plugins/test_templates/*.yaml",
+                "source": "../test/unit/plugins/test_templates/*.yaml",
                 "valid": True,
             },
             {
                 "name": "Directory wildcard path matching two yaml templates",
-                "source": "test/unit/plugins/test_templates/*",
+                "source": "../test/unit/plugins/test_templates/*",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching zero templates",
-                "source": "test/unit/plugins/test_templates/*.conf",
+                "source": "../test/unit/plugins/test_templates/*.conf",
                 "valid": False,
             },
             {
                 "name": "Path to non-existent template",
-                "source": "test/unit/plugins/test_templates/template.conf",
+                "source": "../test/unit/plugins/test_templates/template.conf",
                 "valid": False,
             },
         ]

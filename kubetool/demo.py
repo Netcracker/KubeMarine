@@ -7,27 +7,28 @@ from invoke import UnexpectedExit
 from kubetool.core import cluster, group, flow, executor
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.connections import Connections
-from kubetool.core.group import NodeGroup, _HostToResult
+from kubetool.core.group import NodeGroup, _HostToResult, NodeGroupResult
 from kubetool.core.executor import RemoteExecutor
 
 
 class FakeShell:
     def __init__(self, _cluster):
         self.cluster = _cluster
-        self.results: List[Dict[str, Union[_HostToResult, Any]]] = []
+        self.results: List[Dict[str, Union[NodeGroupResult, Any]]] = []
         self.history = []
 
     def reset(self):
         self.results = []
         self.history = []
 
-    def add(self, result: _HostToResult, do_type, args, usage_limit=0):
+    def add(self, result: NodeGroupResult, do_type, args, usage_limit=0):
         args.sort()
 
         result = {
             'result': result,
             'do_type': do_type,
-            'args': args
+            'args': args,
+            'used_times': 0
         }
 
         if usage_limit > 0:
@@ -42,6 +43,7 @@ class FakeShell:
         for i, item in enumerate(self.results):
             if item['do_type'] == do_type and item['args'] == args:
                 self.history.append(item)
+                self.results[i]['used_times'] += 1
                 if item.get('usage_limit') is not None:
                     self.results[i]['usage_limit'] -= 1
                     if self.results[i]['usage_limit'] < 1:
@@ -59,6 +61,21 @@ class FakeShell:
             if item['do_type'] == do_type and item['args'] == args:
                 result.append(item)
         return result
+
+    def is_called(self, do_type: str, args: list) -> bool:
+        """
+        Returns true if the specified command has already been executed in FakeShell. If there is no such command in the
+        FakeShell expected ones, or if several commands are found, exceptions will be thrown.
+        :param do_type: The type of required command
+        :param args: Required command arguments
+        :return: Boolean
+        """
+        found_entry = self.history_find(do_type, args)
+        if not found_entry:
+            raise Exception('Failed to found entry %s %s in history' % (do_type, str(args)))
+        elif len(found_entry) > 1:
+            raise Exception('Too many entries found for request in history: %s %s' % (do_type, str(args)))
+        return self.history_find(do_type, args)[0]['used_times'] > 0
 
 
 class FakeFS:
@@ -143,13 +160,17 @@ class FakeNodeGroup(group.NodeGroup):
             if found_result is None:
                 raise Exception('Fake result not found for requested action type \'%s\' and args %s' % (do_type, args))
 
-            found_result = {host: result for host, result in found_result.items() if host in nodes.keys()}
+            found_result = {((isinstance(host, fabric.connection.Connection) and host.host) or host): result for host, result in found_result.items() if (isinstance(host, fabric.connection.Connection) and host.host in nodes.keys()) or host in nodes.keys()}
+
+            if not found_result:
+                raise Exception('Fake results were found, but all of them were filtered')
+
             for host, result in found_result.items():
                 if isinstance(result, UnexpectedExit) and kwargs.get('warn', False):
                     found_result[host] = result.result
 
             # Remote Executor support code
-            gre = RemoteExecutor(self.cluster.log)
+            gre = RemoteExecutor(self.cluster)
             executor = gre._get_active_executor()
             batch_results = {}
             for host, result in found_result.items():
@@ -167,10 +188,7 @@ class FakeNodeGroup(group.NodeGroup):
         return
 
     def _make_result(self, results: _HostToResult) -> FakeNodeGroupResult:
-        group_result = FakeNodeGroupResult()
-        for host, result in results.items():
-            group_result[self.nodes[host]] = result
-
+        group_result = FakeNodeGroupResult(self.cluster, results)
         return group_result
 
 
@@ -272,20 +290,24 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
     return inventory
 
 
-def create_exception_result(group_: NodeGroup, exception: Exception) -> _HostToResult:
-    return {host: exception for host in group_.nodes.keys()}
+def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
+    return NodeGroupResult(group_.cluster, {host: exception for host in group_.nodes.keys()})
 
 
-def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> _HostToResult:
+def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
     results = {}
     for host, cxn in group_.nodes.items():
         results[host] = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=cxn)
         if code == -1:
             results[host] = UnexpectedExit(results[host])
-    return results
+    return NodeGroupResult(group_.cluster, results)
 
 
-def empty_action(group):
+def empty_action(*args, **kwargs) -> None:
+    """
+    A dummy method that does nothing
+    :return: None
+    """
     pass
 
 
