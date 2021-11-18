@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 import re
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
+import fabric
 import yaml
 
 from kubetool.core import log
@@ -11,6 +11,8 @@ from kubetool.core.environment import Environment
 from kubetool.core.group import NodeGroup
 
 jinja_query_regex = re.compile("{{ .* }}", re.M)
+
+_AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
 
 
 class KubernetesCluster(Environment):
@@ -80,12 +82,20 @@ class KubernetesCluster(Environment):
     def log(self) -> log.EnhancedLogger:
         return self._log.logger
 
-    def make_group(self, ips: List[str] or List[NodeGroup]) -> NodeGroup:
+    def make_group(self, ips: List[_AnyConnectionTypes]) -> NodeGroup:
         connections: Connections = {}
         for ip in ips:
-            if isinstance(ip, NodeGroup):
-                ip = list(ip.nodes.keys())[0]
-            connections[ip] = self._connection_pool.get_connection(ip)
+            if isinstance(ip, fabric.connection.Connection):
+                ip = ip.host
+                connections[ip] = self._connection_pool.get_connection(ip)
+            elif isinstance(ip, NodeGroup):
+                for host, connection in ip.nodes.items():
+                    ip = connection.host
+                    connections[ip] = self._connection_pool.get_connection(ip)
+            elif isinstance(ip, str):
+                connections[ip] = self._connection_pool.get_connection(ip)
+            else:
+                raise Exception('Unsupported connection object type')
         return NodeGroup(connections, self)
 
     def get_addresses_from_node_names(self, node_names: List[str]) -> dict:
@@ -186,15 +196,63 @@ class KubernetesCluster(Environment):
 
         return package_associations
 
-    def get_os_family_for_node(self, host):
+    def get_os_family_for_node(self, host: str) -> str:
         node_context = self.context['nodes'].get(host)
         if not node_context or not node_context.get('os', {}).get('family'):
             raise Exception('Node %s do not contain necessary context data' % host)
         return node_context['os']['family']
 
-    def get_associations_for_node(self, host):
+    def get_associations_for_node(self, host: str) -> dict:
+        """
+        Returns all packages associations for specific node
+        :param host: The address of the node for which required to find the associations
+        :return: Dict with packages and their associations
+        """
         node_os_family = self.get_os_family_for_node(host)
         return self.get_associations_for_os(node_os_family)
+
+    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str:
+        """
+        Returns the specified association for the specified package from inventory for specific node
+        :param host: The address of the node for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association string value
+        """
+        associations = self.get_associations_for_node(host)
+        association_value = associations.get(package, {}).get(association_key)
+        if association_value is None:
+            raise Exception(f'Failed to get association "{association_key}" for package "{package}"')
+        return association_value
+
+    def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
+        """
+        Returns the specified association dict for the specified package from inventory for entire NodeGroup
+        :param group: NodeGroup for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association values for every host in group, e.g. { host -> value }
+        """
+        results = {}
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            association_value = self.get_package_association_for_node(node['connect_to'], package, association_key)
+            results[node['connect_to']] = association_value
+        return results
+
+    def get_package_association_str_for_group(self, group: NodeGroup, package: str, association_key: str) -> str:
+        """
+        Returns the specified association string for the specified package from inventory for entire NodeGroup. If
+        association value is different between some nodes, an exception will be thrown.
+        :param group: NodeGroup for which required to find the association
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association string value
+        """
+        results = self.get_package_association_for_group(group, package, association_key)
+        results_values = list(set(results.values()))
+        if len(results_values) == 1:
+            return results_values[0]
+        raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
     def cache_package_versions(self):
         detected_packages = packages.detect_installed_packages_version_groups(self.nodes['all'].get_unchanged_nodes().get_online_nodes())

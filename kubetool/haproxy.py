@@ -39,7 +39,7 @@ def enrich_inventory(inventory, cluster):
 
 
 def install(group):
-    with RemoteExecutor(group.cluster.log) as exe:
+    with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
             group.sudo("%s -v" % package_associations['executable_name'], warn=True)
@@ -53,7 +53,7 @@ def install(group):
         # TODO: Add Haproxy version output from previous command to method results
         group.cluster.log.debug("HAProxy already installed, nothing to install")
     else:
-        with RemoteExecutor(group.cluster.log) as exe:
+        with RemoteExecutor(group.cluster) as exe:
             for node in group.get_ordered_members_list(provide_node_configs=True):
                 package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
                 packages.install(node["connection"], include=package_associations['package_name'])
@@ -73,21 +73,21 @@ def restart(group):
     for node in group.get_ordered_members_list(provide_node_configs=True):
         service_name = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']['service_name']
         system.restart_service(node['connection'], name=service_name)
-    RemoteExecutor(group.cluster.log).flush()
+    RemoteExecutor(group.cluster).flush()
     group.cluster.log.debug("Sleep while haproxy comes-up...")
     time.sleep(group.cluster.globals['haproxy']['restart_wait'])
     return
 
 
 def disable(group):
-    with RemoteExecutor(group.cluster.log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
             system.disable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'])
 
 
 def enable(group):
-    with RemoteExecutor(group.cluster.log):
+    with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
             system.enable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'],
@@ -129,7 +129,7 @@ def configure(group):
 
 
 def override_haproxy18(group):
-    rhel_nodes = group.get_nodes_with_os('rhel')
+    rhel_nodes = group.get_subgroup_with_os('rhel')
     if rhel_nodes.is_empty():
         group.cluster.log.debug('Haproxy18 override is not required')
         return

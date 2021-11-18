@@ -125,7 +125,7 @@ def get_selinux_status(group):
 def is_config_valid(group, state=None, policy=None, permissive=None):
     log = group.cluster.log
 
-    if system.get_os_family(group.cluster) == 'debian':
+    if group.get_nodes_os(suppress_exceptions=True) == 'debian':
         log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
         return
 
@@ -177,7 +177,8 @@ def is_config_valid(group, state=None, policy=None, permissive=None):
 def setup_selinux(group):
     log = group.cluster.log
 
-    if system.get_os_family(group.cluster) == 'debian':
+    # this method handles cluster with multiple os, suppressing should be enabled
+    if group.get_nodes_os(suppress_exceptions=True) not in ['rhel', 'rhel8']:
         log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
         return
 

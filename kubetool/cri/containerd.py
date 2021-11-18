@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from io import StringIO
 
 import toml
@@ -12,7 +10,7 @@ from kubetool.core.executor import RemoteExecutor
 
 
 def install(group):
-    with RemoteExecutor(group.cluster.log) as exe:
+    with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
 
@@ -75,7 +73,7 @@ def configure(group):
         group.sudo("rm -f /etc/containers/registries.conf")
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
-    with RemoteExecutor(group.cluster.log) as exe:
+    with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
             log.debug("Uploading containerd configuration to %s node..." % node['name'])

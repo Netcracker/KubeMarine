@@ -172,7 +172,8 @@ def main(cli_arguments=None):
     for version in upgrade_plan:
 
         # reset context from previous installation
-        context = flow.create_context(args, procedure='upgrade')
+        context = flow.create_context(args, procedure='upgrade',
+                                      included_tasks=defined_tasks, excluded_tasks=defined_excludes)
         context['inventory_regenerate_required'] = True
         context['upgrade_version'] = version
         context['dump_filename_prefix'] = version

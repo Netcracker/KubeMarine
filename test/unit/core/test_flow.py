@@ -44,7 +44,7 @@ class FlowTest(unittest.TestCase):
     def test_filter_flow_1(self):
         test_tasks = ["deploy.loadbalancer.haproxy"]
 
-        test_res = flow.filter_flow(tasks, test_tasks, "")
+        test_res, final_list = flow.filter_flow(tasks, test_tasks, "")
         test_res = replace_a_func_in_dict(test_res)
 
         expected_res = {'deploy': {'loadbalancer': {'haproxy': 'a'}}}
@@ -53,7 +53,7 @@ class FlowTest(unittest.TestCase):
     def test_filter_flow_2(self):
         test_tasks = ["deploy"]
 
-        test_res = flow.filter_flow(tasks, test_tasks, "")
+        test_res, final_list = flow.filter_flow(tasks, test_tasks, "")
         test_res = replace_a_func_in_dict(test_res)
 
         expected_res = {'deploy': {'accounts': 'a', 'loadbalancer': {'haproxy': 'a', 'keepalived': 'a'}}}
@@ -62,7 +62,7 @@ class FlowTest(unittest.TestCase):
     def test_filter_flow_3(self):
         test_tasks = ["deploy.loadbalancer.haproxy", "overview"]
 
-        test_res = flow.filter_flow(tasks, test_tasks, "")
+        test_res, final_list = flow.filter_flow(tasks, test_tasks, "")
         test_res = replace_a_func_in_dict(test_res)
 
         expected_res = {'deploy': {'loadbalancer': {'haproxy': 'a'}}, 'overview': 'a'}
@@ -72,7 +72,7 @@ class FlowTest(unittest.TestCase):
         test_tasks = ["deploy"]
         excluded_tasks = ["deploy.loadbalancer"]
 
-        test_res = flow.filter_flow(tasks, test_tasks, excluded_tasks)
+        test_res, final_list = flow.filter_flow(tasks, test_tasks, excluded_tasks)
         test_res = replace_a_func_in_dict(test_res)
 
         expected_res = {'deploy': {'accounts': 'a'}}

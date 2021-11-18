@@ -49,7 +49,8 @@ def main(cli_arguments=None):
     if args.exclude != '':
         defined_excludes = args.exclude.split(",")
 
-    context = flow.create_context(args, procedure='manage_psp')
+    context = flow.create_context(args, procedure='manage_psp',
+                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
     context['inventory_regenerate_required'] = True
 
     flow.run(

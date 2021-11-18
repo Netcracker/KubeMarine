@@ -166,6 +166,7 @@ The actual information about the supported versions can be found at [global.yaml
     * 6443
     * 2379-2380
     * 10250-10252
+    * 10254 - Prometheus port
     * 30000-32767
   * External communication:
     * 80
@@ -772,7 +773,7 @@ The following parameters are supported:
 |ip| |The IP address for virtual IP.|
 |floating_ip| |The floating IP address for virtual IP.|
 |interface|`eth0`|The interface on which the address must be listened.|
-|id|`md5({{ interface }} + {{ ip }})` сropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
+|id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
 
@@ -912,7 +913,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the СPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -2897,6 +2898,8 @@ For example:
       X-Request-Start: t=${msec}
       X-Using-Nginx-Controller: "true"
 ```
+###### monitoring
+By default 10254 port is opened and provides Prometheus metrics.
 
 ##### haproxy-ingress-controller
 
@@ -4070,7 +4073,9 @@ The following is the installation tasks tree:
     * **disable_swap** - Forcibly disables swap in system.
     * **modprobe** - Configures Linux Kernel modules. For more information about parameters for this task, see [modprobe](#modprobe).
     * **sysctl** - Configures Linux Kernel parameters. For more information about parameters for this task, see [sysctl](#sysctl).
-    * **audit** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
+    * **audit**
+      * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
+      * **configure** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).
@@ -4307,7 +4312,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. Аfter several installations, you can find the file and all its backups as in the following example:
+During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*
@@ -4507,28 +4512,30 @@ The tables below shows the correspondence of versions that are supported and is 
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
     <td colspan="4" rowspan="3">v1.20.11</td>
-    <td></td>
+    <td>SHA1: 59f904f50ea10cbc69007891301a2169f42f3537</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td></td>
+    <td>SHA1: 00c0b6a8dda55616343baafee9e9aa2775bc3c22</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td></td>
+    <td>SHA1: 0feee9301e7f6cb6fba1d841a6fd8f378589145f</td>
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4" rowspan="3">v3.19.1</td>
-    <td>Required only if calico is installed.</td>
+    <td colspan="4">v3.19.1</td>
+    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td>Required only if containerd is used as a container runtime.</td>
+    <td colspan="4">v1.20.0</td>	  
+    <td>SHA1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
+    <td colspan="4">19.03</td>	  
     <td></td>
   </tr>
   <tr>
