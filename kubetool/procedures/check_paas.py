@@ -365,7 +365,7 @@ def kubernetes_nodes_roles(cluster):
                 node_name = node_description['metadata']['name']
                 if node['name'] == node_name:
                     if 'master' in node['roles']:
-                        if 'node-role.kubernetes.io/master' not in node_description['metadata']['labels']:
+                        if 'node-role.kubernetes.io/control-plane' not in node_description['metadata']['labels']:
                             nodes_with_bad_roles.append(node['name'])
                             cluster.log.error("Node \"%s\" has to be master, but has invalid role" % node['name'])
                         else:
