@@ -151,7 +151,7 @@ def enrich_inventory(inventory, cluster):
                 # node is both master and worker, thus we remove NoSchedule taint
                 if "taints" not in node:
                     node["taints"] = []
-                node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
+                node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
 
     return inventory
 
