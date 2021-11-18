@@ -78,7 +78,7 @@ def configure(group):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
             log.debug("Uploading containerd configuration to %s node..." % node['name'])
             node['connection'].put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
-                                   sudo=True)
+                                   sudo=True, mkdir=True)
             log.debug("Restarting Containerd on %s node..." % node['name'])
             node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
                                     f"sudo systemctl restart {os_specific_associations['service_name']} && "
