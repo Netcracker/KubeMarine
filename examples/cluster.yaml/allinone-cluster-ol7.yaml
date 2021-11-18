@@ -13,7 +13,6 @@ cluster_name: "k8s.oracle.com"
 
 services:
   resolv.conf:
-    search: default
     nameservers:
       - 1.1.1.1
       - 1.0.0.1
@@ -31,6 +30,7 @@ services:
     package_manager:
       replace-repositories: true
       repositories:
+      # Own OL7 repositories need to be described in cluster.yaml, if they are disabled in OS. 
         ol7_addons:
           name: "Oracle Linux Addons"
           enabled: 1
