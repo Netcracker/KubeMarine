@@ -132,8 +132,8 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
 
     def get_excepted_nodes_list(self) -> List[fabric.connection.Connection]:
         """
-        Returns a list of node connections, for which the result is an exception
-        :return: Boolean
+        Returns a list of nodes connections, for which the result is an exception
+        :return: List with nodes connections
         """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
@@ -144,16 +144,16 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
     def get_excepted_nodes_group(self) -> NodeGroup:
         """
         Forms and returns new NodeGroup of nodes, for which the result is an exception
-        :return: Boolean
+        :return: NodeGroup:
         """
         nodes_list = self.get_excepted_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_exited_nodes_list(self) -> List[fabric.connection.Connection]:
         """
-        Returns a list of node connections, for which the result is the completion of the command and the formation of
+        Returns a list of nodes connections, for which the result is the completion of the command and the formation of
         the Fabric Result
-        :return: Boolean
+        :return: List with nodes connections
         """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
@@ -165,15 +165,15 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         """
         Forms and returns new NodeGroup of nodes, for which the result is the completion of the command and the
         formation of the Fabric Result
-        :return: Boolean
+        :return: NodeGroup:
         """
         nodes_list = self.get_exited_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
         """
-        Returns a list of node connections that either exited with an exception, or the exit code is equals 1
-        :return: Boolean
+        Returns a list of nodes connections that either exited with an exception, or the exit code is equals 1
+        :return: List with nodes connections
         """
         failed_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
@@ -184,28 +184,49 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
     def get_failed_nodes_group(self) -> NodeGroup:
         """
         Forms and returns new NodeGroup of nodes that either exited with an exception, or the exit code is equals 1
-        :return: Boolean
+        :return: NodeGroup:
         """
         nodes_list = self.get_failed_nodes_list()
         return self.cluster.make_group(nodes_list)
 
     def get_nonzero_nodes_list(self) -> List[fabric.connection.Connection]:
         """
-        Returns a list of node connections that exited with non-zero exit code
-        :return: Boolean
+        Returns a list of nodes connections that exited with non-zero exit code
+        :return: List with nodes connections
         """
-        failed_nodes: List[fabric.connection.Connection] = []
+        nonzero_nodes: List[fabric.connection.Connection] = []
         for conn, result in self.items():
             if isinstance(result, Exception) or result.exited != 0:
-                failed_nodes.append(conn)
-        return failed_nodes
+                nonzero_nodes.append(conn)
+        return nonzero_nodes
 
     def get_nonzero_nodes_group(self) -> NodeGroup:
         """
         Forms and returns new NodeGroup of nodes that exited with non-zero exit code
-        :return: Boolean
+        :return: NodeGroup:
         """
         nodes_list = self.get_nonzero_nodes_list()
+        return self.cluster.make_group(nodes_list)
+
+    def get_nodes_list_where_value_in_stderr(self, value: str) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections that contains the given string value in results stderr
+        :param value: The string value to be found in the nodes results stderr.
+        :return: List with nodes connections
+        """
+        nodes_with_stderr_value: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if isinstance(result, fabric.runners.Result) and value in result.stderr:
+                nodes_with_stderr_value.append(conn)
+        return nodes_with_stderr_value
+
+    def get_nodes_group_where_value_in_stderr(self, value: str) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes that contains the given string value in results stderr
+        :param value: The string value to be found in the nodes results stderr.
+        :return: NodeGroup
+        """
+        nodes_list = self.get_nodes_list_where_value_in_stderr(value)
         return self.cluster.make_group(nodes_list)
 
     def __eq__(self, other) -> bool:
