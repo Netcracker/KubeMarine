@@ -6,6 +6,7 @@ This section provides information about the inventory, features, and steps for i
     - [Minimal Hardware Requirements](#minimal-hardware-requirements)
     - [Recommended Hardware Requirements](#recommended-hardware-requirements)
     - [ETCD Recommendation](#etcd-recommendation)
+    - [SSH key Recommendation](#ssh-key-recommendation)
 - [Inventory Preparation](#inventory-preparation)
   - [Deployment Schemes](#deployment-schemes)
     - [Non-HA Deployment Schemes](#non-ha-deployment-schemes)
@@ -278,6 +279,17 @@ Mount point:
 /var/lib/etcd
 ```
 [General H/W recommendations](https://etcd.io/docs/latest/op-guide/hardware/)
+
+### SSH key Recommendation 
+
+Before working with the cluster, you need to generate an ssh key. Kubetool only support these types of keys: *RSA, DSS, ECDSA и Ed25519*.
+
+Example:
+```
+ssh-keygen -t rsa -b 4096
+```
+
+
 
 # Inventory Preparation
 
