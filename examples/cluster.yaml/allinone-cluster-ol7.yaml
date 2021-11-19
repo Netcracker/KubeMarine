@@ -1,0 +1,78 @@
+node_defaults:
+  keyfile: /home/user/id_rsa
+  username: cloud-user
+
+vrrp_ips:
+  - ip: "192.168.1.200"
+nodes:
+  - name: "k8s3"
+    address: "10.101.0.2"
+    internal_address: "192.168.1.9"
+    roles: ["master", "worker", "balancer"]
+cluster_name: "k8s.oracle.com"
+
+services:
+  resolv.conf:
+    nameservers:
+      - 1.1.1.1
+      - 1.0.0.1
+
+  ntp:
+    # For RHEL OS use chrony:
+    chrony:
+      servers:
+        - 0.de.pool.ntp.org iburst
+        - 1.de.pool.ntp.org iburst
+      makestep: 5 10
+      rtcsync: True
+          
+  packages:
+    package_manager:
+      replace-repositories: false
+      repositories:
+      # Own OL7 repositories need to be described in cluster.yaml, if they are disabled in OS. 
+        ol7_addons:
+          name: "Oracle Linux Addons"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "https://yum.oracle.com/repo/OracleLinux/OL7/addons/x86_64/"
+        ol7_latest:
+          name: "Oracle Linux Latest"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64"
+        docker-ce:        
+          name: "CentOS 7 Docker-CE"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "https://download.docker.com/linux/centos/7/x86_64/stable/"
+        centos-sclo-haproxy18:
+          name: "CentOS SCLO rh-haproxy18"
+          enabled: 1
+          gpgcheck: 0
+          baseurl: "http://mirror.centos.org/centos/7/sclo/x86_64/rh/"
+
+    install:
+      - conntrack-tools
+      - kmod
+      - ethtool
+      - ebtables
+      - socat
+      - curl
+      - openssl
+      - unzip
+      - policycoreutils-python
+    associations:
+      containerd:
+        package_name:
+          - 'containerd.io-1.4.6*'    
+          - 'podman-1.4.4*'
+        
+rbac:
+  accounts:
+    - name: superadmin
+      role: cluster-admin
+
+plugins:
+  kubernetes-dashboard:
+    install: true

@@ -12,7 +12,7 @@ def backup_repo(group, repo_filename="*"):
         return
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
-    return group.sudo("find /etc/yum.repos.d/ -type f -name '%s.repo' | sudo xargs -iNAME mv -f NAME NAME.bak" % repo_filename)
+    return group.sudo("find /etc/yum.repos.d/ -type f -name '%s.repo' | sudo xargs -t -iNAME mv -bf NAME NAME.bak" % repo_filename)
 
 
 def add_repo(group, repo_data="", repo_filename="predefined"):

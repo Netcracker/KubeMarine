@@ -16,7 +16,7 @@ def backup_repo(group, repo_filename="*") -> NodeGroupResult or None:
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
     return group.sudo(
-        "find %s -type f -name '%s.list' | sudo xargs -t -iNAME mv -f NAME NAME.bak" % ("/etc/apt/", repo_filename))
+        "find %s -type f -name '%s.list' | sudo xargs -t -iNAME mv -bf NAME NAME.bak" % ("/etc/apt/", repo_filename))
 
 
 def add_repo(group, repo_data="", repo_filename="predefined") -> NodeGroupResult:

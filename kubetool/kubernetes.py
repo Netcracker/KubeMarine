@@ -776,7 +776,7 @@ def prepare_drain_command(node, version: str, globals, disable_eviction: bool, n
         drain_timeout = recalculate_proper_timeout(nodes, drain_globals['timeout'])
     if grace_period is None:
         grace_period = drain_globals['grace_period']
-    drain_cmd = f"kubectl drain {node['name']} --force --ignore-daemonsets --delete-local-data " \
+    drain_cmd = f"kubectl drain {node['name']} --force --ignore-daemonsets --delete-emptydir-data " \
                 f"--timeout={drain_timeout}s --grace-period={grace_period}"
     if version and version >= "v1.18" and disable_eviction:
         drain_cmd += " --disable-eviction=true"
