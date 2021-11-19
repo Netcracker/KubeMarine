@@ -363,6 +363,7 @@ class NodeGroup:
         hide = kwargs.pop("hide", True) is True
         sudo = kwargs.pop("sudo", False) is True
         backup = kwargs.pop("backup", False) is True
+        mkdir = kwargs.pop("mkdir", False) is True
         immutable = kwargs.pop("immutable", False) is True
 
         # for unknown reason fabric v2 can't put async
@@ -375,6 +376,9 @@ class NodeGroup:
 
         if backup:
             self.cluster.log.verbose('File \"%s\" backup required' % remote_file)
+
+        if mkdir:
+            self.cluster.log.verbose('A parent directory will be created')
 
         if immutable:
             self.cluster.log.verbose('File \"%s\" immutable set required' % remote_file)
@@ -405,6 +409,13 @@ class NodeGroup:
             else:
                 mv_command = "cp -f %s %s.bak$(ls %s* | wc -l); %s" \
                              % (remote_file, remote_file, remote_file, mv_command)
+
+        if mkdir:
+            file_directory = "/".join(remote_file.split('/')[:-1])
+            if sudo:
+                mv_command = f"sudo mkdir -p {file_directory}; {mv_command}"
+            else:
+                mv_command = f"mkdir -p {file_directory}; {mv_command}"
 
         mv_command = "cmp --silent %s %s || (%s)" % (remote_file, temp_filepath, mv_command)
 
