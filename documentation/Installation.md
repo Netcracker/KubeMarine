@@ -281,7 +281,7 @@ Mount point:
 
 ### SSH key Recommendation 
 
-Before working with the cluster, you need to generate an ssh key. Kubetool only support these types of keys: *RSA, DSS, ECDSA и Ed25519*.
+Before working with the cluster, you need to generate an ssh key. Kubetool supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
 Example:
 ```
