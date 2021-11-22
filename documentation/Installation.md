@@ -287,9 +287,6 @@ Example:
 ```
 ssh-keygen -t rsa -b 4096
 ```
-
-
-
 # Inventory Preparation
 
 Before you begin, select the deployment scheme and prepare the inventory.
