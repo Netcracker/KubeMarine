@@ -167,7 +167,6 @@ The actual information about the supported versions can be found at [global.yaml
     * 6443
     * 2379-2380
     * 10250-10252
-    * 10254 - Prometheus port
     * 30000-32767
   * External communication:
     * 80
