@@ -136,7 +136,7 @@ def _migrate_cri(cluster, node_group):
             master = cluster.nodes["master"].get_first_member(provide_node_configs=True)
 
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-        cluster.log.debug("Upgrading \"%s\"" % node["name"])
+        cluster.log.debug("Migrating \"%s\"..." % node["name"])
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
         master["connection"].sudo(drain_cmd, is_async=False, hide=False)
