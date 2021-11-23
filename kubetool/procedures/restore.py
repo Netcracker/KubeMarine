@@ -211,8 +211,7 @@ def import_etcd(cluster: KubernetesCluster):
 
     # After restore check db size equal, cluster health and leader elected
     # Checks should be changed
-    master_conn = cluster.nodes['master'].get_first_member()
-    etcd.wait_for_health(cluster, cluster.nodes['master'])
+    cluster_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
 
     # Check DB size is correct
     backup_source = cluster.context['backup_descriptor'].get('etcd', {}).get('source')
