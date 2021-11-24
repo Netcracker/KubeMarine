@@ -5,7 +5,7 @@ High-level overview of this approach is shown on the following diagram.
 
 ![](/documentation/images/tls-termination-nginx.png)
 
-Here, client creates HTTPS connection to HAProxy TCP Load Balancer, which in turn proxies the traffic to Nginx Ingress Controller without TLS termination.
+Here, client creates HTTPS connection to TCP Load Balancer, which in turn proxies the traffic to Nginx Ingress Controller without TLS termination.
 Nginx Ingress Controller uses default wildcard certificate to authenticate itself to a client and to terminate HTTPS connection.
 To support multiple hostnames the certificate could use wildcard SANs.
 Nginx Ingress Controller contacts applications using plain HTTP connection.
@@ -25,5 +25,11 @@ This could be done during:
 - Installation, for details refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
 - On already installed Nginx Ingress Controller, using `certs_renew` maintenance procedure, for details refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
 
-
 **Important:** the default certificate should be issued to wildcard hostnames, so that it could be used for all ingresses.
+
+### Using kubetool-provided TCP Load Balancer
+
+Using kubetool you could install and configure HAProxy TCP Load Balancers in HA mode using VRRP.
+For that you need to assign `balancer` role to some of your hosts, where HAProxy and Keepalived should be installed,
+for more information see [`nodes` section in `cluster.yaml`](/documentation/Installation.md#nodes).
+Also, you need to [configure `vrrp_ips` section](/documentation/Installation.md#vrrp_ips) to assign vrrp IPs for balancer nodes.
