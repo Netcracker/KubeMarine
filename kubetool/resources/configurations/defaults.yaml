@@ -423,6 +423,7 @@ plugins:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: true
     installation:
+      registry: k8s.gcr.io
       priority: 1
       procedures:
         - python:
