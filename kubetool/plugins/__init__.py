@@ -146,9 +146,9 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
         cluster = cluster.cluster
 
     if timeout is None:
-        timeout = cluster.globals['expect']['kubernetes']['timeout']
+        timeout = cluster.globals['expect']['plugins']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['kubernetes']['retries']
+        retries = cluster.globals['expect']['plugins']['retries']
 
     cluster.log.debug("Expecting the following pods to be ready: %s" % pods)
     cluster.log.verbose("Max expectation time: %ss" % (timeout * retries))
