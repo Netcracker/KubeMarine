@@ -27,9 +27,14 @@ This could be done during:
 
 **Important:** the default certificate should be issued to wildcard hostnames, so that it could be used for all ingresses.
 
-### Using kubetool-provided TCP Load Balancer
+### Using Kubetool-provided TCP Load Balancer
 
 Using kubetool you could install and configure HAProxy TCP Load Balancers in HA mode using VRRP.
 For that you need to assign `balancer` role to some of your hosts, where HAProxy and Keepalived should be installed,
-for more information see [`nodes` section in `cluster.yaml`](/documentation/Installation.md#nodes).
-Also, you need to [configure `vrrp_ips` section](/documentation/Installation.md#vrrp_ips) to assign vrrp IPs for balancer nodes.
+for more information see [`nodes` Installation section](/documentation/Installation.md#nodes).
+For instructions on how to configure vrrp IPs for balancer nodes see  [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
+For load balancer nodes hardware requirements see [Minimal Hardware Requirements](/documentation/Installation.md#minimal-hardware-requirements).
+
+### Using Custom TCP Load Balancer
+
+You could also use your own TCP Load balancer instead of kubetool-provided HAProxy.
