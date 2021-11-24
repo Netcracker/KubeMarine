@@ -713,8 +713,10 @@ class NodeGroup:
         return self.get_member(-1, provide_node_configs=provide_node_configs, apply_filter=apply_filter)
 
     def get_any_member(self, provide_node_configs=False, apply_filter=None):
-        return random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
-                                                           apply_filter=apply_filter))
+        member = random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
+                                                             apply_filter=apply_filter))
+        self.cluster.log.verbose(f'Selected node {str(member)}')
+        return member
 
     def get_member_by_name(self, name, provide_node_configs=False):
         return self.get_first_member(provide_node_configs=provide_node_configs, apply_filter={"name": name})
