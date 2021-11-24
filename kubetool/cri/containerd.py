@@ -38,9 +38,10 @@ def configure(group):
     config_string = ""
     # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
     containerd_config = group.cluster.inventory["services"]["cri"]['containerdConfig']
-    containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'] = \
-        bool(strtobool(
-            containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup']))
+    runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
+    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+        containerd_config[runc_options_path]['SystemdCgroup'] = \
+            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
     for key, value in containerd_config.items():
         # first we process all "simple" `key: value` pairs
         if not isinstance(value, dict):
