@@ -40,32 +40,32 @@ def get_package_manager(group: NodeGroup) -> apt or yum:
     raise Exception('Failed to return package manager for unknown or multiple OS')
 
 
-def ls_repofiles(group: NodeGroup) -> NodeGroupResult:
-    return get_package_manager(group).ls_repofiles(group)
+def ls_repofiles(group: NodeGroup, **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).ls_repofiles(group, **kwargs)
 
 
-def backup_repo(group: NodeGroup, repo_filename="*") -> NodeGroupResult:
-    return get_package_manager(group).backup_repo(group, repo_filename)
+def backup_repo(group: NodeGroup, repo_filename="*", **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).backup_repo(group, repo_filename, **kwargs)
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined") -> NodeGroupResult:
-    return get_package_manager(group).add_repo(group, repo_data, repo_filename)
+def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).add_repo(group, repo_data, repo_filename, **kwargs)
 
 
-def clean(group: NodeGroup, mode="all") -> NodeGroupResult:
-    return get_package_manager(group).clean(group, mode)
+def clean(group: NodeGroup, mode="all", **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).clean(group, mode, **kwargs)
 
 
-def install(group: NodeGroup, include=None, exclude=None) -> NodeGroupResult:
-    return get_package_manager(group).install(group, include, exclude)
+def install(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).install(group, include, exclude, **kwargs)
 
 
-def remove(group: NodeGroup, include=None, exclude=None) -> NodeGroupResult:
-    return get_package_manager(group).remove(group, include, exclude)
+def remove(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).remove(group, include, exclude, **kwargs)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None) -> NodeGroupResult:
-    return get_package_manager(group).upgrade(group, include, exclude)
+def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
 
 
 def detect_installed_package_version(group: NodeGroup, package: str, warn=True) -> NodeGroupResult:

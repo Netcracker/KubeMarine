@@ -5,7 +5,7 @@ from collections import OrderedDict
 import io
 import ruamel.yaml
 
-from kubetool import kubernetes, etcd
+from kubetool import kubernetes, etcd, thirdparties, cri
 from kubetool.core import flow
 from kubetool.cri import docker
 from kubetool.procedures import install
@@ -84,12 +84,6 @@ def _prepare_crictl(cluster, inventory):
         return inventory
 
 
-def configure_containerd_on_nodes(cluster):
-    install.system_cri_install(cluster)
-    install.system_cri_configure(cluster)
-    install.system_prepare_thirdparties(cluster)
-
-
 def _configure_containerd_on_nodes(cluster, inventory):
     if "cri" not in cluster.procedure_inventory or "containerRuntime" not in cluster.procedure_inventory["cri"]:
         raise Exception("Please specify mandatory parameter cri.containerRuntime in procedure.yaml")
@@ -135,8 +129,11 @@ def _migrate_cri(cluster, node_group):
         else:
             master = cluster.nodes["master"].get_first_member(provide_node_configs=True)
 
+        cluster.log.debug(f'Updating thirdparties for node "{node["connect_to"]}..."')
+        thirdparties.install_all_thirparties(node["connection"])
+
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-        cluster.log.debug("Upgrading \"%s\"" % node["name"])
+        cluster.log.debug("Migrating \"%s\"..." % node["name"])
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
         master["connection"].sudo(drain_cmd, is_async=False, hide=False)
@@ -146,9 +143,9 @@ def _migrate_cri(cluster, node_group):
                                     f"kube-apiserver-{node['name']} "
                                     f"kube-controller-manager-{node['name']} "
                                     f"kube-scheduler-{node['name']} "
-                                    f"$(sudo kubectl describe node {node['name']} | \
-                                        grep -E 'kube-system\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')"
-                                    , is_async=False, hide=False).get_simple_out()
+                                    f"$(sudo kubectl describe node {node['name']} | "
+                                    "grep -E 'kube-system\\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')",
+                                    is_async=False, hide=False).get_simple_out()
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
@@ -160,9 +157,16 @@ def _migrate_cri(cluster, node_group):
 
         node["connection"].sudo("systemctl stop kubelet")
         docker.prune(node["connection"])
+
         docker_associations = cluster.get_associations_for_node(node['connect_to'])['docker']
-        node["connection"].sudo(f"systemctl disable {docker_associations['service_name']} --now;"
+        node["connection"].sudo(f"systemctl disable {docker_associations['service_name']} --now; "
                                  "sudo sh -c 'rm -rf /var/lib/docker/*'")
+
+        cluster.log.debug('Reinstalling CRI...')
+        cri.install(node["connection"])
+        cri.configure(node["connection"])
+
+        cluster.log.debug(f'CRI configured! Restoring pods on node "{node["connect_to"]}"')
 
         # if there is a disk for docker in "/etc/fstab", then use this disk for containerd
         docker_disk_result = node["connection"].sudo("cat /etc/fstab | grep ' /var/lib/docker '", warn=True)
@@ -192,13 +196,17 @@ def _migrate_cri(cluster, node_group):
             if not package_name.startswith('containerd'):
                 packages_list.append(package_name)
         cluster.log.warning("The following packages will be removed: %s" % packages_list)
-        packages.remove(node["connection"], include=packages_list)
+        if packages_list:
+            packages.remove(node["connection"], include=packages_list, warn=True, hide=False)
+
         # change annotation for cri-socket
-        master["connection"].sudo(f"sudo kubectl annotate node {node['name']} \
-                                    --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
-                                    , is_async=False, hide=True)
+        master["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
+                                  f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
+                                  is_async=False, hide=True)
+
         # delete docker socket
-        node["connection"].sudo("rm -rf /var/run/docker.sock")
+        node["connection"].sudo("rm -rf /var/run/docker.sock", hide=False)
+
 
 def edit_config(kubeadm_flags):
     kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")
@@ -237,7 +245,6 @@ def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
 
 tasks = OrderedDict({
     "add_repos": install.system_prepare_package_manager_configure,
-    "configure_containerd_on_nodes": configure_containerd_on_nodes,
     "apply_new_cri": migrate_cri,
 })
 
@@ -260,7 +267,7 @@ def main(cli_arguments=None):
                         help='exclude comma-separated tasks from execution')
 
     parser.add_argument('procedure_config', metavar='procedure_config', type=str,
-                        help='config file for upgrade parameters')
+                        help='config file for migration parameters')
 
     if cli_arguments is None:
         args = parser.parse_args()

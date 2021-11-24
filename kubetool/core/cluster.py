@@ -256,12 +256,9 @@ class KubernetesCluster(Environment):
 
     def cache_package_versions(self):
         detected_packages = packages.detect_installed_packages_version_groups(self.nodes['all'].get_unchanged_nodes().get_online_nodes())
-        if self.inventory['services']['packages']['associations'].get('debian'):
-            del self.inventory['services']['packages']['associations']['debian']
-        if self.inventory['services']['packages']['associations'].get('rhel'):
-            del self.inventory['services']['packages']['associations']['rhel']
-        if self.inventory['services']['packages']['associations'].get('rhel8'):
-            del self.inventory['services']['packages']['associations']['rhel8']
+        for os_family in ['debian', 'rhel', 'rhel8']:
+            if self.inventory['services']['packages']['associations'].get(os_family):
+                del self.inventory['services']['packages']['associations'][os_family]
         for association_name, associated_params in self.inventory['services']['packages']['associations'].items():
             associated_packages = associated_params.get('package_name', [])
             packages_list = []
