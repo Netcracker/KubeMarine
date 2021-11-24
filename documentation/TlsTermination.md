@@ -31,10 +31,19 @@ This could be done during:
 
 Using kubetool you could install and configure HAProxy TCP Load Balancers in HA mode using VRRP.
 For that you need to assign `balancer` role to some of your hosts, where HAProxy and Keepalived should be installed,
-for more information see [`nodes` Installation section](/documentation/Installation.md#nodes).
+for more information see [`nodes` Installation Section](/documentation/Installation.md#nodes).
 For instructions on how to configure vrrp IPs for balancer nodes see  [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
 For load balancer nodes hardware requirements see [Minimal Hardware Requirements](/documentation/Installation.md#minimal-hardware-requirements).
 
 ### Using Custom TCP Load Balancer
 
 You could also use your own TCP Load balancer instead of kubetool-provided HAProxy.
+In this case your custom TCP Load Balancer should meet following requirements:
+1. Load Balancer should be fully configured and working before running cluster installation using kubetool.
+2. Load Balancer IP address should be specified in ... TODO: where?
+3. Load Balancer should be L4 pass-through TCP Load Balancer, without TLS termination.
+4. Load Balancer should be Highly Available.
+5. Load Balancer should have HTTPS (port 443) and Kubernetes API (port 6443) frontends.
+6. HTTPS frontend should point to backend port 443 of worker nodes where Nginx Ingress Controller is installed.
+7. Kubernetes API frontend should point to backend port 6443 of all master nodes.
+8. Load Balancer backend configuration should be updated accordingly when new nodes are added or removed from cluster.
