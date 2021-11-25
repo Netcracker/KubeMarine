@@ -40,7 +40,7 @@ For load balancer nodes hardware requirements see [Minimal Hardware Requirements
 You could also use your own TCP Load balancer instead of kubetool-provided HAProxy.
 In this case your custom TCP Load Balancer should meet following requirements:
 1. Load Balancer should be fully configured and working before running cluster installation using kubetool.
-2. Load Balancer IP address should be specified in ... TODO: where?
+2. Load Balancer internal and external vrrp IP addresses should be specified in `cluster.yaml`, see [`control_plain` Installation Section](/documentation/Installation.md#control_plain).
 3. Load Balancer should be L4 pass-through TCP Load Balancer, without TLS termination.
 4. Load Balancer should be Highly Available.
 5. Load Balancer should have HTTPS (port 443) and Kubernetes API (port 6443) frontends.
