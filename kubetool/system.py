@@ -572,7 +572,7 @@ def is_modprobe_valid(group):
     for module_name in group.cluster.inventory['services']['modprobe']:
         for conn, result in verify_results.items():
             if module_name not in result.stdout:
-                log.verbose('Kernel module %s not found at %s' % (module_name, conn.host))
+                log.debug('Kernel module %s not found at %s' % (module_name, conn.host))
                 is_valid = False
 
     return is_valid, verify_results
