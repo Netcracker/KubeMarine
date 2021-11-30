@@ -47,3 +47,53 @@ In this case your custom TCP Load Balancer should meet following requirements:
 6. HTTPS frontend should point to backend port 443 of worker nodes where Nginx Ingress Controller is installed.
 7. Kubernetes API frontend should point to backend port 6443 of all master nodes.
 8. Load Balancer backend configuration should be updated accordingly when new nodes are added or removed from cluster.
+
+
+## Advanced Load Balancing techniques
+
+### Allow and deny lists
+Sometimes it is required to allow or deny only specific requests, based on some criteria. 
+Possible criteria depend on the type of the load balancer (TCP or HTTP).
+
+#### Allow and deny lists on TCP load balancer
+For TCP Load Balancer it is possible to introduce both allow and deny lists based on source IP address.
+For example, see HAProxy ACL basics: [http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#7.1](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#7.1).
+An example HAProxy configuration to create allow list based on source IP addresses:
+```
+frontend www
+  bind *:80
+  mode tcp
+  acl network_allowed src 1.1.1.1 2.2.2.2
+  tcp-request connection reject if !network_allowed
+  use_backend my_backend_server
+```
+The drawback of this method is that TCP load balancer will use these criteria for all requests.
+Sometimes it is required that filtering happens only for some specific hostnames.
+To match against hostnames it is required to configure allow list on HTTP load Balancer (Nginx Ingress Controller).
+
+#### Allow list on Nginx Ingress Controller
+For Nginx Ingress Controller it is possible to configure allow lists based both on hostname and source IP addresses.
+See Nginx Ingress Controller `whitelist-source-range` annotation: [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#whitelist-source-range](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#whitelist-source-range).
+An example ingress configuration to create allow list based on source IP addresses for particular hostname:
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-myservice-whitelist
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/24,172.10.0.1"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: whitelist.myservicea.foo.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: myservice
+            port:
+              number: 80
+```
+In this example, hostname `whitelist.myservicea.foo.org` will be available only from IP address `172.10.0.1` and subnet `10.0.0.0/24`.
