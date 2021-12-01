@@ -1,3 +1,12 @@
+**Table of content:**
+- [TLS termination on Nginx Ingress Controller](#tls-termination-on-nginx-ingress-controller)
+  - [How to install](#how-to-install)
+  - [Using Kubetool-provided TCP Load Balancer](#using-kubetool-provided-tcp-load-balancer)
+  - [Using Custom TCP Load Balancer](#using-custom-tcp-load-balancer)
+- [Advanced Load Balancing techniques](#advanced-load-balancing-techniques)
+  - [Allow and deny lists](#allow-and-deny-lists)
+  - [Preserving original HTTP headers](#preserving-original-http-headers)
+
 ## TLS termination on Nginx Ingress Controller
 
 This is the default recommended approach to TLS termination on kubetool-installed environments. This approach is applicable when MTLS is not used in kubernetes and all the communications between pods are over plain HTTP.
