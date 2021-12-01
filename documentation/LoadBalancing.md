@@ -1,48 +1,55 @@
-**Table of content:**
-- [TLS termination on Nginx Ingress Controller](#tls-termination-on-nginx-ingress-controller)
-  - [How to install](#how-to-install)
+The following functions are installed in this section.  
+
+**Table of Content**
+
+- [TLS Termination on Nginx Ingress Controller](#tls-termination-on-nginx-ingress-controller)
+  - [How to Install](#how-to-install)
   - [Using Kubetool-provided TCP Load Balancer](#using-kubetool-provided-tcp-load-balancer)
   - [Using Custom TCP Load Balancer](#using-custom-tcp-load-balancer)
-- [Advanced Load Balancing techniques](#advanced-load-balancing-techniques)
-  - [Allow and deny lists](#allow-and-deny-lists)
-  - [Preserving original HTTP headers](#preserving-original-http-headers)
+- [Advanced Load Balancing Techniques](#advanced-load-balancing-techniques)
+  - [Allow and Deny Lists](#allow-and-deny-lists)
+  - [Preserving Original HTTP Headers](#preserving-original-http-headers)
 
-## TLS termination on Nginx Ingress Controller
+## TLS Termination on Nginx Ingress Controller
 
-This is the default recommended approach to TLS termination on kubetool-installed environments. This approach is applicable when MTLS is not used in kubernetes and all the communications between pods are over plain HTTP.
-High-level overview of this approach is shown on the following diagram.
+This is the default recommended approach to the TLS termination on kubetool-installed environments. This approach is applicable when MTLS is not used in kubernetes and all communications between the pods are over plain HTTP.
+A high-level overview of this approach is shown in the following image.
 
 ![](/documentation/images/tls-termination-nginx.png)
 
-Here, client creates HTTPS connection to TCP Load Balancer, which in turn proxies the traffic to Nginx Ingress Controller without TLS termination.
-Nginx Ingress Controller uses default wildcard certificate to authenticate itself to a client and to terminate HTTPS connection.
-To support multiple hostnames the certificate could use wildcard SANs.
+Here, the client creates a HTTPS connection to the TCP Load Balancer, which in turn proxies the traffic to the Nginx Ingress Controller without a TLS termination.
+Nginx Ingress Controller uses a default wildcard certificate to authenticate itself to a client and to terminate the HTTPS connection.
+To support multiple hostnames, the certificate can use wildcard SANs.
 Nginx Ingress Controller contacts applications using plain HTTP connection.
-Thus, using this approach it is very easy to manage only one certificate in one place - TLS traffic will be terminated on nginx ingress controller using default certificate for all application ingresses.
+Thus using this approach, it is very easy to manage only one certificate in one place - TLS traffic is terminated on the Nginx Ingress Controller using the default certificate for all application ingresses.
 
-To read more about nginx ingress controller default certificate visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
+For more information about Nginx Ingress Controller default certificate, visit [https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate](https://kubernetes.github.io/ingress-nginx/user-guide/tls/#default-ssl-certificate).
 
-**Limitations:**
-- Adding new hostname might require to re-issue certificate, if new hostname do not match any previous wildcard SANs.
-- Connections from nginx ingress controller to applications are HTTP, i.e. without encryption.
-- L7 load balancing options could be customized through "ingress" resources only.
+**Limitations**
 
-### How to install
+This approach has the following limitations:
 
-To enable TLS termination on Nginx Ingress Controller using default certificate it is required to customize "nginx" plugin with a custom default certificate.
-This could be done during:
-- Installation, for details refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
-- On already installed Nginx Ingress Controller, using `certs_renew` maintenance procedure, for details refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
+- Adding a new hostname might require to re-issue the certificate, if the new hostname does not match any previous wildcard SANs.
+- Connections from the Nginx Ingress Controller to applications are through HTTP; thus, without an encryption.
+- L7 load balancing options can be customized through "ingress" resources only.
 
-**Important:** the default certificate should be issued to wildcard hostnames, so that it could be used for all ingresses.
+### How to Install
+
+To enable TLS termination on Nginx Ingress Controller using the default certificate, it is required to customize the "nginx" plugin with a custom default certificate.
+This can be done during:
+
+- Installation; for details, refer to [nginx plugin installation](/documentation/Installation.md#nginx-ingress-controller).
+- On an already installed Nginx Ingress Controller, using the `certs_renew` maintenance procedure. For details, refer to [certificate renew maintenance procedure](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-nginx-ingress-controller).
+
+**Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
 
 ### Using Kubetool-provided TCP Load Balancer
 
-Using kubetool you could install and configure HAProxy TCP Load Balancers in HA mode using VRRP.
-For that you need to assign `balancer` role to some of your hosts, where HAProxy and Keepalived should be installed,
-for more information see [`nodes` Installation Section](/documentation/Installation.md#nodes).
-For instructions on how to configure vrrp IPs for balancer nodes see  [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
-For load balancer nodes hardware requirements see [Minimal Hardware Requirements](/documentation/Installation.md#minimal-hardware-requirements).
+Using kubetool you can install and configure HAProxy TCP Load Balancers in the HA mode using VRRP.
+To do so, assign a `balancer` role to the hosts where HAProxy and Keepalived should be installed.
+For more information, see [`nodes` Installation Section](/documentation/Installation.md#nodes).
+For instructions on how to configure VRRP IPs for balancer nodes, see  [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
+For load balancer nodes hardware requirements, see [Minimal Hardware Requirements](/documentation/Installation.md#minimal-hardware-requirements).
 
 ### Using Custom TCP Load Balancer
 
