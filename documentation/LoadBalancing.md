@@ -126,13 +126,12 @@ In this example, the `whitelist.myservicea.foo.org` hostname is available only f
 The TCP load balancer does not modify the HTTP response/request headers. 
 The Nginx Ingress Controller also does not modify **custom** HTTP headers. 
 However, the Nginx Ingress Controller may modify some well-known headers as described below:
-
-* Nginx Ingress Controller always drops some response headers, 
+1. Nginx Ingress Controller always drops some response headers, 
 particularly, `Date`, `Server`, `X-Pad`, and `X-Accel-...`. For more information, see [http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_hide_header](http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_hide_header).
-* Nginx Ingress Controller by default sets its own values for `X-Forwarded-*` headers.
+2. Nginx Ingress Controller by default sets its own values for `X-Forwarded-*` headers.
 If you have to preserve original values for these headers, refer to the `use-forwarded-header` config map option at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#use-forwarded-headers](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#use-forwarded-headers).
 This is only required if you have another HTTP LB in front of the Nginx Ingress Controller, which sets these headers.
-* Nginx Ingress Controller does not forward the `Expect` header. 
+3. Nginx Ingress Controller does not forward the `Expect` header. 
 This issue can be solved by adding the "proxy_set_header" field in the NGINX configuration with value, "Expect $http_expect". An example of `cluster.yaml` configuration is as follows:
 
 ```
