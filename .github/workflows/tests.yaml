@@ -14,7 +14,7 @@ jobs:
        - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" $(find . -type f -name "*.py" | xargs echo)
        - uses: stefanzweifel/git-auto-commit-action@v4
          with:
-           commit_message: Auto-update license file
+           commit_message: Auto-update license header
   unit-tests:
     needs: license
     runs-on: ubuntu-latest
