@@ -162,8 +162,16 @@ services:
               node-role.kubernetes.io/worker: worker
             affinity:
               podAntiAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  - topologyKey: "kubernetes.io/hostname"
+                preferredDuringSchedulingIgnoredDuringExecution:
+                - podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                      - key: k8s-app
+                        operator: In
+                        values:
+                        - kube-dns
+                    topologyKey: kubernetes.io/hostname
+                  weight: 100
     configmap:
       Corefile:
         '.:53':
@@ -193,7 +201,7 @@ services:
                 fallthrough:
                   - in-addr.arpa
                   - ip6.arpa
-                ttl: 30
+                ttl: 5
           template:
             default:
               priority: 1
