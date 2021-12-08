@@ -115,10 +115,16 @@ def recommended_system_packages_versions(cluster):
                 "containerd": compatibility["containerd"][k8s_version][version_key]
             }
         elif "containerd" in cluster.inventory["services"]["cri"]["containerRuntime"]:
-            expected_system_packages["containerd"] = {
-                "containerd": compatibility["containerd"][k8s_version][version_key],
-                "podman": compatibility["podman"][k8s_version][version_key]
-            }
+            if version_key == "version_rhel":
+                expected_system_packages["containerd"] = {
+                    "containerdio": compatibility["containerdio"][k8s_version][version_key],
+                    "podman": compatibility["podman"][k8s_version][version_key]
+                }
+            else:
+                expected_system_packages["containerd"] = {
+                    "containerd": compatibility["containerd"][k8s_version][version_key],
+                    "podman": compatibility["podman"][k8s_version][version_key]
+                }
 
         good_results = set()
         bad_results = []
