@@ -459,7 +459,7 @@ def kubernetes_pods_condition(cluster):
             if split_description[0] in system_namespaces and split_description[2] in critical_states:
                 critical_system_failed_amount += 1
             else:
-                log.debug('Pods status off %s' % (pod_description))
+                raise TestFailure("Pods status off %s" % (pod_description))
 
         if critical_system_failed_amount > 0:
             s = ''
