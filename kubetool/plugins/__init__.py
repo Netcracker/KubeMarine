@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2021 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,12 +25,12 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
+from dateutil.parser import parse
 
 import yaml
 
 from kubetool import jinja, thirdparties
 from kubetool.core import utils
-from kubetool.core.executor import RemoteExecutor
 from kubetool.core.yaml_merger import default_merger
 from kubetool.core.group import NodeGroup
 
@@ -148,9 +147,13 @@ def install(cluster, plugins=None):
 
 def install_plugin(cluster, plugin_name, installation_procedure):
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
+    if not cluster.context.get('executed_plugins'):
+        cluster.context['executed_plugins'] = {}
+    cluster.context['current_executing_plugin'] = plugin_name
+    cluster.context['executed_plugins'][plugin_name] = time.time()
     for step in installation_procedure:
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs)
+            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
 
 
 def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filter=None):
@@ -221,6 +224,9 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
                     pods_ready = False
 
         if pods_ready:
+            pods_ready = clarify_pods_start_time(cluster, pods)
+
+        if pods_ready:
             cluster.log.debug("Pods are ready!")
             cluster.log.debug(running_pods_stdout)
             return
@@ -231,6 +237,39 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
             time.sleep(timeout)
 
     raise Exception('In the expected time, the pods did not become ready')
+
+
+def clarify_pods_start_time(cluster, pods) -> bool:
+    log = cluster.log
+    plugin_name = cluster.context['current_executing_plugin']
+    plugin_installation_time = cluster.context['executed_plugins'][plugin_name]
+    master = cluster.nodes['master'].get_any_member()
+
+    log.verbose("Detecting pods start time...")
+
+    merged_pods_list = "|".join(pods)
+    actual_pods_list = master.sudo('kubectl get pods -A | grep -E "%s" | awk \'{print $1 " " $2}\'' % merged_pods_list)\
+        .get_simple_out().split("\n")
+
+    cmd = ""
+    for pod_item in actual_pods_list:
+        pod_namespace, pod_name = pod_item.split(' ')
+        if cmd != "":
+            cmd += " && sudo "
+        cmd += "kubectl describe pods -n %s %s | grep \"Start Time\" | awk -F 'Time:' '{print $2}'"\
+               % (pod_namespace, pod_name)
+
+    log.verbose("Comparing pods time, to ensure pods started after plugin installation:")
+    pods_time_items = master.sudo(cmd).get_simple_out().split("\n")
+    for pod_time_raw in pods_time_items:
+        pod_time = parse(pod_time_raw.strip())
+        log.verbose(" - %s < %s" % (plugin_installation_time, pod_time))
+        if plugin_installation_time < pod_time:
+            log.verbose("Detected pod, which was started before plugin installation")
+            return False
+
+    log.verbose("All pods were started after plugin installation")
+    return True
 
 
 def is_critical_state_in_stdout(cluster, stdout):
