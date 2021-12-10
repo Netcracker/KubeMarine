@@ -31,6 +31,7 @@ import yaml
 
 from kubetool import jinja, thirdparties
 from kubetool.core import utils
+from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.yaml_merger import default_merger
 from kubetool.core.group import NodeGroup
 
@@ -143,6 +144,7 @@ def install(cluster, plugins=None):
 
     for plugin_item in plugins_queue:
         install_plugin(cluster, plugin_item['plugin_name'], plugin_item["installation"]['procedures'])
+    cluster.context['current_executing_plugin'] = None
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
@@ -156,7 +158,7 @@ def install_plugin(cluster, plugin_name, installation_procedure):
             procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
 
 
-def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filter=None):
+def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, node=None, apply_filter=None):
 
     if isinstance(cluster, NodeGroup):
         # cluster is a group, not a cluster
@@ -224,7 +226,7 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
                     pods_ready = False
 
         if pods_ready:
-            pods_ready = clarify_pods_start_time(cluster, pods)
+            pods_ready = clarify_pods_start_time(cluster, pods, plugin_name)
 
         if pods_ready:
             cluster.log.debug("Pods are ready!")
@@ -239,9 +241,20 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
     raise Exception('In the expected time, the pods did not become ready')
 
 
-def clarify_pods_start_time(cluster, pods) -> bool:
+def clarify_pods_start_time(cluster: KubernetesCluster, pods: list, plugin_name: str) -> bool:
+    """
+    Method clarifies pods start time and verifies that pods definitely restarted. It will retrieve running pods, detect
+    their start time and compare it with plugin installation time.
+    :param cluster: KubernetesCluster object
+    :param pods: list of string with pods names
+    :param plugin_name: plugin name, which pods should be restarted
+    :return: True if pods restart detected
+    """
     log = cluster.log
-    plugin_name = cluster.context['current_executing_plugin']
+    if plugin_name is None:
+        # When no plugin defined, that means expectation method called directly and it is not possible to check
+        # pods start time
+        return True
     plugin_installation_time = cluster.context['executed_plugins'][plugin_name]
     master = cluster.nodes['master'].get_any_member()
 
@@ -249,7 +262,7 @@ def clarify_pods_start_time(cluster, pods) -> bool:
 
     merged_pods_list = "|".join(pods)
     actual_pods_list = master.sudo('kubectl get pods -A | grep -E "%s" | awk \'{print $1 " " $2}\'' % merged_pods_list)\
-        .get_simple_out().split("\n")
+        .get_simple_out().strip().split("\n")
 
     cmd = ""
     for pod_item in actual_pods_list:
@@ -260,10 +273,11 @@ def clarify_pods_start_time(cluster, pods) -> bool:
                % (pod_namespace, pod_name)
 
     log.verbose("Comparing pods time, to ensure pods started after plugin installation:")
-    pods_time_items = master.sudo(cmd).get_simple_out().split("\n")
-    for pod_time_raw in pods_time_items:
-        pod_time = parse(pod_time_raw.strip())
-        log.verbose(" - %s < %s" % (plugin_installation_time, pod_time))
+    pods_time_items = master.sudo(cmd).get_simple_out().strip().split("\n")
+    for i, pod_time_raw in enumerate(pods_time_items):
+        pod_name = actual_pods_list[i]
+        pod_time = parse(pod_time_raw.strip()).timestamp()
+        log.verbose(" - %s %s < %s" % (pod_name, plugin_installation_time, pod_time))
         if plugin_installation_time < pod_time:
             log.verbose("Detected pod, which was started before plugin installation")
             return False
@@ -289,7 +303,7 @@ def verify_template(cluster, config):
     _verify_file(config, "Template")
 
 
-def apply_template(cluster, config):
+def apply_template(cluster, config, plugin_name=None):
     _apply_file(cluster, config, "Template")
 
 
@@ -310,10 +324,10 @@ def verify_expect(cluster, config):
         raise Exception('Pod expectation defined, but pods list is missing')
 
 
-def apply_expect(cluster, config):
+def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
     if config.get('pods') is not None:
-        expect_pods(cluster, config['pods']['list'],
+        expect_pods(cluster, config['pods']['list'], plugin_name,
                     timeout=config['pods'].get('timeout', cluster.globals['pods']['expect']['plugins']['timeout']),
                     retries=config['pods'].get('retries', cluster.globals['pods']['expect']['plugins']['retries']))
 
@@ -328,7 +342,7 @@ def verify_python(cluster, step):
     # TODO: verify fields types and contents
 
 
-def apply_python(cluster, step):
+def apply_python(cluster, step, plugin_name=None):
     module_path = utils.determine_resource_absolute_path(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
@@ -350,8 +364,9 @@ def verify_thirdparty(cluster, thirdparty):
                         % (thirdparty, defined_thirdparties))
 
 
-def apply_thirdparty(cluster, thirdparty):
+def apply_thirdparty(cluster, thirdparty, plugin_name=None):
     return thirdparties.install_thirdparty(cluster, thirdparty)
+
 
 # **** SHELL ****
 
@@ -384,7 +399,7 @@ def verify_shell(cluster, config):
     # TODO: verify fields types and contents
 
 
-def apply_shell(cluster, step):
+def apply_shell(cluster, step, plugin_name=None):
     commands = step['command']
     sudo = step.get('sudo', False)
     groups = step.get('groups', [])
@@ -468,7 +483,7 @@ def verify_ansible(cluster, config):
     # TODO: verify fields types and contents
 
 
-def apply_ansible(cluster, step):
+def apply_ansible(cluster, step, plugin_name=None):
     playbook_path = utils.determine_resource_absolute_path(step.get('playbook'))
     external_vars = step.get('vars', {})
     become = step.get('become', False)
@@ -505,7 +520,7 @@ def verify_helm(cluster, config):
         raise Exception(f'public_cluster_ip is a mandatory parameter in the inventory in case of usage of helm plugin.')
 
 
-def apply_helm(cluster, config):
+def apply_helm(cluster, config, plugin_name=None):
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
@@ -619,7 +634,7 @@ def verify_config(cluster, config):
     _verify_file(config, "Config")
 
 
-def apply_config(cluster, config):
+def apply_config(cluster, config, plugin_name=None):
     _apply_file(cluster, config, "Config")
 
 
