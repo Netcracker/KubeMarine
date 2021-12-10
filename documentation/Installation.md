@@ -4549,17 +4549,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4715,17 +4715,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4882,17 +4882,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
