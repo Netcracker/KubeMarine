@@ -274,16 +274,17 @@ The recommended hardware requirements are as follows:
 ### Disk Partitioning Recommendation
 Kubernetes clusters use the following important folders:
 
-**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 6GB. 
+**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4GB. 
 For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation).
 
 **/var/lib/containerd** - It is a working directory of containerd, it is used for active container runtimes and storage of local images. 
-For master nodes it should be at least 20GB and for worker nodes 50GB or more, depending on the applications.
+For master nodes it should be at least 20GB and for worker nodes 50GB or more, depending on the application requirements.
 
 **/var/lib/kubelet** - It is a working directory for kubelet. It includes kubelet's configuration files, pods runtime data, environment variables, kube secrets, emptyDirs and data volumes not backed by persistent storage PVs. Its size varies depending on the running applications.
 
-**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located here too). The recommended size is 10 to 30GB or more, depending on logrotation policy. Also, the logrotation should be configured properly to avoid disk overflow.
+**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located there too). The recommended size is 10 to 30GB or more, depending on logrotation policy. Also, the logrotation should be configured properly to avoid disk overflow.
 
+#### Disk Pressure
 To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
 The `nodefs` (or `rootfs`) is the node's main filesystem, used for local disk volumes, emptyDir, log storage, and more. By default, /var/lib/kubelet.
 
