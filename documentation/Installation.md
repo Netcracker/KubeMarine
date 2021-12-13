@@ -297,7 +297,7 @@ If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (6 GB size at least is recommended) on each Master before the installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Master before the installation.
 Mount point:
 
 ```
