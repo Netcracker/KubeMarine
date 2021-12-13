@@ -272,30 +272,32 @@ The recommended hardware requirements are as follows:
 * 120GB HDD
 
 ### Disk Partitioning Recommendation
+
 Kubernetes clusters use the following important folders:
 
-**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4GB. 
-For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation).
+**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
+For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation) section.
 
-**/var/lib/containerd** - It is a working directory of containerd, it is used for active container runtimes and storage of local images. 
-For master nodes it should be at least 20GB and for worker nodes 50GB or more, depending on the application requirements.
+**/var/lib/containerd** - It is a working directory of containerd, and is used for active container runtimes and storage of local images. 
+For master nodes, it should be at least 20 GB, whereas, for worker nodes, it should be 50 GB or more, depending on the application requirements.
 
 **/var/lib/kubelet** - It is a working directory for kubelet. It includes kubelet's configuration files, pods runtime data, environment variables, kube secrets, emptyDirs and data volumes not backed by persistent storage PVs. Its size varies depending on the running applications.
 
-**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located there too). The recommended size is 10 to 30GB or more, depending on logrotation policy. Also, the logrotation should be configured properly to avoid disk overflow.
+**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located there too). The recommended size is 10 to 30 GB or more, depending on the logrotation policy. Also, the logrotation should be configured properly to avoid a disk overflow.
 
 #### Disk Pressure
-To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
-The `nodefs` (or `rootfs`) is the node's main filesystem, used for local disk volumes, emptyDir, log storage, and more. By default, /var/lib/kubelet.
 
-The `imagefs` is an optional filesystem that container runtimes use to store container images and container writable layers.
-For containerd it is the filesystem containing /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs.
+To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
+The `nodefs` (or `rootfs`) is the node's main filesystem used for local disk volumes, emptyDir, log storage, and so on. By default, it is /var/lib/kubelet.
+
+The `imagefs` is an optional filesystem that the container runtimes use to store container images and container writable layers.
+For containerd, it is the filesystem containing /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs.
 
 If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available`, `100% - imagefs.available`), the DiskPressure condition becomes true and the pods start being evicted from the node. So it is crucially important not to allow disk fulfillment coming to the eviction threshold for both nodefs and imagefs.
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (6 Gb size at least is recommended) on each Master before installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (6 GB size at least is recommended) on each Master before the installation.
 Mount point:
 
 ```
