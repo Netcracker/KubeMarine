@@ -1,3 +1,17 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from io import StringIO
 
 import toml
@@ -38,9 +52,10 @@ def configure(group):
     config_string = ""
     # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
     containerd_config = group.cluster.inventory["services"]["cri"]['containerdConfig']
-    containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'] = \
-        bool(strtobool(
-            containerd_config['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup']))
+    runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
+    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+        containerd_config[runc_options_path]['SystemdCgroup'] = \
+            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
     for key, value in containerd_config.items():
         # first we process all "simple" `key: value` pairs
         if not isinstance(value, dict):
@@ -78,7 +93,7 @@ def configure(group):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
             log.debug("Uploading containerd configuration to %s node..." % node['name'])
             node['connection'].put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
-                                   sudo=True)
+                                   sudo=True, mkdir=True)
             log.debug("Restarting Containerd on %s node..." % node['name'])
             node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
                                     f"sudo systemctl restart {os_specific_associations['service_name']} && "

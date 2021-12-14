@@ -1,3 +1,17 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import re
 from copy import deepcopy
 from typing import Dict, List, Union
@@ -211,18 +225,21 @@ class KubernetesCluster(Environment):
         node_os_family = self.get_os_family_for_node(host)
         return self.get_associations_for_os(node_os_family)
 
-    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str:
+    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str or list:
         """
         Returns the specified association for the specified package from inventory for specific node
         :param host: The address of the node for which required to find the association
         :param package: The package name to get the association for
         :param association_key: Association key to get
-        :return: Association string value
+        :return: Association string or list value
         """
         associations = self.get_associations_for_node(host)
         association_value = associations.get(package, {}).get(association_key)
         if association_value is None:
             raise Exception(f'Failed to get association "{association_key}" for package "{package}"')
+        if not isinstance(association_value, str) and not isinstance(association_value, list):
+            raise Exception(f'Unsupported association "{association_key}" value type for package "{package}", '
+                            f'got: {str(association_value)}')
         return association_value
 
     def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
@@ -239,14 +256,15 @@ class KubernetesCluster(Environment):
             results[node['connect_to']] = association_value
         return results
 
-    def get_package_association_str_for_group(self, group: NodeGroup, package: str, association_key: str) -> str:
+    def get_package_association_str_for_group(self, group: NodeGroup,
+                                              package: str, association_key: str) -> str or list:
         """
-        Returns the specified association string for the specified package from inventory for entire NodeGroup. If
-        association value is different between some nodes, an exception will be thrown.
+        Returns the specified association string or list for the specified package from inventory for entire NodeGroup.
+        If association value is different between some nodes, an exception will be thrown.
         :param group: NodeGroup for which required to find the association
         :param package: The package name to get the association for
         :param association_key: Association key to get
-        :return: Association string value
+        :return: Association string or list value
         """
         results = self.get_package_association_for_group(group, package, association_key)
         results_values = list(set(results.values()))
@@ -256,52 +274,55 @@ class KubernetesCluster(Environment):
 
     def cache_package_versions(self):
         detected_packages = packages.detect_installed_packages_version_groups(self.nodes['all'].get_unchanged_nodes().get_online_nodes())
-        if self.inventory['services']['packages']['associations'].get('debian'):
-            del self.inventory['services']['packages']['associations']['debian']
-        if self.inventory['services']['packages']['associations'].get('rhel'):
-            del self.inventory['services']['packages']['associations']['rhel']
-        if self.inventory['services']['packages']['associations'].get('rhel8'):
-            del self.inventory['services']['packages']['associations']['rhel8']
+        for os_family in ['debian', 'rhel', 'rhel8']:
+            if self.inventory['services']['packages']['associations'].get(os_family):
+                del self.inventory['services']['packages']['associations'][os_family]
         for association_name, associated_params in self.inventory['services']['packages']['associations'].items():
             associated_packages = associated_params.get('package_name', [])
             packages_list = []
             final_packages_list = []
             if isinstance(associated_packages, str):
                 packages_list.append(associated_packages)
-            else:
+            elif isinstance(associated_packages, list):
                 packages_list = packages_list + associated_packages
+            else:
+                raise Exception('Unsupported associated packages object type')
+
             for package in packages_list:
                 detected_package_versions = list(detected_packages[package].keys())
                 for version in detected_package_versions:
-                    if "not installed" in version:
-                        # if not installed somewhere - just skip
-                        final_packages_list.append(package)
-                        continue
-                if len(detected_package_versions) == 1:
-                    final_packages_list.append(detected_package_versions[0])
-                else:
-                    # if detected multiple versions, then such broken package should be skipped
-                    final_packages_list.append(package)
+                    # add package version to list only if it was found as installed
+                    if "not installed" not in version:
+                        final_packages_list.append(version)
+
+                # if there no versions detected, then set package version to default
+                if not final_packages_list:
+                    final_packages_list = [package]
+
             # if non-multiple value, then convert to simple string
+            # packages can contain multiple package values, like docker package
+            # (it has docker-ce, docker-cli and containerd.io packages for installation)
             if len(final_packages_list) == 1:
                 final_packages_list = final_packages_list[0]
+            else:
+                final_packages_list = list(set(final_packages_list))
+
             associated_params['package_name'] = final_packages_list
         # packages from direct installation section
         if self.inventory['services']['packages']['install']:
             final_packages_list = []
             for package in self.inventory['services']['packages']['install']['include']:
+                package_versions_list = []
                 detected_package_versions = list(detected_packages[package].keys())
                 for version in detected_package_versions:
-                    if "not installed" in version:
-                        # if not installed somewhere - just skip
-                        final_packages_list.append(package)
-                        continue
-                if len(detected_package_versions) == 1:
-                    final_packages_list.append(detected_package_versions[0])
-                else:
-                    # if detected multiple versions, then such broken package should be skipped
-                    final_packages_list.append(package)
-            self.inventory['services']['packages']['install']['include'] = final_packages_list
+                    if "not installed" not in version:
+                        # add package version to list only if it was found as installed
+                        package_versions_list.append(version)
+                # if there no versions detected, then set package version to default
+                if not package_versions_list:
+                    package_versions_list = [package]
+                final_packages_list = final_packages_list + package_versions_list
+            self.inventory['services']['packages']['install']['include'] = list(set(final_packages_list))
         return detected_packages
 
     def finish(self):

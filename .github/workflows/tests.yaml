@@ -1,16 +1,29 @@
-name: Unit Tests
+name: Tests and Validations
 on:
   push:
     branches:
       - '**'
+env:
+   COPYRIGHT_COMPANY: 'NetCracker Technology Corporation'
+   COPYRIGHT_YEAR: '2021'
 jobs:
+  license:
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v2
+       - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" $(find . -type f -name "*.py" | xargs echo)
+       - uses: stefanzweifel/git-auto-commit-action@v4
+         with:
+           commit_message: Auto-update license header
   unit-tests:
+    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - run: docker build -t kubetools --build-arg BUILD_TYPE=test --no-cache .
       - run: docker run --entrypoint=python3 kubetools -m unittest discover -s /opt/kubetools/test/unit -t /opt/kubetools/test/unit
   coverage:
+    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -18,6 +31,7 @@ jobs:
       - run: docker run --entrypoint=/bin/bash kubetools -c "python3 /usr/local/bin/coverage run -m unittest discover -s /opt/kubetools/test/unit -t /opt/kubetools/test/unit; python3 /usr/local/bin/coverage report -m" > /tmp/report.txt
       - run: cat /tmp/report.txt; PERCENTAGE=$(cat /tmp/report.txt | tail -1 | awk '{print $4}' | tr -dc '0-9')
   linter:
+    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

@@ -122,25 +122,41 @@ compatibility_map:
         version_debian: 5:19.03.*
     containerd:
       v1.20.2:
-        version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.20.11:
-        version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.21.2:
-        version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.21.5:
-        version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.22.2:
-        version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.5.*
+    containerdio:
+      v1.20.2:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.20.11:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.21.2:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.21.5:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.22.2:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
     podman:
       v1.20.2:
         version_rhel: 1.6.4*
@@ -265,15 +281,15 @@ compatibility_map:
         sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
     nginx-ingress-controller:
       v1.20:
-        image-name: k8s.gcr.io/ingress-nginx/controller
+        image-name: ingress-nginx/controller
         version: v1.0.3
         pod-name: ingress-nginx-controller
       v1.21:
-        image-name: k8s.gcr.io/ingress-nginx/controller
+        image-name: ingress-nginx/controller
         version: v1.0.3
         pod-name: ingress-nginx-controller
       v1.22:
-        image-name: k8s.gcr.io/ingress-nginx/controller
+        image-name: ingress-nginx/controller
         version: v1.0.3
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:

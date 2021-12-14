@@ -1,6 +1,25 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import io
 import json
 import time
+from typing import List, Dict
+
+import fabric.connection
+
+from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.group import NodeGroup
 
 
@@ -37,10 +56,12 @@ def remove_members(group: NodeGroup):
         else:
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
-# the method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
-# if all member are healthy the method checks the leader
-def wait_for_health(cluster, connection):
 
+def wait_for_health(cluster: KubernetesCluster, connection: fabric.connection.Connection) -> List[Dict]:
+    """
+    The method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
+    if all member are healthy the method checks the leader.
+    """
     log = cluster.log
     init_timeout = cluster.globals['etcd']['health']['init_timeout']
     timeout = cluster.globals['etcd']['health']['timeout']
@@ -50,8 +71,8 @@ def wait_for_health(cluster, connection):
     time.sleep(init_timeout)
     while retries > 0:
         start_time = time.time()
-        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json'
-                                           , is_async=False, hide=True).get_simple_out()
+        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json',
+                                          is_async=False, hide=True).get_simple_out()
         end_time = time.time()
         sudo_time = int(end_time - start_time)
         log.verbose(etcd_health_raw)
@@ -73,8 +94,8 @@ def wait_for_health(cluster, connection):
             retries -= 1
 
     if is_healthy:
-        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json'
-                                           , is_async=False, hide=True).get_simple_out()
+        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json',
+                                          is_async=False, hide=True).get_simple_out()
         log.verbose(etcd_status_raw)
         etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
         elected_leader = None
@@ -91,3 +112,5 @@ def wait_for_health(cluster, connection):
         raise Exception('ETCD cluster is still not healthy!')
       
     log.verbose('ETCD cluster is healthy!')
+
+    return etcd_status_list

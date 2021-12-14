@@ -1,3 +1,17 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 This module works with audit on remote nodes.
 Using this module you can install, enable audit and configure audit rules.
@@ -50,6 +64,9 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
         log.verbose('Searching for already installed auditd package...')
         debian_group = group.get_subgroup_with_os('debian')
         debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
+        if isinstance(debian_package_name, list):
+            raise Exception(f'Audit can not be installed, because nodes already contains different package versions: '
+                            f'{str(debian_package_name)}')
         audit_installed_results = packages.detect_installed_package_version(debian_group, debian_package_name)
         log.verbose(audit_installed_results)
 

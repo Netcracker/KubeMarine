@@ -21,6 +21,6 @@ jobs:
       - run: docker push ghcr.io/netcracker-technology/kubetool:${{ github.event.release.tag_name }}
 =======
       - run: docker build . -t ghcr.io/netcracker-technology/kubetool:${{ env.TAG_NAME }}
-      - run: echo ${{secrets.GITHUB_TOKEN}} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - run: docker push ghcr.io/netcracker-technology/kubetool:${{ env.TAG_NAME }}
 >>>>>>> d7fe4ef43b40838d41fd9e0bf287162c2110881d

@@ -1,3 +1,17 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import re
 from importlib import import_module
 from copy import deepcopy
@@ -107,7 +121,7 @@ def apply_defaults(inventory, cluster):
 
 def apply_registry(inventory, cluster):
 
-    if not inventory.get('registry', {}).get('address'):
+    if not inventory.get('registry'):
         cluster.log.verbose('Unified registry is not used')
         return inventory
 
@@ -124,13 +138,25 @@ def apply_registry(inventory, cluster):
     if not inventory['services']['kubeadm'].get('imageRepository'):
         inventory['services']['kubeadm']["imageRepository"] = full_registry_address
 
-    # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/quay.io/xxx:v1
+    # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/xxx:v1
     if inventory.get('plugin_defaults') is None:
         inventory['plugin_defaults'] = {}
     if inventory['plugin_defaults'].get('installation') is None:
         inventory['plugin_defaults']['installation'] = {}
-    if not inventory['plugin_defaults']['installation'].get('registry'):
+    if inventory['plugin_defaults']['installation'].get('registry') is None:
         inventory['plugin_defaults']['installation']['registry'] = full_registry_address
+
+    # The following section rewrites DEFAULT plugins registries and do not touches user-defined registries in plugins
+    # This section required, because plugins defaults contains default non-docker registries and method
+    # "kubetool.core.defaults.recursive_apply_defaults" will not overwrite this default registries, because it can not
+    # distinguish default from user-defined.
+    # Also, this part of code supports plugin_defaults inventory section and applies everything in accordance with the
+    # priority of the registries.
+    for plugin_name, plugin_params in cluster.inventory['plugins'].items():
+        if cluster.inventory['plugins'][plugin_name].get('installation') is None:
+            cluster.inventory['plugins'][plugin_name]['installation'] = {}
+        if cluster.raw_inventory.get('plugins', {}).get(plugin_name, {}).get('installation', {}).get('registry') is None:
+            cluster.inventory['plugins'][plugin_name]['installation']['registry'] = inventory['plugin_defaults']['installation']['registry']
 
     cri_impl = inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":

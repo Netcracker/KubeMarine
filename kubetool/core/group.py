@@ -1,3 +1,17 @@
+# Copyright 2021 NetCracker Technology Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 import io
@@ -363,6 +377,7 @@ class NodeGroup:
         hide = kwargs.pop("hide", True) is True
         sudo = kwargs.pop("sudo", False) is True
         backup = kwargs.pop("backup", False) is True
+        mkdir = kwargs.pop("mkdir", False) is True
         immutable = kwargs.pop("immutable", False) is True
 
         # for unknown reason fabric v2 can't put async
@@ -375,6 +390,9 @@ class NodeGroup:
 
         if backup:
             self.cluster.log.verbose('File \"%s\" backup required' % remote_file)
+
+        if mkdir:
+            self.cluster.log.verbose('A parent directory will be created')
 
         if immutable:
             self.cluster.log.verbose('File \"%s\" immutable set required' % remote_file)
@@ -405,6 +423,13 @@ class NodeGroup:
             else:
                 mv_command = "cp -f %s %s.bak$(ls %s* | wc -l); %s" \
                              % (remote_file, remote_file, remote_file, mv_command)
+
+        if mkdir:
+            file_directory = "/".join(remote_file.split('/')[:-1])
+            if sudo:
+                mv_command = f"sudo mkdir -p {file_directory}; {mv_command}"
+            else:
+                mv_command = f"mkdir -p {file_directory}; {mv_command}"
 
         mv_command = "cmp --silent %s %s || (%s)" % (remote_file, temp_filepath, mv_command)
 
@@ -702,8 +727,10 @@ class NodeGroup:
         return self.get_member(-1, provide_node_configs=provide_node_configs, apply_filter=apply_filter)
 
     def get_any_member(self, provide_node_configs=False, apply_filter=None):
-        return random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
-                                                           apply_filter=apply_filter))
+        member = random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
+                                                             apply_filter=apply_filter))
+        self.cluster.log.verbose(f'Selected node {str(member)}')
+        return member
 
     def get_member_by_name(self, name, provide_node_configs=False):
         return self.get_first_member(provide_node_configs=provide_node_configs, apply_filter={"name": name})
