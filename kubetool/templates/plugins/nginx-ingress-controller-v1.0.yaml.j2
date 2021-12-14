@@ -288,7 +288,7 @@ spec:
             - /nginx-ingress-controller
             - --election-id=ingress-controller-leader
             - --ingress-class=k8s.io/ingress-nginx
-             - --configmap=ingress-nginx/ingress-nginx-controller
+            - --configmap=ingress-nginx/ingress-nginx-controller
             {% if plugins['nginx-ingress-controller']['controller']['ssl']['enableSslPassthrough'] is true -%}
             - --enable-ssl-passthrough
             {%- endif %}
