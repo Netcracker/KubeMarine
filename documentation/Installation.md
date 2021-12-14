@@ -429,47 +429,8 @@ services:
                 operator: Exists
                 effect: NoSchedule
 ```
-Plugins also require tolerations section in case of node taints. Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins it should be set in cluster.yaml, for example:
-```
-plugins:
-  kubernetes-dashboard:
-    dashboard:
-      tolerations:
-      - key: application
-        operator: Exists
-        effect: NoSchedule
-    metrics-scraper:
-      tolerations:
-      - key: application
-        operator: Exists
-        effect: NoSchedule
-...
-  nginx-ingress-controller:
-    controller:
-      tolerations:
-      - key: application
-        operator: Exists
-        effect: NoSchedule
-...
-  iperf3:
-    tolerations:
-    - key: application
-      operator: Exists
-      effect: NoSchedule
-...
-  haproxy-ingress-controller:
-    backend:
-      tolerations:
-      - key: application
-        operator: Exists
-        effect: NoSchedule
-...
-  local-host-provisioner:
-    tolerations:
-    - key: application
-      operator: Exists
-      effect: NoSchedule	
-```
+Plugins also require tolerations section in case of node taints. Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins it should be set in cluster.yaml. For additional information see [Tolerations](#tolerations).
+
 If you create your own plugins, tolerations settings should be taken into account.
 
 ## Configuration
@@ -3404,6 +3365,30 @@ The following table contains details about existing tolerations configuration op
         <td><ul>
             <li><code>dashboard.tolerations</code></li>
             <li><code>metrics-scraper.tolerations</code></li>
+        </ul></td>
+        <td>none</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>local-host-provisioner</td>
+        <td><ul>
+            <li><code>tolerations</code></li>
+        </ul></td>
+        <td>none</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>iperf3</td>
+        <td><ul>
+            <li><code>tolerations</code></li>
+        </ul></td>
+        <td>none</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>sock-shop</td>
+        <td><ul>
+            <li><code>tolerations</code></li>
         </ul></td>
         <td>none</td>
         <td></td>
