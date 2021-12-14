@@ -415,6 +415,63 @@ A toleration "matches" a taint if the keys are the same and the effects are the 
 
 **Note**: An empty key with operator Exists matches all keys, values, and effects which specifies that this tolerates everything.
 
+#### CoreDNS deployment with node taints
+By default CoreDNS pods are being scheduled to worker nodes. If worker nodes have taints, CoreDNS must have tolerations configuration in cluster.yaml otherwise CoreDNS pods will get stuck in Pending state. For example:
+```
+services:
+  coredns:
+    deployment:
+      spec:
+        template:
+          spec:
+             tolerations:
+              - key: application
+                operator: Exists
+                effect: NoSchedule
+```
+Plugins also require tolerations section in case of node taints. Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins it should be set in cluster.yaml, for example:
+```
+plugins:
+  kubernetes-dashboard:
+    dashboard:
+      tolerations:
+      - key: application
+        operator: Exists
+        effect: NoSchedule
+    metrics-scraper:
+      tolerations:
+      - key: application
+        operator: Exists
+        effect: NoSchedule
+...
+  nginx-ingress-controller:
+    controller:
+      tolerations:
+      - key: application
+        operator: Exists
+        effect: NoSchedule
+...
+  iperf3:
+    tolerations:
+    - key: application
+      operator: Exists
+      effect: NoSchedule
+...
+  haproxy-ingress-controller:
+    backend:
+      tolerations:
+      - key: application
+        operator: Exists
+        effect: NoSchedule
+...
+  local-host-provisioner:
+    tolerations:
+    - key: application
+      operator: Exists
+      effect: NoSchedule	
+```
+If you create your own plugins, tolerations settings should be taken into account.
+
 ## Configuration
 
 All the installation configurations for the cluster are in a single inventory file. It is recommended to name this file as **cluster.yaml**.
