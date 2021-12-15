@@ -33,7 +33,7 @@ from kubetool import jinja, thirdparties
 from kubetool.core import utils
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.yaml_merger import default_merger
-from kubetool.core.group import NodeGroup
+from kubetool.core.group import NodeGroup, NodeGroupResult
 
 # list of plugins owned and managed by kubetools
 oob_plugins = [
@@ -144,7 +144,8 @@ def install(cluster, plugins=None):
 
     for plugin_item in plugins_queue:
         install_plugin(cluster, plugin_item['plugin_name'], plugin_item["installation"]['procedures'])
-    cluster.context['current_executing_plugin'] = None
+
+    del cluster.context['current_executing_plugin']
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
@@ -153,9 +154,17 @@ def install_plugin(cluster, plugin_name, installation_procedure):
         cluster.context['executed_plugins'] = {}
     cluster.context['current_executing_plugin'] = plugin_name
     cluster.context['executed_plugins'][plugin_name] = time.time()
+
     for step in installation_procedure:
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+            result = procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+
+            if apply_type == "template" and isinstance(result, NodeGroupResult):
+                if "unchanged" in result.get_simple_out():
+                    cluster.context['ignore_pods_restart'] = True
+
+            if apply_type == "expect" and cluster.context.get('ignore_pods_restart'):
+                del cluster.context['ignore_pods_restart']
 
 
 def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, node=None, apply_filter=None):
@@ -226,7 +235,11 @@ def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, nod
                     pods_ready = False
 
         if pods_ready:
-            pods_ready = clarify_pods_start_time(cluster, pods, plugin_name)
+            if cluster.context.get('ignore_pods_restart'):
+                cluster.log.verbose('Started pods restart time clarification...')
+                pods_ready = clarify_pods_start_time(cluster, pods, plugin_name)
+            else:
+                cluster.log.verbose('Skipped pods restart time clarification, because of unchanged pods')
 
         if pods_ready:
             cluster.log.debug("Pods are ready!")
@@ -278,7 +291,7 @@ def clarify_pods_start_time(cluster: KubernetesCluster, pods: list, plugin_name:
         pod_name = actual_pods_list[i]
         pod_time = parse(pod_time_raw.strip()).timestamp()
         log.verbose(" - %s %s < %s" % (pod_name, plugin_installation_time, pod_time))
-        if plugin_installation_time < pod_time:
+        if plugin_installation_time > pod_time:
             log.verbose("Detected pod, which was started before plugin installation")
             return False
 
@@ -300,11 +313,11 @@ def convert_template(cluster, config):
 
 
 def verify_template(cluster, config):
-    _verify_file(config, "Template")
+    return _verify_file(config, "Template")
 
 
 def apply_template(cluster, config, plugin_name=None):
-    _apply_file(cluster, config, "Template")
+    return _apply_file(cluster, config, "Template")
 
 
 # **** EXPECT ****
@@ -327,9 +340,11 @@ def verify_expect(cluster, config):
 def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
     if config.get('pods') is not None:
-        expect_pods(cluster, config['pods']['list'], plugin_name,
-                    timeout=config['pods'].get('timeout', cluster.globals['pods']['expect']['plugins']['timeout']),
-                    retries=config['pods'].get('retries', cluster.globals['pods']['expect']['plugins']['retries']))
+        timeout = cluster.globals['pods']['expect']['plugins']['timeout']
+        retries = cluster.globals['pods']['expect']['plugins']['retries']
+        return expect_pods(cluster, config['pods']['list'], plugin_name,
+                           timeout=config['pods'].get('timeout', timeout),
+                           retries=config['pods'].get('retries', retries))
 
 
 # **** PYTHON ****
@@ -462,6 +477,8 @@ def apply_shell(cluster, step, plugin_name=None):
     else:
         cluster.log.debug(result)
 
+    return result
+
 
 # **** ANSIBLE ****
 
@@ -510,6 +527,8 @@ def apply_ansible(cluster, step, plugin_name=None):
     result = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr, shell=True)
     if result.returncode != 0:
         raise Exception("Failed to apply ansible plugin, see error above")
+
+    return result
 
 
 def verify_helm(cluster, config):
@@ -571,6 +590,8 @@ def apply_helm(cluster, config, plugin_name=None):
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 
+    return output
+
 
 def process_chart_values(config, local_chart_path):
     config_values = config.get("values")
@@ -631,11 +652,11 @@ def convert_config(cluster, config):
 
 
 def verify_config(cluster, config):
-    _verify_file(config, "Config")
+    return _verify_file(config, "Config")
 
 
 def apply_config(cluster, config, plugin_name=None):
-    _apply_file(cluster, config, "Config")
+    return _apply_file(cluster, config, "Config")
 
 
 def _convert_file(config):
@@ -675,7 +696,7 @@ def _verify_file(config, file_type):
         # TODO: verify fields types and contents
 
 
-def _apply_file(cluster, config, file_type):
+def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     """
         Apply yamls as is or
         renders and applies templates that match the config 'source' key.
@@ -743,7 +764,7 @@ def _apply_file(cluster, config, file_type):
             if use_sudo:
                 method = apply_common_group.sudo
             cluster.log.debug("Applying yaml...")
-            method(apply_command, hide=False)
+            return method(apply_command, hide=False)
         else:
             cluster.log.debug('Apply is not required')
 
