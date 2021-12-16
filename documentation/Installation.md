@@ -5,6 +5,7 @@ This section provides information about the inventory, features, and steps for i
   - [Prerequisites for Cluster Nodes](#prerequisites-for-cluster-nodes)
     - [Minimal Hardware Requirements](#minimal-hardware-requirements)
     - [Recommended Hardware Requirements](#recommended-hardware-requirements)
+    - [Disk Partitioning Recommendation](#disk-partitioning-recommendation)
     - [ETCD Recommendation](#etcd-recommendation)
     - [SSH key Recommendation](#ssh-key-recommendation)
 - [Inventory Preparation](#inventory-preparation)
@@ -270,9 +271,33 @@ The recommended hardware requirements are as follows:
 * 16GB RAM
 * 120GB HDD
 
+### Disk Partitioning Recommendation
+
+Kubernetes clusters use the following important folders:
+
+**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
+For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation) section.
+
+**/var/lib/containerd** - It is a working directory of containerd, and is used for active container runtimes and storage of local images. 
+For master nodes, it should be at least 20 GB, whereas, for worker nodes, it should be 50 GB or more, depending on the application requirements.
+
+**/var/lib/kubelet** - It is a working directory for kubelet. It includes kubelet's configuration files, pods runtime data, environment variables, kube secrets, emptyDirs and data volumes not backed by persistent storage PVs. Its size varies depending on the running applications.
+
+**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located there too). The recommended size is 10 to 30 GB or more, depending on the logrotation policy. Also, the logrotation should be configured properly to avoid a disk overflow.
+
+#### Disk Pressure
+
+To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
+The `nodefs` (or `rootfs`) is the node's main filesystem used for local disk volumes, emptyDir, log storage, and so on. By default, it is /var/lib/kubelet.
+
+The `imagefs` is an optional filesystem that the container runtimes use to store container images and container writable layers.
+For containerd, it is the filesystem containing /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs.
+
+If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available`, `100% - imagefs.available`), the DiskPressure condition becomes true and the pods start being evicted from the node. So it is crucially important not to allow disk fulfillment coming to the eviction threshold for both nodefs and imagefs.
+
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (2 Gb size at least is recommended) on each Master before installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Master before the installation.
 Mount point:
 
 ```
@@ -4549,17 +4574,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4715,17 +4740,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4882,17 +4907,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
