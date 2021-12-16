@@ -3377,22 +3377,6 @@ The following table contains details about existing tolerations configuration op
         <td>none</td>
         <td></td>
     </tr>
-    <tr>
-        <td>iperf3</td>
-        <td><ul>
-            <li><code>tolerations</code></li>
-        </ul></td>
-        <td>none</td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>sock-shop</td>
-        <td><ul>
-            <li><code>tolerations</code></li>
-        </ul></td>
-        <td>none</td>
-        <td></td>
-    </tr>
 </table>
 
 For example, if you want to customize the nginx-ingress-controller pods to allow scheduling on master nodes, you need to specify the following tolerations in your `cluster.yml` file:
