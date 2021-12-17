@@ -2174,7 +2174,9 @@ The `services.resolv.conf` section allows you to configure the nameserver addres
 |search|string|The domain name to search|
 |nameservers|list|The DNS servers for usage in the OS|
 
-**Note**: If some network resources are located in a restricted network and do not resolve through the standard DNS, be sure to configure this section and specify your custom DNS service.
+**Note 1**: If some network resources are located in a restricted network and do not resolve through the standard DNS, be sure to configure this section and specify your custom DNS service.
+
+**Note 2**: Do not put ${cluster_name} into `search` field, otherwise some microservices might work incorrectly.
 
 For example:
 
