@@ -430,6 +430,9 @@ services:
                 operator: Exists
                 effect: NoSchedule
 ```
+
+#### Plugins Deployment with Node Taints 
+
 The plugins also require the tolerations section in case of node taints. The Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
 
 If you create your own plugins, the tolerations settings should be taken into account.
