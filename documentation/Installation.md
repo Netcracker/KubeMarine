@@ -2386,6 +2386,7 @@ The following settings are supported:
 **Note**: 
 
 * All settings have their own priority. They are generated in the priority they are in the above table. Their priority cannot be changed.
+* DNS resolving is done according to the hardcoded plugin chain (https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). That is a query goes through `template`, then through `hosts`, then through `kubernetes`, then through `forward`. By default Corefile contains `template` setting which resolves all names like `*.{{ cluster_name }}` into vIP address. Hence despite entries in `Hosts` such names are resolved into vIP addess.
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
