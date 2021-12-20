@@ -2175,8 +2175,8 @@ The `services.resolv.conf` section allows you to configure the nameserver addres
 |nameservers|list|The DNS servers for usage in the OS|
 
 **Note**: 
-* If some network resources are located in a restricted network and do not resolve through the standard DNS, be sure to configure this section and specify your custom DNS service.
-* Do not put ${cluster_name} into `search` field, otherwise some microservices might work incorrectly.
+* If some network resources are located in a restricted network and are not resolved through the standard DNS, be sure to configure this section and specify your custom DNS service.
+* Do not put ${cluster_name} in the `search` field, otherwise some microservices might work incorrectly.
 
 For example:
 
@@ -2386,7 +2386,7 @@ The following settings are supported:
 **Note**: 
 
 * All settings have their own priority. They are generated in the priority they are in the above table. Their priority cannot be changed.
-* DNS resolving is done according to the [hardcoded plugin chain](https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). That is a query goes through `template`, then through `hosts`, then through `kubernetes`, then through `forward`. By default Corefile contains `template` setting which resolves all names like `*.{{ cluster_name }}` into vIP address. Hence despite entries in `Hosts` such names are resolved into vIP addess.
+* DNS resolving is done according to the [hardcoded plugin chain](https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). This specifies that a query goes through `template`, then through `hosts`, then through `kubernetes`, and then through `forward`. By default, Corefile contains the `template` setting, which resolves all names like `*.{{ cluster_name }}` in the vIP address. Hence despite entries in `Hosts`, such names are resolved in the vIP address.
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
