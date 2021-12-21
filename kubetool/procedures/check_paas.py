@@ -109,27 +109,23 @@ def recommended_system_packages_versions(cluster):
             "haproxy": {"haproxy": compatibility["haproxy"][k8s_version][version_key]},
             "keepalived": {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
         }
+        containerd_name = "containerd"
         if "docker" in cluster.inventory['services']['cri']['containerRuntime']:
-            if version_key == "version_rhel"
-               containerd_name="containerd.io" 
-            else:
-               containerd_name="containerd"
-            
+            if version_key == "version_rhel":
+                containerd_name = "containerd.io"
+
             expected_system_packages["docker"] = {
-                    "docker": compatibility["docker"][k8s_version][version_key],
-                    containerd_name: compatibility[containerd_name][k8s_version][version_key],
-                }
+                containerd_name: compatibility[containerd_name][k8s_version][version_key],
+                "docker": compatibility["docker"][k8s_version][version_key]
+            }
         elif "containerd" in cluster.inventory["services"]["cri"]["containerRuntime"]:
             if version_key == "version_rhel":
-                expected_system_packages["containerd"] = {
-                    "containerd.io": compatibility["containerdio"][k8s_version][version_key],
-                    "podman": compatibility["podman"][k8s_version][version_key]
-                }
-            else:
-                expected_system_packages["containerd"] = {
-                    "containerd": compatibility["containerd"][k8s_version][version_key],
-                    "podman": compatibility["podman"][k8s_version][version_key]
-                }
+                containerd_name = "containerd.io"
+
+            expected_system_packages["containerd"] = {
+                containerd_name: compatibility[containerd_name][k8s_version][version_key],
+                "podman": compatibility["podman"][k8s_version][version_key]
+            }
 
         good_results = set()
         bad_results = []
