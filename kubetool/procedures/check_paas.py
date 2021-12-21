@@ -110,17 +110,15 @@ def recommended_system_packages_versions(cluster):
             "keepalived": {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
         }
         if "docker" in cluster.inventory['services']['cri']['containerRuntime']:
-            if version_key == "version_rhel":
-                expected_system_packages["docker"] = {
-                    "docker": compatibility["docker"][k8s_version][version_key],
-                    "containerd.io": compatibility["containerdio"][k8s_version][version_key],
-                }
+            if version_key == "version_rhel"
+               containerd_name="containerd.io" 
             else:
-                expected_system_packages["docker"] = {
+               containerd_name="containerd"
+            
+            expected_system_packages["docker"] = {
                     "docker": compatibility["docker"][k8s_version][version_key],
-                    "containerd": compatibility["containerd"][k8s_version][version_key]
+                    containerd_name: compatibility[containerd_name][k8s_version][version_key],
                 }
-
         elif "containerd" in cluster.inventory["services"]["cri"]["containerRuntime"]:
             if version_key == "version_rhel":
                 expected_system_packages["containerd"] = {
