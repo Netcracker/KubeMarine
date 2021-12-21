@@ -545,7 +545,7 @@ plugins:
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
     image: rancher/local-path-provisioner:v0.0.20
-    helper-pod-image: busybox:1.34.1
+    helper-pod-image: library/busybox:1.34.1
 
 rbac:
   account_defaults:
