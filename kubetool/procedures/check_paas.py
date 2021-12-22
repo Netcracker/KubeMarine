@@ -24,7 +24,7 @@ from typing import List
 import yaml
 import ruamel.yaml
 
-from kubetool import packages as pckgs, system, selinux
+from kubetool import packages as pckgs, system, selinux, etcd
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.procedures import check_iaas
 from kubetool.core import flow
@@ -690,6 +690,22 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
                                    f"manually what the differences are and make changes on the appropriate nodes.")
 
 
+def etcd_health_status(cluster):
+    """
+    This method is a test, check ETCD health
+    """
+    with TestCase(cluster.context['testsuite'], '218', "etcd", "health_status") as tc:
+        try:
+            etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
+        except Exception as e:
+            cluster.log.verbose('Failed to load and parse ETCD status')
+            raise TestFailure('invalid',
+                              hint=f"ETCD not ready, please check"
+                                   f"because of {e}")
+        cluster.log.debug(etcd_health_status)
+        tc.success(results='valid')
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -762,10 +778,9 @@ tasks = OrderedDict({
             },
         },
     },
-    # TODO: support ETCD health validation
-    # 'etcd': {
-    #     'health_status': etcd_health_status
-    # }
+    'etcd': {
+        "health_status": etcd_health_status
+    },
 })
 
 
