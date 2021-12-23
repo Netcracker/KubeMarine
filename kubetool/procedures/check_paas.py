@@ -149,7 +149,7 @@ def recommended_system_packages_versions(cluster):
 
         if bad_results:
             raise TestWarn("detected not recommended packages versions",
-                           hint=f'Check the list of recommended packages and what is listed in the inventory and fix'
+                           hint=f'Check the list of recommended packages and what is listed in the inventory and fix '
                                 f'the inconsistencies of the following packages on the system: {bad_results}')
         cluster.log.debug(f"found packages: {good_results}")
         tc.success("all packages have recommended versions")
@@ -571,13 +571,16 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         permissive_ips = []
         bad_ips = []
         for conn, results in selinux_parsed_result.items():
-            if results['mode'] == 'enforcing':
-                enforcing_ips.append(conn.host)
-            elif results['mode'] == 'permissive' and cluster.inventory.get('services', {})\
-                    .get('kernel_security', {}).get('selinux', {}).get('state') == 'permissive':
-                permissive_ips.append(conn.host)
+            if results.get('status', '') != 'disabled':
+                if results['mode'] == 'enforcing':
+                    enforcing_ips.append(conn.host)
+                elif results['mode'] == 'permissive' and cluster.inventory.get('services', {})\
+                        .get('kernel_security', {}).get('selinux', {}).get('state') == 'permissive':
+                    permissive_ips.append(conn.host)
+                else:
+                    bad_ips.append([conn.host, results['mode']])
             else:
-                bad_ips.append([conn.host, results['mode']])
+                bad_ips.append([conn.host, 'disabled'])
 
         if group.nodes_amount() == len(enforcing_ips):
             tc.success(results='enforcing')
