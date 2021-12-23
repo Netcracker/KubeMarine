@@ -292,7 +292,9 @@ class KubernetesCluster(Environment):
                 detected_package_versions = list(detected_packages[package].keys())
                 for version in detected_package_versions:
                     # add package version to list only if it was found as installed
-                    if "not installed" not in version:
+                    # skip version, which ended with special symbol = or -
+                    # (it is possible in some cases to receive "containerd=" version)
+                    if "not installed" not in version and version[-1] != '=' and version[-1] != '-':
                         final_packages_list.append(version)
 
                 # if there no versions detected, then set package version to default
@@ -315,7 +317,9 @@ class KubernetesCluster(Environment):
                 package_versions_list = []
                 detected_package_versions = list(detected_packages[package].keys())
                 for version in detected_package_versions:
-                    if "not installed" not in version:
+                    # skip version, which ended with special symbol = or -
+                    # (it is possible in some cases)
+                    if "not installed" not in version and version[-1] != '=' and version[-1] != '-':
                         # add package version to list only if it was found as installed
                         package_versions_list.append(version)
                 # if there no versions detected, then set package version to default
