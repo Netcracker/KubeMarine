@@ -29,7 +29,7 @@ from dateutil.parser import parse
 
 import yaml
 
-from kubetool import jinja, thirdparties
+from kubetool import jinja, thirdparties, system
 from kubetool.core import utils
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.yaml_merger import default_merger
@@ -153,7 +153,11 @@ def install_plugin(cluster, plugin_name, installation_procedure):
     if not cluster.context.get('executed_plugins'):
         cluster.context['executed_plugins'] = {}
     cluster.context['current_executing_plugin'] = plugin_name
-    cluster.context['executed_plugins'][plugin_name] = time.time()
+    current_node_time, nodes_time, time_diff = system.get_nodes_time(cluster.nodes['master'])
+    if time_diff > cluster.globals['nodes']['max_time_difference']:
+        cluster.log.verbose('Time difference: %s' % time_diff)
+        cluster.log.warning('WARNING! The time between nodes is not synchronized!')
+    cluster.context['executed_plugins'][plugin_name] = current_node_time
 
     for step in installation_procedure:
         for apply_type, configs in step.items():

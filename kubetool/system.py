@@ -17,12 +17,15 @@ import io
 import re
 import time
 from copy import deepcopy
+from typing import Dict
 
+from dateutil.parser import parse
 import fabric
 import yaml
 
-from kubetool import selinux, kubernetes, packages
+from kubetool import selinux, kubernetes
 from kubetool.core import utils
+from kubetool.core.annotations import restrict_empty_group
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.executor import RemoteExecutor
 from kubetool.core.group import NodeGroupResult, NodeGroup
@@ -483,30 +486,39 @@ def add_to_path(group, string):
 
 
 def configure_chronyd(group, retries=60):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
     chronyd_config = ''
 
-    for server in group.cluster.inventory['services']['ntp']['chrony']['servers']:
+    for server in cluster.inventory['services']['ntp']['chrony']['servers']:
         chronyd_config += "server " + server + "\n"
 
-    if group.cluster.inventory['services']['ntp']['chrony'].get('makestep'):
-        chronyd_config += "\nmakestep " + group.cluster.inventory['services']['ntp']['chrony']['makestep']
+    if cluster.inventory['services']['ntp']['chrony'].get('makestep'):
+        chronyd_config += "\nmakestep " + cluster.inventory['services']['ntp']['chrony']['makestep']
 
-    if group.cluster.inventory['services']['ntp']['chrony'].get('rtcsync', False):
+    if cluster.inventory['services']['ntp']['chrony'].get('rtcsync', False):
         chronyd_config += "\nrtcsync"
 
-    utils.dump_file(group.cluster, chronyd_config, 'chrony.conf')
+    utils.dump_file(cluster, chronyd_config, 'chrony.conf')
     group.put(io.StringIO(chronyd_config), '/etc/chrony.conf', backup=True, sudo=True)
     group.sudo('systemctl restart chronyd')
     while retries > 0:
         log.debug("Waiting for time sync, retries left: %s" % retries)
-        result = group.sudo('chronyc tracking && sudo chronyc sources')
-        if "Normal" in list(result.values())[0].stdout:
-            log.debug("Time synced!")
-            return result
+        results = group.sudo('chronyc tracking && sudo chronyc sources')
+        if results.stdout_contains("Normal"):
+            log.verbose("NTP service reported successful time synchronization, validating...")
+
+            current_node_time, nodes_time, time_diff = get_nodes_time(group)
+            if time_diff > cluster.globals['nodes']['max_time_difference']:
+                log.debug("Time is not synced yet")
+                log.debug(results)
+            else:
+                log.debug("Time synced!")
+                return results
+
         else:
             log.debug("Time is not synced yet")
-            log.debug(result)
+            log.debug(results)
         time.sleep(1)
         retries -= 1
 
@@ -514,10 +526,11 @@ def configure_chronyd(group, retries=60):
 
 
 def configure_timesyncd(group, retries=120):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
     timesyncd_config = ''
 
-    for section, options in group.cluster.inventory['services']['ntp']['timesyncd'].items():
+    for section, options in cluster.inventory['services']['ntp']['timesyncd'].items():
         timesyncd_config += '[%s]' % section
         for option_name, option_value in options.items():
             if isinstance(option_value, list):
@@ -527,7 +540,7 @@ def configure_timesyncd(group, retries=120):
             timesyncd_config += '\n%s=%s' % (option_name, option_value_str)
         timesyncd_config += '\n\n'
 
-    utils.dump_file(group.cluster, timesyncd_config, 'timesyncd.conf')
+    utils.dump_file(cluster, timesyncd_config, 'timesyncd.conf')
     group.put(io.StringIO(timesyncd_config), '/etc/systemd/timesyncd.conf', backup=True, sudo=True)
     res = group.sudo('timedatectl set-ntp true '
                      '&& sudo systemctl enable --now systemd-timesyncd.service '
@@ -536,13 +549,21 @@ def configure_timesyncd(group, retries=120):
     log.verbose(res)
     while retries > 0:
         log.debug("Waiting for time sync, retries left: %s" % retries)
-        result = group.sudo('timedatectl timesync-status && sudo timedatectl status')
-        if "synchronized: yes" in list(result.values())[0].stdout:
-            log.debug("Time synced!")
-            return result
+        results = group.sudo('timedatectl timesync-status && sudo timedatectl status')
+        if results.stdout_contains("synchronized: yes"):
+            log.verbose("NTP service reported successful time synchronization, validating...")
+
+            current_node_time, nodes_time, time_diff = get_nodes_time(group)
+            if time_diff > cluster.globals['nodes']['max_time_difference']:
+                log.debug("Time is not synced yet")
+                log.debug(results)
+            else:
+                log.debug("Time synced!")
+                return results
+
         else:
             log.debug("Time is not synced yet")
-            log.debug(result)
+            log.debug(results)
         time.sleep(1)
         retries -= 1
 
@@ -683,3 +704,33 @@ def whoami(group: NodeGroup) -> NodeGroupResult:
             group.cluster.context['nodes'][node['connect_to']]['online'] = False
             group.cluster.context['nodes'][node['connect_to']]['hasroot'] = False
     return results
+
+
+@restrict_empty_group
+def get_nodes_time(group: NodeGroup) -> (float, Dict[fabric.connection.Connection, float], float):
+    """
+    Polls the time from the specified group of nodes, parses it and returns tuple with results.
+    :param group: Group of nodes, where timestamps should be detected.
+    :return: tuple with max timestamp, dict of parsed timestamps per node and max found time difference.
+
+    Max time required for comparing dates computed on nodes, because we can not detect real time between nodes.
+    Max nodes time should be less than minimal compared time from future.
+
+    Timestamp - is a time in seconds since epoch.
+    """
+
+    parsed_time_per_node: Dict[fabric.connection.Connection, float] = {}
+
+    min_time = None
+    max_time = None
+
+    raw_results = group.run('date')
+    for host, result in raw_results.items():
+        parsed_time = parse(result.stdout.strip()).timestamp()
+        parsed_time_per_node[host] = parsed_time
+        if min_time is None or min_time > parsed_time:
+            min_time = parsed_time
+        if max_time is None or max_time < parsed_time:
+            max_time = parsed_time
+
+    return max_time, parsed_time_per_node, max_time-min_time

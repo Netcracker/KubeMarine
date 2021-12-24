@@ -651,6 +651,30 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
                                    f"procedure.")
 
 
+def verify_time_sync(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test that verifies that the time between all nodes does not lag behind.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster.context['testsuite'], '218', "System", "Time difference",
+                  minimal=cluster.globals['nodes']['max_time_difference']) as tc:
+        group = cluster.nodes['all']
+        current_node_time, nodes_timestamp, time_diff = system.get_nodes_time(group)
+        cluster.log.verbose('Current node time: %s' % current_node_time)
+        cluster.log.verbose('Time difference: %s' % time_diff)
+        cluster.log.verbose('Nodes time details:')
+        for host, timestamp in nodes_timestamp.items():
+            cluster.log.verbose(' - %s: %s' % (host.host, timestamp))
+
+        if time_diff > cluster.globals['nodes']['max_time_difference']:
+            raise TestFailure(time_diff,
+                              hint=f"The time difference between nodes is too large, this can lead to incorrect "
+                                   f"behavior of Kubernetes and services. To fix this problem, run the NTP configuring "
+                                   f"task on all nodes with the correct parameters.")
+        tc.success(results='disabled')
+
+
 def verify_swap_state(cluster: KubernetesCluster) -> None:
     """
     This method is a test, which verifies that swap is disabled on all nodes in the cluster, otherwise the test will
@@ -707,6 +731,7 @@ tasks = OrderedDict({
             }
         },
         'system': {
+            'time': verify_time_sync,
             'swap': {
                 'status': verify_swap_state
             },
