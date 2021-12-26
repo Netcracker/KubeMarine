@@ -415,6 +415,28 @@ A toleration "matches" a taint if the keys are the same and the effects are the 
 
 **Note**: An empty key with operator Exists matches all keys, values, and effects which specifies that this tolerates everything.
 
+#### CoreDNS Deployment with Node Taints
+
+By default, CoreDNS pods are scheduled to worker nodes. If the worker nodes have taints, the CoreDNS must have tolerations configuration in cluster.yaml, otherwise, the CoreDNS pods get stuck in the Pending state. For example:
+```
+services:
+  coredns:
+    deployment:
+      spec:
+        template:
+          spec:
+             tolerations:
+              - key: application
+                operator: Exists
+                effect: NoSchedule
+```
+
+#### Plugins Deployment with Node Taints 
+
+The plugins also require the tolerations section in case of node taints. The Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
+
+If you create your own plugins, the tolerations settings should be taken into account.
+
 ## Configuration
 
 All the installation configurations for the cluster are in a single inventory file. It is recommended to name this file as **cluster.yaml**.
@@ -2174,7 +2196,9 @@ The `services.resolv.conf` section allows you to configure the nameserver addres
 |search|string|The domain name to search|
 |nameservers|list|The DNS servers for usage in the OS|
 
-**Note**: If some network resources are located in a restricted network and do not resolve through the standard DNS, be sure to configure this section and specify your custom DNS service.
+**Note**: 
+* If some network resources are located in a restricted network and are not resolved through the standard DNS, be sure to configure this section and specify your custom DNS service.
+* Do not put ${cluster_name} in the `search` field, otherwise some microservices might work incorrectly.
 
 For example:
 
@@ -2384,6 +2408,7 @@ The following settings are supported:
 **Note**: 
 
 * All settings have their own priority. They are generated in the priority they are in the above table. Their priority cannot be changed.
+* DNS resolving is done according to the [hardcoded plugin chain](https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). This specifies that a query goes through `template`, then through `hosts`, then through `kubernetes`, and then through `forward`. By default, Corefile contains the `template` setting, which resolves all names like `*.{{ cluster_name }}` in the vIP address. Hence despite entries in `Hosts`, such names are resolved in the vIP address.
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
@@ -3347,6 +3372,14 @@ The following table contains details about existing tolerations configuration op
         <td><ul>
             <li><code>dashboard.tolerations</code></li>
             <li><code>metrics-scraper.tolerations</code></li>
+        </ul></td>
+        <td>none</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>local-host-provisioner</td>
+        <td><ul>
+            <li><code>tolerations</code></li>
         </ul></td>
         <td>none</td>
         <td></td>

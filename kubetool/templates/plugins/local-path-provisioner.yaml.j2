@@ -93,6 +93,10 @@ spec:
         - name: config-volume
           configMap:
             name: local-path-config
+      {% if plugins['local-path-provisioner']['tolerations'] is defined -%}
+      tolerations:
+        {{ plugins['local-path-provisioner']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+      {%- endif %}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
