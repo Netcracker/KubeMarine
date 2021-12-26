@@ -20,6 +20,7 @@ import sys
 import time
 from typing import Union
 
+import yaml
 import ruamel.yaml
 from copy import deepcopy
 from traceback import *
@@ -313,3 +314,45 @@ def determine_resource_absolute_dir(path: str) -> str:
         return patched_definition
 
     raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
+
+
+class ClusterStorage:
+    __instance = None
+
+    def __init__(self, cluster):
+        if not ClusterStorage.__instance:
+            #self.cluster = cluster
+            self.folder_name = "/etc/kubemarine/"
+            self.make_dir(cluster)
+            print("new storage created")
+        else:
+            print("reused storage:", self.get_instance(cluster))
+
+    def get_instance(self, cluster):
+        if not self.__instance:
+            self.__instance = ClusterStorage(cluster)
+        return self.__instance
+
+    def _make_dir(self, cluster):
+        timestamp = datetime.now().timestamp()
+        readable_timestamp = datetime.fromtimestamp(timestamp).isoformat()
+        initial_procedure = cluster.context["initial_procedure"]
+        self.folder_name += readable_timestamp + "_" + initial_procedure
+        cluster.nodes['master'].sudo(f"mkdir -m 600 {self.folder_name}")
+        self._collect_procedure_info(cluster)
+
+    def upload_file(self, cluster, stream, file_name):
+        cluster.nodes['master'].put(stream, self.folder_name + "/" + file_name, sudo=True)
+
+    def _collect_procedure_info(self, cluster):
+        out = dict()
+        execution_arguments = cluster.context.get('execution_arguments', {})
+
+        out["tasks"] = execution_arguments["tasks"]
+        out["exclude"] = execution_arguments["exclude"]
+        out["initial_procedure"] = cluster.context["initial_procedure"]
+        output = yaml.dump(out, )
+        self.upload_file(cluster, output, "procedure_parameters")
+        with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
+            dump_file(cluster, stream, "version")
+            self.upload_file(cluster, stream, "version")
