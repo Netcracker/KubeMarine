@@ -25,11 +25,11 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
-from dateutil.parser import parse
+from typing import List, Dict
 
 import yaml
 
-from kubetool import jinja, thirdparties, system
+from kubetool import jinja, thirdparties
 from kubetool.core import utils
 from kubetool.core.cluster import KubernetesCluster
 from kubetool.core.yaml_merger import default_merger
@@ -43,6 +43,10 @@ oob_plugins = [
     "haproxy-ingress-controller",
     "kubernetes-dashboard",
     "local-path-provisioner",
+]
+
+excluded_pods_from_freshness_checking = [
+    'coredns'
 ]
 
 
@@ -145,22 +149,19 @@ def install(cluster, plugins=None):
     for plugin_item in plugins_queue:
         install_plugin(cluster, plugin_item['plugin_name'], plugin_item["installation"]['procedures'])
 
-    del cluster.context['current_executing_plugin']
-
 
 def install_plugin(cluster, plugin_name, installation_procedure):
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
     if not cluster.context.get('executed_plugins'):
         cluster.context['executed_plugins'] = {}
     cluster.context['current_executing_plugin'] = plugin_name
-    current_node_time, nodes_time, time_diff = system.get_nodes_time(cluster.nodes['master'])
-    if time_diff > cluster.globals['nodes']['max_time_difference']:
-        cluster.log.verbose('Time difference: %s' % time_diff)
-        cluster.log.warning('WARNING! The time between nodes is not synchronized!')
-    cluster.context['executed_plugins'][plugin_name] = current_node_time
 
-    for step in installation_procedure:
+    for current_step_i, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
+
+            if apply_type == "template":
+                cache_expected_pods_state(cluster, installation_procedure, current_step_i)
+
             result = procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
 
             if apply_type == "template" and isinstance(result, NodeGroupResult):
@@ -170,11 +171,14 @@ def install_plugin(cluster, plugin_name, installation_procedure):
             if apply_type == "expect" and cluster.context.get('ignore_pods_restart'):
                 del cluster.context['ignore_pods_restart']
 
+    if cluster.context.get('cached_expected_pods'):
+        del cluster.context['cached_expected_pods']
+
 
 def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, node=None, apply_filter=None):
 
     if isinstance(cluster, NodeGroup):
-        # cluster is a group, not a cluster
+        # when instead of cluster there was received a group
         cluster = cluster.cluster
 
     if timeout is None:
@@ -239,11 +243,14 @@ def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, nod
                     pods_ready = False
 
         if pods_ready:
-            if cluster.context.get('ignore_pods_restart'):
-                cluster.log.verbose('Started pods restart time clarification...')
-                pods_ready = clarify_pods_start_time(cluster, pods, plugin_name)
+            # In initial version of this code there were pods time comparing, but it was decided not to use this, since
+            # Kubemarine cannot precisely get the time from the nodes, because a large delay is possible between
+            # deployer node and the cluster nodes, which is especially noticeable in huge clusters with many nodes.
+            if not cluster.context.get('ignore_pods_restart'):
+                cluster.log.verbose('Pods freshness checking...')
+                pods_ready = detect_pods_have_been_restarted(cluster, pods, plugin_name)
             else:
-                cluster.log.verbose('Skipped pods restart time clarification, because of unchanged pods')
+                cluster.log.verbose('Skipped pods freshness checking, because no kubernetes objects were changed')
 
         if pods_ready:
             cluster.log.debug("Pods are ready!")
@@ -258,49 +265,139 @@ def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, nod
     raise Exception('In the expected time, the pods did not become ready')
 
 
-def clarify_pods_start_time(cluster: KubernetesCluster, pods: list, plugin_name: str) -> bool:
+def cache_expected_pods_state(cluster: KubernetesCluster, installation_procedure_actions: List, current_step_i: int) \
+        -> List[str] or None:
     """
-    Method clarifies pods start time and verifies that pods definitely restarted. It will retrieve running pods, detect
-    their start time and compare it with plugin installation time.
+    Parses and caches in context a list of pod names that will be expected in the future after applying the current
+    template installation step. The method only searches for future expecting pods and does not do so beyond the
+    applying section of the next template. If no pods are expected or no pods were found during scanning, nothing will
+    be cached.
+    :param cluster: current Kubernetes cluster, where method actions should be performed
+    :param installation_procedure_actions: a list of all plugin installation actions that is currently being proceeded
+    :param current_step_i: the number of the current plugin installation action
+    :return: list of cached pod names or None
+    """
+    log = cluster.log
+    expected_pods = []
+
+    i = current_step_i + 1
+    while i < len(installation_procedure_actions):
+        installation_step = installation_procedure_actions[i]
+        if installation_step.get('expect') and installation_step['expect'].get('pods'):
+            log.verbose('Added the following pods to expect and cache list:')
+            pods_list = exclude_pods_from_freshness_checking(installation_step['expect']['pods']['list'])
+            log.verbose(pods_list)
+            expected_pods = expected_pods + find_running_pods(cluster, pods_list)
+            break
+        # when template applying called without previous template pods expecting, that means no pods should be expected
+        # from previous template and they should not be cached
+        if installation_step.get('template'):
+            log.verbose('No pods should be expected and cached')
+            break
+        i += 1
+
+    if expected_pods:
+        log.verbose('Detected running expected pods:')
+        for pod in expected_pods:
+            log.verbose(' - %s %s' % (pod['namespace'], pod['name']))
+        cluster.context['cached_expected_pods'] = expected_pods
+        return expected_pods
+    else:
+        if cluster.context.get('cached_expected_pods'):
+            del cluster.context['cached_expected_pods']
+        return None
+
+
+def exclude_pods_from_freshness_checking(pods_list: List[str]) -> List[str]:
+    """
+    The method excludes special pod names from input list. This is required for some special pods that do not restart by
+    design and should be skipped in freshness checking.
+    :param pods_list: list of pods raw names (without id, e.g. "coredns", not "coredns-a2n5ks4")
+    :return: new pods list, excluding special pods
+    """
+    new_list: List[str] = []
+    for pod_name in pods_list:
+        excluded = False
+        for excluded_pod_name in excluded_pods_from_freshness_checking:
+            if excluded_pod_name in pod_name:
+                excluded = True
+                break
+        if not excluded:
+            new_list.append(pod_name)
+    return new_list
+
+
+def find_running_pods(cluster: KubernetesCluster, pods_list: List[str]) -> List[Dict[str, str]]:
+    """
+    The method requests a list of expected pods and parses their real names and namespaces.
     :param cluster: KubernetesCluster object
-    :param pods: list of string with pods names
+    :param pods_list: list of pods raw names (without id, e.g. "coredns", not "coredns-a2n5ks4")
+    :return: list of pod names with id and their namespaces. List can be empty if nothing was found
+    """
+
+    parsed_pods_list: List[Dict[str, str]] = []
+
+    master = cluster.nodes['master'].get_any_member()
+    merged_pods_list = "|".join(pods_list)
+    actual_pods_list = master.sudo('kubectl get pods -A | grep -E "%s" | awk \'{print $1 " " $2}\'' % merged_pods_list)\
+        .get_simple_out().strip().split("\n")
+
+    # parse only if anything was found
+    if actual_pods_list:
+        for pod_item in actual_pods_list:
+            if pod_item != '':
+                pod_namespace, pod_name = pod_item.split(' ')
+                parsed_pods_list.append({
+                    'name': pod_name.strip(),
+                    'namespace': pod_namespace.strip()
+                })
+
+    return parsed_pods_list
+
+
+def detect_pods_have_been_restarted(cluster: KubernetesCluster, expected_pods: List[str], plugin_name: str) -> bool:
+    """
+    The method requests a list of expected pods and compares it with the old list, which was saved in context before
+    applying the template. If something matches, then it is considered that the pods have not been restarted.
+    :param cluster: KubernetesCluster object
+    :param expected_pods: list of pods names
     :param plugin_name: plugin name, which pods should be restarted
-    :return: True if pods restart detected
+    :return: True if pods were restarted
     """
     log = cluster.log
     if plugin_name is None:
         # When no plugin defined, that means expectation method called directly and it is not possible to check
         # pods start time
         return True
-    plugin_installation_time = cluster.context['executed_plugins'][plugin_name]
-    master = cluster.nodes['master'].get_any_member()
 
-    log.verbose("Detecting pods start time...")
+    log.verbose("Checking expected pods were actually restarted...")
 
-    merged_pods_list = "|".join(pods)
-    actual_pods_list = master.sudo('kubectl get pods -A | grep -E "%s" | awk \'{print $1 " " $2}\'' % merged_pods_list)\
-        .get_simple_out().strip().split("\n")
+    old_pods_list = cluster.context.get('cached_expected_pods', False)
 
-    cmd = ""
-    for pod_item in actual_pods_list:
-        pod_namespace, pod_name = pod_item.split(' ')
-        if cmd != "":
-            cmd += " && sudo "
-        cmd += "kubectl describe pods -n %s %s | grep \"Start Time\" | awk -F 'Time:' '{print $2}'"\
-               % (pod_namespace, pod_name)
+    # if cached_expected_pods is None, then no pods were detected initially
+    if not old_pods_list:
+        log.verbose('Previous pods were not running, skipping...')
+        return True
 
-    log.verbose("Comparing pods time, to ensure pods started after plugin installation:")
-    pods_time_items = master.sudo(cmd).get_simple_out().strip().split("\n")
-    for i, pod_time_raw in enumerate(pods_time_items):
-        pod_name = actual_pods_list[i]
-        pod_time = parse(pod_time_raw.strip()).timestamp()
-        log.verbose(" - %s %s < %s" % (pod_name, plugin_installation_time, pod_time))
-        if plugin_installation_time > pod_time:
-            log.verbose("Detected pod, which was started before plugin installation")
-            return False
+    expected_pods_list = find_running_pods(cluster, expected_pods)
+    non_restarted_pods = []
+    for expected_pod in expected_pods_list:
+        for old_pod in old_pods_list:
+            if expected_pod['name'] == old_pod['name'] and expected_pod['namespace'] == old_pod['namespace']:
+                non_restarted_pods.append(expected_pod)
+                break
 
-    log.verbose("All pods were started after plugin installation")
-    return True
+    if non_restarted_pods:
+        log.verbose('The following pods has not been restarted yet:')
+        for pod in non_restarted_pods:
+            log.verbose(' - %s %s' % (pod['namespace'], pod['name']))
+        return False
+    else:
+        log.verbose("All pods were started after plugin installation:")
+        # for debugging purposes all new pods will be printed:
+        for expected_pod in expected_pods_list:
+            log.verbose(' - %s %s' % (expected_pod['namespace'], expected_pod['name']))
+        return True
 
 
 def is_critical_state_in_stdout(cluster, stdout):

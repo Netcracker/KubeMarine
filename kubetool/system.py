@@ -716,17 +716,22 @@ def get_nodes_time(group: NodeGroup) -> (float, Dict[fabric.connection.Connectio
     Max time required for comparing dates computed on nodes, because we can not detect real time between nodes.
     Max nodes time should be less than minimal compared time from future.
 
-    Timestamp - is a time in seconds since epoch.
+    Timestamp - is a time in milliseconds since epoch.
     """
+
+    # Please, note: this method can not detect time on nodes precisely, since Kubemarine can execute commands not at the
+    # same time depending on various factors, for example, restrictions on the number of open sockets.
 
     parsed_time_per_node: Dict[fabric.connection.Connection, float] = {}
 
     min_time = None
     max_time = None
 
+    # TODO: request and parse more accurate timestamp in milliseconds
+
     raw_results = group.run('date')
     for host, result in raw_results.items():
-        parsed_time = parse(result.stdout.strip()).timestamp()
+        parsed_time = parse(result.stdout.strip()).timestamp() * 1000
         parsed_time_per_node[host] = parsed_time
         if min_time is None or min_time > parsed_time:
             min_time = parsed_time

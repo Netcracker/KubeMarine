@@ -2050,6 +2050,10 @@ For Kubernetes and ETCD to work correctly, it is recommended to configure the sy
 
 *OS specific*: Yes, performs only on the RHEL OS family.
 
+**Warning:** incorrect time synchronization can lead to incorrect operation of the cluster or services. You can validate
+the time synchronization via the [Time difference](Kubecheck.md#218-time-difference) test between the nodes from 
+[PAAS Check procedure](Kubecheck.md#paas-procedure).
+
 To synchronize the system time, you must make a list of NTP servers. All servers must be accessible from any node of the cluster.
 The list should be indicated in the `chrony` section of the` services.ntp` section config file.
 In addition to the NTP server address, you can specify any additional configurations in the same line. 
@@ -2095,6 +2099,10 @@ If the configuration `services.ntp.chrony.servers` is absent, then the task` pre
 *Overwrite files*: Yes, `/etc/systemd/timesyncd.conf`, backup is created.
 
 *OS specific*: Yes, performs only on Debian OS family.
+
+**Warning:** incorrect time synchronization can lead to incorrect operation of the cluster or services. You can validate
+the time synchronization via the [Time difference](Kubecheck.md#218-time-difference) test between the nodes from 
+[PAAS Check procedure](Kubecheck.md#paas-procedure).
 
 To synchronize the system time, you must make a list of NTP servers. All servers must be accessible from any node of the cluster.
 The list should be indicated in the `timesyncd.Time.NTP` parameter of the` services.ntp` section config file.

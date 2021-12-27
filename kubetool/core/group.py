@@ -766,7 +766,13 @@ class NodeGroup:
     def get_any_member(self, provide_node_configs=False, apply_filter=None):
         member = random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
                                                              apply_filter=apply_filter))
-        self.cluster.log.verbose(f'Selected node {str(member)}')
+        if isinstance(member, NodeGroup):
+            # to avoid "Selected node <kubetool.core.group.NodeGroup object at 0x7f925625d070>" writing to log,
+            # let's get node ip from selected member and pass to it to log
+            member_str = str(list(member.nodes.keys())[0])
+        else:
+            member_str = str(member)
+        self.cluster.log.verbose(f'Selected node {member_str}')
         return member
 
     def get_member_by_name(self, name, provide_node_configs=False):

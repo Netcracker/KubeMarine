@@ -657,8 +657,7 @@ def verify_time_sync(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], '218', "System", "Time difference",
-                  minimal=cluster.globals['nodes']['max_time_difference']) as tc:
+    with TestCase(cluster.context['testsuite'], '218', "System", "Time difference") as tc:
         group = cluster.nodes['all']
         current_node_time, nodes_timestamp, time_diff = system.get_nodes_time(group)
         cluster.log.verbose('Current node time: %s' % current_node_time)
@@ -668,11 +667,13 @@ def verify_time_sync(cluster: KubernetesCluster) -> None:
             cluster.log.verbose(' - %s: %s' % (host.host, timestamp))
 
         if time_diff > cluster.globals['nodes']['max_time_difference']:
-            raise TestFailure(time_diff,
-                              hint=f"The time difference between nodes is too large, this can lead to incorrect "
-                                   f"behavior of Kubernetes and services. To fix this problem, run the NTP configuring "
-                                   f"task on all nodes with the correct parameters.")
-        tc.success(results='disabled')
+            raise TestWarn("%sms" % time_diff,
+                           hint=f"The time difference between nodes is too large, this can lead to incorrect "
+                                f"behavior of Kubernetes and services. To fix this problem, run the NTP configuring "
+                                f"task on all nodes with the correct parameters. It is also worth paying attention to "
+                                f"the delay between the deployed node and all the others - too much delay can lead to "
+                                f"incorrect time measurements.")
+        tc.success(results="%sms" % time_diff)
 
 
 def verify_swap_state(cluster: KubernetesCluster) -> None:
