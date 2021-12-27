@@ -165,10 +165,10 @@ class KubernetesCluster(Environment):
             "kubetool.kubernetes.add_node_enrichment",
             "kubetool.kubernetes.remove_node_enrichment",
             "kubetool.core.defaults.append_controlplain",
-            "kubetool.core.defaults.compile_inventory",
             "kubetool.core.defaults.calculate_node_names",
             "kubetool.core.defaults.apply_defaults",
-            "kubetool.core.defaults.calculate_nodegroups"
+            "kubetool.core.defaults.calculate_nodegroups",
+            "kubetool.core.defaults.compile_inventory"
         ]
 
     def gather_facts(self, step) -> None:
