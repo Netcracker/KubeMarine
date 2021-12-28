@@ -12,6 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build . -t ghcr.io/netcracker-technology/kubetool:${{ env.TAG_NAME }}
+      - run: docker build . -t ghcr.io/netcracker-technology/kubemarine:${{ env.TAG_NAME }}
       - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
-      - run: docker push ghcr.io/netcracker-technology/kubetool:${{ env.TAG_NAME }}
+      - run: docker push ghcr.io/netcracker-technology/kubemarine:${{ env.TAG_NAME }}

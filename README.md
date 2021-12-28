@@ -1,6 +1,6 @@
-# Kubetools
+# Kubemarine
 
-Kubetools is an open source, lightweight and powerful management tool built for end-to-end Kubernetes cluster deployment and maintenance. It's applicable for many purposes like simple and quick onboarding Kubernetes on local and production environments in different HA schemes depending on your aims, budget and capabilities. Together with simplicity Kubetools can be very flexible and customizable tool covering specific configurability cases on both deployment and maintenance stages. This library provides powerfull CLI commands, as well as can be customized via Python extension API.
+Kubemarine is an open source, lightweight and powerful management tool built for end-to-end Kubernetes cluster deployment and maintenance. It's applicable for many purposes like simple and quick onboarding Kubernetes on local and production environments in different HA schemes depending on your aims, budget and capabilities. Together with simplicity Kubemarine can be very flexible and customizable tool covering specific configurability cases on both deployment and maintenance stages. This library provides powerfull CLI commands, as well as can be customized via Python extension API.
 
 ## Highlights
 - Easy to use
@@ -26,17 +26,17 @@ Kubetools is an open source, lightweight and powerful management tool built for 
 - Support different deployment schemes (all-in-one, mini-HA, HA, etc.)
 
 
-## Kubetools Installation
-Proceed the following steps to install Kubetools on your environment:
+## Kubemarine CLI Installation
+Proceed the following steps to install Kubemarine manually on your environment:
 1. Install latest [python3](https://www.python.org/downloads/)
 2. Upgrade pip:
    ```bash
    python3 -m pip install --upgrade pip
    ```
 3. Ensure your environment meets [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node)
-4. [Download the latest release](https://github.com/netcracker-technology/kubetool/releases) or clone the repo:
+4. [Download the latest release](https://github.com/netcracker-technology/kubemarine/releases) or clone the repo:
    ```bash
-   git clone https://github.com/netcracker-technology/kubetool.git
+   git clone https://github.com/netcracker-technology/kubemarine.git
    ```
 5. Unpack project from archive if required:
    ```bash
@@ -44,18 +44,28 @@ Proceed the following steps to install Kubetools on your environment:
    ```
 6. Navigate to project directory:
    ```bash
-   cd kubetool
+   cd kubemarine
    ```
 7. Install Python dependencies:
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-9. Now you can proceed to run Kubetools!
+8. Add Kubemarine to your binaries location at `/usr/local/bin`:
+   ```bash
+   ln -s $(pwd)/kubemarine/__main__.py /usr/local/bin/kubemarine
+   chmod +x /usr/local/bin/kubemarine
+   ```
+9. Now you can proceed to run Kubemarine! Try the following:
+   ```bash
+   kubemarine help
+   ```
 
 **Note:** building from [Dockerfile](Dockerfile) is also available.
 
+**Note:** python debugging available for `/usr/local/bin/kubemarine` executable.
+
 ## Running Cluster Installation
-Proceed the following steps to install Kubernetes cluster using Kubetools:
+Proceed the following steps to install Kubernetes cluster using Kubemarine:
 1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes)
 2. Create inventory file `cluster.yaml` and describe your env and everything should be configured. See [inventory configs available](documentation/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to fill in all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
    ```yaml
@@ -82,10 +92,10 @@ Proceed the following steps to install Kubernetes cluster using Kubetools:
 
    cluster_name: "k8s.example.com"
    ```
-5. Move `cluster.yaml` to the directory, where Kubetools installed
+5. Move `cluster.yaml` to the directory, where Kubemarine installed
 6. Start installation:
    ```bash
-   ./kubetools install
+   kubemarine install
    ```
 
 See [other guides](#documentation) for more info.
@@ -103,11 +113,11 @@ Also check out the following inventory examples we have prepared:
 - [procedure.yaml](examples/procedure.yaml)
 
 ## Issues, Questions
-If you have any problems while working with Kubetools, feel free to open us a [new issue](https://github.com/netcracker-technology/kubetool/issues) or even [PR](https://github.com/netcracker-technology/kubetool/pulls) with related changes.
+If you have any problems while working with Kubemarine, feel free to open us a [new issue](https://github.com/netcracker-technology/kubemarine/issues) or even [PR](https://github.com/netcracker-technology/kubemarine/pulls) with related changes.
 Follow the process outlined in the Stack Overflow [MCVE](https://stackoverflow.com/help/mcve) document and provide reproducible example.
 
 ## Changelog
-Detailed changes for each release are documented in the [release notes](https://github.com/netcracker-technology/kubetool/releases).
+Detailed changes for each release are documented in the [release notes](https://github.com/netcracker-technology/kubemarine/releases).
 
 ## License
 [Apache License 2.0](LICENSE)

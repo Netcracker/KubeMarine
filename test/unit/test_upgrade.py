@@ -16,9 +16,9 @@
 
 import unittest
 
-from kubetool import kubernetes
-from kubetool.procedures import upgrade
-from kubetool import demo
+from kubemarine import kubernetes
+from kubemarine.procedures import upgrade
+from kubemarine import demo
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):

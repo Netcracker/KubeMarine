@@ -16,8 +16,8 @@
 
 import unittest
 
-from kubetool import haproxy, packages
-from kubetool import demo
+from kubemarine import haproxy, packages
+from kubemarine import demo
 
 
 class HAProxyDefaultsEnrichment(unittest.TestCase):
