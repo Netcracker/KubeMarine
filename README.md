@@ -72,7 +72,7 @@ Proceed the following steps to install Kubemarine manually on your environment:
 
 **Note:** building from [Dockerfile](Dockerfile) is also available.
 
-**Note:** python debugging available for `/usr/local/bin/kubemarine` executable.
+**Note:** Kubemarine debugging available via `kubemarine/__main__.py`.
 
 ## Running Cluster Installation
 Proceed the following steps to install Kubernetes cluster using Kubemarine:
