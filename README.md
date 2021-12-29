@@ -50,15 +50,25 @@ Proceed the following steps to install Kubemarine manually on your environment:
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-8. Add Kubemarine to your binaries location at `/usr/local/bin`:
+8. Optionally add Kubemarine to PATH.
+   You can do this by adding symlink to `/usr/local/bin`:
    ```bash
-   ln -s $(pwd)/kubemarine/__main__.py /usr/local/bin/kubemarine
-   chmod +x /usr/local/bin/kubemarine
+   sudo ln -s $(pwd)/bin/kubemarine /usr/local/bin/kubemarine
+   sudo chmod +x /usr/local/bin/kubemarine
    ```
-9. Now you can proceed to run Kubemarine! Try the following:
+   Alternatively, if you do not have root privileges, you can update your PATH in *rc file. Example:
    ```bash
-   kubemarine help
+   echo "export PATH=\$PATH:$(pwd)/bin" >> ~/.bashrc
+   source ~/.bashrc
    ```
+   If you don't want to add something to path, you can execute the Kubemarine directly from `bin` location:
+   ```bash
+   cd bin
+   ```
+10. Now you can proceed to run Kubemarine! Try the following:
+    ```bash
+    kubemarine help
+    ```
 
 **Note:** building from [Dockerfile](Dockerfile) is also available.
 

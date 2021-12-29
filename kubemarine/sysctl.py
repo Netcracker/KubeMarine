@@ -31,7 +31,7 @@ def make_config(cluster):
     if cluster.inventory['services'].get('sysctl') is not None:
         for key, value in cluster.inventory['services']['sysctl'].items():
             if isinstance(value, str):
-                value = value.strip()
+                value = int(value.strip())
             if value is not None and value != '':
                 if key == "kernel.pid_max":
                     required_pid_max = get_pid_max(cluster.inventory)
@@ -66,6 +66,7 @@ def configure(group: NodeGroup) -> NodeGroupResult:
     The configuration will be placed in sysctl daemon directory.
     """
     config = make_config(group.cluster)
+    group.sudo('rm -f /etc/sysctl.d/98-*-sysctl.conf')
     utils.dump_file(group.cluster, config, '98-kubemarine-sysctl.conf')
     group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf', backup=True, sudo=True)
     return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf')
@@ -75,11 +76,10 @@ def reload(group: NodeGroup) -> NodeGroupResult:
     """
     Reloads sysctl configuration in the specified group.
     """
-    return group.sudo('sysctl -p /etc/sysctl.d/98-kubemarine-sysctl.conf')
+    return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf')
 
 
 def get_pid_max(inventory):
     max_pods = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
     pod_pids_limit = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
     return max_pods * pod_pids_limit + 2048
-
