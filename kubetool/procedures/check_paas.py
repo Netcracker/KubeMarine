@@ -701,16 +701,16 @@ def etcd_health_status(cluster):
     """
     This method is a test, check ETCD health
     """
-    with TestCase(cluster.context['testsuite'], '218', "ETCD", "Health status ETCD") as tc:
+    with TestCase(cluster.context['testsuite'], '218', "etcd", "health_status") as tc:
         try:
             etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
         except Exception as e:
             cluster.log.verbose('Failed to load and parse ETCD status')
             raise TestFailure('invalid',
                               hint=f"ETCD not ready, please check"
-                                   f" because of {e} ")
+                                   f"because of {e}")
         cluster.log.debug(etcd_health_status)
-        tc.success(results='run')
+        tc.success(results='valid')
 
 
 tasks = OrderedDict({
