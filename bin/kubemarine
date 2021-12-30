@@ -20,5 +20,5 @@ if [ -z "${PYTHONUNBUFFERED}" ]; then
   export PYTHONUNBUFFERED=TRUE
 fi
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-python3 "$SCRIPT_DIR"/../kubemarine/__main__.py $@
+cd "$(dirname "$0")/../" || exit 1
+python3 -m kubemarine $@
