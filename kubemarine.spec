@@ -38,8 +38,7 @@ a = Analysis(['./kubemarine/__main__.py'],
              cipher=block_cipher,
              noarchive=False)
 
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(pyz,
           a.scripts,
@@ -54,14 +53,3 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           console=False)
-
-coll = COLLECT(exe,
-               a.scripts,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               debug=False,
-               strip=False,
-               upx=True,
-               upx_exclude=[],
-               name='kubemarine')
