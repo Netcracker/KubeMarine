@@ -31,8 +31,9 @@ def make_config(cluster):
     if cluster.inventory['services'].get('sysctl') is not None:
         for key, value in cluster.inventory['services']['sysctl'].items():
             if isinstance(value, str):
-                value = int(value.strip())
+                value = value.strip()
             if value is not None and value != '':
+                value = int(value)
                 if key == "kernel.pid_max":
                     required_pid_max = get_pid_max(cluster.inventory)
                     if value > 2 ** 22:
