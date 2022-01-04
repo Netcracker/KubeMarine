@@ -822,7 +822,7 @@ class NodeGroup:
         the family is unknown, the exception will be thrown or a string result will be returned.
         :param suppress_exceptions: Flag, deactivating exception. A string value "unknown" or "multiple" will be
         returned instead.
-        :return: Detected OS family
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
         """
         detected_os_family = None
         for node in self.get_new_nodes_or_self().get_ordered_members_list(provide_node_configs=True):
@@ -834,8 +834,8 @@ class NodeGroup:
             elif detected_os_family != os_family:
                 detected_os_family = 'multiple'
                 if not suppress_exceptions:
-                    raise Exception(
-                        'OS families differ: detected %s and %s in same cluster' % (detected_os_family, os_family))
+                    raise Exception('OS families differ: detected "%s" and "%s" in same cluster'
+                                    % (detected_os_family, os_family))
         return detected_os_family
 
     def is_multi_os(self) -> bool:
