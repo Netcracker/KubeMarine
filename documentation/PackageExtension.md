@@ -8,7 +8,7 @@ This section describes the ways in which to extend the standard functionality of
 
 ## Basic Overview
 
-All available code is formed in a single python package `kubetool`. You can call and modify any modules, variables,
+All available code is formed in a single python package `kubemarine`. You can call and modify any modules, variables,
 classes and methods from this package in runtime. 
 
 For example, create new Kubernetes cluster and execute whoami on all nodes with the following code:
@@ -16,20 +16,22 @@ For example, create new Kubernetes cluster and execute whoami on all nodes with 
 ```python
 #!/usr/bin/env python3
 
-from kubetool.core.cluster import KubernetesCluster
-from kubetool.core import flow
+from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core import flow
+
 
 def main():
-  context = flow.create_empty_context()
-  cluster = KubernetesCluster('cluster.yaml', context, gather_facts=True)
-  results = cluster.nodes['master'].sudo('whoami')
-  print(results)
-  
+    context = flow.create_empty_context()
+    cluster = KubernetesCluster('cluster.yaml', context, gather_facts=True)
+    results = cluster.nodes['master'].sudo('whoami')
+    print(results)
+
+
 if __name__ == '__main__':
-  main()
+    main()
 ```
 
-It is not necessary to modify the existing behavior of the Kubetools - you can write your solution on top of this
+It is not necessary to modify the existing behavior of the Kubemarine - you can write your solution on top of this
 package by calling our classes and methods under the hood. However, if you need to add new procedures, change
 configuration paths or inject new methods, read the next [Extension API](#extension-api) section.
 
@@ -40,7 +42,7 @@ support if something does not work as intended to work out of the box.
 
 The package is structured as follows:
 
-- **kubetool** - general directory, where all subpackages and main modules are located
+- **kubemarine** - general directory, where all subpackages and main modules are located
   - **core** - package engine, the modules of which organize the work of all
   - **procedures** - contains all available procedures that describe the sequence of actions
   - **templates** - stores a set of all jinja templates of configurations
@@ -63,27 +65,28 @@ the path of the global config in the class:
 ```python
 #!/usr/bin/env python3
 
-from kubetool.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster
+
 
 class MySuperCluster(KubernetesCluster):
-      def __init__(self, *args, **kwargs):
-          super().__init__(*args, **kwargs)
-          self.GLOBALS_YAML_LOC = "/tmp/modified/custom_globals.yaml"
-          self._load()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.GLOBALS_YAML_LOC = "/tmp/modified/custom_globals.yaml"
+        self._load()
 ```
 
 
 ### Launcher Extension
 
-If you want to use the original Kubetools Launcher with all its built-in features, you can modify that too. The example
+If you want to use the original Kubemarine Launcher with all its built-in features, you can modify that too. The example
 further allows you to replace the native class of the cluster, as well as add an additional procedure to the list of
 original ones.
 
 ```python
 #!/usr/bin/env python3
 
-from kubetool.core import flow
-from kubetools import __main__
+from kubemarine.core import flow
+from kubemarine import __main__
 
 flow.DEFAULT_CLUSTER_OBJ = MySuperCluster
 

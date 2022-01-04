@@ -103,7 +103,7 @@ This section provides information about the inventory, features, and steps for i
 
 # Prerequisites
 
-The technical requirements for all types of host VMs for Kubetools installation are specified in this section.
+The technical requirements for all types of host VMs for Kubemarine installation are specified in this section.
 
 ## Prerequisites for Deployment Node
 
@@ -155,7 +155,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 20.04
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L335).
+The actual information about the supported versions can be found at [global.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L335).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -179,7 +179,7 @@ The actual information about the supported versions can be found at [global.yaml
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `Kubetools` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
+**Warning**: `Kubemarine` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
 
@@ -307,7 +307,7 @@ Mount point:
 
 ### SSH key Recommendation 
 
-Before working with the cluster, you need to generate an ssh key. Kubetool supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
+Before working with the cluster, you need to generate an ssh key. Kubemarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
 Example:
 ```
@@ -327,7 +327,7 @@ There are two major deployment schemes as follows:
 
 ### Non-HA Deployment Schemes
 
-This deployment provides a single Kubetools master.
+This deployment provides a single Kubemarine master.
 
 #### All-in-one Scheme
 
@@ -951,7 +951,7 @@ services:
 
 Before proceeding further, it is recommended to read the official Kubernetes Guide about the CPP deployment in the cluster at [https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/](https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/).
 
-**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubetools procedures for adding and removing nodes.
+**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubemarine procedures for adding and removing nodes.
 
 It is possible to specify a plugin at the installation stage, if it is required. To enable the CPP support, just specify the `external-cloud-volume-plugin` parameter of `controllerManager` in the `kubeadm` cluster configuration. For example:
 
@@ -969,7 +969,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -989,7 +989,7 @@ In this case, Kubetool automatically initializes and joins new cluster nodes wit
    /etc/kubernetes/cloud-config
    ```
 
-   It is recommended to use Kubetools functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
+   It is recommended to use Kubemarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
 
    ```yaml
    services:
@@ -998,7 +998,7 @@ In this case, Kubetool automatically initializes and joins new cluster nodes wit
          source: ./example/cloud-config.txt
    ```
 
-1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubetools plugin, for example:
+1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubemarine plugin, for example:
 
    Create a file `./openstack-cloud-controller-manager-ds.yaml` on deploy node with the following content:
 
@@ -1414,7 +1414,7 @@ services:
         - man_groff 
 ```
 
-If you need to disable AppArmor, you cannot do this using Kubetools. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
+If you need to disable AppArmor, you cannot do this using Kubemarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
 
 **Note**: After the installation of new repositories, the repodata is reloaded.
 
@@ -2012,7 +2012,7 @@ services:
 
 *Can restart service*: No
 
-*Overwrite files*: Yes, only when list of Kernel parameters changes: `/etc/sysctl.d/98-kubetools-sysctl.conf`, backup is created
+*Overwrite files*: Yes, only when list of Kernel parameters changes: `/etc/sysctl.d/98-kubemarine-sysctl.conf`, backup is created
 
 *OS specific*: No
 
@@ -2038,7 +2038,7 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
 
-**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubetools defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
+**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
 You can specify your own parameters instead of the standard parameters. You need to specify the parameter key and its value. If the value is empty, the key is ignored. For example:
 
@@ -3764,7 +3764,7 @@ For this procedure you must specify the following parameters:
 
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from kubetools container, note that kubetools container is shiped with ansible-2.9.9.
+**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with ansible-2.9.9.
 
 For example:
 
@@ -4110,7 +4110,7 @@ Be careful with the following parameters:
 
 # Installation Procedure
 
-The installation information for Kubetools is specified below.
+The installation information for Kubemarine is specified below.
 
 **Warning**: Running the installation on an already running cluster redeploys the cluster from scratch.
 
@@ -4173,7 +4173,7 @@ The following is the installation tasks tree:
 Full installation using CLI can be started with the following command:
 
 ```bash
-./kubetools install
+kubemarine install
 ```
 
 It begins the execution of all tasks available in the installer in accordance with its task tree.
@@ -4185,13 +4185,13 @@ It begins the execution of all tasks available in the installer in accordance wi
 If you are installing via CLI, you can specify the custom `cluster.yaml` location as follows:
 
 ```bash
-./kubetools install --config="${PATH_TO_CONFIG}/cluster.yaml"
+kubemarine install --config="${PATH_TO_CONFIG}/cluster.yaml"
 ```
 
 or shorter
 
 ```bash
-./kubetools install -c "${PATH_TO_CONFIG}/cluster.yaml"
+kubemarine install -c "${PATH_TO_CONFIG}/cluster.yaml"
 ```
 
 where, `${PATH_TO_CONFIG}` - is the path to the local inventory file.
@@ -4209,7 +4209,7 @@ It is possible to override the default installation tasks tree with `--tasks` ar
 The following is an example for CLI:
 
 ```bash
-./kubetools install --tasks="prepare.dns.etc_hosts,deploy"
+kubemarine install --tasks="prepare.dns.etc_hosts,deploy"
 ```
 
 For detailed tree of tasks, see [Installation Tasks Description](#installation-tasks-description).
@@ -4219,7 +4219,7 @@ If required, you can exclude some tasks from the execution in `--exclude` argume
 Example:
 
 ```bash
-./kubetools install --exclude="deploy.loadbalancer,deploy.kubernetes.install"
+kubemarine install --exclude="deploy.loadbalancer,deploy.kubernetes.install"
 ```
 
 The arguments can be combined. For example, when you only need to perform a deploy, but not touch the balancers.
@@ -4227,7 +4227,7 @@ The arguments can be combined. For example, when you only need to perform a depl
 Example:
 
 ```bash
-./kubetools install --tasks="deploy" --exclude="deploy.loadbalancer"
+kubemarine install --tasks="deploy" --exclude="deploy.loadbalancer"
 ```
 
 When you specify the name of the task, you can specify the following types:
@@ -4241,7 +4241,7 @@ When you specify the name of the task, you can specify the following types:
 You can also combine the types, specify both groups and tasks at the same time. For example:
 
 ```bash
-./kubetools install --tasks="prepare.system,prepare.dns.resolv_conf"
+kubemarine install --tasks="prepare.system,prepare.dns.resolv_conf"
 ```
 
 The Flow Filter filters everything and make a new execution tree, on which the
@@ -4270,8 +4270,8 @@ not need to consider the sequence for listing the tasks. You can do it in any se
 
 ## Logging
 
-Kubetools has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubetools Logging](Logging.md) section.
+Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
+For more information, refer to the [Configuring Kubemarine Logging](Logging.md) section.
 
 ## Dump Files
 
@@ -4379,7 +4379,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
+During perform of Kubemarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*
@@ -4396,22 +4396,22 @@ Ansible inventory file is available in the root directory of the distribution im
 
 If you want to generate only an inventory file, you must run the installer with the argument `--without-act`. For example:
 
-```
-$ ./kubetools install --without-act
+```bash
+kubemarine install --without-act
 ```
 
 You can specify custom path and name for the ansible inventory file, using the argument `--ansible-inventory-location`. By default, the file is saved to the executable directory with the name `ansible-inventory.ini`. For example:
 
-```
-$ ./kubetools install --ansible-inventory-location /var/data/ansible-inventory.ini
+```bash
+kubemarine install --ansible-inventory-location /var/data/ansible-inventory.ini
 ```
 
 **Warning**: Always specify the absolute path to the file, not relative.
 
 Arguments can be combined. For example the following arguments generate the inventory without starting the installation:
 
-```
-$ ./kubetools install --without-act --ansible-inventory-location /var/data/inventory.ini
+```bash
+kubemarine install --without-act --ansible-inventory-location /var/data/inventory.ini
 ```
 
 ### Contents

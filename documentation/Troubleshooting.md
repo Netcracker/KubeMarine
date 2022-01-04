@@ -1,4 +1,4 @@
-This section provides troubleshooting information for Kubetools and Kubernetes solutions.
+This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
 
 - [Trobleshooting Tools](#troubleshooting-tools)
   - [etcdctl script](#etcdctl-script)
@@ -8,14 +8,14 @@ This section provides troubleshooting information for Kubetools and Kubernetes s
   - [Packets between nodes in different networks are lost](#packets-between-nodes-in-different-networks-are-lost)
   - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
   - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
-- [Troubleshooting Kubetools](#troubleshooting-kubetools)
+- [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
   - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
 
 # Trobleshooting Tools
 
-This section describes the additional tools that Kubetool provides for convenient troubleshooting of various issues.
+This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
 
 ## etcdctl script
 
@@ -50,7 +50,7 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 # Troubleshooting Kubernetes Generic Issues
 
-This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubetools installation.
+This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubemarine installation.
 
 ## CoreDNS Responds with High Latency
 
@@ -210,9 +210,9 @@ Failed to defragment etcd member
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
 
-# Troubleshooting Kubetools
+# Troubleshooting Kubemarine
 
-This section provides troubleshooting information for Kubetools-specific or installation-specific issues.
+This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
 
 ## Failures During Kubernetes Upgrade Procedure
 
@@ -291,8 +291,8 @@ If everything is done correctly, all of your etcd customizations persist among K
 **Symptoms**: You expect Kubernetes to use a new repository during and after an upgrade, 
 but Kubernetes keeps using the old image repository. Kubernetes may fail to find images and the upgrade fails.
 
-**Root cause**: During an upgrade procedure, the kubeadm cluster configuration is not changed by `kubetool`, 
-particularly there is no way to change the Kubernetes image repository automatically during an upgrade using `kubetool`.
+**Root cause**: During an upgrade procedure, the kubeadm cluster configuration is not changed by `kubemarine`, 
+particularly there is no way to change the Kubernetes image repository automatically during an upgrade using `kubemarine`.
 
 **Solution**: You have to change the image repository manually in the kubeadm configuration and container runtime configuration. You have to modify `cluster.yaml` too.
 
@@ -403,7 +403,7 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
 
 ### Issues related to updating apt repositories list
  
-* In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubetools` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubetools` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
+* In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubemarine` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubemarine` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
     * You can find out the current status of `cloud-init` and wait on completion by using the command below:
     ```bash
     cloud-init status

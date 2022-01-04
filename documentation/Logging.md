@@ -1,4 +1,4 @@
-This section provides information about configuring the logging of Kubetools.
+This section provides information about configuring the logging of Kubemarine.
 
 - [Default Behavior](#default-behavior)
 - [Supported Parameters](#supported-parameters)
@@ -8,7 +8,7 @@ This section provides information about configuring the logging of Kubetools.
 
 # Default Behavior
 
-By default, Kubetools writes its logs into two locations with the following configurations:
+By default, Kubemarine writes its logs into two locations with the following configurations:
 
 * stdout - Debug level, colorize enabled, and correct newlines enabled.
 * `dump/debug.log` - Verbose level, colorize disabled, and correct newlines enabled.
@@ -20,7 +20,7 @@ It is possible to specify an unlimited number of logs - the logs are written to 
 For example:
 
 ```bash
-./kubetools install \
+kubemarine install \
 --log="example.log;level=verbose;colorize=false;correct_newlines=false;filemode=a" \
 --log="graylog;level=verbose;host=10.101.182.166;port=12201;type=tcp"
 ```
@@ -31,7 +31,7 @@ To configure the parameters in each case is described in the following sections.
 
 ## Output to Stdout
 
-By default, Kubetools already writes the logs to stdout, but this can be customized with the necessary parameters.
+By default, Kubemarine already writes the logs to stdout, but this can be customized with the necessary parameters.
 To do this, it is required to specify the special word `stdout` in the target and then list the following supported parameters:
 
 * level - The log output level. It determines which logs are displayed and which are not. The supported levels are: `verbose`, `debug`, `info`, `error`, and `critical`.
@@ -45,7 +45,7 @@ To do this, it is required to specify the special word `stdout` in the target an
 Example:
 
 ```bash
-./kubetools install \
+kubemarine install \
 --log="stdout;level=verbose;colorize=true;correct_newlines=true;format=%(asctime)s %(name)s %(levelname)s %(message)s;datefmt=%I:%M:%S"
 ```
 
@@ -53,7 +53,7 @@ Example:
 
 ## Output to File
 
-Kubetools allows you to output logs to a file. For this, the following parameters are supported:
+Kubemarine allows you to output logs to a file. For this, the following parameters are supported:
 
 * All parameters supported in the stdout output. 
 * filemode - It specifies the mode of working with the file. `w` - rewrites the file for every run, `a` - appends new content to the file for every run.
@@ -61,13 +61,13 @@ Kubetools allows you to output logs to a file. For this, the following parameter
 Example:
 
 ```bash
-./kubetools install \
+kubemarine install \
 --log="example.log;level=verbose;colorize=false;correct_newlines=false;filemode=a"
 ```
 
 ## Output to Graylog
 
-Kubetools allows you to output logs to Graylog. To do this, it is required to specify the special word `graylog` in the target and then list the following supported parameters:
+Kubemarine allows you to output logs to Graylog. To do this, it is required to specify the special word `graylog` in the target and then list the following supported parameters:
 
 * level - The log output level. It determines which logs are sent to Graylog.
 * host - The Graylog hostname to connect to.
@@ -77,6 +77,6 @@ Kubetools allows you to output logs to Graylog. To do this, it is required to sp
 Example:
 
 ```bash
-./kubetools install \
+kubemarine install \
 --log="graylog;level=verbose;host=10.101.182.166;port=12201;type=tcp"
 ```
