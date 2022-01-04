@@ -226,9 +226,14 @@ def detect_os_family(cluster, suppress_exceptions=False):
     return results
 
 
-def get_os_family(cluster):
+def get_os_family(cluster: KubernetesCluster) -> str:
+    """
+    Detects OS on remote hosts and returns common OS family name. If OS already detected, returns data from cache.
+    :param cluster: Cluster object where OS family will be detected.
+    :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
+    """
     if not is_os_detected(cluster):
-        detect_os_family(cluster)
+        detect_os_family(cluster, suppress_exceptions=True)
     return cluster.context.get("os")
 
 
