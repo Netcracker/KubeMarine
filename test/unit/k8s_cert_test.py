@@ -1,4 +1,4 @@
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import unittest
 
-from kubetool import k8s_certs
+from kubemarine import k8s_certs
 
 
 class K8sCertTest(unittest.TestCase):
