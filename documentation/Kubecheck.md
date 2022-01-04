@@ -97,12 +97,12 @@ The final report is generated in a file. For more information, see [Report File 
 Check procedure execution form CLI can be started with the following command:
 
 ```bash
-./kubetools check %{CHECK_TYPE}
-./kubetools check iaas
-./kubetools check paas
+kubemarine check %{CHECK_TYPE}
+kubemarine check iaas
+kubemarine check paas
 ```
 
-It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubetools Installation Procedure_.
+It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubemarine Installation Procedure_.
 
 ### Check Procedures
 
@@ -275,7 +275,7 @@ This test checks if necessary ports are opened on the nodes.
 
 #### PAAS Procedure
 
-The PAAS procedure verifies the platform solution. For example, it checks the health of a cluster or service statuses on nodes. This test checks the already configured environment. All services and the Kubernetes cluster must be installed and should be in working condition. Apart from the environment installed and configured by Kubetools, the test can check other environments too.
+The PAAS procedure verifies the platform solution. For example, it checks the health of a cluster or service statuses on nodes. This test checks the already configured environment. All services and the Kubernetes cluster must be installed and should be in working condition. Apart from the environment installed and configured by Kubemarine, the test can check other environments too.
 
 The task tree is as follows:
 
@@ -436,33 +436,33 @@ This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
 
 ###### 213 Selinux security policy
 
-*Task*: `kubetool.procedures.check_paas.verify_selinux_status`
+*Task*: `kubemarine.procedures.check_paas.verify_selinux_status`
 
 The test checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must be explicitly specified
 in the inventory. Otherwise, the test will fail. This test is applicable only for systems of the RHEL family.
 
 ###### 214 Selinux configuration
 
-*Task*: `kubetool.procedures.check_paas.verify_selinux_config`
+*Task*: `kubemarine.procedures.check_paas.verify_selinux_config`
 
 The test compares the configuration of Selinux on the nodes with the configuration specified in the inventory or with the
 one by default. If the configuration does not match, the test will fail.
 
 ###### 215 Firewalld status
 
-*Task*: `kubetool.procedures.check_paas.verify_firewalld_status`
+*Task*: `kubemarine.procedures.check_paas.verify_firewalld_status`
 
 The test verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
 
 ###### 216 Swap state
 
-*Task*: `kubetool.procedures.check_paas.verify_swap_state`
+*Task*: `kubemarine.procedures.check_paas.verify_swap_state`
 
 The test verifies that swap is disabled on all nodes in the cluster, otherwise the test will fail.
 
 ###### 217 Modprobe rules
 
-*Task*: `kubetool.procedures.check_paas.verify_modprobe_rules`
+*Task*: `kubemarine.procedures.check_paas.verify_modprobe_rules`
 
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.

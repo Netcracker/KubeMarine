@@ -16,8 +16,8 @@
 
 import unittest
 
-from kubetool.core import defaults
-from kubetool import demo
+from kubemarine.core import defaults
+from kubemarine import demo
 
 
 class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):

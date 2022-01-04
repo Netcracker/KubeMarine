@@ -19,8 +19,8 @@ import random
 
 import fabric
 
-from kubetool import demo
-from kubetool.demo import FakeKubernetesCluster
+from kubemarine import demo
+from kubemarine.demo import FakeKubernetesCluster
 
 
 class TestGroupCreation(unittest.TestCase):

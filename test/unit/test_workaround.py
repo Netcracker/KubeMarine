@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubetool import demo
+from kubemarine import demo
 from paramiko.ssh_exception import SSHException
 
 ETCD_LEADER_CHANGED_MESSAGE = 'Error from server: rpc error: code = Unavailable desc = etcdserver: leader changed'

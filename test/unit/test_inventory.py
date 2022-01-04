@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubetool import demo
+from kubemarine import demo
 
 
 class TestInventoryValidation(unittest.TestCase):

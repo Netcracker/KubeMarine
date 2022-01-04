@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubetool import demo, keepalived
+from kubemarine import demo, keepalived
 
 
 class TestKeepalivedDefaultsEnrichment(unittest.TestCase):

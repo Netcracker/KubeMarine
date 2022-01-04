@@ -17,7 +17,7 @@
 import io
 import unittest
 
-from kubetool import demo, system
+from kubemarine import demo, system
 
 
 class TestInventoryGenerator(unittest.TestCase):

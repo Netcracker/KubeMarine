@@ -14,8 +14,8 @@
 
 import unittest
 
-from kubetool import demo
-from kubetool.plugins import verify_template, apply_template
+from kubemarine import demo
+from kubemarine.plugins import verify_template, apply_template
 
 
 class TestTemplate(unittest.TestCase):

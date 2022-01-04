@@ -18,8 +18,8 @@ import unittest
 
 import fabric
 
-from kubetool import demo, audit
-from kubetool.core.group import NodeGroupResult
+from kubemarine import demo, audit
+from kubemarine.core.group import NodeGroupResult
 
 
 class NodeGroupResultsTest(unittest.TestCase):

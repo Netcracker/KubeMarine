@@ -14,7 +14,7 @@
 
 import unittest
 
-from kubetool import k8s_certs
+from kubemarine import k8s_certs
 
 
 class K8sCertTest(unittest.TestCase):

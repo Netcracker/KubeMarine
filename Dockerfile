@@ -7,14 +7,16 @@ ARG BUILD_TYPE
 
 USER root
 
+ENV PYTHONUNBUFFERED 1
+
 # Used in Ansible plugin. See Ansible documentation for more details
 ENV ANSIBLE_HOST_KEY_CHECKING False
 
-COPY . /opt/kubetools/
-WORKDIR /opt/kubetools/
+COPY . /opt/kubemarine/
+WORKDIR /opt/kubemarine/
 
 RUN apt update && apt install -y wget && \
-    pip3 install --no-cache-dir -r /opt/kubetools/requirements.txt && \
+    pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt && \
     if [ "$BUILD_TYPE" = "binary" ]; then \
       apt install -y zlib1g-dev upx-ucl binutils; \
       pip3 install --no-cache-dir pyinstaller;  \
@@ -27,4 +29,4 @@ RUN apt update && apt install -y wget && \
     rm -f /etc/apt/sources.list && \
     rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/bin/bash", "/opt/kubetools/kubetools"]
+ENTRYPOINT ["python3", "-m" "kubemarine"]

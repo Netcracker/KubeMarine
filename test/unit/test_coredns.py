@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubetool import coredns, system, demo
+from kubemarine import coredns, system, demo
 
 
 class CorednsDefaultsEnrichment(unittest.TestCase):
