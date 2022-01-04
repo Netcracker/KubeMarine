@@ -7,7 +7,7 @@ on:
       - 'main'
       - 'rebranding'
 env:
-  TAG_NAME: ${{ github.event.release.tag_name || (github.ref == 'refs/heads/main' && 'main') || 'rebranding' }}
+  TAG_NAME: ${{ github.event.release.tag_name || (github.ref == 'refs/heads/main' && 'main') || 'unknown' }}
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
