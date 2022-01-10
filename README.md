@@ -123,9 +123,11 @@ Also check out the following inventory examples we have prepared:
 - [procedure.yaml](examples/procedure.yaml)
 
 ## Issues, Questions
-If you have any problems while working with Kubemarine, feel free to open us a [new issue](https://github.com/netcracker-technology/kubemarine/issues) or even [PR](https://github.com/netcracker-technology/kubemarine/pulls) with related changes.
-Follow the process outlined in the Stack Overflow [MCVE](https://stackoverflow.com/help/mcve) document and provide reproducible example.
+If you have any problems while working with Kubemarine, feel free to open us a [new issue](https://github.com/netcracker/kubemarine/issues) or even
+[PR](https://github.com/netcracker/kubemarine/pulls) with related changes.
+Please follow the [Contribution Guide](CONTRIBUTING.md ) and the process outlined in the Stack Overflow [MCVE](https://stackoverflow.com/help/mcve) document.
 
+In case security concern [Security Reporting Process](SECURITY.md)
 ## Changelog
 Detailed changes for each release are documented in the [release notes](https://github.com/netcracker-technology/kubemarine/releases).
 
