@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ import unittest
 import ast
 from unittest import mock
 
-from kubetool.core import flow
-from kubetool import demo
+from kubemarine.core import flow
+from kubemarine import demo
 
 test_msg = "test_function_return_result"
 
@@ -122,7 +122,7 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"], "Here should be 4 calls of test_func for: \
          deploy.loadbalancer.haproxy, deploy.loadbalancer.keepalived, deploy.accounts, overview.")
 
-    @mock.patch('kubetool.core.flow.load_inventory', return_value=demo.new_cluster(demo.generate_inventory(**demo.FULLHA)))
+    @mock.patch('kubemarine.core.flow.load_inventory', return_value=demo.new_cluster(demo.generate_inventory(**demo.FULLHA)))
     def test_run(self, patched_func):
         test_tasks = ["deploy.loadbalancer.haproxy"]
         args = flow.new_parser("Help text").parse_args(['-v'])

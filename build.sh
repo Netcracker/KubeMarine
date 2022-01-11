@@ -2,10 +2,10 @@
 
 cd "$(dirname "$0")" || exit 1
 
-NAME=${NAME:-kubetools}
+NAME=${NAME:-kubemarine}
 
 if [[ -n "${LOCATION}" ]]; then
-  sed -i "s|non-release version|version ${LOCATION} build $(date +"%D %T")|g" "kubetool/__main__.py"
+  sed -i "s|non-release version|version ${LOCATION} build $(date +"%D %T")|g" "kubemarine/__main__.py"
 fi
 
 rm -rf build.sh documentation examples CONTRIBUTING.md .git
@@ -16,4 +16,4 @@ for id in $DOCKER_NAMES; do
     docker tag "${NAME}" "$id"
 done
 
-chmod +x kubetools
+chmod +x kubemarine
