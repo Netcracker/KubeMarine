@@ -20,7 +20,7 @@ RUN apt update && apt install -y wget && \
     if [ "$BUILD_TYPE" = "binary" ]; then \
       apt install -y zlib1g-dev upx-ucl binutils; \
       pip3 install --no-cache-dir pyinstaller;  \
-      pyinstaller main.spec --noconfirm;  \
+      pyinstaller kubemarine.spec --noconfirm;  \
     else \
       wget -O - https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1 && \
       [ "$BUILD_TYPE" = "test" ] && pip3 install  --no-cache-dir pytest pylint coverage || true; fi && \
