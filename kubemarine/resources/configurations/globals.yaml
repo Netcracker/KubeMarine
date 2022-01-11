@@ -276,7 +276,7 @@ compatibility_map:
       v1.22.2:
         sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
       v1.23.1:
-        sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
+        sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
     kubelet:
       v1.20.2:
         sha1: 25ca655cce261cdbeb7c3337185f669ee0b53cc3
@@ -289,7 +289,7 @@ compatibility_map:
       v1.22.2:
         sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
       v1.23.1:
-        sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
+        sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
     kubectl:
       v1.20.2:
         sha1: 202e00c35fa2a4085135061e5d0965ebbffed19c
@@ -302,7 +302,7 @@ compatibility_map:
       v1.22.2:
         sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
       v1.23.1:
-        sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
+        sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
     calico:
       v1.20:
         version: v3.19.1
@@ -314,24 +314,24 @@ compatibility_map:
         version: v3.20.1
         sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
       v1.23:
-        version: v3.20.1
+        version: v3.21.2
         sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
     nginx-ingress-controller:
       v1.20:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
       v1.21:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
       v1.23:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
       v1.20:
