@@ -127,7 +127,7 @@ If you have any problems while working with Kubemarine, feel free to open us a [
 [PR](https://github.com/netcracker/kubemarine/pulls) with related changes.
 Please follow the [Contribution Guide](CONTRIBUTING.md ) and the process outlined in the Stack Overflow [MCVE](https://stackoverflow.com/help/mcve) document.
 
-In case security concern [Security Reporting Process](SECURITY.md)
+In case of security concerns, please follow [Security Reporting Process](SECURITY.md)
 ## Changelog
 Detailed changes for each release are documented in the [release notes](https://github.com/netcracker-technology/kubemarine/releases).
 
