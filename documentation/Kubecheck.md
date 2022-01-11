@@ -41,7 +41,7 @@ This section provides information about the Kubecheck functionality.
     - [210 Nodes Condition](#210-nodes-condition)
       - [210 Nodes Condition - NetworkUnavailable](#210-nodes-condition-networkunavailable)
       - [210 Nodes Condition - MemoryPressure](#210-nodes-condition-memorypressure)
-      - [210 Nodes Condition - DiskPressure](#210-nodes-condixtion-diskpressure)
+      - [210 Nodes Condition - DiskPressure](#210-nodes-condition-diskpressure)
       - [210 Nodes Condition - PIDPressure](#210-nodes-condition-pidpressure)
       - [210 Nodes Condition - Ready](#210-nodes-condition-ready)
     - [213 Selinux security policy](#213-selinux-security-policy)
@@ -98,12 +98,12 @@ The final report is generated in a file. For more information, see [Report File 
 Check procedure execution form CLI can be started with the following command:
 
 ```bash
-./kubetools check %{CHECK_TYPE}
-./kubetools check iaas
-./kubetools check paas
+kubemarine check %{CHECK_TYPE}
+kubemarine check iaas
+kubemarine check paas
 ```
 
-It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubetools Installation Procedure_.
+It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubemarine Installation Procedure_.
 
 ### Check Procedures
 
@@ -276,7 +276,7 @@ This test checks if necessary ports are opened on the nodes.
 
 #### PAAS Procedure
 
-The PAAS procedure verifies the platform solution. For example, it checks the health of a cluster or service statuses on nodes. This test checks the already configured environment. All services and the Kubernetes cluster must be installed and should be in working condition. Apart from the environment installed and configured by Kubetools, the test can check other environments too.
+The PAAS procedure verifies the platform solution. For example, it checks the health of a cluster or service statuses on nodes. This test checks the already configured environment. All services and the Kubernetes cluster must be installed and should be in working condition. Apart from the environment installed and configured by Kubemarine, the test can check other environments too.
 
 The task tree is as follows:
 
@@ -481,7 +481,6 @@ Maximum limit value: 15000ms
 between the deployer node and all the others, or any other conditions of the environment. It is also recommended to be 
 sure to perform latency tests: [002 Latency - Single Thread](#002-latency---single-thread) and 
 [003 Latency - Multi Thread](#003-latency---multi-thread).
-
 
 
 ### Report File Generation

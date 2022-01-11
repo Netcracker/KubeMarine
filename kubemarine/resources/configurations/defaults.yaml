@@ -1,0 +1,574 @@
+vrrp_ips: []
+
+node_defaults: {}
+
+nodes: []
+
+public_cluster_ip: '{{ control_plain["external"] }}'
+
+services:
+  kubeadm_kubelet:
+    apiVersion: kubelet.config.k8s.io/v1beta1
+    kind: KubeletConfiguration
+    readOnlyPort: 0
+    protectKernelDefaults: true
+    podPidsLimit: 4096
+    cgroupDriver: systemd
+  kubeadm:
+    apiVersion: kubeadm.k8s.io/v1beta2
+    kind: ClusterConfiguration
+    kubernetesVersion: v1.22.2
+    controlPlaneEndpoint: '{{ cluster_name }}:6443'
+    networking:
+      podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/80{% endif %}'
+      serviceSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}172.30.0.0/16{% else %}fd03::/112{% endif %}'
+    apiServer:
+      certSANs: []
+      extraArgs:
+        enable-admission-plugins: NodeRestriction
+        profiling: "false"
+        audit-log-path: /var/log/audit.log
+        audit-log-maxage: "30"
+        audit-log-maxbackup: "10"
+        audit-log-maxsize: "100"
+    scheduler:
+      extraArgs:
+        profiling: "false"
+    controllerManager:
+      extraArgs:
+        profiling: "false"
+        terminated-pod-gc-threshold: "1000"
+
+  ntp:
+    chrony:
+      makestep: 5 -1
+      rtcsync: True
+    timesyncd:
+      Time:
+        RootDistanceMaxSec: 5
+        PollIntervalMinSec: 32
+        PollIntervalMaxSec: 2048
+
+  kernel_security:
+    selinux:
+      state: enforcing
+      policy: targeted
+      permissive:
+        - haproxy_t
+        - container_t
+        - keepalived_t
+
+  thirdparties:
+    /usr/bin/etcdctl:
+      source: 'resources/scripts/etcdctl.sh'
+      group: master
+      binary: false
+    /usr/bin/kubeadm:
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
+      sha1: '{{ globals.compatibility_map.software.kubeadm[services.kubeadm.kubernetesVersion].sha1 }}'
+    /usr/bin/kubelet:
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
+      sha1: '{{ globals.compatibility_map.software.kubelet[services.kubeadm.kubernetesVersion].sha1 }}'
+    /usr/bin/kubectl:
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
+      sha1: '{{ globals.compatibility_map.software.kubectl[services.kubeadm.kubernetesVersion].sha1 }}'
+      group: master
+    /usr/bin/calicoctl:
+      source: 'https://github.com/projectcalico/calicoctl/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
+      sha1: '{{ globals.compatibility_map.software.calico[services.kubeadm.kubernetesVersion|minorversion].sha1 }}'
+      group: master
+    # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
+    /usr/bin/crictl.tar.gz:
+      source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
+      sha1: '{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].sha1 }}'
+      unpack: /usr/bin/
+
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      version: 2
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
+        runtime_type: "io.containerd.runc.v2"
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
+        SystemdCgroup: '{% if services.kubeadm_kubelet.cgroupDriver == "systemd" %}true{% else %}false{% endif %}'
+    dockerConfig:
+      ipv6: False
+      log-driver: json-file
+      log-opts:
+        max-size: 64m
+        max-file: "3"
+      exec-opts:
+        - native.cgroupdriver=systemd
+      icc: False
+      live-restore: True
+      userland-proxy: False
+
+  modprobe:
+    - br_netfilter
+    - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
+    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack_ipv6{% endif %}'
+    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat_masquerade_ipv6{% endif %}'
+    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
+    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
+
+  sysctl:
+    net.bridge.bridge-nf-call-iptables: 1
+    net.ipv4.ip_forward: 1
+    net.ipv4.ip_nonlocal_bind: 1
+    net.ipv4.conf.all.route_localnet: 1
+    net.bridge.bridge-nf-call-ip6tables: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
+    net.ipv6.conf.all.forwarding: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
+    net.ipv6.ip_nonlocal_bind: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
+    kernel.panic: 10
+    vm.overcommit_memory: 1
+    kernel.panic_on_oops: 1
+
+  etc_hosts:
+    127.0.0.1:
+      - localhost
+      - localhost.localdomain
+    '::1':
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost.localdomain{% endif %}'
+
+  audit:
+    rules:
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.service -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/lib/systemd/system/docker.socket -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/default/docker -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker/daemon.json -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/sbin/runc -k docker{% endif %}'
+      - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /usr/bin/dockerd -k docker{% endif %}'
+      - '-w /usr/bin/containerd -k docker'
+
+  coredns:
+    deployment:
+      spec:
+        template:
+          spec:
+            volumes:
+            - configMap:
+                defaultMode: 420
+                items:
+                - key: Corefile
+                  path: Corefile
+                - key: Hosts
+                  path: Hosts
+                name: coredns
+              name: config-volume
+            nodeSelector:
+              node-role.kubernetes.io/worker: worker
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                - podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                      - key: k8s-app
+                        operator: In
+                        values:
+                        - kube-dns
+                    topologyKey: kubernetes.io/hostname
+                  weight: 100
+    configmap:
+      Corefile:
+        '.:53':
+          errors: True
+          health: True
+          ready: True
+          prometheus: :9153
+          cache: 30
+          loop: True
+          reload: True
+          loadbalance: True
+          hosts:
+            default:
+              priority: 1
+              file: /etc/coredns/Hosts
+              data:
+                fallthrough: ''
+          kubernetes:
+            default:
+              priority: 1
+              zone:
+                - cluster.local
+                - in-addr.arpa
+                - ip6.arpa
+              data:
+                pods: insecure
+                fallthrough:
+                  - in-addr.arpa
+                  - ip6.arpa
+                ttl: 5
+          template:
+            default:
+              priority: 1
+              class: IN
+              type: A
+              zone: '{{ cluster_name }}'
+              data:
+                match: '^(.*\.)?{{ cluster_name }}\.$'
+                answer: '{% raw %}{{ .Name }}{% endraw %} 3600 IN A {{ control_plain["internal"] }}'
+            reject-aaaa:
+              enabled: '{{ nodes[0]["internal_address"]|isipv4 }}'
+              priority: 999
+              class: IN
+              type: AAAA
+              data:
+                authority: '{% raw %}{{ .Name }}{% endraw %} 3600 IN SOA coredns.kube-system.svc.cluster.local. hostmaster.coredns.kube-system.svc.cluster.local. (3600 3600 3600 3600 3600)'
+          forward:
+            - .
+            - /etc/resolv.conf
+
+  loadbalancer:
+    haproxy:
+      config:
+        defaults:
+          timeout_connect: '10s'
+          timeout_client: '1m'
+          timeout_server: '1m'
+          timeout_tunnel: '60m'
+          timeout_client_fin: '1m'
+          maxconn: 10000
+
+  packages:
+    package_manager:
+      replace-repositories: false
+    associations:
+      debian:
+        docker:
+          executable_name: 'docker'
+          package_name:
+            - 'docker-ce={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
+            - 'docker-ce-cli={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
+            - 'containerd.io={{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_debian }}'
+          service_name: 'docker'
+          config_location: '/etc/docker/daemon.json'
+        containerd:
+          executable_name: 'containerd'
+          package_name:
+            - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
+            - 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
+          service_name: 'containerd'
+          config_location: '/etc/containerd/config.toml'
+        haproxy:
+          executable_name: '/usr/sbin/haproxy'
+          package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
+          service_name: 'haproxy'
+          config_location: '/etc/haproxy/haproxy.cfg'
+        keepalived:
+          executable_name: 'keepalived'
+          package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
+          service_name: 'keepalived'
+          config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
+      rhel:
+        docker:
+          executable_name: 'docker'
+          package_name:
+            - 'docker-ce-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}'
+            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}'
+          service_name: 'docker'
+          config_location: '/etc/docker/daemon.json'
+        containerd:
+          executable_name: 'containerd'
+          package_name:
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}'
+            - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel }}'
+          service_name: 'containerd'
+          config_location: '/etc/containerd/config.toml'
+        haproxy:
+          executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
+          package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel }}'
+          service_name: 'rh-haproxy18-haproxy'
+          config_location: '/etc/haproxy/haproxy.cfg'
+        keepalived:
+          executable_name: 'keepalived'
+          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
+          service_name: 'keepalived'
+          config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
+      rhel8:
+        docker:
+          executable_name: 'docker'
+          package_name:
+            - 'docker-ce-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          service_name: 'docker'
+          config_location: '/etc/docker/daemon.json'
+        containerd:
+          executable_name: 'containerd'
+          package_name:
+            - 'containerd-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          service_name: 'containerd'
+          config_location: '/etc/containerd/config.toml'
+        haproxy:
+          executable_name: '/usr/sbin/haproxy'
+          package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          service_name: 'haproxy'
+          config_location: '/etc/haproxy/haproxy.cfg'
+        keepalived:
+          executable_name: 'keepalived'
+          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          service_name: 'keepalived'
+          config_location: '/etc/keepalived/keepalived.conf'
+        audit:
+          executable_name: 'auditctl'
+          package_name: 'auditd'
+          service_name: 'auditd'
+          config_location: '/etc/audit/rules.d/predefined.rules'
+ 
+
+plugin_defaults:
+  installation: {}
+
+plugins:
+
+  calico:
+    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    installation:
+      priority: 0
+      procedures:
+        - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
+        - expect:
+            pods:
+              - coredns
+              - calico-kube-controllers
+              - calico-node
+        - thirdparty: /usr/bin/calicoctl
+        - shell:
+            command: mkdir -p /etc/calico
+            groups: ['master']
+            sudo: true
+        - template:
+            source: templates/plugins/calicoctl.cfg.j2
+            destination: /etc/calico/calicoctl.cfg
+            apply_required: false
+        - template:
+            source: templates/plugins/calico-ippool.yaml.j2
+            destination: /etc/calico/ippool.yaml
+            apply_command: 'calicoctl apply -f /etc/calico/ippool.yaml'
+    mode: ipip
+    crossSubnet: true
+    natOutgoing: true
+    mtu: 1440
+    typha:
+      enabled: false
+      replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'
+      image: 'calico/typha:{{ plugins.calico.version }}'
+      nodeSelector:
+        kubernetes.io/os: linux
+    env:
+      DATASTORE_TYPE: kubernetes
+      WAIT_FOR_DATASTORE: true
+      CLUSTER_TYPE: k8s,bgp
+      CALICO_ROUTER_ID: ''
+      IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
+      IP_AUTODETECTION_METHOD: first-found
+      CALICO_IPV4POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
+      CALICO_IPV4POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
+      CALICO_IPV4POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv4"]["ipv4_pools"][0] }}'
+      CALICO_IPV6POOL_CIDR: '{{ plugins["calico"]["cni"]["ipam"]["ipv6"]["ipv6_pools"][0] }}'
+      IP6: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
+      IP6_AUTODETECTION_METHOD: first-found
+      FELIX_IPV6SUPPORT: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
+      CALICO_IPV6POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
+      CALICO_IPV6POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
+      CALICO_DISABLE_FILE_LOGGING: true
+      FELIX_DEFAULTENDPOINTTOHOSTACTION: ACCEPT
+      FELIX_LOGSEVERITYSCREEN: info
+      FELIX_HEALTHENABLED: true
+    cni:
+      image: 'calico/cni:{{ plugins.calico.version }}'
+      ipam:
+        ipv4:
+          assign_ipv4: 'true'
+          ipv4_pools:
+            - '{% if services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}192.168.0.0/16{% endif %}'
+            - default-ipv4-ippool
+          type: calico-ipam
+        ipv6:
+          assign_ipv4: 'false'
+          assign_ipv6: 'true'
+          ipv6_pools:
+            - '{% if not services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}fd02::/80{% endif %}'
+            - default-ipv6-ippool
+          type: calico-ipam
+    node:
+      image: 'calico/node:{{ plugins.calico.version }}'
+    kube-controllers:
+      image: 'calico/kube-controllers:{{ plugins.calico.version }}'
+      nodeSelector:
+        kubernetes.io/os: linux
+    flexvol:
+      image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
+
+  flannel:
+    installation:
+      priority: 0
+      procedures:
+        - template: templates/plugins/flannel.yaml.j2
+        - expect:
+            pods:
+              - coredns
+              - kube-flannel-ds-amd64
+    image: quay.io/coreos/flannel:v0.11.0-amd64
+
+  nginx-ingress-controller:
+    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    install: true
+    installation:
+      registry: k8s.gcr.io
+      priority: 1
+      procedures:
+        - python:
+            module: plugins/nginx_ingress.py
+            method: manage_custom_certificate
+        - template: 'templates/plugins/nginx-ingress-controller-{{ plugins["nginx-ingress-controller"].version|minorversion }}.yaml.j2'
+        - expect:
+            pods:
+              - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
+    controller:
+      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["image-name"] }}:{{ plugins["nginx-ingress-controller"].version }}'
+      ssl:
+        enableSslPassthrough: false
+      nodeSelector:
+        kubernetes.io/os: linux
+    ports:
+      - name: http
+        containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - name: https
+        containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      - name: prometheus
+        containerPort: 10254
+        protocol: TCP
+
+  # TODO: support hostPort for haproxy-ingress
+  haproxy-ingress-controller:
+    install: false
+    installation:
+      priority: 1
+      procedures:
+        - template: templates/plugins/haproxy-ingress-controller.yaml.j2
+        - expect:
+            pods:
+              - haproxy-ingress
+        - python:
+            module: plugins/haproxy_ingress.py
+            method: override_priviledged_ports
+            arguments:
+              service: haproxy-ingress
+              namespace: haproxy-controller
+    controller:
+      image: haproxytech/kubernetes-ingress:1.2.7
+      nodeSelector:
+        kubernetes.io/os: linux
+    backend:
+      image: k8s.gcr.io/defaultbackend:1.0
+      nodeSelector:
+        kubernetes.io/os: linux
+
+  kubernetes-dashboard:
+    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    install: false
+    installation:
+      priority: 2
+      procedures:
+        - template: 'templates/plugins/dashboard-{{ plugins["kubernetes-dashboard"].version|minorversion }}.yaml.j2'
+        - expect:
+            pods:
+              - kubernetes-dashboard
+              - dashboard-metrics-scraper
+        - template: templates/plugins/dashboard-ingress.yaml.j2
+    hostname: 'dashboard.{{ cluster_name }}'
+    dashboard:
+      image: 'kubernetesui/dashboard:{{ plugins["kubernetes-dashboard"].version }}'
+      nodeSelector:
+        kubernetes.io/os: linux
+    metrics-scraper:
+      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion]["metrics-scraper-version"] }}'
+      nodeSelector:
+        kubernetes.io/os: linux
+    ingress:
+      metadata:
+        name: kubernetes-dashboard
+        namespace: kubernetes-dashboard
+        annotations:
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      spec:
+        ingressClassName: nginx
+        tls:
+          # this section enables tls and ssl-redirect for dashboard
+          # since certificate is not provided here, default controller certificate will be used
+          - hosts:
+            - '{{ plugins["kubernetes-dashboard"].hostname }}'
+        rules:
+          - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
+
+  local-path-provisioner:
+    install: false
+    installation:
+      priority: 2
+      procedures:
+      - template: 'templates/plugins/local-path-provisioner.yaml.j2'
+      - expect:
+          pods:
+            - local-path-provisioner
+    storage-class:
+      name: local-path
+      is-default: "false"
+    volume-dir: /opt/local-path-provisioner
+    image: rancher/local-path-provisioner:v0.0.20
+    helper-pod-image: library/busybox:1.34.1
+
+rbac:
+  account_defaults:
+    namespace: kube-system
+    configs:
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata: {}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata: {}
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+        subjects:
+          - kind: ServiceAccount
+  psp:
+    pod-security: enabled
+    oob-policies:
+      default: enabled
+      host-network: enabled
+      anyuid: enabled
+    custom-policies:
+      psp-list: []
+      roles-list: []
+      bindings-list: []

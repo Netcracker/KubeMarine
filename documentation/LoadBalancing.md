@@ -4,7 +4,7 @@ The following functions are installed in this section.
 
 - [TLS Termination on Nginx Ingress Controller](#tls-termination-on-nginx-ingress-controller)
   - [How to Install](#how-to-install)
-  - [Using Kubetool-provided TCP Load Balancer](#using-kubetool-provided-tcp-load-balancer)
+  - [Using Kubemarine-provided TCP Load Balancer](#using-kubemarine-provided-tcp-load-balancer)
   - [Using Custom TCP Load Balancer](#using-custom-tcp-load-balancer)
 - [Advanced Load Balancing Techniques](#advanced-load-balancing-techniques)
   - [Allow and Deny Lists](#allow-and-deny-lists)
@@ -12,7 +12,7 @@ The following functions are installed in this section.
 
 ## TLS Termination on Nginx Ingress Controller
 
-This is the default recommended approach to the TLS termination on kubetool-installed environments. This approach is applicable when MTLS is not used in kubernetes and all communications between the pods are over plain HTTP.
+This is the default recommended approach to the TLS termination on kubemarine-installed environments. This approach is applicable when MTLS is not used in kubernetes and all communications between the pods are over plain HTTP.
 A high-level overview of this approach is shown in the following image.
 
 ![](/documentation/images/tls-termination-nginx.png)
@@ -43,9 +43,9 @@ This can be done during:
 
 **Important**: The default certificate should be issued to wildcard hostnames, so that it can be used for all ingresses.
 
-### Using Kubetool-provided TCP Load Balancer
+### Using Kubemarine-provided TCP Load Balancer
 
-Using kubetool you can install and configure HAProxy TCP load balancers in the HA mode using VRRP.
+Using kubemarine you can install and configure HAProxy TCP load balancers in the HA mode using VRRP.
 To do so, assign a `balancer` role to the hosts where HAProxy and Keepalived should be installed.
 For more information, refer to the [`nodes` Installation Section](/documentation/Installation.md#nodes).
 For instructions on how to configure VRRP IPs for balancer nodes, refer to the [`vrrp_ips` Installation Section](/documentation/Installation.md#vrrp_ips).
@@ -53,10 +53,10 @@ For load balancer nodes' hardware requirements, refer to [Minimal Hardware Requi
 
 ### Using Custom TCP Load Balancer
 
-You can also use your own TCP load balancer instead of kubetool-provided HAProxy.
+You can also use your own TCP load balancer instead of kubemarine-provided HAProxy.
 In this case, your custom TCP load balancer should meet the following requirements:
 
-* The load balancer should be fully configured and working before running the cluster installation using kubetool.
+* The load balancer should be fully configured and working before running the cluster installation using kubemarine.
 * The load balancer's internal and external VRRP IP addresses should be specified in `cluster.yaml`. For more information, refer to the [`control_plain` Installation Section](/documentation/Installation.md#control_plain).
 * The load balancer should be an L4 pass-through TCP load balancer, without TLS termination.
 * The load balancer should be Highly Available.

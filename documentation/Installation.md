@@ -5,6 +5,7 @@ This section provides information about the inventory, features, and steps for i
   - [Prerequisites for Cluster Nodes](#prerequisites-for-cluster-nodes)
     - [Minimal Hardware Requirements](#minimal-hardware-requirements)
     - [Recommended Hardware Requirements](#recommended-hardware-requirements)
+    - [Disk Partitioning Recommendation](#disk-partitioning-recommendation)
     - [ETCD Recommendation](#etcd-recommendation)
     - [SSH key Recommendation](#ssh-key-recommendation)
 - [Inventory Preparation](#inventory-preparation)
@@ -102,7 +103,7 @@ This section provides information about the inventory, features, and steps for i
 
 # Prerequisites
 
-The technical requirements for all types of host VMs for Kubetools installation are specified in this section.
+The technical requirements for all types of host VMs for Kubemarine installation are specified in this section.
 
 ## Prerequisites for Deployment Node
 
@@ -154,7 +155,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 20.04
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found at [global.yaml configuration](../kubetool/resources/configurations/globals.yaml#L335).
+The actual information about the supported versions can be found at [global.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L335).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -178,7 +179,7 @@ The actual information about the supported versions can be found at [global.yaml
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `Kubetools` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
+**Warning**: `Kubemarine` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
 
@@ -270,9 +271,33 @@ The recommended hardware requirements are as follows:
 * 16GB RAM
 * 120GB HDD
 
+### Disk Partitioning Recommendation
+
+Kubernetes clusters use the following important folders:
+
+**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
+For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation) section.
+
+**/var/lib/containerd** - It is a working directory of containerd, and is used for active container runtimes and storage of local images. 
+For master nodes, it should be at least 20 GB, whereas, for worker nodes, it should be 50 GB or more, depending on the application requirements.
+
+**/var/lib/kubelet** - It is a working directory for kubelet. It includes kubelet's configuration files, pods runtime data, environment variables, kube secrets, emptyDirs and data volumes not backed by persistent storage PVs. Its size varies depending on the running applications.
+
+**/var/log** - It is used for logs from all Linux subsystems (logs of pods are located there too). The recommended size is 10 to 30 GB or more, depending on the logrotation policy. Also, the logrotation should be configured properly to avoid a disk overflow.
+
+#### Disk Pressure
+
+To detect DiskPressure events for nodes, Kubernetes controls the `nodefs` and `imagefs` file system partitions.
+The `nodefs` (or `rootfs`) is the node's main filesystem used for local disk volumes, emptyDir, log storage, and so on. By default, it is /var/lib/kubelet.
+
+The `imagefs` is an optional filesystem that the container runtimes use to store container images and container writable layers.
+For containerd, it is the filesystem containing /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs.
+
+If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available`, `100% - imagefs.available`), the DiskPressure condition becomes true and the pods start being evicted from the node. So it is crucially important not to allow disk fulfillment coming to the eviction threshold for both nodefs and imagefs.
+
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (2 Gb size at least is recommended) on each Master before installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Master before the installation.
 Mount point:
 
 ```
@@ -282,7 +307,7 @@ Mount point:
 
 ### SSH key Recommendation 
 
-Before working with the cluster, you need to generate an ssh key. Kubetool supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
+Before working with the cluster, you need to generate an ssh key. Kubemarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
 Example:
 ```
@@ -302,7 +327,7 @@ There are two major deployment schemes as follows:
 
 ### Non-HA Deployment Schemes
 
-This deployment provides a single Kubetools master.
+This deployment provides a single Kubemarine master.
 
 #### All-in-one Scheme
 
@@ -389,6 +414,28 @@ A toleration "matches" a taint if the keys are the same and the effects are the 
  * the operator is Equal and the values are equal.
 
 **Note**: An empty key with operator Exists matches all keys, values, and effects which specifies that this tolerates everything.
+
+#### CoreDNS Deployment with Node Taints
+
+By default, CoreDNS pods are scheduled to worker nodes. If the worker nodes have taints, the CoreDNS must have tolerations configuration in cluster.yaml, otherwise, the CoreDNS pods get stuck in the Pending state. For example:
+```
+services:
+  coredns:
+    deployment:
+      spec:
+        template:
+          spec:
+             tolerations:
+              - key: application
+                operator: Exists
+                effect: NoSchedule
+```
+
+#### Plugins Deployment with Node Taints 
+
+The plugins also require the tolerations section in case of node taints. The Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
+
+If you create your own plugins, the tolerations settings should be taken into account.
 
 ## Configuration
 
@@ -904,7 +951,7 @@ services:
 
 Before proceeding further, it is recommended to read the official Kubernetes Guide about the CPP deployment in the cluster at [https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/](https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/).
 
-**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubetools procedures for adding and removing nodes.
+**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubemarine procedures for adding and removing nodes.
 
 It is possible to specify a plugin at the installation stage, if it is required. To enable the CPP support, just specify the `external-cloud-volume-plugin` parameter of `controllerManager` in the `kubeadm` cluster configuration. For example:
 
@@ -922,7 +969,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubetool automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -942,7 +989,7 @@ In this case, Kubetool automatically initializes and joins new cluster nodes wit
    /etc/kubernetes/cloud-config
    ```
 
-   It is recommended to use Kubetools functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
+   It is recommended to use Kubemarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
 
    ```yaml
    services:
@@ -951,7 +998,7 @@ In this case, Kubetool automatically initializes and joins new cluster nodes wit
          source: ./example/cloud-config.txt
    ```
 
-1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubetools plugin, for example:
+1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubemarine plugin, for example:
 
    Create a file `./openstack-cloud-controller-manager-ds.yaml` on deploy node with the following content:
 
@@ -1367,7 +1414,7 @@ services:
         - man_groff 
 ```
 
-If you need to disable AppArmor, you cannot do this using Kubetools. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
+If you need to disable AppArmor, you cannot do this using Kubemarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
 
 **Note**: After the installation of new repositories, the repodata is reloaded.
 
@@ -1965,7 +2012,7 @@ services:
 
 *Can restart service*: No
 
-*Overwrite files*: Yes, only when list of Kernel parameters changes: `/etc/sysctl.d/98-kubetools-sysctl.conf`, backup is created
+*Overwrite files*: Yes, only when list of Kernel parameters changes: `/etc/sysctl.d/98-kubemarine-sysctl.conf`, backup is created
 
 *OS specific*: No
 
@@ -1991,7 +2038,7 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
 
-**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubetools defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
+**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
 You can specify your own parameters instead of the standard parameters. You need to specify the parameter key and its value. If the value is empty, the key is ignored. For example:
 
@@ -2157,7 +2204,9 @@ The `services.resolv.conf` section allows you to configure the nameserver addres
 |search|string|The domain name to search|
 |nameservers|list|The DNS servers for usage in the OS|
 
-**Note**: If some network resources are located in a restricted network and do not resolve through the standard DNS, be sure to configure this section and specify your custom DNS service.
+**Note**: 
+* If some network resources are located in a restricted network and are not resolved through the standard DNS, be sure to configure this section and specify your custom DNS service.
+* Do not put ${cluster_name} in the `search` field, otherwise some microservices might work incorrectly.
 
 For example:
 
@@ -2367,6 +2416,7 @@ The following settings are supported:
 **Note**: 
 
 * All settings have their own priority. They are generated in the priority they are in the above table. Their priority cannot be changed.
+* DNS resolving is done according to the [hardcoded plugin chain](https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). This specifies that a query goes through `template`, then through `hosts`, then through `kubernetes`, and then through `forward`. By default, Corefile contains the `template` setting, which resolves all names like `*.{{ cluster_name }}` in the vIP address. Hence despite entries in `Hosts`, such names are resolved in the vIP address.
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
 
@@ -3334,6 +3384,14 @@ The following table contains details about existing tolerations configuration op
         <td>none</td>
         <td></td>
     </tr>
+    <tr>
+        <td>local-host-provisioner</td>
+        <td><ul>
+            <li><code>tolerations</code></li>
+        </ul></td>
+        <td>none</td>
+        <td></td>
+    </tr>
 </table>
 
 For example, if you want to customize the nginx-ingress-controller pods to allow scheduling on master nodes, you need to specify the following tolerations in your `cluster.yml` file:
@@ -3714,7 +3772,7 @@ For this procedure you must specify the following parameters:
 
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from kubetools container, note that kubetools container is shiped with ansible-2.9.9.
+**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with ansible-2.9.9.
 
 For example:
 
@@ -4060,7 +4118,7 @@ Be careful with the following parameters:
 
 # Installation Procedure
 
-The installation information for Kubetools is specified below.
+The installation information for Kubemarine is specified below.
 
 **Warning**: Running the installation on an already running cluster redeploys the cluster from scratch.
 
@@ -4123,7 +4181,7 @@ The following is the installation tasks tree:
 Full installation using CLI can be started with the following command:
 
 ```bash
-./kubetools install
+kubemarine install
 ```
 
 It begins the execution of all tasks available in the installer in accordance with its task tree.
@@ -4135,13 +4193,13 @@ It begins the execution of all tasks available in the installer in accordance wi
 If you are installing via CLI, you can specify the custom `cluster.yaml` location as follows:
 
 ```bash
-./kubetools install --config="${PATH_TO_CONFIG}/cluster.yaml"
+kubemarine install --config="${PATH_TO_CONFIG}/cluster.yaml"
 ```
 
 or shorter
 
 ```bash
-./kubetools install -c "${PATH_TO_CONFIG}/cluster.yaml"
+kubemarine install -c "${PATH_TO_CONFIG}/cluster.yaml"
 ```
 
 where, `${PATH_TO_CONFIG}` - is the path to the local inventory file.
@@ -4159,7 +4217,7 @@ It is possible to override the default installation tasks tree with `--tasks` ar
 The following is an example for CLI:
 
 ```bash
-./kubetools install --tasks="prepare.dns.etc_hosts,deploy"
+kubemarine install --tasks="prepare.dns.etc_hosts,deploy"
 ```
 
 For detailed tree of tasks, see [Installation Tasks Description](#installation-tasks-description).
@@ -4169,7 +4227,7 @@ If required, you can exclude some tasks from the execution in `--exclude` argume
 Example:
 
 ```bash
-./kubetools install --exclude="deploy.loadbalancer,deploy.kubernetes.install"
+kubemarine install --exclude="deploy.loadbalancer,deploy.kubernetes.install"
 ```
 
 The arguments can be combined. For example, when you only need to perform a deploy, but not touch the balancers.
@@ -4177,7 +4235,7 @@ The arguments can be combined. For example, when you only need to perform a depl
 Example:
 
 ```bash
-./kubetools install --tasks="deploy" --exclude="deploy.loadbalancer"
+kubemarine install --tasks="deploy" --exclude="deploy.loadbalancer"
 ```
 
 When you specify the name of the task, you can specify the following types:
@@ -4191,7 +4249,7 @@ When you specify the name of the task, you can specify the following types:
 You can also combine the types, specify both groups and tasks at the same time. For example:
 
 ```bash
-./kubetools install --tasks="prepare.system,prepare.dns.resolv_conf"
+kubemarine install --tasks="prepare.system,prepare.dns.resolv_conf"
 ```
 
 The Flow Filter filters everything and make a new execution tree, on which the
@@ -4220,8 +4278,8 @@ not need to consider the sequence for listing the tasks. You can do it in any se
 
 ## Logging
 
-Kubetools has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubetools Logging](Logging.md) section.
+Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
+For more information, refer to the [Configuring Kubemarine Logging](Logging.md) section.
 
 ## Dump Files
 
@@ -4329,7 +4387,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of Kubetool, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
+During perform of Kubemarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*
@@ -4346,22 +4404,22 @@ Ansible inventory file is available in the root directory of the distribution im
 
 If you want to generate only an inventory file, you must run the installer with the argument `--without-act`. For example:
 
-```
-$ ./kubetools install --without-act
+```bash
+kubemarine install --without-act
 ```
 
 You can specify custom path and name for the ansible inventory file, using the argument `--ansible-inventory-location`. By default, the file is saved to the executable directory with the name `ansible-inventory.ini`. For example:
 
-```
-$ ./kubetools install --ansible-inventory-location /var/data/ansible-inventory.ini
+```bash
+kubemarine install --ansible-inventory-location /var/data/ansible-inventory.ini
 ```
 
 **Warning**: Always specify the absolute path to the file, not relative.
 
 Arguments can be combined. For example the following arguments generate the inventory without starting the installation:
 
-```
-$ ./kubetools install --without-act --ansible-inventory-location /var/data/inventory.ini
+```bash
+kubemarine install --without-act --ansible-inventory-location /var/data/inventory.ini
 ```
 
 ### Contents
@@ -4557,17 +4615,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4723,17 +4781,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -4890,17 +4948,17 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.6</td>
-    <td>1.4.8</td>
-    <td>1.4.6</td>
-    <td>1.4.6</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
     <td></td>
   </tr>
   <tr>
     <td>podman</td>
     <td>1.6.4</td>
-    <td>3.0.1</td>
-    <td>3.1.2</td>
+    <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>

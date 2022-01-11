@@ -5,7 +5,7 @@ on:
       - '**'
 env:
    COPYRIGHT_COMPANY: 'NetCracker Technology Corporation'
-   COPYRIGHT_YEAR: '2021'
+   COPYRIGHT_YEAR: '2021-2022'
 jobs:
   license:
      runs-on: ubuntu-latest
@@ -20,20 +20,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t kubetools --build-arg BUILD_TYPE=test --no-cache .
-      - run: docker run --entrypoint=python3 kubetools -m unittest discover -s /opt/kubetools/test/unit -t /opt/kubetools/test/unit
+      - run: docker build -t kubemarine --build-arg BUILD_TYPE=test --no-cache .
+      - run: docker run --entrypoint=python3 kubemarine -m unittest discover -s /opt/kubemarine/test/unit -t /opt/kubemarine/test/unit
   coverage:
     needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t kubetools --build-arg BUILD_TYPE=test --no-cache .
-      - run: docker run --entrypoint=/bin/bash kubetools -c "python3 /usr/local/bin/coverage run -m unittest discover -s /opt/kubetools/test/unit -t /opt/kubetools/test/unit; python3 /usr/local/bin/coverage report -m" > /tmp/report.txt
+      - run: docker build -t kubemarine --build-arg BUILD_TYPE=test --no-cache .
+      - run: docker run --entrypoint=/bin/bash kubemarine -c "python3 /usr/local/bin/coverage run -m unittest discover -s /opt/kubemarine/test/unit -t /opt/kubemarine/test/unit; python3 /usr/local/bin/coverage report -m" > /tmp/report.txt
       - run: cat /tmp/report.txt; PERCENTAGE=$(cat /tmp/report.txt | tail -1 | awk '{print $4}' | tr -dc '0-9')
   linter:
     needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t kubetools --build-arg BUILD_TYPE=test --no-cache .
-      - run: docker run --entrypoint=/bin/bash kubetools -c "/usr/local/bin/pylint kubetool test --disable fixme || exit 0"
+      - run: docker build -t kubemarine --build-arg BUILD_TYPE=test --no-cache .
+      - run: docker run --entrypoint=/bin/bash kubemarine -c "/usr/local/bin/pylint kubemarine test --disable fixme || exit 0"
