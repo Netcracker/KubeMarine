@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubetool import demo
+from kubemarine import demo
 from paramiko.ssh_exception import SSHException
 
 ETCD_LEADER_CHANGED_MESSAGE = 'Error from server: rpc error: code = Unavailable desc = etcdserver: leader changed'

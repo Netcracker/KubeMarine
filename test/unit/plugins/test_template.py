@@ -1,4 +1,4 @@
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 
 import unittest
 
-from kubetool import demo
-from kubetool.plugins import verify_template, apply_template
+from kubemarine import demo
+from kubemarine.plugins import verify_template, apply_template
 
 
 class TestTemplate(unittest.TestCase):

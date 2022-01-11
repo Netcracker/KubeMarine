@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import random
 
 import fabric
 
-from kubetool import demo
-from kubetool.demo import FakeKubernetesCluster
+from kubemarine import demo
+from kubemarine.demo import FakeKubernetesCluster
 
 
 class TestGroupCreation(unittest.TestCase):

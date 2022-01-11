@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 import io
 import unittest
 
-from kubetool import demo, system
+from kubemarine import demo, system
 
 
 class TestInventoryGenerator(unittest.TestCase):
