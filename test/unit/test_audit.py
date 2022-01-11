@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ import unittest
 
 import fabric
 
-from kubetool import demo, audit
-from kubetool.core.group import NodeGroupResult
+from kubemarine import demo, audit
+from kubemarine.core.group import NodeGroupResult
 
 
 class NodeGroupResultsTest(unittest.TestCase):
