@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021 NetCracker Technology Corporation
+# Copyright 2021-2022 NetCracker Technology Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 
 import unittest
 
-from kubetool import kubernetes
-from kubetool.procedures import upgrade
-from kubetool import demo
+from kubemarine import kubernetes
+from kubemarine.procedures import upgrade
+from kubemarine import demo
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):

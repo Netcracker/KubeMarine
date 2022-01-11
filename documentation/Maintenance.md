@@ -26,11 +26,11 @@ This section describes the features and steps for performing maintenance procedu
 
 Before you start any maintenance procedure, you must complete the following mandatory steps:
 
-1. Verify the environment for compliance with the prerequisites described in the [Kubetools Installation Prerequisites](Installation.md#prerequisites) section in _Kubetools Installation Procedure_.
+1. Verify the environment for compliance with the prerequisites described in the [Kubemarine Installation Prerequisites](Installation.md#prerequisites) section in _Kubemarine Installation Procedure_.
 1. Ensure that all the nodes are up, online, and healthy (except dead nodes, when you trying to remove them). This applies to the new nodes as well as the existing nodes.
 1. If using custom registries, make sure they are online, accessible from nodes, and you are able to download images from the registries.
 1. If using custom RPM repositories, make sure they are online, accessible from nodes, and you are able to perform repository updates.
-1. Prepare the latest actual **cluster.yaml** that should contain information about the current cluster state. For more information, refer to the [Kubetools Inventory Preparation](Installation.md#inventory-preparation) section in _Kubetools Installation Procedure_.
+1. Prepare the latest actual **cluster.yaml** that should contain information about the current cluster state. For more information, refer to the [Kubemarine Inventory Preparation](Installation.md#inventory-preparation) section in _Kubemarine Installation Procedure_.
 
    **Note**: If you provide an incorrect config file, it can cause unknown consequences.
 
@@ -76,7 +76,7 @@ The script upgrades Kubernetes versions one-by-one. After each upgrade, the `clu
 
 #### Upgrading Specific Nodes
 
-**Note**: Kubetools automatically determines already upgraded nodes and excludes them from the Kubernetes upgrade procedure. Use manual nodes specifying for updating in exceptional cases when the problem cannot be solved automatically. Also, if any of the nodes are not available, first remove the node from the cluster, instead of changing the list of nodes for the upgrade.
+**Note**: Kubemarine automatically determines already upgraded nodes and excludes them from the Kubernetes upgrade procedure. Use manual nodes specifying for updating in exceptional cases when the problem cannot be solved automatically. Also, if any of the nodes are not available, first remove the node from the cluster, instead of changing the list of nodes for the upgrade.
 
 **Warning**: By manually specifying the nodes for the upgrade, you completely take control of yourself and bear all the consequences of an unsuccessful upgrade. 
 
@@ -534,7 +534,7 @@ Also pay attention to the following:
 
 ### Configuring Add Node Procedure
 
-The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubetools Inventory Nodes](Installation.md#nodes) section in _Kubetools Installation Procedure_.
+The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
 The following example demonstrates the configuration of two nodes for adding:
 
@@ -550,7 +550,7 @@ nodes:
 
 **Note**:
 
-* The connection information for new nodes can be used from defaults as described in the [Kubetools Inventory Node Defaults](Installation.md#node_defaults) section in _Kubetools Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
+* The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#node_defaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
 * You can add the `vrrp_ips` section to **procedure.yaml** if you intend to add the new `balancer` node and have previously not configured the `vrrp_ips` section.
 
 ### Add Node Tasks Tree
@@ -627,7 +627,7 @@ Removing a node from a Kubernetes cluster is done in the following order:
 
 ### Configuring Remove Node Procedure
 
-To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubetools Inventory Nodes](Installation.md#nodes) section in _Kubetools Installation Procedure_.
+To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
 For example:
 
@@ -670,21 +670,21 @@ The `remove_node` procedure executes the following sequence of tasks:
 
 To change the operating system on an already running cluster:
 
-1. Start Kubetools IAAS and PAAS checks, make sure that the cluster is operating correctly and without any problems.
+1. Start Kubemarine IAAS and PAAS checks, make sure that the cluster is operating correctly and without any problems.
 1. Backup the entire cluster and virtual machine snapshots.
 1. Run the Remove node procedure for the node you want to migrate with an old OS.
 1. Backup/restore/migrate service-specific data from the old node to a new one.
 1. Run the Add node procedure for the node you are migrating with the new OS. The old node can be redeployed with the new OS, or another with a new OS used.
-1. Start Kubetools IAAS and PAAS checks, make sure all services, pods, entire cluster are healthy and running correctly.
+1. Start Kubemarine IAAS and PAAS checks, make sure all services, pods, entire cluster are healthy and running correctly.
 1. If something is not functioning correctly in the cluster, manually correct it before resuming.
 1. Start the migration for the next node, and migrate all the remaining nodes.
 1. After the migration finished, manually replace all OS-specific information in your `cluster.yaml`: repositories, packages, associations, if any. Also pay attention to their versions. In further procedures, use only the new inventory instead of the old one.
 
 **Note**: It is possible to migrate the OS removing/adding groups of nodes, not only for a single node. However, be careful with the selected group of nodes - incorrectly selected nodes for removal or their amount can damage the cluster or lead it to an unusable state. Select the nodes at your discretion.
 
-**Warning**: It is necessary to complete the procedure and completely migrate all nodes to a single operating system. The cluster and services can exist on different operating systems, but if you need to immediately perform any maintenance procedure, Kubetools does not allow you to do this, since the cluster is in an inconsistent state with another maintenance procedure not yet completed.
+**Warning**: It is necessary to complete the procedure and completely migrate all nodes to a single operating system. The cluster and services can exist on different operating systems, but if you need to immediately perform any maintenance procedure, Kubemarine does not allow you to do this, since the cluster is in an inconsistent state with another maintenance procedure not yet completed.
 
-**Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](Installation.md#associations) section in the _Kubetools Installation Procedure_.
+**Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](Installation.md#associations) section in the _Kubemarine Installation Procedure_.
 
 ## Manage PSP Procedure
 
@@ -734,7 +734,7 @@ psp:
     host-network: disabled
 ```
 
-To configure `add-policies` and `delete-policies`, use the configuration format similar to `custom-policies`. For more information, refer to the [Configuring Custom Policies](Installation.md#configuring-custom-policies) section in the _Kubetools Installation Procedure_.
+To configure `add-policies` and `delete-policies`, use the configuration format similar to `custom-policies`. For more information, refer to the [Configuring Custom Policies](Installation.md#configuring-custom-policies) section in the _Kubemarine Installation Procedure_.
 
 **Note**: The OOB plugins use OOB policies, so disabling OOB policy breaks some OOB plugins. 
 To avoid this, you need to specify custom policy and bind it using `ClusterRoleBinding` to the `ServiceAccout` plugin.
@@ -817,7 +817,7 @@ nginx-ingress-controller:
 ```
 
 Similar to the plugin configuration, you can either use the data format or the paths format.
-For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubetools Installation Procedure_.
+For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubemarine Installation Procedure_.
 
 #### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
 To update internal kubernetes certificates you can use the following configuration:
@@ -957,16 +957,16 @@ The following sections describe the execution of procedures using CLI.
 
 ## Procedure Execution from CLI
 
-The command line executive for maintenance procedures has the same parameters as the installation executive. For more details, refer to the [Installing Kubernetes Using CLI](Installation.md#installation-of-kubernetes-using-cli) section in _Kubetools Installation Procedure_.
+The command line executive for maintenance procedures has the same parameters as the installation executive. For more details, refer to the [Installing Kubernetes Using CLI](Installation.md#installation-of-kubernetes-using-cli) section in _Kubemarine Installation Procedure_.
 
-The following features described in the _Kubetools Installation Procedure_ are also available for maintenance procedures:
+The following features described in the _Kubemarine Installation Procedure_ are also available for maintenance procedures:
 
 * [Custom Inventory File Location](Installation.md#custom-inventory-file-location)
 * [Tasks List Redefinition](Installation.md#tasks-list-redefinition)
 * [Ansible Inventory](Installation.md#ansible-inventory)
 * [Dump Files](Installation.md#dump-files)
 
-For maintenance procedures, it is mandatory to provide procedure-specific **procedure.yaml** configuration as positional argument, in addition to an ordinary **cluster.yaml** cluster inventory. You can redefine the tasks list for execution/exclusion according to the selected procedure Tasks Tree. For more information, refer to the [Tasks List Redefinition](Installation.md#tasks-list-redefinition) section in _Kubetools Installation Procedure_.
+For maintenance procedures, it is mandatory to provide procedure-specific **procedure.yaml** configuration as positional argument, in addition to an ordinary **cluster.yaml** cluster inventory. You can redefine the tasks list for execution/exclusion according to the selected procedure Tasks Tree. For more information, refer to the [Tasks List Redefinition](Installation.md#tasks-list-redefinition) section in _Kubemarine Installation Procedure_.
 
 Also it is possible to get the list of supported options and their meaning by executing the maintenance procedure with `--help` flag.
 
@@ -975,7 +975,7 @@ Also it is possible to get the list of supported options and their meaning by ex
 An example for running `add_node` procedure without the **cluster.yaml** definition is as follows:
 
 ```bash
-./kubetools add_node procedure.yaml
+kubemarine add_node procedure.yaml
 ```
 
 It is used from the current location.
@@ -983,19 +983,19 @@ It is used from the current location.
 An example for running `remove_node` procedure with explicit **cluster.yaml** is as follows:
 
 ```bash
-./kubetools remove_node procedure.yaml --config="${PATH_TO_CONFIG}/cluster.yaml"
+kubemarine remove_node procedure.yaml --config="${PATH_TO_CONFIG}/cluster.yaml"
 ``` 
 
 An example for running the `add_node` procedure with overridden tasks is as follows:
 
 ```bash
-./kubetools add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalancer"
+kubemarine add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalancer"
 ```
 
 ## Logging
 
-Kubetools has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubetools Logging](Logging.md) guide.
+Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
+For more information, refer to the [Configuring Kubemarine Logging](Logging.md) guide.
 
 
 ## Additional Parameters
@@ -1027,16 +1027,16 @@ prepull_group_size: 100
 ```
 # Additional procedures
 
-The following kubetools procedures are available additionally: 
+The following kubemarine procedures are available additionally: 
 - `version`      Print current release version
 - `do`           Execute shell command on cluster nodes
 ## Changing Calico Settings
 	
-Sometimes, during the operation you have to change the parameters of the Calico plugin. To do this, you can use the standard Kubetools tools.
+Sometimes, during the operation you have to change the parameters of the Calico plugin. To do this, you can use the standard Kubemarine tools.
 	
 **Warning**: This procedure is performed on all nodes.
 	
-The parameters are changed using the command, **kubetools install --config='file' --tasks=deploy.plugins**.
+The parameters are changed using the command, **kubemarine install --config='file' --tasks=deploy.plugins**.
 	
 Before the installation, you have to change the yaml file responsible for the cluster deployment:
 	
