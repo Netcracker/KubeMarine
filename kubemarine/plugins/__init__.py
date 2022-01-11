@@ -34,7 +34,8 @@ from kubemarine import jinja, thirdparties
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.cluster import KubernetesCluster
 
 # list of plugins owned and managed by kubemarine
 oob_plugins = [

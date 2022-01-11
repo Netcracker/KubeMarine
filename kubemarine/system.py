@@ -29,6 +29,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine.core.annotations import restrict_empty_group
 
 
 def verify_inventory(inventory, cluster):
