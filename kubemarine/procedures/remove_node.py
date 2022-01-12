@@ -88,7 +88,6 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
                 inventory_to_finalize['vrrp_ips'][i]['hosts'] = hosts
 
     # remove nodes from inventory if they in nodes for removal
-    # todo deletion of elements from collection to iterate over!
     size = len(inventory_to_finalize['nodes'])
     for i in range(size):
         for j, node in enumerate(inventory_to_finalize['nodes']):
