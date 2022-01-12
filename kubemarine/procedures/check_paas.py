@@ -710,7 +710,7 @@ def etcd_health_status(cluster):
                               hint=f"ETCD not ready, please check"
                                    f" because of {e} ")
         cluster.log.debug(etcd_health_status)
-        tc.success(results='run')
+        tc.success(results='healthy')
 
 
 tasks = OrderedDict({
