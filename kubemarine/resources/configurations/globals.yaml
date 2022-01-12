@@ -305,14 +305,14 @@ compatibility_map:
         sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
     calico:
       v1.20:
-        version: v3.19.1
-        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+        version: v3.21.2
+          sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.21:
-        version: v3.19.1
-        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+        version: v3.21.2
+          sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.22:
-        version: v3.20.1
-        sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
+        version: v3.21.2
+          sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.23:
         version: v3.21.2
         sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
