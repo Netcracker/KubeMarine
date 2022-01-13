@@ -33,7 +33,7 @@ class TestGroupCreation(unittest.TestCase):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get['worker'].nodes.keys())[1:])
+        expected_group = cluster.make_group(list(cluster.nodes['worker'].nodes.keys())[1:])
         filtered_group = cluster.nodes.get['worker'].new_group(apply_filter=lambda node: 'master' not in node['roles'])
 
         self.assertDictEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
@@ -50,7 +50,7 @@ class TestGroupCreation(unittest.TestCase):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get['worker'].nodes.keys())[1:])
+        expected_group = cluster.make_group(list(cluster.nodes['worker'].nodes.keys())[1:])
         result_group = cluster.nodes.get['worker'].exclude_group(cluster.nodes['master'])
 
         self.assertDictEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
