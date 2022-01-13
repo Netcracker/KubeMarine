@@ -315,7 +315,7 @@ compatibility_map:
           sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.23:
         version: v3.21.2
-        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
+          sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
     nginx-ingress-controller:
       v1.20:
         image-name: ingress-nginx/controller
