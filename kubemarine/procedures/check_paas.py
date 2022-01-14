@@ -168,7 +168,7 @@ def system_packages_versions(cluster, pckg_alias):
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
         if pckg_alias == "docker" or pckg_alias == "containerd":
-            group = cluster.nodes['master'].include_group(cluster.nodes['worker'])
+            group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
         elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
             if "balancer" in cluster.nodes and not cluster.nodes['balancer'].is_empty():
                 group = cluster.nodes['balancer']
