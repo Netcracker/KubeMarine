@@ -17,7 +17,6 @@
 from collections import OrderedDict
 
 import io
-import ruamel.yaml
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow

@@ -20,7 +20,6 @@ from jinja2 import Template
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroupResult
 
 ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, but VRRP IP is not configured."
 
