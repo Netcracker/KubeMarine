@@ -518,7 +518,7 @@ def nodes_pid_max(cluster):
         master = cluster.nodes['master'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
-        for node in cluster.nodes['master'].include_group(cluster.nodes['worker']).get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
 
             node_info = master.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
             config = yaml.load(node_info)
