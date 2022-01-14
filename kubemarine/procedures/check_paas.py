@@ -45,7 +45,7 @@ def services_status(cluster, service_type):
         elif service_type == 'keepalived':
             group = cluster.nodes.get('keepalived', {})
         elif service_type == 'docker' or service_type == "containerd" or service_type == 'kubelet':
-            group = cluster.nodes['master'].include_group(cluster.nodes.get['worker'])
+            group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
 
         if not group or group.is_empty():
             raise TestWarn("No nodes to check service status",
@@ -168,7 +168,7 @@ def system_packages_versions(cluster, pckg_alias):
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
         if pckg_alias == "docker" or pckg_alias == "containerd":
-            group = cluster.nodes['master'].include_group(cluster.nodes.get['worker'])
+            group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
         elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
             if "balancer" in cluster.nodes and not cluster.nodes['balancer'].is_empty():
                 group = cluster.nodes['balancer']
@@ -518,7 +518,7 @@ def nodes_pid_max(cluster):
         master = cluster.nodes['master'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
-        for node in cluster.nodes['master'].include_group(cluster.nodes.get['worker']).get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
 
             node_info = master.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
             config = yaml.load(node_info)

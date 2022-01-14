@@ -380,7 +380,7 @@ def deploy_kubernetes_init(cluster):
     ])
 
     if 'worker' in cluster.nodes:
-        cluster.nodes.get['worker'].get_new_nodes_or_self().new_group(
+        cluster.nodes.get('worker').get_new_nodes_or_self().new_group(
             apply_filter=lambda node: 'master' not in node['roles']) \
             .call(kubernetes.init_workers)
 

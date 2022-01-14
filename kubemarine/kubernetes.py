@@ -757,7 +757,7 @@ def patch_kubeadm_configmap(first_master, cluster):
 
 def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
     first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
-    for node in cluster.nodes.get['worker'].exclude_group(cluster.nodes['master']).get_ordered_members_list(
+    for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['master']).get_ordered_members_list(
             provide_node_configs=True):
 
         if not upgrade_group.has_node(node['name']):
