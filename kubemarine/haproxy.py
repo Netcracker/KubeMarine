@@ -22,7 +22,8 @@ from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult
 
-ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, but VRRP IP is not configured."
+ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, " \
+                               "but VRRP IP is not configured."
 
 
 def enrich_inventory(inventory, cluster):
@@ -46,8 +47,8 @@ def enrich_inventory(inventory, cluster):
                         found = True
 
             if not found:
-                raise Exception('Balancer is combined with other role, but there is no any VRRP IP configured for '
-                                'node \'%s\'.' % node['name'])
+                raise Exception(f"Balancer is combined with other role, but there is no any "
+                                f"VRRP IP configured for node \'{node['name']}\'.")
 
     return inventory
 
@@ -55,7 +56,8 @@ def enrich_inventory(inventory, cluster):
 def install(group):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
+            package_associations = \
+                group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
             group.sudo("%s -v" % package_associations['executable_name'], warn=True)
 
     haproxy_installed = True
@@ -69,11 +71,14 @@ def install(group):
     else:
         with RemoteExecutor(group.cluster) as exe:
             for node in group.get_ordered_members_list(provide_node_configs=True):
-                package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
-                packages.install(node["connection"], include=package_associations['package_name'])
+                package_associations = \
+                    group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
+                packages.install(node["connection"],
+                                 include=package_associations['package_name'])
 
     service_name = package_associations['service_name']
-    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/haproxy.conf", script_relative=True)
+    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/haproxy.conf",
+                                                  script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     enable(group)
     return exe.get_last_results_str()
@@ -85,7 +90,8 @@ def uninstall(group):
 
 def restart(group):
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        service_name = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']['service_name']
+        service_name = \
+            group.cluster.get_associations_for_node(node['connect_to'])['haproxy']['service_name']
         system.restart_service(node['connection'], name=service_name)
     RemoteExecutor(group.cluster).flush()
     group.cluster.log.debug("Sleep while haproxy comes-up...")
@@ -97,14 +103,16 @@ def disable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.disable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'])
+            system.disable_service(node['connection'],
+                                   name=os_specific_associations['haproxy']['service_name'])
 
 
 def enable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.enable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'],
+            system.enable_service(node['connection'],
+                                  name=os_specific_associations['haproxy']['service_name'],
                                   now=True)
 
 
@@ -123,22 +131,30 @@ def get_config(cluster, node, future_nodes):
     # remove duplicates
     bindings = list(set(bindings))
 
-    return Template(open(utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)).read())\
-        .render(nodes=future_nodes, bindings=bindings,config_options=cluster.inventory['services']['loadbalancer']['haproxy'])
+    template_path = \
+        utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
+    jinja_template = open(template_path).read()
+    haproxy_config = cluster.inventory['services']['loadbalancer']['haproxy']
+    return Template(jinja_template).render(nodes=future_nodes,
+                                           bindings=bindings,
+                                           config_options=haproxy_config)
 
 
 def configure(group):
-    all_nodes_configs = group.cluster.nodes['all'].get_final_nodes().get_ordered_members_list(provide_node_configs=True)
+    all_nodes_configs = group.cluster.nodes['all'].get_final_nodes() \
+        .get_ordered_members_list(provide_node_configs=True)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
+        package_associations = \
+            group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
         group.cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node['name'])
         config = get_config(group.cluster, node, all_nodes_configs)
         utils.dump_file(group.cluster, config, 'haproxy_%s.cfg' % node['name'])
         node['connection'].sudo('mkdir -p %s' % configs_directory)
-        node['connection'].put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
+        node['connection'].put(io.StringIO(config), package_associations['config_location'],
+                               backup=True, sudo=True)
         node['connection'].sudo('ls -la %s' % package_associations['config_location'])
 
 
@@ -149,5 +165,6 @@ def override_haproxy18(group):
         return
     package_associations = group.cluster.get_associations_for_os('rhel')['haproxy']
     # TODO: Do not replace the whole file, replace only parameter
-    return group.put(io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
-                     '/etc/sysconfig/%s' % package_associations['service_name'], backup=True, sudo=True)
+    return group.put(io.StringIO(f"CONFIG={package_associations['config_location']}\n"),
+                     f"/etc/sysconfig/{package_associations['service_name']}",
+                     backup=True, sudo=True)

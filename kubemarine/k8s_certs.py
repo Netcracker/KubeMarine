@@ -23,19 +23,24 @@ version_kubectl_alpha_removed = "v1.21.0"
 
 
 def k8s_certs_overview(masters):
-    if kubernetes.version_higher_or_equal(masters.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                          version_kubectl_alpha_removed):
+    cluster = masters.cluster
+    log = cluster.log
+
+    inventory_k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+
+    if kubernetes.version_higher_or_equal(inventory_k8s_version, version_kubectl_alpha_removed):
         for master in masters.get_ordered_members_list(provide_node_configs=True):
-            masters.cluster.log.debug(f"Checking certs expiration for master {master['name']}")
+            log.debug(f"Checking certs expiration for master {master['name']}")
             master['connection'].sudo("kubeadm certs check-expiration", hide=False)
     else:
         for master in masters.get_ordered_members_list(provide_node_configs=True):
-            masters.cluster.log.debug(f"Checking certs expiration for master {master['name']}")
+            log.debug(f"Checking certs expiration for master {master['name']}")
             master['connection'].sudo("kubeadm alpha certs check-expiration", hide=False)
 
 
 def renew_verify(inventory, cluster):
-    if cluster.context.get('initial_procedure') != 'cert_renew' or "kubernetes" not in cluster.procedure_inventory:
+    if cluster.context.get('initial_procedure') != 'cert_renew' \
+            or "kubernetes" not in cluster.procedure_inventory:
         return inventory
 
     cert_list = cluster.procedure_inventory["kubernetes"].get("cert-list")
@@ -47,13 +52,14 @@ def renew_verify(inventory, cluster):
 
 
 def renew_apply(masters):
-    log = masters.cluster.log
+    cluster = masters.cluster
+    log = cluster.log
 
-    procedure = masters.cluster.procedure_inventory["kubernetes"]
+    procedure = cluster.procedure_inventory["kubernetes"]
     cert_list = remove_certs_duplicates(procedure["cert-list"])
+    inventory_k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
 
-    if kubernetes.version_higher_or_equal(masters.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                          version_kubectl_alpha_removed):
+    if kubernetes.version_higher_or_equal(inventory_k8s_version, version_kubectl_alpha_removed):
         for cert in cert_list:
             masters.sudo(f"kubeadm certs renew {cert}")
     else:
@@ -66,11 +72,12 @@ def renew_apply(masters):
 
     masters.call(force_renew_kubelet_serving_certs)
 
-    # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
+    # for some reason simple pod delete do not work for certs update - we need to delete
+    # containers themselves
     masters.call(force_restart_control_plane)
 
     for master in masters.get_ordered_members_list(provide_node_configs=True):
-        kubernetes.wait_for_any_pods(masters.cluster, master["connection"], apply_filter=master["name"])
+        kubernetes.wait_for_any_pods(cluster, master["connection"], apply_filter=master["name"])
 
 
 def force_restart_control_plane(masters):
@@ -79,9 +86,13 @@ def force_restart_control_plane(masters):
     c_filter = "grep -e %s" % " -e ".join(restart_containers)
 
     if cri_impl == "docker":
-        masters.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        masters.sudo(f"sudo docker container rm -f "
+                     f"$(sudo docker ps -a | {c_filter} | awk '{{ print $1 }}')",
+                     warn=True)
     else:
-        masters.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        masters.sudo(f"sudo crictl rm -f "
+                     f"$(sudo crictl ps -a | {c_filter} | awk '{{ print $1 }}')",
+                     warn=True)
 
 
 def force_renew_kubelet_serving_certs(masters):
@@ -94,14 +105,16 @@ def force_renew_kubelet_serving_certs(masters):
 
 def verify_cert_list_format(cert_list):
     if cert_list is None or not isinstance(cert_list, list) or len(cert_list) == 0:
-        raise Exception("Incorrect k8s certs renew configuration, 'cert_list' list should be present and non-empty")
+        raise Exception("Incorrect k8s certs renew configuration, "
+                        "'cert_list' list should be present and non-empty")
     return True
 
 
 def verify_certs_supported(cert_list):
     for line in cert_list:
         if line not in supported_k8s_certs:
-            raise Exception(f"Found unsupported cert: {line}, list of supported certs: {supported_k8s_certs}")
+            raise Exception(f"Found unsupported cert: {line}, "
+                            f"list of supported certs: {supported_k8s_certs}")
     return True
 
 

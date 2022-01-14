@@ -22,7 +22,8 @@ import io
 
 def enrich_add_hosts_config(inventory, cluster):
     if not inventory['services']['coredns']['configmap'].get('Hosts'):
-        inventory['services']['coredns']['configmap']['Hosts'] = system.generate_etc_hosts_config(inventory, cluster)
+        inventory['services']['coredns']['configmap']['Hosts'] = \
+            system.generate_etc_hosts_config(inventory, cluster)
     return inventory
 
 
@@ -88,13 +89,21 @@ def generate_nested_sections(type, data, tabsize):
                 if isinstance(data[section['name']]['zone'], list):
                     data[section['name']]['zone'] = ' '.join(data[section['name']]['zone'])
                 config += ' ' + data[section['name']]['zone']
-            config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+            config += ' {' + \
+                      proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + \
+                      '\n' + \
+                      tab + \
+                      '}'
 
         elif type == 'hosts':
             config += '\n' + tab + type
             if data[section['name']].get('file') and isinstance(data[section['name']]['file'], str):
                 config += ' ' + data[section['name']]['file']
-            config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+            config += ' {' + \
+                      proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + \
+                      '\n' + \
+                      tab + \
+                      '}'
 
         elif type == 'template':
             if data[section['name']].get('zone'):
@@ -110,11 +119,21 @@ def generate_nested_sections(type, data, tabsize):
                     config += ' ' + data[section['name']]['type']
                 if zone:
                     config += ' ' + zone
-                config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+                config += ' {' + \
+                          proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + \
+                          '\n' + \
+                          tab + \
+                          '}'
 
         else:
-            config += '\n' + tab + type + ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2)\
-                      + '\n' + tab + '}'
+            config += '\n' + \
+                      tab + \
+                      type + \
+                      ' {' + \
+                      proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + \
+                      '\n' + \
+                      tab + \
+                      '}'
 
     return config
 
@@ -147,7 +166,7 @@ def apply_configmap(cluster, config):
 
     return cluster.nodes['master'].get_final_nodes().get_first_member()\
         .sudo('kubectl apply -f /etc/kubernetes/coredns-configmap.yaml && '
-             'sudo kubectl rollout restart -n kube-system deployment/coredns')
+              'sudo kubectl rollout restart -n kube-system deployment/coredns')
 
 
 def apply_patch(cluster):
@@ -170,7 +189,8 @@ def apply_patch(cluster):
         group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_final_nodes()
         group.put(io.StringIO(config), filepath, backup=True, sudo=True)
 
-        apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)
+        apply_command = f'kubectl patch {config_type} coredns ' \
+                        f'-n kube-system --type merge -p \"$(sudo cat {filepath})\"'
 
     if apply_command == '':
         return 'Nothing to patch'

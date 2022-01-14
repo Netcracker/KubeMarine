@@ -21,20 +21,24 @@ from kubemarine.core.cluster import KubernetesCluster
 def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
     if cluster.context.get('initial_procedure') == 'upgrade':
         upgrade_version = cluster.context["upgrade_version"]
-        upgrade_thirdparties = cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties')
+        upgrade_thirdparties = \
+            cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties')
         if upgrade_thirdparties:
             upgrade_thirdparties = deepcopy(upgrade_thirdparties)
             default_thirdparties = cluster.defaults['services']['thirdparties']
 
-            # keep some configurations (unpack) from default thirdparties, if they are not re-defined
+            # keep some configurations (unpack) from default thirdparties, if they are not
+            # re-defined
             for destination, config in upgrade_thirdparties.items():
-                if destination in default_thirdparties and 'unpack' in default_thirdparties[destination]\
+                if destination in default_thirdparties\
+                        and 'unpack' in default_thirdparties[destination]\
                         and 'unpack' not in config:
                     config['unpack'] = default_thirdparties[destination]['unpack']
 
             inventory['services']['thirdparties'] = upgrade_thirdparties
         else:
-            cluster.log.warning('New thirdparties for upgrade procedure is not set in procedure config - default will be used')
+            cluster.log.warning('New thirdparties for upgrade procedure is not set in procedure '
+                                'config - default will be used')
     return inventory
 
 
@@ -87,12 +91,13 @@ def enrich_inventory_apply_defaults(inventory, cluster):
 
         inventory['services']['thirdparties'][destination] = config
 
-    # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly specified in cluster.yaml
+    # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly
+    # specified in cluster.yaml
     cri_name = inventory['services']['cri']['containerRuntime']
     crictl_key = '/usr/bin/crictl.tar.gz'
-    if cri_name == "docker" and \
-            crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}) and \
-            crictl_key in inventory['services']['thirdparties']:
+    if cri_name == "docker"\
+            and crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {})\
+            and crictl_key in inventory['services']['thirdparties']:
         del(inventory['services']['thirdparties'][crictl_key])
 
     return inventory
@@ -104,7 +109,8 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
         config = cluster.inventory['services'].get('thirdparties', {}).get(destination)
 
     if config is None:
-        raise Exception('Not possible to install thirdparty %s - not found in configfile' % destination)
+        raise Exception(f'Not possible to install thirdparty {destination} - not found in '
+                        f'configfile')
 
     cluster.log.debug("Thirdparty \"%s\" will be installed" % destination)
     is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
@@ -116,15 +122,16 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
     destination_directory = '/'.join(destination.split('/')[:-1])
     cluster.log.verbose('Destination directory: %s' % destination_directory)
 
-    common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
+    common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []),
+                                                                config.get('nodes', []))
 
     if cluster.context['initial_procedure'] == 'add_node':
         common_group = common_group.get_new_nodes()
 
     # ! In the further code there is no error and nothing is missing !
     # Here a long shell command is intentionally constructed and executed at once to speed up work
-    # At the same time, in the middle of the construction of the command, a file may suddenly be uploaded and then
-    # the command will be executed in two runs instead of single run
+    # At the same time, in the middle of the construction of the command, a file may suddenly be
+    # uploaded and then the command will be executed in two runs instead of single run
 
     # is destination directory exists?
     remote_commands += 'mkdir -p %s' % destination_directory
@@ -133,10 +140,13 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
         cluster.log.verbose('Installation via curl download detected')
         if config.get('sha1') is not None:
             cluster.log.verbose('SHA1 hash is defined, it will be used during installation')
-            # if hash equal, then stop further actions immediately! unpack should not be performed too
-            remote_commands += ' && FILE_HASH=$(sudo openssl sha1 %s | sed "s/^.* //"); ' \
-                               '[ "%s" == "${FILE_HASH}" ] && exit 0 || true ' % (destination, config['sha1'])
-        remote_commands += ' && sudo rm -f %s && sudo curl -f -g -L %s -o %s && ' % (destination, config['source'], destination)
+            # if hash equal, then stop further actions immediately! unpack should not be
+            # performed too
+            remote_commands += f' && FILE_HASH=$(sudo openssl sha1 {destination} | ' \
+                               f'sed "s/^.* //"); ' \
+                               f'[ "{config["sha1"]}" == "${{FILE_HASH}}" ] && exit 0 || true '
+        remote_commands += f' && sudo rm -f {destination} && ' \
+                           f'sudo curl -f -g -L {config["source"]} -o {destination} && '
     else:
         cluster.log.verbose('Installation via sftp upload detected')
         cluster.log.debug(common_group.sudo(remote_commands))
@@ -169,7 +179,8 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
                            % (destination, config['mode'], config['unpack'])
         remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
                            % (destination, config['owner'], config['unpack'])
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' \
+                           % (destination, config['unpack'])
 
     return common_group.sudo(remote_commands)
 

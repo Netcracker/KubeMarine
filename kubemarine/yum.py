@@ -21,8 +21,9 @@ def ls_repofiles(group, **kwargs):
 
 
 def backup_repo(group, repo_filename="*", **kwargs):
-    if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
-        group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
+    cluster = group.cluster
+    if not cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
+        cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
@@ -58,9 +59,10 @@ def install(group, include=None, exclude=None, **kwargs):
         if isinstance(exclude, list):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
-    command += f"; rpm -q {include}; if [ $? != 0 ]; then echo \"Failed to check version for some packages. " \
-               f"Make sure packages are not already installed with higher versions. " \
-               f"Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi "
+    command += f"; rpm -q {include}; if [ $? != 0 ]; then echo \"Failed to check version for " \
+               f"some packages. Make sure packages are not already installed with higher " \
+               f"versions. Also, make sure user-defined packages have rpm-compatible " \
+               f"names. \"; exit 1; fi "
     install_result = group.sudo(command, **kwargs)
 
     return install_result

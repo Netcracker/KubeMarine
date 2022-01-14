@@ -21,8 +21,8 @@ def verify_inventory(inventory, cluster):
     expected_states = ['enforce', 'complain', 'disable']
     for state in inventory['services']['kernel_security'].get('apparmor', {}).keys():
         if state not in expected_states:
-            raise Exception('Unknown apparmor mode found in configfile. Expected %s, but \'%s\' found.'
-                            % (expected_states, state))
+            raise Exception(f'Unknown apparmor mode found in configfile. '
+                            f'Expected {expected_states}, but \'{state}\' found.')
     return inventory
 
 
@@ -71,17 +71,18 @@ def is_state_valid(group, expected_profiles):
                     for remote_profiles in status.values():
                         if profile in remote_profiles:
                             valid = False
-                            log.verbose('Mode %s is enabled on remote host %s' % (state, connection.host))
+                            log.verbose(f'Mode {state} is enabled on remote host {connection.host}')
                             break
             else:
                 if not status.get(state):
                     valid = False
-                    log.verbose('Mode %s is not presented on remote host %s' % (state, connection.host))
+                    log.verbose(f'Mode {state} is not presented on remote host {connection.host}')
                     break
                 for profile in profiles:
                     if convert_profile(profile) not in status[state]:
                         valid = False
-                        log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, connection.host))
+                        log.verbose(f'Profile {profile} is not enabled '
+                                    f'in {state} mode on remote host {connection.host}')
                         break
 
     return valid, parsed_result
@@ -98,13 +99,16 @@ def configure_apparmor(group, expected_profiles):
     cmd = ''
     for profile in expected_profiles.get('enforce', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/disable/%s; sudo rm -f /etc/apparmor.d/force-complain/%s; ' % (profile, profile)
+        cmd += f'sudo rm -f /etc/apparmor.d/disable/{profile}; ' \
+               f'sudo rm -f /etc/apparmor.d/force-complain/{profile}; '
     for profile in expected_profiles.get('complain', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/disable/%s; sudo ln -s /etc/apparmor.d/%s /etc/apparmor.d/force-complain/; ' % (profile, profile)
+        cmd += f'sudo rm -f /etc/apparmor.d/disable/{profile}; ' \
+               f'sudo ln -s /etc/apparmor.d/{profile} /etc/apparmor.d/force-complain/; '
     for profile in expected_profiles.get('disable', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/force-complain/%s; sudo ln -s /etc/apparmor.d/%s /etc/apparmor.d/disable/; ' % (profile, profile)
+        cmd += f'sudo rm -f /etc/apparmor.d/force-complain/{profile}; ' \
+               f'sudo ln -s /etc/apparmor.d/{profile} /etc/apparmor.d/disable/; '
     cmd += 'sudo systemctl reload apparmor.service && sudo apparmor_status'
     return group.sudo(cmd)
 

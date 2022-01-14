@@ -56,7 +56,8 @@ class TestCase:
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, ts, id, category, name, default_results=None, minimal=None, recommended=None):
+    def __init__(self, ts, id, category, name, default_results=None, minimal=None,
+                 recommended=None):
         self.include_in_ts(ts)
         self.category = category
         self.id = str(id)
@@ -91,7 +92,8 @@ class TestCase:
         self.results = results
         return self
 
-    def get_summary(self, show_description=False, show_hint=False, show_minimal=False, show_recommended=False):
+    def get_summary(self, show_description=False, show_hint=False, show_minimal=False,
+                    show_recommended=False):
         output = ""
 
         output += " " * (15 - len(self.category))
@@ -133,8 +135,11 @@ class TestCase:
                 recommended = str(self.recommended)
                 output += ' ' * (14-len(recommended)) + recommended
 
-        if show_hint and (isinstance(self.results, TestFailure) or isinstance(self.results, TestWarn)) and self.results.hint is not None:
-            output += "\n                  HINT:\n" + textwrap.indent(str(self.results.hint), "                       ")
+        if show_hint\
+                and (isinstance(self.results, TestFailure) or isinstance(self.results, TestWarn))\
+                and self.results.hint is not None:
+            output += "\n                  HINT:\n" + \
+                      textwrap.indent(str(self.results.hint), "                       ")
 
         return output
 
@@ -203,7 +208,8 @@ class TestSuite:
         return False
 
     def get_final_summary(self, show_minimal=True, show_recommended=True):
-        result = "          Group    Status   ID    Test                                                               Actual result"
+        result = "          Group    Status   ID    Test" \
+                 "                                                               Actual result"
         if show_minimal:
             result += "        Minimal"
         if show_recommended:
@@ -211,11 +217,13 @@ class TestSuite:
         result += "\n"
 
         for tc in self.tcs:
-            result += "\n" + tc.get_summary(show_minimal=show_minimal, show_recommended=show_recommended)
+            result += "\n" + tc.get_summary(show_minimal=show_minimal,
+                                            show_recommended=show_recommended)
 
         result += "\n\nOVERALL RESULTS: "
 
-        for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
+        for key, value in sorted(self.get_stats_data().items(),
+                                 key=lambda _key: badges_weights[_key[0]]):
             colors = ''
             if key == 'succeeded':
                 colors = "\x1b[48;5;041m\x1b[38;5;232m"
@@ -234,11 +242,13 @@ class TestSuite:
     def print_final_status(self, log):
         if self.is_any_test_failed():
             log.error("\nTEST FAILED"
-                      "\nThe environment does not meet the minimal requirements. Check the test report and resolve the issues.")
+                      "\nThe environment does not meet the minimal requirements. "
+                      "Check the test report and resolve the issues.")
             return
         if self.is_any_test_warned():
             log.warning("\nTEST PASSED WITH WARNINGS"
-                        "\nThe environment meets the minimal requirements, but is not as recommended. Try to check the test report and resolve the issues.")
+                        "\nThe environment meets the minimal requirements, but is not as "
+                        "recommended. Try to check the test report and resolve the issues.")
             return
         log.info("\nTEST PASSED")
 
@@ -260,8 +270,10 @@ class TestSuite:
 
     def save_csv(self, destination_file_path, delimiter=';'):
         with open(destination_file_path, mode='w') as stream:
-            csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
+            csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
+            csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result',
+                                 'minimal_result', 'recommended_result'])
             for tc in self.tcs:
                 csv_writer.writerow([
                     tc.category.lower(),
@@ -275,11 +287,16 @@ class TestSuite:
 
     def save_html(self, destination_file_path, check_type, append_styles=True):
         with open(destination_file_path, mode='w') as stream:
-            stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
-            for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
+            stream.write(f'<!DOCTYPE html><html><head><meta charset="utf-8">'
+                         f'<title>{check_type} Check Report</title></head>'
+                         f'<body><div id="date">{datetime.utcnow()}</div><div id="stats">')
+            for key, value in sorted(self.get_stats_data().items(),
+                                     key=lambda _key: badges_weights[_key[0]]):
                 stream.write('<div class="%s">%s %s</div>' % (key, value, key))
             stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
-            stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
+            stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td>'
+                         '<td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr>'
+                         '</thead><tbody>')
             for tc in self.tcs:
                 minimal = tc.minimal
                 if minimal is None:
@@ -287,16 +304,14 @@ class TestSuite:
                 recommended = tc.recommended
                 if recommended is None:
                     recommended = ''
-                stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
-                             (tc.get_readable_status(),
-                              tc.category.lower(),
-                              tc.get_readable_status(),
-                              tc.id,
-                              tc.name,
-                              tc.results,
-                              minimal,
-                              recommended
-                              ))
+                stream.write(f'<tr class="{tc.get_readable_status()}">'
+                             f'<td>{tc.category.lower()}</td>'
+                             f'<td><div>{tc.get_readable_status()}</div></td>'
+                             f'<td>{tc.id}</td>'
+                             f'<td>{tc.name}</td>'
+                             f'<td>{tc.results}</td>'
+                             f'<td>{minimal}</td>'
+                             f'<td>{recommended}</td></tr>')
             stream.write('</tbody></table>')
             if append_styles:
                 with open(utils.get_resource_absolute_path('resources/reports/check_report.css',

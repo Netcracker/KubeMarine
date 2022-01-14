@@ -80,17 +80,22 @@ def enrich_upgrade_inventory(inventory, cluster):
             inventory['services'] = {}
         if not inventory['services'].get('kubeadm'):
             inventory['services']['kubeadm'] = {}
-        cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
+        cluster.context['initial_kubernetes_version'] = \
+            inventory['services']['kubeadm']['kubernetesVersion']
         inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
         disable_eviction = cluster.procedure_inventory.get("disable-eviction")
         if disable_eviction not in (None, True, False):
-            raise Exception(f"'disable-eviction' value could be either True or False, found {disable_eviction}")
+            raise Exception(f"'disable-eviction' value could be either True or False, "
+                            f"but found \"{disable_eviction}\"")
 
-        test_version_upgrade_possible(cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version'])
-        cluster.log.info(
-            '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
-            cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
+        initial_version = cluster.context['initial_kubernetes_version']
+        upgrade_version = cluster.context['upgrade_version']
+
+        test_version_upgrade_possible(initial_version, upgrade_version)
+        cluster.log.info(f"------------------------------------------\n"
+                         f"UPGRADING KUBERNETES {initial_version} ⭢ {upgrade_version}"
+                         f"\n------------------------------------------")
     return inventory
 
 
@@ -112,7 +117,8 @@ def version_higher_or_equal(version, compared_version):
 
 
 def enrich_inventory(inventory, cluster):
-    if version_higher_or_equal(inventory['services']['kubeadm']['kubernetesVersion'], version_coredns_path_breakage):
+    if version_higher_or_equal(inventory['services']['kubeadm']['kubernetesVersion'],
+                               version_coredns_path_breakage):
         repository = inventory['services']['kubeadm'].get('imageRepository', "")
         if repository:
             inventory['services']['kubeadm']['dns'] = {}
@@ -127,11 +133,14 @@ def enrich_inventory(inventory, cluster):
 
     certsans = inventory["services"]["kubeadm"]['apiServer']['certSANs']
 
-    # do not overwrite apiServer.certSANs, but append - may be user specified something already there?
+    # do not overwrite apiServer.certSANs, but append - may be user specified
+    # something already there?
     for node in inventory["nodes"]:
         if 'balancer' in node['roles'] or 'master' in node['roles']:
-            inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['internal_address'])
-            inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['name'])
+            inventory["services"]["kubeadm"]['apiServer']['certSANs'] \
+                .append(node['internal_address'])
+            inventory["services"]["kubeadm"]['apiServer']['certSANs'] \
+                .append(node['name'])
             if node.get('address') is not None and node['address'] not in certsans:
                 inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['address'])
 
@@ -139,11 +148,14 @@ def enrich_inventory(inventory, cluster):
         for item in inventory["vrrp_ips"]:
             inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(item['ip'])
             if item.get("floating_ip"):
-                inventory["services"]["kubeadm"]["apiServer"]["certSANs"].append(item["floating_ip"])
+                inventory["services"]["kubeadm"]["apiServer"]["certSANs"] \
+                    .append(item["floating_ip"])
 
     if inventory.get("public_cluster_ip"):
-        if inventory["public_cluster_ip"] not in inventory["services"]["kubeadm"]["apiServer"]["certSANs"]:
-            inventory["services"]["kubeadm"]["apiServer"]["certSANs"].append(inventory["public_cluster_ip"])
+        if inventory["public_cluster_ip"] not in \
+                inventory["services"]["kubeadm"]["apiServer"]["certSANs"]:
+            inventory["services"]["kubeadm"]["apiServer"]["certSANs"] \
+                .append(inventory["public_cluster_ip"])
 
     # validating node labels and configuring additional labels
     for node in inventory["nodes"]:
@@ -216,8 +228,8 @@ def reset_installation_env(group: NodeGroup):
             is_add_or_remove_procedure = False
 
     if not nodes_for_manual_etcd_remove.is_empty():
-        log.warning(f"Nodes {list(nodes_for_manual_etcd_remove.nodes.keys())} are considered as not active. "
-                    "Full cleanup procedure cannot be performed. "
+        log.warning(f"Nodes {list(nodes_for_manual_etcd_remove.nodes.keys())} are considered as "
+                    f"not active. Full cleanup procedure cannot be performed. "
                     "Corresponding members will be removed from etcd manually.")
         etcd.remove_members(nodes_for_manual_etcd_remove)
 
@@ -231,26 +243,30 @@ def reset_installation_env(group: NodeGroup):
 
     if not active_nodes.is_empty():
         log.verbose(f"Cleaning nodes {list(active_nodes.nodes.keys())} ...")
-        # bash semicolon mark will avoid script from exiting and will resume the execution
+        # Bash semicolon mark will avoid script from exiting and will resume the execution.
+        # It is required to "cleanup-node" for all procedures
         result = active_nodes.sudo(
-            'sudo kubeadm reset phase cleanup-node; '  # it is required to "cleanup-node" for all procedures
+            'sudo kubeadm reset phase cleanup-node; '  
             'sudo systemctl stop kubelet; '
             'sudo rm -rf /etc/kubernetes/manifests /var/lib/kubelet/pki /var/lib/etcd; '
             'sudo mkdir -p /etc/kubernetes/manifests; ', warn=True)
 
-        # Disabled initial prune for images prepull feature. Need analysis for possible negative impact.
+        # Disabled initial prune for images prepull feature.
+        # Need analysis for possible negative impact.
         # result.update(cri.prune(active_nodes, all_implementations=True))
 
-        log.debug(f"Nodes {list(active_nodes.nodes.keys())} cleaned up successfully:\n" + "%s" % result)
+        log.debug(f"Nodes {list(active_nodes.nodes.keys())} cleaned up successfully:\n{result}")
 
     if is_add_or_remove_procedure:
         return delete_nodes(group)
 
 
 def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=None):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
 
-    master = group.cluster.nodes['master'].get_final_nodes().get_first_member()
+    kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    master = cluster.nodes['master'].get_final_nodes().get_first_member()
     result = master.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
@@ -259,10 +275,10 @@ def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=
     for node in group.get_ordered_members_list(provide_node_configs=True):
         if node["name"] in stdout:
             log.debug("Draining node %s..." % node["name"])
-            master.sudo(prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                              group.cluster.globals, disable_eviction, group.cluster.nodes,
-                                              drain_timeout, grace_period),
-                        hide=False)
+            master.sudo(prepare_drain_command(node,
+                                              kubernetes_version,
+                                              cluster.globals, disable_eviction, cluster.nodes,
+                                              drain_timeout, grace_period), hide=False)
         else:
             log.warning("Node %s is not found in cluster and can't be drained" % node["name"])
 
@@ -295,17 +311,21 @@ def is_available_master(master):
 def install(group):
     log = group.cluster.log
 
+    template_path = utils.get_resource_absolute_path('templates/kubelet.service.j2',
+                                                     script_relative=True)
+    config_template = Template(open(template_path).read())
+
     with RemoteExecutor(group.cluster):
         log.debug("Making systemd unit...")
         group.sudo('rm -rf /etc/systemd/system/kubelet*')
         for node in group.cluster.inventory["nodes"]:
             # perform only for current group members
             if node["connect_to"] in group.nodes.keys():
-                template = Template(open(utils.get_resource_absolute_path('templates/kubelet.service.j2',
-                                                                          script_relative=True)).read()).render(
-                    hostname=node["name"])
+                template = config_template.render(hostname=node["name"])
                 log.debug("Uploading to '%s'..." % node["connect_to"])
-                node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
+                node["connection"].put(io.StringIO(template + "\n"),
+                                       '/etc/systemd/system/kubelet.service',
+                                       sudo=True)
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(group)
@@ -340,7 +360,8 @@ def join_master(group, node, join_dict):
         'kind': 'JoinConfiguration',
         'discovery': {
             'bootstrapToken': {
-                'apiServerEndpoint': group.cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
+                'apiServerEndpoint':
+                    group.cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
                 'token': join_dict['token'],
                 'caCertHashes': [
                     join_dict['discovery-token-ca-cert-hash']
@@ -365,7 +386,9 @@ def join_master(group, node, join_dict):
 
     configure_container_runtime(group.cluster, join_config)
 
-    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(join_config, default_flow_style=False)
+    config = get_kubeadm_config(group.cluster.inventory) + \
+             "---\n" + \
+             yaml.dump(join_config, default_flow_style=False)
 
     utils.dump_file(group.cluster, config, 'join-config_%s.yaml' % node['name'])
 
@@ -373,7 +396,8 @@ def join_master(group, node, join_dict):
     node['connection'].sudo("mkdir -p /etc/kubernetes")
     node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
-    # ! ETCD on masters can't be initialized in async way, that is why it is necessary to disable async mode !
+    # ! ETCD on masters can't be initialized in async way, that is why it is
+    # necessary to disable async mode !
     log.debug('Joining master \'%s\'...' % node['name'])
     node['connection'].sudo("kubeadm join "
                             " --config=/etc/kubernetes/join-config.yaml"
@@ -383,8 +407,9 @@ def join_master(group, node, join_dict):
     log.debug("Patching apiServer bind-address for master %s" % node['name'])
 
     with RemoteExecutor(group.cluster):
-        node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
-                                "/etc/kubernetes/manifests/kube-apiserver.yaml" % node['internal_address'])
+        sed_cmd = f"sed -i 's/--bind-address=.*$/--bind-address={node['internal_address']}/' " \
+                  f"/etc/kubernetes/manifests/kube-apiserver.yaml"
+        node['connection'].sudo(sed_cmd)
         node['connection'].sudo("systemctl restart kubelet")
         copy_admin_config(log, node['connection'])
 
@@ -398,7 +423,8 @@ def copy_admin_config(log, nodes):
 
 def get_join_dict(group):
     first_master = group.cluster.nodes["master"].get_first_member(provide_node_configs=True)
-    token_result = first_master['connection'].sudo("kubeadm token create --print-join-command", hide=False)
+    token_result = first_master['connection'].sudo("kubeadm token create --print-join-command",
+                                                   hide=False)
     join_strings = list(token_result.values())[0].stdout.rstrip("\n")
 
     join_dict = {"worker_join_command": join_strings}

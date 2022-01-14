@@ -25,9 +25,11 @@ from kubemarine.core.group import NodeGroup, NodeGroupResult
 
 def make_config(cluster):
     """
-    Converts parameters from inventory['services']['sysctl'] to a string in the format of systcl.conf.
+    Converts parameters from inventory['services']['sysctl'] to a string in the format
+    of systcl.conf
     """
     config = ""
+    pid_max_allowed_limit = 2 ** 22
     if cluster.inventory['services'].get('sysctl') is not None:
         for key, value in cluster.inventory['services']['sysctl'].items():
             if isinstance(value, str):
@@ -36,10 +38,9 @@ def make_config(cluster):
                 value = int(value)
                 if key == "kernel.pid_max":
                     required_pid_max = get_pid_max(cluster.inventory)
-                    if value > 2 ** 22:
-                        raise Exception(
-                            "The 'kernel.pid_max' value = '%s' is greater than the maximum allowable '%s'"
-                            % (value, 2 ** 22))
+                    if value > pid_max_allowed_limit:
+                        raise Exception(f"The 'kernel.pid_max' value = '{value}' is greater than "
+                                        f"the maximum allowed '{pid_max_allowed_limit}'")
                     if value < required_pid_max:
                         raise Exception(
                             "The 'kernel.pid_max' value = '%s' is lower than "
@@ -54,9 +55,9 @@ def make_config(cluster):
             if pid_max < 32768:
                 cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
                                     "default system value = '32768'" % pid_max)
-            if pid_max > 2**22:
-                raise Exception("Calculated 'pid_max' value = '%s' is greater than the maximum allowable '%s'"
-                                % (pid_max, 2**22))
+            if pid_max > pid_max_allowed_limit:
+                raise Exception(f"Calculated 'pid_max' value = '{pid_max}' is greater than "
+                                f"the maximum allowed '{pid_max_allowed_limit}'")
             config += "%s = %s\n" % ("kernel.pid_max", pid_max)
     return config
 
@@ -69,7 +70,8 @@ def configure(group: NodeGroup) -> NodeGroupResult:
     config = make_config(group.cluster)
     group.sudo('rm -f /etc/sysctl.d/98-*-sysctl.conf')
     utils.dump_file(group.cluster, config, '98-kubemarine-sysctl.conf')
-    group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf', backup=True, sudo=True)
+    group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf',
+              backup=True, sudo=True)
     return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf')
 
 

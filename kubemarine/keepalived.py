@@ -62,7 +62,8 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                 item['router_id'] = item['ip'].split(':').pop()
                 if item['router_id'] == '':
                     item['router_id'] = '0'
-                # in adress with long last octet e.g. "765d" it is necessary to use only last "5d" and convert it from hex to int
+                # in adress with long last octet e.g. "765d" it is necessary to use only last "5d"
+                # and convert it from hex to int
                 item['router_id'] = str(int(item['router_id'][-2:], 16))
             else:
                 item['router_id'] = item['ip'].split('.').pop()
@@ -83,7 +84,8 @@ def enrich_inventory_apply_defaults(inventory, cluster):
         if item.get('hosts') is None:
             # is there default names found?
             if not default_names:
-                raise Exception('Section #%s in vrrp_ips has no hosts, but default names can\'t be found.' % i)
+                raise Exception(f"Section #{i} in vrrp_ips has no hosts, "
+                                f"but default names can't be found.")
             # ok, default names found, and can be used
             inventory['vrrp_ips'][i]['hosts'] = default_names
 
@@ -93,12 +95,14 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                     'name': record
                 }
             if not item['hosts'][j].get('priority'):
-                item['hosts'][j]['priority'] = cluster.globals['keepalived']['defaults']['priority']['max_value'] - \
-                                               (j + cluster.globals['keepalived']['defaults']['priority']['step'])
+                item['hosts'][j]['priority'] = \
+                    cluster.globals['keepalived']['defaults']['priority']['max_value'] - \
+                    (j + cluster.globals['keepalived']['defaults']['priority']['step'])
             if not item['hosts'][j].get('interface') and item.get('interface'):
                 item['hosts'][j]['interface'] = item['interface']
             if item['hosts'][j].get('interface', 'auto') == 'auto':
-                item['hosts'][j]['interface'] = autodetect_interface(cluster, item['hosts'][j]['name'])
+                item['hosts'][j]['interface'] = \
+                    autodetect_interface(cluster, item['hosts'][j]['name'])
 
     return inventory
 
@@ -131,9 +135,11 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
     # it is important to remove duplicates
     names = list(set(names))
 
-    filtered_members = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=False, apply_filter={
+    filter_pattern = {
         'name': names
-    })
+    }
+    filtered_members = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=False,
+                                                                     apply_filter=filter_pattern)
 
     # create new group where keepalived will be installed
     cluster.nodes['keepalived'] = cluster.make_group(filtered_members)
@@ -148,9 +154,10 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
 
 
 def install(group):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
 
-    package_associations = group.cluster.inventory['services']['packages']['associations']['keepalived']
+    package_associations = cluster.inventory['services']['packages']['associations']['keepalived']
 
     keepalived_version = group.sudo("%s -v" % package_associations['executable_name'], warn=True)
     keepalived_installed = True
@@ -163,10 +170,13 @@ def install(group):
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
-        installation_result = packages.install(group.get_new_nodes_or_self(), include=package_associations['package_name'])
+        installation_result = packages.install(group.get_new_nodes_or_self(),
+                                               include=package_associations['package_name'])
 
-    service_name = group.cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
-    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/keepalived.conf", script_relative=True)
+    service_name = \
+        cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
+    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/keepalived.conf",
+                                                  script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     group.call(install_haproxy_check_script)
     enable(group)
@@ -175,7 +185,8 @@ def install(group):
 
 
 def install_haproxy_check_script(group: NodeGroup):
-    local_path = utils.get_resource_absolute_path("./resources/scripts/check_haproxy.sh", script_relative=True)
+    local_path = utils.get_resource_absolute_path("./resources/scripts/check_haproxy.sh",
+                                                  script_relative=True)
     group.put(local_path, "/usr/local/bin/check_haproxy.sh", sudo=True, binary=False)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
@@ -189,7 +200,8 @@ def restart(group):
     for node in group.get_ordered_members_list(provide_node_configs=True):
         os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
         package_associations = os_specific_associations['keepalived']
-        results.update(system.restart_service(node['connection'], name=package_associations['service_name']))
+        results.update(system.restart_service(node['connection'],
+                                              name=package_associations['service_name']))
         group.cluster.log.debug("Sleep while keepalived comes-up...")
         time.sleep(group.cluster.globals['keepalived']['restart_wait'])
     return results
@@ -199,7 +211,8 @@ def enable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.enable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'],
+            system.enable_service(node['connection'],
+                                  name=os_specific_associations['keepalived']['service_name'],
                                   now=True)
 
 
@@ -207,7 +220,8 @@ def disable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.disable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'])
+            system.disable_service(node['connection'],
+                                   name=os_specific_associations['keepalived']['service_name'])
 
 
 def generate_config(inventory, node):
@@ -216,7 +230,8 @@ def generate_config(inventory, node):
     for i, item in enumerate(inventory['vrrp_ips']):
 
         if i > 0:
-            # this is required for double newline in config, but avoid double newline in the end of file
+            # this is required for double newline in config, but avoid double newline
+            # in the end of file
             config += "\n"
 
         ips = {
@@ -236,8 +251,11 @@ def generate_config(inventory, node):
                 if i_node['name'] == record['name'] and i_node['internal_address'] != ips['source']:
                     ips['peers'].append(i_node['internal_address'])
 
-        template_location = utils.get_resource_absolute_path('templates/keepalived.conf.j2', script_relative=True)
-        config += Template(open(template_location).read()).render(inventory=inventory, item=item, node=node,
+        template_location = \
+            utils.get_resource_absolute_path('templates/keepalived.conf.j2', script_relative=True)
+        config += Template(open(template_location).read()).render(inventory=inventory,
+                                                                  item=item,
+                                                                  node=node,
                                                                   interface=interface,
                                                                   priority=priority, **ips) + "\n"
 
@@ -253,7 +271,8 @@ def configure(group: NodeGroup) -> NodeGroupResult:
 
             log.debug("Configuring keepalived on '%s'..." % node['name'])
 
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'])['keepalived']
+            package_associations = \
+                group.cluster.get_associations_for_node(node['connect_to'])['keepalived']
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
             group.sudo('mkdir -p %s' % configs_directory, hide=True)
@@ -261,7 +280,9 @@ def configure(group: NodeGroup) -> NodeGroupResult:
             config = generate_config(group.cluster.inventory, node)
             utils.dump_file(group.cluster, config, 'keepalived_%s.conf' % node['name'])
 
-            node['connection'].put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node['connection'].put(io.StringIO(config),
+                                   package_associations['config_location'],
+                                   sudo=True)
 
     log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
 

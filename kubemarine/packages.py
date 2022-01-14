@@ -62,7 +62,8 @@ def backup_repo(group: NodeGroup, repo_filename="*", **kwargs) -> NodeGroupResul
     return get_package_manager(group).backup_repo(group, repo_filename, **kwargs)
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
+def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) \
+        -> NodeGroupResult:
     return get_package_manager(group).add_repo(group, repo_data, repo_filename, **kwargs)
 
 
@@ -82,7 +83,8 @@ def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroup
     return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
 
 
-def detect_installed_package_version(group: NodeGroup, package: str, warn=True) -> NodeGroupResult:
+def detect_installed_package_version(group: NodeGroup, package: str, warn=True) \
+        -> NodeGroupResult:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -111,21 +113,25 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     return group.sudo(cmd)
 
 
-def detect_installed_packages_versions(group: NodeGroup, packages_list: List or str = None) -> Dict[str, NodeGroupResult]:
+def detect_installed_packages_versions(group: NodeGroup, packages_list: List or str = None) \
+        -> Dict[str, NodeGroupResult]:
     """
     Detect packages versions for each host on remote group from specified list of packages
     :param group: Group of nodes, where packages should be found
-    :param packages_list: Single package or list of packages, which versions should be detected. If packages list empty,
-    then packages will be automatically added from services.packages.associations and services.packages.install.include
-    :return: Dictionary with NodeGroupResults for each queried package, e.g. "foo" -> {1.1.1.1:"foo-1", 1.1.1.2:"foo-2"}
+    :param packages_list: Single package or list of packages, which versions should be detected.
+    If packages list empty, then packages will be automatically added from
+    "services.packages.associations" and "services.packages.install.include"
+    :return: Dictionary with NodeGroupResults for each queried package,
+    e.g. "foo" -> {1.1.1.1:"foo-1", 1.1.1.2:"foo-2"}
     """
 
     cluster = group.cluster
+    packages_associations = cluster.inventory['services']['packages']['associations']
 
     if not packages_list:
         packages_list = []
         # packages from associations
-        for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
+        for association_name, associated_params in packages_associations.items():
             associated_packages = associated_params.get('package_name', [])
             if isinstance(associated_packages, str):
                 packages_list.append(associated_packages)
@@ -133,7 +139,8 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
                 packages_list = packages_list + associated_packages
         # packages from direct installation section
         if cluster.inventory['services']['packages'].get('install', {}):
-            packages_list = packages_list + cluster.inventory['services']['packages']['install']['include']
+            packages_list = packages_list + \
+                            cluster.inventory['services']['packages']['install']['include']
 
     # dedup
     packages_list = list(set(packages_list))
@@ -148,8 +155,10 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     for i, package in enumerate(packages_list):
         results[package] = NodeGroupResult(cluster)
         for host, multiple_results in raw_result.items():
-            node_detected_package = multiple_results[i].stdout.strip() + multiple_results[i].stderr.strip()
-            if "not installed" in node_detected_package or "no packages found" in node_detected_package:
+            node_detected_package = multiple_results[i].stdout.strip() + \
+                                    multiple_results[i].stderr.strip()
+            if "not installed" in node_detected_package \
+                    or "no packages found" in node_detected_package:
                 node_detected_package = f"not installed {package}"
             results[package][host] = node_detected_package
 
@@ -161,8 +170,9 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
     """
     Detect grouped packages versions on remote group from specified list of packages.
     :param group: Group of nodes, where packages should be found
-    :param packages_list: Single package or list of packages, which versions should be detected. If packages list empty,
-    then packages will be automatically added from services.packages.associations and services.packages.install.include
+    :param packages_list: Single package or list of packages, which versions should be detected.
+    If packages list empty, then packages will be automatically added from
+    "services.packages.associations" and "services.packages.install.include"
     :return: Dictionary with grouped versions for each queried package, pointing to list of hosts,
         e.g. {"foo" -> {"foo-1": [host1, host2]}, "bar" -> {"bar-1": [host1], "bar-2": [host2]}}
     """

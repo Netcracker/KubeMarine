@@ -23,7 +23,8 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 
 
-# the methods requires etcdctl.sh to be installed on all active master nodes during thirdparties task.
+# the methods requires etcdctl.sh to be installed on all active master nodes during thirdparties
+# task.
 
 def remove_members(group: NodeGroup):
     log = group.cluster.log
@@ -57,7 +58,8 @@ def remove_members(group: NodeGroup):
             log.verbose(f"Skipping {node_name} as it is not among etcd members.")
 
 
-def wait_for_health(cluster: KubernetesCluster, connection: fabric.connection.Connection) -> List[Dict]:
+def wait_for_health(cluster: KubernetesCluster, connection: fabric.connection.Connection)\
+        -> List[Dict]:
     """
     The method checks etcd endpoints health until all endpoints are healthy or retries are exhausted
     if all member are healthy the method checks the leader.

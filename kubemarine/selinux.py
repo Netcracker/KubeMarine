@@ -75,18 +75,21 @@ def get_expected_permissive(inventory):
 
 
 def verify_inventory(inventory, cluster):
+    kernel_security = inventory['services']['kernel_security']
 
     expected_selinux_states = ['enforcing', 'permissive', 'disabled']
-    if inventory['services']['kernel_security'].get('selinux', {}).get('state') and \
-            inventory['services']['kernel_security']['selinux']['state'] not in expected_selinux_states:
-        raise Exception('Unknown selinux state found in configfile. Expected %s, but \'%s\' found.'
-                        % (expected_selinux_states, inventory['services']['kernel_security']['selinux']['state']))
+    if kernel_security.get('selinux', {}).get('state') and \
+            kernel_security['selinux']['state'] not in expected_selinux_states:
+        raise Exception(f"Unknown selinux state found in configfile. "
+                        f"Expected {expected_selinux_states}, but "
+                        f"'{kernel_security['selinux']['state']}' found.")
 
     expected_selinux_policies = ['targeted', 'strict']
-    if inventory['services']['kernel_security'].get('selinux', {}).get('policy') and \
-            inventory['services']['kernel_security']['selinux']['policy'] not in expected_selinux_policies:
-        raise Exception('Unknown selinux policy found in configfile. Expected %s, but \'%s\' found.'
-                        % (expected_selinux_policies, inventory['services']['kernel_security']['selinux']['policy']))
+    if kernel_security.get('selinux', {}).get('policy') and \
+            kernel_security['selinux']['policy'] not in expected_selinux_policies:
+        raise Exception(f"Unknown selinux policy found in configfile. "
+                        f"Expected {expected_selinux_policies}, but "
+                        f"'{kernel_security['selinux']['policy']}' found.")
 
     return inventory
 
@@ -130,8 +133,9 @@ def get_selinux_status(group):
     parsed_result = {}
     for connection, node_result in result.items():
         log.verbose('Parsing status for %s...' % connection.host)
-        parsed_result[connection] = parse_selinux_status(log, node_result.stdout)
-        parsed_result[connection]['permissive_types'] = parse_selinux_permissive_types(log, node_result.stdout)
+        stdout = node_result.stdout
+        parsed_result[connection] = parse_selinux_status(log, stdout)
+        parsed_result[connection]['permissive_types'] = parse_selinux_permissive_types(log, stdout)
     log.verbose("Parsed remote sestatus summary:\n%s" % parsed_result)
     return result, parsed_result
 
@@ -176,10 +180,11 @@ def is_config_valid(group, state=None, policy=None, permissive=None):
             for permissive_type in permissive:
                 if permissive_type not in selinux_status['permissive_types']:
                     valid = False
-                    log.verbose('Permissive type %s not found in types %s at %s '
-                                % (permissive_type, selinux_status['permissive_types'], connection.host))
+                    log.verbose(f"Permissive type {permissive_type} not found in types "
+                                f"{selinux_status['permissive_types']} at {connection.host}")
                     break
-            # if no break was called in previous for loop, then else called and no break will be called in current loop
+            # if no break was called in previous for loop, then else called and no break will be
+            # called in current loop
             else:
                 continue
             # if break was called in previous for loop, then do break in current loop
@@ -220,7 +225,8 @@ def setup_selinux(group):
         if semanage_commands != '':
             semanage_commands = semanage_commands + ' && sudo '
         semanage_commands = semanage_commands + 'semanage permissive -a %s' % item
-    log.verbose("The following command will be executed to configure permissive:\n%s" % semanage_commands)
+    log.verbose(f"The following command will be executed to configure permissive:"
+                f"\n{semanage_commands}")
 
     group.sudo(semanage_commands)
 

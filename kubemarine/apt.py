@@ -24,13 +24,14 @@ def ls_repofiles(group, **kwargs) -> NodeGroupResult:
 
 
 def backup_repo(group, repo_filename="*", **kwargs) -> NodeGroupResult or None:
-    if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
-        group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
+    cluster = group.cluster
+    if not cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
+        cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
-    return group.sudo("find %s -type f -name '%s.list' | "
-                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % ("/etc/apt/", repo_filename), **kwargs)
+    return group.sudo(f"find /etc/apt/ -type f -name '{repo_filename}.list' | "
+                      f"sudo xargs -t -iNAME mv -bf NAME NAME.bak", **kwargs)
 
 
 def add_repo(group, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
@@ -39,7 +40,8 @@ def add_repo(group, repo_data="", repo_filename="predefined", **kwargs) -> NodeG
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
         repo_data_str = str(repo_data)
-    group.put(io.StringIO(repo_data_str), '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename), sudo=True)
+    str_stream = io.StringIO(repo_data_str)
+    group.put(str_stream, f'/etc/apt/sources.list.d/{repo_filename}.list', sudo=True)
     return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update', **kwargs)
 
 

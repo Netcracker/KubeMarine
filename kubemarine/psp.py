@@ -55,10 +55,12 @@ def enrich_inventory(inventory, _):
         return inventory
 
     # if security enabled, then add PodSecurityPolicy admission plugin
-    enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"]
+    enabled_admissions = \
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"]
     if 'PodSecurityPolicy' not in enabled_admissions:
-        enabled_admissions = "%s,PodSecurityPolicy" % enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = enabled_admissions
+        enabled_admissions = f"{enabled_admissions},PodSecurityPolicy"
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = \
+            enabled_admissions
 
     return inventory
 
@@ -124,10 +126,11 @@ def verify_custom(custom_scope):
 def verify_custom_list(custom_list, type, supported_kinds):
     for item in custom_list:
         if item["kind"] not in supported_kinds:
-            raise Exception("Type %s should have %s kind" % (type, supported_kinds))
+            raise Exception(f"Type {type} should have {supported_kinds} kind")
         # forbid using 'oob-' prefix in order to avoid conflicts of our policies and users policies
         if item["metadata"]["name"].startswith("oob-"):
-            raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
+            raise Exception(f"Name \"{item['metadata']['name']}\" is not allowed "
+                            f"for custom type \"{type}\"")
 
 
 def finalize_inventory(cluster, inventory_to_finalize):
@@ -143,12 +146,14 @@ def finalize_inventory(cluster, inventory_to_finalize):
 
     # Perform custom-policies lists changes.
     # Perform changes only if there are any "custom-policies" or "add-policies" in inventory,
-    # do not perform changes if only "delete-policies" defined, there is nothing to delete from inventory in this case.
+    # do not perform changes if only "delete-policies" defined, there is nothing to delete from
+    # inventory in this case.
     adding_custom_policies = procedure_config.get("add-policies", {})
     deleting_custom_policies = procedure_config.get("delete-policies", {})
     existing_custom_policies = current_config.get("custom-policies", {})
     if existing_custom_policies or adding_custom_policies:
-        # if custom policies are not defined in inventory, then we need to create custom policies ourselves
+        # if custom policies are not defined in inventory, then we need to create custom
+        # policies ourselves
         if not existing_custom_policies:
             current_config["custom-policies"] = {}
         current_config["custom-policies"] = merge_custom_policies(existing_custom_policies,
@@ -156,13 +161,15 @@ def finalize_inventory(cluster, inventory_to_finalize):
                                                                   deleting_custom_policies)
 
     # merge flags from procedure config and cluster config
-    current_config["pod-security"] = procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
+    current_config["pod-security"] = \
+        procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
     if "oob-policies" in procedure_config:
         if "oob-policies" not in current_config:
             current_config["oob-policies"] = procedure_config["oob-policies"]
         else:
             for oob_policy in procedure_config["oob-policies"]:
-                current_config["oob-policies"][oob_policy] = procedure_config["oob-policies"][oob_policy]
+                current_config["oob-policies"][oob_policy] = \
+                    procedure_config["oob-policies"][oob_policy]
 
     return inventory_to_finalize
 
@@ -188,7 +195,8 @@ def merge_policy_lists(old_list, added_list, deleted_list):
     for old_item in old_list:
         old_item_name = old_item["metadata"]["name"]
         if old_item_name in added_names_list or old_item_name in deleted_names_list:
-            # skip old item, since it was either deleted, replaced by new item, or deleted and then replaced
+            # skip old item, since it was either deleted, replaced by new item,
+            # or deleted and then replaced
             continue
         # old item is nor deleted, nor updated, then we need to preserve it in resulting list
         resulting_list.append(old_item)
@@ -202,16 +210,17 @@ def install_psp_task(cluster):
         return
 
     first_master = cluster.nodes["master"].get_first_member()
+    cluster_psp = cluster.inventory["rbac"]["psp"]
 
     cluster.log.debug("Installing OOB policies...")
     first_master.call(manage_policies,
                       manage_type="apply",
-                      manage_scope=resolve_oob_scope(cluster.inventory["rbac"]["psp"]["oob-policies"], "enabled"))
+                      manage_scope=resolve_oob_scope(cluster_psp["oob-policies"], "enabled"))
 
     cluster.log.debug("Installing custom policies...")
     first_master.call(manage_policies,
                       manage_type="apply",
-                      manage_scope=cluster.inventory["rbac"]["psp"]["custom-policies"])
+                      manage_scope=cluster_psp["custom-policies"])
 
 
 def delete_custom_task(cluster):
@@ -251,7 +260,9 @@ def reconfigure_oob_task(cluster):
 
     cluster.log.debug("Deleting all OOB policies...")
     first_master.call(delete_privileged_policy)
-    first_master.call(manage_policies, manage_type="delete", manage_scope=resolve_oob_scope(loaded_oob_policies, "all"))
+    first_master.call(manage_policies,
+                      manage_type="delete",
+                      manage_scope=resolve_oob_scope(loaded_oob_policies, "all"))
 
     if target_security_state == "disabled":
         cluster.log.debug("Security disabled, OOB will not be recreated")
@@ -265,7 +276,9 @@ def reconfigure_oob_task(cluster):
         if procedure_config.get(policy, current_config[policy]) == "enabled":
             policies_to_recreate[policy] = True
     first_master.call(apply_privileged_policy)
-    first_master.call(manage_policies, manage_type="apply", manage_scope=resolve_oob_scope(policies_to_recreate, "all"))
+    first_master.call(manage_policies,
+                      manage_type="apply",
+                      manage_scope=resolve_oob_scope(policies_to_recreate, "all"))
 
 
 def reconfigure_plugin_task(cluster):
@@ -288,19 +301,22 @@ def reconfigure_plugin_task(cluster):
 
 def restart_pods_task(cluster, disable_eviction=False):
     first_master = cluster.nodes["master"].get_first_member()
+    kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
 
     cluster.log.debug("Drain-Uncordon all nodes to restart pods")
     kube_nodes = cluster.nodes["master"].include_group(cluster.nodes["worker"])
     for node in kube_nodes.get_ordered_members_list(provide_node_configs=True):
         first_master.sudo(
-            kubernetes.prepare_drain_command(node, cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                             cluster.globals, disable_eviction, cluster.nodes), hide=False)
+            kubernetes.prepare_drain_command(node, kubernetes_version, cluster.globals,
+                                             disable_eviction, cluster.nodes), hide=False)
         first_master.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")
-    daemon_sets = yaml.safe_load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
+    daemon_sets_yaml = first_master.sudo("kubectl get ds -A -o yaml").get_simple_out()
+    daemon_sets = yaml.safe_load(daemon_sets_yaml)
     for ds in daemon_sets["items"]:
-        first_master.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
+        first_master.sudo(f"kubectl rollout restart ds {ds['metadata']['name']} "
+                          f"-n {ds['metadata']['namespace']}")
 
     # we do not know to wait for, only for system pods maybe
     cluster.log.debug("Waiting for system pods...")
@@ -343,7 +359,8 @@ def update_kubeapi_config(masters, plugins_list):
 
         # update kube-apiserver config with updated plugins list
         conf = yaml.load(list(result.values())[0].stdout)
-        new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"] if "enable-admission-plugins" not in cmd]
+        new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]
+                       if "enable-admission-plugins" not in cmd]
         new_command.append("--enable-admission-plugins=%s" % plugins_list)
         conf["spec"]["containers"][0]["command"] = new_command
 
@@ -375,7 +392,8 @@ def delete_privileged_policy(group):
 def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
     if manage_type not in ["apply", "delete"]:
         raise Exception("unexpected manage type for privileged policy")
-    local_path = utils.get_resource_absolute_path(os.path.join(policies_file_path, filename), script_relative=True)
+    file_path = os.path.join(policies_file_path, filename)
+    local_path = utils.get_resource_absolute_path(file_path, script_relative=True)
     remote_path = tmp_filepath_pattern % filename
     group.put(local_path, remote_path, backup=True, sudo=True, binary=False)
 
@@ -407,8 +425,8 @@ def resolve_oob_scope(oob_policies_conf, selector):
 def load_oob_policies_files():
     oob_policies = {}
     for oob_name in provided_oob_policies:
-        local_path = utils.get_resource_absolute_path(os.path.join(policies_file_path, "%s.yaml" % oob_name),
-                                                      script_relative=True)
+        file_path = os.path.join(policies_file_path, f"{oob_name}.yaml")
+        local_path = utils.get_resource_absolute_path(file_path, script_relative=True)
         with open(local_path) as stream:
             oob_policies[oob_name] = yaml.safe_load(stream)
 

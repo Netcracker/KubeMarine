@@ -55,13 +55,15 @@ def install(cluster):
     tokens = []
     for account in rbac["accounts"]:
         cluster.log.debug('Creating cluster account:')
-        cluster.log.debug('\tName: %s\n\tRole: %s\n\tNameSpace: %s' % (account['name'], account['role'], account['namespace']))
+        cluster.log.debug(f"\tName: {account['name']}\n"
+                          f"\tRole: {account['role']}\n"
+                          f"\tNameSpace: {account['namespace']}")
 
         dump = ''
         for config in account['configs']:
             dump += '---\n'+yaml.dump(config, default_flow_style=False)
 
-        filename = 'account_%s_%s_%s.yaml' % (account['name'], account['role'], account['namespace'])
+        filename = f"account_{account['name']}_{account['role']}_{account['namespace']}.yaml"
         destination_path = '/etc/kubernetes/%s' % filename
 
         utils.dump_file(cluster, dump, filename)
@@ -71,12 +73,14 @@ def install(cluster):
         cluster.nodes['master'].put(io.StringIO(dump), destination_path, sudo=True)
 
         cluster.log.debug("Applying yaml...")
-        cluster.nodes['master'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False)
+        cluster.nodes['master'].get_first_member().sudo(f'kubectl apply -f {destination_path}',
+                                                        hide=False)
 
         cluster.log.debug('Loading token...')
-        load_tokens_cmd = 'kubectl -n kube-system get secret ' \
-                          '$(sudo kubectl -n kube-system get sa %s -o \'jsonpath={.secrets[0].name}\') ' \
-                          '-o \'jsonpath={.data.token}\' | sudo base64 -d' % account['name']
+        load_tokens_cmd = f"kubectl -n kube-system get secret " \
+                          f"$(sudo kubectl get sa {account['name']} " \
+                          f"-n kube-system -o 'jsonpath={{.secrets[0].name}}') " \
+                          f"-o 'jsonpath={{.data.token}}' | sudo base64 -d"
         result = cluster.nodes['master'].get_first_member().sudo(load_tokens_cmd)
         token = list(result.values())[0].stdout
 

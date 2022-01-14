@@ -37,12 +37,14 @@ def is_audit_rules_defined(inventory) -> bool:
 
 
 @restrict_multi_os_group
-def install(group: NodeGroup, enable_service: bool = True, force: bool = False) -> NodeGroupResult or None:
+def install(group: NodeGroup, enable_service: bool = True, force: bool = False) \
+        -> NodeGroupResult or None:
     """
     Automatically installs and enables the audit service for the specified nodes
     :param group: Nodes group on which audit installation should be performed
     :param enable_service: Flag, automatically enables the service after installation
-    :param force: A flag that causes a forced installation even on centos nodes and nodes where the audit is already
+    :param force: A flag that causes a forced installation even on centos nodes and nodes where
+    the audit is already
     installed
     :return: String with installation output from nodes or None, when audit installation was skipped
     """
@@ -63,15 +65,18 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
     if not force:
         log.verbose('Searching for already installed auditd package...')
         debian_group = group.get_subgroup_with_os('debian')
-        debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
+        debian_package_name = \
+            cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
         if isinstance(debian_package_name, list):
-            raise Exception(f'Audit can not be installed, because nodes already contains different package versions: '
-                            f'{str(debian_package_name)}')
-        audit_installed_results = packages.detect_installed_package_version(debian_group, debian_package_name)
-        log.verbose(audit_installed_results)
+            raise Exception(f'Audit can not be installed, because nodes already contains '
+                            f'different package versions: {str(debian_package_name)}')
+        pkg_found_results = \
+            packages.detect_installed_package_version(debian_group, debian_package_name)
+        log.verbose(pkg_found_results)
 
         # Reduce nodes amount for installation
-        install_group = audit_installed_results.get_nodes_group_where_value_in_stderr("no packages found matching")
+        install_group = \
+            pkg_found_results.get_nodes_group_where_value_in_stderr("no packages found matching")
 
         if install_group.nodes_amount() == 0:
             log.debug('Auditd is already installed on all nodes')
@@ -79,7 +84,8 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
         else:
             log.debug('Auditd package is not installed, installing...')
 
-    package_name = cluster.get_package_association_str_for_group(install_group, 'audit', 'package_name')
+    package_name = \
+        cluster.get_package_association_str_for_group(install_group, 'audit', 'package_name')
 
     with RemoteExecutor(cluster) as exe:
         packages.install(install_group, include=package_name)
@@ -122,7 +128,8 @@ def apply_audit_rules(group: NodeGroup, now: bool = True) -> NodeGroupResult or 
     Generates and applies audit rules to the group
     :param group: Nodes group, where audit service should be configured
     :param now: Flag indicating that the audit service should be restarted immediately
-    :return: Service restart result or nothing if audit rules are non exists, or restart is not required
+    :return: Service restart result or nothing if audit rules are non exists, or restart is
+    not required
     """
     cluster = group.cluster
     log = cluster.log
@@ -134,7 +141,8 @@ def apply_audit_rules(group: NodeGroup, now: bool = True) -> NodeGroupResult or 
     log.debug('Applying audit rules...')
     rules_content = " \n".join(group.cluster.inventory['services']['audit']['rules'])
 
-    rules_config_location = cluster.get_package_association_str_for_group(group, 'audit', 'config_location')
+    rules_config_location = \
+        cluster.get_package_association_str_for_group(group, 'audit', 'config_location')
 
     utils.dump_file(group.cluster, rules_content, 'audit.rules')
     group.put(io.StringIO(rules_content), rules_config_location,

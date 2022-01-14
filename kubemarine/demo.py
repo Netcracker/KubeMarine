@@ -78,7 +78,8 @@ class FakeShell:
 
     def is_called(self, do_type: str, args: list) -> bool:
         """
-        Returns true if the specified command has already been executed in FakeShell. If there is no such command in the
+        Returns true if the specified command has already been executed in FakeShell. If there is
+        no such command in the
         FakeShell expected ones, or if several commands are found, exceptions will be thrown.
         :param do_type: The type of required command
         :param args: Required command arguments
@@ -86,9 +87,9 @@ class FakeShell:
         """
         found_entry = self.history_find(do_type, args)
         if not found_entry:
-            raise Exception('Failed to found entry %s %s in history' % (do_type, str(args)))
+            raise Exception(f'Failed to found entry {do_type} {str(args)} in history')
         elif len(found_entry) > 1:
-            raise Exception('Too many entries found for request in history: %s %s' % (do_type, str(args)))
+            raise Exception(f'Too many entries found for request in history: {do_type} {str(args)}')
         return self.history_find(do_type, args)[0]['used_times'] > 0
 
 
@@ -172,7 +173,8 @@ class FakeNodeGroup(group.NodeGroup):
             found_result = self.cluster.fake_shell.find(do_type, args, kwargs)
 
             if found_result is None:
-                raise Exception('Fake result not found for requested action type \'%s\' and args %s' % (do_type, args))
+                raise Exception(f'Fake result not found for requested '
+                                f'action type \'{do_type}\' and args {args}')
 
             found_result = {((isinstance(host, fabric.connection.Connection) and host.host) or host): result for host, result in found_result.items() if (isinstance(host, fabric.connection.Connection) and host.host in nodes.keys()) or host in nodes.keys()}
 
@@ -311,7 +313,8 @@ def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGrou
 def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
     results = {}
     for host, cxn in group_.nodes.items():
-        results[host] = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=cxn)
+        results[host] = fabric.runners.Result(stdout=stdout, stderr=stderr,
+                                              exited=code, connection=cxn)
         if code == -1:
             results[host] = UnexpectedExit(results[host])
     return NodeGroupResult(group_.cluster, results)

@@ -30,10 +30,9 @@ from kubemarine.core.yaml_merger import default_merger
 
 
 def verify_inventory(inventory, cluster):
-
-    if cluster.inventory['services']['ntp'].get('chrony', {}).get('servers') \
-        and (cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('NTP') or
-             cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP')):
+    timesyncd_time = inventory['services']['ntp'].get('timesyncd', {}).get('Time', {})
+    if inventory['services']['ntp'].get('chrony', {}).get('servers') \
+            and (timesyncd_time.get('NTP') or timesyncd_time.get('FallbackNTP')):
         raise Exception('chrony and timesyncd configured both at the same time')
 
     # TODO: Add validation that selinux and apparmor are not enabled at the same time
@@ -52,17 +51,18 @@ def enrich_inventory(inventory, cluster):
                 for __type in ['include', 'exclude']:
                     if inventory['services']['packages'][_type].get(__type) is not None:
                         if not isinstance(inventory['services']['packages'][_type][__type], list):
-                            raise Exception('Packages %s section in configfile has invalid type. '
-                                            'Expected \'list\', but found \'%s\''
-                                            % (__type, type(inventory['services']['packages'][_type][__type])))
+                            found_type = type(inventory['services']['packages'][_type][__type])
+                            raise Exception(f'Packages {__type} section in configfile has invalid '
+                                            f'type. Expected \'list\', but found \'{found_type}\'')
                         if not inventory['services']['packages'][_type][__type]:
-                            raise Exception('Packages %s section contains empty \'%s\' definition. ' % (__type, __type))
+                            raise Exception(f'Packages {_type} section contains '
+                                            f'empty \'{__type}\' definition.')
                     elif __type == 'include':
                         if _type != 'install':
                             inventory['services']['packages'][_type]['include'] = ['*']
                         else:
-                            raise Exception('Definition \'include\' is missing in \'install\' packages section, '
-                                            'but should be specified.')
+                            raise Exception('Definition \'include\' is missing in \'install\' '
+                                            'packages section, but should be specified.')
 
     if inventory['services'].get('etc_hosts'):
 
@@ -77,20 +77,23 @@ def enrich_inventory(inventory, cluster):
             if 'remove_node' in node['roles']:
                 continue
 
-            internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
-            internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
+            internal_node_ip_names = inventory['services']['etc_hosts']\
+                .get(node['internal_address'], [])
+            internal_node_ip_names.append(node['name'] + "." + cluster.inventory['cluster_name'])
             internal_node_ip_names.append(node['name'])
             inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
 
             if node.get('address'):
+                full_external_name = f"{node['name']}-external.{cluster.inventory['cluster_name']}"
+                small_external_name = node['name'] + "-external"
+
                 external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
-                external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
-                external_node_ip_names.append(node['name'] + "-external")
+                external_node_ip_names.append(full_external_name)
+                external_node_ip_names.append(small_external_name)
                 inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
 
             uniq_node_hostnames = list(set(inventory['services']['etc_hosts'][node['address']]))
             inventory['services']['etc_hosts'][node['address']] = uniq_node_hostnames
-
 
     return inventory
 
@@ -99,32 +102,46 @@ def enrich_upgrade_inventory(inventory, cluster):
     if cluster.context.get("initial_procedure") != "upgrade":
         return inventory
 
+    procedure_inventory = cluster.procedure_inventory
+    os_family = get_os_family(cluster)
+
     # validate all packages sections in procedure inventory
-    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
-            as stream:
-        base_associations = yaml.safe_load(stream)["services"]["packages"]["associations"][get_os_family(cluster)]
+    defaults_path = utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
+                                                     script_relative=True)
+    with open(defaults_path, 'r') as stream:
+        loaded_yaml = yaml.safe_load(stream)
+        base_associations = loaded_yaml["services"]["packages"]["associations"][os_family]
 
     cluster_associations = deepcopy(cluster.inventory["services"]["packages"]["associations"])
     previous_ver = cluster.context["initial_kubernetes_version"]
-    upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
+    upgrade_plan = procedure_inventory.get('upgrade_plan')
     for version in upgrade_plan:
-        upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
+        upgrade_associations = procedure_inventory \
+            .get(version, {}).get("packages", {}).get("associations", {})
         for package in get_system_packages(cluster):
-            if base_associations[package]["package_name"] != cluster_associations[package]["package_name"] \
-                    and not upgrade_associations.get(package, {}).get("package_name"):
-                raise Exception(f"Associations are redefined for {package} in cluster.yaml for version {previous_ver}, "
-                                f"but not present in procedure inventory for version {version}. "
-                                f"Please, specify required associations explicitly in procedure inventory "
-                                f"for all versions since {previous_ver}.")
+
+            base_package_name = base_associations[package]["package_name"]
+            cluster_package_name = cluster_associations[package]["package_name"]
+            upgrade_package_name = upgrade_associations.get(package, {}).get("package_name")
+
+            if base_package_name != cluster_package_name and not upgrade_package_name:
+                raise Exception(f"Associations are redefined for {package} in cluster.yaml "
+                                f"for version {previous_ver}, but not present in procedure "
+                                f"inventory for version {version}. Please, specify required "
+                                f"associations explicitly in procedure inventory for all versions "
+                                f"since {previous_ver}.")
+
             if upgrade_associations.get(package, {}).get("package_name"):
-                cluster_associations[package]["package_name"] = upgrade_associations[package]["package_name"]
+                cluster_associations[package]["package_name"] = \
+                    upgrade_associations[package]["package_name"]
+
         previous_ver = version
 
     upgrade_required = get_system_packages_for_upgrade(cluster)
     cluster.context["packages"] = {"upgrade_required": upgrade_required}
 
     upgrade_ver = cluster.context["upgrade_version"]
-    packages_section = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages")
+    packages_section = procedure_inventory.get(upgrade_ver, {}).get("packages")
     if packages_section:
         default_merger.merge(inventory["services"]["packages"], packages_section)
 
@@ -138,17 +155,22 @@ def get_system_packages_for_upgrade(cluster):
 
     # handle special cases in which upgrade is not required for particular package
     cluster_associations = cluster.inventory["services"]["packages"]["associations"]
-    upgrade_associations = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}).get("associations", {})
+    upgrade_associations = cluster.procedure_inventory \
+        .get(upgrade_ver, {}).get("packages", {}).get("associations", {})
     system_packages = get_system_packages(cluster)
     upgrade_required = list(system_packages)
     for package in system_packages:
         defined_association = upgrade_associations.get(package, {}).get("package_name")
-        if defined_association and defined_association == cluster_associations[package]['package_name']:
-            # case 1: package_name is defined in upgrade inventory but is equal to one already defined in cluster.yaml
+        if defined_association \
+                and defined_association == cluster_associations[package]['package_name']:
+            # case 1: package_name is defined in upgrade inventory but is equal to one already
+            # defined in cluster.yaml
             upgrade_required.remove(package)
-        elif compatibility.get(package) and compatibility[package][upgrade_ver] == compatibility[package][previous_ver] \
+        elif compatibility.get(package) \
+                and compatibility[package][upgrade_ver] == compatibility[package][previous_ver] \
                 and not defined_association:
-            # case 2: package_name is not defined in upgrade inventory and default versions are equal
+            # case 2: package_name is not defined in upgrade inventory and default
+            # versions are equal
             upgrade_required.remove(package)
 
     # all other packages should be updated
@@ -166,10 +188,12 @@ def detect_os_family(cluster, suppress_exceptions=False):
         group = cluster.nodes['all'].wait_active_nodes(timeout=active_timeout)
 
     '''
-    For Red Hat, CentOS, Oracle Linux, and Ubuntu information in /etc/os-release /etc/redhat-release is sufficient but,
-    Debian stores the full version in a special file. sed transforms version string, eg 10.10 becomes DEBIAN_VERSION="10.10"  
+    For Red Hat, CentOS, Oracle Linux, and Ubuntu information in 
+    /etc/os-release /etc/redhat-release is sufficient but, Debian stores the full version in a 
+    special file. sed transforms version string, eg 10.10 becomes DEBIAN_VERSION="10.10"  
     '''
-    results = group.run("cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
+    results = group.run("cat /etc/*elease; cat /etc/debian_version 2> /dev/null | "
+                        "sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
 
     for connection, result in results.items():
         stdout = result.stdout.lower()
@@ -228,7 +252,8 @@ def detect_os_family(cluster, suppress_exceptions=False):
 
 def get_os_family(cluster: KubernetesCluster) -> str:
     """
-    Detects OS on remote hosts and returns common OS family name. If OS already detected, returns data from cache.
+    Detects OS on remote hosts and returns common OS family name. If OS already detected,
+    returns data from cache.
     :param cluster: Cluster object where OS family will be detected.
     :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
     """
@@ -407,8 +432,6 @@ def is_swap_disabled(group):
 
 
 def disable_swap(group):
-
-
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
 
@@ -430,29 +453,35 @@ def disable_swap(group):
 
 
 def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
 
     if try_graceful is None:
-        if 'controlplain_uri' not in group.cluster.context.keys():
-            kubernetes.is_cluster_installed(group.cluster)
+        if 'controlplain_uri' not in cluster.context.keys():
+            kubernetes.is_cluster_installed(cluster)
 
     graceful_reboot = try_graceful is True or \
-                      (try_graceful is None and group.cluster.context['controlplain_uri'] is not None)
+        (try_graceful is None and cluster.context['controlplain_uri'] is not None)
 
     if not graceful_reboot:
         return perform_group_reboot(group)
 
     log.verbose('Graceful reboot required')
 
-    first_master = group.cluster.nodes['master'].get_first_member()
-    results = NodeGroupResult(group.cluster)
+    first_master = cluster.nodes['master'].get_first_member()
+    results = NodeGroupResult(cluster)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        cordon_required = cordone_on_graceful and ('master' in node['roles'] or 'worker' in node['roles'])
+        cordon_required = cordone_on_graceful and \
+                          ('master' in node['roles'] or 'worker' in node['roles'])
         if cordon_required:
+            kubernetesVersion = cluster.inventory['services']['kubeadm']['kubernetesVersion']
             res = first_master.sudo(
-                kubernetes.prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                                 group.cluster.globals, False, group.cluster.nodes), warn=True)
+                kubernetes.prepare_drain_command(node,
+                                                 kubernetesVersion,
+                                                 cluster.globals,
+                                                 False,
+                                                 cluster.nodes), warn=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node["name"]}"')
         raw_results = perform_group_reboot(node['connection'])
@@ -488,19 +517,20 @@ def add_to_path(group, string):
 
 
 def configure_chronyd(group, retries=60):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
     chronyd_config = ''
 
-    for server in group.cluster.inventory['services']['ntp']['chrony']['servers']:
+    for server in cluster.inventory['services']['ntp']['chrony']['servers']:
         chronyd_config += "server " + server + "\n"
 
-    if group.cluster.inventory['services']['ntp']['chrony'].get('makestep'):
-        chronyd_config += "\nmakestep " + group.cluster.inventory['services']['ntp']['chrony']['makestep']
+    if cluster.inventory['services']['ntp']['chrony'].get('makestep'):
+        chronyd_config += "\nmakestep " + cluster.inventory['services']['ntp']['chrony']['makestep']
 
-    if group.cluster.inventory['services']['ntp']['chrony'].get('rtcsync', False):
+    if cluster.inventory['services']['ntp']['chrony'].get('rtcsync', False):
         chronyd_config += "\nrtcsync"
 
-    utils.dump_file(group.cluster, chronyd_config, 'chrony.conf')
+    utils.dump_file(cluster, chronyd_config, 'chrony.conf')
     group.put(io.StringIO(chronyd_config), '/etc/chrony.conf', backup=True, sudo=True)
     group.sudo('systemctl restart chronyd')
     while retries > 0:
@@ -576,7 +606,8 @@ def setup_modprobe(group):
 
     log.debug("Uploading config...")
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
-    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True, hide=True)
+    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf",
+              backup=True, sudo=True, hide=True)
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
@@ -598,17 +629,18 @@ def is_modprobe_valid(group):
 
 
 def verify_system(group):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
     # this method handles clusters with multiple is, suppress exceptions enabled
     os_family = group.get_nodes_os(suppress_exceptions=True)
 
-    if os_family in ['rhel', 'rhel8'] and group.cluster.is_task_completed('prepare.system.setup_selinux'):
+    if os_family in ['rhel', 'rhel8'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
-                                    state=selinux.get_expected_state(group.cluster.inventory),
-                                    policy=selinux.get_expected_policy(group.cluster.inventory),
-                                    permissive=selinux.get_expected_permissive(group.cluster.inventory))
+                                    state=selinux.get_expected_state(cluster.inventory),
+                                    policy=selinux.get_expected_policy(cluster.inventory),
+                                    permissive=selinux.get_expected_permissive(cluster.inventory))
         log.debug(selinux_result)
         if not selinux_configured:
             raise Exception("Selinux is still not configured")
@@ -616,14 +648,14 @@ def verify_system(group):
         log.debug('Selinux verification skipped - origin task was not completed')
 
     # TODO: support apparmor validation
-    # if group.cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
+    # if cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
     #     log.debug("Verifying Apparmor...")
     #     if not apparmor_configured:
     #         raise Exception("Selinux is still not configured")
     # else:
     #     log.debug('Apparmor verification skipped - origin task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
+    if cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
         firewalld_disabled, firewalld_result = is_firewalld_disabled(group)
         log.debug(firewalld_result)
@@ -632,7 +664,7 @@ def verify_system(group):
     else:
         log.debug('FirewallD verification skipped - origin disable task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.disable_swap'):
+    if cluster.is_task_completed('prepare.system.disable_swap'):
         log.debug("Verifying swap...")
         swap_disabled, swap_result = is_swap_disabled(group)
         log.debug(swap_result)
@@ -641,7 +673,7 @@ def verify_system(group):
     else:
         log.debug('Swap verification skipped - origin disable task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.modprobe'):
+    if cluster.is_task_completed('prepare.system.modprobe'):
         log.debug("Verifying modprobe...")
         modprobe_valid, modprobe_result = is_modprobe_valid(group)
         log.debug(modprobe_result)
