@@ -75,6 +75,8 @@ nodes:
     grace_period: 60
   remove:
     check_active_timeout: 30
+  command_execution:
+    timeout: 2700
 error_handling:
   failure_message: >
     An unexpected error occurred. It is failed to solve the problem automatically.
