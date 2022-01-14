@@ -167,7 +167,7 @@ def apply_patch(cluster):
 
         utils.dump_file(cluster, config, filename)
 
-        group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_final_nodes()
+        group = cluster.nodes['master'].include_group(cluster.nodes['worker']).get_final_nodes()
         group.put(io.StringIO(config), filepath, backup=True, sudo=True)
 
         apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)
