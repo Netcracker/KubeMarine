@@ -70,7 +70,7 @@ nodes:
   boot:
     reboot_command: 'reboot 2>/dev/null >/dev/null &'
     defaults:
-      timeout: 180
+      timeout: 600
       delay_period: 5
   drain:
     timeout: 10
