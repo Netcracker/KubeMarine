@@ -65,11 +65,14 @@ code.
 To fix it, first try checking the nodes and the cluster with 
 [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
 see failed tests, try fixing the cause of the fail. If the error persists, try to inspect the 
-stacktrace and come to a solution yourself as much as possible.
+stacktrace and come to a solution yourself as much as possible. 
 
 If you still can't resolve this error yourself, start 
 [a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and attach a description of the 
 error with its stacktrace. We will try to help as soon as possible.
+
+If you were able to solve the problem yourself, let us know about it and your solution by 
+[opening a new PR](https://github.com/Netcracker/KubeMarine/pulls). Our team will appreciate it!
 
 
 ## KME0002: Remote group exception
@@ -155,10 +158,10 @@ frozen stage of the procedure. It will be useful to check the cluster with
 
 ```
 FAILURE!
-KME0002: There are no workers defined in the cluster scheme
+KME0004: There are no workers defined in the cluster scheme
 ```
 
-An error related with absence of any worker role in the inventory file. The error occurs even before
+An error related with absence of any worker role in the inventory file. The error occurs before
 the payload is executed on the cluster.
 
 To fix it, you need to either specify new nodes with the `worker` role, or add the `worker` role to 
@@ -196,11 +199,11 @@ applications pods.
 
 ```
 FAILURE!
-TASK FAILED xxx
+TASK FAILED prepare.check.sudoer
 KME0005: 10.101.1.1 is not a sudoer
 ```
 
-The error reports that the specified node does not have superuser rights. The error occurs even 
+The error reports that the specified node does not have superuser rights. The error occurs 
 before the payload is executed on the cluster when running `install` or `add_node` procedure.
 
 To fix this, add connection user to the sudoer group on the cluster node. 

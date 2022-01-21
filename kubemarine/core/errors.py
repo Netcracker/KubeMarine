@@ -50,7 +50,16 @@ class KME(RuntimeError):
         return self.code + ": " + self.message
 
 
-def print_beautiful_error(reason: Union[str, Exception], log=None):
+def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
+    """
+    Parses the passed error and nicely displays its name and structure depending on what was passed.
+    The method outputs to stdout by default, but will use the logger if one is specified.
+    :param reason: an object containing an exception or other error (must be able to be represented
+    as a string)
+    :param log: logger object, if you need to write a log there
+    :return: None
+    """
+
     if reason == "":
         return
 

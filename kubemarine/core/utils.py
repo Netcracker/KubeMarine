@@ -25,7 +25,7 @@ from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
-from kubemarine.core.errors import print_beautiful_error
+from kubemarine.core.errors import pretty_print_error
 from kubemarine.plugins import nginx_ingress
 
 
@@ -40,7 +40,7 @@ def do_fail(message='', reason: Union[str, Exception] = '', hint='', log=None):
         if message != "":
             sys.stderr.write(" - " + message + "\n")
 
-    print_beautiful_error(reason, log)
+    pretty_print_error(reason, log)
 
     sys.stderr.write("\n")
 
