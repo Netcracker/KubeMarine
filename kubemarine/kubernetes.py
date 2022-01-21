@@ -26,6 +26,7 @@ from kubemarine import system, plugins, psp, etcd, cri, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.errors import KME
 
 version_coredns_path_breakage = "v1.21.2"
 
@@ -145,6 +146,8 @@ def enrich_inventory(inventory, cluster):
         if inventory["public_cluster_ip"] not in inventory["services"]["kubeadm"]["apiServer"]["certSANs"]:
             inventory["services"]["kubeadm"]["apiServer"]["certSANs"].append(inventory["public_cluster_ip"])
 
+    any_worker_found = False
+
     # validating node labels and configuring additional labels
     for node in inventory["nodes"]:
         if "master" not in node["roles"] and "worker" not in node["roles"]:
@@ -157,6 +160,8 @@ def enrich_inventory(inventory, cluster):
             continue
 
         if "worker" in node["roles"]:
+            any_worker_found = True
+
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
@@ -166,6 +171,9 @@ def enrich_inventory(inventory, cluster):
                 if "taints" not in node:
                     node["taints"] = []
                 node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+
+    if not any_worker_found:
+        raise KME("KME0004")
 
     return inventory
 

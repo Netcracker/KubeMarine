@@ -18,6 +18,7 @@ from collections import OrderedDict
 import fabric
 import yaml
 
+from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils
@@ -29,7 +30,7 @@ def system_prepare_check_sudoer(cluster):
         if node_context['online'] and node_context['hasroot']:
             cluster.log.debug("%s online and has root" % host)
         else:
-            raise Exception('%s is not sudoer' % host)
+            raise KME("KME0005", hostname=host)
 
 
 def system_prepare_check_system(cluster):

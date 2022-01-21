@@ -1,6 +1,12 @@
 This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
 
-- [Trobleshooting Tools](#troubleshooting-tools)
+- [KubeMarine Errors](#kubemarine-errors)
+  - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
+  - [KME0002: Remote group exception](#kme0002-remote-group-exception)
+  - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
+  - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
+  - [KME0005: {hostname} is not a sudoer](#kme0005-hostname-is-not-a-sudoer)
+- [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
   - [CoreDNS Responds with High Latency](#coredns-responds-with-high-latency)
@@ -13,7 +19,199 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
   - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
 
-# Trobleshooting Tools
+# KubeMarine Errors
+
+This section lists all known errors with explanations and recommendations for their fixing. If an 
+error occurs during the execution of any of these procedures, you can find it here.
+
+
+## KME0001: Unexpected exception
+
+```
+FAILURE - TASK FAILED xxx
+Reason: KME001: Unexpected exception
+Traceback (most recent call last):
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/flow.py", line 131, in run_flow
+    task(cluster)
+  File "/home/centos/repos/kubemarine/kubemarine/install", line 193, in deploy_kubernetes_init
+    cluster.nodes["worker"].new_group(apply_filter=lambda node: 'master' not in node['roles']).call(kubernetes.init_workers)
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 165, in call
+    return self.call_batch([action], **{action.__name__: kwargs})
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 179, in call_batch
+    results[action] = action(self, **action_kwargs)
+  File "/home/centos/repos/kubemarine/kubemarine/src/kubernetes.py", line 238, in init_workers
+    reset_installation_env(group)
+  File "/home/centos/repos/kubemarine/kubemarine/src/kubernetes.py", line 60, in reset_installation_env
+    group.sudo("systemctl stop kubelet", warn=True)
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 34, in sudo
+    return self.do("sudo", *args, **kwargs)
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 106, in do
+    self.workaround(exception)
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 119, in workaround
+    raise e from None
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 95, in do
+    return self._do(do_type, args, kwargs)
+  File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 141, in _do
+    with ThreadPoolExecutor(max_workers=len(self.nodes)) as executor:
+  File "/usr/lib/python3.6/concurrent/futures/thread.py", line 104, in __init__
+    raise ValueError("max_workers must be greater than 0")
+ValueError: max_workers must be greater than 0
+```
+
+This error occurs in case of an unexpected exception at runtime and does not yet have a classifying 
+code.
+
+
+To fix it, first try checking the nodes and the cluster with 
+[IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
+see failed tests, try fixing the cause of the fail. If the error persists, try to inspect the 
+stacktrace and come to a solution yourself as much as possible.
+
+If you still can't resolve this error yourself, start 
+[a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and attach a description of the 
+error with its stacktrace. We will try to help as soon as possible.
+
+
+## KME0002: Remote group exception
+
+Shell error:
+
+```
+FAILURE!
+TASK FAILED xxx
+KME0002: Remote group exception
+10.101.10.1:
+	Encountered a bad command exit code!
+	
+	Command: 'apt install bad-package-name'
+	
+	Exit code: 127
+	
+	Stdout:
+	
+	
+	
+	Stderr:
+	
+	bash: apt: command not found
+```
+
+
+Hierarchical error:
+
+```
+FAILURE!
+TASK FAILED xxx
+KME0002: Remote group exception
+10.101.10.1:
+	KME0003: Action took too long to complete and timed out
+```
+
+An error indicating an unexpected runtime bash command exit on a remote cluster host. This error 
+occurs when some command terminated unexpectedly with a non-zero error code.
+
+Error prints the status of the command execution for each node in the group on which bash command 
+was executed. The status can be a correct result (shell results), a result with an error 
+(shell error), as well as a hierarchical KME with its own code.
+
+To fix it, first try checking the nodes and the cluster with 
+[IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
+see failed tests, try fixing the cause of the fail. Make sure that you do everything according to 
+the instructions, in the correct sequence and correctly filled out the inventory and other dependent
+files. If the error persists, try to figure out what might be causing the command to fail on remote 
+nodes and fix by yourself as much as possible.
+
+If you still can't resolve this error yourself, start 
+[a new issue](https://github.com/Netcracker/KubeMarine/issues/new) and attach a description of the 
+error with its stacktrace. We will try to help as soon as possible.
+
+
+## KME0003: Action took too long to complete and timed out
+
+```
+FAILURE!
+TASK FAILED xxx
+KME0002: Remote group exception
+10.101.10.1:
+	KME0003: Action took too long to complete and timed out
+```
+
+An error that occurs when some command did not have time to execute at the specified time.
+
+The error can occur if there is a problem with the remote hypervisor or host hanging, if the 
+command executable hangs, or if the SSH-connection is unexpectedly disconnected or other network 
+problems between the deployer node and the cluster.
+
+The longest possible timeout for command is 2700 seconds (45 minutes).
+
+To resolve this error, check all of the listed items that may hang and manually fix the hang by 
+rebooting the hypervisor or node, fixing the environment or settings of the executable, updating it,
+fixing the network channel, as well as any other actions that, in your opinion, should fix the 
+frozen stage of the procedure. It will be useful to check the cluster with 
+[IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity
+
+
+## KME0004: There are no workers defined in the cluster scheme
+
+```
+FAILURE!
+KME0002: There are no workers defined in the cluster scheme
+```
+
+An error related with absence of any worker role in the inventory file. The error occurs even before
+the payload is executed on the cluster.
+
+To fix it, you need to either specify new nodes with the `worker` role, or add the `worker` role to 
+the existing masters nodes.
+
+An example of specifying different nodes with separate `master` and `worker` roles:
+```yaml
+- address: 10.101.1.1
+  internal_address: 192.168.101.1
+  name: master-1
+  roles:
+  - master
+- address: 10.101.1.2
+  internal_address: 192.168.101.2
+  name: worker-1
+  roles:
+  - worker
+```
+
+Example of specifying multiple `master` and `worker` roles for single node:
+```yaml
+- address: 10.101.1.1
+  internal_address: 192.168.101.1
+  name: master-1
+  roles:
+  - master
+  - worker
+```
+
+Note: Masters with `worker` role remain as control planes, however, they start scheduling
+applications pods.
+
+
+## KME0005: {hostname} is not a sudoer
+
+```
+FAILURE!
+TASK FAILED xxx
+KME0005: 10.101.1.1 is not a sudoer
+```
+
+The error reports that the specified node does not have superuser rights. The error occurs even 
+before the payload is executed on the cluster when running `install` or `add_node` procedure.
+
+To fix this, add connection user to the sudoer group on the cluster node. 
+
+Example for Ubuntu (reboot required):
+```bash
+sudo adduser <username> sudo
+```
+
+
+# Troubleshooting Tools
 
 This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
 

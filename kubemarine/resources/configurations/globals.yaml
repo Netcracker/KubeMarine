@@ -83,9 +83,10 @@ error_handling:
   failure_message: >
     An unexpected error occurred. It is failed to solve the problem automatically.
     Follow the instructions from the Troubleshooting Guide available to you.
-    If it is impossible to solve the problem, provide the dump and the technical information above to the support team.
+    If it is impossible to solve the problem, provide the dump and the technical information above
+    to the support team.
 
-    You can restart the script from the last task with the following command:
+    You can restart the procedure from the last task with the following command:
     %s --tasks="%s"
 keepalived:
   restart_wait: 5
