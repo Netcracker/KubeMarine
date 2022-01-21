@@ -319,10 +319,11 @@ class NodeGroup:
             if kwargs.get("hide") is None:
                 kwargs['hide'] = True
 
-        if kwargs.get("timeout", None) is None:
-            kwargs["timeout"] = self.cluster.globals['nodes']['command_execution']['timeout']
-        execution_timeout = kwargs["timeout"]
+            if kwargs.get("timeout", None) is None:
+                kwargs["timeout"] = self.cluster.globals['nodes']['command_execution']['timeout']
 
+        execution_timeout = kwargs.get("timeout", None)
+        
         results = {}
 
         if not nodes:
