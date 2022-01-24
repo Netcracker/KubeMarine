@@ -160,6 +160,9 @@ def enrich_inventory(inventory, cluster):
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
+        else:
+            raise Exception("There are no workers in the cluster")
+
 
             if "master" in node["roles"]:
                 # node is both master and worker, thus we remove NoSchedule taint
