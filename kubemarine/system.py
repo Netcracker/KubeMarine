@@ -21,7 +21,7 @@ from copy import deepcopy
 import fabric
 import yaml
 
-from kubemarine import selinux, kubernetes, packages
+from kubemarine import selinux, kubernetes
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor

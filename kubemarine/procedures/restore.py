@@ -14,8 +14,6 @@
 # limitations under the License.
 
 
-import io
-import json
 import os
 import re
 import tarfile

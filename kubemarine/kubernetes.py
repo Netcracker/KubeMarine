@@ -22,7 +22,7 @@ import ruamel.yaml
 import yaml
 from jinja2 import Template
 
-from kubemarine import system, plugins, psp, etcd, cri, packages
+from kubemarine import system, plugins, psp, etcd, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup

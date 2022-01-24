@@ -18,7 +18,7 @@ from typing import List, Dict, Union, Any
 import fabric
 from invoke import UnexpectedExit
 
-from kubemarine.core import cluster, group, flow, executor
+from kubemarine.core import cluster, group, flow
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.connections import Connections
 from kubemarine.core.group import NodeGroup, _HostToResult, NodeGroupResult

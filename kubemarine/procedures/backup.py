@@ -24,7 +24,7 @@ import time
 from collections import OrderedDict
 import yaml
 
-from kubemarine import packages, system
+from kubemarine import system
 from kubemarine.core import utils, flow
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
