@@ -285,6 +285,8 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
 
     for id_, roles in id_roles_map.items():
         ip_i = ip_i + 1
+        if "master" in roles and worker == 0:
+            roles.append('worker')
         inventory['nodes'].append({
             'name': id_,
             'address': '10.101.1.%s' % ip_i,
