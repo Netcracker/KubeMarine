@@ -61,10 +61,9 @@ ValueError: max_workers must be greater than 0
 This error occurs in case of an unexpected exception at runtime and does not yet have a classifying 
 code.
 
-
 To fix it, first try checking the nodes and the cluster with 
 [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
-see failed tests, try fixing the cause of the fail. If the error persists, try to inspect the 
+see failed tests, try fixing the cause of the failure. If the error persists, try to inspect the 
 stacktrace and come to a solution yourself as much as possible. 
 
 If you still can't resolve this error yourself, start 
@@ -99,7 +98,6 @@ KME0002: Remote group exception
 	bash: apt: command not found
 ```
 
-
 Hierarchical error:
 
 ```
@@ -111,16 +109,16 @@ KME0002: Remote group exception
 ```
 
 An error indicating an unexpected runtime bash command exit on a remote cluster host. This error 
-occurs when some command terminated unexpectedly with a non-zero error code.
+occurs when a command is terminated unexpectedly with a non-zero error code.
 
-Error prints the status of the command execution for each node in the group on which bash command 
+The error prints the status of the command execution for each node in the group on which the bash command 
 was executed. The status can be a correct result (shell results), a result with an error 
 (shell error), as well as a hierarchical KME with its own code.
 
 To fix it, first try checking the nodes and the cluster with 
 [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
-see failed tests, try fixing the cause of the fail. Make sure that you do everything according to 
-the instructions, in the correct sequence and correctly filled out the inventory and other dependent
+see failed tests, try fixing the cause of the failure. Make sure that you do everything according to 
+the instructions in the correct sequence and correctly fill the inventory and other dependent
 files. If the error persists, try to figure out what might be causing the command to fail on remote 
 nodes and fix by yourself as much as possible.
 
@@ -139,19 +137,19 @@ KME0002: Remote group exception
 	KME0003: Action took too long to complete and timed out
 ```
 
-An error that occurs when some command did not have time to execute at the specified time.
+An error that occurs when a command did not have time to execute at the specified time.
 
 The error can occur if there is a problem with the remote hypervisor or host hanging, if the 
 command executable hangs, or if the SSH-connection is unexpectedly disconnected or other network 
 problems between the deployer node and the cluster.
 
-The longest possible timeout for command is 2700 seconds (45 minutes).
+The longest possible timeout for the command is 2700 seconds (45 minutes).
 
 To resolve this error, check all of the listed items that may hang and manually fix the hang by 
 rebooting the hypervisor or node, fixing the environment or settings of the executable, updating it,
 fixing the network channel, as well as any other actions that, in your opinion, should fix the 
 frozen stage of the procedure. It will be useful to check the cluster with 
-[IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity
+[IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity.
 
 
 ## KME0004: There are no workers defined in the cluster scheme
@@ -161,13 +159,14 @@ FAILURE!
 KME0004: There are no workers defined in the cluster scheme
 ```
 
-An error related with absence of any worker role in the inventory file. The error occurs before
+An error related with the absence of any worker role in the inventory file. The error occurs before
 the payload is executed on the cluster.
 
 To fix it, you need to either specify new nodes with the `worker` role, or add the `worker` role to 
 the existing masters nodes.
 
-An example of specifying different nodes with separate `master` and `worker` roles:
+An example of specifying different nodes with separate `master` and `worker` roles is as follows.
+
 ```yaml
 - address: 10.101.1.1
   internal_address: 192.168.101.1
@@ -181,7 +180,8 @@ An example of specifying different nodes with separate `master` and `worker` rol
   - worker
 ```
 
-Example of specifying multiple `master` and `worker` roles for single node:
+An example of specifying multiple `master` and `worker` roles for a single node is as follows.
+
 ```yaml
 - address: 10.101.1.1
   internal_address: 192.168.101.1
@@ -191,7 +191,7 @@ Example of specifying multiple `master` and `worker` roles for single node:
   - worker
 ```
 
-Note: Masters with `worker` role remain as control planes, however, they start scheduling
+**Note**: Masters with a `worker` role remain as control planes, however, they start scheduling
 applications pods.
 
 
@@ -204,11 +204,12 @@ KME0005: 10.101.1.1 is not a sudoer
 ```
 
 The error reports that the specified node does not have superuser rights. The error occurs 
-before the payload is executed on the cluster when running `install` or `add_node` procedure.
+before the payload is executed on the cluster when running the `install` or `add_node` procedure.
 
-To fix this, add connection user to the sudoer group on the cluster node. 
+To fix this, add a connection user to the sudoer group on the cluster node. 
 
-Example for Ubuntu (reboot required):
+An example for Ubuntu (reboot required) is as given below.
+
 ```bash
 sudo adduser <username> sudo
 ```
@@ -394,7 +395,7 @@ To run defragmentation for all cluster members list all endpoints sequentially
 ```
 `ENDPOINT_IP` is the internal IP address of the etcd endpoint.
 
-> **_Note:_** that defragmentation to a live member blocks the system from reading and writing data while rebuilding its states. It is not recommended to run defragmentation for all etcd members at the same time.
+> **Note**: The defragmentation to a live member blocks the system from reading and writing data while rebuilding its states. It is not recommended to run defragmentation for all etcd members at the same time.
 
 ## etcdctl defrag return context deadline exceeded
 
