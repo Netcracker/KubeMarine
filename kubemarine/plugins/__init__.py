@@ -36,8 +36,11 @@ from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.kubernetes.daemonset import DaemonSet
+from kubemarine.kubernetes.deployment import Deployment
 
 # list of plugins owned and managed by kubemarine
+
 oob_plugins = [
     "calico",
     "flannel",
@@ -175,6 +178,78 @@ def install_plugin(cluster, plugin_name, installation_procedure):
 
     if cluster.context.get('cached_expected_pods'):
         del cluster.context['cached_expected_pods']
+
+
+def expect_daemonset(cluster, daemonsets_names, plugin_name=None, timeout=None, retries=None,
+                     node=None, apply_filter=None):
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for DaemonSets...")
+
+    daemonsets = []
+    for name in daemonsets_names:
+        if isinstance(name, str):
+            daemonsets.append(DaemonSet(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            daemonsets.append(DaemonSet(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for daemonset in daemonsets:
+            if not daemonset.reload(master=node, suppress_exceptions=True).is_up_to_date():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("DaemonSets are up to date")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug("DaemonSets are not up to date yet... (%ss left)" % (retries * timeout))
+            time.sleep(timeout)
+
+
+def expect_deployment(cluster, deployments_names, plugin_name=None, timeout=None, retries=None,
+                      node=None, apply_filter=None):
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following Deployments to be up to date: {deployments_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for Deployments...")
+
+    deployments = []
+    for name in deployments_names:
+        if isinstance(name, str):
+            deployments.append(Deployment(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            deployments.append(Deployment(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for deployment in deployments:
+            if not deployment.reload(master=node, suppress_exceptions=True).is_actual_and_ready():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("Deployments are up to date!")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug("Deployments are not up to date yet... (%ss left)" % (retries * timeout))
+            time.sleep(timeout)
 
 
 def expect_pods(cluster, pods, plugin_name=None, timeout=None, retries=None, node=None, apply_filter=None):
@@ -426,6 +501,14 @@ def apply_template(cluster, config, plugin_name=None):
 # **** EXPECT ****
 
 def convert_expect(cluster, config):
+    if config.get('daemonsets') is not None and isinstance(config['daemonsets'], list):
+        config['daemonsets'] = {
+            'list': config['daemonsets']
+        }
+    if config.get('deployments') is not None and isinstance(config['pods'], list):
+        config['deployments'] = {
+            'list': config['deployments']
+        }
     if config.get('pods') is not None and isinstance(config['pods'], list):
         config['pods'] = {
             'list': config['pods']
@@ -436,19 +519,41 @@ def convert_expect(cluster, config):
 def verify_expect(cluster, config):
     if not config:
         raise Exception('Expect procedure is empty, but it should not be')
+
+    if config.get('daemonsets') is not None and config['daemonsets'].get('list') is None:
+        raise Exception('DaemonSet expectation defined, but DaemonSets list is missing')
+
+    if config.get('deployments') is not None and config['deployments'].get('list') is None:
+        raise Exception('Deployment expectation defined, but Deployments list is missing')
+
     if config.get('pods') is not None and config['pods'].get('list') is None:
-        raise Exception('Pod expectation defined, but pods list is missing')
+        raise Exception('Pod expectation defined, but Pods list is missing')
 
 
 def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
-    if config.get('pods') is not None:
-        timeout = cluster.globals['pods']['expect']['plugins']['timeout']
-        retries = cluster.globals['pods']['expect']['plugins']['retries']
-        return expect_pods(cluster, config['pods']['list'], plugin_name,
-                           timeout=config['pods'].get('timeout', timeout),
-                           retries=config['pods'].get('retries', retries))
 
+    plugins_timeout = cluster.globals['pods']['expect']['plugins']['timeout']
+    plugins_retries = cluster.globals['pods']['expect']['plugins']['retries']
+
+    for expect_type, expect_conf in config.items():
+        if expect_type == 'daemonsets':
+            expect_daemonset(cluster, config['daemonsets']['list'], plugin_name,
+                             timeout=config['daemonsets'].get('timeout', plugins_timeout),
+                             retries=config['daemonsets'].get('retries', plugins_retries))
+
+        elif expect_type == 'deployments':
+            expect_deployment(cluster, config['deployments']['list'], plugin_name,
+                              timeout=config['deployments'].get('timeout', plugins_timeout),
+                              retries=config['deployments'].get('retries', plugins_retries))
+
+        elif expect_type == 'pods':
+            expect_pods(cluster, config['pods']['list'], plugin_name,
+                        timeout=config['pods'].get('timeout', plugins_timeout),
+                        retries=config['pods'].get('retries', plugins_retries))
+
+        else:
+            raise Exception(f'Unknown expectation type "{expect_type}"')
 
 # **** PYTHON ****
 
