@@ -28,9 +28,26 @@ services:
         enable-admission-plugins: NodeRestriction
         profiling: "false"
         audit-log-path: /var/log/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
+      volumeMounts:
+        - mountPath: /etc/kubernetes/audit-policy.yaml
+          name: audit
+          readOnly: true
+        - mountPath: /var/log/kubernetes/audit/
+          name: audit-log
+          readOnly: false
+      volumes:
+        - name: audit
+          hostPath:
+            path: /etc/kubernetes/audit-policy.yaml
+            type: File
+        - name: audit-log
+          hostPath:
+            path: /var/log/kubernetes/audit/
+            type: DirectoryOrCreate
     scheduler:
       extraArgs:
         profiling: "false"

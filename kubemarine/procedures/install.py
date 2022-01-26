@@ -110,9 +110,15 @@ def system_install_audit(cluster):
     cluster.log.debug(group.call(audit.install))
 
 
-def system_prepare_audit(cluster):
+def system_prepare_audit_daemon(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
+
+def system_prepare_policy(cluster):
+    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
+    cluster.log.debug(group.call(audit.apply_audit_rules))
+    policy = group.sudo("touch audit-policy.yaml")
+    group.put(policy, '/etc/kubernetes/audit-policy.yaml', sudo=True)
 
 
 def system_prepare_dns_hostname(cluster):
@@ -462,7 +468,8 @@ tasks = OrderedDict({
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
-                "configure": system_prepare_audit
+                "configure": system_prepare_audit_daemon,
+                "policy": system_prepare_policy
             }
         },
         "cri": {
