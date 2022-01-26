@@ -17,6 +17,7 @@
 from collections import OrderedDict
 import fabric
 import yaml
+import io
 
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
@@ -116,8 +117,8 @@ def system_prepare_audit_daemon(cluster):
 def system_prepare_audit_policy(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
-    policy = open("audit-policy.yaml", "wa")
-    group.put(io.StringIO(policy), '/etc/kubernetes/manifests/kube-apiserver.yaml', sudo=True)
+    policy = group.sudo("touch audit-policy.yaml")
+    group.put(policy, '/etc/kubernetes/manifests/audit-policy.yaml', sudo=True)
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
