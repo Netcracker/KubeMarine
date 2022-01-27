@@ -3100,9 +3100,9 @@ plugins:
   kubernetes-dashboard:
     install: true
     dashboard:
-      image: kubernetesui/dashboard:v2.0.0-rc2
+      image: kubernetesui/dashboard:v2.4.0-rc2
     metrics-scraper:
-      image: kubernetesui/metrics-scraper:v1.0.2
+      image: kubernetesui/metrics-scraper:v1.0.7
 ```
 
 The following is an example to redefine ingress parameters:
@@ -4599,8 +4599,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.19.1</td>
-    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.21.2</td>
+    <td>SHA1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -4680,7 +4680,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.19.1</td>
+    <td colspan="4" rowspan="5">v3.21.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -4701,7 +4701,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.0.3</td>
+    <td colspan="4">v1.1.0</td>
     <td></td>
   </tr>
   <tr>
@@ -4716,7 +4716,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.20</td>
+    <td colspan="4">v0.0.21</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4765,8 +4765,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.19.1</td>
-    <td>SHA1: dde3851a977280f7c0d54538526bb9459fa7a7ac<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.21.2</td>
+    <td>SHA1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -4846,7 +4846,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.19.1</td>
+    <td colspan="4" rowspan="5">v3.21.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -4867,7 +4867,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.0.7</td>
+    <td colspan="4">v1.1.0</td>
     <td></td>
   </tr>
   <tr>
@@ -4882,7 +4882,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.20</td>
+    <td colspan="4">v0.0.21</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -4932,8 +4932,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.20.1</td>
-    <td>SHA1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.21.2</td>
+    <td>SHA1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5013,7 +5013,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.20.1</td>
+    <td colspan="4" rowspan="5">v3.21.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5034,7 +5034,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.0.3</td>
+    <td colspan="4">v1.1.0</td>
     <td></td>
   </tr>
   <tr>
@@ -5049,7 +5049,174 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.20</td>
+    <td colspan="4">v0.0.21</td>
+    <td>Required only if local-path provisioner plugin is set to be installed.</td>
+  </tr>
+</tbody>
+</table>
+
+
+## Default Dependent Components Versions for Kubernetes Versions v1.23.1
+
+<table style="undefined;table-layout: fixed; width: 1167px">
+<colgroup>
+<col style="width: 60px">
+<col style="width: 389px">
+<col style="width: 128px">
+<col style="width: 119px">
+<col style="width: 99px">
+<col style="width: 100px">
+<col style="width: 272px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">Type</th>
+    <th rowspan="2">Name</th>
+    <th colspan="4">Versions</th>
+    <th rowspan="2">Note</th>
+  </tr>
+  <tr>
+    <th>CentOS RHEL<br>7.5+</th>
+    <th>CentOS RHEL<br>Oracle Linux 8.4</th>
+    <th>Ubuntu 20.04</th>
+    <th>Oracle Linux 7.5+</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td rowspan="5">binaries</td>
+    <td>kubeadm</td>
+    <td colspan="4" rowspan="3">v1.23.1</td>
+    <td>SHA1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1</td>
+  </tr>
+  <tr>
+    <td>kubelet</td>
+    <td>SHA1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50</td>
+  </tr>
+  <tr>
+    <td>kubectl</td>
+    <td>SHA1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc</td>
+  </tr>
+  <tr>
+    <td>calicoctl</td>
+    <td colspan="4">v3.21.2</td>
+    <td>SHA1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2<br>Required only if calico is installed.</td>
+  </tr>
+  <tr>
+    <td>crictl</td>
+    <td colspan="4">v1.22.0</td>
+    <td>SHA1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e<br>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td rowspan="5">rpms</td>
+    <td>docker-ce</td>
+    <td colspan="4">19.03</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>containerd.io</td>
+    <td>1.4.*</td>
+    <td>1.4.*</td>
+    <td>1.5.*</td>
+    <td>1.4.*</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>podman</td>
+    <td>1.6.4</td>
+    <td>latest</td>
+    <td>latest</td>
+    <td>1.4.4</td>
+    <td>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td>haproxy/rh-haproxy</td>
+    <td>1.8</td>
+    <td>1.8</td>
+    <td>2.0</td>
+    <td>1.8</td>
+    <td>Required only if balancers are presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td>keepalived</td>
+    <td>1.3</td>
+    <td>2.1</td>
+    <td>2.0</td>
+    <td>1.3</td>
+    <td>Required only if VRRP is presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td rowspan="16">images</td>
+    <td>k8s.gcr.io/kube-apiserver</td>
+    <td colspan="4" rowspan="4">v1.23.1</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-controller-manager</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-proxy</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-scheduler</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/coredns</td>
+    <td colspan="4">1.8.6</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/pause</td>
+    <td colspan="4">3.6</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/etcd</td>
+    <td colspan="4">3.5.1-0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/typha</td>
+    <td colspan="4" rowspan="5">v3.21.2</td>
+    <td>Required only if Typha is enabled in Calico config.</td>
+  </tr>
+  <tr>
+    <td>calico/cni</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/node</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/kube-controllers</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/pod2daemon-flexvol</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
+    <td colspan="4">v1.1.0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>kubernetesui/dashboard</td>
+    <td colspan="4">v2.4.0</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>kubernetesui/metrics-scraper</td>
+    <td colspan="4">v1.0.7</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>rancher/local-path-provisioner</td>
+    <td colspan="4">v0.0.21</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>

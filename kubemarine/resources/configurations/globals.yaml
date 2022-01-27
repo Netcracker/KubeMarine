@@ -5,6 +5,8 @@ kubernetes_versions:
     supported: true
   v1.22:
     supported: true
+  v1.23:
+    supported: true
 
 connection:
   defaults:
@@ -68,7 +70,7 @@ nodes:
   boot:
     reboot_command: 'reboot 2>/dev/null >/dev/null &'
     defaults:
-      timeout: 180
+      timeout: 600
       delay_period: 5
   drain:
     timeout: 10
@@ -121,6 +123,10 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
+      v1.23.1:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
     containerd:
       v1.20.2:
         version_rhel8: 1.4*
@@ -135,6 +141,9 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.22.2:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.23.1:
         version_rhel8: 1.4*
         version_debian: 1.5.*
     containerdio:
@@ -155,6 +164,10 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.4.*
       v1.22.2:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.23.1:
         version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.4.*
@@ -179,6 +192,10 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
+      v1.23.1:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
     haproxy:
       v1.20.2:
         version_rhel: 1.8*
@@ -197,6 +214,10 @@ compatibility_map:
         version_rhel8: 1.8*
         version_debian: 2.0.*
       v1.22.2:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.23.1:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
@@ -221,6 +242,10 @@ compatibility_map:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
+      v1.23.1:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
     crictl:
       v1.20.2:
         version: v1.20.0
@@ -237,6 +262,9 @@ compatibility_map:
       v1.22.2:
         version: v1.22.0
         sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
+      v1.23.1:
+        version: v1.22.0
+        sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
     kubeadm:
       v1.20.2:
         sha1: 4c025ebf29eb7aa32012a1c8f81e7b85df2bf92f
@@ -248,6 +276,8 @@ compatibility_map:
         sha1: 2ee056ac1d0b9c2289bdb03cb7bb0cd21ee29a8b
       v1.22.2:
         sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
+      v1.23.1:
+        sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
     kubelet:
       v1.20.2:
         sha1: 25ca655cce261cdbeb7c3337185f669ee0b53cc3
@@ -259,6 +289,8 @@ compatibility_map:
         sha1: 61da22475b977cb678cca8cf7249bf727d72ee89
       v1.22.2:
         sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
+      v1.23.1:
+        sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
     kubectl:
       v1.20.2:
         sha1: 202e00c35fa2a4085135061e5d0965ebbffed19c
@@ -270,28 +302,37 @@ compatibility_map:
         sha1: c4648e31ca16fb00e3826f8ab7c653da81eff367
       v1.22.2:
         sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
+      v1.23.1:
+        sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
     calico:
       v1.20:
-        version: v3.19.1
-        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+        version: v3.21.2
+        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.21:
-        version: v3.19.1
-        sha1: dde3851a977280f7c0d54538526bb9459fa7a7ac
+        version: v3.21.2
+        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.22:
-        version: v3.20.1
-        sha1: 4c5aec4da45c6ce45e03df2f36abb0010909b7db
+        version: v3.21.2
+        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
+      v1.23:
+        version: v3.21.2
+        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
     nginx-ingress-controller:
       v1.20:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
       v1.21:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: ingress-nginx/controller
-        version: v1.0.3
+        version: v1.1.0
+        pod-name: ingress-nginx-controller
+      v1.23:
+        image-name: ingress-nginx/controller
+        version: v1.1.0
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
       v1.20:
@@ -303,12 +344,17 @@ compatibility_map:
       v1.22:
         version: v2.4.0
         metrics-scraper-version: v1.0.7
+      v1.23:
+        version: v2.4.0
+        metrics-scraper-version: v1.0.7
     local-path-provisioner:
       v1.20:
         version: v0.0.20
       v1.21:
         version: v0.0.20
       v1.22:
+        version: v0.0.20
+      v1.23:
         version: v0.0.20
     pause:
       v1.20:
@@ -317,6 +363,9 @@ compatibility_map:
         version: 3.4.1
       v1.22:
         version: 3.5
+      v1.23:
+        version: 3.6
+
   hardware:
     minimal:
       balancer:

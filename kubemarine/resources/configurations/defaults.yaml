@@ -17,7 +17,7 @@ services:
   kubeadm:
     apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
-    kubernetesVersion: v1.22.2
+    kubernetesVersion: v1.23.1
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     networking:
       podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/80{% endif %}'
@@ -556,8 +556,8 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: rancher/local-path-provisioner:v0.0.20
-    helper-pod-image: library/busybox:1.34.1
+    image: rancher/local-path-provisioner:v0.0.21
+    helper-pod-image: library/busybox:1.35.0
 
 rbac:
   account_defaults:
