@@ -24,7 +24,7 @@ import time
 from collections import OrderedDict
 import yaml
 
-from kubemarine import packages, system
+from kubemarine import system
 from kubemarine.core import utils, flow
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -196,7 +196,7 @@ def export_etcd(cluster: KubernetesCluster):
                             f'&& sudo mv /var/lib/etcd/{snap_name} /tmp/{snap_name} '
                             f'&& sudo ls -la /tmp/{snap_name} '
                             f'&& sudo du -hs /tmp/{snap_name} '
-                            f'&& sudo chmod 666 /tmp/{snap_name}')
+                            f'&& sudo chmod 666 /tmp/{snap_name}', timeout=600)
     cluster.log.debug(result)
     etcd_node.get('/tmp/' + snap_name, backup_directory + '/etcd.db')
     cluster.log.verbose('Deleting ETCD snapshot file from "%s"...')

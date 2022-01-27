@@ -34,9 +34,9 @@ Proceed the following steps to install Kubemarine manually on your environment:
    python3 -m pip install --upgrade pip
    ```
 3. Ensure your environment meets [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node)
-4. [Download the latest release](https://github.com/netcracker-technology/kubemarine/releases) or clone the repo:
+4. [Download the latest release](https://github.com/netcracker/kubemarine/releases) or clone the repo:
    ```bash
-   git clone https://github.com/netcracker-technology/kubemarine.git
+   git clone https://github.com/netcracker/kubemarine.git
    ```
 5. Unpack project from archive if required:
    ```bash
@@ -129,7 +129,7 @@ Please follow the [Contribution Guide](CONTRIBUTING.md ) and the process outline
 
 In case of security concerns, please follow [Security Reporting Process](SECURITY.md)
 ## Changelog
-Detailed changes for each release are documented in the [release notes](https://github.com/netcracker-technology/kubemarine/releases).
+Detailed changes for each release are documented in the [release notes](https://github.com/netcracker/kubemarine/releases).
 
 ## License
 [Apache License 2.0](LICENSE)

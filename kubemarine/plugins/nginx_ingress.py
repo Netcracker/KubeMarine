@@ -150,4 +150,4 @@ def verify_certificate_and_key(first_master: NodeGroup, crt_path, key_path):
 
 def create_tls_secret(first_master, crt_path, key_path, name, namespace):
     first_master.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
-                      f"--dry-run -o yaml | sudo kubectl apply -f -")
+                      f"--dry-run -o yaml | sudo kubectl apply -f -", timeout=300)

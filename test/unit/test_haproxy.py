@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubemarine import haproxy, packages
+from kubemarine import haproxy
 from kubemarine import demo
 
 

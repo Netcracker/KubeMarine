@@ -22,12 +22,10 @@ from typing import Union
 
 import ruamel.yaml
 from copy import deepcopy
-from traceback import *
 from datetime import datetime
 from collections import OrderedDict
 
-import fabric.exceptions
-
+from kubemarine.core.errors import pretty_print_error
 from kubemarine.plugins import nginx_ingress
 
 
@@ -42,29 +40,7 @@ def do_fail(message='', reason: Union[str, Exception] = '', hint='', log=None):
         if message != "":
             sys.stderr.write(" - " + message + "\n")
 
-    if reason != "":
-        if isinstance(reason, fabric.exceptions.GroupException):
-            if log:
-                log.critical("Remote group exception")
-                for connection, result in reason.result.items():
-                    log.critical("%s:" % connection.host)
-                    log.critical(result)
-            else:
-                sys.stderr.write("Remote group exception\n")
-                for connection, result in reason.result.items():
-                    sys.stderr.write("\n%s:" % connection.host)
-                    sys.stderr.write("\n%s\n" % result)
-        elif isinstance(reason, Exception):
-            if log:
-                log.critical('Unexpected exception', exc_info=True)
-            else:
-                sys.stderr.write("Unexpected exception\n\n")
-                print_exc()
-        else:
-            if log:
-                log.critical(reason)
-            else:
-                sys.stderr.write(reason + "\n")
+    pretty_print_error(reason, log)
 
     sys.stderr.write("\n")
 
