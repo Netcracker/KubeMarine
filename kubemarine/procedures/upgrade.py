@@ -15,15 +15,19 @@
 
 
 from collections import OrderedDict
+from io import StringIO
 
 import yaml
+import toml
 
+from distutils.util import strtobool
 from kubemarine.core.flow import load_inventory
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core import flow
 from kubemarine.procedures import install
 from kubemarine import kubernetes, plugins, system
 from itertools import chain
+from kubemarine.core import utils
 
 
 def system_prepare_thirdparties(cluster):
@@ -95,6 +99,26 @@ def upgrade_plugins(cluster):
     plugins.install(cluster, upgrade_candidates)
 
 
+def upgrade_containerd(cluster):
+
+    config_string = ""
+    containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
+    runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
+    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+        containerd_config[runc_options_path]['SystemdCgroup'] = \
+            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+    for key, value in containerd_config.items():
+        # first we process all "simple" `key: value` pairs
+        if not isinstance(value, dict):
+            config_string += f"{toml.dumps({key: value})}"
+    for key, value in containerd_config.items():
+        # next we process all "complex" `key: dict_value` pairs, representing named sections
+        if isinstance(value, dict):
+            config_string += f"\n[{key}]\n{toml.dumps(value)}"
+    config_toml = toml.loads(config_string)
+    utils.dump_file(cluster, config_string, 'containerd-config.toml')
+
+
 tasks = OrderedDict({
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
@@ -102,8 +126,10 @@ tasks = OrderedDict({
     "kubernetes": kubernetes_upgrade,
     "kubernetes_cleanup": kubernetes_cleanup_nodes_versions,
     "packages": upgrade_packages,
+    "upgrade_containerd": upgrade_containerd,
     "plugins": upgrade_plugins,
     "overview": install.overview
+
 })
 
 
