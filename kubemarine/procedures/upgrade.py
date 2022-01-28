@@ -28,6 +28,11 @@ from kubemarine.procedures import install
 from kubemarine import kubernetes, plugins, system
 from itertools import chain
 from kubemarine.core import utils
+from kubemarine.core.executor import RemoteExecutor
+
+
+
+
 
 
 def system_prepare_thirdparties(cluster):
@@ -100,23 +105,41 @@ def upgrade_plugins(cluster):
 
 
 def upgrade_containerd(cluster):
-
-    config_string = ""
-    containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-    runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-        containerd_config[runc_options_path]['SystemdCgroup'] = \
-            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
-    for key, value in containerd_config.items():
-        # first we process all "simple" `key: value` pairs
-        if not isinstance(value, dict):
-            config_string += f"{toml.dumps({key: value})}"
-    for key, value in containerd_config.items():
-        # next we process all "complex" `key: dict_value` pairs, representing named sections
-        if isinstance(value, dict):
-            config_string += f"\n[{key}]\n{toml.dumps(value)}"
-    config_toml = toml.loads(config_string)
-    utils.dump_file(cluster, config_string, 'containerd-config.toml')
+    target_kubernetes_version = cluster.context["upgrade_version"]
+    pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
+    path = 'plugins."io.containerd.grpc.v1.cri"'
+    last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
+    if last_pause_version != pause_version:
+        sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
+        param_begin_pos = sandbox.rfind(":")
+        sandbox = sandbox[:param_begin_pos] + pause_version
+        cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"] = sandbox
+        config_string = ""
+        containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
+        runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
+        if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+            containerd_config[runc_options_path]['SystemdCgroup'] = \
+                bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+        for key, value in containerd_config.items():
+            # first we process all "simple" `key: value` pairs
+            if not isinstance(value, dict):
+                config_string += f"{toml.dumps({key: value})}"
+        for key, value in containerd_config.items():
+            # next we process all "complex" `key: dict_value` pairs, representing named sections
+            if isinstance(value, dict):
+                config_string += f"\n[{key}]\n{toml.dumps(value)}"
+        config_toml = toml.loads(config_string)
+        utils.dump_file(cluster, config_string, 'containerd-config.toml')
+        with RemoteExecutor(cluster) as exe:
+            for node in cluster.get_ordered_members_list(provide_node_configs=True):
+                os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
+                node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
+                                       backup=True,
+                                       sudo=True, mkdir=True)
+                node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
+                                        f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                                        f"systemctl status {os_specific_associations['service_name']}")
+        return exe.get_last_results_str()
 
 
 tasks = OrderedDict({
