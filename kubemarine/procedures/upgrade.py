@@ -106,11 +106,11 @@ def upgrade_plugins(cluster):
 
 def upgrade_containerd(cluster):
 
-    target_kubernetes_version = cluster.context["upgrade_version"]
-    index = target_kubernetes_version.rfind(".")
-    target_kubernetes_version = target_kubernetes_version[:index]
-    pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
     path = 'plugins."io.containerd.grpc.v1.cri"'
+    target_kubernetes_version = cluster.context["upgrade_version"]
+    index_pos = target_kubernetes_version.rfind(".")
+    target_kubernetes_version = target_kubernetes_version[:index_pos]
+    pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
     last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
     if last_pause_version != pause_version:
         sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
@@ -131,7 +131,6 @@ def upgrade_containerd(cluster):
             # next we process all "complex" `key: dict_value` pairs, representing named sections
             if isinstance(value, dict):
                 config_string += f"\n[{key}]\n{toml.dumps(value)}"
-        config_toml = toml.loads(config_string)
         utils.dump_file(cluster, config_string, 'containerd-config.toml')
         with RemoteExecutor(cluster) as exe:
             for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
