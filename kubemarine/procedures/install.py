@@ -17,6 +17,7 @@ import os.path
 from collections import OrderedDict
 import fabric
 import yaml
+import ruamel.yaml
 import io
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
@@ -115,11 +116,16 @@ def system_prepare_audit_daemon(cluster):
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
 def system_prepare_policy(cluster):
+
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
-    cluster.sudo(f"mkdir -p {audit_log_dir}")
+    cluster.nodes['master'].sudo(f"mkdir -p {audit_log_dir}")
+    cluster.nodes['master'].sudo(f"mkdir -p /etc/kubernetes/")
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+
+    policy_config = yaml.dump(policy_config)
+    utils.dump_file(cluster, policy_config, 'audit-policy.yaml')
     if policy_config:
-        cluster.put(io.StringIO(policy_config), '/etc/kubernetes/audit-policy.yaml', sudo=True)
+        cluster.nodes['master'].put(io.StringIO(policy_config), '/etc/kubernetes/audit-policy.yaml', sudo=True)
         # TODO: reload policy when cluster already installed
     else:
         cluster.log.debug("Audit cluster policy config not found")
