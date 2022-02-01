@@ -153,16 +153,16 @@ services:
       apiVersion: audit.k8s.io/v1
       kind: Policy
       omitStages:
-        - "RequestReceived"
+          - "RequestReceived"
       rules:
         # log changes to pods at RequestResponse level
-        - level: RequestResponse
-          omitStages:
-            - RequestReceived
-          resources:
-            - group: "" # core API group; add third-party API services and your API services if needed
-              resources: [ "pods" ]
-              verbs: [ "create", "patch", "update", "delete" ]
+          - level: RequestResponse
+            omitStages:
+              - RequestReceived
+            resources:
+              - group: "" # core API group; add third-party API services and your API services if needed
+                resources: [ "pods" ]
+                verbs: [ "create", "patch", "update", "delete" ]
 
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
