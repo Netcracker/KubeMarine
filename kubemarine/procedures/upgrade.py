@@ -133,7 +133,8 @@ def upgrade_containerd(cluster):
                 config_string += f"\n[{key}]\n{toml.dumps(value)}"
         utils.dump_file(cluster, config_string, 'containerd-config.toml')
         with RemoteExecutor(cluster) as exe:
-            for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+            for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
+                    provide_node_configs=True):
                 os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
                 node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
                                        backup=True,
