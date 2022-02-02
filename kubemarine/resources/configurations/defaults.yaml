@@ -33,16 +33,16 @@ services:
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
       volumeMounts:
-        - mountPath: /etc/kubernetes/audit-policy.yaml
+        - mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
           name: audit
           readOnly: true
         - mountPath: /var/log/kubernetes/audit/
           name: audit-log
           readOnly: false
       volumes:
-        - name: audit
+          name: audit
           hostPath:
-            path: /etc/kubernetes/audit-policy.yaml
+            path: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
             type: File
         - name: audit-log
           hostPath:
