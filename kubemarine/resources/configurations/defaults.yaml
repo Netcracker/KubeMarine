@@ -36,7 +36,7 @@ services:
         - mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
           name: audit
           readOnly: true
-        - mountPath: /var/log/kubernetes/audit/
+        - mountPath: '{{ os.path.dirname["services"]["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
           name: audit-log
           readOnly: false
       volumes:
@@ -46,7 +46,7 @@ services:
             type: File
         - name: audit-log
           hostPath:
-            path: /var/log/kubernetes/audit/
+            path: '{{ os.path.dirname["services"]["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
             type: DirectoryOrCreate
     scheduler:
       extraArgs:
