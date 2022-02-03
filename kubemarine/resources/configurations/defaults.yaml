@@ -37,7 +37,7 @@ services:
           name: audit
           readOnly: true
           '{% path = {{["services"]["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"]}}.split("/") %}'
-        - mountPath: '{{ path[1] + path[2] + path[3] + path[4] }}'
+        - mountPath: '{{ path[1] + path[2] + path[3] }}'
           name: audit-log
           readOnly: false
       volumes:
@@ -48,7 +48,7 @@ services:
         - name: audit-log
           hostPath:
             '{% path = {{["services"]["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"]}}.split("/") %}'
-            path: '{{ path[1] + path[2] + path[3] + path[4] }}'
+            path: '{{ path[1] + path[2] + path[3] }}'
             type: DirectoryOrCreate
     scheduler:
       extraArgs:
