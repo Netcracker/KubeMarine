@@ -141,8 +141,7 @@ def upgrade_containerd(cluster):
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
                                            backup=True,
                                            sudo=True, mkdir=True)
-                    node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
-                                            f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                    node['connection'].sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
                                             f"systemctl status {os_specific_associations['service_name']}")
             return exe.get_last_results_str()
 
