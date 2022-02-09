@@ -32,22 +32,17 @@ services:
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
-      volumeMounts:
-        - mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
-          name: audit
-          readOnly: true
-        - mountPath:  '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
-          name: audit-log
-          readOnly: false
-      volumes:
-        - name: audit
-          hostPath:
-            path: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
-            type: File
-        - name: audit-log
-          hostPath:
-            path: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
-            type: DirectoryOrCreate
+      extraVolumes:
+      - name: audit
+        hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
+        mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
+        readOnly: True
+        pathType: File
+      - name: audit-log
+        hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
+        mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
+        readOnly: False
+        pathType: DirectoryOrCreate
     scheduler:
       extraArgs:
         profiling: "false"
