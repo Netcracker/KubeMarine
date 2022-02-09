@@ -1069,7 +1069,8 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
 
     nodes = group.get_ordered_members_list()
 
-    if len(nodes) < group_size:
+    # group_size should be greater than 0
+    if len(nodes) != 0 and len(nodes) < group_size:
         group_size = len(nodes)
 
     groups_amount = math.ceil(len(nodes) / group_size)
