@@ -344,6 +344,10 @@ plugins:
       procedures:
         - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
         - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
             pods:
               - coredns
               - calico-kube-controllers
@@ -439,6 +443,9 @@ plugins:
             method: manage_custom_certificate
         - template: 'templates/plugins/nginx-ingress-controller-{{ plugins["nginx-ingress-controller"].version|minorversion }}.yaml.j2'
         - expect:
+            daemonsets:
+              - name: ingress-nginx-controller
+                namespace: ingress-nginx
             pods:
               - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
     controller:
@@ -493,6 +500,11 @@ plugins:
       procedures:
         - template: 'templates/plugins/dashboard-{{ plugins["kubernetes-dashboard"].version|minorversion }}.yaml.j2'
         - expect:
+            deployments:
+              - name: kubernetes-dashboard
+                namespace: kubernetes-dashboard
+              - name: dashboard-metrics-scraper
+                namespace: kubernetes-dashboard
             pods:
               - kubernetes-dashboard
               - dashboard-metrics-scraper

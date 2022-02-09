@@ -194,7 +194,7 @@ class KubernetesCluster(Environment):
             self.context = t_cluster.context
         elif step == 'after':
             self.remove_invalid_cri_config(self.inventory)
-            # Method "kubetool.system.is_multiple_os_detected" is not used because it detects OS family for new nodes
+            # Method "kubemarine.system.is_multiple_os_detected" is not used because it detects OS family for new nodes
             # only, while package versions caching performs on all nodes.
             if self.nodes['all'].get_nodes_os(suppress_exceptions=True, force_all_nodes=True) != 'multiple':
                 self.cache_package_versions()

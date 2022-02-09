@@ -222,9 +222,21 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         nodes_list = self.get_nonzero_nodes_list()
         return self.cluster.make_group(nodes_list)
 
+    def get_nodes_list_where_value_in_stdout(self, value: str) -> List[fabric.connection.Connection]:
+        """
+        Returns a list of node connections that contains the given string value in results stderr.
+        :param value: The string value to be found in the nodes results stderr.
+        :return: List with nodes connections
+        """
+        nodes_with_stderr_value: List[fabric.connection.Connection] = []
+        for conn, result in self.items():
+            if isinstance(result, fabric.runners.Result) and value in result.stdout:
+                nodes_with_stderr_value.append(conn)
+        return nodes_with_stderr_value
+
     def get_nodes_list_where_value_in_stderr(self, value: str) -> List[fabric.connection.Connection]:
         """
-        Returns a list of node connections that contains the given string value in results stderr
+        Returns a list of node connections that contains the given string value in results stderr.
         :param value: The string value to be found in the nodes results stderr.
         :return: List with nodes connections
         """
@@ -234,14 +246,39 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 nodes_with_stderr_value.append(conn)
         return nodes_with_stderr_value
 
+    def get_nodes_group_where_value_in_stdout(self, value: str) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes that contains the given string value in results stdout.
+        :param value: The string value to be found in the nodes results stdout.
+        :return: NodeGroup
+        """
+        nodes_list = self.get_nodes_list_where_value_in_stdout(value)
+        return self.cluster.make_group(nodes_list)
+
     def get_nodes_group_where_value_in_stderr(self, value: str) -> NodeGroup:
         """
-        Forms and returns new NodeGroup of nodes that contains the given string value in results stderr
+        Forms and returns new NodeGroup of nodes that contains the given string value in results stderr.
         :param value: The string value to be found in the nodes results stderr.
         :return: NodeGroup
         """
         nodes_list = self.get_nodes_list_where_value_in_stderr(value)
         return self.cluster.make_group(nodes_list)
+
+    def stdout_contains(self, value: str) -> bool:
+        """
+        Checks for the presence of the given string in all results stdout.
+        :param value: The string value to be found in the nodes results stdout.
+        :return: true if string presented
+        """
+        return len(self.get_nodes_list_where_value_in_stdout(value)) > 0
+
+    def stderr_contains(self, value: str) -> bool:
+        """
+        Checks for the presence of the given string in all results stderr.
+        :param value: The string value to be found in the nodes results stderr.
+        :return: true if string presented
+        """
+        return len(self.get_nodes_list_where_value_in_stderr(value)) > 0
 
     def __eq__(self, other) -> bool:
         if self is other:
@@ -732,7 +769,13 @@ class NodeGroup:
     def get_any_member(self, provide_node_configs=False, apply_filter=None):
         member = random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
                                                              apply_filter=apply_filter))
-        self.cluster.log.verbose(f'Selected node {str(member)}')
+        if isinstance(member, NodeGroup):
+            # to avoid "Selected node <kubemarine.core.group.NodeGroup object at 0x7f925625d070>" writing to log,
+            # let's get node ip from selected member and pass to it to log
+            member_str = str(list(member.nodes.keys())[0])
+        else:
+            member_str = str(member)
+        self.cluster.log.verbose(f'Selected node {member_str}')
         return member
 
     def get_member_by_name(self, name, provide_node_configs=False):

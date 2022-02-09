@@ -77,6 +77,7 @@ nodes:
     grace_period: 60
   remove:
     check_active_timeout: 30
+  max_time_difference: 15000
   command_execution:
     timeout: 2700
 error_handling:

@@ -7,3 +7,4 @@ ruamel.yaml
 ansible==2.9.9
 pygelf
 toml
+python-dateutil
