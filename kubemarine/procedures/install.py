@@ -127,11 +127,7 @@ def system_prepare_policy(cluster):
     policy_config = yaml.dump(policy_config)
     utils.dump_file(cluster, policy_config, 'audit-policy.yaml')
     if policy_config:
-        if cluster.nodes['master'].sudo(f"cat {policy_file}"):
-            cluster.nodes['master'].sudo(f"rm -f {policy_file}")
-            cluster.nodes['master'].put(io.StringIO(policy_config), audit_file_name, sudo=True)
-        else:
-            cluster.nodes['master'].put(io.StringIO(policy_config), audit_file_name, sudo=True)
+        cluster.nodes['master'].put(io.StringIO(policy_config), audit_file_name, sudo=True, backup=True)
     else:
         cluster.log.debug("Audit cluster policy config not found")
 
