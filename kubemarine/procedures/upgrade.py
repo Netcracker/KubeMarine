@@ -105,6 +105,10 @@ def upgrade_plugins(cluster):
 
 
 def upgrade_containerd(cluster):
+    """
+        This function fixes the incorrect version of pause during the cluster update procedure
+    """
+
 
     cri = cluster.inventory["services"]["cri"]['containerRuntime']
     if cri == 'containerd':
