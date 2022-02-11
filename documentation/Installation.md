@@ -4182,7 +4182,7 @@ The following is the installation tasks tree:
     * **audit**
       * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
       * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
-      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [Kubernetes-audit] (#Kubernetes-audit)
+      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [Kubernetes-audit](#Kubernetes-audit)
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).
