@@ -41,9 +41,9 @@ def connection_ssh_connectivity(cluster):
                 cluster.log.error(e)
         if failed_nodes:
             raise TestFailure("Failed to connect to %s nodes" % len(failed_nodes),
-                              hint="Failed to connect from deploy node to the remote node of the cluster. Check that "
-                                   "the inventory is filled in correctly (key, username, nodes addresses), verify "
-                                   "access to remote nodes.")
+                              hint="Failed to connect from the deploy node to the remote node of the cluster. Check that "
+                                   "the inventory details (key, username, and nodes addresses) are entered correctly, and verify "
+                                   "the access to remote nodes.")
 
 
 def connection_ssh_latency_single(cluster):
@@ -65,11 +65,11 @@ def connection_ssh_latency_single(cluster):
         if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical']:
             raise TestFailure("Very high latency: %sms" % average_latency,
                               hint="A very high latency was detected between the deploy node and cluster nodes. "
-                                   "Check your network settings and status. It is necessary to reduce latency to %sms."
+                                   "Check your network settings and status. It is necessary to reduce the latency to %sms."
                                    % cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical'])
         if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended']:
             raise TestWarn("High latency: %sms" % average_latency,
-                           hint="Detected latency is higher than recommended value (%sms). Check your network settings "
+                           hint="The detected latency is higher than the recommended value (%sms). Check your network settings "
                                 "and status." % cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended'])
         tc.success(results="%sms" % average_latency)
 
@@ -92,11 +92,11 @@ def connection_ssh_latency_multiple(cluster):
         if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical']:
             raise TestFailure("Very high latency: %sms" % average_latency,
                               hint="A very high latency was detected between the deploy node and cluster nodes. "
-                                   "Check your network settings and status. It is necessary to reduce latency to %sms."
+                                   "Check your network settings and status. It is necessary to reduce the latency to %sms."
                                    % cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical'])
         if average_latency > cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended']:
             raise TestWarn("High latency: %sms" % average_latency,
-                           hint="Detected latency is higher than recommended value (%sms). Check your network settings "
+                           hint="The detected latency is higher than the recommended value (%sms). Check your network settings "
                                 "and status." % cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended'])
         tc.success(results="%sms" % average_latency)
 
@@ -111,8 +111,8 @@ def connection_sudoer_access(cluster):
                 non_root.append(connection.host)
         if non_root:
             raise TestFailure("Non-sudoer access found at: %s" % ", ".join(non_root),
-                              hint="Certain nodes do not have the appropriate sudoer access. At this nodes add "
-                                   "connection user to sudoers group.")
+                              hint="Certain nodes do not have the appropriate sudoer access. At these nodes, add "
+                                   "a connection user to the sudoers group.")
 
 
 def hardware_members_amount(cluster, group_name):
@@ -142,16 +142,16 @@ def hardware_members_amount(cluster, group_name):
             if group_name == 'all':
                 beauty_name = 'all node'
             raise TestFailure("Less than minimal. Detected %s item%s" % (amount, s),
-                              hint="Increase the number of resources, so the number of %ss in the cluster should not "
-                                   "be less than %s" % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
+                              hint="Increase the number of resources, so that the number of %ss in the cluster should not "
+                                   "be less than %s." % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
 
         if amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['amount']:
             beauty_name = group_name
             if group_name == 'all':
                 beauty_name = 'all node'
             raise TestWarn("Less than recommended. Detected %s item%s" % (amount, s),
-                           hint="Increase the number of resources, so the number of %ss in the cluster should not "
-                                "be less than %s" % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
+                           hint="Increase the number of resources, so that the number of %ss in the cluster should not "
+                                "be less than %s." % (beauty_name, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount']))
 
         tc.success("%s item%s" % (amount, s))
 
@@ -220,7 +220,7 @@ def hardware_ram(cluster, group_name):
                                    "value: %sGB." % cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'])
         if minimal_amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']:
             raise TestWarn("Less than recommended. Detected %sGB" % minimal_amount,
-                           hint="Increase the number of RAM in the node configuration up to %sGB."
+                           hint="Increase the number of RAM in the node configuration up to %s GB."
                                 % cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram'])
         tc.success(results='%sGB' % minimal_amount)
 
@@ -276,7 +276,7 @@ def pod_subnet_connectivity(cluster):
 
         if failed_nodes:
             raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint=f"Traffic is not allowed for pod subnet({pod_subnet}) on nodes: {failed_nodes}.")
+                              hint=f"Traffic is not allowed for the pod subnet({pod_subnet}) on nodes: {failed_nodes}.")
 
 
 def service_subnet_connectivity(cluster):
@@ -286,7 +286,7 @@ def service_subnet_connectivity(cluster):
 
         if failed_nodes:
             raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint=f"Traffic is not allowed for service subnet({service_subnet}) on nodes: {failed_nodes}.")
+                              hint=f"Traffic is not allowed for the service subnet({service_subnet}) on nodes: {failed_nodes}.")
 
 
 def cmd_for_ports(ports, query):
@@ -366,7 +366,7 @@ def check_subnet_connectivity(cluster, subnet):
     node_list = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
     host_to_ip = {}
 
-    # Create alias from node network interface for subnet on every node
+    # Create alias from the node network interface for the subnet on every node
     # And run process that LISTEN TCP port
     i = 30
     for node in node_list:
@@ -380,7 +380,7 @@ def check_subnet_connectivity(cluster, subnet):
     failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
 
     i = 30
-    # Remove created aliases form network interfaces and kill created during test processes
+    # Remove the created aliases from network interfaces and kill the created during the test processes
     for node in node_list:
         random_host = subnet_hosts[subnet_hosts_len - i]
         iface = iface_cmd % node['internal_address']
@@ -406,7 +406,7 @@ def check_tcp_ports(cluster):
 
         failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
 
-        # Kill created during test processes
+        # Kill the created during test processes
         for node in node_list:
             socat_cmd = cmd_for_ports(tcp_ports, get_stop_socat_cmd())
             node['connection'].sudo(socat_cmd)
@@ -535,7 +535,7 @@ Hot to use:
     )
 
     # Final summary should be printed only to stdout with custom formatting
-    # If tests results required for parsing, they can be found in test results files
+    # If test results are required for parsing, they can be found in the test results files
     print(cluster.context['testsuite'].get_final_summary())
     cluster.context['testsuite'].print_final_status(cluster.log)
     make_reports(cluster)

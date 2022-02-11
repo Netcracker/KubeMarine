@@ -89,8 +89,8 @@ def services_status(cluster, service_type):
 
 def recommended_system_packages_versions(cluster):
     """
-    Task which checks if configured "system" packages versions are compatible with configured k8s version and OS.
-    Fails if unable to detect OS family.
+    Task that checks if configured "system" packages versions are compatible with the configured k8s version and OS.
+    Fails if unable to detect the OS family.
     Warns if configured not recommended k8s version or if configured not recommended system packages versions.
     """
     with TestCase(cluster.context['testsuite'], '204', "Services", f"Recommended packages version") as tc:
@@ -314,7 +314,7 @@ def thirdparties_hashes(cluster):
                                  '    $(sudo tar xfO %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
                                  '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
                                  'done' % (path, path, unpack_dir))
-                # for each file on each host verify that sha in archive is equal to sha for unpacked
+                # for each file on each host, verify that SHA in archive is equal to SHA for unpacked
                 for host, result in res.items():
                     if result.failed:
                         broken.append(f'can not verify files SHA for archive {path} '
@@ -376,7 +376,7 @@ def kubernetes_nodes_existence(cluster):
         if not_found:
             raise TestFailure("Nodes not found: %s" % ', '.join(not_found),
                               hint="The cluster must contain all the nodes that are described in the inventory. Add "
-                                   "the missing nodes to cluster.")
+                                   "the missing nodes to the cluster.")
 
 
 def kubernetes_nodes_roles(cluster):
@@ -404,8 +404,8 @@ def kubernetes_nodes_roles(cluster):
         nodes_with_bad_roles = list(set(nodes_with_bad_roles))
         if nodes_with_bad_roles:
             raise TestFailure("Incorrect role detected at: %s" % ', '.join(nodes_with_bad_roles),
-                              hint="There were detected some nodes, whose role differs from that specified in the "
-                                   "inventory. The configuration of these nodes should be fixed.")
+                              hint="Some nodes whose role differs from that specified in the "
+                                   "inventory were detected. The configuration of these nodes should be fixed.")
 
 
 def kubernetes_nodes_condition(cluster, condition_type):
@@ -468,16 +468,16 @@ def kubernetes_pods_condition(cluster):
             if critical_system_failed_amount != 1:
                 s = 's'
             raise TestFailure("%s failed system pod%s" % (critical_system_failed_amount, s),
-                              hint="Try to determine the cause of pods failure, redeploy, reapply or restart them. If "
-                                   "this is not fixed, the cluster may not work or do it incorrectly.")
+                              hint="Try to determine the cause of the pods failure. Then redeploy, reapply, or restart them. If "
+                                   "this is not fixed, the cluster may not work or may work incorrectly.")
         elif total_failed_amount > 0:
             s = ''
             if total_failed_amount != 1:
                 s = 's'
             raise TestWarn("%s pod%s are failed/not running" % (total_failed_amount, s),
                            hint="Try to determine the reason the pods are not operational, "
-                                "try to wait, redeploy, reapply or restart them. "
-                                "If this is not fixed, some deployed applications may not work or do it incorrectly.")
+                                "try to wait, redeploy, reapply, or restart them. "
+                                "If this is not fixed, some deployed applications may not work or may work incorrectly.")
         else:
             tc.success(results="All pods are running")
 
@@ -591,7 +591,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         elif len(bad_ips) == 0:
             pretty_list = '\n - ' + ('\n - '.join(permissive_ips))
             raise TestWarn('permissive',
-                           hint=f"It is not recommended to use permissive state, but this is possible if you "
+                           hint=f"It is not recommended to use the permissive state, but this is possible if you "
                                 f"explicitly specify this in your inventory, thereby assuming all risks. Only "
                                 f"\"enforcing\" policy is recommended. Please use it on the following "
                                 f"nodes:{pretty_list}")
@@ -607,7 +607,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
                     pretty_list_ips.append(ip)
             pretty_list = '\n - ' + ('\n - '.join(pretty_list_ips))
             raise TestFailure(', '.join(bad_states),
-                              hint=f"Selinux is configured with wrong state, which is not recommended. Only "
+                              hint=f"Selinux is configured with the wrong state, which is not recommended. Only "
                                    f"\"enforcing\" policy is recommended. Please use it on the following "
                                    f"nodes:{pretty_list}")
 
@@ -636,7 +636,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
             raise TestFailure('invalid',
                               hint=f"Selinux is incorrectly configured - its configuration is different from the one "
                                    f"specified in the inventory. Check the configuration and run the selinux setup task"
-                                   f" via installation procedure.")
+                                   f" using the installation procedure.")
 
 
 def verify_firewalld_status(cluster: KubernetesCluster) -> None:
@@ -654,7 +654,7 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('enabled',
                               hint=f"FirewallD must be disabled as it is not supported and can create compatibility "
-                                   f"issues. To solve this problem, execute firewalld disable task in the installation "
+                                   f"issues. To solve this problem, execute the firewalld disable task in the installation "
                                    f"procedure.")
 
 
@@ -699,7 +699,7 @@ def verify_swap_state(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('enabled',
                               hint=f"Swap must be disabled as it is not supported and can create performance "
-                                   f"issues. To solve this problem, execute swap disable task in the installation "
+                                   f"issues. To solve this problem, execute the swap disable task in the installation "
                                    f"procedure.")
 
 
