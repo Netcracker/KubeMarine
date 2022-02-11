@@ -150,14 +150,23 @@ services:
       omitStages:
           - "RequestReceived"
       rules:
-        # log changes to pods at RequestResponse level
-          - level: RequestResponse
-            omitStages:
-              - RequestReceived
-            resources:
-              - group: "" # core API group; add third-party API services and your API services if needed
-                resources: [ "pods" ]
-                verbs: [ "create", "patch", "update", "delete" ]
+        - level: Request
+          resources:
+            - group: "" # core
+            - group: "admissionregistration.k8s.io"
+            - group: "apps"
+            - group: "authentication.k8s.io"
+            - group: "authorization.k8s.io"
+            - group: "autoscaling"
+            - group: "batch"
+            - group: "certificates.k8s.io"
+            - group: "extensions"
+            - group: "networking.k8s.io"
+            - group: "policy"
+            - group: "rbac.authorization.k8s.io"
+            - group: "settings.k8s.io"
+            - group: "storage.k8s.io"
+
 
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
