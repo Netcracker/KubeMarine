@@ -115,10 +115,11 @@ def system_prepare_audit_daemon(cluster):
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
 def system_prepare_policy(cluster):
-
+    """
+    Task generates rules for logging kubernetes
+    """
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
-    policy_file = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     cluster.nodes['master'].sudo(f"mkdir -p {audit_log_dir}")
     cluster.nodes['master'].sudo(f"mkdir -p {audit_policy_dir}")
