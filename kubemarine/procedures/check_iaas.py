@@ -507,10 +507,7 @@ Hot to use:
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []

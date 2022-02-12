@@ -535,10 +535,7 @@ def main(cli_arguments=None):
                         default='',
                         help='exclude comma-separated tasks from execution')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []

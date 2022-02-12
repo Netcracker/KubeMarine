@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import os
 import sys
 import time
 from copy import deepcopy
@@ -264,7 +265,23 @@ def new_parser(cli_help):
                         nargs='*',
                         help='Logging options, can be specified multiple times')
 
+    parser.add_argument('-w', '--workdir',
+                        default='',
+                        help='Custom path of the workdir')
+
     return parser
+
+
+def parse_args(parser, arguments: None):
+    if arguments is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(arguments)
+
+    if args.workdir != '':
+        os.chdir(args.workdir)
+
+    return args
 
 
 def schedule_cumulative_point(cluster, point_method):

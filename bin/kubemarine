@@ -21,5 +21,7 @@ if [ -z "${PYTHONUNBUFFERED}" ]; then
   export PYTHONUNBUFFERED=TRUE
 fi
 
+WORKDIR=$(pwd)
+
 cd "$(dirname "$0")/../" || exit 1
-python3 -m kubemarine $@
+python3 -m kubemarine $@ -w ${WORKDIR}
