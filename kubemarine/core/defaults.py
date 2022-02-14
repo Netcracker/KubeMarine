@@ -434,6 +434,9 @@ def compile_inventory(inventory, cluster):
     merged_inventory = yaml.dump(prepare_for_dump(inventory))
     utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
+    cluster_storage = utils.ClusterStorage.get_instance(cluster)
+    cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+
     return inventory
 
 
