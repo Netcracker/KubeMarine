@@ -37,6 +37,7 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
+from kubemarine.kubernetes.replicaset import ReplicaSet
 
 # list of plugins owned and managed by kubemarine
 
@@ -208,6 +209,56 @@ def expect_daemonset(cluster: KubernetesCluster,
             time.sleep(timeout)
 
 
+def expect_replicaset(cluster: KubernetesCluster,
+                      replicasets_names: List[str] or List[Dict[str, str]],
+                      timeout: int = None,
+                      retries: int = None,
+                      node: NodeGroup = None) -> None:
+    """
+    The method waits for the configuration parameters of the given ReplicaSets to be applied.
+    :param cluster: KubernetesCluster object where method should be performed
+    :param replicasets_names: List of ReplicaSets names (or dicts with name and namespace) to be
+    expected
+    :param timeout: Retry attempt time (seconds)
+    :param retries: Number of retry attempts
+    :param node: Node where replicasests should be detected
+    :return: None
+    """
+
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following ReplicaSets to be up to date: {replicasets_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for ReplicaSets...")
+
+    replicasets = []
+    for name in replicasets_names:
+        if isinstance(name, str):
+            replicasets.append(ReplicaSet(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            replicasets.append(ReplicaSet(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for replicaset in replicasets:
+            if not replicaset.reload(master=node, suppress_exceptions=True).is_available():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("ReplicaSets are up to date")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug(f"ReplicaSets are not up to date yet... ({retries * timeout}s left)")
+            time.sleep(timeout)
+
+
 def expect_deployment(cluster: KubernetesCluster,
                       deployments_names: List[str] or List[Dict[str, str]],
                       timeout: int = None,
@@ -366,6 +417,10 @@ def convert_expect(cluster, config):
         config['daemonsets'] = {
             'list': config['daemonsets']
         }
+    if config.get('replicasets') is not None and isinstance(config['replicasets'], list):
+        config['replicasets'] = {
+            'list': config['replicasets']
+        }
     if config.get('deployments') is not None and isinstance(config['pods'], list):
         config['deployments'] = {
             'list': config['deployments']
@@ -383,6 +438,9 @@ def verify_expect(cluster, config):
 
     if config.get('daemonsets') is not None and config['daemonsets'].get('list') is None:
         raise Exception('DaemonSet expectation defined, but DaemonSets list is missing')
+
+    if config.get('replicasets') is not None and config['replicasets'].get('list') is None:
+        raise Exception('ReplicaSet expectation defined, but replicasets list is missing')
 
     if config.get('deployments') is not None and config['deployments'].get('list') is None:
         raise Exception('Deployment expectation defined, but Deployments list is missing')
@@ -402,6 +460,11 @@ def apply_expect(cluster, config, plugin_name=None):
             expect_daemonset(cluster, config['daemonsets']['list'],
                              timeout=config['daemonsets'].get('timeout', plugins_timeout),
                              retries=config['daemonsets'].get('retries', plugins_retries))
+
+        elif expect_type == 'replicasets':
+            expect_deployment(cluster, config['replicasets']['list'],
+                              timeout=config['replicasets'].get('timeout', plugins_timeout),
+                              retries=config['replicasets'].get('retries', plugins_retries))
 
         elif expect_type == 'deployments':
             expect_deployment(cluster, config['deployments']['list'],

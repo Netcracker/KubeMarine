@@ -28,19 +28,19 @@ class DaemonSet(KubernetesObject):
         desired_number_scheduled = self._obj.get('status', {}).get('desiredNumberScheduled')
         updated_number_scheduled = self._obj.get('status', {}).get('updatedNumberScheduled')
         return desired_number_scheduled is not None \
-               and updated_number_scheduled is not None \
-               and desired_number_scheduled == updated_number_scheduled
+            and updated_number_scheduled is not None \
+            and desired_number_scheduled == updated_number_scheduled
 
     def is_ready(self) -> bool:
         desired_number_scheduled = self._obj.get('status', {}).get('desiredNumberScheduled')
         number_ready = self._obj.get('status', {}).get('numberReady')
         return desired_number_scheduled is not None \
-               and number_ready is not None \
-               and desired_number_scheduled == number_ready
+            and number_ready is not None \
+            and desired_number_scheduled == number_ready
 
     def is_scheduled(self) -> bool:
         desired_number_scheduled = self._obj.get('status', {}).get('desiredNumberScheduled')
         current_number_scheduled = self._obj.get('status', {}).get('currentNumberScheduled')
         return desired_number_scheduled is not None \
-               and current_number_scheduled is not None \
-               and desired_number_scheduled == current_number_scheduled
+            and current_number_scheduled is not None \
+            and desired_number_scheduled == current_number_scheduled
