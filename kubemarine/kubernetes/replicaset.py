@@ -21,7 +21,7 @@ class ReplicaSet(KubernetesObject):
     def __init__(self, cluster: KubernetesCluster, name=None, namespace=None, obj=None):
         super().__init__(cluster, kind='ReplicaSet', name=name, namespace=namespace, obj=obj)
 
-    def is_available_labeled_and_ready(self) -> bool:
+    def is_actual_and_ready(self) -> bool:
         return self.is_available() and self.is_fully_labeled() and self.is_ready()
 
     def is_ready(self) -> bool:
