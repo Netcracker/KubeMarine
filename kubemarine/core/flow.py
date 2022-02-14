@@ -122,7 +122,6 @@ def create_context(execution_arguments, procedure=None, included_tasks=None, exc
     if excluded_tasks:
         context['scheduled_tasks']['excluded'] = excluded_tasks
 
-    utils.collect_procedure_info()
 
     return context
 

@@ -299,11 +299,12 @@ class ClusterStorage:
         if not ClusterStorage.__instance:
             #self.cluster = cluster
             self.folder_name = "/etc/kubemarine/"
-            self.make_dir(cluster)
+            self._make_dir(cluster)
             print("new storage created")
         else:
             print("reused storage:", self.get_instance(cluster))
 
+    @classmethod
     def get_instance(self, cluster):
         if not self.__instance:
             self.__instance = ClusterStorage(cluster)
@@ -314,11 +315,11 @@ class ClusterStorage:
         readable_timestamp = datetime.fromtimestamp(timestamp).isoformat()
         initial_procedure = cluster.context["initial_procedure"]
         self.folder_name += readable_timestamp + "_" + initial_procedure
-        cluster.nodes['master'].sudo(f"mkdir -m 600 {self.folder_name}")
+        cluster.nodes['master'].sudo(f"mkdir -p -m 600 {self.folder_name}")
         self._collect_procedure_info(cluster)
 
     def upload_file(self, cluster, stream, file_name):
-        cluster.nodes['master'].put(stream, self.folder_name + "/" + file_name, sudo=True)
+        cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True)
 
     def _collect_procedure_info(self, cluster):
         out = dict()
@@ -327,9 +328,10 @@ class ClusterStorage:
         out["tasks"] = execution_arguments["tasks"]
         out["exclude"] = execution_arguments["exclude"]
         out["initial_procedure"] = cluster.context["initial_procedure"]
-        output = yaml.dump(out, )
+        output = yaml.dump(out)
         self.upload_file(cluster, output, "procedure_parameters")
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
-            dump_file(cluster, stream, "version")
-            self.upload_file(cluster, stream, "version")
+            output = yaml.safe_load(stream)
+            output = yaml.dump(output)
+            self.upload_file(cluster, output, "version")
 
