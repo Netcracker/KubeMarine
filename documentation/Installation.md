@@ -2058,7 +2058,7 @@ services:
 
 #### Kubernetes-audit
 
-*Installation task*: `prepare.system.policy`
+*Installation task*: `prepare.system.audit.configure_policy`
 
 *Can cause reboot*: No
 
