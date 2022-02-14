@@ -390,11 +390,17 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
         cluster.log.verbose('Enrichment finished!')
 
         if make_dumps:
-            utils.dump_file(cluster, yaml.dump(prepare_for_dump(inventory), ), "cluster.yaml")
+            output = yaml.dump(prepare_for_dump(inventory), )
+
+            utils.dump_file(cluster, output, "cluster.yaml")
+            cluster_storage = utils.ClusterStorage.get_instance(cluster)
+            cluster_storage.upload_file(cluster, output, "cluster.yaml")
+
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
                     utils.dump_file(cluster, stream, "procedure.yaml")
+                    cluster_storage.upload_file(cluster, stream, "procedure.yaml")
 
         return inventory
 
