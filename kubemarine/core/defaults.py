@@ -362,6 +362,14 @@ def verify_node_names(inventory, cluster):
 def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
+
+    merged_inventory = yaml.dump(prepare_for_dump(inventory))
+    utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+
+    cluster_storage = utils.ClusterStorage.get_instance(cluster)
+    cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+
+
     return inventory
 
 
@@ -395,6 +403,8 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
             utils.dump_file(cluster, output, "cluster.yaml")
             cluster_storage = utils.ClusterStorage.get_instance(cluster)
             cluster_storage.upload_file(cluster, output, "cluster.yaml")
+
+
 
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
@@ -431,11 +441,6 @@ def compile_inventory(inventory, cluster):
 
     inventory = compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
 
-    #merged_inventory = yaml.dump(prepare_for_dump(inventory))
-    #utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-
-    #cluster_storage = utils.ClusterStorage.get_instance(cluster)
-    #cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
     return inventory
 

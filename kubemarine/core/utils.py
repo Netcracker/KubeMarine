@@ -292,6 +292,8 @@ def determine_resource_absolute_dir(path: str) -> str:
     raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
 
+
+
 class ClusterStorage:
     __instance = None
 
@@ -305,10 +307,10 @@ class ClusterStorage:
             print("reused storage:", self.get_instance(cluster))
 
     @classmethod
-    def get_instance(self, cluster):
-        if not self.__instance:
-            self.__instance = ClusterStorage(cluster)
-        return self.__instance
+    def get_instance(cls, cluster):
+        if not cls.__instance:
+            cls.__instance = ClusterStorage(cluster)
+        return cls.__instance
 
     def _make_dir(self, cluster):
         timestamp = datetime.now().timestamp()
@@ -317,9 +319,19 @@ class ClusterStorage:
         self.folder_name += readable_timestamp + "_" + initial_procedure
         cluster.nodes['master'].sudo(f"mkdir -p -m 600 {self.folder_name}")
         self._collect_procedure_info(cluster)
+        self._make_link(cluster)
+
+
+    def _make_link(self, cluster):
+        cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
+
+    def _pack_file(self,cluster):
+        cluster.nodes['master'].sudo(f"tar -zcvf {self.folder_name}")
+
 
     def upload_file(self, cluster, stream, file_name):
         cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True)
+
 
     def _collect_procedure_info(self, cluster):
         out = dict()
@@ -330,8 +342,8 @@ class ClusterStorage:
         out["initial_procedure"] = cluster.context["initial_procedure"]
         output = yaml.dump(out)
         self.upload_file(cluster, output, "procedure_parameters")
+        #self._pack_file(cluster)
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
             output = yaml.safe_load(stream)
             output = yaml.dump(output)
             self.upload_file(cluster, output, "version")
-
