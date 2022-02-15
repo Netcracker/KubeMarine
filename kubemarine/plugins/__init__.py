@@ -360,7 +360,8 @@ def expect_deployment(cluster: KubernetesCluster,
             time.sleep(timeout)
 
 
-def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filter=None):
+def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
+                node=None, apply_filter=None):
 
     if isinstance(cluster, NodeGroup):
         # when instead of cluster there was received a group
@@ -381,7 +382,11 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
     if node is None:
         node = cluster.nodes['master'].get_first_member()
 
-    command = 'kubectl get pods -A -o=wide'
+    namespace_filter = '-A'
+    if namespace is not None:
+        namespace_filter = "-n " + namespace
+
+    command = f"kubectl get pods {namespace_filter} -o=wide"
     if apply_filter is not None:
         command += ' | grep %s' % apply_filter
 
@@ -520,14 +525,14 @@ def apply_expect(cluster, config, plugin_name=None):
                              retries=config['daemonsets'].get('retries', plugins_retries))
 
         elif expect_type == 'replicasets':
-            expect_deployment(cluster, config['replicasets']['list'],
+            expect_replicaset(cluster, config['replicasets']['list'],
                               timeout=config['replicasets'].get('timeout', plugins_timeout),
                               retries=config['replicasets'].get('retries', plugins_retries))
 
         elif expect_type == 'statefulsets':
-            expect_deployment(cluster, config['statefulsets']['list'],
-                              timeout=config['statefulsets'].get('timeout', plugins_timeout),
-                              retries=config['statefulsets'].get('retries', plugins_retries))
+            expect_statefulset(cluster, config['statefulsets']['list'],
+                               timeout=config['statefulsets'].get('timeout', plugins_timeout),
+                               retries=config['statefulsets'].get('retries', plugins_retries))
 
         elif expect_type == 'deployments':
             expect_deployment(cluster, config['deployments']['list'],
@@ -536,6 +541,7 @@ def apply_expect(cluster, config, plugin_name=None):
 
         elif expect_type == 'pods':
             expect_pods(cluster, config['pods']['list'],
+                        namespace=config['pods'].get('namespace'),
                         timeout=config['pods'].get('timeout', plugins_timeout),
                         retries=config['pods'].get('retries', plugins_retries))
 
