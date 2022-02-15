@@ -299,9 +299,10 @@ class ClusterStorage:
 
     def __init__(self, cluster):
         if not ClusterStorage.__instance:
-            #self.cluster = cluster
+            self.cluster = cluster
             self.folder_name = "/etc/kubemarine/"
             self._make_dir(cluster)
+            self.target_folder = ''
             print("new storage created")
         else:
             print("reused storage:", self.get_instance(cluster))
@@ -314,23 +315,34 @@ class ClusterStorage:
 
     def _make_dir(self, cluster):
         timestamp = datetime.now().timestamp()
-        readable_timestamp = datetime.fromtimestamp(timestamp).isoformat()
+        t = datetime.fromtimestamp(timestamp)
+        t = str(t)
+        t = t.split(".")
+        readable_timestamp = datetime.strptime(str(t[0]), "%Y-%m-%d %H:%M:%S")
+        readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
         initial_procedure = cluster.context["initial_procedure"]
         self.folder_name += readable_timestamp + "_" + initial_procedure
-        cluster.nodes['master'].sudo(f"mkdir -p -m 600 {self.folder_name}")
+        self.target_folder = readable_timestamp + "_" + initial_procedure
+        cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
         self._collect_procedure_info(cluster)
         self._make_link(cluster)
-
+        #self._pack_file(cluster)
 
     def _make_link(self, cluster):
         cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
 
-    def _pack_file(self,cluster):
-        cluster.nodes['master'].sudo(f"tar -zcvf {self.folder_name}")
+    def pack_file(self, cluster):
+        default_folder = "/etc/kubemarine/"
+        command = f'cd {default_folder} && ' \
+                         f'sudo tar -czvf logging.tar {self.target_folder} &&' \
+                         f'sudo mv logging.tar {self.target_folder}.tar.gz '
+
+
+        cluster.nodes['master'].run(command)
 
 
     def upload_file(self, cluster, stream, file_name):
-        cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True)
+        self.cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True)
 
 
     def _collect_procedure_info(self, cluster):
@@ -342,7 +354,7 @@ class ClusterStorage:
         out["initial_procedure"] = cluster.context["initial_procedure"]
         output = yaml.dump(out)
         self.upload_file(cluster, output, "procedure_parameters")
-        #self._pack_file(cluster)
+
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
             output = yaml.safe_load(stream)
             output = yaml.dump(output)
