@@ -431,7 +431,7 @@ def overview(cluster):
     master.sudo("kubectl describe nodes", hide=False)
     cluster.log.debug("\n")
     master.sudo("kubectl cluster-info", hide=False, warn=True)
-    cluster_storage.pack_file(self)
+
 
 
 tasks = OrderedDict({
