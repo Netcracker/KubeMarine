@@ -48,7 +48,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [Kubernetes-audit](#Kubernetes-audit)
+      - [audit-Kubernetes Policy](#audit-Kubernetes Policy)
     - [RBAC psp](#rbac-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
       - [Configuring OOB Policies](#configuring-oob-policies)
@@ -2056,7 +2056,7 @@ services:
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
 
-#### Kubernetes-audit
+#### audit-Kubernetes Policy
 
 *Installation task*: `prepare.system.audit.configure_policy`
 
@@ -2093,7 +2093,7 @@ services:
             - group: "storage.k8s.io"
 ```
 
-#### audit
+#### audit-System Policy
 
 *Installation task*: `prepare.system.audit.daemon`
 
@@ -4182,7 +4182,7 @@ The following is the installation tasks tree:
     * **audit**
       * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
       * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
-      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [Kubernetes-audit](#Kubernetes-audit)
+      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes Policy)
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).

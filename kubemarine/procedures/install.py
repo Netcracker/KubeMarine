@@ -121,16 +121,15 @@ def system_prepare_policy(cluster):
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
-    cluster.nodes['master'].sudo(f"mkdir -p {audit_log_dir}")
-    cluster.nodes['master'].sudo(f"mkdir -p {audit_policy_dir}")
+    cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
 
-    policy_config = yaml.dump(policy_config)
-    utils.dump_file(cluster, policy_config, 'audit-policy.yaml')
     if policy_config:
-        cluster.nodes['master'].put(io.StringIO(policy_config), audit_file_name, sudo=True, backup=True)
+        policy_config_file = yaml.dump(policy_config)
+        utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+        cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
     else:
-        cluster.log.debug("Audit cluster policy config not found")
+        cluster.log.debug("Audit cluster policy config is empty, nothing will be configured")
 
 
 def system_prepare_dns_hostname(cluster):
