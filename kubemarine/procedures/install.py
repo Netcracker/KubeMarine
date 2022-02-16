@@ -142,7 +142,7 @@ def system_prepare_policy(cluster):
             utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
             cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
         else:
-            cluster.log.debug("Audit cluster policy config is empty, nothing will be configured")
+            cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
 
         cluster.nodes['master'].call(utils.wait_command_successful,
