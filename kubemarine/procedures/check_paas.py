@@ -818,20 +818,14 @@ tasks = OrderedDict({
 
 
 def main(cli_arguments=None):
-    parser = argparse.ArgumentParser(description='''
-Script for checking Kubernetes cluster PAAS layer.
+    cli_help = '''
+    Script for checking Kubernetes cluster PAAS layer.
+    
+    Hot to use:
 
-Hot to use:
+    '''
 
-''', formatter_class=argparse.RawTextHelpFormatter)
-
-    parser.add_argument('-v', '--verbose',
-                        action='store_true',
-                        help='enable the verbosity mode')
-
-    parser.add_argument('-c', '--config',
-                        default='cluster.yaml',
-                        help='define main cluster configuration file')
+    parser = flow.new_parser(cli_help)
 
     parser.add_argument('--tasks',
                         default='',
@@ -861,10 +855,7 @@ Hot to use:
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []
