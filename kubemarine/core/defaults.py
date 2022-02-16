@@ -126,15 +126,15 @@ def apply_registry(inventory, cluster):
         cluster.log.verbose('Unified registry is not used')
         return inventory
 
-    if inventory['registry'].get('entrypoints') and inventory['registry'].get('docker_port'):
+    if inventory['registry'].get('endpoints') and inventory['registry'].get('docker_port'):
         raise KME('KME0006')
 
     thirdparties_address = None
     containerd_endpoints = None
     protocol = None
 
-    if inventory['registry'].get('entrypoints'):
-        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_entrypoints(inventory, cluster)
+    if inventory['registry'].get('endpoints'):
+        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory, cluster)
     else:
         if inventory['registry'].get('docker_port'):
             registry_mirror_address = "%s:%s" % (inventory['registry']['address'], inventory['registry']['docker_port'])
@@ -174,7 +174,7 @@ def apply_registry(inventory, cluster):
 
     cri_impl = inventory['services']['cri']['containerRuntime']
 
-    if cri_impl == "docker" and inventory['registry'].get('entrypoints'):
+    if cri_impl == "docker" and inventory['registry'].get('endpoints'):
         raise KME('KME0007')
 
     if cri_impl == "docker":
@@ -245,7 +245,7 @@ def apply_registry(inventory, cluster):
     return inventory
 
 
-def apply_registry_entrypoints(inventory, cluster):
+def apply_registry_endpoints(inventory, cluster):
 
     thirdparties_address = None
     containerd_endpoints = []
