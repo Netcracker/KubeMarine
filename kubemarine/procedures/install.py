@@ -17,6 +17,7 @@ import os.path
 from collections import OrderedDict
 import fabric
 import yaml
+import ruamel.yaml
 import io
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
@@ -118,19 +119,42 @@ def system_prepare_policy(cluster):
     """
     Task generates rules for logging kubernetes
     """
-    audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
-    audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
-    audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
-    cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
-    policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+    yaml = ruamel.yaml.YAML()
+    #audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
+    #audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
+    #audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
+    #cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+    #policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+#
+    #if policy_config:
 
-    if policy_config:
-        policy_config_file = yaml.dump(policy_config)
-        utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
-        cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
-    else:
-        cluster.log.debug("Audit cluster policy config is empty, nothing will be configured")
 
+        #config_new = kubernetes.get_kubeadm_config(cluster.inventory) + "---\n"
+        #kubeconfig = cluster.nodes['master'].sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        #string = list(kubeconfig.values())[0].stdout.strip()
+        #yamls = yaml.safe_load(string)
+
+    #    policy_config_file = yaml.dump(policy_config)
+    #    utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+    #    cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+    #else:
+    #    cluster.log.debug("Audit cluster policy config is empty, nothing will be configured")
+
+    for master in cluster.nodes['master'].get_ordered_members_list():
+        config_new = kubernetes.get_kubeadm_config(cluster.inventory) + "---\n"
+        result = cluster.nodes['master'].sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        conf = yaml.load(list(result.values())[0].stdout)
+        conf = config_new
+        buf = io.StringIO()
+        yaml.dump(conf, buf)
+        master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
+
+
+        cluster.nodes['master'].call(utils.wait_command_successful,
+                                            command="kubectl delete pod -n kube-system "
+                                                    "$(sudo kubectl get pod -n kube-system "
+                                                    "| grep 'kube-apiserver' | awk '{ print $1 }')")
+        cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
