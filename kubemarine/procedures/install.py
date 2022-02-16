@@ -119,7 +119,7 @@ def system_prepare_policy(cluster):
     """
     Task generates rules for logging kubernetes
     """
-    yaml = ruamel.yaml.YAML()
+    yamls = ruamel.yaml.YAML()
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
@@ -131,10 +131,10 @@ def system_prepare_policy(cluster):
     for master in cluster.nodes['master'].get_ordered_members_list():
         config_new = kubernetes.get_kubeadm_config(cluster.inventory) + "---\n"
         result = cluster.nodes['master'].sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-        conf = yaml.load(list(result.values())[0].stdout)
+        conf = yamls.load(list(result.values())[0].stdout)
         conf = config_new
         buf = io.StringIO()
-        yaml.dump(conf, buf)
+        yamls.dump(conf, buf)
         master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
         if policy_config:
