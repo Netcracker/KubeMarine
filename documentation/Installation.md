@@ -2062,10 +2062,11 @@ services:
 
 *Can cause reboot*: No
 
-*Can restart service*: Always yes, container kube-apiserver.
+*Can restart service*: Always yes
 
 *OS specific*: No.
 
+The `audit-Kubernetes Policy` section controls the audit setting for Kubernetes cluster. . By default, the following key-values are configured: 
 ```yaml
 services:
   audit:
@@ -2092,7 +2093,25 @@ services:
             - group: "settings.k8s.io"
             - group: "storage.k8s.io"
 ```
+**Note**: Each user can set up their own rules by specifying them in cluster.yaml
 
+Example:
+
+```yaml
+services:
+  audit:
+    cluster_policy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+          - "RequestReceived"
+      rules:
+        - level: Metadata
+          resources:
+            - group: "authentication.k8s.io"
+            - group: "authorization.k8s.io"
+
+```
 #### audit-System Policy
 
 *Installation task*: `prepare.system.audit.daemon`
