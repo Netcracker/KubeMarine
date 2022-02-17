@@ -134,15 +134,14 @@ def system_prepare_policy(cluster):
             master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
             master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml ")
 
-            cluster.nodes['master'].call(utils.wait_command_successful,
-                                         command="kubectl delete pod -n kube-system "
-                                                 "$(sudo kubectl get pod -n kube-system "
-                                                 "| grep 'kube-apiserver' | awk '{ print $1 }')")
-            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
     else:
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
-
+    cluster.nodes['master'].call(utils.wait_command_successful,
+                                 command="kubectl delete pod -n kube-system "
+                                         "$(sudo kubectl get pod -n kube-system "
+                                         "| grep 'kube-apiserver' | awk '{ print $1 }')")
+    cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
