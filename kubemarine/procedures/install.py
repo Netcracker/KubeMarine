@@ -125,26 +125,24 @@ def system_prepare_policy(cluster):
     cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
 
+    if policy_config:
+        policy_config_file = yaml.dump(policy_config)
+        utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+        cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+        for master in cluster.nodes['master'].get_ordered_members_list():
+            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml ")
+
+            cluster.nodes['master'].call(utils.wait_command_successful,
+                                         command="kubectl delete pod -n kube-system "
+                                                 "$(sudo kubectl get pod -n kube-system "
+                                                 "| grep 'kube-apiserver' | awk '{ print $1 }')")
+            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
+    else:
+        cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
 
-    for master in cluster.nodes['master'].get_ordered_members_list():
-        config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-        master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-        master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml ")
-
-        if policy_config:
-            policy_config_file = yaml.dump(policy_config)
-            utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
-            cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
-        else:
-            cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
-
-
-        cluster.nodes['master'].call(utils.wait_command_successful,
-                                            command="kubectl delete pod -n kube-system "
-                                                    "$(sudo kubectl get pod -n kube-system "
-                                                    "| grep 'kube-apiserver' | awk '{ print $1 }')")
-        cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
