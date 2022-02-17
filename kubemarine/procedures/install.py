@@ -119,7 +119,6 @@ def system_prepare_policy(cluster):
     """
     Task generates rules for logging kubernetes
     """
-    yamls = ruamel.yaml.YAML()
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
@@ -129,13 +128,9 @@ def system_prepare_policy(cluster):
 
 
     for master in cluster.nodes['master'].get_ordered_members_list():
-        config_new = list(kubernetes.get_kubeadm_config(cluster.inventory))
-        result = cluster.nodes['master'].sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-        conf = yamls.load(list(result.values())[0].stdout)
-        merged_config = default_merger.merge(conf, config_new)
-        buf = io.StringIO()
-        yamls.dump(merged_config, buf)
-        master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
+        config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+        master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+        master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml ")
 
         if policy_config:
             policy_config_file = yaml.dump(policy_config)
