@@ -2459,17 +2459,16 @@ This section contains the configuration parameters that are applied to the **hap
 services:
   loadbalancer:
     haproxy:
-      config:
-        defaults:
-          timeout_connect: '10s'
-          timeout_client: '1m'
-          timeout_server: '1m'
-          timeout_tunnel: '60m'
-          timeout_client_fin: '1m'
-          maxconn: 10000
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+        keep_configs_updated: True
 ```
 
-These settings can be overrided in the **cluster.yaml**. Currently, the following settings for `defaults` part of **haproxy.cfg** are supported:
+These settings can be overrided in the **cluster.yaml**. Currently, the following settings of **haproxy.cfg** are supported:
 
 <table>
 <thead>
@@ -2517,11 +2516,46 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td>10000</td>
     <td>"maxconn". Limits the sockets to this number of concurrent connections.</td>
   </tr>
+  <tr>
+    <td>keep_configs_updated</td>
+    <td>boolean</td>
+    <td>True</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>config</td>
+    <td>string</td>
+    <td></td>
+    <td>Custom haproxy config value to be used instead of the default one.</td>
+  </tr>
+  <tr>
+    <td>config_file</td>
+    <td>string</td>
+    <td></td>
+    <td>Path to the Jinja-template file with custom haproxy config to be used instead of the default one.</td>
+  </tr>
 </tbody>
 </table>
 
-For more information on these parameters, refer to the official Haproxy documentation at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
+For more information on Haproxy-related parameters, refer to the official Haproxy documentation at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
 
+**Note**: you can use either `config` or `config_file` if you need to use custom config instead of default.
+
+Parameter `config_file` allows to specify path to Jinja-compiled template. Example:
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+        keep_configs_updated: True
+        config_path: '/root/my_haproxy_config.cfg.j2'
+```
+
+This parameter use the following context options for template rendering:
+- nodes
+- bindings
+- config_options
+
+As an example of a template, you can look at [default template].
 
 ### RBAC psp
 

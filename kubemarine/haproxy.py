@@ -122,8 +122,22 @@ def get_config(cluster, node, future_nodes):
     # remove duplicates
     bindings = list(set(bindings))
 
-    return Template(open(utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)).read())\
-        .render(nodes=future_nodes, bindings=bindings,config_options=cluster.inventory['services']['loadbalancer']['haproxy'])
+    if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
+        return cluster.inventory['services']['loadbalancer']['haproxy']['config']
+
+    config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
+    if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
+        config_file = utils.get_resource_absolute_path(
+            cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
+            script_relative=False)
+
+    config_source = open(config_file).read()
+
+    config_options = cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {})
+
+    return Template(config_source).render(nodes=future_nodes,
+                                          bindings=bindings,
+                                          config_options=config_options)
 
 
 def configure(group):
