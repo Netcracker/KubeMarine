@@ -2555,7 +2555,7 @@ This parameter use the following context options for template rendering:
 - bindings
 - config_options
 
-As an example of a template, you can look at [default template].
+As an example of a template, you can look at [default template](kubemarine/templates/haproxy.cfg.j2).
 
 ### RBAC psp
 
