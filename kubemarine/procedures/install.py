@@ -24,7 +24,7 @@ from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins,
     kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils
 from kubemarine.core.executor import RemoteExecutor
-
+from kubemarine.core.yaml_merger import default_merger
 
 def system_prepare_check_sudoer(cluster):
     for host, node_context in cluster.context['nodes'].items():
@@ -129,12 +129,12 @@ def system_prepare_policy(cluster):
 
 
     for master in cluster.nodes['master'].get_ordered_members_list():
-        config_new = kubernetes.get_kubeadm_config(cluster.inventory) + "---\n"
+        config_new = list(kubernetes.get_kubeadm_config(cluster.inventory))
         result = cluster.nodes['master'].sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         conf = yamls.load(list(result.values())[0].stdout)
-        conf = config_new
+        merged_config = default_merger.merge(conf, config_new)
         buf = io.StringIO()
-        yamls.dump(conf, buf)
+        yamls.dump(merged_config, buf)
         master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
         if policy_config:
