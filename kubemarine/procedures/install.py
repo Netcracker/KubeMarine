@@ -139,6 +139,7 @@ def kubernetes_audit_on(cluster):
         config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
         master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
         master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
+        continue
 
     cluster.nodes['master'].call(utils.wait_command_successful,
                                  command="kubectl delete pod -n kube-system "
