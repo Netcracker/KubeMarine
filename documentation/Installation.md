@@ -48,7 +48,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [audit-Kubernetes Policy](#audit-Kubernetes Policy)
+      - [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
     - [RBAC psp](#rbac-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
       - [Configuring OOB Policies](#configuring-oob-policies)
@@ -2058,7 +2058,7 @@ services:
 
 #### audit-Kubernetes Policy
 
-*Installation task*: `prepare.system.audit.configure_policy`
+*Installation task*: `prepare.system.audit.configure_policy,deploy.kubernetes.kubernetes_audit`
 
 *Can cause reboot*: No
 
@@ -4201,7 +4201,7 @@ The following is the installation tasks tree:
     * **audit**
       * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
       * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
-      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes Policy)
+      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).

@@ -501,7 +501,7 @@ tasks = OrderedDict({
             "install": system_cri_install,
             "configure": system_cri_configure
         },
-        "thirdparties": system_prepare_thirdparties,
+        "thirdparties": system_prepare_thirdparties
 
     },
     "deploy": {
