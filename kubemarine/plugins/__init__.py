@@ -26,15 +26,22 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
+from typing import Dict, List
 
 import yaml
 
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
 from kubemarine.core import utils
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.kubernetes.daemonset import DaemonSet
+from kubemarine.kubernetes.deployment import Deployment
+from kubemarine.kubernetes.replicaset import ReplicaSet
+from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
+
 oob_plugins = [
     "calico",
     "flannel",
@@ -147,15 +154,217 @@ def install(cluster, plugins=None):
 
 def install_plugin(cluster, plugin_name, installation_procedure):
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
-    for step in installation_procedure:
+
+    for current_step_i, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs)
+            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
 
 
-def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filter=None):
+def expect_daemonset(cluster: KubernetesCluster,
+                     daemonsets_names: List[str] or List[Dict[str, str]],
+                     timeout: int = None,
+                     retries: int = None,
+                     node: NodeGroup = None) -> None:
+    """
+    The method waits for the configuration parameters of the given DaemonSets to be applied.
+    :param cluster: KubernetesCluster object where method should be performed
+    :param daemonsets_names: List of DaemonSet names (or dicts with name and namespace) to be
+    expected
+    :param timeout: Retry attempt time (seconds)
+    :param retries: Number of retry attempts
+    :param node: Node where daemonsets should be detected
+    :return: None
+    """
+
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for DaemonSets...")
+
+    daemonsets = []
+    for name in daemonsets_names:
+        if isinstance(name, str):
+            daemonsets.append(DaemonSet(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            daemonsets.append(DaemonSet(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for daemonset in daemonsets:
+            if not daemonset.reload(master=node, suppress_exceptions=True).is_up_to_date():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("DaemonSets are up to date")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug(f"DaemonSets are not up to date yet... ({retries * timeout}s left)")
+            time.sleep(timeout)
+
+
+def expect_replicaset(cluster: KubernetesCluster,
+                      replicasets_names: List[str] or List[Dict[str, str]],
+                      timeout: int = None,
+                      retries: int = None,
+                      node: NodeGroup = None) -> None:
+    """
+    The method waits for the configuration parameters of the given ReplicaSets to be applied.
+    :param cluster: KubernetesCluster object where method should be performed
+    :param replicasets_names: List of ReplicaSets names (or dicts with name and namespace) to be
+    expected
+    :param timeout: Retry attempt time (seconds)
+    :param retries: Number of retry attempts
+    :param node: Node where replicasests should be detected
+    :return: None
+    """
+
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following ReplicaSets to be up to date: {replicasets_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for ReplicaSets...")
+
+    replicasets = []
+    for name in replicasets_names:
+        if isinstance(name, str):
+            replicasets.append(ReplicaSet(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            replicasets.append(ReplicaSet(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for replicaset in replicasets:
+            if not replicaset.reload(master=node, suppress_exceptions=True).is_available():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("ReplicaSets are up to date")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug(f"ReplicaSets are not up to date yet... ({retries * timeout}s left)")
+            time.sleep(timeout)
+
+
+def expect_statefulset(cluster: KubernetesCluster,
+                       statefulsets_names: List[str] or List[Dict[str, str]],
+                       timeout: int = None,
+                       retries: int = None,
+                       node: NodeGroup = None) -> None:
+    """
+    The method waits for the configuration parameters of the given StatefulSets to be applied.
+    :param cluster: KubernetesCluster object where method should be performed
+    :param statefulsets_names: List of StatefulSets names (or dicts with name and namespace) to be
+    expected
+    :param timeout: Retry attempt time (seconds)
+    :param retries: Number of retry attempts
+    :param node: Node where statefulsets should be detected
+    :return: None
+    """
+
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following StatefulSets to be up to date: {statefulsets_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for StatefulSets...")
+
+    statefulsets = []
+    for name in statefulsets_names:
+        if isinstance(name, str):
+            statefulsets.append(StatefulSet(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            statefulsets.append(StatefulSet(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for statefulset in statefulsets:
+            if not statefulset.reload(master=node, suppress_exceptions=True).is_updated():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("StatefulSets are up to date")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug(f"StatefulSets are not up to date yet... ({retries * timeout}s left)")
+            time.sleep(timeout)
+
+
+def expect_deployment(cluster: KubernetesCluster,
+                      deployments_names: List[str] or List[Dict[str, str]],
+                      timeout: int = None,
+                      retries: int = None,
+                      node: NodeGroup = None):
+    """
+    The method waits for the configuration parameters of the given Deployments to be applied.
+    :param cluster: KubernetesCluster object where method should be performed
+    :param deployments_names: List of Deployments names (or dicts with name and namespace) to be
+    expected
+    :param timeout: Retry attempt time (seconds)
+    :param retries: Number of retry attempts
+    :param node: Node where deployments should be detected
+    :return: None
+    """
+
+    log = cluster.log
+
+    if timeout is None:
+        timeout = cluster.globals['expect']['plugins']['timeout']
+    if retries is None:
+        retries = cluster.globals['expect']['plugins']['retries']
+
+    log.debug(f"Expecting the following Deployments to be up to date: {deployments_names}")
+    log.verbose("Max expectation time: %ss" % (timeout * retries))
+
+    log.debug("Waiting for Deployments...")
+
+    deployments = []
+    for name in deployments_names:
+        if isinstance(name, str):
+            deployments.append(Deployment(cluster, name=name, namespace='kube-system'))
+        elif isinstance(name, dict):
+            deployments.append(Deployment(cluster, name=name['name'], namespace=name['namespace']))
+
+    while retries > 0:
+        up_to_date = True
+        for deployment in deployments:
+            if not deployment.reload(master=node, suppress_exceptions=True).is_actual_and_ready():
+                up_to_date = False
+
+        if up_to_date:
+            cluster.log.debug("Deployments are up to date!")
+            return
+        else:
+            retries -= 1
+            cluster.log.debug(f"Deployments are not up to date yet... ({retries * timeout}s left)")
+            time.sleep(timeout)
+
+
+def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
+                node=None, apply_filter=None):
 
     if isinstance(cluster, NodeGroup):
-        # cluster is a group, not a cluster
+        # when instead of cluster there was received a group
         cluster = cluster.cluster
 
     if timeout is None:
@@ -173,7 +382,11 @@ def expect_pods(cluster, pods, timeout=None, retries=None, node=None, apply_filt
     if node is None:
         node = cluster.nodes['master'].get_first_member()
 
-    command = 'kubectl get pods -A -o=wide'
+    namespace_filter = '-A'
+    if namespace is not None:
+        namespace_filter = "-n " + namespace
+
+    command = f"kubectl get pods {namespace_filter} -o=wide"
     if apply_filter is not None:
         command += ' | grep %s' % apply_filter
 
@@ -246,16 +459,32 @@ def convert_template(cluster, config):
 
 
 def verify_template(cluster, config):
-    _verify_file(config, "Template")
+    return _verify_file(config, "Template")
 
 
-def apply_template(cluster, config):
-    _apply_file(cluster, config, "Template")
+def apply_template(cluster, config, plugin_name=None):
+    return _apply_file(cluster, config, "Template")
 
 
 # **** EXPECT ****
 
 def convert_expect(cluster, config):
+    if config.get('daemonsets') is not None and isinstance(config['daemonsets'], list):
+        config['daemonsets'] = {
+            'list': config['daemonsets']
+        }
+    if config.get('replicasets') is not None and isinstance(config['replicasets'], list):
+        config['replicasets'] = {
+            'list': config['replicasets']
+        }
+    if config.get('statefulsets') is not None and isinstance(config['statefulsets'], list):
+        config['statefulsets'] = {
+            'list': config['statefulsets']
+        }
+    if config.get('deployments') is not None and isinstance(config['pods'], list):
+        config['deployments'] = {
+            'list': config['deployments']
+        }
     if config.get('pods') is not None and isinstance(config['pods'], list):
         config['pods'] = {
             'list': config['pods']
@@ -266,16 +495,58 @@ def convert_expect(cluster, config):
 def verify_expect(cluster, config):
     if not config:
         raise Exception('Expect procedure is empty, but it should not be')
+
+    if config.get('daemonsets') is not None and config['daemonsets'].get('list') is None:
+        raise Exception('DaemonSet expectation defined, but DaemonSets list is missing')
+
+    if config.get('replicasets') is not None and config['replicasets'].get('list') is None:
+        raise Exception('ReplicaSet expectation defined, but replicasets list is missing')
+
+    if config.get('statefulsets') is not None and config['statefulsets'].get('list') is None:
+        raise Exception('StatefulSet expectation defined, but statefulsets list is missing')
+
+    if config.get('deployments') is not None and config['deployments'].get('list') is None:
+        raise Exception('Deployment expectation defined, but Deployments list is missing')
+
     if config.get('pods') is not None and config['pods'].get('list') is None:
-        raise Exception('Pod expectation defined, but pods list is missing')
+        raise Exception('Pod expectation defined, but Pods list is missing')
 
 
-def apply_expect(cluster, config):
+def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
-    if config.get('pods') is not None:
-        expect_pods(cluster, config['pods']['list'],
-                    timeout=config['pods'].get('timeout', cluster.globals['pods']['expect']['plugins']['timeout']),
-                    retries=config['pods'].get('retries', cluster.globals['pods']['expect']['plugins']['retries']))
+
+    plugins_timeout = cluster.globals['pods']['expect']['plugins']['timeout']
+    plugins_retries = cluster.globals['pods']['expect']['plugins']['retries']
+
+    for expect_type, expect_conf in config.items():
+        if expect_type == 'daemonsets':
+            expect_daemonset(cluster, config['daemonsets']['list'],
+                             timeout=config['daemonsets'].get('timeout', plugins_timeout),
+                             retries=config['daemonsets'].get('retries', plugins_retries))
+
+        elif expect_type == 'replicasets':
+            expect_replicaset(cluster, config['replicasets']['list'],
+                              timeout=config['replicasets'].get('timeout', plugins_timeout),
+                              retries=config['replicasets'].get('retries', plugins_retries))
+
+        elif expect_type == 'statefulsets':
+            expect_statefulset(cluster, config['statefulsets']['list'],
+                               timeout=config['statefulsets'].get('timeout', plugins_timeout),
+                               retries=config['statefulsets'].get('retries', plugins_retries))
+
+        elif expect_type == 'deployments':
+            expect_deployment(cluster, config['deployments']['list'],
+                              timeout=config['deployments'].get('timeout', plugins_timeout),
+                              retries=config['deployments'].get('retries', plugins_retries))
+
+        elif expect_type == 'pods':
+            expect_pods(cluster, config['pods']['list'],
+                        namespace=config['pods'].get('namespace'),
+                        timeout=config['pods'].get('timeout', plugins_timeout),
+                        retries=config['pods'].get('retries', plugins_retries))
+
+        else:
+            raise Exception(f'Unknown expectation type "{expect_type}"')
 
 
 # **** PYTHON ****
@@ -288,7 +559,7 @@ def verify_python(cluster, step):
     # TODO: verify fields types and contents
 
 
-def apply_python(cluster, step):
+def apply_python(cluster, step, plugin_name=None):
     module_path = utils.determine_resource_absolute_path(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
@@ -310,8 +581,9 @@ def verify_thirdparty(cluster, thirdparty):
                         % (thirdparty, defined_thirdparties))
 
 
-def apply_thirdparty(cluster, thirdparty):
+def apply_thirdparty(cluster, thirdparty, plugin_name=None):
     return thirdparties.install_thirdparty(cluster, thirdparty)
+
 
 # **** SHELL ****
 
@@ -344,7 +616,7 @@ def verify_shell(cluster, config):
     # TODO: verify fields types and contents
 
 
-def apply_shell(cluster, step):
+def apply_shell(cluster, step, plugin_name=None):
     commands = step['command']
     sudo = step.get('sudo', False)
     groups = step.get('groups', [])
@@ -407,6 +679,8 @@ def apply_shell(cluster, step):
     else:
         cluster.log.debug(result)
 
+    return result
+
 
 # **** ANSIBLE ****
 
@@ -428,7 +702,7 @@ def verify_ansible(cluster, config):
     # TODO: verify fields types and contents
 
 
-def apply_ansible(cluster, step):
+def apply_ansible(cluster, step, plugin_name=None):
     playbook_path = utils.determine_resource_absolute_path(step.get('playbook'))
     external_vars = step.get('vars', {})
     become = step.get('become', False)
@@ -456,6 +730,8 @@ def apply_ansible(cluster, step):
     if result.returncode != 0:
         raise Exception("Failed to apply ansible plugin, see error above")
 
+    return result
+
 
 def verify_helm(cluster, config):
     if config.get('chart_path') is None or config['chart_path'] == '':
@@ -465,7 +741,7 @@ def verify_helm(cluster, config):
         raise Exception(f'public_cluster_ip is a mandatory parameter in the inventory in case of usage of helm plugin.')
 
 
-def apply_helm(cluster, config):
+def apply_helm(cluster, config, plugin_name=None):
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
@@ -515,6 +791,8 @@ def apply_helm(cluster, config):
     command = prepare_for_helm_command + f'{deployment_mode} {chart_name} . --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
+
+    return output
 
 
 def process_chart_values(config, local_chart_path):
@@ -576,11 +854,11 @@ def convert_config(cluster, config):
 
 
 def verify_config(cluster, config):
-    _verify_file(config, "Config")
+    return _verify_file(config, "Config")
 
 
-def apply_config(cluster, config):
-    _apply_file(cluster, config, "Config")
+def apply_config(cluster, config, plugin_name=None):
+    return _apply_file(cluster, config, "Config")
 
 
 def _convert_file(config):
@@ -620,7 +898,7 @@ def _verify_file(config, file_type):
         # TODO: verify fields types and contents
 
 
-def _apply_file(cluster, config, file_type):
+def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     """
         Apply yamls as is or
         renders and applies templates that match the config 'source' key.
@@ -688,7 +966,7 @@ def _apply_file(cluster, config, file_type):
             if use_sudo:
                 method = apply_common_group.sudo
             cluster.log.debug("Applying yaml...")
-            method(apply_command, hide=False)
+            return method(apply_command, hide=False)
         else:
             cluster.log.debug('Apply is not required')
 

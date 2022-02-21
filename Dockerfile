@@ -29,4 +29,4 @@ RUN apt update && apt install -y wget && \
     rm -f /etc/apt/sources.list && \
     rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python3", "-m" "kubemarine"]
+ENTRYPOINT ["python3", "-m", "kubemarine"]

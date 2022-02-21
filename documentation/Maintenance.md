@@ -220,6 +220,7 @@ The `upgrade` procedure executes the following sequence of tasks:
 * kubernetes
 * kubernetes_cleanup
 * packages
+* upgrade_containerd
 * plugins
 * overview
 
