@@ -342,7 +342,10 @@ class KubernetesCluster(Environment):
         utils.dump_file(self, output, "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
         cluster_storage.upload_file(self, output, "cluster_finalized.yaml")
-        cluster_storage.pack_file(self)
+        cluster_storage.pack_file()
+
+
+
 
     def escape_jinja_characters_for_inventory(self, obj):
         if isinstance(obj, dict):

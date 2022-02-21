@@ -321,8 +321,9 @@ class ClusterStorage:
         readable_timestamp = datetime.strptime(str(t[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
         initial_procedure = cluster.context["initial_procedure"]
-        self.folder_name += readable_timestamp + "_" + initial_procedure
         self.target_folder = readable_timestamp + "_" + initial_procedure
+        self.folder_name += self.target_folder
+        self.folder = self.target_folder = readable_timestamp + "_" + initial_procedure
         cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
         self._collect_procedure_info(cluster)
         self._make_link(cluster)
@@ -331,18 +332,15 @@ class ClusterStorage:
     def _make_link(self, cluster):
         cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
 
-    def pack_file(self, cluster):
+    def pack_file(self):
         default_folder = "/etc/kubemarine/"
-        command = f'cd {default_folder} && ' \
-                         f'sudo tar -czvf logging.tar {self.target_folder} &&' \
-                         f'sudo mv logging.tar {self.target_folder}.tar.gz '
+        command = f'cd {default_folder} && pwd && sudo tar -czvf logging.tar {self.folder}'
 
-
-        cluster.nodes['master'].run(command)
+        self.cluster.nodes['master'].run(command)
 
 
     def upload_file(self, cluster, stream, file_name):
-        self.cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True)
+        self.cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True, is_async=False)
 
 
     def _collect_procedure_info(self, cluster):
