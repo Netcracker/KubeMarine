@@ -121,21 +121,22 @@ def system_prepare_policy(cluster):
     """
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
-    audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+    audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
         cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
-        for master in cluster.nodes['master'].get_ordered_members_list():
-            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml ")
-
     else:
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
+
+def kubernetes_audit_on(cluster):
+
+    for master in cluster.nodes['master'].get_ordered_members_list():
+        config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+        master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+        master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
 
     cluster.nodes['master'].call(utils.wait_command_successful,
                                  command="kubectl delete pod -n kube-system "
@@ -498,7 +499,8 @@ tasks = OrderedDict({
             "install": system_cri_install,
             "configure": system_cri_configure
         },
-        "thirdparties": system_prepare_thirdparties
+        "thirdparties": system_prepare_thirdparties,
+
     },
     "deploy": {
         "loadbalancer": {
@@ -515,7 +517,9 @@ tasks = OrderedDict({
             "reset": deploy_kubernetes_reset,
             "install": deploy_kubernetes_install,
             "prepull_images": deploy_kubernetes_prepull_images,
-            "init": deploy_kubernetes_init
+            "init": deploy_kubernetes_init,
+            "kubernetes_audit": kubernetes_audit_on
+
         },
         "psp": psp.install_psp_task,
         "coredns": deploy_coredns,
