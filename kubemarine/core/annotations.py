@@ -27,3 +27,17 @@ def restrict_multi_os_group(fn: callable):
             raise Exception(f'Method "{str(fn)}" do not supports multi-os group')
         return fn(group, *args, **kwargs)
     return wrapper
+
+
+def restrict_empty_group(fn: callable):
+    """
+    Method is an annotation that prohibits passing empty groups to the function.
+    :param fn: Origin function to apply annotation validation to
+    :return: Validation wrapper function
+    """
+    def wrapper(group: NodeGroup, *args, **kwargs):
+        # TODO: walk through all nodes in *args, check isinstance NodeGroup and perform validation
+        if group.is_empty():
+            raise Exception(f'Method "{str(fn)}" prohibits passing empty groups to it')
+        return fn(group, *args, **kwargs)
+    return wrapper

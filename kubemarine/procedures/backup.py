@@ -18,6 +18,7 @@ import datetime
 import io
 import json
 import os
+import random
 import shutil
 import tarfile
 import time
@@ -263,9 +264,11 @@ def download_resources(log, resources, location, master: NodeGroup, namespace=No
         return actual_resources
 
     cmd = ''
+    resource_separator = ''.join(random.choice('=-_') for _ in range(32))
+
     for resource in resources:
         if cmd != '':
-            cmd += ' && echo \'\n------------------------\n\' && '
+            cmd += ' && echo \'\n' + resource_separator + '\n\' && '
         if namespace:
             cmd += 'sudo kubectl -n %s get --ignore-not-found %s -o yaml' % (namespace, resource)
         else:
@@ -274,7 +277,7 @@ def download_resources(log, resources, location, master: NodeGroup, namespace=No
     result = master.sudo(cmd).get_simple_out()
     master.cluster.log.verbose(result)
 
-    found_resources_results = result.split('------------------------')
+    found_resources_results = result.split(resource_separator)
     for i, result in enumerate(found_resources_results):
         resource = resources[i]
         resource_file_path = os.path.join(location, '%s.yaml' % resource)
@@ -452,10 +455,7 @@ def main(cli_arguments=None):
     parser.add_argument('procedure_config', metavar='procedure_config', type=str,
                         help='config file for backup procedure')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []
