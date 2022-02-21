@@ -132,7 +132,9 @@ def system_prepare_policy(cluster):
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
 def kubernetes_audit_on(cluster):
-
+    """
+    Task including audit
+    """
     for master in cluster.nodes['master'].get_ordered_members_list():
         config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
         master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
