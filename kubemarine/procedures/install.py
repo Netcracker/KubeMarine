@@ -141,6 +141,7 @@ def system_prepare_policy(cluster):
             master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
             master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
 
+    cluster.nodes['master'].get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
