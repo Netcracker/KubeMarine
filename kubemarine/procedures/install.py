@@ -130,9 +130,10 @@ def system_prepare_policy(cluster):
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
         cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+
     else:
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
-
+    return cluster
 
 def kubernetes_audit_on(cluster):
     """
@@ -145,10 +146,8 @@ def kubernetes_audit_on(cluster):
 
 
 
-    cluster.nodes['master'].get_first_member().call(utils.wait_command_successful,
-                                 command="kubectl delete pod -n kube-system "
-                                         "$(sudo kubectl get pod -n kube-system "
-                                         "| grep 'kube-apiserver' | awk '{ print $1 }')")
+    cluster.nodes['master'].get_first_member().call(utils.wait_command_successful, command="crictl rm -f $(sudo crictl ps | grep 'kube-apiserver' | awk '{ print $1 }')")
+
     cluster.nodes['master'].get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
