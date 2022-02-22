@@ -650,9 +650,9 @@ def is_cluster_installed(cluster):
             if 'is running at' in result.stdout:
                 cluster.log.verbose('Detected running Kubernetes cluster on %s' % conn.host)
                 for line in result.stdout.split("\n"):
-                    if 'master' in line:
+                    if 'Kubernetes control plane' in line:
                         cluster.context['controlplain_uri'] = line.split('at ')[1]
-                        return True
+                return True
     except Exception as e:
         cluster.log.verbose(e)
     cluster.context['controlplain_uri'] = None

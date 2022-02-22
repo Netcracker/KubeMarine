@@ -133,24 +133,18 @@ def system_prepare_policy(cluster):
 
     else:
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
-    return cluster
 
-def kubernetes_audit_on(cluster):
-    """
-    Task including audit
-    """
-    for master in cluster.nodes['master'].get_ordered_members_list():
-        config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-        master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-        master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
-        master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
-
+    if kubernetes.is_cluster_installed(cluster):
+        for master in cluster.nodes['master'].get_ordered_members_list():
+            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
+            master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
 
 
     cluster.nodes['master'].get_first_member().call(utils.wait_command_successful, command="crictl rm -f "
                                                                                            "$(sudo crictl ps | grep 'kube-apiserver'"
                                                                                            " | awk '{ print $1 }')")
-
     cluster.nodes['master'].get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 def system_prepare_dns_hostname(cluster):
@@ -527,7 +521,7 @@ tasks = OrderedDict({
             "install": deploy_kubernetes_install,
             "prepull_images": deploy_kubernetes_prepull_images,
             "init": deploy_kubernetes_init,
-            "kubernetes_audit": kubernetes_audit_on
+
 
         },
         "psp": psp.install_psp_task,
