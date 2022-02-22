@@ -117,7 +117,7 @@ def system_prepare_audit_daemon(cluster):
 
 def system_prepare_policy(cluster):
     """
-    Task generates rules for logging kubernetes
+    Task generates rules for logging kubernetes and on audit
     """
 
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
