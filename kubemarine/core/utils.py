@@ -300,7 +300,7 @@ class ClusterStorage:
     def __init__(self, cluster):
         if not ClusterStorage.__instance:
             self.cluster = cluster
-            self.folder_name = "/etc/kubemarine/"
+            self.folder_name = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
             self.target_folder = ''
             print("new storage created")
@@ -333,8 +333,8 @@ class ClusterStorage:
         cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
 
     def pack_file(self):
-        default_folder = "/etc/kubemarine/"
-        command = f'cd {default_folder} && pwd && sudo tar -czvf logging.tar {self.folder}'
+        default_folder = "/etc/kubemarine/kube_tasks/"
+        command = f'cd {default_folder} && sudo tar -czvf logging.tar {self.folder} && sudo mv logging.tar {self.folder}.tar.gz'
 
         self.cluster.nodes['master'].run(command)
 
@@ -357,3 +357,21 @@ class ClusterStorage:
             output = yaml.safe_load(stream)
             output = yaml.dump(output)
             self.upload_file(cluster, output, "version")
+
+
+    def collect_info_all_master(self):
+
+        backup_command = 'cd /etc/kubemarine/kube_tasks/ && sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
+
+
+        data_copy_res = self.cluster.nodes['master'].get_first_member().run(backup_command)
+
+        self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
+
+        self.cluster.log.debug('Downloading nodes backups:')
+        for node in self.cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+            node['connection'].get('/tmp/kubemarine-backup.tar.gz',
+                                   os.path.join("dump", '%s.tar.gz' % node['name']))
+            self.cluster.log.debug('Backup \'%s\' downloaded' % node['name'])
+
+        self.cluster.log.verbose('Deleting backup file from nodes...')

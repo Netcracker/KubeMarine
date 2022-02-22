@@ -343,6 +343,7 @@ class KubernetesCluster(Environment):
         cluster_storage = utils.ClusterStorage.get_instance(self)
         cluster_storage.upload_file(self, output, "cluster_finalized.yaml")
         cluster_storage.pack_file()
+        cluster_storage.collect_info_all_master()
 
 
 
