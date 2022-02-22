@@ -48,7 +48,6 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [audit-Kubernetes Policy](#audit-Kubernetes Policy)
     - [RBAC psp](#rbac-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
       - [Configuring OOB Policies](#configuring-oob-policies)
@@ -903,8 +902,7 @@ By default, the installer uses the following parameters:
 |apiServer.certSANs|List with all nodes internal IPs, external IPs and names|
 |apiServer.extraArgs.enable-admission-plugins|`NodeRestriction`|
 |apiServer.extraArgs.profiling|`false`|
-|apiServer.extraArgs.audit-log-path|`/var/log/kubernetes/audit/audit.log`|
-|apiServer.extraArgs.audit-policy-file|`/etc/kubernetes/audit-policy.yaml`|
+|apiServer.extraArgs.audit-log-path|`/var/log/apiserver/audit.log`|
 |apiServer.extraArgs.audit-log-maxage|`30`|
 |apiServer.extraArgs.audit-log-maxbackup|`10`|
 |apiServer.extraArgs.audit-log-maxsize|`100`|
@@ -2056,65 +2054,9 @@ services:
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
 
-#### audit-Kubernetes Policy
+#### audit
 
-*Installation task*: `prepare.system.audit.configure_policy`
-
-*Can cause reboot*: No
-
-*Can restart service*: Always yes
-
-*OS specific*: No.
-
-The `audit-Kubernetes Policy` section controls the audit setting for Kubernetes cluster. . By default, the following key-values are configured: 
-```yaml
-services:
-  audit:
-    cluster_policy:
-      apiVersion: audit.k8s.io/v1
-      kind: Policy
-      omitStages:
-          - "RequestReceived"
-      rules:
-        - level: Request
-          resources:
-            - group: "" # core
-            - group: "admissionregistration.k8s.io"
-            - group: "apps"
-            - group: "authentication.k8s.io"
-            - group: "authorization.k8s.io"
-            - group: "autoscaling"
-            - group: "batch"
-            - group: "certificates.k8s.io"
-            - group: "extensions"
-            - group: "networking.k8s.io"
-            - group: "policy"
-            - group: "rbac.authorization.k8s.io"
-            - group: "settings.k8s.io"
-            - group: "storage.k8s.io"
-```
-**Note**: Each user can set up their own rules by specifying them in cluster.yaml
-
-Example:
-
-```yaml
-services:
-  audit:
-    cluster_policy:
-      apiVersion: audit.k8s.io/v1
-      kind: Policy
-      omitStages:
-          - "RequestReceived"
-      rules:
-        - level: Metadata
-          resources:
-            - group: "authentication.k8s.io"
-            - group: "authorization.k8s.io"
-
-```
-#### audit-System Policy
-
-*Installation task*: `prepare.system.audit.daemon`
+*Installation task*: `prepare.system.audit`
 
 *Can cause reboot*: No
 
@@ -4208,8 +4150,7 @@ The following is the installation tasks tree:
     * **sysctl** - Configures Linux Kernel parameters. For more information about parameters for this task, see [sysctl](#sysctl).
     * **audit**
       * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
-      * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
-      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes Policy)
+      * **configure** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).
