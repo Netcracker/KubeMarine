@@ -455,10 +455,7 @@ def main(cli_arguments=None):
     parser.add_argument('procedure_config', metavar='procedure_config', type=str,
                         help='config file for backup procedure')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []
