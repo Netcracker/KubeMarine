@@ -247,29 +247,17 @@ def apply_registry(inventory, cluster):
 
 def apply_registry_endpoints(inventory, cluster):
 
-    thirdparties_address = None
-    containerd_endpoints = []
-
     if not inventory['registry'].get('mirror_registry'):
         inventory['registry']['mirror_registry'] = 'registry.cluster.local'
 
     registry_mirror_address = inventory['registry']['mirror_registry']
 
     for i, endpoint_address in enumerate(inventory['registry']['endpoints']):
-        if isinstance(endpoint_address, str):
-            inventory['registry']['endpoints'][i] = {
-                'address': endpoint_address,
-                'type': 'containers'
-            }
-        elif isinstance(endpoint_address, dict) \
-                and endpoint_address['type'] not in ['containerd', 'thirdparties']:
+        if not isinstance(endpoint_address, str):
             raise KME('KME0008')
 
-    for endpoint in inventory['registry']['endpoints']:
-        if endpoint['type'] == 'thirdparties' and not thirdparties_address:
-            thirdparties_address = endpoint['address']
-        elif endpoint['type'] == 'containers':
-            containerd_endpoints.append(endpoint['address'])
+    containerd_endpoints = inventory['registry']['endpoints']
+    thirdparties_address = inventory['registry'].get('thirdparties')
 
     return registry_mirror_address, containerd_endpoints, thirdparties_address
 

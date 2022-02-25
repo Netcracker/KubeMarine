@@ -700,10 +700,11 @@ abandon the old format. Only one format can be used.
 
 The following parameters are supported:
 
-| Parameter         | Type   | Default value            | Description                                                                                   |
-|-------------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
-| endpoints         | list   |                          | Address list of registry endponites                                                           |
-| mirror_registry   | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
+| Parameter       | Type   | Default value            | Description                                                                                   |
+|-----------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
+| endpoints       | list   |                          | Address list of registry endponites                                                           |
+| mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
+| thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
 
 Endpoints in the list can be specified in short and expanded form.
 
@@ -717,34 +718,14 @@ registry:
     - https://repository-02.example.com:27001
 ```
 
-The long record format allows you to specify the type of what this endpoint is for. Supported types:
-- containers (default)
-- thirdparties
-
-Long record format example:
+Also, you can mix this types. Full example:
 
 ```yaml
 registry:
-  endpoints:
-    - type: containers
-      address: https://repository-01.example.com:17001
-    - type: containers
-      address: https://repository-02.example.com:27001
-    - type: thirdparties
-      address: https://repository-03.example.com:8080/custom_location
-```
-
-
-Also, you can mix this types. Mixed endpoints example:
-
-```yaml
-registry:
+  thirdparties: https://repository-03.example.com:8080/custom_location
   endpoints:
     - https://repository-01.example.com:17001
-    - type: containers
-      address: https://repository-02.example.com:27001
-    - type: thirdparties
-      address: https://repository-03.example.com:8080/custom_location
+    - https://repository-02.example.com:27001
   mirror_registry: "registry.cluster.local"
 ```
 
