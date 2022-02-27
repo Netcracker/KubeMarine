@@ -15,6 +15,7 @@
 
 
 import copy
+import os
 
 from collections import OrderedDict
 from kubemarine import kubernetes, system
@@ -55,13 +56,25 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
 
     new_nodes = cluster.nodes['all'].get_new_nodes()
 
+    if new_nodes != None:
+        cluster_storage = utils.ClusterStorage.get_instance(cluster)
+        cluster_storage.collect_info_all_master()
+        
+
     # add nodes to inventory if they in new nodes
     for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
+        if 'master' in new_node['roles']:
+                new_node['connection'].put("./dump/dump_log_cluster.tar.gz", os.path.join("/tmp/",'dump_log_cluster.tar.gz'), sudo=True, binary=False)
+                command = f'cd / && sudo tar xzvf /tmp/dump_log_cluster.tar.gz'
+                new_node['connection'].run(command)
+        else:
+            print('master not found')
         new_node_found = False
         for i, node in enumerate(inventory_to_finalize['nodes']):
             if node['name'] == new_node['name']:
                 # new node already presented in final inventory - ok, just remove label
                 if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
+
                     inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
                     cluster.inventory['nodes'][i]['roles'].remove('add_node')
                 new_node_found = True
