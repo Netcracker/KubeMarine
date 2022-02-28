@@ -353,10 +353,7 @@ def update_kubeapi_config(masters, plugins_list):
         master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
     # force kube-apiserver pod restart, then wait for api to become available
-    masters.get_first_member().call(utils.wait_command_successful,
-                                    command="kubectl delete pod -n kube-system "
-                                            "$(sudo kubectl get pod -n kube-system "
-                                            "| grep 'kube-apiserver' | awk '{ print $1 }')")
+
     masters.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 
