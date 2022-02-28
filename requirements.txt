@@ -3,6 +3,7 @@ deepmerge
 fabric
 jinja2==2.11.*
 invoke
+MarkupSafe==2.0.1
 ruamel.yaml
 ansible==2.9.9
 pygelf
