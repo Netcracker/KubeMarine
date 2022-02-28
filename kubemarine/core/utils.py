@@ -323,11 +323,11 @@ class ClusterStorage:
         initial_procedure = cluster.context["initial_procedure"]
         self.target_folder = readable_timestamp + "_" + initial_procedure
         self.folder_name += self.target_folder
-        self.folder = readable_timestamp + "_" + initial_procedure
+        self.folder = str(readable_timestamp + "_" + initial_procedure)
         cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
         self._collect_procedure_info(cluster)
         self._make_link(cluster)
-        #self._pack_file(cluster)
+
 
     def _make_link(self, cluster):
         cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
