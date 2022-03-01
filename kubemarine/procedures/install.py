@@ -499,7 +499,6 @@ tasks = OrderedDict({
             "configure": system_cri_configure
         },
         "thirdparties": system_prepare_thirdparties
-
     },
     "deploy": {
         "loadbalancer": {
