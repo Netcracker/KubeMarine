@@ -516,9 +516,7 @@ tasks = OrderedDict({
             "reset": deploy_kubernetes_reset,
             "install": deploy_kubernetes_install,
             "prepull_images": deploy_kubernetes_prepull_images,
-            "init": deploy_kubernetes_init,
-
-
+            "init": deploy_kubernetes_init
         },
         "psp": psp.install_psp_task,
         "coredns": deploy_coredns,
