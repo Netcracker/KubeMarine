@@ -141,8 +141,8 @@ def system_prepare_policy(cluster):
             master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
             master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
 
-    for masters in cluster.nodes['master'].get_ordered_members_list():
-        masters.call(utils.wait_command_successful, command="kubectl get pod -A | grep 'kube-apiserver'")
+        for masters in cluster.nodes['master'].get_ordered_members_list():
+            masters.call(utils.wait_command_successful, command="kubectl get pod -A | grep 'kube-apiserver'")
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
