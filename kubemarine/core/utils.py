@@ -320,7 +320,9 @@ class ClusterStorage:
         t = t.split(".")
         readable_timestamp = datetime.strptime(str(t[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        initial_procedure = cluster.context["initial_procedure"]
+        initial_procedure = ""
+        if cluster.context["initial_procedure"]:
+            initial_procedure = cluster.context["initial_procedure"]
         self.target_folder = readable_timestamp + "_" + initial_procedure
         self.folder_name += self.target_folder
         self.folder = str(readable_timestamp + "_" + initial_procedure)
