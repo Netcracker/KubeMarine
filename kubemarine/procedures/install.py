@@ -115,7 +115,7 @@ def system_prepare_audit_daemon(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
-def system_prepare_policy(cluster):
+def system_prepare_policy(cluster,warn=True, hide=False):
     """
     Task generates rules for logging kubernetes and on audit
     """
@@ -125,6 +125,7 @@ def system_prepare_policy(cluster):
     cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
@@ -143,8 +144,18 @@ def system_prepare_policy(cluster):
             master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
             master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
 
-        for masters in cluster.nodes['master'].get_ordered_members_list():
-            masters.call(utils.wait_command_successful, command="kubectl get pod -A | grep 'kube-apiserver'")
+        result = cluster.nodes['master'].sudo(f"kubectl get pod -A", warn=warn, hide=hide)
+        exit_code = list(result.values())[0].exited
+        if exit_code == 0:
+            for masters in cluster.nodes['master'].get_ordered_members_list():
+                masters.call(utils.wait_command_successful, command="crictl rm -f "
+                                                                    "$(sudo crictl ps | grep 'kube-apiserver'"
+                                                                    " | awk '{ print $1 }')")
+                masters.call(utils.wait_command_successful, command="kubectl get pod -A")
+        else:
+            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
+
+
 
 def system_prepare_dns_hostname(cluster):
     with RemoteExecutor(cluster):
