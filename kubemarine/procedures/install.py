@@ -131,7 +131,9 @@ def system_prepare_policy(cluster):
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
         cluster.nodes['master'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
         audit_config = True
+        cluster.log.debug("Audit cluster policy config")
     else:
+        audit_config = False
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
     if kubernetes.is_cluster_installed(cluster) and audit_config == True:
