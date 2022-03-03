@@ -327,8 +327,8 @@ class ClusterStorage:
             self.folder_name += self.target_folder
             self.folder = str(readable_timestamp + "_" + initial_procedure)
             cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
-        self._collect_procedure_info(cluster)
-        self._make_link(cluster)
+            self._collect_procedure_info(cluster)
+            self._make_link(cluster)
 
 
     def _make_link(self, cluster):
