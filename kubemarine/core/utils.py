@@ -320,13 +320,13 @@ class ClusterStorage:
         t = t.split(".")
         readable_timestamp = datetime.strptime(str(t[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        initial_procedure = ""
-        if cluster.context["initial_procedure"]:
+
+        if cluster.context["initial_procedure"] != None:
             initial_procedure = cluster.context["initial_procedure"]
-        self.target_folder = readable_timestamp + "_" + initial_procedure
-        self.folder_name += self.target_folder
-        self.folder = str(readable_timestamp + "_" + initial_procedure)
-        cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
+            self.target_folder = readable_timestamp + "_" + initial_procedure
+            self.folder_name += self.target_folder
+            self.folder = str(readable_timestamp + "_" + initial_procedure)
+            cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
         self._collect_procedure_info(cluster)
         self._make_link(cluster)
 
