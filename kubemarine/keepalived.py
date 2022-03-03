@@ -16,7 +16,7 @@ import hashlib
 import io
 import random
 import time
-
+import yaml
 from jinja2 import Template
 
 from kubemarine import system, packages
@@ -143,6 +143,12 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
 
     # fill in ips
     cluster.ips['keepalived'] = list(cluster.nodes['keepalived'].nodes.keys())
+
+    merged_inventory = yaml.dump(prepare_for_dump(inventory))
+    utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+
+    cluster_storage = utils.ClusterStorage.get_instance(cluster)
+    cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
     return inventory
 
