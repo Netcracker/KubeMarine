@@ -363,11 +363,11 @@ def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
 
-    #merged_inventory = yaml.dump(prepare_for_dump(inventory))
-    #utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-#
-    #cluster_storage = utils.ClusterStorage.get_instance(cluster)
-    #cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+    merged_inventory = yaml.dump(prepare_for_dump(inventory))
+    utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+
+    cluster_storage = utils.ClusterStorage.get_instance(cluster)
+    cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
 
     return inventory
