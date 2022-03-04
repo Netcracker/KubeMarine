@@ -22,7 +22,7 @@ import ruamel.yaml
 import yaml
 from jinja2 import Template
 
-from kubemarine import system, plugins, psp, etcd, packages
+from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
@@ -458,6 +458,9 @@ def init_first_master(group):
     log.debug("Uploading init config to initial master...")
     first_master_group.sudo("mkdir -p /etc/kubernetes")
     first_master_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
+    
+    # copy admission config on first master
+    first_master_group.call(admission.copy_pss)
 
     log.debug("Initializing first master...")
     result = first_master_group.sudo("kubeadm init"
@@ -469,10 +472,8 @@ def init_first_master(group):
 
     log.debug("Setting up admin-config...")
     first_master_group.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
-
-    if psp.is_security_enabled(group.cluster.inventory):
-        log.debug("Setting up privileged psp...")
-        first_master_group.call(psp.apply_privileged_policy)
+    # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
+    first_master_group.call(admission.apply_admission)
 
     log.debug('Downloading admin.conf...')
     group.cluster.context['kube_config'] = \
