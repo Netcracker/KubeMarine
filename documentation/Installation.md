@@ -706,10 +706,7 @@ The following parameters are supported:
 | mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
 | thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
 
-Endpoints in the list can be specified in short and expanded form.
-
-The short form is a string with an address (protocol, host, and port). The short entries are the 
-addresses for the containers. Short record format example:
+Endpoint value is a string with an address (protocol, host, and port). Record format example:
 
 ```yaml
 registry:
