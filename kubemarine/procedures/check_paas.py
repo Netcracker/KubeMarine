@@ -738,6 +738,135 @@ def etcd_health_status(cluster):
         tc.success(results='healthy')
 
 
+def control_plane_configuration_status(cluster):
+    with TestCase(cluster.context['testsuite'], '219', "control plane", "configuration_status") as tc:
+        results = []
+        static_pod_names = {'kube-apiserver': 'apiServer',
+                            'kube-controller-manager': 'controllerManager',
+                            'kube-scheduler': 'scheduler'}
+        static_pods_content = []
+        not_presented_static_pods = []
+        for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+            for static_pod_name, value in static_pod_names.items():
+                result = master['connection'].sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
+                exit_code = list(result.values())[0].exited
+                result = result.get_simple_out()
+                if exit_code == 0:
+                    result = yaml.safe_load(result)
+                    result[static_pod_name] = value
+                    static_pods_content.append(result)
+                else:
+                    not_presented_static_pods.append(static_pod_name)
+            for not_presented_static_pod in not_presented_static_pods:
+                del static_pod_names[not_presented_static_pod]
+
+            result = dict()
+            result['name'] = master['name']
+            version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+
+            for static_pod in static_pods_content:
+                result[static_pod['metadata']['name']] = dict()
+                if version in static_pod["spec"]["containers"][0].get("image", ""):
+                    result[static_pod['metadata']['name']]['correct_version'] = True
+                result[static_pod['metadata']['name']]['correct_properties'] = check_extra_args(cluster, static_pod)
+                result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
+            results.append(result)
+
+        message = ""
+        for result in results:
+            for static_pod_name in static_pod_names:
+                if result[static_pod_name]['correct_version'] and \
+                   result[static_pod_name]['correct_properties'] and \
+                   result[static_pod_name]['correct_volumes']:
+                    cluster.log.verbose(f'Master {result["name"]} have correct configuration for {static_pod_name}')
+                else:
+                    message += f"Master {result['name']} have incorrect configuration for {static_pod_name} \n"
+        if not_presented_static_pods:
+            message += f"{not_presented_static_pods} static pods doesn't presented"
+
+        if not message:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid', hint=message)
+
+
+def check_extra_args(cluster, static_pod):
+    static_pod_name = static_pod[static_pod['metadata']['name']]
+    for arg, value in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraArgs", {}).items():
+        correct_property = False
+        original_property = arg + "=" + value
+        properties = static_pod["spec"]["containers"][0].get("command", [])
+        for property in properties:
+            if original_property in property:
+                correct_property = True
+                break
+        if not correct_property:
+            return False
+    return True
+
+
+def check_extra_volumes(cluster, static_pod):
+    static_pod_name = static_pod[static_pod['metadata']['name']]
+    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
+        correct_volume = False
+        volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", [])
+        for volumeMount in volume_mounts:
+            if volumeMount['mountPath'] == original_volume['mountPath'] and \
+                    volumeMount['name'] == original_volume['name'] and \
+                    volumeMount['readOnly'] == original_volume['readOnly']:
+                correct_volume = True
+                break
+        if not correct_volume:
+            return False
+
+        correct_volume = False
+
+        volumes = static_pod["spec"].get("volumes", [])
+        for volume in volumes:
+            if volume['name'] == original_volume['name'] and \
+                    volume['hostPath']['path'] == original_volume['hostPath'] and \
+                    volume['hostPath']['type'] == original_volume['pathType']:
+                correct_volume = True
+                break
+        if not correct_volume:
+            return False
+    return True
+
+
+def control_plane_health_status(cluster):
+    with TestCase(cluster.context['testsuite'], '220', "control plane", "health_status") as tc:
+        static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
+        static_pod_names = []
+
+        for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+            for static_pod in static_pods:
+                static_pod_names.append(static_pod + '-' + master['name'])
+
+        first_master = cluster.nodes['master'].get_first_member()
+        not_found_pod = []
+        for static_pod_name in static_pod_names:
+            result = first_master.sudo(f"kubectl get pod -n kube-system -oyaml {static_pod_name}", warn=True)
+            exit_code = list(result.values())[0].exited
+            if exit_code == 0:
+                result = result.get_simple_out()
+                result = yaml.safe_load(result)
+                if result['status']['containerStatuses'][0]['state'].get('running'):
+                    break
+            not_found_pod.append(static_pod_name)
+
+        if len(not_found_pod) == 0:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid', hint=f"{not_found_pod} pods doesn't running")
+
+
+def check_default_services(cluster):
+    with TestCase(cluster.context['testsuite'], '220', "control plane", "health_status") as tc:
+        entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]}, {"Deployment": ["calico-kube-controllers", "coredns"]}], ""}
+
+
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -813,6 +942,10 @@ tasks = OrderedDict({
     },
     'etcd': {
         "health_status": etcd_health_status
+    },
+    'control_plane': {
+        "configuration_status": control_plane_configuration_status,
+        "health_status": control_plane_health_status
     },
 })
 
