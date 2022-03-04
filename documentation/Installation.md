@@ -2459,13 +2459,14 @@ This section contains the configuration parameters that are applied to the **hap
 services:
   loadbalancer:
     haproxy:
+      defaults:
         timeout_connect: '10s'
         timeout_client: '1m'
         timeout_server: '1m'
         timeout_tunnel: '60m'
         timeout_client_fin: '1m'
         maxconn: 10000
-        keep_configs_updated: True
+      keep_configs_updated: True
 ```
 
 These settings can be overrided in the **cluster.yaml**. Currently, the following settings of **haproxy.cfg** are supported:
@@ -2481,37 +2482,37 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
 </thead>
 <tbody>
   <tr>
-    <td>timeout_connect</td>
+    <td>defaults.timeout_connect</td>
     <td>string</td>
     <td>10s</td>
     <td>"timeout connect". Set the maximum time to wait for a connection attempt to a server to succeed.</td>
   </tr>
   <tr>
-    <td>timeout_client</td>
+    <td>defaults.timeout_client</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout client". Set the maximum inactivity time on the client side.</td>
   </tr>
   <tr>
-    <td>timeout_server</td>
+    <td>defaults.timeout_server</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout server". Set the maximum inactivity time on the server side.</td>
   </tr>
   <tr>
-    <td>timeout_tunnel</td>
+    <td>defaults.timeout_tunnel</td>
     <td>string</td>
     <td>60m</td>
     <td>"timeout tunnel". Set the maximum inactivity time on the client and server sides for tunnels.</td>
   </tr>
   <tr>
-    <td>timeout_client_fin</td>
+    <td>defaults.timeout_client_fin</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout client-fin". Set the inactivity timeout on the client side for half-closed connections.</td>
   </tr>
   <tr>
-    <td>maxconn</td>
+    <td>defaults.maxconn</td>
     <td>integer</td>
     <td>10000</td>
     <td>"maxconn". Limits the sockets to this number of concurrent connections.</td>
@@ -2520,7 +2521,7 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td>keep_configs_updated</td>
     <td>boolean</td>
     <td>True</td>
-    <td></td>
+    <td>Allows Kubemarine update haproxy configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)</td>
   </tr>
   <tr>
     <td>config</td>

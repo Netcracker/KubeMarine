@@ -4,12 +4,12 @@ global
 defaults
     log                 global
     option              dontlognull
-    timeout connect     {{ config_options['timeout_connect'] }}
-    timeout client      {{ config_options['timeout_client'] }}
-    timeout server      {{ config_options['timeout_server'] }}
-    timeout tunnel      {{ config_options['timeout_tunnel'] }}
-    timeout client-fin  {{ config_options['timeout_client_fin'] }}
-    maxconn             {{ config_options['maxconn'] }}
+    timeout connect     {{ config_options['defaults']['timeout_connect'] }}
+    timeout client      {{ config_options['defaults']['timeout_client'] }}
+    timeout server      {{ config_options['defaults']['timeout_server'] }}
+    timeout tunnel      {{ config_options['defaults']['timeout_tunnel'] }}
+    timeout client-fin  {{ config_options['defaults']['timeout_client_fin'] }}
+    maxconn             {{ config_options['defaults']['maxconn'] }}
 
 frontend http
 {%- for binding in bindings %}
