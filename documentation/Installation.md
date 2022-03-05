@@ -672,14 +672,11 @@ public_cluster_ip: "10.102.0.1"
 
 ### registry
 
-If you want to install Kubernetes in a private environment, without access to the internet, then you need to redefine the addresses of remote resources. These resources are many, so for convenience there is a single unified registry parameter that allows you to specify the registry for everything at once. To do this, you need to specify `registry` section in the root of the inventory and fill it with parameters. The following parameters are supported:
-
-| Parameter   | Type    | Default value | Description                                                  |
-|-------------|---------|---------------|--------------------------------------------------------------|
-| address     | string  |               | Full address to the registry, without protocol and port.     |
-| docker_port | number  |               | Custom port for connecting to the image registry.               |
-| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
-| ssl         | boolean | `False`       | Registry SSL support switch.                                 |
+If you want to install Kubernetes in a private environment, without access to the internet, then you
+need to redefine the addresses of remote resources. These resources are many, so for convenience 
+there is a single unified registry parameter that allows you to specify the registry for everything 
+at once. To do this, you need to specify `registry` section in the root of the inventory and fill it
+with parameters. 
 
 The `registry` parameter automatically completes the following parameters:
 
@@ -693,6 +690,53 @@ The `registry` parameter automatically completes the following parameters:
 |`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
+
+Registry section support 2 formats - new endpoints definition without docker support and old-style
+address-port with docker support. We recommend to use new endpoints format as in the future we will 
+abandon the old format. Only one format can be used.
+
+
+#### registry (new endpoints format)
+
+The following parameters are supported:
+
+| Parameter       | Type   | Default value            | Description                                                                                   |
+|-----------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
+| endpoints       | list   |                          | Address list of registry endponites                                                           |
+| mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
+| thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
+
+Endpoint value is a string with an address (protocol, host, and port). Record format example:
+
+```yaml
+registry:
+  endpoints:
+    - https://repository-01.example.com:17001
+    - https://repository-02.example.com:27001
+```
+
+Also, you can mix this types. Full example:
+
+```yaml
+registry:
+  thirdparties: https://repository-03.example.com:8080/custom_location
+  endpoints:
+    - https://repository-01.example.com:17001
+    - https://repository-02.example.com:27001
+  mirror_registry: "registry.cluster.local"
+```
+
+
+#### registry (old address-port format)
+
+The following parameters are supported:
+
+| Parameter   | Type    | Default value | Description                                                  |
+|-------------|---------|---------------|--------------------------------------------------------------|
+| address     | string  |               | Full address to the registry, without protocol and port.     |
+| docker_port | number  |               | Custom port for connecting to the image registry.               |
+| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
+| ssl         | boolean | `False`       | Registry SSL support switch.                                 |
 
 Example:
 
