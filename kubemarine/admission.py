@@ -80,7 +80,7 @@ def enrich_inventory_pss(inventory, _):
     # TODO verify virsion
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"]
     if 'PodSecurity=true' not in enabled_admissions:
-        if len(enable_admission) == 0:
+        if len(enabled_admissions) == 0:
             enabled_admissions = "PodSecurity=true"
         else:
             enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
@@ -383,9 +383,9 @@ def update_kubeadm_configmap_psp(first_master, target_state):
 
 def update_kubeadm_configmap(first_master, target_state):
     if admission_impl == "psp":
-        return update_kubeadm_config_psp(masters, target_state)
+        return update_kubeadm_config_psp(first_master, target_state)
     elif admission_impl == "pss":
-        return update_kubeadm_config_pss(masters, target_state)
+        return update_kubeadm_config_pss(first_master, target_state)
 
 
 def update_kubeapi_config_psp(masters, plugins_list):
@@ -436,14 +436,14 @@ def delete_privileged_policy(group):
 
 
 def apply_admission(group):
-    admission_impl = inventory['rbac']['admission']
-    if admission.is_security_enabled(group.cluster.inventory):
+    admission_impl = group.cluster.inventory['rbac']['admission']
+    if is_security_enabled(group.cluster.inventory):
         if admission_impl == "psp":
-            log.debug("Setting up privileged psp...")
-            first_master_group.call(apply_privileged_policy)
+            group.cluster.log.debug("Setting up privileged psp...")
+            apply_privileged_policy(group)
         elif admission_impl == "pss":
-            log.debug("Setting up default pss...")
-            first_master_group.call(apply_default_pss)
+            group.cluster.log.debug("Setting up default pss...")
+            apply_default_pss(group)
 
 
 def apply_default_pss(group):
@@ -597,7 +597,7 @@ def manage_enrichment(inventory, cluster):
 
 
 def manage_pss(group, manage_type):
-    if cluster.context.get('initial_procedure') != 'install':
+    if group.cluster.context.get('initial_procedure') != 'install':
         copy_pss(group)
         first_master = cluster.nodes["master"].get_first_member()
     
