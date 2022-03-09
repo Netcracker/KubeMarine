@@ -2548,7 +2548,7 @@ services:
   loadbalancer:
     haproxy:
         keep_configs_updated: True
-        config_path: '/root/my_haproxy_config.cfg.j2'
+        config_file: '/root/my_haproxy_config.cfg.j2'
 ```
 
 This parameter use the following context options for template rendering:
