@@ -584,3 +584,7 @@ rbac:
       psp-list: []
       roles-list: []
       bindings-list: []
+
+dump_parameters:
+  pack_file : 5
+  delete_old: 10

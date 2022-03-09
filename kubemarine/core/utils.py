@@ -18,6 +18,7 @@ import os
 import shutil
 import sys
 import time
+import logging
 from typing import Union
 
 import yaml
@@ -291,21 +292,18 @@ def determine_resource_absolute_dir(path: str) -> str:
 
     raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
-
-
-
 class ClusterStorage:
     __instance = None
 
     def __init__(self, cluster):
         if not ClusterStorage.__instance:
             self.cluster = cluster
-            self.folder_name = "/etc/kubemarine/kube_tasks/"
+            self.dir_path = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
             self.target_folder = ''
-            print("new storage created")
+            self.cluster.log.debug("new storage created")
         else:
-            print("reused storage:", self.get_instance(cluster))
+            self.cluster.log.debug("reused storage:", self.get_instance(cluster))
 
     @classmethod
     def get_instance(cls, cluster):
@@ -324,25 +322,40 @@ class ClusterStorage:
         if cluster.context["initial_procedure"] != None:
             initial_procedure = cluster.context["initial_procedure"]
             self.target_folder = readable_timestamp + "_" + initial_procedure
-            self.folder_name += self.target_folder
-            self.folder = str(readable_timestamp + "_" + initial_procedure)
-            cluster.nodes['master'].sudo(f"mkdir -p {self.folder_name}", is_async=False)
+            self.dir_path += self.target_folder
+            self.dir_name = str(readable_timestamp + "_" + initial_procedure)
+            cluster.nodes['master'].sudo(f"mkdir -p {self.dir_path}", is_async=False)
             self._collect_procedure_info(cluster)
             self._make_link(cluster)
 
 
     def _make_link(self, cluster):
-        cluster.nodes['master'].sudo(f"ln -s {self.folder_name} latest")
+        default_folder = "/etc/kubemarine/
+        cluster.nodes['master'].sudo(f"ln -s {self.dir_path} latest_dump && sudo mv latest_dump {default_folder}")
 
-    def pack_file(self):
+
+    def pack_file(self,cluster):
+
         default_folder = "/etc/kubemarine/kube_tasks/"
-        command = f'cd {default_folder} && sudo tar -czvf logging.tar {self.folder} && sudo mv logging.tar {self.folder}.tar.gz'
+        command_count = f"cd {default_folder} && find * -maxdepth 0 -type d,f | wc -l"
+        count = int(self.cluster.nodes['master'].run(command_count).get_simple_out())
+        command = f'ls {default_folder}'
+        sum_file = self.cluster.nodes['master'].run(command,is_async=False).get_simple_out()
+        files = sum_file.split()
+        files.sort(reverse=True)
+        pack_file = cluster.defaults['dump_parameters']['pack_file']
+        delete_old = cluster.defaults['dump_parameters']['delete_old']
+        if count > pack_file:
+            command = f'cd {default_folder} && sudo tar -czvf {default_folder + "/" + files[pack_file] + ".tar.gz"} {default_folder + "/" + files[pack_file]}'
+            self.cluster.nodes['master'].run(command)
+            cluster.nodes['master'].sudo(f'rm -r {default_folder + "/" + files[pack_file]}')
+        if count > delete_old:
+            cluster.log.verbose('Deleting backup file from nodes...')
+            cluster.nodes['master'].sudo(f'rm -r {default_folder + "/" + files[delete_old]}')
 
-        self.cluster.nodes['master'].run(command)
 
-
-    def upload_file(self, cluster, stream, file_name):
-        self.cluster.nodes['master'].put(io.StringIO(stream), self.folder_name + "/" + file_name, sudo=True, is_async=False)
+    def upload_file(self,cluster,stream, file_name):
+        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_path + "/" + file_name, sudo=True, is_async=False)
 
 
     def _collect_procedure_info(self, cluster):
