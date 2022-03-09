@@ -330,7 +330,7 @@ class ClusterStorage:
 
 
     def _make_link(self, cluster):
-        default_folder = "/etc/kubemarine/
+        default_folder = "/etc/kubemarine/"
         cluster.nodes['master'].sudo(f"ln -s {self.dir_path} latest_dump && sudo mv latest_dump {default_folder}")
 
 
