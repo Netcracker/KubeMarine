@@ -68,13 +68,12 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
                 command = f'sudo tar -C / xzvf /tmp/dump_log_cluster.tar.gz'
                 new_node['connection'].run(command)
         else:
-            print('master not found')
+            cluster.log.debug('Master not found')
         new_node_found = False
         for i, node in enumerate(inventory_to_finalize['nodes']):
             if node['name'] == new_node['name']:
                 # new node already presented in final inventory - ok, just remove label
                 if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
-
                     inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
                     cluster.inventory['nodes'][i]['roles'].remove('add_node')
                 new_node_found = True
