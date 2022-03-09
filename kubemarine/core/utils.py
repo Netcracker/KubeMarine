@@ -378,14 +378,15 @@ class ClusterStorage:
         backup_command = 'cd /etc/kubemarine/kube_tasks/ && sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
 
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-            if node['connection']:
+            ip = node['address']
+            if self.cluster.context['nodes'][ip]['online']:
                 data_copy_res = self.cluster.nodes['master'].get_first_member().run(backup_command)
                 self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
                 node['connection'].get('/tmp/kubemarine-backup.tar.gz', os.path.join(self.cluster.context['execution_arguments']['dump_location'], 'dump_log_cluster.tar.gz'))
                 self.cluster.log.debug('Backup downloaded')
                 return
             else:
-                print('Masters offline %s' % node['name'])
+                self.cluster.log.debug('Masters offline %s' % node['name'])
 
 
 
