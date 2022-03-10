@@ -29,7 +29,8 @@ policies_file_path = "./resources/psp/"
 tmp_filepath_pattern = "/tmp/%s"
 
 admission_template = "./templates/admission.yaml.j2"
-admission_path = "/etc/kubernetes/pki/admission.yaml"
+admission_dir = "/etc/kubernetes/pki"
+admission_path = "%s/admission.yaml" % admission_dir
 
 psp_list_option = "psp-list"
 roles_list_option = "roles-list"
@@ -84,8 +85,9 @@ def enrich_inventory_pss(inventory, _):
             enabled_admissions = "PodSecurity=true"
         else:
             enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
-            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
-            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+            
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
 
     return inventory
 
@@ -716,7 +718,9 @@ def copy_pss(group):
         # put admission config on every masters
         filename = uuid.uuid4().hex
         remote_path = tmp_filepath_pattern % filename
+        group.cluster.log.debug("Copy admission config: %s, %s" % (remote_path, admission_path))
         group.put(io.StringIO(admission_config), remote_path, backup=True, sudo=True)
+        group.sudo("mkdir -p %s" % admission_dir, warn=True)
         result = group.sudo("cp %s %s" % (remote_path, admission_path), warn=True)
         group.sudo("rm -f %s" % remote_path)
 
