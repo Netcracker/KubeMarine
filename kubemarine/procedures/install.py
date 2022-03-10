@@ -13,18 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os.path
+
 from collections import OrderedDict
 import fabric
 import yaml
-import ruamel.yaml
-import io
+
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.yaml_merger import default_merger
+
 
 def system_prepare_check_sudoer(cluster):
     for host, node_context in cluster.context['nodes'].items():
@@ -111,10 +110,11 @@ def system_install_audit(cluster):
     cluster.log.debug(group.call(audit.install))
 
 
-def system_prepare_audit_daemon(cluster):
+def system_prepare_audit(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
+    
 def system_prepare_policy(cluster,warn=True, hide=False):
     """
     Task generates rules for logging kubernetes and on audit
@@ -148,6 +148,7 @@ def system_prepare_policy(cluster,warn=True, hide=False):
                                                                 " | awk '{ print $1 }')")
 
         cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
+
 
 
 
@@ -303,7 +304,14 @@ def deploy_loadbalancer_haproxy_install(cluster):
 
 
 def deploy_loadbalancer_haproxy_configure(cluster):
+
+    if not cluster.inventory['services'].get('loadbalancer', {}) \
+            .get('haproxy', {}).get('keep_configs_updated', True):
+        cluster.log.debug('Skipped - haproxy balancers configs update manually disabled')
+        return
+
     group = None
+
     if "balancer" in cluster.nodes:
 
         if cluster.context['initial_procedure'] != 'remove_node':
@@ -498,8 +506,7 @@ tasks = OrderedDict({
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
-                "configure_daemon": system_prepare_audit_daemon,
-                "configure_policy": system_prepare_policy
+                "configure": system_prepare_audit
             }
         },
         "cri": {
