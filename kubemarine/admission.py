@@ -725,3 +725,23 @@ def copy_pss(group):
         group.sudo("rm -f %s" % remote_path)
 
         return result
+
+#def set_pss_labels(cluster, plugin):
+#    cluster.log.debug("PLUGIN: %s" % plugin)
+#    exit()
+#    admission_impl = cluster.inventory['rbac']['admission']
+#    if admission_impl == "pss":
+#        verify_flag("pod-security", cluster.inventory["rbac"]["pss"]["pod-security"])
+#        if cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
+#            plugins = [
+#                "nginx-ingress-controller",
+#                "haproxy-ingress-controller",
+#                "local-path-provisioner",
+#            ]
+#            first_master = cluster.nodes["master"].get_first_member()
+#            first_master.sudo("kubectl create ns %s" % namespace)
+#            modes = ['enforce', 'audit', 'warn']
+#            level = 'privileged'
+#            for mode in modes:
+#                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s" % (namespace, mode, level))
+
