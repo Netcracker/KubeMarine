@@ -27,22 +27,10 @@ services:
       extraArgs:
         enable-admission-plugins: NodeRestriction
         profiling: "false"
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+        audit-log-path: /var/log/audit.log
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
-      extraVolumes:
-      - name: audit
-        hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
-        mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
-        readOnly: True
-        pathType: File
-      - name: audit-log
-        hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
-        mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
-        readOnly: False
-        pathType: DirectoryOrCreate
     scheduler:
       extraArgs:
         profiling: "false"
@@ -144,30 +132,6 @@ services:
       - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost.localdomain{% endif %}'
 
   audit:
-    cluster_policy:
-      apiVersion: audit.k8s.io/v1
-      kind: Policy
-      omitStages:
-          - "RequestReceived"
-      rules:
-        - level: Request
-          resources:
-            - group: "" # core
-            - group: "admissionregistration.k8s.io"
-            - group: "apps"
-            - group: "authentication.k8s.io"
-            - group: "authorization.k8s.io"
-            - group: "autoscaling"
-            - group: "batch"
-            - group: "certificates.k8s.io"
-            - group: "extensions"
-            - group: "networking.k8s.io"
-            - group: "policy"
-            - group: "rbac.authorization.k8s.io"
-            - group: "settings.k8s.io"
-            - group: "storage.k8s.io"
-
-
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'
@@ -260,14 +224,14 @@ services:
 
   loadbalancer:
     haproxy:
-      config:
-        defaults:
-          timeout_connect: '10s'
-          timeout_client: '1m'
-          timeout_server: '1m'
-          timeout_tunnel: '60m'
-          timeout_client_fin: '1m'
-          maxconn: 10000
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
 
   packages:
     package_manager:
