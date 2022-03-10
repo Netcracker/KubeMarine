@@ -375,7 +375,8 @@ class ClusterStorage:
 
     def collect_info_all_master(self):
 
-        backup_command = 'cd /etc/kubemarine/kube_tasks/ && sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
+        backup_command = 'cd /etc/kubemarine/kube_tasks/' \
+                         '&& sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
 
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             ip = node['address']
