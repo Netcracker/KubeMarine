@@ -29,6 +29,10 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
+from kubemarine.kubernetes.daemonset import DaemonSet
+from kubemarine.kubernetes.deployment import Deployment
+from kubemarine.coredns import generate_configmap
+from deepdiff import DeepDiff
 
 
 def services_status(cluster, service_type):
@@ -860,11 +864,87 @@ def control_plane_health_status(cluster):
             raise TestFailure('invalid', hint=f"{not_found_pod} pods doesn't running")
 
 
-def check_default_services(cluster):
-    with TestCase(cluster.context['testsuite'], '220', "control plane", "health_status") as tc:
-        entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]}, {"Deployment": ["calico-kube-controllers", "coredns"]}], ""}
+def default_services_configuration_status(cluster):
+    with TestCase(cluster.context['testsuite'], '221', "default services", "configuration_status") as tc:
+        first_master = cluster.nodes['master'].get_first_member()
+        original_coredns_cm = generate_configmap(cluster.inventory)
+        original_coredns_cm = yaml.safe_load(original_coredns_cm)
+        coredns_cm = first_master.sudo('kubectl get cm coredns -n kube-system -oyaml').get_simple_out()
+        coredns_cm = yaml.safe_load(coredns_cm)
+        ddiff = DeepDiff(coredns_cm['data'], original_coredns_cm['data'], ignore_order=True)
+        coredns_result = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
+
+        message = ""
+        if coredns_result:
+            message += f"CoreDNS config is outdated: \n {coredns_result} \n"
+
+        coredns_version = first_master.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
+        version = ".".join(cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
+        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
+                                                            {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
+                                             {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
+                                                             {"coredns": {"version": coredns_version}}]}],
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version":  cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]}}]}]}
+
+        results = dict()
+        for namespace, types_dict in entities_to_check.items():
+            for type_dict in types_dict:
+                for type, services in type_dict.items():
+                    for service in services:
+                        for service_name, properties in service.items():
+                            content = first_master.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
+                            content = yaml.safe_load(content)
+                            if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
+                                results[service_name] = True
+                            else:
+                                results[service_name] = False
+        for item, condition in results.items():
+            if not condition:
+                message += f"{item} have outdated image version\n"
+
+        if message:
+            raise TestFailure('invalid', hint=f"{message}")
+        else:
+            tc.success(results='valid')
 
 
+def default_services_health_status(cluster):
+    with TestCase(cluster.context['testsuite'], '222', "default services", "health_status") as tc:
+        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"mandatory": True}},
+                                                            {"kube-proxy": {"mandatory": True}}]},
+                                             {"Deployment": [{"calico-kube-controllers": {"mandatory": True}},
+                                                             {"coredns": {"mandatory": True}}]}],
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"mandatory": False}}]}]}
+
+        first_master = cluster.nodes['master'].get_first_member()
+        not_ready_entities = []
+        for namespace, types_dict in entities_to_check.items():
+            for type_dict in types_dict:
+                for type, services in type_dict.items():
+                    if type == 'DaemonSet':
+                        for service in services:
+                            for service_name, mandatory in service.items():
+                                if not mandatory:
+                                    if not cluster.inventory['plugins'][service_name]['install']:
+                                        break
+                                daemon_set = DaemonSet(cluster, name=service_name, namespace=namespace)
+                                ready = daemon_set.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                                if not ready:
+                                    not_ready_entities.append(service_name)
+                    elif type == 'Deployment':
+                        for service in services:
+                            for service_name, mandatory in service.items():
+                                if not mandatory:
+                                    if not cluster.inventory['plugins'][service_name]['install']:
+                                        break
+                                deployment = Deployment(cluster, name=service_name, namespace=namespace)
+                                ready = deployment.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                                if not ready:
+                                    not_ready_entities.append(service_name)
+        if len(not_ready_entities) == 0:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid', hint=f"{not_ready_entities} pods doesn't ready")
 
 
 tasks = OrderedDict({
@@ -947,6 +1027,10 @@ tasks = OrderedDict({
         "configuration_status": control_plane_configuration_status,
         "health_status": control_plane_health_status
     },
+    'default_services': {
+        "configuration_status": default_services_configuration_status,
+        "health_status": default_services_health_status
+    }
 })
 
 
