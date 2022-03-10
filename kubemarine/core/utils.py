@@ -292,6 +292,9 @@ def determine_resource_absolute_dir(path: str) -> str:
     raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
 class ClusterStorage:
+    """
+    This class is responsible for collecting data about operations on the cluster.
+    """
     __instance = None
 
     def __init__(self, cluster):
@@ -311,6 +314,9 @@ class ClusterStorage:
         return cls.__instance
 
     def _make_dir(self, cluster):
+        """
+        This method creates a directory in which logs about operations on the cluster will be stored.
+        """
         timestamp = datetime.now().timestamp()
         t = datetime.fromtimestamp(timestamp)
         t = str(t)
@@ -329,11 +335,17 @@ class ClusterStorage:
 
 
     def _make_link(self, cluster):
+        """
+        This method creates a link to the last collected log files.
+        """
         default_folder = "/etc/kubemarine/"
         cluster.nodes['master'].sudo(f"ln -s {self.dir_path} latest_dump && sudo mv latest_dump {default_folder}")
 
 
     def pack_file(self,cluster):
+        """
+        This method packs files with logs and maintains a structured storage of logs on the cluster.
+        """
 
         default_folder = "/etc/kubemarine/kube_tasks/"
         command_count = f"cd {default_folder} && find * -maxdepth 0 -type d,f | wc -l"
@@ -354,10 +366,16 @@ class ClusterStorage:
 
 
     def upload_file(self,cluster,stream, file_name):
+        """
+        This method sends the collected files to the nodes.
+        """
         self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_path + "/" + file_name, sudo=True, is_async=False)
 
 
     def _collect_procedure_info(self, cluster):
+        """
+        This method collects information about the type of procedure and the version of the tool we are working with.
+        """
         out = dict()
         execution_arguments = cluster.context.get('execution_arguments', {})
 
@@ -374,6 +392,9 @@ class ClusterStorage:
 
 
     def collect_info_all_master(self):
+        """
+        This method is used to transfer backup logs from the main master to the new master.
+        """
 
         backup_command = 'cd /etc/kubemarine/kube_tasks/' \
                          '&& sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
