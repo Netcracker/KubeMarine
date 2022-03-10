@@ -302,7 +302,7 @@ class ClusterStorage:
             self.cluster = cluster
             self.dir_path = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
-            self.target_folder = ''
+            self.dir_name = ''
             self.cluster.log.debug("new storage created")
         else:
             self.cluster.log.debug("reused storage:", self.get_instance(cluster))
@@ -326,9 +326,8 @@ class ClusterStorage:
 
         if cluster.context["initial_procedure"] != None:
             initial_procedure = cluster.context["initial_procedure"]
-            self.target_folder = readable_timestamp + "_" + initial_procedure
-            self.dir_path += self.target_folder
-            self.dir_name = str(readable_timestamp + "_" + initial_procedure)
+            self.dir_name = readable_timestamp + "_" + initial_procedure
+            self.dir_path += self.dir_name
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_path}", is_async=False)
             self._collect_procedure_info(cluster)
             self._make_link(cluster)
