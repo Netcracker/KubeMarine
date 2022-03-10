@@ -381,6 +381,8 @@ def join_master(group, node, join_dict):
     node['connection'].sudo("mkdir -p /etc/kubernetes")
     node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
+    admission.copy_pss(node['connection'])
+
     # ! ETCD on masters can't be initialized in async way, that is why it is necessary to disable async mode !
     log.debug('Joining master \'%s\'...' % node['name'])
     node['connection'].sudo("kubeadm join "
