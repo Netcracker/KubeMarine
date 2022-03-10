@@ -143,9 +143,14 @@ def system_prepare_policy(cluster,warn=True, hide=False):
             master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
             master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
             master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
-            master.call(utils.wait_command_successful, command="crictl rm -f "
-                                                                "$(sudo crictl ps | grep 'kube-apiserver'"
+            if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+                master.call(utils.wait_command_successful, command="crictl rm -f "
+                                                                "$(sudo crictl ps | grep kube-apiserver"
                                                                 " | awk '{ print $1 }')")
+            else:
+                master.call(utils.wait_command_successful, command="docker stop "
+                                                                   "$(sudo docker ps | grep k8s_kube-apiserver"
+                                                                   " | awk '{print $1}'")
 
         cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
 
