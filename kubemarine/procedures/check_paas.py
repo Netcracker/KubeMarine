@@ -23,6 +23,7 @@ from typing import List
 
 import yaml
 import ruamel.yaml
+import ipaddress
 
 from kubemarine import packages as pckgs, system, selinux, etcd
 from kubemarine.core.cluster import KubernetesCluster
@@ -729,8 +730,10 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
 def etcd_health_status(cluster):
     """
     This method is a test, check ETCD health
+    :param cluster: KubernetesCluster object
+    :return: None
     """
-    with TestCase(cluster.context['testsuite'], '218', "ETCD", "Health status ETCD") as tc:
+    with TestCase(cluster.context['testsuite'], '219', "ETCD", "Health status ETCD") as tc:
         try:
             etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
         except Exception as e:
@@ -743,7 +746,12 @@ def etcd_health_status(cluster):
 
 
 def control_plane_configuration_status(cluster):
-    with TestCase(cluster.context['testsuite'], '219', "control plane", "configuration_status") as tc:
+    '''
+    This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`
+    :param cluster: KubernetesCluster object
+    :return: None
+    '''
+    with TestCase(cluster.context['testsuite'], '220', "control plane", "configuration status") as tc:
         results = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
@@ -838,7 +846,12 @@ def check_extra_volumes(cluster, static_pod):
 
 
 def control_plane_health_status(cluster):
-    with TestCase(cluster.context['testsuite'], '220', "control plane", "health_status") as tc:
+    '''
+    This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`
+    :param cluster: KubernetesCluster object
+    :return: None
+    '''
+    with TestCase(cluster.context['testsuite'], '221', "control plane", "health status") as tc:
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
@@ -865,7 +878,12 @@ def control_plane_health_status(cluster):
 
 
 def default_services_configuration_status(cluster):
-    with TestCase(cluster.context['testsuite'], '221', "default services", "configuration_status") as tc:
+    '''
+    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+    :param cluster: KubernetesCluster object
+    :return: None
+    '''
+    with TestCase(cluster.context['testsuite'], '222', "default services", "configuration status") as tc:
         first_master = cluster.nodes['master'].get_first_member()
         original_coredns_cm = generate_configmap(cluster.inventory)
         original_coredns_cm = yaml.safe_load(original_coredns_cm)
@@ -884,7 +902,8 @@ def default_services_configuration_status(cluster):
                                                             {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
                                              {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
                                                              {"coredns": {"version": coredns_version}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version":  cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]}}]}]}
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version":  cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"],
+                                                                                            "mandatory": False}}]}]}
 
         results = dict()
         for namespace, types_dict in entities_to_check.items():
@@ -892,6 +911,9 @@ def default_services_configuration_status(cluster):
                 for type, services in type_dict.items():
                     for service in services:
                         for service_name, properties in service.items():
+                            if not properties.get("mandatory", True):
+                                if not cluster.inventory['plugins'][service_name]['install']:
+                                    break
                             content = first_master.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
                             content = yaml.safe_load(content)
                             if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
@@ -909,11 +931,16 @@ def default_services_configuration_status(cluster):
 
 
 def default_services_health_status(cluster):
-    with TestCase(cluster.context['testsuite'], '222', "default services", "health_status") as tc:
-        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"mandatory": True}},
-                                                            {"kube-proxy": {"mandatory": True}}]},
-                                             {"Deployment": [{"calico-kube-controllers": {"mandatory": True}},
-                                                             {"coredns": {"mandatory": True}}]}],
+    '''
+    This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+    :param cluster: KubernetesCluster object
+    :return: None
+    '''
+    with TestCase(cluster.context['testsuite'], '223', "default services", "health status") as tc:
+        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {}},
+                                                            {"kube-proxy": {}}]},
+                                             {"Deployment": [{"calico-kube-controllers": {}},
+                                                             {"coredns": {}}]}],
                              "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"mandatory": False}}]}]}
 
         first_master = cluster.nodes['master'].get_first_member()
@@ -923,8 +950,8 @@ def default_services_health_status(cluster):
                 for type, services in type_dict.items():
                     if type == 'DaemonSet':
                         for service in services:
-                            for service_name, mandatory in service.items():
-                                if not mandatory:
+                            for service_name, properties in service.items():
+                                if not properties.get("mandatory", True):
                                     if not cluster.inventory['plugins'][service_name]['install']:
                                         break
                                 daemon_set = DaemonSet(cluster, name=service_name, namespace=namespace)
@@ -933,8 +960,8 @@ def default_services_health_status(cluster):
                                     not_ready_entities.append(service_name)
                     elif type == 'Deployment':
                         for service in services:
-                            for service_name, mandatory in service.items():
-                                if not mandatory:
+                            for service_name, properties in service.items():
+                                if not properties.get("mandatory", True):
                                     if not cluster.inventory['plugins'][service_name]['install']:
                                         break
                                 deployment = Deployment(cluster, name=service_name, namespace=namespace)
@@ -945,6 +972,48 @@ def default_services_health_status(cluster):
             tc.success(results='valid')
         else:
             raise TestFailure('invalid', hint=f"{not_ready_entities} pods doesn't ready")
+
+
+def calico_config_check(cluster):
+    '''
+    This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
+    :param cluster: KubernetesCluster object
+    :return: None
+    '''
+    with TestCase(cluster.context['testsuite'], '224', "calico", "configuration check") as tc:
+        message = ""
+        correct_config = True
+        first_master = cluster.nodes['master'].get_first_member()
+        result = first_master.sudo(f"kubectl get DaemonSet calico-node -n kube-system -oyaml")
+        result = result.get_simple_out()
+        result = yaml.safe_load(result)
+        for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
+            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
+                if not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
+                    correct_config = False
+        if not correct_config:
+            message += "calico-node env configuration is outdated\n"
+
+        result = first_master.sudo(f"kubectl get cm calico-config -n kube-system -oyaml").get_simple_out()
+        result = yaml.safe_load(result)
+        result = yaml.safe_load(result["data"]["cni_network_config"])
+        if isinstance(cluster.inventory["services"]["kubeadm"]["networking"]["podSubnet"], ipaddress.IPv4Address):
+            ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv4"]
+        else:
+            ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv6"]
+        ddiff = DeepDiff(ipam_config, result["plugins"][0]["ipam"], ignore_order=True)
+        ipam_diff = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
+        if ipam_diff:
+            message += f"calico cm is outdated: {ipam_diff}\n"
+
+        result = first_master.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'").get_simple_out()
+        if int(result) > 0:
+            message += "ipam check indicates some problems," \
+                       " for more info you can use `calicoctl ipam check --show-problem-ips`"
+        if message:
+            raise TestFailure('invalid', hint=message)
+        else:
+            tc.success(results='valid')
 
 
 tasks = OrderedDict({
@@ -1030,6 +1099,9 @@ tasks = OrderedDict({
     'default_services': {
         "configuration_status": default_services_configuration_status,
         "health_status": default_services_health_status
+    },
+    'calico': {
+        "config_check": calico_config_check
     }
 })
 
