@@ -4,8 +4,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: haproxy-controller
-  labels:
     {% if rbac['admission'] == "pss" and rbac["pss"]["pod-security"] == "enabled" and rbac["pss"]["defaults"]["enforce"] != "privileged" %}
+  labels:
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
     pod-security.kubernetes.io/audit: privileged
