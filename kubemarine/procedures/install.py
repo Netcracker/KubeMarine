@@ -267,7 +267,14 @@ def deploy_loadbalancer_haproxy_install(cluster):
 
 
 def deploy_loadbalancer_haproxy_configure(cluster):
+
+    if not cluster.inventory['services'].get('loadbalancer', {}) \
+            .get('haproxy', {}).get('keep_configs_updated', True):
+        cluster.log.debug('Skipped - haproxy balancers configs update manually disabled')
+        return
+
     group = None
+
     if "balancer" in cluster.nodes:
 
         if cluster.context['initial_procedure'] != 'remove_node':

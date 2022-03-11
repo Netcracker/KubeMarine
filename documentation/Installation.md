@@ -672,14 +672,11 @@ public_cluster_ip: "10.102.0.1"
 
 ### registry
 
-If you want to install Kubernetes in a private environment, without access to the internet, then you need to redefine the addresses of remote resources. These resources are many, so for convenience there is a single unified registry parameter that allows you to specify the registry for everything at once. To do this, you need to specify `registry` section in the root of the inventory and fill it with parameters. The following parameters are supported:
-
-| Parameter   | Type    | Default value | Description                                                  |
-|-------------|---------|---------------|--------------------------------------------------------------|
-| address     | string  |               | Full address to the registry, without protocol and port.     |
-| docker_port | number  |               | Custom port for connecting to the image registry.               |
-| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
-| ssl         | boolean | `False`       | Registry SSL support switch.                                 |
+If you want to install Kubernetes in a private environment, without access to the internet, then you
+need to redefine the addresses of remote resources. These resources are many, so for convenience 
+there is a single unified registry parameter that allows you to specify the registry for everything 
+at once. To do this, you need to specify `registry` section in the root of the inventory and fill it
+with parameters. 
 
 The `registry` parameter automatically completes the following parameters:
 
@@ -693,6 +690,53 @@ The `registry` parameter automatically completes the following parameters:
 |`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
+
+Registry section support 2 formats - new endpoints definition without docker support and old-style
+address-port with docker support. We recommend to use new endpoints format as in the future we will 
+abandon the old format. Only one format can be used.
+
+
+#### registry (new endpoints format)
+
+The following parameters are supported:
+
+| Parameter       | Type   | Default value            | Description                                                                                   |
+|-----------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
+| endpoints       | list   |                          | Address list of registry endponites                                                           |
+| mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
+| thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
+
+Endpoint value is a string with an address (protocol, host, and port). Record format example:
+
+```yaml
+registry:
+  endpoints:
+    - https://repository-01.example.com:17001
+    - https://repository-02.example.com:27001
+```
+
+Also, you can mix this types. Full example:
+
+```yaml
+registry:
+  thirdparties: https://repository-03.example.com:8080/custom_location
+  endpoints:
+    - https://repository-01.example.com:17001
+    - https://repository-02.example.com:27001
+  mirror_registry: "registry.cluster.local"
+```
+
+
+#### registry (old address-port format)
+
+The following parameters are supported:
+
+| Parameter   | Type    | Default value | Description                                                  |
+|-------------|---------|---------------|--------------------------------------------------------------|
+| address     | string  |               | Full address to the registry, without protocol and port.     |
+| docker_port | number  |               | Custom port for connecting to the image registry.               |
+| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
+| ssl         | boolean | `False`       | Registry SSL support switch.                                 |
 
 Example:
 
@@ -2459,17 +2503,17 @@ This section contains the configuration parameters that are applied to the **hap
 services:
   loadbalancer:
     haproxy:
-      config:
-        defaults:
-          timeout_connect: '10s'
-          timeout_client: '1m'
-          timeout_server: '1m'
-          timeout_tunnel: '60m'
-          timeout_client_fin: '1m'
-          maxconn: 10000
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
 ```
 
-These settings can be overrided in the **cluster.yaml**. Currently, the following settings for `defaults` part of **haproxy.cfg** are supported:
+These settings can be overrided in the **cluster.yaml**. Currently, the following settings of **haproxy.cfg** are supported:
 
 <table>
 <thead>
@@ -2482,46 +2526,81 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
 </thead>
 <tbody>
   <tr>
-    <td>timeout_connect</td>
+    <td>defaults.timeout_connect</td>
     <td>string</td>
     <td>10s</td>
     <td>"timeout connect". Set the maximum time to wait for a connection attempt to a server to succeed.</td>
   </tr>
   <tr>
-    <td>timeout_client</td>
+    <td>defaults.timeout_client</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout client". Set the maximum inactivity time on the client side.</td>
   </tr>
   <tr>
-    <td>timeout_server</td>
+    <td>defaults.timeout_server</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout server". Set the maximum inactivity time on the server side.</td>
   </tr>
   <tr>
-    <td>timeout_tunnel</td>
+    <td>defaults.timeout_tunnel</td>
     <td>string</td>
     <td>60m</td>
     <td>"timeout tunnel". Set the maximum inactivity time on the client and server sides for tunnels.</td>
   </tr>
   <tr>
-    <td>timeout_client_fin</td>
+    <td>defaults.timeout_client_fin</td>
     <td>string</td>
     <td>1m</td>
     <td>"timeout client-fin". Set the inactivity timeout on the client side for half-closed connections.</td>
   </tr>
   <tr>
-    <td>maxconn</td>
+    <td>defaults.maxconn</td>
     <td>integer</td>
     <td>10000</td>
     <td>"maxconn". Limits the sockets to this number of concurrent connections.</td>
   </tr>
+  <tr>
+    <td>keep_configs_updated</td>
+    <td>boolean</td>
+    <td>True</td>
+    <td>Allows Kubemarine update haproxy configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)</td>
+  </tr>
+  <tr>
+    <td>config</td>
+    <td>string</td>
+    <td></td>
+    <td>Custom haproxy config value to be used instead of the default one.</td>
+  </tr>
+  <tr>
+    <td>config_file</td>
+    <td>string</td>
+    <td></td>
+    <td>Path to the Jinja-template file with custom haproxy config to be used instead of the default one.</td>
+  </tr>
 </tbody>
 </table>
 
-For more information on these parameters, refer to the official Haproxy documentation at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
+For more information on Haproxy-related parameters, refer to the official Haproxy documentation at [https://www.haproxy.org/download/1.8/doc/configuration.txt](https://www.haproxy.org/download/1.8/doc/configuration.txt).
 
+**Note**: you can use either `config` or `config_file` if you need to use custom config instead of default.
+
+Parameter `config_file` allows to specify path to Jinja-compiled template. Example:
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+        keep_configs_updated: True
+        config_file: '/root/my_haproxy_config.cfg.j2'
+```
+
+This parameter use the following context options for template rendering:
+- nodes
+- bindings
+- config_options
+
+As an example of a template, you can look at [default template](kubemarine/templates/haproxy.cfg.j2).
 
 ### RBAC psp
 

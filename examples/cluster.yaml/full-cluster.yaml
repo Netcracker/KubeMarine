@@ -198,14 +198,14 @@ services:
 
   loadbalancer:
     haproxy:
-      config:
-        defaults:
-          timeout_connect: '10s'
-          timeout_client: '1m'
-          timeout_server: '1m'
-          timeout_tunnel: '60m'
-          timeout_client_fin: '1m'
-          maxconn: 10000
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
 
   packages:
     package_manager:
