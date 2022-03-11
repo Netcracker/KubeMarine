@@ -17,7 +17,8 @@
 from collections import OrderedDict
 import fabric
 import yaml
-
+import os
+import io
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
@@ -110,7 +111,7 @@ def system_install_audit(cluster):
     cluster.log.debug(group.call(audit.install))
 
 
-def system_prepare_audit(cluster):
+def system_prepare_audit_daemon(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
@@ -511,7 +512,9 @@ tasks = OrderedDict({
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
-                "configure": system_prepare_audit
+                "configure_daemon": system_prepare_audit_daemon,
+                "configure_policy": system_prepare_policy
+
             }
         },
         "cri": {
