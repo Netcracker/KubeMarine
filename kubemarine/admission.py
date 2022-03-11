@@ -15,6 +15,7 @@
 import io
 import os
 import uuid
+import re
 
 import ruamel.yaml
 import yaml
@@ -42,6 +43,7 @@ provided_oob_policies = ["default", "host-network", "anyuid"]
 valid_switches = ["pss", "psp"]
 valid_profiles = ["privileged", "baseline", "restricted"]
 valid_exemptions = ["usernames", "runtimeClasses", "namespaces"]
+valid_versions_templ = r"^v1\.\d{1,2}$"
 
 loaded_oob_policies = {}
 
@@ -51,9 +53,9 @@ def enrich_inventory_psp(inventory, _):
     loaded_oob_policies = load_oob_policies_files()
 
     # check flags
-    verify_flag("pod-security", inventory["rbac"]["psp"]["pod-security"])
+    verify_parameter("pod-security", inventory["rbac"]["psp"]["pod-security"], valid_flags)
     for oob_name in provided_oob_policies:
-        verify_flag("oob-policies", inventory["rbac"]["psp"]["oob-policies"][oob_name])
+        verify_parameter("oob-policies", inventory["rbac"]["psp"]["oob-policies"][oob_name], valid_flags)
 
     # validate custom
     custom_policies = inventory["rbac"]["psp"]["custom-policies"]
@@ -73,12 +75,20 @@ def enrich_inventory_psp(inventory, _):
 
 
 def enrich_inventory_pss(inventory, _):
-    # check flags
-    verify_flag("pod-security", inventory["rbac"]["pss"]["pod-security"])
-    verify_profile("enforce", inventory["rbac"]["pss"]["defaults"]["enforce"])
-    verify_profile("audit", inventory["rbac"]["pss"]["defaults"]["audit"])
-    verify_profile("warn", inventory["rbac"]["pss"]["defaults"]["warn"])
-    # TODO verify virsion
+    # check flags, enforce and logs parameters
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version < 23:
+        raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
+    verify_parameter("pod-security", inventory["rbac"]["pss"]["pod-security"], valid_flags)
+    verify_parameter("enforce", inventory["rbac"]["pss"]["defaults"]["enforce"], valid_profiles)
+    verify_version("enforce-version", inventory["rbac"]["pss"]["defaults"]["enforce-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce"], minor_version)
+    verify_equal("audit", inventory["rbac"]["pss"]["defaults"]["audit"], inventory["rbac"]["pss"]["defaults"]["enforce"])
+    verify_equal("warn", inventory["rbac"]["pss"]["defaults"]["warn"], inventory["rbac"]["pss"]["defaults"]["enforce"])
+    verify_equal("audit-version", inventory["rbac"]["pss"]["defaults"]["audit-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
+    verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"]
     if 'PodSecurity=true' not in enabled_admissions:
         if len(enabled_admissions) == 0:
@@ -93,7 +103,7 @@ def enrich_inventory_pss(inventory, _):
 
 
 def enrich_inventory(inventory, _):
-    verify_switch("admission", inventory["rbac"]["admission"])
+    verify_parameter("admission", inventory["rbac"]["admission"], valid_switches)
     admission_impl = inventory['rbac']['admission']
     if admission_impl == "psp":
         return enrich_inventory_psp(inventory, _)
@@ -112,11 +122,11 @@ def manage_psp_enrichment(inventory, cluster):
 
     # check flags
     if "pod-security" in procedure_config:
-        verify_flag("pod-security", procedure_config["pod-security"])
+        verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
     if "oob-policies" in procedure_config:
         for oob_policy in provided_oob_policies:
             if oob_policy in procedure_config["oob-policies"]:
-                verify_flag("oob-policy", procedure_config["oob-policies"][oob_policy])
+                verify_parameter("oob-policy", procedure_config["oob-policies"][oob_policy], valid_flags)
 
     # validate added custom
     custom_add_policies = procedure_config.get("add-policies", {})
@@ -140,9 +150,14 @@ def manage_psp_enrichment(inventory, cluster):
     return inventory
 
 
-def verify_flag(owner, value):
-    if value not in valid_flags:
-        raise Exception("incorrect value for %s, valid values: %s" % (owner, valid_flags))
+def verify_parameter(owner, value, parameters):
+    if value not in parameters:
+        raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
+
+
+def verify_equal(owner, value, standard):
+    if value != standard:
+        raise Exception("incorrect value for %s, it should be: %s" % (owner, standard))
 
 
 def verify_custom(custom_scope):
@@ -168,14 +183,16 @@ def verify_custom_list(custom_list, type, supported_kinds):
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
 
 
-def verify_switch(owner, value):
-    if value not in valid_switches:
-        raise Exception("incorrect value for %s, valid values: %s" % (owner, valid_switches))
-
-
-def verify_profile(owner, value):
-    if value not in valid_profiles:
-        raise Exception("incorrect value for %s, valid values: %s" % (owner, valid_profiles))
+def verify_version(owner, version, enforce, minor_version_cfg):
+    if enforce == "restricted" and version != "latest":
+        result = re.match(valid_versions_templ, version)
+        if result is None:
+            raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
+    elif enforce != "restricted" and version != "latest":
+        raise Exception("incorrect value for %s, valid value is 'latest'" % owner)
+        minor_version = int(version.split('.')[1])
+        if minor_version > minor_version_cfg:
+            raise Exception("%s version must not be higher than Kubernetes version" % owner)
 
 
 def finalize_inventory_psp(cluster, inventory_to_finalize):
@@ -725,23 +742,4 @@ def copy_pss(group):
         group.sudo("rm -f %s" % remote_path)
 
         return result
-
-#def set_pss_labels(cluster, plugin):
-#    cluster.log.debug("PLUGIN: %s" % plugin)
-#    exit()
-#    admission_impl = cluster.inventory['rbac']['admission']
-#    if admission_impl == "pss":
-#        verify_flag("pod-security", cluster.inventory["rbac"]["pss"]["pod-security"])
-#        if cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
-#            plugins = [
-#                "nginx-ingress-controller",
-#                "haproxy-ingress-controller",
-#                "local-path-provisioner",
-#            ]
-#            first_master = cluster.nodes["master"].get_first_member()
-#            first_master.sudo("kubectl create ns %s" % namespace)
-#            modes = ['enforce', 'audit', 'warn']
-#            level = 'privileged'
-#            for mode in modes:
-#                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s" % (namespace, mode, level))
 
