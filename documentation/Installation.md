@@ -2131,7 +2131,7 @@ services:
 
 #### audit-daemon
 
-*Installation task*: `prepare.system.audit`
+*Installation task*: `prepare.system.audit_daemon`
 
 *Can cause reboot*: No
 
