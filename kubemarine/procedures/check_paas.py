@@ -902,8 +902,7 @@ def default_services_configuration_status(cluster):
                                                             {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
                                              {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
                                                              {"coredns": {"version": coredns_version}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version":  cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"],
-                                                                                            "mandatory": False}}]}]}
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]}}]}]}
 
         results = dict()
         for namespace, types_dict in entities_to_check.items():
@@ -911,8 +910,8 @@ def default_services_configuration_status(cluster):
                 for type, services in type_dict.items():
                     for service in services:
                         for service_name, properties in service.items():
-                            if not properties.get("mandatory", True):
-                                if not cluster.inventory['plugins'][service_name]['install']:
+                            if service_name == "ingress-nginx-controller":
+                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
                             content = first_master.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
                             content = yaml.safe_load(content)
@@ -937,11 +936,9 @@ def default_services_health_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '223', "default services", "health status") as tc:
-        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {}},
-                                                            {"kube-proxy": {}}]},
-                                             {"Deployment": [{"calico-kube-controllers": {}},
-                                                             {"coredns": {}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"mandatory": False}}]}]}
+        entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
+                                             {"Deployment": ["calico-kube-controllers", "coredns"]}],
+                             "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
 
         first_master = cluster.nodes['master'].get_first_member()
         not_ready_entities = []
@@ -950,24 +947,19 @@ def default_services_health_status(cluster):
                 for type, services in type_dict.items():
                     if type == 'DaemonSet':
                         for service in services:
-                            for service_name, properties in service.items():
-                                if not properties.get("mandatory", True):
-                                    if not cluster.inventory['plugins'][service_name]['install']:
-                                        break
-                                daemon_set = DaemonSet(cluster, name=service_name, namespace=namespace)
-                                ready = daemon_set.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
-                                if not ready:
-                                    not_ready_entities.append(service_name)
+                            if service == "ingress-nginx-controller":
+                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
+                                    break
+                            daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
+                            ready = daemon_set.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                            if not ready:
+                                not_ready_entities.append(service)
                     elif type == 'Deployment':
                         for service in services:
-                            for service_name, properties in service.items():
-                                if not properties.get("mandatory", True):
-                                    if not cluster.inventory['plugins'][service_name]['install']:
-                                        break
-                                deployment = Deployment(cluster, name=service_name, namespace=namespace)
-                                ready = deployment.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
-                                if not ready:
-                                    not_ready_entities.append(service_name)
+                            deployment = Deployment(cluster, name=service, namespace=namespace)
+                            ready = deployment.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                            if not ready:
+                                not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
             tc.success(results='valid')
         else:
