@@ -514,7 +514,6 @@ tasks = OrderedDict({
                 "install": system_install_audit,
                 "configure_daemon": system_prepare_audit_daemon,
                 "configure_policy": system_prepare_policy
-
             }
         },
         "cri": {
