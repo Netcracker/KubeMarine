@@ -303,6 +303,7 @@ class ClusterStorage:
             self.dir_path = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
             self.dir_name = ''
+            self.dir_location = ''
             self.cluster.log.debug("new storage created")
         else:
             self.cluster.log.debug("reused storage:", self.get_instance(cluster))
