@@ -65,8 +65,7 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
     for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
         if 'master' in new_node['roles']:
                 new_node['connection'].put(cluster.context['execution_arguments']['dump_location'] + "dump_log_cluster.tar.gz", os.path.join("/tmp/",'dump_log_cluster.tar.gz'), sudo=True, binary=False)
-                command = f'sudo tar -C / xzvf /tmp/dump_log_cluster.tar.gz'
-                new_node['connection'].run(command)
+                new_node['connection'].sudo(f'tar -C / xzvf /tmp/dump_log_cluster.tar.gz')
         else:
             cluster.log.debug('Master not found')
         new_node_found = False
