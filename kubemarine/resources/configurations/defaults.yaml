@@ -585,6 +585,6 @@ rbac:
       roles-list: []
       bindings-list: []
 
-dump_parameters:
-  pack_file : 5
-  delete_old: 10
+procedure_history:
+  archive_threshold: 5
+  delete_threshold: 10

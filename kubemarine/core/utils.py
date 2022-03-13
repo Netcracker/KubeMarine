@@ -318,57 +318,43 @@ class ClusterStorage:
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
         timestamp = datetime.now().timestamp()
-        t = datetime.fromtimestamp(timestamp)
-        t = str(t)
-        t = t.split(".")
-        readable_timestamp = datetime.strptime(str(t[0]), "%Y-%m-%d %H:%M:%S")
+        time_step = str(datetime.fromtimestamp(timestamp)).split(".")
+        readable_timestamp = datetime.strptime(str(time_step[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-
+        folder_link = "/etc/kubemarine/"
         if cluster.context["initial_procedure"] != None:
             initial_procedure = cluster.context["initial_procedure"]
-            self.dir_name = readable_timestamp + "_" + initial_procedure
-            self.dir_path += self.dir_name
-            cluster.nodes['master'].sudo(f"mkdir -p {self.dir_path}", is_async=False)
+            self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
+            self.dir_location = self.dir_path + self.dir_name
+            cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
+            cluster.nodes['master'].sudo(f"ln -s {self.dir_location} latest_dump && sudo mv latest_dump {folder_link}")
             self._collect_procedure_info(cluster)
-            self._make_link(cluster)
 
-
-    def _make_link(self, cluster):
-        """
-        This method creates a link to the last collected log files.
-        """
-        default_folder = "/etc/kubemarine/"
-        cluster.nodes['master'].sudo(f"ln -s {self.dir_path} latest_dump && sudo mv latest_dump {default_folder}")
-
-
-    def pack_file(self,cluster):
+    def pack_file(self, cluster):
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-
-        default_folder = "/etc/kubemarine/kube_tasks/"
-        command_count = f"cd {default_folder} && find * -maxdepth 0 -type d,f | wc -l"
+        command_count = f"cd {self.dir_path} && find * -maxdepth 0 -type d,f | wc -l"
         count = int(self.cluster.nodes['master'].run(command_count).get_simple_out())
-        command = f'ls {default_folder}'
-        sum_file = self.cluster.nodes['master'].run(command,is_async=False).get_simple_out()
+        command = f'ls {self.dir_path}'
+        sum_file = self.cluster.nodes['master'].run(command, is_async=False).get_simple_out()
         files = sum_file.split()
         files.sort(reverse=True)
-        pack_file = cluster.defaults['dump_parameters']['pack_file']
-        delete_old = cluster.defaults['dump_parameters']['delete_old']
+        pack_file = cluster.defaults['procedure_history']['archive_threshold']
+        delete_old = cluster.defaults['procedure_history']['delete_threshold']
         if count > pack_file:
-            command = f'cd {default_folder} && sudo tar -czvf {default_folder + "/" + files[pack_file] + ".tar.gz"} {default_folder + "/" + files[pack_file]}'
-            self.cluster.nodes['master'].run(command)
-            cluster.nodes['master'].sudo(f'rm -r {default_folder + "/" + files[pack_file]}')
+            cluster.nodes['master'].sudo(f'tar -czvf {self.dir_path + files[pack_file] + ".tar.gz"} {self.dir_path + files[pack_file]}')
+            cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[pack_file]}')
         if count > delete_old:
             cluster.log.verbose('Deleting backup file from nodes...')
-            cluster.nodes['master'].sudo(f'rm -r {default_folder + "/" + files[delete_old]}')
+            cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[delete_old]}')
 
 
     def upload_file(self,cluster,stream, file_name):
         """
         This method sends the collected files to the nodes.
         """
-        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_path + "/" + file_name, sudo=True, is_async=False)
+        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False, warn=True)
 
 
     def _collect_procedure_info(self, cluster):
@@ -377,7 +363,6 @@ class ClusterStorage:
         """
         out = dict()
         execution_arguments = cluster.context.get('execution_arguments', {})
-
         out["tasks"] = execution_arguments["tasks"]
         out["exclude"] = execution_arguments["exclude"]
         out["initial_procedure"] = cluster.context["initial_procedure"]
@@ -394,14 +379,10 @@ class ClusterStorage:
         """
         This method is used to transfer backup logs from the main master to the new master.
         """
-
-        backup_command = 'cd /etc/kubemarine/kube_tasks/' \
-                         '&& sudo tar -czvf /tmp/kubemarine-backup.tar.gz /etc/kubemarine/kube_tasks/'
-
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             ip = node['address']
             if self.cluster.context['nodes'][ip]['online']:
-                data_copy_res = self.cluster.nodes['master'].get_first_member().run(backup_command)
+                data_copy_res = self.cluster.nodes['master'].get_first_member().sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
                 self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
                 node['connection'].get('/tmp/kubemarine-backup.tar.gz', os.path.join(self.cluster.context['execution_arguments']['dump_location'], 'dump_log_cluster.tar.gz'))
                 self.cluster.log.debug('Backup downloaded')
