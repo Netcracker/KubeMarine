@@ -153,7 +153,7 @@ def system_prepare_policy(cluster,warn=True, hide=False):
                                                                    "$(sudo docker ps | grep k8s_kube-apiserver"
                                                                    " | awk '{print $1}'")
 
-        cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -A")
+        cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 
