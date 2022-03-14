@@ -587,4 +587,4 @@ rbac:
 
 procedure_history:
   archive_threshold: 5
-  delete_threshold: 10
+  delete_threshold: 8
