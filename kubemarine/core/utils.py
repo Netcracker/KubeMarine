@@ -330,6 +330,7 @@ class ClusterStorage:
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
             cluster.nodes['master'].sudo(f"ln -s {self.dir_location} latest_dump && sudo mv latest_dump {folder_link}")
             self._collect_procedure_info(cluster)
+            self.pack_file(cluster)
 
     def pack_file(self, cluster):
         """
@@ -341,21 +342,30 @@ class ClusterStorage:
         sum_file = self.cluster.nodes['master'].run(command, is_async=False).get_simple_out()
         files = sum_file.split()
         files.sort(reverse=True)
+        files_unsort = sum_file.split()
         pack_file = cluster.defaults['procedure_history']['archive_threshold']
         delete_old = cluster.defaults['procedure_history']['delete_threshold']
         if count > pack_file:
-            cluster.nodes['master'].sudo(f'tar -czvf {self.dir_path + files[pack_file] + ".tar.gz"} {self.dir_path + files[pack_file]}')
-            cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[pack_file]}')
+            for i in range(len(files)):
+                diff = count - pack_file
+                if i < diff:
+                    cluster.nodes['master'].sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
+                    cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[i]}')
+
         if count > delete_old:
-            cluster.log.verbose('Deleting backup file from nodes...')
-            cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[delete_old]}')
+            for i in range(len(files_unsort)):
+                diff = count - delete_old
+                if i < diff:
+                    cluster.log.verbose('Deleting backup file from nodes...')
+                    cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files_unsort[i]}')
+        print('tut')
 
 
     def upload_file(self,cluster,stream, file_name):
         """
         This method sends the collected files to the nodes.
         """
-        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False, warn=True)
+        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False)
 
 
     def _collect_procedure_info(self, cluster):
