@@ -90,17 +90,14 @@ def enrich_inventory_pss(inventory, _):
     verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
             inventory["rbac"]["pss"]["defaults"]["enforce-version"])
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
-    if enabled_admission:
+    if enabled_admissions:
         if 'PodSecurity=true' not in enabled_admissions:
-            if len(enabled_admissions) == 0:
-                enabled_admissions = "PodSecurity=true"
-            else:
                 enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
         inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].append("admission-control-config-file: %s" % admission_path)
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
     else:     
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].append("feature-gates: %s" %enabled_admissions)
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].append("admission-control-config-file: %s" % admission_path)
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
 
     return inventory
 
@@ -112,8 +109,6 @@ def enrich_inventory(inventory, _):
         return enrich_inventory_psp(inventory, _)
     elif admission_impl == "pss":
         return enrich_inventory_pss(inventory, _)
-#####################
-    exit()
 
 
 def manage_psp_enrichment(inventory, cluster):
@@ -575,13 +570,12 @@ def resolve_final_plugins_list(cluster_config, target_state):
         return resulting_list.replace(",,", ",").strip(",")
 
 
-def install(group):
-    admission_impl = group.cluster.inventory['rbac']['admission']
-
+def install(cluster):
+    admission_impl = cluster.inventory['rbac']['admission']
     if admission_impl == "psp":
-        return install_psp_task(group)
+        return install_psp_task(cluster)
     elif admission_impl == "pss":
-        return install_pss_task(group)
+        return install_pss_task(cluster)
 
 
 def install_pss_task(cluster):
