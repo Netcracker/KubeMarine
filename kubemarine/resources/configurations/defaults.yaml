@@ -26,8 +26,6 @@ services:
       certSANs: []
       extraArgs:
         enable-admission-plugins: NodeRestriction
-        feature-gates: ""
-        admission-control-config-file: ""
         profiling: "false"
         audit-log-path: /var/log/audit.log
         audit-log-maxage: "30"
