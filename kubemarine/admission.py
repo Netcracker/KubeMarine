@@ -348,7 +348,7 @@ def reconfigure_plugin_task(cluster):
 
     # update api-server config on all masters
     cluster.log.debug("Updating kube-apiserver configs on masters")
-    cluster.nodes["master"].call(update_kubeapi_config, plugins_list=final_admission_plugins_list)
+    cluster.nodes["master"].call(update_kubeapi_config, options_list=final_admission_plugins_list)
 
 
 def restart_pods_task(cluster, disable_eviction=False):
@@ -401,10 +401,11 @@ def update_kubeadm_configmap_psp(first_master, target_state):
 
 
 def update_kubeadm_configmap(first_master, target_state):
+    admission_impl = first_master.cluster.inventory['rbac']['admission']
     if admission_impl == "psp":
-        return update_kubeadm_config_psp(first_master, target_state)
+        return update_kubeadm_configmap_psp(first_master, target_state)
     elif admission_impl == "pss":
-        return update_kubeadm_config_pss(first_master, target_state)
+        return update_kubeadm_configmap_pss(first_master, target_state)
 
 
 def update_kubeapi_config_psp(masters, plugins_list):
@@ -433,6 +434,7 @@ def update_kubeapi_config_psp(masters, plugins_list):
 
 
 def update_kubeapi_config(masters, options_list):
+    admission_impl = masters.cluster.inventory['rbac']['admission']
     if admission_impl == "psp":
         return update_kubeapi_config_psp(masters, options_list)
     elif admission_impl == "pss":
@@ -607,7 +609,6 @@ def manage_pss_enrichment(inventory, cluster):
 
 def manage_enrichment(inventory, cluster):
     admission_impl = inventory['rbac']['admission']
-
     if admission_impl == "psp":
         return manage_psp_enrichment(inventory, cluster)
     elif admission_impl == "pss":
