@@ -343,12 +343,11 @@ class ClusterStorage:
         files = sum_file.split()
         files.sort(reverse=True)
         files_unsort = sum_file.split()
-        pack_file = cluster.defaults['procedure_history']['archive_threshold']
+        not_pack_file = cluster.defaults['procedure_history']['not_archive_threshold']
         delete_old = cluster.defaults['procedure_history']['delete_threshold']
-        if count > pack_file:
-            for i in range(len(files)):
-                diff = count - pack_file
-                if i < diff:
+        if count > not_pack_file:
+            for i in range(not_pack_file, delete_old):
+                if not 'tar.gz' in files[i]:
                     cluster.nodes['master'].sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
                     cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[i]}')
 
