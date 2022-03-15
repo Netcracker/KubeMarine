@@ -293,7 +293,12 @@ def determine_resource_absolute_dir(path: str) -> str:
 
 class ClusterStorage:
     """
-    This class is responsible for collecting data about operations on the cluster.
+    File preservation:
+    1- Create folder where dumps are stored
+    2- Rotating dumps in the storage folder
+    3- Uploading dumps to nodes
+    4- Copying dumps to new nodes
+
     """
     __instance = None
 
@@ -357,7 +362,7 @@ class ClusterStorage:
                 if i < diff:
                     cluster.log.verbose('Deleting backup file from nodes...')
                     cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files_unsort[i]}')
-        print('tut')
+
 
 
     def upload_file(self,cluster,stream, file_name):
