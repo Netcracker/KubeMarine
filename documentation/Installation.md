@@ -2814,7 +2814,14 @@ rbac:
 ### Admission pss
 
 **Note**:
+
 * PSS are supported for Kubernetes version higher than 1.23
+* For PSS enabling one should define `admission: pss` explicitly in cluster.yaml:
+
+```yaml
+rbac:
+  admission: pss
+```
 
 #### Configuring Default Profiles
 
