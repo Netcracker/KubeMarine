@@ -433,7 +433,6 @@ def overview(cluster):
     master.sudo("kubectl cluster-info", hide=False, warn=True)
 
 
-
 tasks = OrderedDict({
     "prepare": {
         "check": {

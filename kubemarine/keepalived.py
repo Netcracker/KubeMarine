@@ -16,7 +16,6 @@ import hashlib
 import io
 import random
 import time
-import yaml
 from jinja2 import Template
 
 from kubemarine import system, packages
@@ -143,8 +142,6 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
 
     # fill in ips
     cluster.ips['keepalived'] = list(cluster.nodes['keepalived'].nodes.keys())
-
-
 
     return inventory
 

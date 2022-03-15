@@ -147,7 +147,6 @@ class FakeKubernetesCluster(cluster.KubernetesCluster):
         self.fake_fs = FakeFS(self)
         super().__init__(inventory, execution_arguments)
 
-
     def make_group(self, ips) -> NodeGroup:
         nodegroup = super().make_group(ips)
         return FakeNodeGroup(nodegroup.nodes, self)

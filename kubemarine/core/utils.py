@@ -298,18 +298,18 @@ class ClusterStorage:
     2- Rotating dumps in the storage folder
     3- Uploading dumps to nodes
     4- Copying dumps to new nodes
-
     """
     __instance = None
 
     def __init__(self, cluster):
         if not ClusterStorage.__instance:
-            self.cluster = cluster
-            self.dir_path = "/etc/kubemarine/kube_tasks/"
-            self._make_dir(cluster)
-            self.dir_name = ''
-            self.dir_location = ''
-            self.cluster.log.debug("new storage created")
+            if cluster.context["initial_procedure"] != None:
+                self.cluster = cluster
+                self.dir_path = "/etc/kubemarine/kube_tasks/"
+                self._make_dir(cluster)
+                self.dir_name
+                self.dir_location
+                self.cluster.log.debug("new storage created")
         else:
             self.cluster.log.debug("reused storage:", self.get_instance(cluster))
 
@@ -335,7 +335,7 @@ class ClusterStorage:
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
             cluster.nodes['master'].sudo(f"ln -s {self.dir_location} latest_dump && sudo mv latest_dump {folder_link}")
             self._collect_procedure_info(cluster)
-            self.pack_file(cluster)
+
 
     def pack_file(self, cluster):
         """
@@ -364,12 +364,12 @@ class ClusterStorage:
                     cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files_unsort[i]}')
 
 
-
     def upload_file(self,cluster,stream, file_name):
         """
         This method sends the collected files to the nodes.
         """
         self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False)
+        print('f')
 
 
     def _collect_procedure_info(self, cluster):

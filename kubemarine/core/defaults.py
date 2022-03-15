@@ -365,10 +365,8 @@ def calculate_nodegroups(inventory, cluster):
 
     merged_inventory = yaml.dump(prepare_for_dump(inventory))
     utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-
     cluster_storage = utils.ClusterStorage.get_instance(cluster)
     cluster_storage.upload_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-
 
     return inventory
 
@@ -399,12 +397,9 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
         if make_dumps:
             output = yaml.dump(prepare_for_dump(inventory), )
-
             utils.dump_file(cluster, output, "cluster.yaml")
             cluster_storage = utils.ClusterStorage.get_instance(cluster)
             cluster_storage.upload_file(cluster, output, "cluster.yaml")
-
-
 
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
@@ -412,7 +407,6 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
                     output = yaml.safe_load(stream)
                     output = yaml.dump(output)
                     cluster_storage.upload_file(cluster, output, "procedure.yaml")
-
 
         return inventory
 
