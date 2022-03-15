@@ -381,7 +381,7 @@ def join_master(group, node, join_dict):
     node['connection'].sudo("mkdir -p /etc/kubernetes")
     node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
-    # copy admission config on master
+    # copy admission config to master
     admission.copy_pss(node['connection'])
 
     # ! ETCD on masters can't be initialized in async way, that is why it is necessary to disable async mode !
@@ -462,7 +462,7 @@ def init_first_master(group):
     first_master_group.sudo("mkdir -p /etc/kubernetes")
     first_master_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
     
-    # copy admission config on first master
+    # copy admission config to first master
     first_master_group.call(admission.copy_pss)
 
     log.debug("Initializing first master...")
