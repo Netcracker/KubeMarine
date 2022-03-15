@@ -47,6 +47,7 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 
 loaded_oob_policies = {}
 
+# TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
 def enrich_inventory_psp(inventory, _):
     global loaded_oob_policies
@@ -90,6 +91,7 @@ def enrich_inventory_pss(inventory, _):
     verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
             inventory["rbac"]["pss"]["defaults"]["enforce-version"])
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
+    # add extraArgs to kube-apiserver config
     if enabled_admissions:
         if 'PodSecurity=true' not in enabled_admissions:
                 enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
@@ -184,6 +186,7 @@ def verify_custom_list(custom_list, type, supported_kinds):
 
 
 def verify_version(owner, version, enforce, minor_version_cfg):
+    # check Kubernetes version and admission config matching
     if enforce == "restricted" and version != "latest":
         result = re.match(valid_versions_templ, version)
         if result is None:
