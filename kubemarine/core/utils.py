@@ -303,13 +303,12 @@ class ClusterStorage:
 
     def __init__(self, cluster):
         if not ClusterStorage.__instance:
-            if cluster.context["initial_procedure"] != None:
-                self.cluster = cluster
-                self.dir_path = "/etc/kubemarine/kube_tasks/"
-                self._make_dir(cluster)
-                self.dir_name
-                self.dir_location
-                self.cluster.log.debug("new storage created")
+            self.cluster = cluster
+            self.dir_path = "/etc/kubemarine/kube_tasks/"
+            self._make_dir(cluster)
+            self.dir_name
+            self.dir_location
+            self.cluster.log.debug("new storage created")
         else:
             self.cluster.log.debug("reused storage:", self.get_instance(cluster))
 
