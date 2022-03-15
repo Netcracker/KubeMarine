@@ -2608,9 +2608,9 @@ As an example of a template, you can look at [default template](kubemarine/templ
 
 ### RBAC admission
 
-There are two options for admissions: `psp` and `pss`. PodSecurityPolicy (PSP) is being deprecated in Kubernetes 1.21 and will be removed in Kubernetes 1.25. Kubernetes 1.23 supports Pod Security Standards (PSS) that are implemented as a feature gates of `kube-apiserver`.
-
 *Installation task*: `deploy.admission`
+
+There are two options for admissions: `psp` and `pss`. PodSecurityPolicy (PSP) is being deprecated in Kubernetes 1.21 and will be removed in Kubernetes 1.25. Kubernetes 1.23 supports Pod Security Standards (PSS) that are implemented as a feature gates of `kube-apiserver`.
 
 ```yaml
 rbac:
@@ -2812,6 +2812,9 @@ rbac:
 * To manage custom policies on an existing cluster use the `manage_psp` maintenance procedure. 
 
 ### Admission pss
+
+**Note**:
+* PSS are supported for Kubernetes version higher than 1.23
 
 #### Configuring Default Profiles
 
@@ -4311,7 +4314,7 @@ The following is the installation tasks tree:
     * **install** - Configures Kubernetes service in the file `/etc/systemd/system/kubelet.service`
     * **prepull_images** - Prepulls Kubernetes images on all nodes using parameters from the inventory.
     * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm).
-  * **psp** - Applies OOB and custom pod security policies. For more information about parameters for this task, see [RBAC psp](#rbac-psp).
+  * **admission** - Applies OOB and custom pod security policies or pod security standards. For more information about parameters for this task, see [Admission psp](#admission-psp) and [Admission pss](#admission-pss).
   * **coredns** - Configures CoreDNS service with [coredns](#coredns) inventory settings.
   * **plugins** - Applies plugin installation procedures. For more information about parameters for this task, see [Plugins](#plugins).
   * **accounts** - Creates new users in cluster. For more information about parameters for this task, see [RBAC accounts](#rbac-accounts).
