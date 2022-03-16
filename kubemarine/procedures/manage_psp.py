@@ -16,15 +16,15 @@
 
 from collections import OrderedDict
 
-from kubemarine import psp
+from kubemarine import admission
 from kubemarine.core import flow
 
 tasks = OrderedDict({
-    "delete_custom": psp.delete_custom_task,
-    "add_custom": psp.add_custom_task,
-    "reconfigure_oob": psp.reconfigure_oob_task,
-    "reconfigure_plugin": psp.reconfigure_plugin_task,
-    "restart_pods": psp.restart_pods_task
+    "delete_custom": admission.delete_custom_task,
+    "add_custom": admission.add_custom_task,
+    "reconfigure_oob": admission.reconfigure_oob_task,
+    "reconfigure_plugin": admission.reconfigure_plugin_task,
+    "restart_pods": admission.restart_pods_task
 })
 
 
@@ -49,10 +49,7 @@ def main(cli_arguments=None):
     parser.add_argument('procedure_config', metavar='procedure_config', type=str,
                         help='config file for add_node procedure')
 
-    if cli_arguments is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(cli_arguments)
+    args = flow.parse_args(parser, cli_arguments)
 
     defined_tasks = []
     defined_excludes = []

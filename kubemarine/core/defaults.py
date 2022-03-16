@@ -18,6 +18,7 @@ from copy import deepcopy
 
 import yaml
 
+from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils
 from kubemarine.core.yaml_merger import default_merger
@@ -31,7 +32,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.packages.enrich_inventory_associations",
     "kubemarine.system.enrich_upgrade_inventory",
     "kubemarine.core.defaults.compile_inventory",
-    "kubemarine.psp.manage_psp_enrichment",
+    "kubemarine.admission.manage_enrichment",
     "kubemarine.thirdparties.enrich_inventory_apply_upgrade_defaults",
     "kubemarine.procedures.migrate_cri.enrich_inventory",
     "kubemarine.core.defaults.apply_registry",
@@ -41,7 +42,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.keepalived.enrich_inventory_apply_defaults",
     "kubemarine.haproxy.enrich_inventory",
     "kubemarine.kubernetes.enrich_inventory",
-    "kubemarine.psp.enrich_inventory",
+    "kubemarine.admission.enrich_inventory",
     "kubemarine.kubernetes_accounts.enrich_inventory",
     "kubemarine.plugins.calico.enrich_inventory",
     "kubemarine.plugins.nginx_ingress.cert_renew_enrichment",
@@ -125,18 +126,31 @@ def apply_registry(inventory, cluster):
         cluster.log.verbose('Unified registry is not used')
         return inventory
 
-    if inventory['registry'].get('docker_port'):
-        full_registry_address = "%s:%s" % (inventory['registry']['address'], inventory['registry']['docker_port'])
-    else:
-        full_registry_address = inventory['registry']['address']
+    if inventory['registry'].get('endpoints') and inventory['registry'].get('docker_port'):
+        raise KME('KME0006')
 
-    protocol = 'http'
-    if inventory['registry'].get('ssl', False):
-        protocol = 'https'
+    thirdparties_address = None
+    containerd_endpoints = None
+    protocol = None
+
+    if inventory['registry'].get('endpoints'):
+        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory, cluster)
+    else:
+        if inventory['registry'].get('docker_port'):
+            registry_mirror_address = "%s:%s" % (inventory['registry']['address'], inventory['registry']['docker_port'])
+        else:
+            registry_mirror_address = inventory['registry']['address']
+
+        protocol = 'http'
+        if inventory['registry'].get('ssl', False):
+            protocol = 'https'
+
+        if inventory['registry'].get('webserver', False):
+            thirdparties_address = f"{protocol}://{inventory['registry']['address']}"
 
     # Patch kubeadm imageRepository
     if not inventory['services']['kubeadm'].get('imageRepository'):
-        inventory['services']['kubeadm']["imageRepository"] = full_registry_address
+        inventory['services']['kubeadm']["imageRepository"] = registry_mirror_address
 
     # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/xxx:v1
     if inventory.get('plugin_defaults') is None:
@@ -144,7 +158,7 @@ def apply_registry(inventory, cluster):
     if inventory['plugin_defaults'].get('installation') is None:
         inventory['plugin_defaults']['installation'] = {}
     if inventory['plugin_defaults']['installation'].get('registry') is None:
-        inventory['plugin_defaults']['installation']['registry'] = full_registry_address
+        inventory['plugin_defaults']['installation']['registry'] = registry_mirror_address
 
     # The following section rewrites DEFAULT plugins registries and do not touches user-defined registries in plugins
     # This section required, because plugins defaults contains default non-docker registries and method
@@ -159,34 +173,46 @@ def apply_registry(inventory, cluster):
             cluster.inventory['plugins'][plugin_name]['installation']['registry'] = inventory['plugin_defaults']['installation']['registry']
 
     cri_impl = inventory['services']['cri']['containerRuntime']
+
+    if cri_impl == "docker" and inventory['registry'].get('endpoints'):
+        raise KME('KME0007')
+
     if cri_impl == "docker":
-        if not inventory['registry'].get('ssl', False):
+
+        if protocol == 'http':
             if inventory['services']['cri']['dockerConfig'].get("insecure-registries") is None:
                 inventory['services']['cri']['dockerConfig']["insecure-registries"] = []
             insecure_registries = inventory['services']['cri']['dockerConfig']["insecure-registries"]
-            insecure_registries.append(full_registry_address)
+            insecure_registries.append(registry_mirror_address)
             inventory['services']['cri']['dockerConfig']["insecure-registries"] = list(set(insecure_registries))
 
         if inventory['services']['cri']['dockerConfig'].get("registry-mirrors") is None:
             inventory['services']['cri']['dockerConfig']["registry-mirrors"] = []
+
         registry_mirrors = inventory['services']['cri']['dockerConfig']["registry-mirrors"]
-        registry_mirrors.append(f"{protocol}://{full_registry_address}")
+        registry_mirrors.append(f"{protocol}://{registry_mirror_address}")
         inventory['services']['cri']['dockerConfig']["registry-mirrors"] = list(set(registry_mirrors))
+
     elif cri_impl == "containerd":
-        registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{full_registry_address}"'
+        registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
+
+        if not inventory['services']['cri']['containerdConfig'].get(registry_section):
+            if not containerd_endpoints:
+                containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
+
+            inventory['services']['cri']['containerdConfig'][registry_section] = {
+                'endpoint': containerd_endpoints
+            }
+
         effective_kubernetes_version = ".".join(inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
         pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]['version']
-        if not inventory['services']['cri']['containerdConfig'].get(registry_section):
-            inventory['services']['cri']['containerdConfig'][registry_section] = {
-                'endpoint': ["%s://%s" % (protocol, full_registry_address)]
-            }
         if not inventory['services']['cri']['containerdConfig'].get('plugins."io.containerd.grpc.v1.cri"'):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
         if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
                 f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
-    if inventory['registry'].get('webserver', False) and inventory['services'].get('thirdparties', []):
+    if inventory['services'].get('thirdparties', []) and thirdparties_address:
         for destination, config in inventory['services']['thirdparties'].items():
 
             if isinstance(config, str):
@@ -199,24 +225,41 @@ def apply_registry(inventory, cluster):
             for binary in ['kubeadm', 'kubelet', 'kubectl']:
                 if destination == '/usr/bin/' + binary:
                     new_source = new_source.replace('https://storage.googleapis.com/kubernetes-release/release',
-                                                    '%s://%s/kubernetes/%s'
-                                                    % (protocol, inventory['registry']['address'], binary))
+                                                    '%s/kubernetes/%s'
+                                                    % (thirdparties_address, binary))
 
             if '/usr/bin/calicoctl' == destination:
                 new_source = new_source.replace('https://github.com/projectcalico/calicoctl/releases/download',
-                                                '%s://%s/projectcalico/calicoctl'
-                                                % (protocol, inventory['registry']['address']))
+                                                '%s/projectcalico/calicoctl'
+                                                % thirdparties_address)
 
             if '/usr/bin/crictl.tar.gz' == destination:
                 new_source = new_source.replace('https://github.com/kubernetes-sigs/cri-tools/releases/download',
-                                                '%s://%s/kubernetes-sigs/cri-tools'
-                                                % (protocol, inventory['registry']['address']))
+                                                '%s/kubernetes-sigs/cri-tools'
+                                                % thirdparties_address)
             if isinstance(config, str):
                 inventory['services']['thirdparties'][destination] = new_source
             else:
                 inventory['services']['thirdparties'][destination]['source'] = new_source
 
     return inventory
+
+
+def apply_registry_endpoints(inventory, cluster):
+
+    if not inventory['registry'].get('mirror_registry'):
+        inventory['registry']['mirror_registry'] = 'registry.cluster.local'
+
+    registry_mirror_address = inventory['registry']['mirror_registry']
+
+    for i, endpoint_address in enumerate(inventory['registry']['endpoints']):
+        if not isinstance(endpoint_address, str):
+            raise KME('KME0008')
+
+    containerd_endpoints = inventory['registry']['endpoints']
+    thirdparties_address = inventory['registry'].get('thirdparties')
+
+    return registry_mirror_address, containerd_endpoints, thirdparties_address
 
 
 def append_controlplain(inventory, cluster):

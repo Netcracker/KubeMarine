@@ -14,6 +14,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Packets between nodes in different networks are lost](#packets-between-nodes-in-different-networks-are-lost)
   - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
   - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
+  - [Long Recovery after a Node goes Offline](#long-recovery-after-a-node-goes-offline)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -355,6 +356,39 @@ data:
         ...
 
 ```
+
+## Long Recovery after a Node goes Offline
+
+**Symptoms**: If for any reason, a cluster node goes offline, the pods from that node are redeployed in almost 6 minutes. For some installations, it might be too long and this time needs to be reduced.
+
+**Root Cause**: When a node goes offline, Kubernetes takes time to discover that the node is unavailable (up to 10 seconds). It then waits till the node returns or the timeout expires (40 seconds), then marks the pods at this node to be deleted, and waits for the situation to recover or for the timeout to expire (5 minutes). After that, the pods are redeployed to healthy nodes.
+
+**Solution**: Reduce the timeouts related to the node status discovery and pods eviction.
+
+It can be done by tuning the following variables:
+- `nodeStatusUpdateFrequency` - A kubelet's variable that specifies the frequency kubelet computes the node status and posts it to master. The default value is 10s. It should be twice the value of `node-monitor-period`.
+- `node-monitor-period` - A kube-controller-manager's variable that specifies the period for syncing NodeStatus in NodeController. The default value is 5s. It should be half the value of `nodeStatusUpdateFrequency`.
+- `node-monitor-grace-period` - A kube-controller-manager's variable that specifies the amount of time that a running node is allowed to be unresponsive before marking it unhealthy. The default value is 40s. It must be (N-1) times more than kubelet's `nodeStatusUpdateFrequency`, where N is the number of retries allowed for kubelet to post the node status. Currently N is hardcoded to 5. 
+- `pod-eviction-timeout` - A kube-controller-manager's variable that specifies the grace period for deleting pods on failed nodes. The default value is 5 min.
+
+These variables can be redefined in cluster.yaml during the cluster deployment or upgrade. For example:
+
+```
+services:
+  kubeadm_kubelet:
+    nodeStatusUpdateFrequency: 4s
+  kubeadm:
+    controllerManager:
+      extraArgs:
+        node-monitor-period: "2s"
+        node-monitor-grace-period: "16s" 
+        pod-eviction-timeout: "30s"
+```
+
+The exact numbers should be chosen according to the environment state. If the network or hosts are unstable, these values should cover short nodes unavailability without redeployment of the pods. Often redeployment may cause significant load increase and cluster instability.
+
+At working clusters, these variables can be adjusted manually by updating `/var/lib/kubelet/config.yaml` (for kubelet, at all the nodes) and `/etc/kubernetes/manifests/kube-controller-manager.yaml` (for controller-manager, at the masters).
+
 
 ## `kube-controller-manager` unable to sync caches for garbage collector
 

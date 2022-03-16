@@ -2,6 +2,7 @@ PyYAML
 deepmerge
 fabric
 jinja2==2.11.*
+MarkupSafe==2.0.1
 invoke
 MarkupSafe==2.0.1
 ruamel.yaml
