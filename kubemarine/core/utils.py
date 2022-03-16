@@ -144,7 +144,7 @@ def make_ansible_inventory(location, cluster):
     for section_name, strings in config.items():
         config_compiled += '[%s]' % section_name
         for string in strings:
-            config_compiled += '\n'+string
+            config_compiled += '\n' + string
         config_compiled += '\n\n'
 
     with open(location, 'w') as configfile:
@@ -156,7 +156,6 @@ def get_current_timestamp_formatted():
 
 
 def recreate_final_inventory_file(cluster):
-
     # load inventory as ruamel.yaml to save original structure
     ruamel_yaml = ruamel.yaml.YAML()
     ruamel_yaml.preserve_quotes = True
@@ -220,7 +219,8 @@ def dump_file(cluster, data, filename):
         filename = f"{cluster.context['dump_filename_prefix']}_{filename}"
 
     if not cluster.context['execution_arguments'].get('disable_dump', True):
-        with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location']+'/'+filename), 'w') as file:
+        with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
+                  'w') as file:
             file.write(data)
 
 
@@ -289,7 +289,9 @@ def determine_resource_absolute_dir(path: str) -> str:
     if os.path.isdir(patched_definition):
         return patched_definition
 
-    raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
+    raise Exception(
+        'Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
+
 
 class ClusterStorage:
     """
@@ -312,9 +314,9 @@ class ClusterStorage:
             else:
                 self.dir_name = ''
                 self.dir_location = ''
-            self.cluster.log.debug("new storage created")
+            self.cluster.log.debug("New storage created")
         else:
-            self.cluster.log.debug("reused storage:", self.get_instance(cluster))
+            self.cluster.log.debug("Reused storage:", self.get_instance(cluster))
 
     @classmethod
     def get_instance(cls, cluster):
@@ -338,42 +340,43 @@ class ClusterStorage:
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
             cluster.nodes['master'].sudo(f"ln -s {self.dir_location} latest_dump && sudo mv latest_dump {folder_link}")
             self._collect_procedure_info(cluster)
-
+            self.pack_file(cluster)
 
     def pack_file(self, cluster):
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        command_count = f"cd {self.dir_path} && find * -maxdepth 0 -type d,f | wc -l"
-        count = int(self.cluster.nodes['master'].run(command_count).get_simple_out())
-        command = f'ls {self.dir_path}'
-        sum_file = self.cluster.nodes['master'].run(command, is_async=False).get_simple_out()
-        files = sum_file.split()
-        files.sort(reverse=True)
-        files_unsort = sum_file.split()
-        not_pack_file = cluster.defaults['procedure_history']['not_archive_threshold']
-        delete_old = cluster.defaults['procedure_history']['delete_threshold']
-        if count > not_pack_file:
-            for i in range(not_pack_file, delete_old):
-                if not 'tar.gz' in files[i]:
-                    cluster.nodes['master'].sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
-                    cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files[i]}')
+        collect_node = self.cluster.nodes['master'].get_ordered_members_list()
+        for node in collect_node:
+            command_count = f"cd {self.dir_path} && find * -maxdepth 0 -type d,f | wc -l"
+            count = int(node.run(command_count).get_simple_out())
+            command = f'ls {self.dir_path}'
+            sum_file = node.run(command, is_async=False).get_simple_out()
+            files = sum_file.split()
+            files.sort(reverse=True)
+            files_unsort = sum_file.split()
+            not_pack_file = cluster.defaults['procedure_history']['not_archive_threshold']
+            delete_old = cluster.defaults['procedure_history']['delete_threshold']
+            if count > not_pack_file:
+                for i in range(not_pack_file, delete_old):
+                    if 'tar.gz' not in files[i] and i <= count:
+                        node.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
+                        node.sudo(f'rm -r {self.dir_path + files[i]}')
+                    else:
+                        break
+            if count > delete_old:
+                for i in range(len(files_unsort)):
+                    diff = count - delete_old
+                    if i < diff:
+                        cluster.log.verbose('Deleting backup file from nodes...')
+                        node.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
 
-        if count > delete_old:
-            for i in range(len(files_unsort)):
-                diff = count - delete_old
-                if i < diff:
-                    cluster.log.verbose('Deleting backup file from nodes...')
-                    cluster.nodes['master'].sudo(f'rm -r {self.dir_path + files_unsort[i]}')
-
-
-    def upload_file(self,cluster,stream, file_name):
+    def upload_file(self, cluster, stream, file_name):
         """
         This method sends the collected files to the nodes.
         """
         self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False)
         self.cluster.log.debug('File download %s' % file_name)
-
 
     def _collect_procedure_info(self, cluster):
         """
@@ -392,7 +395,6 @@ class ClusterStorage:
             output = yaml.dump(output)
             self.upload_file(cluster, output, "version")
 
-
     def collect_info_all_master(self):
         """
         This method is used to transfer backup logs from the main master to the new master.
@@ -400,13 +402,13 @@ class ClusterStorage:
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             ip = node['address']
             if self.cluster.context['nodes'][ip]['online']:
-                data_copy_res = self.cluster.nodes['master'].get_first_member().sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
+                data_copy_res = self.cluster.nodes['master'].get_first_member().sudo(
+                    f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
                 self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
-                node['connection'].get('/tmp/kubemarine-backup.tar.gz', os.path.join(self.cluster.context['execution_arguments']['dump_location'], 'dump_log_cluster.tar.gz'))
+                node['connection'].get('/tmp/kubemarine-backup.tar.gz',
+                                       os.path.join(self.cluster.context['execution_arguments']['dump_location'],
+                                                    'dump_log_cluster.tar.gz'))
                 self.cluster.log.debug('Backup downloaded')
                 return
             else:
                 self.cluster.log.debug('Masters offline %s' % node['name'])
-
-
-
