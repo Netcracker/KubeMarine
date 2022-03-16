@@ -181,14 +181,14 @@ def get_final_inventory(cluster, initial_inventory=None):
     else:
         inventory = deepcopy(initial_inventory)
 
-    from kubemarine import psp
+    from kubemarine import admission
     from kubemarine.procedures import add_node, remove_node, upgrade, migrate_cri
 
     inventory_finalize_functions = {
         add_node.add_node_finalize_inventory,
         remove_node.remove_node_finalize_inventory,
         upgrade.upgrade_finalize_inventory,
-        psp.finalize_inventory,
+        admission.finalize_inventory,
         nginx_ingress.finalize_inventory,
         migrate_cri.migrate_cri_finalize_inventory
     }

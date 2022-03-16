@@ -574,6 +574,7 @@ rbac:
           kind: ClusterRole
         subjects:
           - kind: ServiceAccount
+  admission: psp
   psp:
     pod-security: enabled
     oob-policies:
@@ -584,3 +585,16 @@ rbac:
       psp-list: []
       roles-list: []
       bindings-list: []
+  pss:
+    pod-security: enabled
+    defaults:
+      enforce: baseline
+      enforce-version: latest
+      audit: baseline
+      audit-version: latest
+      warn: baseline
+      warn-version: latest
+    exemptions:
+      usernames: []
+      runtimeClasses: []
+      namespaces: ["kube-system"]
