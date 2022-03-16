@@ -15,9 +15,11 @@
 import io
 import os
 import uuid
+import re
 
 import ruamel.yaml
 import yaml
+from jinja2 import Template
 
 from kubemarine import kubernetes
 from kubemarine.core import utils
@@ -27,6 +29,10 @@ privileged_policy_filename = "privileged.yaml"
 policies_file_path = "./resources/psp/"
 tmp_filepath_pattern = "/tmp/%s"
 
+admission_template = "./templates/admission.yaml.j2"
+admission_dir = "/etc/kubernetes/pki"
+admission_path = "%s/admission.yaml" % admission_dir
+
 psp_list_option = "psp-list"
 roles_list_option = "roles-list"
 bindings_list_option = "bindings-list"
@@ -34,17 +40,23 @@ bindings_list_option = "bindings-list"
 valid_flags = ["enabled", "disabled"]
 provided_oob_policies = ["default", "host-network", "anyuid"]
 
+valid_switches = ["pss", "psp"]
+valid_profiles = ["privileged", "baseline", "restricted"]
+valid_exemptions = ["usernames", "runtimeClasses", "namespaces"]
+valid_versions_templ = r"^v1\.\d{1,2}$"
+
 loaded_oob_policies = {}
 
+# TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
-def enrich_inventory(inventory, _):
+def enrich_inventory_psp(inventory, _):
     global loaded_oob_policies
     loaded_oob_policies = load_oob_policies_files()
 
     # check flags
-    verify_flag("pod-security", inventory["rbac"]["psp"]["pod-security"])
+    verify_parameter("pod-security", inventory["rbac"]["psp"]["pod-security"], valid_flags)
     for oob_name in provided_oob_policies:
-        verify_flag("oob-policies", inventory["rbac"]["psp"]["oob-policies"][oob_name])
+        verify_parameter("oob-policies", inventory["rbac"]["psp"]["oob-policies"][oob_name], valid_flags)
 
     # validate custom
     custom_policies = inventory["rbac"]["psp"]["custom-policies"]
@@ -63,6 +75,44 @@ def enrich_inventory(inventory, _):
     return inventory
 
 
+def enrich_inventory_pss(inventory, _):
+    # check flags, enforce and logs parameters
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version < 23:
+        raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
+    verify_parameter("pod-security", inventory["rbac"]["pss"]["pod-security"], valid_flags)
+    verify_parameter("enforce", inventory["rbac"]["pss"]["defaults"]["enforce"], valid_profiles)
+    verify_version("enforce-version", inventory["rbac"]["pss"]["defaults"]["enforce-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce"], minor_version)
+    verify_equal("audit", inventory["rbac"]["pss"]["defaults"]["audit"], inventory["rbac"]["pss"]["defaults"]["enforce"])
+    verify_equal("warn", inventory["rbac"]["pss"]["defaults"]["warn"], inventory["rbac"]["pss"]["defaults"]["enforce"])
+    verify_equal("audit-version", inventory["rbac"]["pss"]["defaults"]["audit-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
+    verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
+            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
+    enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
+    # add extraArgs to kube-apiserver config
+    if enabled_admissions:
+        if 'PodSecurity=true' not in enabled_admissions:
+                enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+    else:     
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
+        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+
+    return inventory
+
+
+def enrich_inventory(inventory, _):
+    verify_parameter("admission", inventory["rbac"]["admission"], valid_switches)
+    admission_impl = inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return enrich_inventory_psp(inventory, _)
+    elif admission_impl == "pss":
+        return enrich_inventory_pss(inventory, _)
+
+
 def manage_psp_enrichment(inventory, cluster):
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
@@ -74,11 +124,11 @@ def manage_psp_enrichment(inventory, cluster):
 
     # check flags
     if "pod-security" in procedure_config:
-        verify_flag("pod-security", procedure_config["pod-security"])
+        verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
     if "oob-policies" in procedure_config:
         for oob_policy in provided_oob_policies:
             if oob_policy in procedure_config["oob-policies"]:
-                verify_flag("oob-policy", procedure_config["oob-policies"][oob_policy])
+                verify_parameter("oob-policy", procedure_config["oob-policies"][oob_policy], valid_flags)
 
     # validate added custom
     custom_add_policies = procedure_config.get("add-policies", {})
@@ -102,9 +152,14 @@ def manage_psp_enrichment(inventory, cluster):
     return inventory
 
 
-def verify_flag(owner, value):
-    if value not in valid_flags:
-        raise Exception("incorrect value for %s, valid values: %s" % (owner, valid_flags))
+def verify_parameter(owner, value, parameters):
+    if value not in parameters:
+        raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
+
+
+def verify_equal(owner, value, standard):
+    if value != standard:
+        raise Exception("incorrect value for %s, it should be: %s" % (owner, standard))
 
 
 def verify_custom(custom_scope):
@@ -130,7 +185,20 @@ def verify_custom_list(custom_list, type, supported_kinds):
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
 
 
-def finalize_inventory(cluster, inventory_to_finalize):
+def verify_version(owner, version, enforce, minor_version_cfg):
+    # check Kubernetes version and admission config matching
+    if enforce == "restricted" and version != "latest":
+        result = re.match(valid_versions_templ, version)
+        if result is None:
+            raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
+    elif enforce != "restricted" and version != "latest":
+        raise Exception("incorrect value for %s, valid value is 'latest'" % owner)
+        minor_version = int(version.split('.')[1])
+        if minor_version > minor_version_cfg:
+            raise Exception("%s version must not be higher than Kubernetes version" % owner)
+
+
+def finalize_inventory_psp(cluster, inventory_to_finalize):
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory_to_finalize
     procedure_config = cluster.procedure_inventory["psp"]
@@ -283,7 +351,7 @@ def reconfigure_plugin_task(cluster):
 
     # update api-server config on all masters
     cluster.log.debug("Updating kube-apiserver configs on masters")
-    cluster.nodes["master"].call(update_kubeapi_config, plugins_list=final_admission_plugins_list)
+    cluster.nodes["master"].call(update_kubeapi_config, options_list=final_admission_plugins_list)
 
 
 def restart_pods_task(cluster, disable_eviction=False):
@@ -307,7 +375,7 @@ def restart_pods_task(cluster, disable_eviction=False):
     first_master.call(kubernetes.wait_for_any_pods, connection=None)
 
 
-def update_kubeadm_configmap(first_master, target_state):
+def update_kubeadm_configmap_psp(first_master, target_state):
     yaml = ruamel.yaml.YAML()
 
     # load kubeadm config map and retrieve cluster config
@@ -335,7 +403,15 @@ def update_kubeadm_configmap(first_master, target_state):
     return final_plugins_string
 
 
-def update_kubeapi_config(masters, plugins_list):
+def update_kubeadm_configmap(first_master, target_state):
+    admission_impl = first_master.cluster.inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return update_kubeadm_configmap_psp(first_master, target_state)
+    elif admission_impl == "pss":
+        return update_kubeadm_configmap_pss(first_master, target_state)
+
+
+def update_kubeapi_config_psp(masters, plugins_list):
     yaml = ruamel.yaml.YAML()
 
     for master in masters.get_ordered_members_list():
@@ -360,8 +436,19 @@ def update_kubeapi_config(masters, plugins_list):
     masters.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 
+def update_kubeapi_config(masters, options_list):
+    admission_impl = masters.cluster.inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return update_kubeapi_config_psp(masters, options_list)
+    elif admission_impl == "pss":
+        return update_kubeapi_config_pss(masters, options_list)
+
 def is_security_enabled(inventory):
-    return inventory["rbac"]["psp"]["pod-security"] == "enabled"
+    admission_impl = inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return inventory["rbac"]["psp"]["pod-security"] == "enabled"
+    elif admission_impl == "pss":
+        return inventory["rbac"]["pss"]["pod-security"] == "enabled"
 
 
 def apply_privileged_policy(group):
@@ -370,6 +457,21 @@ def apply_privileged_policy(group):
 
 def delete_privileged_policy(group):
     return manage_privileged_from_file(group, privileged_policy_filename, "delete")
+
+
+def apply_admission(group):
+    admission_impl = group.cluster.inventory['rbac']['admission']
+    if is_security_enabled(group.cluster.inventory):
+        if admission_impl == "psp":
+            group.cluster.log.debug("Setting up privileged psp...")
+            apply_privileged_policy(group)
+        elif admission_impl == "pss":
+            group.cluster.log.debug("Setting up default pss...")
+            apply_default_pss(group)
+
+
+def apply_default_pss(group):
+    return manage_pss(group, "apply")
 
 
 def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
@@ -471,3 +573,176 @@ def resolve_final_plugins_list(cluster_config, target_state):
             resulting_list = current_plugins
 
         return resulting_list.replace(",,", ",").strip(",")
+
+
+def install(cluster):
+    admission_impl = cluster.inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return install_psp_task(cluster)
+    elif admission_impl == "pss":
+        return install_pss_task(cluster)
+
+
+def install_pss_task(cluster):
+    if not is_security_enabled(cluster.inventory):
+        cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+        return
+
+    first_master = cluster.nodes["master"].get_first_member()
+
+    cluster.log.debug("Installing default configuration...")
+    first_master.call(manage_pss, manage_type="apply")
+
+
+def manage_pss_enrichment(inventory, cluster):
+    if cluster.context.get('initial_procedure') != 'manage_pss':
+        return inventory
+    if "pss" not in cluster.procedure_inventory:
+        raise Exception("'manage_pss' config should have 'pss' in its root")
+
+    procedure_config = cluster.procedure_inventory["pss"]
+    current_config = cluster.inventory["rbac"]["pss"]
+
+    # check flags, profiles, and exemptions
+    if "pod-security" in procedure_config:
+        verify_config(inventory)
+
+    return inventory
+
+
+def manage_enrichment(inventory, cluster):
+    admission_impl = inventory['rbac']['admission']
+    if admission_impl == "psp":
+        return manage_psp_enrichment(inventory, cluster)
+    elif admission_impl == "pss":
+        return manage_pss_enrichment(inventory, cluster)
+
+
+def manage_pss(group, manage_type):
+    if group.cluster.context.get('initial_procedure') != 'install':
+        copy_pss(group)
+        first_master = cluster.nodes["master"].get_first_member()
+    
+        cluster.log.debug("Updating kubeadm config map")
+        result = first_master.call(update_kubeadm_configmap, target_state=target_state)
+        final_features_list = list(result.values())[0]
+    
+        # update api-server config on all masters
+        cluster.log.debug("Updating kube-apiserver configs on masters")
+        cluster.nodes["master"].call(update_kubeapi_config, features_list=final_features_list)
+        return result
+
+
+def update_kubeapi_config_pss(masters, features_list):
+    yaml = ruamel.yaml.YAML()
+
+    for master in masters.get_ordered_members_list():
+        result = master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+
+        # update kube-apiserver config with updated features list
+        conf = yaml.load(list(result.values())[0].stdout)
+        new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"] if "feature-gates" not in cmd]
+        new_command.append("--feature-gates=%s" % features_list)
+        new_command.append("--admission-control-config-file=%s" % admission_path)
+        conf["spec"]["containers"][0]["command"] = new_command
+
+        # place updated config on master
+        buf = io.StringIO()
+        yaml.dump(conf, buf)
+        master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
+
+    # force kube-apiserver pod restart, then wait for api to become available
+    masters.get_first_member().call(utils.wait_command_successful,
+                                    command="kubectl delete pod -n kube-system "
+                                            "$(sudo kubectl get pod -n kube-system "
+                                            "| grep 'kube-apiserver' | awk '{ print $1 }')")
+    masters.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
+
+
+def update_kubeadm_configmap_pss(first_master, target_state):
+    yaml = ruamel.yaml.YAML()
+
+    # load kubeadm config map and retrieve cluster config
+    result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
+    kubeadm_cm = yaml.load(list(result.values())[0].stdout)
+    cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+
+    # resolve resulting admission plugins list
+    final_features_string = resolve_final_plugins_list(cluster_config, target_state)
+
+    # update kubeadm config map with updated plugins list
+    cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_features_string
+    cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+    buf = io.StringIO()
+    yaml.dump(cluster_config, buf)
+    kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
+
+    # apply updated kubeadm config map
+    buf = io.StringIO()
+    yaml.dump(kubeadm_cm, buf)
+    filename = uuid.uuid4().hex
+    first_master.put(buf, "/tmp/%s.yaml" % filename)
+    first_master.sudo("kubectl apply -f /tmp/%s.yaml" % filename)
+    first_master.sudo("rm -f /tmp/%s.yaml" % filename)
+
+    return final_plugins_string
+
+
+def finalize_inventory(cluster, inventory_to_finalize):
+    admission_impl = cluster.inventory['rbac']['admission']
+
+    if admission_impl == "psp":
+        return finalize_inventory_psp(cluster, inventory_to_finalize)
+    elif admission_impl == "pss":
+        return finalize_inventory_pss(cluster, inventory_to_finalize)
+
+
+def finalize_inventory_pss(cluster, inventory_to_finalize):
+    if cluster.context.get('initial_procedure') != 'manage_pss':
+        return inventory_to_finalize
+    procedure_config = cluster.procedure_inventory["pss"]
+
+    if "rbac" not in inventory_to_finalize:
+        inventory_to_finalize["rbac"] = {}
+    if "pss" not in inventory_to_finalize["rbac"]:
+        inventory_to_finalize["rbac"]["pss"] = {}
+    current_config = inventory_to_finalize["rbac"]["pss"]
+
+    # merge flags from procedure config and cluster config
+    current_config["pod-security"] = procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
+    if "defaults" in procedure_config:
+        if "defaults" not in current_config:
+            current_config["defaults"] = procedure_config["defaults"]
+        else:
+            for default_option in procedure_config["defaults"]:
+                current_config["defaults"][default_option] = procedure_config["defaults"][default_option]
+    if "exemptions" in procedure_config:
+        if "exemptions" not in current_config:
+            current_config["exemptions"] = procedure_config["exemptions"]
+        else:
+            for exemption in procedure_config["exemptions"]:
+                current_config["exemptions"][exemption] = procedure_config["exemptions"][exemption]
+
+    return inventory_to_finalize
+
+
+def copy_pss(group):
+    admission_impl = group.cluster.inventory['rbac']['admission']
+    if admission_impl == "pss":
+        defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
+        exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
+        # create admission config from template and cluster.yaml
+        admission_config = Template(open(utils.get_resource_absolute_path(admission_template, script_relative=True)).read())\
+                           .render(defaults=defaults,exemptions=exemptions)
+    
+        # put admission config on every masters
+        filename = uuid.uuid4().hex
+        remote_path = tmp_filepath_pattern % filename
+        group.cluster.log.debug("Copy admission config: %s, %s" % (remote_path, admission_path))
+        group.put(io.StringIO(admission_config), remote_path, backup=True, sudo=True)
+        group.sudo("mkdir -p %s" % admission_dir, warn=True)
+        result = group.sudo("cp %s %s" % (remote_path, admission_path), warn=True)
+        group.sudo("rm -f %s" % remote_path)
+
+        return result
+

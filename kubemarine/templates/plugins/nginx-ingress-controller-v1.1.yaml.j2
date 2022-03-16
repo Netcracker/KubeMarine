@@ -5,6 +5,14 @@ metadata:
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/instance: ingress-nginx
+    {% if rbac['admission'] == "pss" and rbac["pss"]["pod-security"] == "enabled" and rbac["pss"]["defaults"]["enforce"] != "privileged" %}
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+    {% endif %}
 
 ---
 # Source: ingress-nginx/templates/controller-serviceaccount.yaml
