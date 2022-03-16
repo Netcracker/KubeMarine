@@ -306,8 +306,12 @@ class ClusterStorage:
             self.cluster = cluster
             self.dir_path = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
-            self.dir_name
-            self.dir_location
+            if cluster.context["initial_procedure"] != None:
+                self.dir_name
+                self.dir_location
+            else:
+                self.dir_name = ''
+                self.dir_location = ''
             self.cluster.log.debug("new storage created")
         else:
             self.cluster.log.debug("reused storage:", self.get_instance(cluster))
@@ -368,7 +372,7 @@ class ClusterStorage:
         This method sends the collected files to the nodes.
         """
         self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False)
-        print('f')
+        self.cluster.log.debug('File download %s' % file_name)
 
 
     def _collect_procedure_info(self, cluster):
