@@ -224,14 +224,14 @@ services:
 
   loadbalancer:
     haproxy:
-      config:
-        defaults:
-          timeout_connect: '10s'
-          timeout_client: '1m'
-          timeout_server: '1m'
-          timeout_tunnel: '60m'
-          timeout_client_fin: '1m'
-          maxconn: 10000
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
 
   packages:
     package_manager:
@@ -574,6 +574,7 @@ rbac:
           kind: ClusterRole
         subjects:
           - kind: ServiceAccount
+  admission: psp
   psp:
     pod-security: enabled
     oob-policies:
@@ -584,3 +585,16 @@ rbac:
       psp-list: []
       roles-list: []
       bindings-list: []
+  pss:
+    pod-security: enabled
+    defaults:
+      enforce: baseline
+      enforce-version: latest
+      audit: baseline
+      audit-version: latest
+      warn: baseline
+      warn-version: latest
+    exemptions:
+      usernames: []
+      runtimeClasses: []
+      namespaces: ["kube-system"]

@@ -20,7 +20,7 @@ import yaml
 
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
-    kubernetes_accounts, selinux, thirdparties, psp, audit, coredns, cri, packages, apparmor
+    kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils
 from kubemarine.core.executor import RemoteExecutor
 
@@ -267,7 +267,14 @@ def deploy_loadbalancer_haproxy_install(cluster):
 
 
 def deploy_loadbalancer_haproxy_configure(cluster):
+
+    if not cluster.inventory['services'].get('loadbalancer', {}) \
+            .get('haproxy', {}).get('keep_configs_updated', True):
+        cluster.log.debug('Skipped - haproxy balancers configs update manually disabled')
+        return
+
     group = None
+
     if "balancer" in cluster.nodes:
 
         if cluster.context['initial_procedure'] != 'remove_node':
@@ -488,7 +495,7 @@ tasks = OrderedDict({
             "prepull_images": deploy_kubernetes_prepull_images,
             "init": deploy_kubernetes_init
         },
-        "psp": psp.install_psp_task,
+        "admission": admission.install,
         "coredns": deploy_coredns,
         "plugins": deploy_plugins,
         "accounts": deploy_accounts
