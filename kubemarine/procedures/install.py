@@ -139,24 +139,20 @@ def system_prepare_policy(cluster,warn=True, hide=False):
         audit_config = False
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
-    if kubernetes.is_cluster_installed(cluster) and audit_config == True:
+    if kubernetes.is_cluster_installed(cluster) and audit_config == True and cluster.context['initial_procedure'] != 'add_node':
         for master in collect_node:
-            if cluster.context['initial_procedure'] != 'add_node':
-                config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-                master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-                master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
-                master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
-                if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-                    master.call(utils.wait_command_successful, command="crictl rm -f "
-                                                                "$(sudo crictl ps --name kube-apiserver -q)")
-                else:
-                    master.call(utils.wait_command_successful, command="docker stop "
-                                                                   "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
-                                                                   " | awk '{print $1}'")
-
-                cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-
-
+            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
+            master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
+            if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+                master.call(utils.wait_command_successful, command="crictl rm -f "
+                                                            "$(sudo crictl ps --name kube-apiserver -q)")
+            else:
+                master.call(utils.wait_command_successful, command="docker stop "
+                                                               "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
+                                                               " | awk '{print $1}'")
+            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def system_prepare_dns_hostname(cluster):
