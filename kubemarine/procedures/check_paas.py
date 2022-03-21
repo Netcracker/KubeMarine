@@ -751,7 +751,7 @@ def control_plane_configuration_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], '220', "control plane", "configuration status") as tc:
+    with TestCase(cluster.context['testsuite'], '220', "Control plane", "configuration status") as tc:
         results = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
@@ -790,9 +790,9 @@ def control_plane_configuration_status(cluster):
                 if result[static_pod_name]['correct_version'] and \
                    result[static_pod_name]['correct_properties'] and \
                    result[static_pod_name]['correct_volumes']:
-                    cluster.log.verbose(f'Master {result["name"]} have correct configuration for {static_pod_name}')
+                    cluster.log.verbose(f'Master {result["name"]} has correct configuration for {static_pod_name}')
                 else:
-                    message += f"Master {result['name']} have incorrect configuration for {static_pod_name} \n"
+                    message += f"Master {result['name']} has incorrect configuration for {static_pod_name} \n"
         if not_presented_static_pods:
             message += f"{not_presented_static_pods} static pods doesn't presented"
 
@@ -851,7 +851,7 @@ def control_plane_health_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], '221', "control plane", "health status") as tc:
+    with TestCase(cluster.context['testsuite'], '221', "Control plane", "health status") as tc:
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
@@ -883,7 +883,7 @@ def default_services_configuration_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], '222', "default services", "configuration status") as tc:
+    with TestCase(cluster.context['testsuite'], '222', "Default services", "configuration status") as tc:
         first_master = cluster.nodes['master'].get_first_member()
         original_coredns_cm = generate_configmap(cluster.inventory)
         original_coredns_cm = yaml.safe_load(original_coredns_cm)
@@ -921,7 +921,7 @@ def default_services_configuration_status(cluster):
                                 results[service_name] = False
         for item, condition in results.items():
             if not condition:
-                message += f"{item} have outdated image version\n"
+                message += f"{item} has outdated image version\n"
 
         if message:
             raise TestFailure('invalid', hint=f"{message}")
@@ -935,7 +935,7 @@ def default_services_health_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], '223', "default services", "health status") as tc:
+    with TestCase(cluster.context['testsuite'], '223', "Default services", "health status") as tc:
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
@@ -972,7 +972,7 @@ def calico_config_check(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], '224', "calico", "configuration check") as tc:
+    with TestCase(cluster.context['testsuite'], '224', "Calico", "configuration check") as tc:
         message = ""
         correct_config = True
         first_master = cluster.nodes['master'].get_first_member()
