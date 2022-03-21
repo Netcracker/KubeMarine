@@ -341,8 +341,8 @@ class KubernetesCluster(Environment):
         output = yaml.dump(prepared_inventory)
         utils.dump_file(self, output, "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
-        cluster_storage.upload_file(self, output, "cluster_finalized.yaml")
-        cluster_storage.pack_file(self)
+        cluster_storage.upload(self, output, "cluster_finalized.yaml")
+        cluster_storage.rotation_file(self)
 
 
     def escape_jinja_characters_for_inventory(self, obj):

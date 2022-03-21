@@ -332,25 +332,32 @@ class ClusterStorage:
         time_step = str(datetime.fromtimestamp(timestamp)).split(".")
         readable_timestamp = datetime.strptime(str(time_step[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        folder_link = "/etc/kubemarine/"
         if cluster.context["initial_procedure"] != None:
             initial_procedure = cluster.context["initial_procedure"]
             self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
             self.dir_location = self.dir_path + self.dir_name
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
-            cluster.nodes['master'].sudo(f"ln -s {self.dir_location} latest_dump && sudo mv latest_dump {folder_link}")
+            create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+            cluster.nodes['master'].run(create_link)
+            link_check = f'ls {self.dir_path} | grep latest_dump'
+            link_check = cluster.nodes['master'].run(link_check).get_simple_out()
+            if link_check == 'latest_dump\n':
+                link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
+                cluster.nodes['master'].run(link_delete)
+                create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+                cluster.nodes['master'].run(create_link)
             self._collect_procedure_info(cluster)
-            self.pack_file(cluster)
 
-    def pack_file(self, cluster):
+    def rotation_file(self, cluster):
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
         collect_node = self.cluster.nodes['master'].get_ordered_members_list()
         for node in collect_node:
-            command_count = f"cd {self.dir_path} && find * -maxdepth 0 -type d,f | wc -l"
-            count = int(node.run(command_count).get_simple_out())
-            command = f'ls {self.dir_path}'
+            command_count_folder = f"ls {self.dir_path} -l | grep ^d | wc -l"
+            command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
+            count = int(node.run(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
+            command = f'ls {self.dir_path} | grep -v latest_dump'
             sum_file = node.run(command, is_async=False).get_simple_out()
             files = sum_file.split()
             files.sort(reverse=True)
@@ -359,11 +366,10 @@ class ClusterStorage:
             delete_old = cluster.defaults['procedure_history']['delete_threshold']
             if count > not_pack_file:
                 for i in range(not_pack_file, delete_old):
-                    if 'tar.gz' not in files[i] and i <= count:
+                    if 'tar.gz' not in files[i] and i < count:
                         node.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
                         node.sudo(f'rm -r {self.dir_path + files[i]}')
-                    else:
-                        break
+                    break
             if count > delete_old:
                 for i in range(len(files_unsort)):
                     diff = count - delete_old
@@ -371,7 +377,7 @@ class ClusterStorage:
                         cluster.log.verbose('Deleting backup file from nodes...')
                         node.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
 
-    def upload_file(self, cluster, stream, file_name):
+    def upload(self, cluster, stream, file_name):
         """
         This method sends the collected files to the nodes.
         """
@@ -388,12 +394,12 @@ class ClusterStorage:
         out["exclude"] = execution_arguments["exclude"]
         out["initial_procedure"] = cluster.context["initial_procedure"]
         output = yaml.dump(out)
-        self.upload_file(cluster, output, "procedure_parameters")
+        self.upload(cluster, output, "procedure_parameters")
 
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
             output = yaml.safe_load(stream)
             output = yaml.dump(output)
-            self.upload_file(cluster, output, "version")
+            self.upload(cluster, output, "version")
 
     def collect_info_all_master(self):
         """
