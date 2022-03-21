@@ -131,6 +131,7 @@ def system_prepare_policy(cluster,warn=True, hide=False):
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+        #download rules in cluster
         for node in collect_node:
             node.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
             audit_config = True
