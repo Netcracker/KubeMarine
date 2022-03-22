@@ -50,6 +50,12 @@ This section provides information about the Kubecheck functionality.
     - [216 Swap state](#216-swap-state)
     - [217 Modprobe rules](#217-modprobe-rules)
     - [218 Time difference](#218-time-difference)
+    - [219 Health status ETCD](#219-health-status-etcd)
+    - [220 Control plane configuration status](#220-control-plane-configuration-status)
+    - [221 Control plane health status](#221-control-plane-health-status)
+    - [222 Default services configuration status](#222-default-services-configuration-status)
+    - [223 Default services health status](#223-default-services-health-status)
+    - [224 Calico configuration check](#224-calico-configuration-check)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -482,6 +488,41 @@ between the deployer node and all the others, or any other conditions of the env
 sure to perform latency tests: [002 Latency - Single Thread](#002-latency---single-thread) and 
 [003 Latency - Multi Thread](#003-latency---multi-thread).
 
+###### 219 Health status ETCD
+
+*Task*: `etcd.health_status`
+
+This test verifies ETCD health.
+
+###### 220 Control plane configuration status
+
+*Task*: `control_plane.configuration_status`
+
+This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
+
+###### 221 Control plane health status
+
+*Task*: `control_plane.health_status`
+
+This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
+
+###### 222 Default services configuration status
+
+*Task*: `default_services.configuration_status`
+
+In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+
+###### 223 Default services health status
+
+*Task*: `default_services.health_status`
+
+This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+
+###### 224 Calico configuration check
+
+*Task*: `calico.config_check`
+
+This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
 
 ### Report File Generation
 
