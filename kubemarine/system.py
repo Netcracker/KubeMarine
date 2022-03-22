@@ -14,13 +14,16 @@
 
 import configparser
 import io
+import paramiko
 import re
+import socket
 import time
 from copy import deepcopy
 from typing import Dict
 
 from dateutil.parser import parse
 import fabric
+import invoke
 import yaml
 
 from kubemarine import selinux, kubernetes
@@ -162,17 +165,19 @@ def get_system_packages(cluster):
     return ["haproxy", "keepalived", cluster.inventory['services']['cri']['containerRuntime']]
 
 
-def detect_os_family(cluster, suppress_exceptions=False):
-    group = cluster.nodes['all'].get_online_nodes()
-    if cluster.context.get("initial_procedure") == "remove_node":
-        active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
-        group = cluster.nodes['all'].wait_active_nodes(timeout=active_timeout)
-
+def fetch_os_versions(cluster: KubernetesCluster):
+    group = cluster.nodes['all'].get_accessible_nodes()
     '''
     For Red Hat, CentOS, Oracle Linux, and Ubuntu information in /etc/os-release /etc/redhat-release is sufficient but,
     Debian stores the full version in a special file. sed transforms version string, eg 10.10 becomes DEBIAN_VERSION="10.10"  
     '''
-    results = group.run("cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
+
+    return group.run(
+        "cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
+
+
+def detect_os_family(cluster):
+    results = fetch_os_versions(cluster)
 
     for connection, result in results.items():
         stdout = result.stdout.lower()
@@ -218,25 +223,23 @@ def detect_os_family(cluster, suppress_exceptions=False):
 
         cluster.log.debug("OS family: %s" % os_family)
 
-        group.cluster.context["nodes"][connection.host]["os"] = {
+        cluster.context["nodes"][connection.host]["os"] = {
             'name': name,
             'version': version,
             'family': os_family
         }
 
-    group.cluster.context["os"] = group.get_nodes_os(suppress_exceptions=suppress_exceptions)
-
-    return results
+    cluster.context["os"] = cluster.nodes["all"].get_accessible_nodes().get_nodes_os(suppress_exceptions=True)
 
 
 def get_os_family(cluster: KubernetesCluster) -> str:
     """
-    Detects OS on remote hosts and returns common OS family name. If OS already detected, returns data from cache.
-    :param cluster: Cluster object where OS family will be detected.
+    Returns common OS family name from remote hosts.
+    :param cluster: Cluster object where OS family is detected.
     :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
     """
-    if not is_os_detected(cluster):
-        detect_os_family(cluster, suppress_exceptions=True)
+    # OS family is always not None,
+    # because it is either detected during cluster initialization, or there are no accessible nodes to detect it.
     return cluster.context.get("os")
 
 
@@ -328,10 +331,6 @@ def update_etc_hosts(group, config=None):
         raise Exception("Data can't be empty")
     utils.dump_file(group.cluster, config, 'etc_hosts')
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True)
-
-
-def is_os_detected(cluster):
-    return bool(cluster.context.get("os"))
 
 
 def restart_service(group, name=None):
@@ -671,8 +670,9 @@ def verify_system(group):
         log.debug('Modprobe verification skipped - origin setup task was not completed')
 
 
-def detect_active_interface(group: NodeGroup):
-    with RemoteExecutor(group.cluster) as exe:
+def detect_active_interface(cluster: KubernetesCluster):
+    group = cluster.nodes['all'].get_accessible_nodes()
+    with RemoteExecutor(cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             detect_interface_by_address(node['connection'], node['internal_address'])
     for cxn, host_results in exe.get_last_results().items():
@@ -680,33 +680,72 @@ def detect_active_interface(group: NodeGroup):
             interface = list(host_results.values())[0].stdout.strip()
         except Exception:
             interface = None
-        group.cluster.context['nodes'][cxn.host]['online'] = True
-        group.cluster.context['nodes'][cxn.host]['active_interface'] = interface
+        cluster.context['nodes'][cxn.host]['active_interface'] = interface
 
     return exe.get_last_results_str()
 
 
-def detect_interface_by_address(connection: fabric.connection.Connection, address: str):
-    return connection.sudo("sudo ip -o a | grep %s | awk '{print $2}'" % address)
+def detect_interface_by_address(group: NodeGroup, address: str):
+    return group.run("ip -o a | grep %s | awk '{print $2}'" % address)
 
 
-def whoami(group: NodeGroup) -> NodeGroupResult:
-    '''
-    Determines which nodes are enabled and which ones are disabled
-    '''
-    if group.cluster.context['initial_procedure'] == 'remove_node':
-        online_nodes = group.wait_active_nodes()
-    else:
-        online_nodes = group
-    offline_nodes = group.exclude_group(online_nodes)
-    results = online_nodes.sudo("whoami")
+def _detect_nodes_access_info(cluster: KubernetesCluster):
+    nodes_context = cluster.context['nodes']
+    hosts_unknown_status = [host for host, node_context in nodes_context.items() if 'access' not in node_context]
+    group_unknown_status = cluster.make_group(hosts_unknown_status)
+    if group_unknown_status.is_empty():
+        return
+
+    check_active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
+    exc = None
+    try:
+        # This should invoke sudo last reboot
+        results = group_unknown_status.wait_and_get_boot_history(timeout=check_active_timeout)
+    except fabric.group.GroupException as e:
+        exc = e
+        results = e.result
+
     for connection, result in results.items():
-        group.cluster.context['nodes'][connection.host]['online'] = True
-        group.cluster.context['nodes'][connection.host]['hasroot'] = result.stdout.strip() == "root"
-    if not offline_nodes.is_empty():
-        for node in offline_nodes.get_ordered_members_list(provide_node_configs=True):
-            group.cluster.context['nodes'][node['connect_to']]['online'] = False
-            group.cluster.context['nodes'][node['connect_to']]['hasroot'] = False
+        access_info = {
+            'online': False,
+            'accessible': False,
+            'sudo': 'No'
+        }
+        nodes_context[connection.host]['access'] = access_info
+
+        if isinstance(result, Exception):
+            if isinstance(result, invoke.AuthFailure):
+                # The error is thrown only if connection is successful, but something is wrong with sudo access.
+                # In general, sudo password is incorrect. In our case, user is not a sudoer, or not a nopasswd sudoer.
+                access_info['online'] = True
+                access_info['accessible'] = True
+            elif isinstance(result, socket.timeout):
+                # Usually when node is off. All statuses are unchecked.
+                pass
+            elif isinstance(result, paramiko.ssh_exception.SSHException):
+                # At least, node is on, but something is wrong with ssh credentials (user / identity key)
+                access_info['online'] = True
+            elif isinstance(result, paramiko.ssh_exception.NoValidConnectionsError):
+                # Internal socket error, for example, when ssh daemon is off. All statuses are unchecked.
+                pass
+            else:
+                raise exc
+        else:
+            access_info['online'] = True
+            access_info['accessible'] = True
+            access_info['sudo'] = "Yes"
+
+
+def whoami(cluster: KubernetesCluster) -> NodeGroupResult:
+    '''
+    Determines different nodes access information, such as if the node is online, ssh credentials are correct, etc.
+    '''
+    _detect_nodes_access_info(cluster)
+
+    results = cluster.nodes["all"].get_sudo_nodes().sudo("whoami")
+    for connection, result in results.items():
+        node_ctx = cluster.context['nodes'][connection.host]
+        node_ctx['access']['sudo'] = 'Root' if result.stdout.strip() == "root" else 'Yes'
     return results
 
 

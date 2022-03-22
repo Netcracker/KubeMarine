@@ -84,7 +84,7 @@ class TestGroupCall(unittest.TestCase):
 
     def test_GroupException_one_node_failed(self):
         all_nodes = TestGroupCall.cluster.nodes["all"]
-        results = demo.create_nodegroup_result(all_nodes, stdout='example result')
+        results = demo.create_hosts_result(all_nodes.get_hosts(), stdout='example result')
         results[random.choice(list(all_nodes.nodes.keys()))] = Exception('Some error')
 
         TestGroupCall.cluster.fake_shell.add(results, "run", ['some command'])

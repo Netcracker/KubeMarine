@@ -124,10 +124,10 @@ class TestHaproxyInstallation(unittest.TestCase):
 
 def get_result_str(results):
     output = ""
-    for host, result in results.items():
+    for conn, result in results.items():
         if output != "":
             output += "\n"
-        output += "\t%s (%s): code=%i" % (host.host, 0, result.exited)
+        output += "\t%s (%s): code=%i" % (conn, 0, result.exited)
         if result.stdout:
             output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
         if result.stderr:
