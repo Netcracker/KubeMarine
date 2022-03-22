@@ -337,15 +337,17 @@ class ClusterStorage:
             self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
             self.dir_location = self.dir_path + self.dir_name
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
-            create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-            cluster.nodes['master'].run(create_link)
-            link_check = f'ls {self.dir_path} | grep latest_dump'
-            link_check = cluster.nodes['master'].run(link_check).get_simple_out()
-            if link_check == 'latest_dump\n':
-                link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
-                cluster.nodes['master'].run(link_delete)
+            collect_node = self.cluster.nodes['master'].get_ordered_members_list()
+            for node in collect_node:
                 create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                cluster.nodes['master'].run(create_link)
+                node.run(create_link)
+                link_check = f'ls {self.dir_path} | grep latest_dump'
+                link_check = node.run(link_check).get_simple_out()
+                if link_check == 'latest_dump\n':
+                    link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
+                    node.run(link_delete)
+                    create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+                    node.run(create_link)
             self._collect_procedure_info(cluster)
 
     def rotation_file(self, cluster):
