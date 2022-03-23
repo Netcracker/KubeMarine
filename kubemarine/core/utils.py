@@ -25,6 +25,7 @@ import ruamel.yaml
 from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
+from kubemarine.core import defaults
 
 from kubemarine.core.errors import pretty_print_error
 from kubemarine.plugins import nginx_ingress
@@ -403,6 +404,11 @@ class ClusterStorage:
             output = yaml.dump(output)
             self.upload(cluster, output, "version")
 
+        #cluster_original = cluster.inventory
+        #inventory = yaml.dump(defaults.prepare_for_dump(cluster_original))
+        #dump_file(cluster, inventory, "cluster_original.yaml")
+        #self.upload(cluster, inventory, "cluster_original.yaml")
+#
     def collect_info_all_master(self):
         """
         This method is used to transfer backup logs from the main master to the new master.

@@ -415,6 +415,7 @@ def calculate_nodegroups(inventory, cluster):
 
 
 def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True, custom_fns=None):
+
     with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
@@ -438,10 +439,16 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
         cluster.log.verbose('Enrichment finished!')
 
+        cluster_original = custom_inventory
+        output = yaml.dump(cluster_original)
+        utils.dump_file(cluster, output, "cluster_original.yaml")
+        cluster_storage = utils.ClusterStorage.get_instance(cluster)
+        cluster_storage.upload(cluster, output, "cluster_original.yaml")
+
         if make_dumps:
             output = yaml.dump(prepare_for_dump(inventory), )
             utils.dump_file(cluster, output, "cluster.yaml")
-            cluster_storage = utils.ClusterStorage.get_instance(cluster)
+            #cluster_storage = utils.ClusterStorage.get_instance(cluster)
             cluster_storage.upload(cluster, output, "cluster.yaml")
 
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
