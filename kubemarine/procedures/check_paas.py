@@ -738,6 +738,55 @@ def etcd_health_status(cluster):
         tc.success(results='healthy')
 
 
+def kubernetes_admission(cluster):
+    """
+    The method checks status of Pod Security Admissions, default Pod Security Profile, 
+    and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
+    """
+    first_master = cluster.nodes['master'].get_first_member()
+    with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
+        kube_admission_status = ""
+        #check kubeadm config map
+        result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
+        kubeadm_cm = yaml.load(list(result.values())[0].stdout)
+        cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+        if "feature-gates" in cluster_config["apiServer"]["extraArgs"] and 
+           "admission-control-config-file" in cluster_config["apiServer"]["extraArgs"]:
+            if 'PodSecurity=true' in cluster_config["apiServer"]["extraArgs"]["feature-gates"]:
+                features = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+                admission_path = cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+                cluster.log.debug(kube_admission_status)
+                #check admission.yaml, kube-apiserver.yaml
+                api_result = first_master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+                api_conf = yaml.load(list(result.values())[0].stdout)
+                commands = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]
+                # kubeapi config parsing
+                for item in conf["spec"]["containers"][0]["command"]:
+                    if item.startswith("--"):
+                        key = re.split('=',item)[0]
+                        value = re.search('=(.*)$', item).group(1)
+                        if key == "--feature-gates" and value != features:
+                            cluster.log.debug("VALUE: %s; FEATURES: %s" % (value, features))
+                            raise TestWarn('enable',
+                                     hint=f"Check if the '--feature-gates' option in 'kubeadm-config'"
+                                          f"is consistent with 'kube-apiserver.yaml")
+                        if key == "--admission-control-config-file" and value != admission_path:
+                            raise TestWarn('enable',
+                                     hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config'"
+                                          f"is consistent with 'kube-apiserver.yaml")
+                adm_result = first_master.sudo("cat %s" % admission_path)
+                adm_conf = yaml.load(list(result.values())[0].stdout)
+                cluster.log.debug("ADM_CONF: %s" % adm_conf)
+                profile = adm_conf["plugins"]["PodSecurity"]["configuration"]["defaults"]["enforce"]
+                kube_admission_status = "PSS is enabled, default profile is '%s'" % profile
+                cluster.log.debug(kube_admission_status)
+                tc.success(results='enabled')
+            else:
+                kube_admission_status = "PSS is disabled"
+                cluster.log.debug(kube_admission_status)
+                tc.success(results='disabled')
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -810,6 +859,7 @@ tasks = OrderedDict({
                 "ready": lambda cluster: kubernetes_nodes_condition(cluster, 'Ready')
             },
         },
+        'admission': kubernetes_admission,
     },
     'etcd': {
         "health_status": etcd_health_status

@@ -21,13 +21,9 @@ from kubemarine.core import flow
 
 tasks = OrderedDict({
     "delete_default_pss": admission.delete_default_pss,
-    "apply_default_pss": admission.apply_default_pss
+    "apply_default_pss": admission.apply_default_pss,
+    "restart_pods": admission.restart_pods_task
 })
-#tasks = OrderedDict({
-#    "delete_default_pss": admission.delete_default_pss,
-#    "apply_default_pss": admission.apply_default_pss,
-#    "restart_pods": admission.restart_pods_task
-#})
 
 
 def main(cli_arguments=None):
