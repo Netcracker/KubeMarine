@@ -140,7 +140,7 @@ class FakeFS:
             elif isinstance(data, str):
                 # this is for self-testing purpose
                 pass
-            elif isinstance(data, io.TextIOWrapper):
+            elif isinstance(data, io.IOBase):
                 data = data.read()
             else:
                 raise ValueError("Unsupported data type " + str(type(data)))
