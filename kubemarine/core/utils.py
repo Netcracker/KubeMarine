@@ -340,15 +340,19 @@ class ClusterStorage:
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
             collect_node = self.cluster.nodes['master'].get_ordered_members_list()
             for node in collect_node:
-                create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                node.run(create_link)
-                link_check = f'ls {self.dir_path} | grep latest_dump'
-                link_check = node.run(link_check).get_simple_out()
-                if link_check == 'latest_dump\n':
-                    link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
-                    node.run(link_delete)
+                link_check = cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+                exit_code = list(link_check.values())[0].exited
+                link_check = cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
+                if exit_code == 0:
+                    if link_check == 'latest_dump\n':
+                        link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
+                        node.run(link_delete)
+                        create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+                        node.run(create_link)
+                else:
                     create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
                     node.run(create_link)
+
             self._collect_procedure_info(cluster)
 
     def rotation_file(self, cluster):
@@ -361,7 +365,7 @@ class ClusterStorage:
             command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
             count = int(node.run(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
             command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = node.run(command, is_async=False).get_simple_out()
+            sum_file = node.run(command, is_async=False)
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
@@ -404,11 +408,6 @@ class ClusterStorage:
             output = yaml.dump(output)
             self.upload(cluster, output, "version")
 
-        #cluster_original = cluster.inventory
-        #inventory = yaml.dump(defaults.prepare_for_dump(cluster_original))
-        #dump_file(cluster, inventory, "cluster_original.yaml")
-        #self.upload(cluster, inventory, "cluster_original.yaml")
-#
     def collect_info_all_master(self):
         """
         This method is used to transfer backup logs from the main master to the new master.
