@@ -582,9 +582,9 @@ rbac:
       host-network: enabled
       anyuid: enabled
     custom-policies:
-      psp-list: [ ]
-      roles-list: [ ]
-      bindings-list: [ ]
+      psp-list: []
+      roles-list: []
+      bindings-list: []
   pss:
     pod-security: enabled
     defaults:
@@ -595,9 +595,9 @@ rbac:
       warn: baseline
       warn-version: latest
     exemptions:
-      usernames: [ ]
-      runtimeClasses: [ ]
-      namespaces: [ "kube-system" ]
+      usernames: []
+      runtimeClasses: []
+      namespaces: ["kube-system"]
 
 procedure_history:
   not_archive_threshold: 5
