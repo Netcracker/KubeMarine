@@ -25,7 +25,7 @@ import ruamel.yaml
 from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
-from kubemarine.core import defaults
+
 
 from kubemarine.core.errors import pretty_print_error
 from kubemarine.plugins import nginx_ingress
