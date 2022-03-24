@@ -711,13 +711,10 @@ def update_kubeapi_config_pss(masters, features_list):
         else:
             for item in conf["spec"]["containers"][0]["command"]:
                 if item.startswith("--"):
-                    masters.cluster.log.debug("ITEM: %s" % item)
                     key = re.split('=',item)[0]
-                    masters.cluster.log.debug("KEY: %s" % key)
                     value = re.search('=(.*)$', item).group(1)
                     if key in ["--feature-gates", "--admission-control-config-file"]:
                         del_option = "%s=%s" % (key, value)
-                        masters.cluster.log.debug("DEL_OPTION: %s" % del_option)
                         new_command.remove(del_option)
 
         conf["spec"]["containers"][0]["command"] = new_command
@@ -847,28 +844,6 @@ def copy_pss(group):
     group.sudo("rm -f %s" % remote_path)
 
     return result
-
-
-#def erase_pss_config(cluster):
-#    procedure_config = cluster.procedure_inventory["pss"]
-#
-#    if cluster.context.get('initial_procedure') != 'manage_pss':
-#        return
-#    if procedure_config["pod-security"] != "disabled": 
-#        return
-#
-#    first_master = cluster.nodes["master"].get_first_member()
-#    # load kubeadm config map and retrieve cluster config
-#    result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
-#    kubeadm_cm = yaml.load(list(result.values())[0].stdout)
-#    cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
-#    # check if the PSS is enabled and erase exists on masters
-#    if "admission-control-config-file" in cluster_config["apiServer"]["extraArgs"]:
-#        group = cluster.nodes["master"]
-#        cluster.log.debug("Erase admission configuration... %s" % admission_path)
-#        result = group.sudo("rm -f %s" % admission_path, warn=True)
-#    
-#    return result
 
 
 def label_namespace_pss(cluster, manage_type):
