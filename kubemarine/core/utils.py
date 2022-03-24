@@ -352,7 +352,6 @@ class ClusterStorage:
                 else:
                     create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
                     node.run(create_link)
-
             self._collect_procedure_info(cluster)
 
     def rotation_file(self, cluster):
@@ -365,7 +364,7 @@ class ClusterStorage:
             command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
             count = int(node.run(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
             command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = node.run(command, is_async=False)
+            sum_file = node.run(command, is_async=False).get_simple_out()
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
