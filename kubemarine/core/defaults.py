@@ -441,14 +441,14 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
         cluster_original = custom_inventory
         output = yaml.dump(cluster_original)
-        utils.dump_file(cluster, output, "cluster_original.yaml")
+        utils.dump_file(cluster, output, "cluster.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(cluster)
-        cluster_storage.upload(cluster, output, "cluster_original.yaml")
+        cluster_storage.upload(cluster, output, "cluster.yaml")
 
         if make_dumps:
             output = yaml.dump(prepare_for_dump(inventory), )
-            utils.dump_file(cluster, output, "cluster.yaml")
-            cluster_storage.upload(cluster, output, "cluster.yaml")
+            utils.dump_file(cluster, output, "cluster_default.yaml")
+            cluster_storage.upload(cluster, output, "cluster_default.yaml")
 
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
