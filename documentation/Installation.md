@@ -2878,6 +2878,23 @@ There are three parts of PSS configuration. `pod-security` enables or disables t
 `enforce` defines the policy standard that enforces the pods. It must be one of `privileged`, `baseline`, or `restricted`.
 For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
 
+The PSS enabling requires spacial labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+```
+
+In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
+
 #### Configuring Exemption
 
 The `exemption` section describes objects that are not enforced by the policy. It is possible to define `User` or `ServiceAccount` in 
@@ -2898,6 +2915,8 @@ The default configuration does not enforce the default policy to any of the pods
     exemptions:
       namespaces: ["kube-system"]
 ```
+
+Do not change the namespaces exemption list without strong necessary. In any case check our maintenance guide before any implementation.
 
 ### RBAC Accounts
 
@@ -4352,8 +4371,8 @@ The following is the installation tasks tree:
     * **reset** - Resets an existing or previous Kubernetes cluster. All the data related to the Kubernetes is removed, including the container runtime being cleaned up.
     * **install** - Configures Kubernetes service in the file `/etc/systemd/system/kubelet.service`
     * **prepull_images** - Prepulls Kubernetes images on all nodes using parameters from the inventory.
-    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm).
-  * **admission** - Applies OOB and custom pod security policies or pod security standards. For more information about the parameters for this task, see [Admission psp](#admission-psp) and [Admission pss](#admission-pss).
+    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm). Also apply PSS if it is enabled. For more information about PPS, see [Admission pss](#admission-pss).
+  * **admission** - Applies OOB and custom pod security policies. For more information about the parameters for this task, see [Admission psp](#admission-psp).
   * **coredns** - Configures CoreDNS service with [coredns](#coredns) inventory settings.
   * **plugins** - Applies plugin installation procedures. For more information about parameters for this task, see [Plugins](#plugins).
   * **accounts** - Creates new users in cluster. For more information about parameters for this task, see [RBAC accounts](#rbac-accounts).
