@@ -365,8 +365,7 @@ def reconfigure_plugin_task(cluster):
 def restart_pods_task(cluster, disable_eviction=False):
     if cluster.context.get('initial_procedure') == 'manage_pss':
         is_restart = cluster.procedure_inventory["pss"].get("restart-pods", False)
-        cluster.log.debug("RESTART: %s" % is_restart)
-        if not is_restart:
+        if not is_restart and cluster.procedure_inventory["pss"]["pod-security"] == "disabled"
             return
 
     first_master = cluster.nodes["master"].get_first_member()
