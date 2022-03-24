@@ -750,9 +750,9 @@ def kubernetes_admission(cluster):
         result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
         kubeadm_cm = yaml.load(list(result.values())[0].stdout)
         cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
-        if "feature-gates" in cluster_config["apiServer"]["extraArgs"] and 
-           "admission-control-config-file" in cluster_config["apiServer"]["extraArgs"]:
-            if 'PodSecurity=true' in cluster_config["apiServer"]["extraArgs"]["feature-gates"]:
+        if "feature-gates" in cluster_config["apiServer"]["extraArgs"] and \
+                "admission-control-config-file" in cluster_config["apiServer"]["extraArgs"]:
+            if "PodSecurity=false" not in cluster_config["apiServer"]["extraArgs"]["feature-gates"]:
                 features = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
                 admission_path = cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
                 cluster.log.debug(kube_admission_status)
@@ -781,10 +781,10 @@ def kubernetes_admission(cluster):
                 kube_admission_status = "PSS is enabled, default profile is '%s'" % profile
                 cluster.log.debug(kube_admission_status)
                 tc.success(results='enabled')
-            else:
-                kube_admission_status = "PSS is disabled"
-                cluster.log.debug(kube_admission_status)
-                tc.success(results='disabled')
+        else:
+            kube_admission_status = "PSS is disabled"
+            cluster.log.debug(kube_admission_status)
+            tc.success(results='disabled')
 
 
 tasks = OrderedDict({
