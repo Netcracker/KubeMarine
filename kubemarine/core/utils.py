@@ -340,9 +340,9 @@ class ClusterStorage:
             cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
             collect_node = self.cluster.nodes['master'].get_ordered_members_list()
             for node in collect_node:
-                link_check = cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+                link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
                 exit_code = list(link_check.values())[0].exited
-                link_check = cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
+                link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
                 if exit_code == 0:
                     if link_check == 'latest_dump\n':
                         link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
