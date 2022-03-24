@@ -30,8 +30,8 @@ services:
         audit-log-path: /var/log/kubernetes/audit/audit.log
         audit-policy-file: /etc/kubernetes/audit-policy.yaml
         audit-log-maxage: "30"
-        audit-log-maxbackup: "10"
-        audit-log-maxsize: "100"
+        audit-log-maxbackup: "5"
+        audit-log-maxsize: "20"
       extraVolumes:
         - name: audit
           hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
