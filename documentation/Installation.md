@@ -48,6 +48,8 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
+      - [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
+      - [audit-daemon](#audit-daemon)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
@@ -950,7 +952,8 @@ By default, the installer uses the following parameters:
 |apiServer.certSANs|List with all nodes internal IPs, external IPs and names|
 |apiServer.extraArgs.enable-admission-plugins|`NodeRestriction`|
 |apiServer.extraArgs.profiling|`false`|
-|apiServer.extraArgs.audit-log-path|`/var/log/apiserver/audit.log`|
+|apiServer.extraArgs.audit-log-path|`/var/log/kubernetes/audit/audit.log`|
+|apiServer.extraArgs.audit-policy-file|`/etc/kubernetes/audit-policy.yaml`|
 |apiServer.extraArgs.audit-log-maxage|`30`|
 |apiServer.extraArgs.audit-log-maxbackup|`10`|
 |apiServer.extraArgs.audit-log-maxsize|`100`|
@@ -971,7 +974,8 @@ services:
       extraArgs:
         enable-admission-plugins: NodeRestriction,PodNodeSelector
         profiling: "false"
-        audit-log-path: /var/log/apiserver/audit.log
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
@@ -2102,9 +2106,36 @@ services:
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
 
-#### audit
+#### audit-Kubernetes Policy
 
-*Installation task*: `prepare.system.audit`
+*Installation task*: `prepare.system.audit.configure_policy`
+
+*Can cause reboot*: No
+
+*Can restart service*: Always yes, container kube-apiserver.
+
+*OS specific*: No.
+```yaml
+services:
+  audit:
+    cluster_policy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+          - "RequestReceived"
+      rules:
+        - level: Request
+          resources:
+            - group: "" # core
+            - group: "admissionregistration.k8s.io"
+            - group: "apps"
+            - group: "storage.k8s.io"
+
+```
+
+#### audit-daemon
+
+*Installation task*: `prepare.system.audit_daemon`
 
 *Can cause reboot*: No
 
@@ -4302,7 +4333,10 @@ The following is the installation tasks tree:
     * **sysctl** - Configures Linux Kernel parameters. For more information about parameters for this task, see [sysctl](#sysctl).
     * **audit**
       * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
-      * **configure** - Configures Linux audit rules. For more information about parameters for this task, see [audit](#audit).
+      * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit-daemon](#audit-daemon).
+      * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
+      
+
   * **cri**
     * **install** - Installs the container runtime. For more information about parameters for this task, see [CRI](#cri).
     * **configure** - Configures the container runtime. For more information about parameters for this task, see [CRI](#cri).
