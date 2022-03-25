@@ -778,12 +778,17 @@ pss:
     namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
   namespaces:
     example-namespace-2:
-      enforce: "baseline"
-      version: latest
+      enforce: privileged/baseline/restricted
+      enforce-version: latest
+      audit: privileged/baseline/restricted
+      audit-version: latest
+      warn: privileged/baseline/restricted
+      warn-version: latest
+restart-pods: false
 ```
 
 The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
-namespaces that will be labled during the maintenance procedure.
+namespaces that will be labled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
 
 **Warnings**
 Be careful with `exemption` section it may cause cluster instability.
