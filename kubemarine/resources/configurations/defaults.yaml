@@ -153,8 +153,8 @@ services:
         - level: Metadata
           resources:
             - group: "authentication.k8s.io"
-            - group: "authorization.k8s.io"
               resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
             - group: "rbac.authorization.k8s.io"
 
     rules:
