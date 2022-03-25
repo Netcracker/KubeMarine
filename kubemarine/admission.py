@@ -477,11 +477,14 @@ def apply_admission(group):
 
 
 def apply_default_pss(cluster):
-    procedure_config = cluster.procedure_inventory["pss"]
-    current_config = cluster.inventory["rbac"]["pss"]
-    if (procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "enabled") or \
-            (procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "disabled"):    
-        return manage_pss(cluster, "apply")
+    if cluster.context.get('initial_procedure') == 'manage_pss':
+        procedure_config = cluster.procedure_inventory["pss"]
+        current_config = cluster.inventory["rbac"]["pss"]
+        if (procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "enabled") or \
+                (procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "disabled"):
+            return manage_pss(cluster, "apply")
+    else:
+            return manage_pss(cluster, "apply")
 
 
 def delete_default_pss(cluster):
@@ -605,10 +608,8 @@ def install_pss_task(cluster):
         cluster.log.debug("Pod security disabled, skipping pod admission installation...")
         return
 
-    first_master = cluster.nodes["master"].get_first_member()
-
     cluster.log.debug("Installing default configuration...")
-    first_master.call(manage_pss, manage_type="apply")
+    manage_pss(cluster, "apply")
 
 
 def manage_pss_enrichment(inventory, cluster):
@@ -682,8 +683,8 @@ def manage_enrichment(inventory, cluster):
 
 
 def manage_pss(cluster, manage_type):
-    if cluster.context.get('initial_procedure') != 'manage_pss':
-        return
+    #if cluster.context.get('initial_procedure') != 'manage_pss':
+    #    return
 
     first_master = cluster.nodes["master"].get_first_member()
     if manage_type == "apply":
@@ -721,6 +722,9 @@ def update_kubeapi_config_pss(masters, features_list):
 
     for master in masters.get_ordered_members_list():
         result = master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        # previous command may return error in case of join master during installation
+        if list(result.values())[0].stderr != 0:
+            return
 
         # update kube-apiserver config with updated features list
         conf = yaml.load(list(result.values())[0].stdout)
@@ -847,9 +851,15 @@ def finalize_inventory_pss(cluster, inventory_to_finalize):
 def copy_pss(group):
     if  group.cluster.inventory['rbac']['admission'] !=  "pss":
         return
-    if not is_security_enabled(group.cluster.inventory) and group.cluster.procedure_inventory["pss"]["pod-security"] != "enabled":
-        group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
-        return
+    if group.cluster.context.get('initial_procedure') == 'manage_pss':
+        if not is_security_enabled(group.cluster.inventory) and \
+                group.cluster.procedure_inventory["pss"]["pod-security"] != "enabled":
+            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+            return
+    if group.cluster.context.get('initial_procedure') == 'install':
+        if not is_security_enabled(group.cluster.inventory):
+            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+            return
 
     defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
     exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
