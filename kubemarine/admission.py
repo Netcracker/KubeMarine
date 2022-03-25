@@ -89,15 +89,15 @@ def enrich_inventory_pss(inventory, _):
     if minor_version < 23:
         raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
     verify_parameter("pod-security", inventory["rbac"]["pss"]["pod-security"], valid_flags)
-    verify_parameter("enforce", inventory["rbac"]["pss"]["defaults"]["enforce"], valid_profiles)
-    verify_version("enforce-version", inventory["rbac"]["pss"]["defaults"]["enforce-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce"], minor_version)
-    verify_equal("audit", inventory["rbac"]["pss"]["defaults"]["audit"], inventory["rbac"]["pss"]["defaults"]["enforce"])
-    verify_equal("warn", inventory["rbac"]["pss"]["defaults"]["warn"], inventory["rbac"]["pss"]["defaults"]["enforce"])
-    verify_equal("audit-version", inventory["rbac"]["pss"]["defaults"]["audit-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
-    verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
+    ########################################################################
+    for item in inventory["rbac"]["pss"]["defaults"]:
+        if item.endswith("version"):
+            mode = re.split('-',item)[0]
+            profile = inventory["rbac"]["pss"]["defaults"][mode]
+            verify_version(item, inventory["rbac"]["pss"]["defaults"][item], profile, minor_version)
+        else:
+            verify_parameter(item, inventory["rbac"]["pss"]["defaults"][item], valid_profiles)
+    ########################################################################
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
     # add extraArgs to kube-apiserver config
     if enabled_admissions:
@@ -165,11 +165,6 @@ def verify_parameter(owner, value, parameters):
         raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
 
 
-def verify_equal(owner, value, standard):
-    if value != standard:
-        raise Exception("incorrect value for %s, it should be: %s" % (owner, standard))
-
-
 def verify_custom(custom_scope):
     psp_list = custom_scope.get(psp_list_option, None)
     if psp_list:
@@ -193,17 +188,17 @@ def verify_custom_list(custom_list, type, supported_kinds):
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
 
 
-def verify_version(owner, version, enforce, minor_version_cfg):
+def verify_version(owner, version, profile, minor_version_cfg):
     # check Kubernetes version and admission config matching
-    if enforce == "restricted" and version != "latest":
+    if profile == "restricted" and version != "latest":
         result = re.match(valid_versions_templ, version)
         if result is None:
-            raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
-    elif enforce != "restricted" and version != "latest":
-        raise Exception("incorrect value for %s, valid value is 'latest'" % owner)
+            raise Exception("incorrect Kubernetes version %s, valid version(for example): v1.23" % owner)
         minor_version = int(version.split('.')[1])
         if minor_version > minor_version_cfg:
             raise Exception("%s version must not be higher than Kubernetes version" % owner)
+    elif profile != "restricted" and version != "latest":
+        raise Exception("incorrect value for %s, valid value is 'latest'" % owner)
 
 
 def finalize_inventory_psp(cluster, inventory_to_finalize):
@@ -365,7 +360,7 @@ def reconfigure_plugin_task(cluster):
 def restart_pods_task(cluster, disable_eviction=False):
     if cluster.context.get('initial_procedure') == 'manage_pss':
         is_restart = cluster.procedure_inventory["pss"].get("restart-pods", False)
-        if not is_restart and cluster.procedure_inventory["pss"]["pod-security"] == "disabled"
+        if not is_restart and cluster.procedure_inventory["pss"]["pod-security"] == "disabled":
             return
 
     first_master = cluster.nodes["master"].get_first_member()
@@ -379,7 +374,7 @@ def restart_pods_task(cluster, disable_eviction=False):
         first_master.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")
-    daemon_sets = yaml.safe_load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
+    daemon_sets = yaml.load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
     for ds in daemon_sets["items"]:
         first_master.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
 
@@ -488,7 +483,10 @@ def apply_default_pss(cluster):
 
 
 def delete_default_pss(cluster):
-    return manage_pss(cluster, "delete")
+    procedure_config = cluster.procedure_inventory["pss"]
+    current_config = cluster.inventory["rbac"]["pss"]
+    if procedure_config["pod-security"] == "disabled" and current_config["pod-security"] == "enabled":
+        return manage_pss(cluster, "delete")
 
 
 def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
@@ -616,27 +614,36 @@ def manage_pss_enrichment(inventory, cluster):
         return inventory
     if "pss" not in cluster.procedure_inventory:
         raise Exception("'manage_pss' config should have 'pss' in its root")
-
+    if "pod-security" not in procedure_config:
+        raise Exception("Procedure config should include 'pod-security'")
 
     procedure_config = cluster.procedure_inventory["pss"]
     current_config = cluster.inventory["rbac"]["pss"]
-    if procedure_config["pod-security"] == current_config["pod-security"]: 
-        raise Exception("'pod-security' in procedure config and current config are equal. There is nothing to change")
     minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
 
-    # check flags, profiles, and exemptions
-    if "pod-security" in procedure_config:
-        verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
+    if is_security_enabled(inventory):
+        if "defaults" in procedure_config:
+            procedure_profile = procedure_config["defaults"]["enforce"]
+            if procedure_config["pod-security"] == "enabled" and procedure_profile == current_config["defaults"]["enforce"]:
+                raise Exception("'enforce' in procedure config and current config are equal. There is nothing to change")
+    else:
+        if procedure_config["pod-security"] == current_config["pod-security"]: 
+            raise Exception("'pod-security' in procedure config and current config are equal. There is nothing to change")
+
+    # check flags, profiles; enrich inventory
+    verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
     if "defaults" in procedure_config:
-        verify_parameter("enforce", procedure_config["defaults"]["enforce"], valid_profiles)
-        verify_version("enforce-version", procedure_config["defaults"]["enforce-version"], 
-                procedure_config["defaults"]["enforce"], minor_version)
-        verify_equal("audit", procedure_config["defaults"]["audit"], procedure_config["defaults"]["enforce"])
-        verify_equal("warn", procedure_config["defaults"]["warn"], procedure_config["defaults"]["enforce"])
-        verify_equal("audit-version", procedure_config["defaults"]["audit-version"], 
-                procedure_config["defaults"]["enforce-version"])
-        verify_equal("warn-version", procedure_config["defaults"]["warn-version"], 
-                procedure_config["defaults"]["enforce-version"])
+        for item in procedure_config["defaults"]:
+            if item.endswith("version"):
+                mode = re.split('-',item)[0]
+                if mode in procedure_config["defaults"]:
+                    profile = procedure_config["defaults"][mode]
+                else:
+                    profile = current_config["defaults"][mode]
+                verify_version(item, procedure_config["defaults"][item], profile, minor_version)
+            else:
+                verify_parameter(item, procedure_config["defaults"][item], valid_profiles)
+            inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
     if "namespaces" in procedure_config:
         for namespace in procedure_config["namespaces"]:
             verify_parameter("enforce", procedure_config["namespaces"][namespace]["enforce"], valid_profiles)
@@ -658,39 +665,35 @@ def manage_pss(cluster, manage_type):
     if cluster.context.get('initial_procedure') != 'manage_pss':
         return
 
-    procedure_config = cluster.procedure_inventory["pss"]
-    current_config = cluster.inventory["rbac"]["pss"]
     first_master = cluster.nodes["master"].get_first_member()
     if manage_type == "apply":
-        if procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "disabled": 
-            # set labels for predifined plugins namespaces and namespaces defined in procedure config
-            label_namespace_pss(cluster, manage_type)
-            # copy admission config on masters
-            copy_pss(cluster.nodes["master"])
-        
-            cluster.log.debug("Updating kubeadm config map")
-            result = first_master.call(update_kubeadm_configmap, target_state="enabled")
-            final_features_list = list(result.values())[0]
-        
-            # update api-server config on all masters
-            cluster.log.debug("Updating kube-apiserver configs on masters")
-            cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
+        # set labels for predifined plugins namespaces and namespaces defined in procedure config
+        label_namespace_pss(cluster, manage_type)
+        # copy admission config on masters
+        copy_pss(cluster.nodes["master"])
+    
+        cluster.log.debug("Updating kubeadm config map")
+        result = first_master.call(update_kubeadm_configmap, target_state="enabled")
+        final_features_list = list(result.values())[0]
+    
+        # update api-server config on all masters
+        cluster.log.debug("Updating kube-apiserver configs on masters")
+        cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
     elif manage_type == "delete":
-        if procedure_config["pod-security"] == "disabled" and current_config["pod-security"] == "enabled": 
-            # set labels for predifined plugins namespaces and namespaces defined in procedure config
-            label_namespace_pss(cluster, manage_type)
+        # set labels for predifined plugins namespaces and namespaces defined in procedure config
+        label_namespace_pss(cluster, manage_type)
 
-            result = first_master.call(update_kubeadm_configmap, target_state="disabled")
-            final_features_list = list(result.values())[0]
+        result = first_master.call(update_kubeadm_configmap, target_state="disabled")
+        final_features_list = list(result.values())[0]
 
-            # update api-server config on all masters
-            cluster.log.debug("Updating kube-apiserver configs on masters")
-            cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
+        # update api-server config on all masters
+        cluster.log.debug("Updating kube-apiserver configs on masters")
+        cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
 
-            # erase PSS admission config 
-            cluster.log.debug("Erase admission configuration... %s" % admission_path)
-            group = cluster.nodes["master"]
-            group.sudo("rm -f %s" % admission_path, warn=True)
+        # erase PSS admission config 
+        cluster.log.debug("Erase admission configuration... %s" % admission_path)
+        group = cluster.nodes["master"]
+        group.sudo("rm -f %s" % admission_path, warn=True)
 
 
 def update_kubeapi_config_pss(masters, features_list):

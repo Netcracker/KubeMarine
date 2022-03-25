@@ -9,6 +9,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
     - [Manage PSP Procedure](#manage-psp-procedure)
+    - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Migration Cri Procedure](#migration-cri-procedure)
@@ -749,6 +750,45 @@ The `manage_psp` procedure executes the following sequence of tasks:
 3. reconfigure_oob
 4. reconfigure_plugin
 5. restart_pods
+
+## Manage PSP Procedure
+
+The manage PSS procedure allows:
+* enable/disable PSS
+* change default settings
+* change exemption
+
+### Configure Manage PSS Procedure
+
+To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
+
+```yaml
+pss:
+  pod-security: enabled/disabled
+  defaults:
+    enforce: privileged/baseline/restricted
+    enforce-version: latest
+    audit: privileged/baseline/restricted
+    audit-version: latest
+    warn: privileged/baseline/restricted
+    warn-version: latest
+  exemptions:
+    usernames: ["example-user1", "example-user2"]
+    runtimeClasses: ["example-class-1", "example-class-2"]
+    namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
+  namespaces:
+    example-namespace-2:
+      enforce: "baseline"
+      version: latest
+```
+
+The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
+namespaces that will be labled during the maintenance procedure.
+
+**Warnings**
+Be careful with `exemption` section it may cause cluster instability.
+Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
+
 
 ## Reboot Procedure
 
