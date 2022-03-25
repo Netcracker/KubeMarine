@@ -150,24 +150,12 @@ services:
       omitStages:
         - "RequestReceived"
       rules:
-        - level: Request
+        - level: Metadata
           resources:
-            - group: "" # core
-            - group: "admissionregistration.k8s.io"
-            - group: "apps"
             - group: "authentication.k8s.io"
             - group: "authorization.k8s.io"
-            - group: "autoscaling"
-            - group: "batch"
-            - group: "certificates.k8s.io"
-            - group: "extensions"
-            - group: "networking.k8s.io"
-            - group: "policy"
+              resources: ["tokenreviews"]
             - group: "rbac.authorization.k8s.io"
-            - group: "settings.k8s.io"
-            - group: "storage.k8s.io"
-
-
 
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
