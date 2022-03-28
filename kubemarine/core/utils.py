@@ -334,25 +334,35 @@ class ClusterStorage:
         readable_timestamp = datetime.strptime(str(time_step[0]), "%Y-%m-%d %H:%M:%S")
         readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
         if cluster.context["initial_procedure"] != None:
-            initial_procedure = cluster.context["initial_procedure"]
-            self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
-            self.dir_location = self.dir_path + self.dir_name
-            cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
-            collect_node = self.cluster.nodes['master'].get_ordered_members_list()
-            for node in collect_node:
-                link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
-                exit_code = list(link_check.values())[0].exited
-                link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
-                if exit_code == 0:
-                    if link_check == 'latest_dump\n':
-                        link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
-                        node.run(link_delete)
+            if cluster.context["initial_procedure"] == 'paas':
+                self.dir_name = None
+                self.dir_location = None
+            elif cluster.context["initial_procedure"] == 'iaas':
+                self.dir_name = None
+                self.dir_location = None
+            else:
+                initial_procedure = cluster.context["initial_procedure"]
+                self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
+                self.dir_location = self.dir_path + self.dir_name
+                cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
+                collect_node = self.cluster.nodes['master'].get_ordered_members_list()
+                for node in collect_node:
+                    link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+                    exit_code = list(link_check.values())[0].exited
+                    link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
+                    if exit_code == 0:
+                        if link_check == 'latest_dump\n':
+                            link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
+                            node.run(link_delete)
+                            create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+                            node.run(create_link)
+                    else:
                         create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
                         node.run(create_link)
-                else:
-                    create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                    node.run(create_link)
-            self._collect_procedure_info(cluster)
+                    self._collect_procedure_info(cluster)
+
+            
+
 
     def rotation_file(self, cluster):
         """

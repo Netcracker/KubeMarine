@@ -406,10 +406,16 @@ def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
 
-    merged_inventory = yaml.dump(prepare_for_dump(inventory))
-    utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-    cluster_storage = utils.ClusterStorage.get_instance(cluster)
-    cluster_storage.upload(cluster, merged_inventory, "cluster_precompiled.yaml")
+    if cluster.context["initial_procedure"] == 'paas':
+        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+    elif cluster.context["initial_procedure"] == 'iaas':
+        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+    else:
+        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+        merged_inventory = yaml.dump(prepare_for_dump(inventory))
+        utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
+        cluster_storage = utils.ClusterStorage.get_instance(cluster)
+        cluster_storage.upload(cluster, merged_inventory, "cluster_precompiled.yaml")
 
     return inventory
 
@@ -439,24 +445,28 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
         cluster.log.verbose('Enrichment finished!')
 
-        cluster_original = custom_inventory
-        output = yaml.dump(cluster_original)
-        utils.dump_file(cluster, output, "cluster.yaml")
-        cluster_storage = utils.ClusterStorage.get_instance(cluster)
-        cluster_storage.upload(cluster, output, "cluster.yaml")
+        if cluster.context["initial_procedure"] == 'paas':
+            cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+        elif cluster.context["initial_procedure"] == 'iaas':
+            cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+        else:
+            cluster_original = custom_inventory
+            output = yaml.dump(cluster_original)
+            utils.dump_file(cluster, output, "cluster.yaml")
+            cluster_storage = utils.ClusterStorage.get_instance(cluster)
+            cluster_storage.upload(cluster, output, "cluster.yaml")
 
-        if make_dumps:
-            output = yaml.dump(prepare_for_dump(inventory), )
-            utils.dump_file(cluster, output, "cluster_default.yaml")
-            cluster_storage.upload(cluster, output, "cluster_default.yaml")
+            if make_dumps:
+                output = yaml.dump(prepare_for_dump(inventory), )
+                utils.dump_file(cluster, output, "cluster_default.yaml")
+                cluster_storage.upload(cluster, output, "cluster_default.yaml")
 
-            procedure_config = cluster.context["execution_arguments"].get("procedure_config")
-            if procedure_config:
-                with open(procedure_config, 'r') as stream:
-                    output = yaml.safe_load(stream)
-                    output = yaml.dump(output)
-                    cluster_storage.upload(cluster, output, "procedure.yaml")
-
+                procedure_config = cluster.context["execution_arguments"].get("procedure_config")
+                if procedure_config:
+                    with open(procedure_config, 'r') as stream:
+                        output = yaml.safe_load(stream)
+                        output = yaml.dump(output)
+                        cluster_storage.upload(cluster, output, "procedure.yaml")
         return inventory
 
 

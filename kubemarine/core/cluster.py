@@ -338,11 +338,17 @@ class KubernetesCluster(Environment):
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)
         prepared_inventory = defaults.prepare_for_dump(prepared_inventory, copy=False)
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
-        output = yaml.dump(prepared_inventory)
-        utils.dump_file(self, output, "cluster_finalized.yaml")
-        cluster_storage = utils.ClusterStorage.get_instance(self)
-        cluster_storage.upload(self, output, "cluster_finalized.yaml")
-        cluster_storage.rotation_file(self)
+
+        if self.context["initial_procedure"] == 'paas':
+            self.log.verbose(self.context["initial_procedure"] + ' procedure')
+        elif self.context["initial_procedure"] == 'iaas':
+            self.log.verbose(self.context["initial_procedure"] + ' procedure')
+        else:
+            output = yaml.dump(prepared_inventory)
+            utils.dump_file(self, output, "cluster_finalized.yaml")
+            cluster_storage = utils.ClusterStorage.get_instance(self)
+            cluster_storage.upload(self, output, "cluster_finalized.yaml")
+            cluster_storage.rotation_file(self)
 
 
     def escape_jinja_characters_for_inventory(self, obj):
