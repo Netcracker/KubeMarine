@@ -527,7 +527,7 @@ This test checks the configuration of the `calico-node` envs, Calico's ConfigMap
 
 ###### 225 Pod security admission status
 
-*Task*: `kubernetes.kubernetes_admission_status`
+*Task*: `kubernetes.admission`
 
 The test checks status of Pod Security Admissions, default PSS(Pod Security Standards) profile, and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy.
 

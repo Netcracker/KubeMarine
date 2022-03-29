@@ -819,13 +819,14 @@ def check_extra_args(cluster, static_pod):
 
 def check_extra_volumes(cluster, static_pod):
     static_pod_name = static_pod[static_pod['metadata']['name']]
-    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
+    #for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
+    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}):
         correct_volume = False
-        volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", [])
+        volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", {})
         for volumeMount in volume_mounts:
             if volumeMount['mountPath'] == original_volume['mountPath'] and \
                     volumeMount['name'] == original_volume['name'] and \
-                    volumeMount['readOnly'] == original_volume['readOnly']:
+                    volumeMount.get('readOnly', '') == original_volume.get('readOnly', ''):
                 correct_volume = True
                 break
         if not correct_volume:
