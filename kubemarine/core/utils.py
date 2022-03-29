@@ -171,9 +171,16 @@ def recreate_final_inventory_file(cluster):
     # convert initial inventory to final
     final_inventory = get_final_inventory(cluster, initial_inventory=initial_inventory)
 
+    buf = io.StringIO()
+    ruamel_yaml.dump(final_inventory, buf)
+    cluster_orig = buf.getvalue()
+    cluster_storage = ClusterStorage.get_instance(cluster)
+    cluster_storage.upload(cluster, cluster_orig, "cluster.yaml")
+
     # replace intial inventory with final one
     with open(get_resource_absolute_path(cluster.context['execution_arguments']['config']), "w+") as stream:
         ruamel_yaml.dump(final_inventory, stream)
+
 
 
 def get_final_inventory(cluster, initial_inventory=None):
@@ -360,8 +367,6 @@ class ClusterStorage:
                         create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
                         node.run(create_link)
                     self._collect_procedure_info(cluster)
-
-            
 
 
     def rotation_file(self, cluster):
