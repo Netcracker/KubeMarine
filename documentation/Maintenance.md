@@ -788,7 +788,7 @@ restart-pods: false
 ```
 
 The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
-namespaces that will be labled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
+namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
 
 **Warnings**
 Be careful with `exemption` section it may cause cluster instability.

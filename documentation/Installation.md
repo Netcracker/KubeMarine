@@ -2683,6 +2683,7 @@ In this case no OOB or custom policies are installed. To disable admission contr
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     pod-security: disabled
 ```
@@ -2742,6 +2743,7 @@ For example, to disable `host-network` OOB policy:
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     oob-policies:
       host-network: disabled
@@ -2760,6 +2762,7 @@ You can install custom policies during cluster installation. For example, to ins
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     custom-policies:
       psp-list:

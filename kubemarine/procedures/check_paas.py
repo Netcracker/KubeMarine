@@ -1014,40 +1014,44 @@ def kubernetes_admission_status(cluster):
     """
     first_master = cluster.nodes['master'].get_first_member()
     with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
-        kube_admission_status = ""
+        profile = ""
         result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
         kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
         cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
-        if "feature-gates" in cluster_config["apiServer"]["extraArgs"] and \
-                "admission-control-config-file" in cluster_config["apiServer"]["extraArgs"]:
-            if "PodSecurity=false" not in cluster_config["apiServer"]["extraArgs"]["feature-gates"]:
-                features = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
-                admission_path = cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
-                cluster.log.debug(kube_admission_status)
-                api_result = first_master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-                api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
-                ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
-                for item in ext_args:
-                    if item.startswith("--"):
-                        key = re.split('=',item)[0]
-                        value = re.search('=(.*)$', item).group(1)
-                        if key == "--feature-gates" and value != features:
-                            cluster.log.debug("VALUE: %s; FEATURES: %s" % (value, features))
+        api_result = first_master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
+        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
+        for item in ext_args:
+            if item.startswith("--"):
+                key = re.split('=',item)[0]
+                value = re.search('=(.*)$', item).group(1)
+                if key == "--admission-control-config-file":
+                    admission_path = value
+                    adm_result = first_master.sudo("cat %s" % admission_path)
+                    adm_conf = yaml.safe_load(list(adm_result.values())[0].stdout)
+                    profile = adm_conf["plugins"][0]["configuration"]["defaults"]["enforce"]
+                if key == "--feature-gates":
+                    features = value
+                    if "PodSecurity=false" not in features:
+                        kube_admission_status = 'PSS is "enabled", default profile is "%s"' % profile
+                        cluster.log.debug(kube_admission_status)
+                        tc.success(results='enabled')
+                        feature_cm = cluster_config["apiServer"]["extraArgs"].get("feature-gates", "")
+                        if features != feature_cm:
                             raise TestWarn('enable',
-                                     hint=f"Check if the '--feature-gates' option in 'kubeadm-config'"
-                                          f"is consistent with 'kube-apiserver.yaml")
-                        if key == "--admission-control-config-file" and value != admission_path:
+                                    hint=f"Check if the '--feature-gates' option in 'kubeadm-config'"
+                                         f"is consistent with 'kube-apiserver.yaml")
+                        admission_path_cm = cluster_config["apiServer"]["extraArgs"].get("admission-control-config-file","")
+                        if admission_path != admission_path_cm:
                             raise TestWarn('enable',
-                                     hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config'"
-                                          f"is consistent with 'kube-apiserver.yaml")
-                adm_result = first_master.sudo("cat %s" % admission_path)
-                adm_conf = yaml.safe_load(list(adm_result.values())[0].stdout)
-                profile = adm_conf["plugins"][0]["configuration"]["defaults"]["enforce"]
-                kube_admission_status = "PSS is enabled, default profile is '%s'" % profile
-                cluster.log.debug(kube_admission_status)
-                tc.success(results='enabled')
-        else:
-            kube_admission_status = "PSS is disabled"
+                                    hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config'"
+                                         f"is consistent with 'kube-apiserver.yaml")
+                    else:
+                        kube_admission_status = 'PSS is "disabled"'
+                        cluster.log.debug(kube_admission_status)
+                        tc.success(results='disabled')
+        if not profile:
+            kube_admission_status = 'PSS is "disabled"'
             cluster.log.debug(kube_admission_status)
             tc.success(results='disabled')
 
