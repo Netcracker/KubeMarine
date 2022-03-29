@@ -407,11 +407,10 @@ def calculate_nodegroups(inventory, cluster):
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
 
     if cluster.context["initial_procedure"] == 'paas':
-        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+        cluster.log.verbose('procedure paas check')
     elif cluster.context["initial_procedure"] == 'iaas':
-        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+        cluster.log.verbose('procedure iaas check')
     else:
-        cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
         merged_inventory = yaml.dump(prepare_for_dump(inventory))
         utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(cluster)
@@ -446,9 +445,9 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
         cluster.log.verbose('Enrichment finished!')
 
         if cluster.context["initial_procedure"] == 'paas':
-            cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+            cluster.log.verbose('procedure paas check')
         elif cluster.context["initial_procedure"] == 'iaas':
-            cluster.log.verbose(cluster.context["initial_procedure"] + ' procedure')
+            cluster.log.verbose('procedure iaas check')
         else:
             cluster_original = custom_inventory
             output = yaml.dump(cluster_original)
