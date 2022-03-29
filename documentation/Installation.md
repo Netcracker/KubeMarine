@@ -2122,15 +2122,14 @@ services:
       apiVersion: audit.k8s.io/v1
       kind: Policy
       omitStages:
-          - "RequestReceived"
+        - "RequestReceived"
       rules:
-        - level: Request
+        - level: Metadata
           resources:
-            - group: "" # core
-            - group: "admissionregistration.k8s.io"
-            - group: "apps"
-            - group: "storage.k8s.io"
-
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
+            - group: "rbac.authorization.k8s.io"
 ```
 
 #### audit-daemon
