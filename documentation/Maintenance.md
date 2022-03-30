@@ -757,6 +757,7 @@ The manage PSS procedure allows:
 * enable/disable PSS
 * change default settings
 * change exemption
+* set PSS labels on namespaces
 
 ### Configure Manage PSS Procedure
 

@@ -2898,6 +2898,10 @@ metadata:
 
 In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
 
+**Warning:** In case of using PSS the application that installed on Kubernetes cluster should be matched with PSS profiles 
+(`privileged`, `baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined 
+plugins. For more information see the official Kubernetes documentation.
+
 #### Configuring Exemption
 
 The `exemption` section describes objects that are not enforced by the policy. It is possible to define `User` or `ServiceAccount` in 
