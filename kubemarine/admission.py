@@ -433,7 +433,6 @@ def update_kubeapi_config_psp(masters, plugins_list):
                                     command="kubectl delete pod -n kube-system "
                                             "$(sudo kubectl get pod -n kube-system "
                                             "| grep 'kube-apiserver' | awk '{ print $1 }')")
-
     masters.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
 
 
