@@ -1013,8 +1013,12 @@ def kubernetes_admission_status(cluster):
     The method checks status of Pod Security Admissions, default Pod Security Profile,
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
-    first_master = cluster.nodes['master'].get_first_member()
     with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
+        first_master = cluster.nodes['master'].get_first_member()
+        profile_inv = ""
+        if cluster.inventory["rbac"]["admission"] == "pss" and \
+                cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
+            profile_inv = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
         profile = ""
         result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
         kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
@@ -1040,17 +1044,21 @@ def kubernetes_admission_status(cluster):
                         feature_cm = cluster_config["apiServer"]["extraArgs"].get("feature-gates", "")
                         if features != feature_cm:
                             raise TestWarn('enable',
-                                    hint=f"Check if the '--feature-gates' option in 'kubeadm-config'"
+                                    hint=f"Check if the '--feature-gates' option in 'kubeadm-config' "
                                          f"is consistent with 'kube-apiserver.yaml")
                         admission_path_cm = cluster_config["apiServer"]["extraArgs"].get("admission-control-config-file","")
                         if admission_path != admission_path_cm:
                             raise TestWarn('enable',
-                                    hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config'"
+                                    hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config' "
                                          f"is consistent with 'kube-apiserver.yaml")
                     else:
                         kube_admission_status = 'PSS is "disabled"'
                         cluster.log.debug(kube_admission_status)
                         tc.success(results='disabled')
+        if profile != profile_inv:
+            raise TestFailure('invalid',
+                    hint=f"The 'cluster.yaml' does not match with the configuration "
+                         f"that is applied on cluster in 'kube-apiserver.yaml' and 'admission.yaml'")
         if not profile:
             kube_admission_status = 'PSS is "disabled"'
             cluster.log.debug(kube_admission_status)

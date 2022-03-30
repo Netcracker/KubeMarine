@@ -751,7 +751,7 @@ The `manage_psp` procedure executes the following sequence of tasks:
 4. reconfigure_plugin
 5. restart_pods
 
-## Manage PSP Procedure
+## Manage PSS Procedure
 
 The manage PSS procedure allows:
 * enable/disable PSS
