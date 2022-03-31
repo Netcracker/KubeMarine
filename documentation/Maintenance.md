@@ -13,6 +13,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Migration Cri Procedure](#migration-cri-procedure)
+    - [Admission Migration Procedure](#migration-cri-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
@@ -1010,6 +1011,11 @@ thirdparties:
     4. Uncordon the node.
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual claster.yaml structure. The services.docker scheme is deprecated. 
+
+## Admission Migration Procedure
+
+Since Kubernetes v1.20 Pod Security Policy has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
+from PSP to  another solution is very important.
 
 # Procedure Execution
 
