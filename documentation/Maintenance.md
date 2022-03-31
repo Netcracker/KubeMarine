@@ -795,6 +795,13 @@ namespaces that will be labeled during the maintenance procedure. The `restart-p
 Be careful with `exemption` section it may cause cluster instability.
 Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
 
+### Manage PSS Tasks Tree
+
+The `manage_pss procedure executes the following sequence of tasks:
+
+1. delete_default_pss
+2. apply_default_pss
+3. restart_pods_task
 
 ## Reboot Procedure
 
