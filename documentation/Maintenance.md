@@ -13,7 +13,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Migration Cri Procedure](#migration-cri-procedure)
-    - [Admission Migration Procedure](#migration-cri-procedure)
+    - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
@@ -1014,8 +1014,25 @@ thirdparties:
 
 ## Admission Migration Procedure
 
-Since Kubernetes v1.20 Pod Security Policy has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
-from PSP to  another solution is very important.
+Since Kubernetes v1.20 Pod Security Policy(PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
+from PSP to  another solution is very important. KubeMarine supports Pod Security Standards(PSS) by default as a replacement PSP.
+The most important step in the procedure is to define the PSS profiles for particular namespace. PSS has only three feasible options:
+'privileged', 'baseline', 'restricted' that should be matched with PSP.
+
+**Note**: KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+
+### Procedure Execution Steps
+
+1. Verify that Kubernetes cluster has version v1.23+
+2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above
+3. Run the `manage_psp` procedure with `pod-security: disabled` option
+4. Verify if the apllications in cluster work properly
+5. Fill in `namespaces` subsection in `pss` section in procedure file
+6. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution 
+7. Restart pods in all namespaces if `restart-pods: false` option was used on previous step 
+8. Verify if the applications in cluster work properly
+
+For more information see [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
 
 # Procedure Execution
 
