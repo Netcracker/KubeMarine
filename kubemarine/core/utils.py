@@ -174,8 +174,7 @@ def recreate_final_inventory_file(cluster):
     buf = io.StringIO()
     ruamel_yaml.dump(final_inventory, buf)
     cluster_orig = buf.getvalue()
-    cluster_storage = ClusterStorage.get_instance(cluster)
-    cluster_storage.upload(cluster, cluster_orig, "cluster.yaml")
+    dump_file(cluster, cluster_orig, "cluster.yaml")
 
     # replace intial inventory with final one
     with open(get_resource_absolute_path(cluster.context['execution_arguments']['config']), "w+") as stream:
@@ -317,8 +316,8 @@ class ClusterStorage:
             self.dir_path = "/etc/kubemarine/kube_tasks/"
             self._make_dir(cluster)
             if cluster.context["initial_procedure"] != None:
-                self.dir_name
-                self.dir_location
+                self.dir_name = ''
+                self.dir_location = ''
             else:
                 self.dir_name = ''
                 self.dir_location = ''
@@ -351,22 +350,21 @@ class ClusterStorage:
                 initial_procedure = cluster.context["initial_procedure"]
                 self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
                 self.dir_location = self.dir_path + self.dir_name
-                cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}", is_async=False)
-                collect_node = self.cluster.nodes['master'].get_ordered_members_list()
-                for node in collect_node:
-                    link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+                cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}")
+                link_check = self.cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+
+                for connection, result in link_check.items():
                     exit_code = list(link_check.values())[0].exited
-                    link_check = node.sudo(f"ls {self.dir_path} | grep latest_dump",warn=True).get_simple_out()
                     if exit_code == 0:
-                        if link_check == 'latest_dump\n':
-                            link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
-                            node.run(link_delete)
-                            create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                            node.run(create_link)
+                        link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
+                        connection.run(link_delete)
+                        create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
+                        connection.run(create_link)
                     else:
                         create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                        node.run(create_link)
+                        connection.run(create_link)
                     self._collect_procedure_info(cluster)
+
 
 
     def rotation_file(self, cluster):

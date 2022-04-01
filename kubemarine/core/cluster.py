@@ -347,7 +347,8 @@ class KubernetesCluster(Environment):
             output = yaml.dump(prepared_inventory)
             utils.dump_file(self, output, "cluster_finalized.yaml")
             cluster_storage = utils.ClusterStorage.get_instance(self)
-            cluster_storage.upload(self, output, "cluster_finalized.yaml")
+            cluster_storage.make_dir(self)
+            cluster_storage.collect_procedure_info(self)
             cluster_storage.rotation_file(self)
 
 

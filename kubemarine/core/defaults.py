@@ -411,10 +411,8 @@ def calculate_nodegroups(inventory, cluster):
     elif cluster.context["initial_procedure"] == 'iaas':
         cluster.log.verbose('procedure iaas check')
     else:
-        merged_inventory = yaml.dump(prepare_for_dump(inventory))
-        utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
-        cluster_storage = utils.ClusterStorage.get_instance(cluster)
-        cluster_storage.upload(cluster, merged_inventory, "cluster_precompiled.yaml")
+        cluster_precompiled = yaml.dump(prepare_for_dump(inventory))
+        utils.dump_file(cluster, cluster_precompiled, "cluster_precompiled.yaml")
 
     return inventory
 
@@ -450,22 +448,19 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
             cluster.log.verbose('procedure iaas check')
         else:
             cluster_original = custom_inventory
-            output = yaml.dump(cluster_original)
-            utils.dump_file(cluster, output, "cluster.yaml")
-            cluster_storage = utils.ClusterStorage.get_instance(cluster)
-            cluster_storage.upload(cluster, output, "cluster.yaml")
+            cluster_original = yaml.dump(cluster_original)
+            utils.dump_file(cluster, cluster_original, "cluster.yaml")
 
             if make_dumps:
-                output = yaml.dump(prepare_for_dump(inventory), )
-                utils.dump_file(cluster, output, "cluster_default.yaml")
-                cluster_storage.upload(cluster, output, "cluster_default.yaml")
+                cluster_default = yaml.dump(prepare_for_dump(inventory), )
+                utils.dump_file(cluster, cluster_default, "cluster_default.yaml")
 
                 procedure_config = cluster.context["execution_arguments"].get("procedure_config")
                 if procedure_config:
                     with open(procedure_config, 'r') as stream:
-                        output = yaml.safe_load(stream)
-                        output = yaml.dump(output)
-                        cluster_storage.upload(cluster, output, "procedure.yaml")
+                        procedure = yaml.safe_load(stream)
+                        procedure = yaml.dump(procedure)
+                        utils.dump_file(cluster, procedure, "procedure.yaml")
         return inventory
 
 
