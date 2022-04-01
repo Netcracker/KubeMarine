@@ -826,7 +826,7 @@ def check_extra_volumes(cluster, static_pod):
         for volumeMount in volume_mounts:
             if volumeMount['mountPath'] == original_volume['mountPath'] and \
                     volumeMount['name'] == original_volume['name'] and \
-                    volumeMount.get('readOnly', '') == original_volume.get('readOnly', ''):
+                    volumeMount.get('readOnly', False ) == original_volume.get('readOnly', ''):
                 correct_volume = True
                 break
         if not correct_volume:
