@@ -756,7 +756,7 @@ The `manage_psp` procedure executes the following sequence of tasks:
 The manage PSS procedure allows:
 * enable/disable PSS
 * change default settings
-* change exemption
+* change exemptions
 * set PSS labels on namespaces
 
 ### Configure Manage PSS Procedure
@@ -791,9 +791,15 @@ restart-pods: false
 The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
 namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
 
-**Warnings**
-Be careful with `exemption` section it may cause cluster instability.
+**Warnings**:
+Be careful with the `exemptions` section it may cause cluster instability.
 Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
+The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
+'kubernetes-dashboard' etc) will be deleted during the procedure in case of using `pod-security: disabled`
+Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to restart
+pods in cluster is a manual restart according to particular application. The restart procedure should consider if the application 
+is stateless or stateful.
+
 
 ### Manage PSS Tasks Tree
 
