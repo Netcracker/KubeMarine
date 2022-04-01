@@ -819,13 +819,14 @@ def check_extra_args(cluster, static_pod):
 
 def check_extra_volumes(cluster, static_pod):
     static_pod_name = static_pod[static_pod['metadata']['name']]
-    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
+    #for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
+    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}):
         correct_volume = False
-        volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", [])
+        volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", {})
         for volumeMount in volume_mounts:
             if volumeMount['mountPath'] == original_volume['mountPath'] and \
                     volumeMount['name'] == original_volume['name'] and \
-                    volumeMount['readOnly'] == original_volume['readOnly']:
+                    volumeMount.get('readOnly', '') == original_volume.get('readOnly', ''):
                 correct_volume = True
                 break
         if not correct_volume:
@@ -1007,6 +1008,62 @@ def calico_config_check(cluster):
         else:
             tc.success(results='valid')
 
+def kubernetes_admission_status(cluster):
+    """
+    The method checks status of Pod Security Admissions, default Pod Security Profile,
+    and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
+    """
+    with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
+        first_master = cluster.nodes['master'].get_first_member()
+        profile_inv = ""
+        if cluster.inventory["rbac"]["admission"] == "pss" and \
+                cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
+            profile_inv = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
+        profile = ""
+        result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
+        kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
+        cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
+        api_result = first_master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
+        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
+        for item in ext_args:
+            if item.startswith("--"):
+                key = re.split('=',item)[0]
+                value = re.search('=(.*)$', item).group(1)
+                if key == "--admission-control-config-file":
+                    admission_path = value
+                    adm_result = first_master.sudo("cat %s" % admission_path)
+                    adm_conf = yaml.safe_load(list(adm_result.values())[0].stdout)
+                    profile = adm_conf["plugins"][0]["configuration"]["defaults"]["enforce"]
+                if key == "--feature-gates":
+                    features = value
+                    if "PodSecurity=false" not in features:
+                        kube_admission_status = 'PSS is "enabled", default profile is "%s"' % profile
+                        cluster.log.debug(kube_admission_status)
+                        tc.success(results='enabled')
+                        feature_cm = cluster_config["apiServer"]["extraArgs"].get("feature-gates", "")
+                        if features != feature_cm:
+                            raise TestWarn('enable',
+                                    hint=f"Check if the '--feature-gates' option in 'kubeadm-config' "
+                                         f"is consistent with 'kube-apiserver.yaml")
+                        admission_path_cm = cluster_config["apiServer"]["extraArgs"].get("admission-control-config-file","")
+                        if admission_path != admission_path_cm:
+                            raise TestWarn('enable',
+                                    hint=f"Check if the '--admission-control-config-file' option in 'kubeadm-config' "
+                                         f"is consistent with 'kube-apiserver.yaml")
+                    else:
+                        kube_admission_status = 'PSS is "disabled"'
+                        cluster.log.debug(kube_admission_status)
+                        tc.success(results='disabled')
+        if profile != profile_inv:
+            raise TestFailure('invalid',
+                    hint=f"The 'cluster.yaml' does not match with the configuration "
+                         f"that is applied on cluster in 'kube-apiserver.yaml' and 'admission.yaml'")
+        if not profile:
+            kube_admission_status = 'PSS is "disabled"'
+            cluster.log.debug(kube_admission_status)
+            tc.success(results='disabled')
+
 
 tasks = OrderedDict({
     'services': {
@@ -1080,6 +1137,7 @@ tasks = OrderedDict({
                 "ready": lambda cluster: kubernetes_nodes_condition(cluster, 'Ready')
             },
         },
+        'admission': kubernetes_admission_status,
     },
     'etcd': {
         "health_status": etcd_health_status
