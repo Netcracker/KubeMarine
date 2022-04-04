@@ -15,6 +15,8 @@
 import re
 from copy import deepcopy
 from typing import Dict, List, Union
+from os import listdir
+from os.path import isfile, join
 
 import fabric
 import yaml
@@ -347,8 +349,22 @@ class KubernetesCluster(Environment):
             output = yaml.dump(prepared_inventory)
             utils.dump_file(self, output, "cluster_finalized.yaml")
             cluster_storage = utils.ClusterStorage.get_instance(self)
-            cluster_storage.make_dir(self)
             cluster_storage.collect_procedure_info(self)
+            dump_dir = self.context['execution_arguments']['dump_location']
+            files_dump = {
+                  'procedure_parameters':'procedure_parameters',
+                  'version':'version',
+                  'cluster_precompiled.yaml':'cluster_precompiled.yaml',
+                  'cluster.yaml':'cluster.yaml',
+                  'cluster_default.yaml':'cluster_default.yaml',
+                  'cluster_finalized.yaml':'cluster_finalized.yaml',
+                  'procedure.yaml': 'procedure.yaml'
+                  }
+            onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
+            for name, path in files_dump.items():
+                if name in onlyfiles:
+                    output = dump_dir + path
+                    cluster_storage.upload(self, output, name)
             cluster_storage.rotation_file(self)
 
 

@@ -318,6 +318,7 @@ class ClusterStorage:
             if cluster.context["initial_procedure"] != None:
                 self.dir_name = ''
                 self.dir_location = ''
+                self._make_dir(cluster)
             else:
                 self.dir_name = ''
                 self.dir_location = ''
@@ -352,20 +353,15 @@ class ClusterStorage:
                 self.dir_location = self.dir_path + self.dir_name
                 cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}")
                 link_check = self.cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
-
+                test_dir = self.cluster.context['execution_arguments']['dump_location']
                 for connection, result in link_check.items():
-                    exit_code = list(link_check.values())[0].exited
+                    exit_code = result.exited
                     if exit_code == 0:
-                        link_delete = f'cd {self.dir_path} && sudo rm latest_dump'
-                        connection.run(link_delete)
-                        create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                        connection.run(create_link)
+                        link_delete_create = f'cd {self.dir_path} && sudo rm latest_dump && sudo ln -s {self.dir_name} latest_dump'
+                        connection.run(link_delete_create)
                     else:
                         create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
                         connection.run(create_link)
-                    self._collect_procedure_info(cluster)
-
-
 
     def rotation_file(self, cluster):
         """
@@ -396,14 +392,14 @@ class ClusterStorage:
                         cluster.log.verbose('Deleting backup file from nodes...')
                         node.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
 
-    def upload(self, cluster, stream, file_name):
+    def upload(self, cluster, path, file_name):
         """
         This method sends the collected files to the nodes.
         """
-        self.cluster.nodes['master'].put(io.StringIO(stream), self.dir_location + file_name, sudo=True, is_async=False)
+        self.cluster.nodes['master'].put(path, self.dir_location + file_name, sudo=True, is_async=False, binary=False)
         self.cluster.log.debug('File download %s' % file_name)
 
-    def _collect_procedure_info(self, cluster):
+    def collect_procedure_info(self, cluster):
         """
         This method collects information about the type of procedure and the version of the tool we are working with.
         """
@@ -413,12 +409,14 @@ class ClusterStorage:
         out["exclude"] = execution_arguments["exclude"]
         out["initial_procedure"] = cluster.context["initial_procedure"]
         output = yaml.dump(out)
-        self.upload(cluster, output, "procedure_parameters")
+        dump_file(cluster, output, "procedure_parameters")
+
 
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
             output = yaml.safe_load(stream)
             output = yaml.dump(output)
-            self.upload(cluster, output, "version")
+            dump_file(cluster, output, "version")
+
 
     def collect_info_all_master(self):
         """
