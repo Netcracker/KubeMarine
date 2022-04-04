@@ -904,18 +904,20 @@ def label_namespace_pss(cluster, manage_type):
                     first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version=%s --overwrite" 
                                       % (baseline_plugins[plugin], mode, "latest"))
         elif manage_type == "delete":
-            cluster.log.debug("Delete PSS labels from namespace %s" % privileged_plugins[plugin])
-            for mode in valid_modes:
-                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
-                                  % (privileged_plugins[plugin], mode))
-                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
-                                  % (privileged_plugins[plugin], mode))
-            cluster.log.debug("Delete PSS labels from namespace %s" % baseline_plugins[plugin])
-            for mode in valid_modes:
-                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
-                                  % (baseline_plugins[plugin], mode))
-                first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
-                                  % (baseline_plugins[plugin], mode))
+            if is_install and plugin in privileged_plugins.keys():
+                cluster.log.debug("Delete PSS labels from namespace %s" % privileged_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
+                                      % (privileged_plugins[plugin], mode))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
+                                      % (privileged_plugins[plugin], mode))
+            elif is_install and plugin in baseline_plugins.keys():
+                cluster.log.debug("Delete PSS labels from namespace %s" % baseline_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
+                                      % (baseline_plugins[plugin], mode))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
+                                      % (baseline_plugins[plugin], mode))
 
     procedure_config = cluster.procedure_inventory["pss"]
     namespaces = procedure_config.get("namespaces")
@@ -935,5 +937,6 @@ def label_namespace_pss(cluster, manage_type):
 
 def check_inventory(cluster):
     # check if 'admission' option in cluster.yaml and procedure.yaml are inconsistent 
-    if cluster.inventory["rbac"]["admission"] != "pss":
-        raise Exception("Procedure config should include 'admission: pss'")
+    if cluster.context.get('initial_procedure') == 'manage_pss' and cluster.inventory["rbac"]["admission"] != "pss" or \
+        cluster.context.get('initial_procedure') == 'manage_psp' and cluster.inventory["rbac"]["admission"] != "psp":
+        raise Exception("Procedure config and cluster config are inconsistent. Please check 'admission' option")

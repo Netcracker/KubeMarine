@@ -20,6 +20,7 @@ from kubemarine import admission
 from kubemarine.core import flow
 
 tasks = OrderedDict({
+    "check_inventory": admission.check_inventory,
     "delete_custom": admission.delete_custom_task,
     "add_custom": admission.add_custom_task,
     "reconfigure_oob": admission.reconfigure_oob_task,
