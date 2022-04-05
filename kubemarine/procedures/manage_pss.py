@@ -20,6 +20,7 @@ from kubemarine import admission
 from kubemarine.core import flow
 
 tasks = OrderedDict({
+    "check_inventory": admission.check_inventory,
     "delete_default_pss": admission.delete_default_pss,
     "apply_default_pss": admission.apply_default_pss,
     "restart_pods": admission.restart_pods_task
