@@ -14,17 +14,19 @@
 # limitations under the License.
 
 
-import argparse
 import ipaddress
 import math
 import sys
+import uuid
 from collections import OrderedDict
 import time
+from contextlib import contextmanager
 
 import fabric
 
-from kubemarine.core import flow
+from kubemarine.core import flow, utils
 from kubemarine import system
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 
 
@@ -270,8 +272,37 @@ def system_distributive(cluster):
         tc.success(results=", ".join(detected_supported_os))
 
 
+def install_tcp_listener(cluster: KubernetesCluster) -> str:
+    local_path = utils.get_resource_absolute_path('resources/scripts/simple_tcp_listener.py', script_relative=True)
+    tcp_listener_path = "/tmp/%s.py" % uuid.uuid4().hex
+    cluster.nodes["all"].put(local_path, tcp_listener_path, binary=False)
+    return tcp_listener_path
+
+
+@contextmanager
+def suspend_firewalld(cluster: KubernetesCluster):
+    firewalld_statuses = system.fetch_firewalld_status(cluster.nodes["all"])
+    stop_firewalld_group = firewalld_statuses.get_nodes_group_where_value_in_stdout("active (running)")
+
+    exc = None
+    try:
+        stop_result = system.stop_service(stop_firewalld_group, "firewalld")
+    except fabric.group.GroupException as e:
+        exc = e
+        stop_result = e.result
+
+    nodes_to_rollback = stop_result.get_exited_nodes_group()
+    try:
+        if exc is not None:
+            raise exc
+        yield
+    finally:
+        system.start_service(nodes_to_rollback, "firewalld")
+
+
 def pod_subnet_connectivity(cluster):
-    with TestCase(cluster.context['testsuite'], '009', 'Network', 'PodSubnet', default_results='Connected'):
+    with TestCase(cluster.context['testsuite'], '009', 'Network', 'PodSubnet', default_results='Connected'),\
+            suspend_firewalld(cluster):
         pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
         failed_nodes = check_subnet_connectivity(cluster, pod_subnet)
 
@@ -281,7 +312,8 @@ def pod_subnet_connectivity(cluster):
 
 
 def service_subnet_connectivity(cluster):
-    with TestCase(cluster.context['testsuite'], '010', 'Network', 'ServiceSubnet', default_results='Connected'):
+    with TestCase(cluster.context['testsuite'], '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
+            suspend_firewalld(cluster):
         service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
         failed_nodes = check_subnet_connectivity(cluster, service_subnet)
 
@@ -305,12 +337,13 @@ def tcp_connect(log, node_from, node_to, tcp_ports, host_to_ip, mtu):
     node_from['connection'].sudo(cmd)
 
 
-def get_start_socat_cmd():
-    return "sudo nohup socat TCP-LISTEN:%s,reuseaddr,fork - &> /dev/null &"
+def get_start_tcp_listener_cmd(tcp_listener):
+    return f"sudo nohup python2 {tcp_listener} %s &> /dev/null &"
 
 
-def get_stop_socat_cmd():
-    return "port=%s;pid=$(ps aux | grep ' socat ' | grep $port | grep -v grep | awk '{print $2}') " \
+def get_stop_tcp_listener_cmd(tcp_listener):
+    identify_pid = "ps aux | grep \" %s ${port}$\" | grep -v grep | grep -v nohup | awk '{print $2}'" % tcp_listener
+    return f"port=%s;pid=$({identify_pid}) " \
            "&& if [ ! -z $pid ]; then sudo kill -9 $pid; echo \"killed pid $pid for port $port\"; fi"
 
 
@@ -357,6 +390,7 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
 
 
 def check_subnet_connectivity(cluster, subnet):
+    tcp_listener = install_tcp_listener(cluster)
     inet = ipaddress.ip_network(subnet)
     net_mask = str(inet.netmask)
     subnet_hosts = list(inet.hosts())
@@ -374,7 +408,7 @@ def check_subnet_connectivity(cluster, subnet):
         random_host = subnet_hosts[subnet_hosts_len - i]
         host_to_ip[node['name']] = random_host
         iface = iface_cmd % node['internal_address']
-        socat_cmd = cmd_for_ports(tcp_ports, get_start_socat_cmd())
+        socat_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
         node['connection'].sudo(f"ip a add {random_host}/{net_mask} dev $({iface}); " + socat_cmd)
         i = i + 1
 
@@ -385,15 +419,17 @@ def check_subnet_connectivity(cluster, subnet):
     for node in node_list:
         random_host = subnet_hosts[subnet_hosts_len - i]
         iface = iface_cmd % node['internal_address']
-        socat_cmd = cmd_for_ports(tcp_ports, get_stop_socat_cmd())
-        node['connection'].sudo(socat_cmd + f" && ip a del {random_host}/{net_mask} dev $({iface})", warn=True)
+        socat_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
+        node['connection'].sudo(socat_cmd + f" && sudo ip a del {random_host}/{net_mask} dev $({iface})", warn=True)
         i = i + 1
 
     return failed_nodes
 
 
 def check_tcp_ports(cluster):
-    with TestCase(cluster.context['testsuite'], '011', 'Network', 'TCPPorts', default_results='Connected'):
+    with TestCase(cluster.context['testsuite'], '011', 'Network', 'TCPPorts', default_results='Connected'),\
+            suspend_firewalld(cluster):
+        tcp_listener = install_tcp_listener(cluster)
         tcp_ports = ["80", "443", "6443", "2379", "2380", "10250", "10251", "10252", "30001", "30002"]
         node_list = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
         host_to_ip = {}
@@ -401,7 +437,7 @@ def check_tcp_ports(cluster):
         # Run process that LISTEN TCP port
         for node in node_list:
             host_to_ip[node['name']] = node['internal_address']
-            socat_cmd = cmd_for_ports(tcp_ports, get_start_socat_cmd())
+            socat_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
             res = node['connection'].sudo(socat_cmd)
             cluster.log.verbose(res)
 
@@ -409,7 +445,7 @@ def check_tcp_ports(cluster):
 
         # Kill the created during test processes
         for node in node_list:
-            socat_cmd = cmd_for_ports(tcp_ports, get_stop_socat_cmd())
+            socat_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
             node['connection'].sudo(socat_cmd)
 
         if failed_nodes:

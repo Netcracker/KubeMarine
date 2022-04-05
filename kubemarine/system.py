@@ -333,6 +333,14 @@ def update_etc_hosts(group, config=None):
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True)
 
 
+def stop_service(group: NodeGroup, name: str) -> NodeGroupResult:
+    return group.sudo('systemctl stop %s' % name)
+
+
+def start_service(group: NodeGroup, name: str) -> NodeGroupResult:
+    return group.sudo('systemctl start %s' % name)
+
+
 def restart_service(group, name=None):
     if name is None:
         raise Exception("Service name can't be empty")
@@ -366,8 +374,12 @@ def patch_systemd_service(group: NodeGroup, service_name, patch_source):
     group.sudo("systemctl daemon-reload")
 
 
+def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
+    return group.sudo("systemctl status firewalld", warn=True)
+
+
 def is_firewalld_disabled(group):
-    result = group.sudo("systemctl status firewalld", warn=True)
+    result = fetch_firewalld_status(group)
     disabled_status = True
 
     for node_result in list(result.values()):
