@@ -311,20 +311,11 @@ class ClusterStorage:
     __instance = None
 
     def __init__(self, cluster):
-        if not ClusterStorage.__instance:
-            self.cluster = cluster
-            self.dir_path = "/etc/kubemarine/kube_tasks/"
-            self._make_dir(cluster)
-            if cluster.context["initial_procedure"] != None:
-                self.dir_name = ''
-                self.dir_location = ''
-                self._make_dir(cluster)
-            else:
-                self.dir_name = ''
-                self.dir_location = ''
-            self.cluster.log.debug("New storage created")
-        else:
-            self.cluster.log.debug("Reused storage:", self.get_instance(cluster))
+        self.cluster = cluster
+        self.dir_path = "/etc/kubemarine/kube_tasks/"
+        self.dir_name = ''
+        self.dir_location = ''
+        self.cluster.log.debug("New storage created")
 
     @classmethod
     def get_instance(cls, cluster):
@@ -332,43 +323,29 @@ class ClusterStorage:
             cls.__instance = ClusterStorage(cluster)
         return cls.__instance
 
-    def _make_dir(self, cluster):
+    def make_dir(self, cluster):
         """
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
-        timestamp = datetime.now().timestamp()
-        time_step = str(datetime.fromtimestamp(timestamp)).split(".")
-        readable_timestamp = datetime.strptime(str(time_step[0]), "%Y-%m-%d %H:%M:%S")
-        readable_timestamp = readable_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        if cluster.context["initial_procedure"] != None:
-            if cluster.context["initial_procedure"] == 'paas':
-                self.dir_name = None
-                self.dir_location = None
-            elif cluster.context["initial_procedure"] == 'iaas':
-                self.dir_name = None
-                self.dir_location = None
+        readable_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        initial_procedure = cluster.context["initial_procedure"]
+        self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
+        self.dir_location = self.dir_path + self.dir_name
+        cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}")
+        link_check = self.cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
+        for connection, result in link_check.items():
+            exit_code = result.exited
+            if exit_code == 0:
+                connection.sudo(f'rm {self.dir_path + "latest_dump"}')
+                connection.sudo(f'ln -s {self.dir_location} {self.dir_path + "latest_dump"}')
             else:
-                initial_procedure = cluster.context["initial_procedure"]
-                self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
-                self.dir_location = self.dir_path + self.dir_name
-                cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}")
-                link_check = self.cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
-                test_dir = self.cluster.context['execution_arguments']['dump_location']
-                for connection, result in link_check.items():
-                    exit_code = result.exited
-                    if exit_code == 0:
-                        link_delete_create = f'cd {self.dir_path} && sudo rm latest_dump && sudo ln -s {self.dir_name} latest_dump'
-                        connection.run(link_delete_create)
-                    else:
-                        create_link = f'cd {self.dir_path} && sudo ln -s {self.dir_name} latest_dump'
-                        connection.run(create_link)
+                connection.sudo(f'ln -s {self.dir_location} {self.dir_path + "latest_dump"}')
 
     def rotation_file(self, cluster):
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        collect_node = self.cluster.nodes['master'].get_ordered_members_list()
-        for node in collect_node:
+        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             command_count_folder = f"ls {self.dir_path} -l | grep ^d | wc -l"
             command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
             count = int(node.run(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
@@ -396,7 +373,7 @@ class ClusterStorage:
         """
         This method sends the collected files to the nodes.
         """
-        self.cluster.nodes['master'].put(path, self.dir_location + file_name, sudo=True, is_async=False, binary=False)
+        self.cluster.nodes['master'].put(path, self.dir_location + file_name, sudo=True, binary=False)
         self.cluster.log.debug('File download %s' % file_name)
 
     def collect_procedure_info(self, cluster):
