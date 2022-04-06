@@ -370,7 +370,7 @@ def restart_pods_task(cluster, disable_eviction=False):
         first_master.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")
-    daemon_sets = yaml.safe_load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
+    daemon_sets = ruamel.yaml.YAML().load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
     for ds in daemon_sets["items"]:
         first_master.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
 
