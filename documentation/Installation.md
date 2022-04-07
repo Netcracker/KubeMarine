@@ -185,7 +185,8 @@ The actual information about the supported versions can be found at [global.yaml
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `Kubemarine` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
+**Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
+If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
 

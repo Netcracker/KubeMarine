@@ -329,12 +329,12 @@ def cmd_for_ports(ports, query):
     return result[3:]
 
 
-def tcp_connect(log, node_from, node_to, tcp_ports, host_to_ip, mtu):
+def tcp_connect(cluster, node_from, node_to, tcp_ports, host_to_ip, mtu):
     # 40 bites for headers
     mtu -= 40
-    log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
+    cluster.log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
     cmd = cmd_for_ports(tcp_ports, f"echo $(dd if=/dev/urandom bs={mtu}  count=1) >/dev/tcp/{host_to_ip[node_to['name']]}/%s")
-    node_from['connection'].sudo(cmd)
+    node_from['connection'].sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
 def get_start_tcp_listener_cmd(tcp_listener):
@@ -348,6 +348,9 @@ def get_stop_tcp_listener_cmd(tcp_listener):
 
 
 def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip):
+    if len(node_list) <= 1:
+        return []
+
     mtu = cluster.inventory['plugins']['calico']['mtu']
 
     cluster.log.verbose("Searching for success node...")
@@ -362,7 +365,7 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
     for i in range(0, len(node_list)):
         for j in range(i + 1, len(node_list)):
             try:
-                tcp_connect(cluster.log, node_list[j], node_list[i], tcp_ports, host_to_ip, mtu)
+                tcp_connect(cluster, node_list[j], node_list[i], tcp_ports, host_to_ip, mtu)
                 # If node has at least one successful connection with another node - this node has appropriate settings.
                 success_node = node_list[i]
                 cluster.log.verbose(f"Successful node found: {success_node['name']}")
@@ -380,7 +383,7 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
     if success_node is not None:
         for node in nodes_for_check:
             try:
-                tcp_connect(cluster.log, success_node, node, tcp_ports, host_to_ip, mtu)
+                tcp_connect(cluster, success_node, node, tcp_ports, host_to_ip, mtu)
                 failed_nodes.remove(node["name"])
             except Exception as e:
                 cluster.log.error(f"Subnet connectivity test failed from '{success_node['name']}' to '{node['name']}'")
@@ -399,6 +402,8 @@ def check_subnet_connectivity(cluster, subnet):
     iface_cmd = "sudo ip -o a | grep %s | awk '{print $2}'"
     tcp_ports = ["30050"]
     node_list = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
+    # exclude nodes which are only balancers.
+    node_list = [node for node in node_list if node["roles"] != ["balancer"]]
     host_to_ip = {}
 
     # Create alias from the node network interface for the subnet on every node
@@ -408,8 +413,8 @@ def check_subnet_connectivity(cluster, subnet):
         random_host = subnet_hosts[subnet_hosts_len - i]
         host_to_ip[node['name']] = random_host
         iface = iface_cmd % node['internal_address']
-        socat_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
-        node['connection'].sudo(f"ip a add {random_host}/{net_mask} dev $({iface}); " + socat_cmd)
+        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
+        node['connection'].sudo(f"ip a add {random_host}/{net_mask} dev $({iface}); " + tcp_listener_cmd)
         i = i + 1
 
     failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
@@ -419,8 +424,8 @@ def check_subnet_connectivity(cluster, subnet):
     for node in node_list:
         random_host = subnet_hosts[subnet_hosts_len - i]
         iface = iface_cmd % node['internal_address']
-        socat_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-        node['connection'].sudo(socat_cmd + f" && sudo ip a del {random_host}/{net_mask} dev $({iface})", warn=True)
+        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
+        node['connection'].sudo(tcp_listener_cmd + f" && sudo ip a del {random_host}/{net_mask} dev $({iface})", warn=True)
         i = i + 1
 
     return failed_nodes
@@ -437,16 +442,16 @@ def check_tcp_ports(cluster):
         # Run process that LISTEN TCP port
         for node in node_list:
             host_to_ip[node['name']] = node['internal_address']
-            socat_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
-            res = node['connection'].sudo(socat_cmd)
+            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
+            res = node['connection'].sudo(tcp_listener_cmd)
             cluster.log.verbose(res)
 
         failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
 
         # Kill the created during test processes
         for node in node_list:
-            socat_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-            node['connection'].sudo(socat_cmd)
+            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
+            node['connection'].sudo(tcp_listener_cmd)
 
         if failed_nodes:
             raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
