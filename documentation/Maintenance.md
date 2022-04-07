@@ -800,7 +800,10 @@ The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-co
 Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to restart
 pods in cluster is a manual restart according to particular application. The restart procedure should consider if the application 
 is stateless or stateful.
-
+Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
+Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster 
+behavior.
 
 ### Manage PSS Tasks Tree
 
