@@ -48,7 +48,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
+      - [audit-Kubernetes Policy](#audit-kubernetes-policy)
       - [audit-daemon](#audit-daemon)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
