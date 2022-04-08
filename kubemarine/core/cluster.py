@@ -20,6 +20,7 @@ from os.path import isfile, join
 
 import fabric
 import yaml
+import tarfile
 
 from kubemarine.core import log
 from kubemarine.core.connections import ConnectionPool, Connections
@@ -362,10 +363,16 @@ class KubernetesCluster(Environment):
                       'procedure.yaml': 'procedure.yaml'
                       }
                 onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
-                for name, path in files_dump.items():
-                    if name in onlyfiles:
-                        output = dump_dir + path
-                        cluster_storage.upload(self, output, name)
+
+                archive = dump_dir + "local.tar.gz"
+
+                with tarfile.open(archive, "w:gz") as tar:
+                    for name, path in files_dump.items():
+                        if name in onlyfiles:
+                            output = dump_dir + path
+                            tar.add(output)
+                    tar.close()
+                cluster_storage.upload(self, archive, 'local.tar.gz')
                 cluster_storage.rotation_file(self)
 
 

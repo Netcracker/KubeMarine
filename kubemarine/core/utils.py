@@ -345,12 +345,12 @@ class ClusterStorage:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+        for node in self.cluster.get_ordered_members_list(provide_node_configs=True):
             command_count_folder = f"ls {self.dir_path} -l | grep ^d | wc -l"
             command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
-            count = int(node.run(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
+            count = int(node.sudo(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
             command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = node.run(command, is_async=False).get_simple_out()
+            sum_file = node.sudo(command, is_async=False).get_simple_out()
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
@@ -375,6 +375,8 @@ class ClusterStorage:
         """
         self.cluster.nodes['master'].put(path, self.dir_location + file_name, sudo=True, binary=False)
         self.cluster.log.debug('File download %s' % file_name)
+        self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 ')
+        self.cluster.nodes['master'].sudo(f'rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
         """
