@@ -15,12 +15,11 @@
 import re
 from copy import deepcopy
 from typing import Dict, List, Union
-from os import listdir
-from os.path import isfile, join
+
 
 import fabric
 import yaml
-import tarfile
+
 
 from kubemarine.core import log
 from kubemarine.core.connections import ConnectionPool, Connections
@@ -345,35 +344,8 @@ class KubernetesCluster(Environment):
         utils.dump_file(self, output, "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
         cluster_storage.collect_procedure_info(self)
-        if self.context["initial_procedure"] == 'paas':
-            self.log.verbose(self.context["initial_procedure"] + ' procedure')
-        elif self.context["initial_procedure"] == 'iaas':
-            self.log.verbose(self.context["initial_procedure"] + ' procedure')
-        else:
-            if self.context["initial_procedure"] != None:
-                cluster_storage.make_dir(self)
-                dump_dir = self.context['execution_arguments']['dump_location']
-                files_dump = {
-                      'procedure_parameters':'procedure_parameters',
-                      'version':'version',
-                      'cluster_precompiled.yaml':'cluster_precompiled.yaml',
-                      'cluster.yaml':'cluster.yaml',
-                      'cluster_default.yaml':'cluster_default.yaml',
-                      'cluster_finalized.yaml':'cluster_finalized.yaml',
-                      'procedure.yaml': 'procedure.yaml'
-                      }
-                onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
-
-                archive = dump_dir + "local.tar.gz"
-
-                with tarfile.open(archive, "w:gz") as tar:
-                    for name, path in files_dump.items():
-                        if name in onlyfiles:
-                            output = dump_dir + path
-                            tar.add(output)
-                    tar.close()
-                cluster_storage.upload(self, archive, 'local.tar.gz')
-                cluster_storage.rotation_file(self)
+        cluster_storage.comprese_and_upload_archive(self)
+        cluster_storage.rotation_file(self)
 
 
     def escape_jinja_characters_for_inventory(self, obj):

@@ -18,6 +18,10 @@ import os
 import shutil
 import sys
 import time
+import tarfile
+
+from os import listdir
+from os.path import isfile, join
 from typing import Union
 
 import yaml
@@ -26,7 +30,7 @@ from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
-
+from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 from kubemarine.plugins import nginx_ingress
 
@@ -323,7 +327,7 @@ class ClusterStorage:
             cls.__instance = ClusterStorage(cluster)
         return cls.__instance
 
-    def make_dir(self, cluster):
+    def _make_dir(self, cluster):
         """
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
@@ -345,19 +349,13 @@ class ClusterStorage:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        connect_nodes = []
-        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-            self.cluster.context['nodes'][node['connect_to']] = {
-                connect_nodes.append(node['connect_to'])
-            }
-        rotate_nodes = cluster.make_group(connect_nodes)
 
-        for node in rotate_nodes.nodes.values():
-            command_count_folder = f"ls {self.dir_path} -l | grep ^d | wc -l"
-            command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
-            count = int(node.sudo(command_count_folder).stdout) + int(node.sudo(command_count_tar).stdout)
+        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+            group = cluster.make_group([node['connect_to']])
+            command_count = f'ls {self.dir_path} -l |  egrep "^d|tar.gz" | wc -l'
+            count = int(group.sudo(command_count).get_simple_out())
             command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = node.sudo(command).stdout
+            sum_file = group.sudo(command).get_simple_out()
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
@@ -366,22 +364,46 @@ class ClusterStorage:
             if count > not_pack_file:
                 for i in range(not_pack_file, delete_old):
                     if 'tar.gz' not in files[i] and i < count:
-                        node.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
-                        node.sudo(f'rm -r {self.dir_path + files[i]}')
+                        group.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
+                        group.sudo(f'rm -r {self.dir_path + files[i]}')
                     break
             if count > delete_old:
                 for i in range(len(files_unsort)):
                     diff = count - delete_old
                     if i < diff:
                         cluster.log.verbose('Deleting backup file from nodes...')
-                        node.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
+                        group.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
 
-    def upload(self, cluster, path, file_name):
+    def comprese_and_upload_archive(self, cluster):
         """
-        This method sends the collected files to the nodes.
+        This method compose dump files and sends the collected files to the nodes.
         """
-        self.cluster.nodes['master'].put(path, self.dir_location + file_name, sudo=True, binary=False)
-        self.cluster.log.debug('File download %s' % file_name)
+        if self.cluster.context["initial_procedure"] == 'paas':
+            self.cluster.log.verbose(self.cluster.context["initial_procedure"] + ' procedure')
+        elif self.cluster.context["initial_procedure"] == 'iaas':
+            self.cluster.log.verbose(self.cluster.context["initial_procedure"] + ' procedure')
+        else:
+            if self.cluster.context["initial_procedure"] != None:
+                self._make_dir(cluster)
+                dump_dir = self.cluster.context['execution_arguments']['dump_location']
+                files_dump = {
+                      'procedure_parameters':'procedure_parameters',
+                      'version':'version',
+                      'cluster_precompiled.yaml':'cluster_precompiled.yaml',
+                      'cluster.yaml':'cluster.yaml',
+                      'cluster_default.yaml':'cluster_default.yaml',
+                      'cluster_finalized.yaml':'cluster_finalized.yaml',
+                      'procedure.yaml': 'procedure.yaml'
+                      }
+                onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
+                archive = dump_dir + "local.tar.gz"
+                with tarfile.open(archive, "w:gz") as tar:
+                    for name, path in files_dump.items():
+                        if name in onlyfiles:
+                            output = dump_dir + path
+                            tar.add(output)
+        self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True, binary=False)
+        self.cluster.log.debug('File download local.tar.gz')
         self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 ')
         self.cluster.nodes['master'].sudo(f'rm -f {self.dir_location + "local.tar.gz"} ')
 
