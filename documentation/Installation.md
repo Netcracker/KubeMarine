@@ -2845,6 +2845,15 @@ rbac:
 
 ### Admission pss
 
+Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
+(or profiles) of policies. The profiles are the following:
+`privileged`	- Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
+escalations.
+`Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
+Pod configuration.
+`restricted`	- Heavily restricted policy, following current Pod hardening best practices.
+There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+
 **Note**:
 
 * PSS are supported for Kubernetes versions higher than 1.23.
@@ -2877,9 +2886,10 @@ rbac:
       namespaces: ["kube-system"]
 ```
 
-There are three parts of PSS configuration. `pod-security` enables or disables the PSS installation. The default profile is described in the `defaults` section. 
-`enforce` defines the policy standard that enforces the pods. It must be one of `privileged`, `baseline`, or `restricted`.
-For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+There are three parts of PSS configuration. 
+* `pod-security` enables or disables the PSS installation
+* default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
+* `exemptions` describes exemptions from default rules
 
 The PSS enabling requires spacial labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
 
@@ -2899,9 +2909,6 @@ metadata:
 In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
 
 **Warnings:** 
-In case of using PSS the application that installed on Kubernetes cluster should be matched with PSS profiles 
-(`privileged`, `baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined 
-plugins. For more information see the official Kubernetes documentation.
 Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
 `kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
 Therefor PSS labels on namespaces shouldn't be set even if you Kubernetes cluster is deployed without PSS enabled.
@@ -2928,6 +2935,23 @@ The default configuration does not enforce the default policy to any of the pods
 ```
 
 Do not change the namespaces exemption list without strong necessary. In any case check our maintenance guide before any implementation.
+
+#### Application prerequisites
+
+In case of using PSS the application that installed on Kubernetes cluster should be matched with PSS profiles (`privileged`, 
+`baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined plugins. 
+Moreover the application should be compatible with PASS. The `restricted` profile requires the following section in pod description:
+```
+...
+securityContext: 
+  runAsNonRoot: true
+  seccompProfile: 
+    type: "RuntimeDefault"
+  allowPrivilegeEscalation: false
+  capabilities: 
+    drop: ["ALL"]
+...
+```
 
 ### RBAC Accounts
 
