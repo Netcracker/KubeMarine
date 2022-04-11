@@ -2852,12 +2852,14 @@ escalations.
 * `Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
 Pod configuration.
 * `Restricted`	- Heavily restricted policy, following current Pod hardening best practices.
-There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+
+There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to 
+[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-admission/).
 
 **Note**:
 
 * PSS are supported for Kubernetes versions higher than 1.23.
-* To enable PSS, define `admission: pss` explicitly in cluster.yaml.
+* To enable PSS, define `admission: pss` explicitly in cluster.yaml:
 
 ```yaml
 rbac:
