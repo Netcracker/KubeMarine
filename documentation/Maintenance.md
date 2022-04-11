@@ -1026,9 +1026,9 @@ for namespace. For proper matching see the following articles:
 * [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
 * [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
-**Notes:**: 
-KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
-Before running migration procedure please be sure that all application in Kubernetes cluster match with prerequisites:
+**Notes:** 
+* KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+* Before running migration procedure please be sure that all application in Kubernetes cluster match with prerequisites:
 [Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
 
 ### Procedure Execution Steps
