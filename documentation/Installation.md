@@ -2945,7 +2945,7 @@ In case of using PSS the application that installed in Kubernetes cluster should
 Moreover the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
 
 ```yaml
-dd...
+...
 securityContext: 
   runAsNonRoot: true
   seccompProfile: 
