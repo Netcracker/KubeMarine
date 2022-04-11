@@ -2854,7 +2854,7 @@ Pod configuration.
 * `Restricted`	- Heavily restricted policy, following current Pod hardening best practices.
 
 There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to 
-[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
 
 **Note**:
 
