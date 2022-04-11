@@ -2847,11 +2847,11 @@ rbac:
 
 Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
 (or profiles) of policies. The profiles are the following:
-`privileged`	- Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
+* `Privileged`	- Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
 escalations.
-`Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
+* `Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
 Pod configuration.
-`restricted`	- Heavily restricted policy, following current Pod hardening best practices.
+* `Restricted`	- Heavily restricted policy, following current Pod hardening best practices.
 There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
 
 **Note**:
@@ -2938,11 +2938,12 @@ Do not change the namespaces exemption list without strong necessary. In any cas
 
 #### Application prerequisites
 
-In case of using PSS the application that installed on Kubernetes cluster should be matched with PSS profiles (`privileged`, 
+In case of using PSS the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
 `baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined plugins. 
-Moreover the application should be compatible with PASS. The `restricted` profile requires the following section in pod description:
-```
-...
+Moreover the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
+
+```yaml
+dd...
 securityContext: 
   runAsNonRoot: true
   seccompProfile: 

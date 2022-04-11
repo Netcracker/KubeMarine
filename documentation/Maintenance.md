@@ -809,9 +809,10 @@ behavior.
 
 The `manage_pss procedure executes the following sequence of tasks:
 
-1. delete_default_pss
-2. apply_default_pss
-3. restart_pods_task
+1. check_inventory
+2. delete_default_pss
+3. apply_default_pss
+4. restart_pods_task
 
 ## Reboot Procedure
 
@@ -1025,7 +1026,10 @@ for namespace. For proper matching see the following articles:
 * [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
 * [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
-**Note**: KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+**Notes:**: 
+KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+Before running migration procedure please be sure that all application in Kubernetes cluster match with prerequisites:
+[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
 
 ### Procedure Execution Steps
 
