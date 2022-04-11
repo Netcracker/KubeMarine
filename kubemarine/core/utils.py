@@ -345,12 +345,19 @@ class ClusterStorage:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        for node in self.cluster.get_ordered_members_list(provide_node_configs=True):
+        connect_nodes = []
+        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+            self.cluster.context['nodes'][node['connect_to']] = {
+                connect_nodes.append(node['connect_to'])
+            }
+        rotate_nodes = cluster.make_group(connect_nodes)
+
+        for node in rotate_nodes.nodes.values():
             command_count_folder = f"ls {self.dir_path} -l | grep ^d | wc -l"
             command_count_tar = f"ls {self.dir_path}  -l | grep tar.gz | wc -l"
-            count = int(node.sudo(command_count_folder).get_simple_out()) + int(node.run(command_count_tar).get_simple_out())
+            count = int(node.sudo(command_count_folder).stdout) + int(node.sudo(command_count_tar).stdout)
             command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = node.sudo(command, is_async=False).get_simple_out()
+            sum_file = node.sudo(command).stdout
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
