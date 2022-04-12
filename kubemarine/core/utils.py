@@ -335,15 +335,8 @@ class ClusterStorage:
         initial_procedure = cluster.context["initial_procedure"]
         self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
         self.dir_location = self.dir_path + self.dir_name
-        cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location}")
-        link_check = self.cluster.nodes['master'].sudo(f"ls {self.dir_path} | grep latest_dump",warn=True)
-        for connection, result in link_check.items():
-            exit_code = result.exited
-            if exit_code == 0:
-                connection.sudo(f'rm {self.dir_path + "latest_dump"}')
-                connection.sudo(f'ln -s {self.dir_location} {self.dir_path + "latest_dump"}')
-            else:
-                connection.sudo(f'ln -s {self.dir_location} {self.dir_path + "latest_dump"}')
+        cluster.nodes['master'].run(f"sudo mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
+                                     f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
     def rotation_file(self, cluster):
         """
