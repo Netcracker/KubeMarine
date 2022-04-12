@@ -76,7 +76,7 @@ This section provides information about the inventory, features, and steps for i
         - [Tolerations](#tolerations)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
-        - [expect pods](#expect_pods)
+        - [expect pods](#expect-pods)
         - [python](#python)
         - [thirdparty](#thirdparty)
         - [shell](#shell)
