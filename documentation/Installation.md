@@ -2130,6 +2130,7 @@ services:
             - group: "admissionregistration.k8s.io"
             - group: "apps"
             - group: "storage.k8s.io"
+- 
 ```
 
 #### audit-daemon
