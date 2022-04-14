@@ -448,9 +448,7 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
-                    procedure = yaml.safe_load(stream)
-                    procedure = yaml.dump(procedure)
-                    utils.dump_file(cluster, procedure, "procedure.yaml")
+                    utils.dump_file(cluster, stream, "procedure.yaml")
 
         return inventory
 

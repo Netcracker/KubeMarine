@@ -357,8 +357,8 @@ class ClusterStorage:
             if count > not_pack_file:
                 for i in range(not_pack_file, delete_old):
                     if 'tar.gz' not in files[i] and i < count:
-                        group.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]}')
-                        group.sudo(f'rm -r {self.dir_path + files[i]}')
+                        group.run(f'sudo tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
+                                   f'sudo rm -r {self.dir_path + files[i]}')
                     break
             if count > delete_old:
                 for i in range(len(files_unsort)):
@@ -371,34 +371,25 @@ class ClusterStorage:
         """
         This method compose dump files and sends the collected files to the nodes.
         """
-        if self.cluster.context["initial_procedure"] == 'paas':
-            self.cluster.log.verbose(self.cluster.context["initial_procedure"] + ' procedure')
-        elif self.cluster.context["initial_procedure"] == 'iaas':
+        if self.cluster.context["initial_procedure"] in ('paas', 'iaas'):
             self.cluster.log.verbose(self.cluster.context["initial_procedure"] + ' procedure')
         else:
             if self.cluster.context["initial_procedure"] != None:
                 self._make_dir(cluster)
                 dump_dir = self.cluster.context['execution_arguments']['dump_location']
-                files_dump = {
-                      'procedure_parameters':'procedure_parameters',
-                      'version':'version',
-                      'cluster_precompiled.yaml':'cluster_precompiled.yaml',
-                      'cluster.yaml':'cluster.yaml',
-                      'cluster_default.yaml':'cluster_default.yaml',
-                      'cluster_finalized.yaml':'cluster_finalized.yaml',
-                      'procedure.yaml': 'procedure.yaml'
-                      }
+                files_dump = ['procedure_parameters','version','cluster_precompiled.yaml','cluster.yaml',
+                      'cluster_default.yaml','cluster_finalized.yaml','procedure.yaml']
                 onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
                 archive = dump_dir + "local.tar.gz"
                 with tarfile.open(archive, "w:gz") as tar:
-                    for name, path in files_dump.items():
+                    for name in files_dump:
                         if name in onlyfiles:
-                            output = dump_dir + path
+                            output = dump_dir + name
                             tar.add(output)
-        self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True, binary=False)
-        self.cluster.log.debug('File download local.tar.gz')
-        self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 ')
-        self.cluster.nodes['master'].sudo(f'rm -f {self.dir_location + "local.tar.gz"} ')
+                self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
+                self.cluster.log.debug('File upload local.tar.gz')
+                self.cluster.nodes['master'].run(f'sudo tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
+                                                  f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
         """
@@ -414,9 +405,7 @@ class ClusterStorage:
 
 
         with open(get_resource_absolute_path("version", script_relative=True), 'r') as stream:
-            output = yaml.safe_load(stream)
-            output = yaml.dump(output)
-            dump_file(cluster, output, "version")
+            dump_file(cluster, stream, "version")
 
 
     def collect_info_all_master(self):
