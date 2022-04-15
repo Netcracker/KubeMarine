@@ -292,7 +292,7 @@ class FlowTest(unittest.TestCase):
 
         for node in inventory["nodes"]:
             self._stub_result([node["address"]], sudoer_nodes, online_nodes, "run",
-                              ["ip -o a | grep %s | awk '{print $2}'" % node["internal_address"]], 'eth0')
+                              ["/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % node["internal_address"]], 'eth0')
 
         with open(os.path.dirname(__file__) + "/../../resources/fetch_os_versions_example.txt") as f:
             fetch_os_versions = f.read()
