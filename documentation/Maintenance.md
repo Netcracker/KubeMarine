@@ -801,9 +801,7 @@ namespaces that will be labeled during the maintenance procedure. The `restart-p
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
 application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
 * Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
-`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
-* Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster 
-behavior.
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster behavior.
 
 ### Manage PSS Tasks Tree
 
