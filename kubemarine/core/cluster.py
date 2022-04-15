@@ -37,7 +37,8 @@ class KubernetesCluster(Environment):
         self.supported_roles = [
             "balancer",
             "master",
-            "worker"
+            "worker",
+            "control-plane"
         ]
 
         self.roles = []
