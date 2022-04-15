@@ -327,13 +327,6 @@ class KubernetesCluster(Environment):
                 # if there no versions detected, then set package version to default
                 if not package_versions_list:
                     package_versions_list = [package]
-                if len(package_versions_list) > 1:
-                    for i in range(len(package_versions_list)):
-                        for j in range(i + 1, len(package_versions_list)):
-                            if package_versions_list[i] > package_versions_list[j]:
-                                package_versions_list.pop(j)
-                            else:
-                                package_versions_list.pop(i)
                 final_packages_list = final_packages_list + package_versions_list
             self.inventory['services']['packages']['install']['include'] = list(set(final_packages_list))
         return detected_packages
