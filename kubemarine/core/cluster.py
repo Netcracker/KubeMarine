@@ -211,7 +211,7 @@ class KubernetesCluster(Environment):
         system.detect_os_family(self)
         self.log.verbose('OS family check finished')
 
-        # todo get rid of todo
+        # todo get rid of sudo
         if self.context.get('initial_procedure') not in \
                 ['install', 'do', 'migrate_kubemarine']:
             deltas.validate_remote_deltas(self)
@@ -221,6 +221,9 @@ class KubernetesCluster(Environment):
 
     def _gather_facts_after(self):
         self.log.debug('Gathering facts after tasks execution started...')
+
+        if self.context.get('initial_procedure') == 'add_node':
+            deltas.update_remote_deltas(self)
 
         self.remove_invalid_cri_config(self.inventory)
         # Method "kubemarine.system.is_multiple_os_detected" is not used because it detects OS family for new nodes

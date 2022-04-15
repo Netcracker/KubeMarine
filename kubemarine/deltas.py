@@ -231,7 +231,7 @@ def validate_remote_deltas(cluster):
 def update_remote_deltas(cluster):
     cluster.log.verbose('Updating remote deltas list...')
     deltas_str = ('\n'.join(map(str, cluster.context['deltas']['remote']))) + '\n'
-    group = cluster.nodes['master']
+    group = cluster.nodes['master'].get_new_nodes_or_self()
     return group.put(io.StringIO(deltas_str), DELTAS_REMOTE_LOCATION, sudo=True, mkdir=True)
 
 
