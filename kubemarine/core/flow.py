@@ -157,11 +157,17 @@ def _provide_cluster(*args, **kw):
 
 
 def _load_operational_cluster(inventory_filepath, context, procedure_inventory_filepath):
+    """
+    Initialize main cluster instance to be used in tasks.
+    """
     return _provide_cluster(inventory_filepath, context,
                             procedure_inventory=procedure_inventory_filepath)
 
 
 def _load_light_cluster(cluster: c.KubernetesCluster):
+    """
+    Initialize temporary cluster instance to detect initial nodes context.
+    """
     return _provide_cluster(cluster.raw_inventory, cluster.context,
                             procedure_inventory=cluster.procedure_inventory,
                             shallow_copy_env_from=cluster)

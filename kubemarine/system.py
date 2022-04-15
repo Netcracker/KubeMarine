@@ -686,7 +686,7 @@ def detect_active_interface(cluster: KubernetesCluster):
 
 
 def detect_interface_by_address(group: NodeGroup, address: str):
-    return group.run("ip -o a | grep %s | awk '{print $2}'" % address)
+    return group.run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
 
 
 def _detect_nodes_access_info(cluster: KubernetesCluster):
