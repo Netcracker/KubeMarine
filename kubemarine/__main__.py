@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import os.path
 import sys
 from collections import OrderedDict
 
@@ -33,12 +32,15 @@ u''.encode('idna')
 # but Fabric2 writes to stderr if hide=false used and remote console has stderr messages.
 sys.stderr = sys.stdout
 
-release_version = 'non-release version'
-
 procedures = OrderedDict({
     'install': {
         'description': "Install a cluster from scratch",
         'group': 'installation'
+    },
+    'migrate_kubemarine': {
+        'description': "Automatically applies migration steps to update the environment for the "
+                       "latest version of Kubemarine",
+        'group': 'maintenance'
     },
     'upgrade': {
         'description': "Automatically upgrade the entire Kubernetes cluster to a new version",
@@ -103,6 +105,25 @@ procedures = OrderedDict({
 })
 
 
+def get_version():
+    version_file = os.path.dirname(__file__) + '../VERSION'
+    if not os.path.isfile(version_file):
+        return None, None
+
+    with open(version_file, 'r') as file:
+        data = file.read()
+        version, build = data.strip().split(' ')
+        return version, build
+
+
+def get_version_str():
+    version, build = get_version()
+    if version is None:
+        return "non-released version"
+    else:
+        return f"version {version} build {build}"
+
+
 def main():
 
     arguments = sys.argv[1:]
@@ -111,7 +132,7 @@ def main():
         if arguments[0] == 'selftest':
             return selftest()
         elif arguments[0] == 'version':
-            print('Kubemarine %s' % release_version)
+            print('Kubemarine %s' % get_version_str())
             return
 
     if len(arguments) < 1 or arguments[0] not in procedures.keys():
@@ -196,6 +217,18 @@ def selftest():
     from kubemarine import demo
 
     demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+
+    print('\nValidating deltas sequence...')
+
+    from kubemarine import deltas
+    local_deltas = deltas.load_local_deltas_list()
+    previous_delta = local_deltas[0]
+    for delta in local_deltas[0:]:
+        if delta.number > previous_delta.number:
+            previous_delta = delta
+        else:
+            raise Exception(f'Delta \"{delta.name}\" should have number greater '
+                            f'then delta \"{previous_delta.name}\"')
 
     print("Finished")
 

@@ -42,22 +42,32 @@ KME_DICTIONARY = {
     },
     "KME0008": {
         "name": "Unknown endpoint registry type specified"
+    },
+    "KME0009": {
+        "name": "Remote deltas out of sync between nodes"
+    },
+    "KME0010": {
+        "name": "Found deltas not applied on the remote environment"
     }
 }
 
 
 # TODO: support for more complex KME00XX objects with custom constructors
 class KME(RuntimeError):
-    def __init__(self, code, **kwargs):
+    def __init__(self, code, reason: str = None, **kwargs):
         self.code = code
         self.kme = KME_DICTIONARY.get(self.code)
         if self.kme is None:
             raise ValueError('An error was raised with an unknown error code')
         self.message = self.kme.get('name').format(**kwargs)
+        self.reason = reason
         super().__init__(self.message)
 
     def __str__(self):
-        return self.code + ": " + self.message
+        res = self.code + ": " + self.message
+        if self.reason is not None:
+            res = res + "\n" + self.reason
+        return res
 
 
 def pretty_print_error(reason: Union[str, Exception], log=None) -> None:

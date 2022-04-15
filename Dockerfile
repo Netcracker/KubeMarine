@@ -4,6 +4,7 @@ FROM python:3.9-slim-buster
 # will suddenly be unable to use the compiled binary version on older systems.
 
 ARG BUILD_TYPE
+ARG VERSION
 
 USER root
 
@@ -15,7 +16,8 @@ ENV ANSIBLE_HOST_KEY_CHECKING False
 COPY . /opt/kubemarine/
 WORKDIR /opt/kubemarine/
 
-RUN apt update && apt install -y wget && \
+RUN if [ -n "$VERSION" ]; then echo "$VERSION $(date +\"%D_%T\")" > /opt/kubemarine/VERSION; fi && \
+    apt update && apt install -y wget && \
     pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt && \
     if [ "$BUILD_TYPE" = "binary" ]; then \
       apt install -y zlib1g-dev upx-ucl binutils; \

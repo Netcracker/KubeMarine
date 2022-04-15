@@ -65,8 +65,8 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                     raise Exception(f'Host "{host}" was not found in provided cluster object')
                 self[connection] = result
 
-    def get_simple_out(self) -> str:
-        if len(self) != 1:
+    def get_simple_out(self, ignore_multiple_nodes=False) -> str:
+        if not ignore_multiple_nodes and len(self) != 1:
             raise NotImplementedError("Simple output can be returned only for NodeGroupResult consisted of "
                                       "exactly one node, but %s were provided." % list(self.keys()))
 
@@ -127,6 +127,12 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 return True
         return False
 
+    def is_all_has_code(self, code: int or str) -> bool:
+        for conn, result in self.items():
+            if not isinstance(result, fabric.runners.Result) or str(result.exited) != str(code):
+                return False
+        return True
+
     def is_any_excepted(self) -> bool:
         """
         Returns true if at least one result in group is an execution
@@ -137,12 +143,21 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                 return True
         return False
 
+    def is_all_excepted(self) -> bool:
+        for conn, result in self.items():
+            if not isinstance(result, Exception):
+                return False
+        return True
+
     def is_any_failed(self) -> bool:
         """
         Returns true if at least one result in the group finished with code 1 or failed with an exception
         :return: Boolean
         """
         return self.is_any_has_code(1) or self.is_any_excepted()
+
+    def is_all_failed(self) -> bool:
+        return self.is_all_has_code(1) or self.is_all_excepted()
 
     def get_excepted_nodes_list(self) -> List[fabric.connection.Connection]:
         """
@@ -279,6 +294,21 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :return: true if string presented
         """
         return len(self.get_nodes_list_where_value_in_stderr(value)) > 0
+
+    def is_any_results_different(self):
+        for conn, result in self.items():
+
+            if not isinstance(result, fabric.runners.Result):
+                # exceptions or other non results can not be compared and detected as non-equal
+                return True
+
+            for compared_conn, compared_result in self.items():
+                if result.stdout != compared_result.stdout \
+                    or result.stderr != compared_result.stderr \
+                    or result.exited != compared_result.exited:
+                    return True
+
+        return False
 
     def __eq__(self, other) -> bool:
         if self is other:

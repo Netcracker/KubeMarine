@@ -267,7 +267,7 @@ def main(cli_arguments=None):
         Script for automated migration from docker to containerd.
 
         How to use:
-
+a
         '''
 
     parser = flow.new_parser(cli_help)

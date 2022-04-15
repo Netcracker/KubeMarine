@@ -289,3 +289,55 @@ def determine_resource_absolute_dir(path: str) -> str:
         return patched_definition
 
     raise Exception('Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
+
+
+def get_build_version():
+    version_file = get_resource_absolute_dir('../VERSION', script_relative=True)
+    if not os.path.isfile(version_file):
+        return None, None
+
+    with open(version_file, 'r') as file:
+        data = file.read()
+        version, build = data.strip().split(' ')
+        return version, build
+
+
+# TODO: align this method with Kubernetes version comparing
+def is_version_greater(v1: str, v2: str):
+
+    if v1 is None:
+        v1_number = float('inf')
+    else:
+        v1_number = version_str_to_int(v1)
+
+    if v2 is None:
+        v2_number = float('inf')
+    else:
+        v2_number = version_str_to_int(v2)
+
+    return v1_number > v2_number
+
+
+# TODO: align this method with Kubernetes version comparing
+def is_version_lower(v1: str, v2: str):
+
+    if v1 is None:
+        v1_number = float('inf')
+    else:
+        v1_number = version_str_to_int(v1)
+
+    if v2 is None:
+        v2_number = float('inf')
+    else:
+        v2_number = version_str_to_int(v2)
+
+    return v1_number < v2_number
+
+
+# TODO: align this method with Kubernetes version comparing
+def version_str_to_int(version: str) -> int:
+    major, minor, patch = map(int, version.split("."))
+    major = (major << 24) & 0xFF000000
+    minor = (minor << 16) & 0x00FF0000
+    patch = (patch << 12) & 0x0000F000
+    return int(major | minor | patch)

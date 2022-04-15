@@ -1,0 +1,7 @@
+actions:
+- ask: "Did you finished all previous \"Apply Procedures\"?"
+- echo: "Ok, resuming..."
+- shell:
+    command: whoami
+    groups: ['master']
+    sudo: true

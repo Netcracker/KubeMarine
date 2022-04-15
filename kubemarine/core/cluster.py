@@ -19,6 +19,7 @@ from typing import Dict, List, Union
 import fabric
 import yaml
 
+from kubemarine import deltas
 from kubemarine.core import log
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
@@ -87,6 +88,8 @@ class KubernetesCluster(Environment):
         if nodes_context is not None:
             self.context['nodes'] = deepcopy(nodes_context['nodes'])
             self.context['os'] = deepcopy(nodes_context['os'])
+            if "deltas" in nodes_context:
+                self.context['deltas'] = deepcopy(nodes_context['deltas'])
 
         # do not make dumps for custom enrichment functions, because result is generally undefined
         make_dumps = custom_enrichment_fns is None
@@ -207,6 +210,12 @@ class KubernetesCluster(Environment):
         self.log.verbose('Interface check finished')
         system.detect_os_family(self)
         self.log.verbose('OS family check finished')
+
+        # todo get rid of todo
+        if self.context.get('initial_procedure') not in \
+                ['install', 'do', 'migrate_kubemarine']:
+            deltas.validate_remote_deltas(self)
+            self.log.verbose('Applied deltas validated')
 
         self.log.debug('Detecting nodes context finished!')
 

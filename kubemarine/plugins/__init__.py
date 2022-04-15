@@ -62,19 +62,29 @@ def verify_inventory(inventory, cluster):
                     raise Exception('Unknown installation procedure type found in a plugin \'%s\'. '
                                     'Expected any of %s, but found \'%s\'.'
                                     % (plugin_name, supported_procedure_types, procedure_type))
-                procedure_types[procedure_type]['verify'](cluster, configs)
+                if procedure_types[procedure_type].get('verify'):
+                    procedure_types[procedure_type]['verify'](cluster, configs)
 
     return inventory
 
 
 def enrich_inventory(inventory, cluster):
     for plugin_name, plugin_item in inventory["plugins"].items():
-        for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
-            for procedure_type, configs in step.items():
-                if procedure_types[procedure_type].get('convert') is not None:
-                    inventory["plugins"][plugin_name]['installation']['procedures'][i][procedure_type] = \
-                        procedure_types[procedure_type]['convert'](cluster, configs)
+        procedures = plugin_item.get('installation', {}).get('procedures', [])
+        if not plugin_item.get('installation'):
+            inventory['plugins'][plugin_name]['installation'] = {}
+        inventory['plugins'][plugin_name]['installation']['procedures'] = \
+            enrich_inventory_plugin_procedures(cluster, procedures)
     return inventory
+
+
+def enrich_inventory_plugin_procedures(cluster, procedures):
+    for i, step in enumerate(procedures):
+        for procedure_type, configs in step.items():
+            if procedure_types[procedure_type].get('convert') is not None:
+                procedures[i][procedure_type] = \
+                    procedure_types[procedure_type]['convert'](cluster, configs)
+    return procedures
 
 
 def enrich_upgrade_inventory(inventory, cluster):
@@ -153,11 +163,15 @@ def install(cluster, plugins=None):
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
-    cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
+    if plugin_name != 'deltas':
+        cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
 
     for current_step_i, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+            res = procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+
+            if apply_type == 'ask' and res is False:
+                return 'skipped'
 
 
 def expect_daemonset(cluster: KubernetesCluster,
@@ -733,6 +747,8 @@ def apply_ansible(cluster, step, plugin_name=None):
     return result
 
 
+# **** HELM ****
+
 def verify_helm(cluster, config):
     if config.get('chart_path') is None or config['chart_path'] == '':
         raise Exception('Chart path is missing')
@@ -849,6 +865,8 @@ def get_local_chart_path(log, config):
     return local_chart_folder
 
 
+# **** CONFIG ****
+
 def convert_config(cluster, config):
     return _convert_file(config)
 
@@ -860,6 +878,67 @@ def verify_config(cluster, config):
 def apply_config(cluster, config, plugin_name=None):
     return _apply_file(cluster, config, "Config")
 
+
+# **** ECHO ****
+
+def convert_echo(cluster, value):
+    if isinstance(value, str):
+        value = {
+            'message': value,
+            'level': 'debug'
+        }
+    return value
+
+
+def verify_echo(cluster, value):
+    if value.get('level') not in ['debug', 'warning']:
+        raise Exception('Unsupported echo message level')
+
+
+def apply_echo(cluster, value, plugin_name=None):
+    if value['level'] == 'debug':
+        cluster.log.debug(value['message'])
+    elif value['level'] == 'warning':
+        cluster.log.warning(value['message'])
+
+
+# **** ASK ****
+
+def apply_ask(cluster, question, plugin_name=None):
+    if cluster.context.get('noninteractive', False):
+        response = 'skip'
+    else:
+        response = input(question.strip() + " (yes/no/skip): ")
+
+    response = response.lower()
+
+    if response in ['no', 'false', '0', '-']:
+        exit(1)
+    elif response in ['yes', 'true', '1', '+', 'ok']:
+        return True
+    elif response in ['skip', 'ignore', 'continue']:
+        return False
+    else:
+        return apply_ask(cluster, question, plugin_name=None)
+
+
+# **** RUN ****
+
+def verify_run(cluster, value):
+    if not value.get('procedure') or not value.get('tasks'):
+        raise Exception('Run action do not contains procedure name or tasks list')
+
+
+def apply_run(cluster, value, plugin_name=None):
+    module_name = 'kubemarine.procedures.%s' % value['procedure']
+    imported_module = __import__(module_name, fromlist=['object'])
+    # TODO: support more arguments for procedure
+    # TODO: resolve flow init bugs
+    # TODO: resolve logging file access problem
+    imported_module.main([('tasks', value['tasks'])])
+
+
+# **** INTERNAL ****
 
 def _convert_file(config):
     if isinstance(config, str):
@@ -1008,5 +1087,17 @@ procedure_types = {
         'convert': convert_config,
         'verify': verify_config,
         'apply': apply_config
+    },
+    'echo': {
+        'convert': convert_echo,
+        'verify': verify_echo,
+        'apply': apply_echo
+    },
+    'ask': {
+        'apply': apply_ask
+    },
+    'run': {
+        'verify': verify_run,
+        'apply': apply_run
     },
 }
