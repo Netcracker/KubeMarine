@@ -39,8 +39,8 @@ services:
           readOnly: True
           pathType: File
         - name: audit-log
-          hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
-          mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/"}}'
+          hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
+          mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
           readOnly: False
           pathType: DirectoryOrCreate
     scheduler:
