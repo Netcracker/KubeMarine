@@ -786,23 +786,23 @@ pss:
       audit-version: latest
       warn: privileged/baseline/restricted
       warn-version: latest
-restart-pods: false
+restart-pods: false/true
 ```
 
 The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
 namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
 
 **Warnings**:
-Be careful with the `exemptions` section it may cause cluster instability.
-Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
-The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
+* Be careful with the `exemptions` section it may cause cluster instability.
+* Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
+* The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
 'kubernetes-dashboard' etc) will be deleted during the procedure in case of using `pod-security: disabled`
-Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to restart
-pods in cluster is a manual restart according to particular application. The restart procedure should consider if the application 
-is stateless or stateful.
-Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
+* Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
+restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
+application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
+* Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
 `kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
-Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster 
+* Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster 
 behavior.
 
 ### Manage PSS Tasks Tree
