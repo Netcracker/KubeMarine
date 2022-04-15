@@ -921,8 +921,8 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     files = glob.glob(source)
 
     if len(files) == 0:
-        raise Exception('Cannot find any %s files matching this '
-                        'source value: %s' % (source, file_type))
+        raise ValueError('Cannot find any %s files matching this '
+                         'source value: %s' % (source, file_type))
 
     for file in files:
         source_filename = os.path.basename(file)
@@ -966,7 +966,7 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
             if use_sudo:
                 method = apply_common_group.sudo
             cluster.log.debug("Applying yaml...")
-            return method(apply_command, hide=False)
+            method(apply_command, hide=False)
         else:
             cluster.log.debug('Apply is not required')
 
