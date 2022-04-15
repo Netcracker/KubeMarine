@@ -151,7 +151,6 @@ def load_inventory(inventory_filepath, context, silent=False, procedure_inventor
             if "control-plane" not in cluster.roles:
                 cluster.log.debug("The 'control-plane' role is absent, let's add it")
                 cluster.nodes["control-plane"] = cluster.make_group(cluster.ips["master"])
-        cluster.log.debug("INVENTORY_NODES%s" % cluster.inventory["nodes"])
         return cluster
     except yaml.YAMLError as exc:
         utils.do_fail("Failed to load inventory file", exc, log=log)

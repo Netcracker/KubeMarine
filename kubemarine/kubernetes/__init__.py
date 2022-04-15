@@ -170,7 +170,12 @@ def enrich_inventory(inventory, cluster):
                 # node is both master and worker, thus we remove NoSchedule taint
                 if "taints" not in node:
                     node["taints"] = []
-                node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                # TODO delete if-else case when oldest supported version become higher or equal v1.24
+                minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+                if minor_version < 24:
+                    node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                else:
+                    node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     if not any_worker_found:
         raise KME("KME0004")

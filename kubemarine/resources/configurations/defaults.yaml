@@ -380,7 +380,7 @@ plugins:
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico
-            groups: ['master']
+            groups: ['master', 'control-plane']
             sudo: true
         - template:
             source: templates/plugins/calicoctl.cfg.j2
