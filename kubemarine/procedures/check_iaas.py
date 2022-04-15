@@ -16,6 +16,7 @@
 
 import ipaddress
 import math
+import re
 import sys
 import uuid
 from collections import OrderedDict
@@ -272,7 +273,36 @@ def system_distributive(cluster):
         tc.success(results=", ".join(detected_supported_os))
 
 
+def detect_preinstalled_python(cluster: KubernetesCluster):
+    version_pattern = r'^Python{space}([2-3])(\.[0-9]+){{0,2}}$'
+    bash_version_pattern = version_pattern.format(space='[[:space:]]')
+    python_version_pattern = version_pattern.format(space=' ')
+
+    nodes_context = cluster.context['nodes']
+    hosts_unknown_python = [host for host, node_context in nodes_context.items() if 'python' not in node_context]
+    group_unknown_python = cluster.make_group(hosts_unknown_python)
+    detected_python = group_unknown_python.run(
+        rf'for i in $(whereis -b python); do '
+        rf'if [[ -f "$i" ]] && [[ $($i --version 2>&1 | head -n 1) =~ {bash_version_pattern} ]]; then '
+        rf'echo "$i"; $i --version 2>&1; break; '
+        rf'fi; done')
+
+    for conn, result in detected_python.items():
+        result = result.stdout.strip()
+        if not result:
+            raise TestFailure("Failed to detect preinstalled python executable. The task cannot be performed.")
+
+        executable, version = tuple(result.splitlines())
+        version = re.match(python_version_pattern, version).group(1)
+        nodes_context[conn.host]["python"] = {
+            "executable": executable,
+            "major_version": version
+        }
+
+
 def install_tcp_listener(cluster: KubernetesCluster) -> str:
+    detect_preinstalled_python(cluster)
+    # currently tcp listener can be run on both python 2 and 3
     local_path = utils.get_resource_absolute_path('resources/scripts/simple_tcp_listener.py', script_relative=True)
     tcp_listener_path = "/tmp/%s.py" % uuid.uuid4().hex
     cluster.nodes["all"].put(local_path, tcp_listener_path, binary=False)
@@ -337,8 +367,8 @@ def tcp_connect(cluster, node_from, node_to, tcp_ports, host_to_ip, mtu):
     node_from['connection'].sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
-def get_start_tcp_listener_cmd(tcp_listener):
-    return f"sudo nohup python2 {tcp_listener} %s &> /dev/null &"
+def get_start_tcp_listener_cmd(python_executable, tcp_listener):
+    return f"sudo nohup {python_executable} {tcp_listener} %s &> /dev/null &"
 
 
 def get_stop_tcp_listener_cmd(tcp_listener):
@@ -413,7 +443,8 @@ def check_subnet_connectivity(cluster, subnet):
         random_host = subnet_hosts[subnet_hosts_len - i]
         host_to_ip[node['name']] = random_host
         iface = iface_cmd % node['internal_address']
-        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
+        python_executable = cluster.context['nodes'][node["connect_to"]]['python']['executable']
+        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
         node['connection'].sudo(f"ip a add {random_host}/{net_mask} dev $({iface}); " + tcp_listener_cmd)
         i = i + 1
 
@@ -442,7 +473,8 @@ def check_tcp_ports(cluster):
         # Run process that LISTEN TCP port
         for node in node_list:
             host_to_ip[node['name']] = node['internal_address']
-            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(tcp_listener))
+            python_executable = cluster.context['nodes'][node["connect_to"]]['python']['executable']
+            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
             res = node['connection'].sudo(tcp_listener_cmd)
             cluster.log.verbose(res)
 

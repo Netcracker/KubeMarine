@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Simple TCP socket listener in python 2, which accepts connection sequentially, and writes received data to stdout
+# Simple TCP socket listener that can be run on both python 2 and 3,
+# The listener accepts connections sequentially, and suppresses the received data.
 # The script is for testing purpose only.
 # The only argv parameter is a TCP port to listen.
 
@@ -30,6 +31,5 @@ while True:
         data = client.recv(1024)
         if not data:
             break
-        sys.stdout.write(data)
 
     client.close()
