@@ -646,11 +646,18 @@ def manage_pss_enrichment(inventory, cluster):
                 inventory["rbac"]["pss"]["exemptions"][item] = procedure_config["exemptions"][item]
     if "namespaces" in procedure_config:
         for namespace in procedure_config["namespaces"]:
-            for item in procedure_config["namespaces"][namespace]:
-                if item.endswith("version"):
-                    verify_version(item, procedure_config["namespaces"][namespace][item], minor_version)
-                else:
-                    verify_parameter(item, procedure_config["namespaces"][namespace][item], valid_profiles)
+            if procedure_config["namespaces"][namespace]:
+                for item in procedure_config["namespaces"][namespace]:
+                    if item.endswith("version"):
+                        verify_version(item, procedure_config["namespaces"][namespace][item], minor_version)
+                    else:
+                        verify_parameter(item, procedure_config["namespaces"][namespace][item], valid_profiles)
+    if "namespaces_defaults" in procedure_config:
+        for item in procedure_config["namespaces_defaults"]:
+            if item.endswith("version"):
+                verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
+            else:
+                verify_parameter(item, procedure_config["namespaces_defaults"][item], valid_profiles)
 
     return inventory
 
@@ -923,13 +930,32 @@ def label_namespace_pss(cluster, manage_type):
     namespaces = procedure_config.get("namespaces")
     # get the list of namespaces that should be labeled then set/delete labels
     if namespaces:
+        # check if procedure config has default values for labels
+        namespaces_defaults = procedure_config.get("namespaces_defaults")
+        if namespaces_defaults:
+            default_modes = {}
+            for default_mode in namespaces_defaults:
+                 default_modes[default_mode] = namespaces_defaults[default_mode]
         for namespace in namespaces:
             if manage_type in ["apply", "install"]:
-                cluster.log.debug("Set PSS labels on namespace %s" % namespace)
-                for mode in namespaces[namespace]:
-                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                      % (namespace, mode, namespaces[namespace][mode]))
+                if default_modes:
+                    # set labels that are set in default section
+                    cluster.log.debug("Set PSS labels on namespace from defaults %s" % namespace)
+                    for mode in default_modes:
+                        first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                          % (namespace, mode, default_modes[mode]))
+                if namespaces[namespace]:
+                    # set labels that are set in namespaces section
+                    cluster.log.debug("Set PSS labels on namespace %s" % namespace)
+                    for mode in namespaces[namespace]:
+                        first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                          % (namespace, mode, namespaces[namespace][mode]))
             elif manage_type == "delete":
+                # delete labels that are set in default section
+                cluster.log.debug("Delete PSS labels on namespace from defaults %s" % namespace)
+                for mode in default_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s-" % (namespace, mode))
+                # delete labels that are set in namespaces section
                 cluster.log.debug("Delete PSS labels on namespace %s" % namespace)
                 for mode in namespaces[namespace]:
                     first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (namespace, mode))
