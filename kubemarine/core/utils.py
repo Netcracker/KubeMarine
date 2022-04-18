@@ -335,7 +335,7 @@ class ClusterStorage:
         initial_procedure = cluster.context["initial_procedure"]
         self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
         self.dir_location = self.dir_path + self.dir_name
-        cluster.nodes['master'].run(f"sudo mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
+        cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                      f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
     def rotation_file(self, cluster):
@@ -352,12 +352,13 @@ class ClusterStorage:
             files = sum_file.split()
             files.sort(reverse=True)
             files_unsort = sum_file.split()
-            not_pack_file = cluster.defaults['procedure_history']['not_archive_threshold']
-            delete_old = cluster.defaults['procedure_history']['delete_threshold']
+            files_unsort.sort()
+            not_pack_file = cluster.inventory['procedure_history']['not_archive_threshold']
+            delete_old = cluster.inventory['procedure_history']['delete_threshold']
             if count > not_pack_file:
                 for i in range(not_pack_file, delete_old):
                     if 'tar.gz' not in files[i] and i < count:
-                        group.run(f'sudo tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
+                        group.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
                                    f'sudo rm -r {self.dir_path + files[i]}')
                     break
             if count > delete_old:
@@ -388,7 +389,7 @@ class ClusterStorage:
                             tar.add(output)
                 self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
                 self.cluster.log.debug('File upload local.tar.gz')
-                self.cluster.nodes['master'].run(f'sudo tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
+                self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
                                                   f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
@@ -408,15 +409,15 @@ class ClusterStorage:
             dump_file(cluster, stream, "version")
 
 
-    def collect_info_all_master(self):
+    def collect_info_all_master(self, cluster):
         """
         This method is used to transfer backup logs from the main master to the new master.
         """
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             ip = node['address']
             if self.cluster.context['nodes'][ip]['online']:
-                data_copy_res = self.cluster.nodes['master'].get_first_member().sudo(
-                    f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
+                group = cluster.make_group([node['connect_to']])
+                data_copy_res = group.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
                 self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
                 node['connection'].get('/tmp/kubemarine-backup.tar.gz',
                                        os.path.join(self.cluster.context['execution_arguments']['dump_location'],

@@ -57,7 +57,7 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
     new_nodes = cluster.nodes['all'].get_new_nodes()
 
     cluster_storage = utils.ClusterStorage.get_instance(cluster)
-    cluster_storage.collect_info_all_master()
+    cluster_storage.collect_info_all_master(cluster)
 
     # add nodes to inventory if they in new nodes and transfer log on the new node
     for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
