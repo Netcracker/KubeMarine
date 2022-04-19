@@ -27,16 +27,21 @@ from kubemarine.core.executor import RemoteExecutor
 
 
 def system_prepare_check_sudoer(cluster):
+    not_sudoers = []
     for host, node_context in cluster.context['nodes'].items():
-        if node_context['online'] and node_context['hasroot']:
+        access_info = node_context['access']
+        if access_info['online'] and access_info['sudo'] == 'Root':
             cluster.log.debug("%s online and has root" % host)
         else:
-            raise KME("KME0005", hostname=host)
+            not_sudoers.append(host)
+
+    if not_sudoers:
+        raise KME("KME0005", hostnames=not_sudoers)
 
 
 def system_prepare_check_system(cluster):
     group = cluster.nodes['all'].get_new_nodes_or_self()
-    cluster.log.debug(system.detect_os_family(cluster, suppress_exceptions=True))
+    cluster.log.debug(system.fetch_os_versions(cluster))
     for address, context in cluster.context["nodes"].items():
         if address not in group.nodes or not context.get('os'):
             continue

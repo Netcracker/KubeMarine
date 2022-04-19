@@ -201,8 +201,7 @@ def reset_installation_env(group: NodeGroup):
 
     if not group.get_nodes_for_removal().is_empty():
         # this is remove_node procedure
-        check_active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
-        active_nodes = group.wait_active_nodes(timeout=check_active_timeout)
+        active_nodes = group.get_online_nodes(True)
 
         # We need to manually remove members from etcd for "remove" procedure,
         # only if corresponding nodes are not active.

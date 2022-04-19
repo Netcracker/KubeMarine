@@ -17,13 +17,14 @@ import os
 import sys
 import time
 from copy import deepcopy
+from typing import Type, Optional, List
 
 import yaml
 import importlib
 
 from kubemarine.core import utils, cluster as c
 
-DEFAULT_CLUSTER_OBJ = None
+DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 
 
 def run(tasks,
@@ -33,8 +34,7 @@ def run(tasks,
         context,
         procedure_inventory_filepath=None,
         cumulative_points=None,
-        print_final_message=True,
-        cluster_obj=None):
+        print_final_message=True):
 
     time_start = time.time()
 
@@ -58,8 +58,7 @@ def run(tasks,
         utils.prepare_dump_directory(context['execution_arguments'].get('dump_location'),
                                      reset_directory=not context['execution_arguments'].get('disable_dump_cleanup', False))
 
-    cluster = load_inventory(inventory_filepath, context, procedure_inventory_filepath=procedure_inventory_filepath,
-                             cluster_obj=cluster_obj)
+    cluster = load_inventory(inventory_filepath, context, procedure_inventory_filepath=procedure_inventory_filepath)
 
     if 'ansible_inventory_location' in cluster.context['execution_arguments']:
         utils.make_ansible_inventory(cluster.context['execution_arguments']['ansible_inventory_location'], cluster)
@@ -126,18 +125,19 @@ def create_context(execution_arguments, procedure=None, included_tasks=None, exc
     return context
 
 
-def load_inventory(inventory_filepath, context, silent=False, procedure_inventory_filepath=None, cluster_obj=None):
+def load_inventory(inventory_filepath, context, silent=False, procedure_inventory_filepath=None):
+    silent = silent or isinstance(inventory_filepath, dict)
     if not silent:
         print("Loading inventory file '%s'" % inventory_filepath)
+
+    log = None
     try:
-        if cluster_obj is None:
-            cluster_obj = DEFAULT_CLUSTER_OBJ
-        if cluster_obj is None:
-            cluster_obj = c.KubernetesCluster
-        cluster = cluster_obj(inventory_filepath,
-                              context,
-                              procedure_inventory=procedure_inventory_filepath,
-                              gather_facts=True)
+        cluster = _load_operational_cluster(inventory_filepath, context, procedure_inventory_filepath)
+        log = cluster.log
+        light_cluster = _load_light_cluster(cluster)
+        light_cluster.enrich(custom_enrichment_fns=cluster.get_facts_enrichment_fns())
+        cluster.enrich(nodes_context=light_cluster.context)
+
         if not silent:
             cluster.log.debug("Inventory file loaded:")
             for role in cluster.roles:
@@ -146,24 +146,47 @@ def load_inventory(inventory_filepath, context, silent=False, procedure_inventor
                     cluster.log.debug("    %s" % ip)
         return cluster
     except yaml.YAMLError as exc:
-        utils.do_fail("Failed to load inventory file", exc)
+        utils.do_fail("Failed to load inventory file", exc, log=log)
     except Exception as exc:
-        utils.do_fail("Failed to proceed inventory file", exc)
+        utils.do_fail("Failed to proceed inventory file", exc, log=log)
 
 
-def filter_flow(tasks, tasks_filter, excluded_tasks, _task_path='', flow_changed=False):
+def _provide_cluster(*args, **kw):
+    return DEFAULT_CLUSTER_OBJ(*args, **kw) if DEFAULT_CLUSTER_OBJ is not None \
+        else c.KubernetesCluster(*args, **kw)
+
+
+def _load_operational_cluster(inventory_filepath, context, procedure_inventory_filepath):
+    """
+    Initialize main cluster instance to be used in tasks.
+    """
+    return _provide_cluster(inventory_filepath, context,
+                            procedure_inventory=procedure_inventory_filepath)
+
+
+def _load_light_cluster(cluster: c.KubernetesCluster):
+    """
+    Initialize temporary cluster instance to detect initial nodes context.
+    """
+    return _provide_cluster(cluster.raw_inventory, cluster.context,
+                            procedure_inventory=cluster.procedure_inventory,
+                            shallow_copy_env_from=cluster)
+
+
+def filter_flow(tasks, tasks_filter: List[str], excluded_tasks: List[str]):
+    # Remove any whitespaces from filters, and split by '.'
+    tasks_filter = [tasks.split(".") for tasks in list(map(str.strip, tasks_filter))]
+    excluded_tasks = [tasks.split(".") for tasks in list(map(str.strip, excluded_tasks))]
+
+    return _filter_flow_internal(tasks, tasks_filter, excluded_tasks, [])
+
+
+def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: List[List[str]], _task_path: List[str]):
     filtered = {}
     final_list = []
 
-    # Remove any whitespaces from filters
-    map(str.strip, tasks_filter)
-    map(str.strip, excluded_tasks)
-
     for task_name, task in tasks.items():
-        if _task_path == '':
-            __task_path = task_name
-        else:
-            __task_path = _task_path + "." + task_name
+        __task_path = _task_path + [task_name]
 
         allowed = True
         # if task_filter is not empty - smb specified filter argument
@@ -172,21 +195,25 @@ def filter_flow(tasks, tasks_filter, excluded_tasks, _task_path='', flow_changed
             # Check if the iterable subpath is in allowed paths. For example we have to check if
             # system_prepare.cri in allowed path system_prepare.cri.docker
             for task_path in tasks_filter:
-                if __task_path in task_path or task_path in __task_path:
+                # one of task_path, __task_path is a sublist of another
+                # check if current '__task_path' is a sublist only if 'task' is not a final task.
+                if (task_path[:len(__task_path)] == __task_path and not callable(task)) \
+                        or __task_path[:len(task_path)] == task_path:
                     allowed = True
                     # print("Allowed %s in %s" % (__task_path, task_path))
 
-        if allowed and (not excluded_tasks or __task_path not in excluded_tasks):
+        if allowed and __task_path not in excluded_tasks:
             if callable(task):
                 filtered[task_name] = task
-                final_list.append(__task_path)
+                final_list.append(".".join(__task_path))
             else:
-                filtered_flow, _final_list = filter_flow(task, tasks_filter, excluded_tasks, __task_path, flow_changed)
-                if filter_flow is not {}:
+                filtered_flow, _final_list = _filter_flow_internal(task, tasks_filter, excluded_tasks, __task_path)
+                # there is something to execute in subtree
+                if filtered_flow:
                     filtered[task_name] = filtered_flow
                     final_list += _final_list
         else:
-            print("\t%s" % __task_path)
+            print("\t%s" % ".".join(__task_path))
 
     return filtered, final_list
 

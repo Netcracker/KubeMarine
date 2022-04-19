@@ -31,7 +31,8 @@ _AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
 
 class KubernetesCluster(Environment):
 
-    def __init__(self, inventory, context, procedure_inventory=None, gather_facts=False):
+    def __init__(self, inventory, context, procedure_inventory=None,
+                 shallow_copy_env_from: 'KubernetesCluster' = None):
 
         self.supported_roles = [
             "balancer",
@@ -45,16 +46,8 @@ class KubernetesCluster(Environment):
         }
         self.nodes: Dict[str, NodeGroup] = {}
 
-        self.context = context
+        self.context = deepcopy(context)
         self.context['runtime_vars'] = {}
-
-        with open(utils.get_resource_absolute_path('resources/configurations/globals.yaml',
-                                                   script_relative=True), 'r') as stream:
-            self._globals = yaml.safe_load(stream)
-
-        with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
-                                                   script_relative=True), 'r') as stream:
-            self._defaults = yaml.safe_load(stream)
 
         if isinstance(inventory, dict):
             self.raw_inventory = deepcopy(inventory)
@@ -62,7 +55,20 @@ class KubernetesCluster(Environment):
             with open(inventory, 'r') as stream:
                 self.raw_inventory = yaml.safe_load(stream)
 
-        self._log = log.init_log_from_context_args(self)
+        if shallow_copy_env_from:
+            self._globals = shallow_copy_env_from._globals
+            self._defaults = shallow_copy_env_from._defaults
+            self._log = shallow_copy_env_from._log
+        else:
+            with open(utils.get_resource_absolute_path('resources/configurations/globals.yaml',
+                                                       script_relative=True), 'r') as stream:
+                self._globals = yaml.safe_load(stream)
+
+            with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
+                                                       script_relative=True), 'r') as stream:
+                self._defaults = yaml.safe_load(stream)
+
+            self._log = log.init_log_from_context_args(self)
 
         self.procedure_inventory = {}
         if procedure_inventory is not None:
@@ -73,12 +79,23 @@ class KubernetesCluster(Environment):
                     self.procedure_inventory = yaml.safe_load(stream)
 
         self._inventory = {}
+        # connection pool should be created every time, because it is relied on partially enriched inventory
         self._connection_pool = ConnectionPool(self)
 
-        if gather_facts:
-            self.gather_facts('before')
+    def enrich(self, nodes_context: dict = None, custom_enrichment_fns: List[str] = None):
+        # if nodes context is explicitly supplied, let's copy it first.
+        if nodes_context is not None:
+            self.context['nodes'] = deepcopy(nodes_context['nodes'])
+            self.context['os'] = deepcopy(nodes_context['os'])
 
-        self._inventory = defaults.enrich_inventory(self, self.raw_inventory)
+        # do not make dumps for custom enrichment functions, because result is generally undefined
+        make_dumps = custom_enrichment_fns is None
+        self._inventory = defaults.enrich_inventory(self, self.raw_inventory,
+                                                    make_dumps=make_dumps, custom_fns=custom_enrichment_fns)
+
+        # detect nodes context automatically, after enrichment is done to ensure that node groups are initialized
+        if nodes_context is None:
+            self._detect_nodes_context()
 
     @property
     def inventory(self) -> dict:
@@ -171,38 +188,69 @@ class KubernetesCluster(Environment):
             "kubemarine.core.defaults.calculate_nodegroups"
         ]
 
-    def gather_facts(self, step) -> None:
-        self.log.debug('Gathering facts started...')
+    def _detect_nodes_context(self) -> None:
+        self.log.debug('Start detecting nodes context...')
 
-        if step == 'before':
-            t_cluster = deepcopy(self)
-            defaults.enrich_inventory(t_cluster, t_cluster.raw_inventory, make_dumps=False, custom_fns=self.get_facts_enrichment_fns())
+        for node in self.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+            self.context['nodes'][node['connect_to']] = {
+                "name": node['name'],
+                "roles": node['roles']
+            }
 
-            for node in t_cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-                t_cluster.context['nodes'][node['connect_to']] = {
-                    "name": node['name'],
-                    "roles": node['roles'],
-                    "online": False
-                }
+        system.whoami(self)
+        self.log.verbose('Whoami check finished')
 
-            system.whoami(t_cluster.nodes['all'])
-            self.log.verbose('Whoami check finished')
-            system.detect_active_interface(t_cluster.nodes['all'].get_online_nodes())
-            self.log.verbose('Interface check finished')
-            system.detect_os_family(t_cluster, suppress_exceptions=True)
-            self.log.verbose('OS family check finished')
-            self.context = t_cluster.context
-        elif step == 'after':
-            self.remove_invalid_cri_config(self.inventory)
-            # Method "kubemarine.system.is_multiple_os_detected" is not used because it detects OS family for new nodes
-            # only, while package versions caching performs on all nodes.
-            if self.nodes['all'].get_nodes_os(suppress_exceptions=True, force_all_nodes=True) != 'multiple':
-                self.cache_package_versions()
-                self.log.verbose('Package versions detection finished')
-            else:
-                self.log.verbose('Package versions detection cancelled - cluster in multiple OS state')
+        self._check_online_nodes()
+        self._check_accessible_nodes()
 
-        self.log.debug('Gathering facts finished!')
+        system.detect_active_interface(self)
+        self.log.verbose('Interface check finished')
+        system.detect_os_family(self)
+        self.log.verbose('OS family check finished')
+
+        self.log.debug('Detecting nodes context finished!')
+
+    def _gather_facts_after(self):
+        self.log.debug('Gathering facts after tasks execution started...')
+
+        self.remove_invalid_cri_config(self.inventory)
+        # Method "kubemarine.system.is_multiple_os_detected" is not used because it detects OS family for new nodes
+        # only, while package versions caching performs on all nodes.
+        if self.nodes['all'].get_nodes_os(suppress_exceptions=True, force_all_nodes=True) != 'multiple':
+            self.cache_package_versions()
+            self.log.verbose('Package versions detection finished')
+        else:
+            self.log.verbose('Package versions detection cancelled - cluster in multiple OS state')
+
+        self.log.debug('Gathering facts after tasks execution finished!')
+
+    def _check_online_nodes(self):
+        """
+        Check that only subset of nodes for removal can be offline
+        """
+        all = self.nodes['all']
+        for_removal = all.get_nodes_for_removal()
+        remained = all.exclude_group(for_removal)
+        offline = all.get_online_nodes(False)
+        remained_offline = remained.intersection_group(offline)
+        if not remained_offline.is_empty():
+            raise Exception(f"{remained_offline.get_hosts()} are not reachable. "
+                            "Probably they are turned off or something is incorrect with ssh daemon, "
+                            "or incorrect ssh port is specified.")
+
+    # todo this check can probably be moved to prepare.check tasks group of each procedure
+    def _check_accessible_nodes(self):
+        """
+        Check that all online nodes are accessible.
+        """
+        all = self.nodes['all']
+        online = all.get_online_nodes(True)
+        accessible = all.get_accessible_nodes()
+        not_accessible = all.exclude_group(accessible)
+        not_accessible_online = online.intersection_group(not_accessible)
+        if not not_accessible_online.is_empty():
+            raise Exception(f"{not_accessible_online.get_hosts()} are not accessible through ssh. "
+                            f"Check ssh credentials.")
 
     def get_associations_for_os(self, os_family):
         package_associations = self.inventory['services']['packages']['associations']
@@ -275,7 +323,9 @@ class KubernetesCluster(Environment):
         raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
     def cache_package_versions(self):
-        detected_packages = packages.detect_installed_packages_version_groups(self.nodes['all'].get_unchanged_nodes().get_online_nodes())
+        # todo consider nodes not having sudo privileges
+        detected_packages = packages.detect_installed_packages_version_groups(
+            self.nodes['all'].get_unchanged_nodes().get_online_nodes(True))
         for os_family in ['debian', 'rhel', 'rhel8']:
             if self.inventory['services']['packages']['associations'].get(os_family):
                 del self.inventory['services']['packages']['associations'][os_family]
@@ -332,7 +382,7 @@ class KubernetesCluster(Environment):
         return detected_packages
 
     def finish(self):
-        self.gather_facts('after')
+        self._gather_facts_after()
         # TODO: rewrite the following lines as deenrichment functions like common enrichment mechanism
         from kubemarine.procedures import remove_node
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)

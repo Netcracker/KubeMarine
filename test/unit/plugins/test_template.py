@@ -118,9 +118,12 @@ class TestTemplate(unittest.TestCase):
                     apply_template(cluster, config)
 
                     for file in tc["apply_files"]:
-                        history = cluster.fake_shell.history_find("sudo", [f"kubectl apply -f /etc/kubernetes/{file}"])
-                        self.assertEqual(1, len(history))
-                        self.assertEqual(1, history[0]["used_times"])
+                        cnt = 0
+                        for host in cluster.nodes['master'].get_hosts():
+                            history = cluster.fake_shell.history_find(host, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"])
+                            if len(history) == 1 and history[0]["used_times"] == 1:
+                                cnt += 1
+                        self.assertEqual(1, cnt)
                 else:
                     # If test case is not valid check for exception raise
                     self.assertRaises(

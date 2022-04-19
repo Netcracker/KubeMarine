@@ -62,9 +62,10 @@ class TestFakeShell(unittest.TestCase):
 
         system.reboot_nodes(self.cluster.nodes['master'])
 
-        self.assertEqual(2,
-                         len(self.cluster.fake_shell.history_find('sudo', ['last reboot'])),
-                         msg="Wrong number of reboots in history")
+        for host in self.cluster.nodes['master'].get_hosts():
+            self.assertEqual(2,
+                             len(self.cluster.fake_shell.history_find(host, 'sudo', ['last reboot'])),
+                             msg="Wrong number of reboots in history")
 
 
 class TestFakeFS(unittest.TestCase):
@@ -107,7 +108,7 @@ class TestFakeFS(unittest.TestCase):
 
         expected_data = 'hello\nworld'
         self.cluster.nodes['master'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
-        actual_data_group = self.cluster.fake_fs.group_read(self.cluster.nodes['master'], '/tmp/test/file.txt')
+        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['master'].get_hosts(), '/tmp/test/file.txt')
 
         for host, actual_data in actual_data_group.items():
             self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal for node %s" % host)
