@@ -26,6 +26,7 @@ from kubemarine.core.yaml_merger import default_merger
 # All enrichment procedures should not connect to any node.
 # The information about nodes should be collected within KubernetesCluster#_detect_nodes_context().
 DEFAULT_ENRICHMENT_FNS = [
+    "kubemarine.kubernetes.master_node_enrichment",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
@@ -61,8 +62,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.plugins.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
     "kubemarine.k8s_certs.renew_verify",
-    "kubemarine.cri.enrich_inventory",
-    "kubemarine.kubernetes.master_node_enrichment",
+    "kubemarine.cri.enrich_inventory"
 ]
 
 supported_defaults = {
