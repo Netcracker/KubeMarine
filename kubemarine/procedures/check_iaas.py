@@ -28,6 +28,7 @@ import fabric
 from kubemarine.core import flow, utils
 from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.executor import RemoteExecutor
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 
 
@@ -314,42 +315,121 @@ def suspend_firewalld(cluster: KubernetesCluster):
     firewalld_statuses = system.fetch_firewalld_status(cluster.nodes["all"])
     stop_firewalld_group = firewalld_statuses.get_nodes_group_where_value_in_stdout("active (running)")
 
-    exc = None
+    nodes_to_rollback = cluster.make_group([])
     try:
-        stop_result = system.stop_service(stop_firewalld_group, "firewalld")
-    except fabric.group.GroupException as e:
-        exc = e
-        stop_result = e.result
+        try:
+            nodes_to_rollback = system.stop_service(stop_firewalld_group, "firewalld").get_group()
+        except fabric.group.GroupException as e:
+            nodes_to_rollback = e.result.get_exited_nodes_group()
+            raise
 
-    nodes_to_rollback = stop_result.get_exited_nodes_group()
-    try:
-        if exc is not None:
-            raise exc
         yield
     finally:
         system.start_service(nodes_to_rollback, "firewalld")
+
+
+def _get_not_balancers(cluster: KubernetesCluster) -> dict:
+    nodes = {}
+    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+        # exclude nodes which are only balancers.
+        if node["roles"] == ["balancer"]:
+            cluster.log.debug(f"Exclude balancer '{node['name']}' from subnet connectivity check.")
+            continue
+        nodes[node["connect_to"]] = node
+
+    return nodes
+
+
+@contextmanager
+def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
+    inet = ipaddress.ip_network(subnet)
+    net_mask = str(inet.netmask)
+    subnet_hosts = list(inet.hosts())
+    subnet_hosts_len = len(subnet_hosts)
+
+    host_to_inf = {}
+    host_to_ip = {}
+    skipped_nodes = []
+    nodes_to_rollback = cluster.make_group([])
+
+    try:
+        # Assign random IP for the subnet on every node
+        i = 30
+        for host, node in nodes.items():
+            inf = cluster.context['nodes'][host]['active_interface']
+            if not inf:
+                raise TestFailure(f"Failed to detect active interface on {node['name']}")
+            host_to_inf[host] = inf
+            random_host = subnet_hosts[subnet_hosts_len - i]
+            host_to_ip[host] = random_host
+            i = i + 1
+
+        with RemoteExecutor(cluster) as exe:
+            for host, node in nodes.items():
+                existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
+                node['connection'].sudo(existing_alias, warn=True)
+
+            exe.flush()
+            for cxn, result in exe.get_merged_result().items():
+                host = cxn.host
+                if not result.stdout and not result.stderr and result.exited == 1:
+                    # grep returned nothing, subnet is not used.
+                    pass
+                else:
+                    skipped_nodes.append(nodes[host]["name"])
+                    del nodes[host]
+
+            # Create alias from the node network interface for the subnet on every node
+            for host, node in nodes.items():
+                node['connection'].sudo(f"ip a add {host_to_ip[host]}/{net_mask} dev {host_to_inf[host]}")
+
+            exe.flush()
+            try:
+                nodes_to_rollback = exe.get_merged_result().get_group()
+            except fabric.group.GroupException as e:
+                nodes_to_rollback = e.result.get_exited_nodes_group()
+                raise
+
+        yield host_to_ip
+    finally:
+        # Remove the created aliases from network interfaces
+        with RemoteExecutor(cluster):
+            for node in nodes_to_rollback.get_ordered_members_list(provide_node_configs=True):
+                host = node["connect_to"]
+                node['connection'].sudo(f"ip a del {host_to_ip[host]}/{net_mask} dev {host_to_inf[host]}",
+                                        warn=True)
+
+    if skipped_nodes:
+        raise TestWarn(f"Cannot perform check on {skipped_nodes}: subnet is already in use. "
+                       f"Use check_paas procedure if you already have installed cluster.")
 
 
 def pod_subnet_connectivity(cluster):
     with TestCase(cluster.context['testsuite'], '009', 'Network', 'PodSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
-        failed_nodes = check_subnet_connectivity(cluster, pod_subnet)
+        nodes = _get_not_balancers(cluster)
+        with assign_random_ips(cluster, nodes, pod_subnet) as host_to_ip:
+            failed_nodes = check_connectivity(cluster, nodes, host_to_ip, ["30050"])
 
-        if failed_nodes:
-            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint=f"Traffic is not allowed for the pod subnet({pod_subnet}) on nodes: {failed_nodes}.")
+            if failed_nodes:
+                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                                  hint=f"Traffic is not allowed for the pod subnet({pod_subnet}) "
+                                       f"on nodes: {failed_nodes}.")
 
 
 def service_subnet_connectivity(cluster):
     with TestCase(cluster.context['testsuite'], '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
-        failed_nodes = check_subnet_connectivity(cluster, service_subnet)
+        nodes = _get_not_balancers(cluster)
+        with assign_random_ips(cluster, nodes, service_subnet) as host_to_ip:
+            failed_nodes = check_connectivity(cluster, nodes, host_to_ip, ["30050"])
 
-        if failed_nodes:
-            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint=f"Traffic is not allowed for the service subnet({service_subnet}) on nodes: {failed_nodes}.")
+            if failed_nodes:
+                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                                  hint=f"Traffic is not allowed for the service subnet({service_subnet}) "
+                                       f"on nodes: {failed_nodes}.")
 
 
 def cmd_for_ports(ports, query):
@@ -363,7 +443,7 @@ def tcp_connect(cluster, node_from, node_to, tcp_ports, host_to_ip, mtu):
     # 40 bites for headers
     mtu -= 40
     cluster.log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
-    cmd = cmd_for_ports(tcp_ports, f"echo $(dd if=/dev/urandom bs={mtu}  count=1) >/dev/tcp/{host_to_ip[node_to['name']]}/%s")
+    cmd = cmd_for_ports(tcp_ports, f"echo $(dd if=/dev/urandom bs={mtu}  count=1) >/dev/tcp/{host_to_ip[node_to['connect_to']]}/%s")
     node_from['connection'].sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
@@ -422,42 +502,22 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
     return failed_nodes
 
 
-def check_subnet_connectivity(cluster, subnet):
+def check_connectivity(cluster, nodes: dict, host_to_ip: dict, tcp_ports):
     tcp_listener = install_tcp_listener(cluster)
-    inet = ipaddress.ip_network(subnet)
-    net_mask = str(inet.netmask)
-    subnet_hosts = list(inet.hosts())
-    subnet_hosts_len = len(subnet_hosts)
 
-    iface_cmd = "sudo ip -o a | grep %s | awk '{print $2}'"
-    tcp_ports = ["30050"]
-    node_list = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
-    # exclude nodes which are only balancers.
-    node_list = [node for node in node_list if node["roles"] != ["balancer"]]
-    host_to_ip = {}
-
-    # Create alias from the node network interface for the subnet on every node
-    # And run process that LISTEN TCP port
-    i = 30
-    for node in node_list:
-        random_host = subnet_hosts[subnet_hosts_len - i]
-        host_to_ip[node['name']] = random_host
-        iface = iface_cmd % node['internal_address']
-        python_executable = cluster.context['nodes'][node["connect_to"]]['python']['executable']
+    # Run process that LISTEN TCP port
+    for host, node in nodes.items():
+        python_executable = cluster.context['nodes'][host]['python']['executable']
         tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
-        node['connection'].sudo(f"ip a add {random_host}/{net_mask} dev $({iface}); " + tcp_listener_cmd)
-        i = i + 1
+        res = node['connection'].sudo(tcp_listener_cmd)
+        cluster.log.verbose(res)
 
-    failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
+    failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
 
-    i = 30
-    # Remove the created aliases from network interfaces and kill the created during the test processes
-    for node in node_list:
-        random_host = subnet_hosts[subnet_hosts_len - i]
-        iface = iface_cmd % node['internal_address']
+    # Kill the created during the test processes
+    for node in nodes.values():
         tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-        node['connection'].sudo(tcp_listener_cmd + f" && sudo ip a del {random_host}/{net_mask} dev $({iface})", warn=True)
-        i = i + 1
+        node['connection'].sudo(tcp_listener_cmd, warn=True)
 
     return failed_nodes
 
@@ -465,25 +525,12 @@ def check_subnet_connectivity(cluster, subnet):
 def check_tcp_ports(cluster):
     with TestCase(cluster.context['testsuite'], '011', 'Network', 'TCPPorts', default_results='Connected'),\
             suspend_firewalld(cluster):
-        tcp_listener = install_tcp_listener(cluster)
         tcp_ports = ["80", "443", "6443", "2379", "2380", "10250", "10251", "10252", "30001", "30002"]
-        node_list = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
-        host_to_ip = {}
+        nodes = {node["connect_to"]: node
+                 for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)}
+        host_to_ip = {host: node['internal_address'] for host, node in nodes.items()}
 
-        # Run process that LISTEN TCP port
-        for node in node_list:
-            host_to_ip[node['name']] = node['internal_address']
-            python_executable = cluster.context['nodes'][node["connect_to"]]['python']['executable']
-            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
-            res = node['connection'].sudo(tcp_listener_cmd)
-            cluster.log.verbose(res)
-
-        failed_nodes = check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_ip)
-
-        # Kill the created during test processes
-        for node in node_list:
-            tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-            node['connection'].sudo(tcp_listener_cmd)
+        failed_nodes = check_connectivity(cluster, nodes, host_to_ip, tcp_ports)
 
         if failed_nodes:
             raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",

@@ -210,7 +210,10 @@ class RemoteExecutor:
 
     def get_merged_nodegroup_results(self):
         """
-        Merges last tokenized results to NodeGroupResult
+        Merges last tokenized results into NodeGroupResult.
+
+        The method is useful to check exceptions, or to check result in case only one command per node is executed.
+
         :return: None or NodeGroupResult
         """
         # TODO: Get rid of this WA import, added to avoid circular import problem
@@ -221,17 +224,19 @@ class RemoteExecutor:
         group_results = NodeGroupResult(self.cluster)
         for cxn, host_results in executor.get_last_results().items():
             merged_result = {
-                "stdout": None,
-                "stderr": None,
+                "stdout": '',
+                "stderr": '',
                 "exited": 0
             }
             object_result = None
             for token, result in host_results.items():
                 if isinstance(result, fabric.runners.Result):
                     if result.stdout:
-                        merged_result['stdout'] = str(merged_result['stdout'] or '') + '\n\n' + result.stdout
+                        merged_result['stdout'] = result.stdout if not merged_result['stdout'] \
+                            else merged_result['stdout'] + '\n\n' + result.stdout
                     if result.stderr:
-                        merged_result['stderr'] = str(merged_result['stderr'] or '') + '\n\n' + result.stderr
+                        merged_result['stderr'] = result.stderr if not merged_result['stderr'] \
+                            else merged_result['stderr'] + '\n\n' + result.stderr
 
                     # Exit codes can not be merged, that's why they are assigned by priority:
                     # 1. Most important code is 1, it should be assigned if any results contains it
@@ -259,17 +264,26 @@ class RemoteExecutor:
         Throws an exception if last results has failed commands. Ignores enabled executor.warn option.
         :return: None
         """
+        self.get_merged_result()
+
+    def get_merged_result(self):
+        """
+        Returns last results, merged into NodeGroupResult. If any node failed, throws GroupException.
+
+        The method is useful to propagate exceptions, or to check result in case only one command per node is executed.
+
+        :return: NodeGroupResult
+        """
         executor = self._get_active_executor()
         if len(executor.results) == 0:
-            return
+            return None
         group_results = executor.get_merged_nodegroup_results()
         if len(group_results.failed) > 0:
-            # If any failed, then check is any command had warn=False to throw an exception
-            # If all commands had warn=True, then no exception should be thrown
-            for conn, result in group_results.failed.items():
-                for command in executor.connections_queue_history[-1][conn]:
-                    if not command[0][2].get('warn', False):
-                        raise fabric.group.GroupException(group_results)
+            # If any failed, then throw exception.
+            # Do not check 'warn' arg, because if any command had 'False' value, UnexpectedExit can be already thrown.
+            raise fabric.group.GroupException(group_results)
+
+        return group_results
 
     def get_last_results_str(self):
         batched_results = self.get_last_results()
@@ -332,6 +346,7 @@ class RemoteExecutor:
                     except Exception as e:
                         results[key] = e
 
+                # todo if previous batch for some cxn failed, probably we should not continue executing for that cxn
                 for cxn, payload in batch.items():
                     action, callbacks, tokens = payload
                     do_type, args, kwargs = action
