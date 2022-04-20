@@ -175,15 +175,9 @@ def recreate_final_inventory_file(cluster):
     # convert initial inventory to final
     final_inventory = get_final_inventory(cluster, initial_inventory=initial_inventory)
 
-    buf = io.StringIO()
-    ruamel_yaml.dump(final_inventory, buf)
-    cluster_orig = buf.getvalue()
-    dump_file(cluster, cluster_orig, "cluster.yaml")
-
     # replace intial inventory with final one
     with open(get_resource_absolute_path(cluster.context['execution_arguments']['config']), "w+") as stream:
         ruamel_yaml.dump(final_inventory, stream)
-
 
 
 def get_final_inventory(cluster, initial_inventory=None):
@@ -345,11 +339,11 @@ class ClusterStorage:
 
         for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
             group = cluster.make_group([node['connect_to']])
-            command_count = f'ls {self.dir_path} -l |  egrep "^d|tar.gz" | wc -l'
-            count = int(group.sudo(command_count).get_simple_out())
             command = f'ls {self.dir_path} | grep -v latest_dump'
             sum_file = group.sudo(command).get_simple_out()
+
             files = sum_file.split()
+            count = len(files)
             files.sort(reverse=True)
             files_unsort = sum_file.split()
             files_unsort.sort()

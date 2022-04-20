@@ -75,6 +75,9 @@ def run(tasks,
     if cluster.context.get('inventory_regenerate_required', False) is True:
         utils.recreate_final_inventory_file(cluster)
 
+    with open(cluster.context['execution_arguments']['config']) as stream:
+        utils.dump_file(cluster, stream, "cluster.yaml")
+
     cluster.finish()
 
     time_end = time.time()

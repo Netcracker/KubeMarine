@@ -15,7 +15,7 @@
 
 
 import copy
-import os
+
 
 from collections import OrderedDict
 from kubemarine import kubernetes, system
