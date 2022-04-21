@@ -482,8 +482,8 @@ services:
         audit-policy-file: /etc/kubernetes/audit-policy.yaml
       extraVolumes:
         - name: audit
-          hostPath: /var/log/kubernetes/audit/audit.log
-          mountPath: /var/log/kubernetes/audit/audit.log
+          hostPath: /etc/kubernetes/audit-policy.yaml
+          mountPath: /etc/kubernetes/audit-policy.yaml
           readOnly: True
           pathType: File
         - name: audit-log
