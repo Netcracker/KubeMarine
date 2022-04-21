@@ -77,7 +77,7 @@ def enrich_inventory_psp(inventory, _):
     if 'PodSecurityPolicy' not in enabled_admissions:
         enabled_admissions = "%s,PodSecurityPolicy" % enabled_admissions
         inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = enabled_admissions
-
+        
     return inventory
 
 
@@ -612,20 +612,6 @@ def manage_pss_enrichment(inventory, cluster):
     current_config = cluster.inventory["rbac"]["pss"]
     minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
         
-    if is_security_enabled(inventory) and procedure_config["pod-security"] == "enabled": 
-        # check the difference between current and procedure config
-        diff = 0
-        if "defaults" in procedure_config:
-            for mode in procedure_config["defaults"]:
-                if procedure_config["defaults"][mode] != current_config["defaults"][mode]:
-                    diff += 1
-        if "exemptions" in procedure_config:
-            for mode in procedure_config["exemptions"]:
-                if procedure_config["exemptions"][mode] != current_config["exemptions"][mode]:
-                    diff += 1
-        if diff == 0 and not procedure_config.get("namespaces", False):
-            raise Exception("Procedure configuration error. Please specify what you going to change explicitly.")
-
     if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
         raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
 
