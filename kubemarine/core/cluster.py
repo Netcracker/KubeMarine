@@ -343,6 +343,9 @@ class KubernetesCluster(Environment):
         output = yaml.dump(prepared_inventory)
         utils.dump_file(self, output, "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
+        if self.context.get('initial_procedure') == 'add_node':
+            cluster_storage.collect_info_all_master(self)
+            cluster_storage.upload_info_new_node(self)
         cluster_storage.collect_procedure_info(self)
         cluster_storage.comprese_and_upload_archive(self)
         cluster_storage.rotation_file(self)

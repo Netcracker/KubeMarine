@@ -413,10 +413,25 @@ class ClusterStorage:
                 group = cluster.make_group([node['connect_to']])
                 data_copy_res = group.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
                 self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
-                node['connection'].get('/tmp/kubemarine-backup.tar.gz',
+                group.get('/tmp/kubemarine-backup.tar.gz',
                                        os.path.join(self.cluster.context['execution_arguments']['dump_location'],
                                                     'dump_log_cluster.tar.gz'))
                 self.cluster.log.debug('Backup downloaded')
                 return
             else:
                 self.cluster.log.debug('Masters offline %s' % node['name'])
+
+    def upload_info_new_node(self,cluster):
+
+        new_nodes = cluster.nodes['all'].get_new_nodes()
+
+        for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
+            group = cluster.make_group([new_node['connect_to']])
+            if 'master' in new_node['roles']:
+                group.put(
+                    cluster.context['execution_arguments']['dump_location'] + "dump_log_cluster.tar.gz",
+                    "/tmp/dump_log_cluster.tar.gz", sudo=True, binary=False)
+                group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
+            else:
+                cluster.log.debug('Master not found')
+
