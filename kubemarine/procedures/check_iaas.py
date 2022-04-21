@@ -301,15 +301,6 @@ def detect_preinstalled_python(cluster: KubernetesCluster):
         }
 
 
-def install_tcp_listener(cluster: KubernetesCluster) -> str:
-    detect_preinstalled_python(cluster)
-    # currently tcp listener can be run on both python 2 and 3
-    local_path = utils.get_resource_absolute_path('resources/scripts/simple_tcp_listener.py', script_relative=True)
-    tcp_listener_path = "/tmp/%s.py" % uuid.uuid4().hex
-    cluster.nodes["all"].put(local_path, tcp_listener_path, binary=False)
-    return tcp_listener_path
-
-
 @contextmanager
 def suspend_firewalld(cluster: KubernetesCluster):
     firewalld_statuses = system.fetch_firewalld_status(cluster.nodes["all"])
@@ -409,8 +400,10 @@ def pod_subnet_connectivity(cluster):
             suspend_firewalld(cluster):
         pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
         nodes = _get_not_balancers(cluster)
-        with assign_random_ips(cluster, nodes, pod_subnet) as host_to_ip:
-            failed_nodes = check_connectivity(cluster, nodes, host_to_ip, ["30050"])
+        tcp_ports = ["30050"]
+        with assign_random_ips(cluster, nodes, pod_subnet) as host_to_ip, \
+                install_tcp_listener(cluster, nodes, tcp_ports):
+            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
 
             if failed_nodes:
                 raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
@@ -423,8 +416,10 @@ def service_subnet_connectivity(cluster):
             suspend_firewalld(cluster):
         service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
         nodes = _get_not_balancers(cluster)
-        with assign_random_ips(cluster, nodes, service_subnet) as host_to_ip:
-            failed_nodes = check_connectivity(cluster, nodes, host_to_ip, ["30050"])
+        tcp_ports = ["30050"]
+        with assign_random_ips(cluster, nodes, service_subnet) as host_to_ip, \
+                install_tcp_listener(cluster, nodes, tcp_ports):
+            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
 
             if failed_nodes:
                 raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
@@ -448,7 +443,27 @@ def tcp_connect(cluster, node_from, node_to, tcp_ports, host_to_ip, mtu):
 
 
 def get_start_tcp_listener_cmd(python_executable, tcp_listener):
-    return f"sudo nohup {python_executable} {tcp_listener} %s &> /dev/null &"
+    # 1. Create anonymous pipe
+    # 2. Create python tcp listener process in background and redirect output to pipe
+    # 3. Wait till the listener successfully binds the port, or till it fails and exits.
+    #    Read one line from pipe to check that.
+    # 4. Exit with success or fail correspondingly.
+    return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
+           f"sudo nohup {python_executable} {tcp_listener} $PORT >&3 2>&1 & " \
+           "PID=$(echo $!); " \
+           "while read -t 0.1 -u 3 || sudo kill -0 $PID 2>/dev/null && [[ -z $REPLY ]]; do " \
+               ":; " \
+           "done; " \
+           "DATA=$REPLY; " \
+           "if [[ $DATA == \"In use\" ]]; then " \
+               "echo \"$PORT in use\" >&2 ; " \
+               "exit 1; " \
+           "elif [[ $DATA == \"Listen\" ]]; then " \
+               "exit 0; " \
+           "fi; " \
+           "DATA=$(echo $DATA && dd iflag=nonblock status=none <&3 2>/dev/null); " \
+           "echo \"$DATA\" >&2 ; " \
+           "exit 1"
 
 
 def get_stop_tcp_listener_cmd(tcp_listener):
@@ -502,24 +517,57 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
     return failed_nodes
 
 
-def check_connectivity(cluster, nodes: dict, host_to_ip: dict, tcp_ports):
-    tcp_listener = install_tcp_listener(cluster)
+@contextmanager
+def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
+    detect_preinstalled_python(cluster)
+    # currently tcp listener can be run on both python 2 and 3
+    local_path = utils.get_resource_absolute_path('resources/scripts/simple_tcp_listener.py', script_relative=True)
+    tcp_listener = "/tmp/%s.py" % uuid.uuid4().hex
+    cluster.make_group(list(nodes.keys())).put(local_path, tcp_listener, binary=False)
 
-    # Run process that LISTEN TCP port
-    for host, node in nodes.items():
-        python_executable = cluster.context['nodes'][host]['python']['executable']
-        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
-        res = node['connection'].sudo(tcp_listener_cmd)
-        cluster.log.verbose(res)
+    skipped_nodes = {}
+    nodes_to_rollback = cluster.make_group([])
+    try:
+        with RemoteExecutor(cluster) as exe:
+            # Run process that LISTEN TCP port
+            for host, node in nodes.items():
+                python_executable = cluster.context['nodes'][host]['python']['executable']
+                tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
+                node['connection'].sudo(tcp_listener_cmd, warn=True)
 
-    failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
+            exe.flush()
+            try:
+                results = exe.get_merged_result()
+                nodes_to_rollback = results.get_group()
+            except fabric.group.GroupException as e:
+                nodes_to_rollback = e.result.get_exited_nodes_group()
+                raise
 
-    # Kill the created during the test processes
-    for node in nodes.values():
-        tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-        node['connection'].sudo(tcp_listener_cmd, warn=True)
+            port_in_use = re.compile(r'^(\d+) in use$')
+            for cxn, result in results.items():
+                host = cxn.host
+                matcher = port_in_use.match(result.stderr.strip())
+                if matcher is not None:
+                    skipped_nodes[nodes[host]["name"]] = matcher.group(1)
+                    del nodes[host]
+                elif result.exited != 0:
+                    raise fabric.group.GroupException(results)
+                else:
+                    cluster.log.verbose(result)
 
-    return failed_nodes
+        yield
+
+    finally:
+        with RemoteExecutor(cluster):
+            # Kill the created during the test processes
+            for node in nodes_to_rollback.get_ordered_members_list(provide_node_configs=True):
+                tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
+                node['connection'].sudo(tcp_listener_cmd, warn=True)
+
+    if skipped_nodes:
+        cluster.log.warning(f"Ports in use: {skipped_nodes}")
+        raise TestWarn(f"Cannot perform check on {list(skipped_nodes.keys())}: some ports are already in use. "
+                       f"Use check_paas procedure if you already have installed cluster.")
 
 
 def check_tcp_ports(cluster):
@@ -529,13 +577,13 @@ def check_tcp_ports(cluster):
         nodes = {node["connect_to"]: node
                  for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)}
         host_to_ip = {host: node['internal_address'] for host, node in nodes.items()}
+        with install_tcp_listener(cluster, nodes, tcp_ports):
+            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
 
-        failed_nodes = check_connectivity(cluster, nodes, host_to_ip, tcp_ports)
-
-        if failed_nodes:
-            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint=f"Not all needed tcp ports are opened on nodes: {failed_nodes}. "
-                                   f"Ports that should be opened: {tcp_ports}")
+            if failed_nodes:
+                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                                  hint=f"Not all needed tcp ports are opened on nodes: {failed_nodes}. "
+                                       f"Ports that should be opened: {tcp_ports}")
 
 
 def make_reports(cluster):

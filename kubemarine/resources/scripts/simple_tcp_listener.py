@@ -22,7 +22,18 @@ import sys
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-s.bind(('', int(sys.argv[1])))
+try:
+    s.bind(('', int(sys.argv[1])))
+except socket.error as e:
+    if "Address already in use" in str(e):
+        sys.stdout.write("In use\n")
+        sys.stdout.flush()
+        exit(1)
+    else:
+        raise
+
+sys.stdout.write("Listen\n")
+sys.stdout.flush()
 s.listen(1)
 
 while True:
