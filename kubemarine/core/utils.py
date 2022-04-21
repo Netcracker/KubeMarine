@@ -336,31 +336,31 @@ class ClusterStorage:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
+        not_pack_file = cluster.inventory['procedure_history']['not_archive_threshold']
+        delete_old = cluster.inventory['procedure_history']['delete_threshold']
 
-        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-            group = cluster.make_group([node['connect_to']])
-            command = f'ls {self.dir_path} | grep -v latest_dump'
-            sum_file = group.sudo(command).get_simple_out()
-
-            files = sum_file.split()
-            count = len(files)
+        command = f'ls {self.dir_path} | grep -v latest_dump'
+        with RemoteExecutor(self.cluster) as exe:
+            self.cluster.nodes["master"].sudo(command)
+        node_group_results = exe.get_merged_nodegroup_results()
+        for cxn, result in node_group_results.items():
+            files = result.stdout.split()
             files.sort(reverse=True)
-            files_unsort = sum_file.split()
+            files_unsort = result.stdout.split()
             files_unsort.sort()
-            not_pack_file = cluster.inventory['procedure_history']['not_archive_threshold']
-            delete_old = cluster.inventory['procedure_history']['delete_threshold']
+            count = len(files)
             if count > not_pack_file:
                 for i in range(not_pack_file, delete_old):
                     if 'tar.gz' not in files[i] and i < count:
-                        group.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
+                        cxn.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
                                    f'sudo rm -r {self.dir_path + files[i]}')
                     break
             if count > delete_old:
-                for i in range(len(files_unsort)):
+                for j in range(len(files_unsort)):
                     diff = count - delete_old
-                    if i < diff:
+                    if j < diff:
                         cluster.log.verbose('Deleting backup file from nodes...')
-                        group.sudo(f'rm -r {self.dir_path + files_unsort[i]}')
+                        cxn.sudo(f'rm -rf {self.dir_path + files_unsort[j]}')
 
     def comprese_and_upload_archive(self, cluster):
         """
