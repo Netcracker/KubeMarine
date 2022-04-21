@@ -144,13 +144,6 @@ def load_inventory(inventory_filepath, context, silent=False, procedure_inventor
                 cluster.log.debug("  %s %i" % (role, len(cluster.ips[role])))
                 for ip in cluster.ips[role]:
                     cluster.log.debug("    %s" % ip)
-            # Backward compatibility 'master' and  'control-plane' roles
-            if "master" not in cluster.roles:
-                cluster.log.debug("The 'master' role is absent, let's add it")
-                cluster.nodes["master"] = cluster.make_group(cluster.ips["control-plane"])
-            if "control-plane" not in cluster.roles:
-                cluster.log.debug("The 'control-plane' role is absent, let's add it")
-                cluster.nodes["control-plane"] = cluster.make_group(cluster.ips["master"])
         return cluster
     except yaml.YAMLError as exc:
         utils.do_fail("Failed to load inventory file", exc, log=log)

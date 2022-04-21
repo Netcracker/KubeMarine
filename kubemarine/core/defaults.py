@@ -22,13 +22,14 @@ from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine import controlplane 
 
 # All enrichment procedures should not connect to any node.
 # The information about nodes should be collected within KubernetesCluster#_detect_nodes_context().
 DEFAULT_ENRICHMENT_FNS = [
-    "kubemarine.kubernetes.master_node_enrichment",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
+    "kubemarine.controlplane.controlplane_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
     "kubemarine.kubernetes.enrich_upgrade_inventory",
     "kubemarine.plugins.enrich_upgrade_inventory",

@@ -1115,21 +1115,28 @@ def images_prepull(group: NodeGroup):
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
 
 
-def master_node_enrichment(inventory, cluster):
-    """
-    Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
-    The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
-    """
-    for node in inventory["nodes"]:
-        if "master" in node["roles"] and "control-plane" not in node["roles"]:
-            cluster.log.debug("'control-plane' role will be added for nodes with 'master' role")
-            cluster.log.warning("Node with name: %s has legacy role 'master'. Please use 'control-plane' instead" % node["name"])
-            node_id = inventory["nodes"].index(node)
-            inventory["nodes"][node_id]["roles"].append("control-plane")
-        if "control-plane" in node["roles"] and "master" not in node["roles"]:
-            cluster.log.debug("'master' role will be added for nodes with 'control-plane' role")
-            node_id = inventory["nodes"].index(node)
-            inventory["nodes"][node_id]["roles"].append("master")
-
-    return inventory
-
+#def controlplane_node_enrichment(inventory, cluster):
+#    """
+#    Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
+#    The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
+#    """
+#    for node in inventory["nodes"]:
+#        if "master" in node["roles"] and "control-plane" not in node["roles"]:
+#            cluster.log.debug("'control-plane' role will be added for nodes with 'master' role")
+#            cluster.log.warning("Node with name: %s has legacy role 'master'. Please use 'control-plane' instead" % node["name"])
+#            node_id = inventory["nodes"].index(node)
+#            inventory["nodes"][node_id]["roles"].append("control-plane")
+#        if "control-plane" in node["roles"] and "master" not in node["roles"]:
+#            cluster.log.debug("'master' role will be added for nodes with 'control-plane' role")
+#            node_id = inventory["nodes"].index(node)
+#            inventory["nodes"][node_id]["roles"].append("master")
+#
+#    return inventory
+#
+#def controlplane_finalize_inventory(cluster, inventory):
+#    """
+#    Delete 'control-plane' role before inventory saving
+#    """
+#    for i, node in enumerate(cluster.inventory['nodes']):
+#        if 'control-plane' in node['roles']:
+#            cluster.inventory['nodes'][i]['roles'].remove('control-plane')

@@ -182,6 +182,7 @@ def get_final_inventory(cluster, initial_inventory=None):
         inventory = deepcopy(initial_inventory)
 
     from kubemarine import admission
+    from kubemarine import controlplane
     from kubemarine.procedures import add_node, remove_node, upgrade, migrate_cri
 
     inventory_finalize_functions = {
@@ -195,6 +196,9 @@ def get_final_inventory(cluster, initial_inventory=None):
 
     for finalize_fn in inventory_finalize_functions:
         inventory = finalize_fn(cluster, inventory)
+    
+    # remove additional roles for 'control-plane' before saving
+    inventory = controlplane.controlplane_finalize_inventory(cluster, inventory)
 
     return inventory
 
