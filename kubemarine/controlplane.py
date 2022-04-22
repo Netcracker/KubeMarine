@@ -23,14 +23,10 @@ def controlplane_node_enrichment(inventory, cluster):
             cluster.log.warning("Node with name: %s has legacy role 'master'. Please use 'control-plane' instead" % node["name"])
             node_id = inventory["nodes"].index(node)
             inventory["nodes"][node_id]["roles"].append("control-plane")
-            cluster.supported_roles.append("cl-patched")
-            inventory["nodes"][node_id]["roles"].append("cl-patched")
         if "control-plane" in node["roles"] and "master" not in node["roles"]:
             cluster.log.debug("'master' role will be added for nodes with 'control-plane' role")
             node_id = inventory["nodes"].index(node)
             inventory["nodes"][node_id]["roles"].append("master")
-            cluster.supported_roles.append("m-patched")
-            inventory["nodes"][node_id]["roles"].append("m-patched")
 
     return inventory
 
@@ -38,10 +34,9 @@ def controlplane_finalize_inventory(cluster, inventory):
     """
     Delete 'control-plane'/'master' role before inventory saving if 'control-plane'/'master' is not set in 'cluster.yaml'
     """
+    # check if 'control-plane' or 'master' roles were pached
     for i, node in enumerate(inventory['nodes']):
         if 'control-plane' in node['roles'] and 'cl-patched' in node['roles']:
             inventory['nodes'][i]['roles'].remove('control-plane')
-            inventory['nodes'][i]['roles'].remove('cl-patched')
         if 'master' in node['roles'] and 'm-patched' in node['roles']:
             inventory['nodes'][i]['roles'].remove('master')
-            inventory['nodes'][i]['roles'].remove('m-patched')
