@@ -1032,8 +1032,8 @@ for namespace. For proper matching see the following articles:
 ### Procedure Execution Steps
 
 1. Verify that Kubernetes cluster has version v1.23+
-2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above
-3. Run the `manage_psp` procedure with `pod-security: disabled` option
+2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
+3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary.
 4. Verify if the apllications in cluster work properly
 5. Set the `admission: pss` options in `cluster.yaml`
 6. Fill in `namespaces` subsection in `pss` section in procedure file
