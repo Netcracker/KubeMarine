@@ -386,9 +386,11 @@ class KubernetesCluster(Environment):
         self._gather_facts_after()
         # TODO: rewrite the following lines as deenrichment functions like common enrichment mechanism
         from kubemarine.procedures import remove_node
+        from kubemarine import controlplane
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)
         prepared_inventory = defaults.prepare_for_dump(prepared_inventory, copy=False)
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
+        prepared_inventory = controlplane.controlplane_finalize_inventory(self, prepared_inventory)
         utils.dump_file(self, yaml.dump(prepared_inventory), "cluster_finalized.yaml")
 
     def escape_jinja_characters_for_inventory(self, obj):
