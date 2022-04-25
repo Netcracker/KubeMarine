@@ -251,13 +251,13 @@ compatibility_map:
         version_debian: 1:2.0.*
     crictl:
       v1.21.5:
-        version: v1.20.0
+        version: v1.23.0
         sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
       v1.22.2:
-        version: v1.22.0
+        version: v1.23.0
         sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
       v1.23.1:
-        version: v1.22.0
+        version: v1.23.0
         sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
     kubeadm:
       v1.21.5:
