@@ -48,7 +48,7 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
+      - [audit-Kubernetes Policy](#audit-kubernetes-policy)
       - [audit-daemon](#audit-daemon)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
@@ -76,7 +76,7 @@ This section provides information about the inventory, features, and steps for i
         - [Tolerations](#tolerations)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
-        - [expect pods](#expect_pods)
+        - [expect pods](#expect-pods)
         - [python](#python)
         - [thirdparty](#thirdparty)
         - [shell](#shell)
@@ -2122,15 +2122,14 @@ services:
       apiVersion: audit.k8s.io/v1
       kind: Policy
       omitStages:
-          - "RequestReceived"
+        - "RequestReceived"
       rules:
-        - level: Request
+        - level: Metadata
           resources:
-            - group: "" # core
-            - group: "admissionregistration.k8s.io"
-            - group: "apps"
-            - group: "storage.k8s.io"
-
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
+            - group: "rbac.authorization.k8s.io"
 ```
 
 #### audit-daemon
@@ -2684,6 +2683,7 @@ In this case no OOB or custom policies are installed. To disable admission contr
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     pod-security: disabled
 ```
@@ -2743,6 +2743,7 @@ For example, to disable `host-network` OOB policy:
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     oob-policies:
       host-network: disabled
@@ -2761,6 +2762,7 @@ You can install custom policies during cluster installation. For example, to ins
 
 ```yaml
 rbac:
+  admission: psp
   psp:
     custom-policies:
       psp-list:
@@ -2843,10 +2845,21 @@ rbac:
 
 ### Admission pss
 
+Pod Security Standards (PSS) are the replacement for Pod Security Policies (PSP). Originally PSS assumes only three levels 
+(or profiles) of policies. The profiles are the following:
+* `Privileged`	- Unrestricted policy, providing the widest possible level of permissions. This policy allows for known privilege 
+escalations.
+* `Baseline`	- Minimally restrictive policy which prevents known privilege escalations. Allows the default (minimally specified) 
+Pod configuration.
+* `Restricted`	- Heavily restricted policy, following current Pod hardening best practices.
+
+There are plenty of rules that included in `baseline` and `restricted` profiles. For more information, refer to 
+[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
+
 **Note**:
 
 * PSS are supported for Kubernetes versions higher than 1.23.
-* To enable PSS, define `admission: pss` explicitly in cluster.yaml.
+* To enable PSS, define `admission: pss` explicitly in cluster.yaml:
 
 ```yaml
 rbac:
@@ -2875,9 +2888,32 @@ rbac:
       namespaces: ["kube-system"]
 ```
 
-There are three parts of PSS configuration. `pod-security` enables or disables the PSS installation. The default profile is described in the `defaults` section. 
-`enforce` defines the policy standard that enforces the pods. It must be one of `privileged`, `baseline`, or `restricted`.
-For more information, refer to [Pod Security Standards](#https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+There are three parts of PSS configuration. 
+* `pod-security` enables or disables the PSS installation
+* default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
+* `exemptions` describes exemptions from default rules
+
+The PSS enabling requires spacial labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+```
+
+In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
+
+**Warnings:** 
+Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
+Therefor PSS labels on namespaces shouldn't be set even if you Kubernetes cluster is deployed without PSS enabled.
 
 #### Configuring Exemption
 
@@ -2898,6 +2934,26 @@ The default configuration does not enforce the default policy to any of the pods
 ...
     exemptions:
       namespaces: ["kube-system"]
+```
+
+Do not change the namespaces exemption list without strong necessary. In any case check our maintenance guide before any implementation.
+
+#### Application prerequisites
+
+In case of using PSS the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
+`baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined plugins. 
+Moreover the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
+
+```yaml
+...
+securityContext: 
+  runAsNonRoot: true
+  seccompProfile: 
+    type: "RuntimeDefault"
+  allowPrivilegeEscalation: false
+  capabilities: 
+    drop: ["ALL"]
+...
 ```
 
 ### RBAC Accounts
@@ -4353,8 +4409,8 @@ The following is the installation tasks tree:
     * **reset** - Resets an existing or previous Kubernetes cluster. All the data related to the Kubernetes is removed, including the container runtime being cleaned up.
     * **install** - Configures Kubernetes service in the file `/etc/systemd/system/kubelet.service`
     * **prepull_images** - Prepulls Kubernetes images on all nodes using parameters from the inventory.
-    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm).
-  * **admission** - Applies OOB and custom pod security policies or pod security standards. For more information about the parameters for this task, see [Admission psp](#admission-psp) and [Admission pss](#admission-pss).
+    * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm). Also apply PSS if it is enabled. For more information about PPS, see [Admission pss](#admission-pss).
+  * **admission** - Applies OOB and custom pod security policies. For more information about the parameters for this task, see [Admission psp](#admission-psp).
   * **coredns** - Configures CoreDNS service with [coredns](#coredns) inventory settings.
   * **plugins** - Applies plugin installation procedures. For more information about parameters for this task, see [Plugins](#plugins).
   * **accounts** - Creates new users in cluster. For more information about parameters for this task, see [RBAC accounts](#rbac-accounts).

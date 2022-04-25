@@ -9,9 +9,11 @@ This section describes the features and steps for performing maintenance procedu
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
     - [Manage PSP Procedure](#manage-psp-procedure)
+    - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
     - [Migration Cri Procedure](#migration-cri-procedure)
+    - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
@@ -750,6 +752,66 @@ The `manage_psp` procedure executes the following sequence of tasks:
 4. reconfigure_plugin
 5. restart_pods
 
+## Manage PSS Procedure
+
+The manage PSS procedure allows:
+* enable/disable PSS
+* change default settings
+* change exemptions
+* set PSS labels on namespaces
+
+### Configure Manage PSS Procedure
+
+To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
+
+```yaml
+pss:
+  pod-security: enabled/disabled
+  defaults:
+    enforce: privileged/baseline/restricted
+    enforce-version: latest
+    audit: privileged/baseline/restricted
+    audit-version: latest
+    warn: privileged/baseline/restricted
+    warn-version: latest
+  exemptions:
+    usernames: ["example-user1", "example-user2"]
+    runtimeClasses: ["example-class-1", "example-class-2"]
+    namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
+  namespaces:
+    example-namespace-2:
+      enforce: privileged/baseline/restricted
+      enforce-version: latest
+      audit: privileged/baseline/restricted
+      audit-version: latest
+      warn: privileged/baseline/restricted
+      warn-version: latest
+restart-pods: false/true
+```
+
+The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
+namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
+
+**Warnings**:
+* Be careful with the `exemptions` section it may cause cluster instability.
+* Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
+* The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
+'kubernetes-dashboard' etc) will be deleted during the procedure in case of using `pod-security: disabled`
+* Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
+restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
+application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
+* Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
+`kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). Therefor all PSS labels on namespaces should be deleted during the maintenance procedure so as not to face unpredictable cluster behavior.
+
+### Manage PSS Tasks Tree
+
+The `manage_pss procedure executes the following sequence of tasks:
+
+1. check_inventory
+2. delete_default_pss
+3. apply_default_pss
+4. restart_pods_task
+
 ## Reboot Procedure
 
 This procedure allows you to safely reboot all nodes in one click. By default, all nodes in the cluster are rebooted. Gracefully reboot is performed only if installed Kubernetes cluster is detected on nodes. You can customize the process by specifying additional parameters.
@@ -951,6 +1013,34 @@ thirdparties:
     4. Uncordon the node.
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual claster.yaml structure. The services.docker scheme is deprecated. 
+
+## Admission Migration Procedure
+
+Since Kubernetes v1.20 Pod Security Policy(PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
+from PSP to  another solution is very important. KubeMarine supports Pod Security Standards(PSS) by default as a replacement PSP.
+The most important step in the procedure is to define the PSS profiles for particular namespace. PSS has only three feasible options:
+`privileged`, `baseline`, `restricted` that should be matched with PSP. It's better to use more restrictive the PSS profile 
+for namespace. For proper matching see the following articles:
+* [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
+* [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+
+**Notes:** 
+* KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+* Before running migration procedure please be sure that all application in Kubernetes cluster match with prerequisites:
+[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
+
+### Procedure Execution Steps
+
+1. Verify that Kubernetes cluster has version v1.23+
+2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
+3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary.
+4. Verify if the apllications in cluster work properly
+5. Set the `admission: pss` options in `cluster.yaml`
+6. Fill in `namespaces` subsection in `pss` section in procedure file
+7. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution 
+8. Restart pods in all namespaces if `restart-pods: false` option was used on previous step 
+9. Verify if the applications in cluster work properly
+
 
 # Procedure Execution
 

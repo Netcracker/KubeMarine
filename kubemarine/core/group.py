@@ -544,7 +544,7 @@ class NodeGroup:
                 return False
 
         # if there are not booted nodes, but we succeeded to wait for at least one is booted, we can continue execution
-        if not_booted and self.cluster.make_group(not_booted).wait_active_nodes().is_empty():
+        if not_booted and self.cluster.make_group(not_booted).wait_and_get_active_nodes().is_empty():
             return False
 
         return True
@@ -605,6 +605,21 @@ class NodeGroup:
 
         return results
 
+    def get_online_nodes(self, online: bool) -> 'NodeGroup':
+        online = [host for host, node_context in self.cluster.context['nodes'].items()
+                  if node_context['access']['online'] == online]
+        return self.cluster.make_group(online).intersection_group(self)
+
+    def get_accessible_nodes(self) -> 'NodeGroup':
+        accessible = [host for host, node_context in self.cluster.context['nodes'].items()
+                      if node_context['access']['accessible']]
+        return self.cluster.make_group(accessible).intersection_group(self)
+
+    def get_sudo_nodes(self) -> 'NodeGroup':
+        sudo = [host for host, node_context in self.cluster.context['nodes'].items()
+                if node_context['access']['sudo'] != "No"]
+        return self.cluster.make_group(sudo).intersection_group(self)
+
     def wait_for_reboot(self, initial_boot_history: NodeGroupResult, timeout=None) -> NodeGroupResult:
         results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
         return self._make_result_or_fail(
@@ -612,11 +627,11 @@ class NodeGroup:
             lambda host, result: isinstance(result, Exception) or result == initial_boot_history.get(self.nodes[host])
         )
 
-    def get_online_nodes(self) -> 'NodeGroup':
-        online = [host for host, node_context in self.cluster.context['nodes'].items() if node_context.get('online', False)]
-        return self.cluster.make_group(online).intersection_group(self)
+    def wait_and_get_boot_history(self, timeout=None) -> NodeGroupResult:
+        results = self._await_rebooted_nodes(timeout)
+        return self._make_result_or_fail(results, lambda _, r: isinstance(r, Exception))
 
-    def wait_active_nodes(self, timeout=None) -> 'NodeGroup':
+    def wait_and_get_active_nodes(self, timeout=None) -> 'NodeGroup':
         results = self._await_rebooted_nodes(timeout)
         not_booted = [host for host, result in results.items() if isinstance(result, Exception)]
         return self.exclude_group(self.cluster.make_group(not_booted))
@@ -644,9 +659,14 @@ class NodeGroup:
             self.disconnect(list(left_nodes.keys()))
 
             self.cluster.log.verbose("Attempting to connect to nodes...")
-            results.update(self._do("sudo", left_nodes, True, "last reboot", timeout=delay_period))
+            # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
+            results.update(self._do("sudo", left_nodes, True, "last reboot"))
             left_nodes = {host: left_nodes[host] for host, result in results.items()
-                          if isinstance(result, Exception) or result == initial_boot_history.get(self.nodes[host])}
+                          if (isinstance(result, Exception)
+                              # Something is wrong with sudo access. Node is active.
+                              and not isinstance(result, invoke.AuthFailure))
+                          or (not isinstance(result, Exception)
+                              and result == initial_boot_history.get(self.nodes[host]))}
 
             waited = (datetime.now() - time_start).total_seconds()
 
@@ -818,6 +838,10 @@ class NodeGroup:
         for node in members:
             result.append(node['name'])
         return result
+
+    def get_hosts(self) -> List[str]:
+        members = self.get_ordered_members_list(provide_node_configs=True)
+        return [node['connect_to'] for node in members]
 
     def is_empty(self) -> bool:
         return not self.nodes

@@ -40,7 +40,7 @@ class NodeGroupResultsTest(unittest.TestCase):
         service_name = package_associations['service_name']
 
         # simulate package detection command
-        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=1,
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=0,
                                                     stderr='dpkg-query: no packages found matching %s' % package_name)
         cluster.fake_shell.add(exp_results1, 'sudo', ['dpkg-query -f \'${Package}=${Version}\\n\' -W %s || true'
                                                       % package_name])
@@ -87,7 +87,7 @@ class NodeGroupResultsTest(unittest.TestCase):
                                                 exited=0,
                                                 connection=all_nodes_group['10.101.1.2']),
             '10.101.1.3': fabric.runners.Result(stderr='dpkg-query: no packages found matching %s' % package_name,
-                                                exited=1,
+                                                exited=0,
                                                 connection=all_nodes_group['10.101.1.3']),
             '10.101.1.4': fabric.runners.Result(stdout='%s=' % package_name,
                                                 exited=0,
@@ -112,8 +112,10 @@ class NodeGroupResultsTest(unittest.TestCase):
         # run task
         audit.install(cluster.nodes['master'])
 
-        is_task_finished = cluster.fake_shell.is_called('sudo', enable_command)
-        self.assertTrue(is_task_finished, msg="Installation task did not finished with audit enable command")
+        for host in cluster.nodes['master'].get_hosts():
+            expected_is_called = True if host == '10.101.1.3' else False
+            self.assertEquals(expected_is_called, cluster.fake_shell.is_called(host, 'sudo', enable_command),
+                              msg="Installation task did not finished with audit enable command")
 
     def test_audit_configuring(self):
         cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')

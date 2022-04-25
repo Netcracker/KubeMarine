@@ -80,6 +80,7 @@ class RemoteExecutor:
     def _is_actions_equal(self, action1, action2):
         if action1[0] not in ["sudo", "run"] or action1[0] != action2[0]:
             return False
+        # todo bug, what if one kwargs dict is a subdict of another?
         for key, value in action1[2].items():
             if value != action2[2].get(key):
                 return False
@@ -123,6 +124,7 @@ class RemoteExecutor:
         executor = self._get_active_executor()
 
         if executor.ignore_failed:
+            # todo exit codes in separators do not work, because 'echo command_separator' always rewrites exit code to 0
             separator_symbol = ";"
         else:
             separator_symbol = "&&"

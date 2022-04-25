@@ -5,7 +5,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
   - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
   - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
-  - [KME0005: {hostname} is not a sudoer](#kme0005-hostname-is-not-a-sudoer)
+  - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
@@ -196,16 +196,16 @@ An example of specifying multiple `master` and `worker` roles for a single node 
 applications pods.
 
 
-## KME0005: {hostname} is not a sudoer
+## KME0005: {hostnames} are not sudoers
 
 ```
 FAILURE!
 TASK FAILED prepare.check.sudoer
-KME0005: 10.101.1.1 is not a sudoer
+KME0005: ['10.101.1.1'] are not sudoers
 ```
 
-The error reports that the specified node does not have superuser rights. The error occurs 
-before the payload is executed on the cluster when running the `install` or `add_node` procedure.
+The error reports that connection users in the specified nodes either do not have superuser rights, or require passwords to run `sudo` commands.
+The error occurs before the payload is executed on the cluster when running the `install` or `add_node` procedure.
 
 To fix this, add a connection user to the sudoer group on the cluster node. 
 
@@ -215,6 +215,11 @@ An example for Ubuntu (reboot required) is as given below.
 sudo adduser <username> sudo
 ```
 
+To run `sudo` commands without being asked for a password, add
+```bash
+username  ALL=(ALL) NOPASSWD:ALL
+```
+in the end of `/etc/sudoers` file, where `username` is a name of the connection user.
 
 # Troubleshooting Tools
 

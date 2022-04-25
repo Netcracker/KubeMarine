@@ -56,6 +56,7 @@ This section provides information about the Kubecheck functionality.
     - [222 Default services configuration status](#222-default-services-configuration-status)
     - [223 Default services health status](#223-default-services-health-status)
     - [224 Calico configuration check](#224-calico-configuration-check)
+    - [225 Pod security admission status](#225-pod-security-admission-status)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -523,6 +524,12 @@ This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `c
 *Task*: `calico.config_check`
 
 This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
+
+###### 225 Pod security admission status
+
+*Task*: `kubernetes.admission`
+
+The test checks status of Pod Security Admissions, default PSS(Pod Security Standards) profile and match consistance between 'cluster.yaml' and current Kubernetes configuration. Also it check consistancy between 'kube-apiserver.yaml' and 'kubeadm-config'.
 
 ### Report File Generation
 

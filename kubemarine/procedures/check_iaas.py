@@ -104,11 +104,12 @@ def connection_ssh_latency_multiple(cluster):
 def connection_sudoer_access(cluster):
     with TestCase(cluster.context['testsuite'], '004', 'SSH', 'Sudoer Access', default_results='Access provided'):
         non_root = []
-        results = cluster.nodes['all'].sudo("whoami")
-        cluster.log.verbose(results)
-        for connection, result in results.items():
-            if result.stdout.strip() != 'root':
-                non_root.append(connection.host)
+        for host, node_context in cluster.context['nodes'].items():
+            access_info = node_context['access']
+            if access_info['online'] and access_info['sudo'] == 'Root':
+                cluster.log.debug("%s online and has root" % host)
+            else:
+                non_root.append(host)
         if non_root:
             raise TestFailure("Non-sudoer access found at: %s" % ", ".join(non_root),
                               hint="Certain nodes do not have the appropriate sudoer access. At these nodes, add "
@@ -229,7 +230,7 @@ def system_distributive(cluster):
     with TestCase(cluster.context['testsuite'], '008', 'System', 'Distibutive') as tc:
         supported_distributives = cluster.globals['compatibility_map']['distributives'].keys()
 
-        cluster.log.debug(system.detect_os_family(cluster, suppress_exceptions=True))
+        cluster.log.debug(system.fetch_os_versions(cluster))
 
         detected_unsupported_os = []
         detected_supported_os = []
@@ -426,6 +427,7 @@ def make_reports(cluster):
 
 tasks = OrderedDict({
     'ssh': {
+        # todo this is useless, because flow.load_inventory already fails in case of no connectivity
         'connectivity': connection_ssh_connectivity,
         'latency': {
             'single': connection_ssh_latency_single,
