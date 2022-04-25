@@ -77,7 +77,7 @@ def enrich_inventory_psp(inventory, _):
     if 'PodSecurityPolicy' not in enabled_admissions:
         enabled_admissions = "%s,PodSecurityPolicy" % enabled_admissions
         inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = enabled_admissions
-
+        
     return inventory
 
 
@@ -612,20 +612,6 @@ def manage_pss_enrichment(inventory, cluster):
     current_config = cluster.inventory["rbac"]["pss"]
     minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
         
-    if is_security_enabled(inventory) and procedure_config["pod-security"] == "enabled": 
-        # check the difference between current and procedure config
-        diff = 0
-        if "defaults" in procedure_config:
-            for mode in procedure_config["defaults"]:
-                if procedure_config["defaults"][mode] != current_config["defaults"][mode]:
-                    diff += 1
-        if "exemptions" in procedure_config:
-            for mode in procedure_config["exemptions"]:
-                if procedure_config["exemptions"][mode] != current_config["exemptions"][mode]:
-                    diff += 1
-        if diff == 0 and not procedure_config.get("namespaces", False):
-            raise Exception("Procedure configuration error. Please specify what you going to change explicitly.")
-
     if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
         raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
 
@@ -646,11 +632,21 @@ def manage_pss_enrichment(inventory, cluster):
                 inventory["rbac"]["pss"]["exemptions"][item] = procedure_config["exemptions"][item]
     if "namespaces" in procedure_config:
         for namespace in procedure_config["namespaces"]:
-            for item in procedure_config["namespaces"][namespace]:
-                if item.endswith("version"):
-                    verify_version(item, procedure_config["namespaces"][namespace][item], minor_version)
-                else:
-                    verify_parameter(item, procedure_config["namespaces"][namespace][item], valid_profiles)
+            # check if the namespace has its own profiles
+            if type(namespace) is dict:
+                for item in namespace:
+                    # exclude name of namespace
+                    if namespace[item]:
+                        if item.endswith("version"):
+                            verify_version(item, namespace[item], minor_version)
+                        else:
+                            verify_parameter(item, namespace[item], valid_profiles)
+    if "namespaces_defaults" in procedure_config:
+        for item in procedure_config["namespaces_defaults"]:
+            if item.endswith("version"):
+                verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
+            else:
+                verify_parameter(item, procedure_config["namespaces_defaults"][item], valid_profiles)
 
     return inventory
 
@@ -923,16 +919,52 @@ def label_namespace_pss(cluster, manage_type):
     namespaces = procedure_config.get("namespaces")
     # get the list of namespaces that should be labeled then set/delete labels
     if namespaces:
+        default_modes = {}
+        # check if procedure config has default values for labels
+        namespaces_defaults = procedure_config.get("namespaces_defaults")
+        if namespaces_defaults:
+            for default_mode in namespaces_defaults:
+                 default_modes[default_mode] = namespaces_defaults[default_mode]
         for namespace in namespaces:
             if manage_type in ["apply", "install"]:
-                cluster.log.debug("Set PSS labels on namespace %s" % namespace)
-                for mode in namespaces[namespace]:
-                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                      % (namespace, mode, namespaces[namespace][mode]))
+                # define name of namespace
+                if type(namespace) is dict:
+                    for item in namespace:
+                        if not namespace[item]:
+                            ns_name = item
+                else:
+                    ns_name = namespace
+                if default_modes:
+                    # set labels that are set in default section
+                    cluster.log.debug("Set PSS labels on %s namespace from defaults" % ns_name)
+                    for mode in default_modes:
+                        first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                          % (ns_name, mode, default_modes[mode]))
+                if type(namespace) is dict:
+                    # set labels that are set in namespaces section
+                    cluster.log.debug("Set PSS labels on %s namespace" % ns_name)
+                    for mode in namespace: 
+                        if namespace[mode]:
+                            first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                              % (ns_name, mode, namespace[mode]))
             elif manage_type == "delete":
-                cluster.log.debug("Delete PSS labels on namespace %s" % namespace)
-                for mode in namespaces[namespace]:
-                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (namespace, mode))
+                # define name of namespace
+                if type(namespace) is dict:
+                    for item in namespace:
+                        if not namespace[item]:
+                            ns_name = item
+                else:
+                    ns_name = namespace
+                # delete labels that are set in default section
+                cluster.log.debug("Delete PSS labels on %s namespace from defaults" % ns_name)
+                for mode in default_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
+                # delete labels that are set in namespaces section
+                cluster.log.debug("Delete PSS labels on %s namespace" % ns_name)
+                if type(namespace) is dict:
+                    for mode in namespace:
+                        if namespace[mode]:
+                            first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
 
 
 def check_inventory(cluster):

@@ -779,18 +779,31 @@ pss:
     runtimeClasses: ["example-class-1", "example-class-2"]
     namespaces: ["kube-system", "example-namespace-1", "example-namespace-2"]
   namespaces:
-    example-namespace-2:
-      enforce: privileged/baseline/restricted
-      enforce-version: latest
-      audit: privileged/baseline/restricted
-      audit-version: latest
-      warn: privileged/baseline/restricted
-      warn-version: latest
-restart-pods: false/true
+    - example-namespace-1
+    - example-namespace-2:
+        enforce: privileged/baseline/restricted
+        enforce-version: latest
+        audit: privileged/baseline/restricted
+        audit-version: latest
+        warn: privileged/baseline/restricted
+        warn-version: latest
+    - example-namespace-3
+    - example-namespace-4
+  namespaces_defaults:
+    enforce: privileged/baseline/restricted
+    enforce-version: latest
+    audit: privileged/baseline/restricted
+    audit-version: latest
+    warn: privileged/baseline/restricted
+    warn-version: latest
+restart-pods: false
 ```
 
 The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
 namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
+The `namespaces_defaults` option is useful for bulk labels setting. In case of `namespaces_defaults` is set labels in `namespaces` 
+section may be ommited. The labels from `namespaces_defaults` will be applyed on namespaces list from `namespaces` then any labels 
+from particuar namespaces will be applied.
 
 **Warnings**:
 * Be careful with the `exemptions` section it may cause cluster instability.
