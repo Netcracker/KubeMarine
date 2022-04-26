@@ -121,22 +121,6 @@ def apply_defaults(inventory, cluster):
             if address not in cluster.ips[role]:
                 cluster.ips[role].append(address)
 
-        # Backward compatibility 'master' and  'control-plane' roles
-        if "master" not in node.get("roles") and "control-plane" in node.get("roles"):
-            cluster.log.debug("The 'master' role is absent for %s, let's add it" % node['name'])
-            node["roles"].append("master") 
-        if "control-plane" in node.get("roles") and "master" not in node.get("roles"):
-            cluster.log.debug("The 'control-plane' role is absent for %s, let's add it" % node['name'])
-            node["roles"].append("master") 
-
-    # Backward compatibility 'master' and  'control-plane' roles
-    if "master" not in cluster.roles:
-        cluster.log.debug("The group 'master' is not in nodes list, let's add it")
-        cluster.nodes["master"] = cluster.make_group(cluster.ips["control-plane"])
-    if "control-plane" not in cluster.roles:
-        cluster.log.debug("The group 'control-plane' is not in nodes list, let's add it")
-        cluster.nodes["control-plane"] = cluster.make_group(cluster.ips["master"])
-
     return inventory
 
 
@@ -453,8 +437,8 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
         cluster.log.verbose('Enrichment finished!')
 
         if make_dumps:
-            inventory = controlplane.controlplane_finalize_inventory(cluster, inventory)
-            utils.dump_file(cluster, yaml.dump(prepare_for_dump(inventory), ), "cluster.yaml")
+            inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump((inventory)))
+            utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
@@ -473,7 +457,6 @@ def compile_inventory(inventory, cluster):
     while iterations > 0:
 
         cluster.log.verbose('Inventory is not rendered yet...')
-        inventory = controlplane.controlplane_finalize_inventory(cluster, inventory)
         inventory = compile_object(cluster.log, inventory, root)
 
         temp_dump = yaml.dump(inventory)
@@ -490,7 +473,8 @@ def compile_inventory(inventory, cluster):
 
     inventory = compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
 
-    merged_inventory = yaml.dump(prepare_for_dump(inventory))
+    inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
+    merged_inventory = yaml.dump(inventory_for_dump)
     utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
     return inventory
