@@ -470,6 +470,47 @@ After the cause of the failure is fixed, you need to run the `upgrade` procedure
 For example, imagine you are doing the following upgrade: `1.16.12 -> 1.17.7 -> 1.18.8`. 
 In this case, if the upgrade fails on version `1.18.8`, but is completed for version `1.17.7`, you have to update `cluster.yaml` with the latest information available in the regenerated inventory (`cluster.yaml` is regenerated after each minor version upgrade) and also remove version `1.17.7` from the procedure inventory. It is absolutely fine to retry upgrades for version `X.Y.Z`, but only until the moment the upgrade starts for next version `X.Y+1.M`. It is incorrect to start upgrade to version `1.17.7` after the upgrade to version `1.18.8` is started.
 
+### Upgrade procedure failure, when using custom kubernetes audit settings
+
+**Symptoms**: The `upgrade` procedure fails at some point, leaving the upgrade process incomplete. When the cluster has custom audit settings
+
+**Root cause**: Using custom audit settings without specifying them in cluster.yaml will cause the process to fail.
+
+**Solution**:  In order for the `upgrade` procedure to complete with custom audit settings, you need to specify them in cluster.yaml in the service section.
+
+**Example**:
+```yaml
+services:
+  kubeadm:
+    apiServer:
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+      extraVolumes:
+        - name: audit
+          hostPath: /etc/kubernetes/audit-policy.yaml
+          mountPath: /etc/kubernetes/audit-policy.yaml
+          readOnly: True
+          pathType: File
+        - name: audit-log
+          hostPath: /var/log/kubernetes/audit/
+          mountPath: /var/log/kubernetes/audit/
+          readOnly: False
+          pathType: DirectoryOrCreate
+
+  audit:
+    cluster_policy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+        - "RequestReceived"
+      rules:
+        - level: Metadata
+          resources:
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
+            - group: "rbac.authorization.k8s.io"
+```
 ### Cannot drain node because of PodDisruptionBudget
 
 **Symptoms**: The `upgrade` procedure fails during node drain because of PodDisruptionBudget (PDB) limits.
