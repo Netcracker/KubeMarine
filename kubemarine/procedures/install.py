@@ -121,7 +121,7 @@ def system_prepare_audit_daemon(cluster):
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
     
-def system_prepare_policy(cluster,warn=True, hide=False):
+def system_prepare_policy(cluster):
     """
     Task generates rules for logging kubernetes and on audit
     """
