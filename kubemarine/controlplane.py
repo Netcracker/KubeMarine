@@ -17,15 +17,15 @@ def controlplane_node_enrichment(inventory, cluster):
     Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
     The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
     """
-    for node_id, node in enumerate(inventory["nodes"]):
+    for node in inventory["nodes"]:
         if "master" in node["roles"] and "control-plane" not in node["roles"]:
-            cluster.log.debug(f"'control-plane' role will be added for {inventory['nodes'][node_id]['name']}")
+            cluster.log.debug(f"'control-plane' role will be added for {node['name']}")
             cluster.log.warning(f"Node witch name is {node['name']} has legacy role 'master'."
                                 f"Please use 'control-plane' instead")
-            inventory["nodes"][node_id]["roles"].append("control-plane")
+            node["roles"].append("control-plane")
         if "control-plane" in node["roles"] and "master" not in node["roles"]:
-            cluster.log.debug(f"'master' role will be added for {inventory['nodes'][node_id]['name']}")
-            inventory["nodes"][node_id]["roles"].append("master")
+            cluster.log.debug(f"'master' role will be added for {node['name']}")
+            node["roles"].append("master")
 
     return inventory
 
@@ -34,9 +34,9 @@ def controlplane_finalize_inventory(cluster, inventory):
     Delete 'control-plane' and 'master' roles before inventory saving if they are not set in 'cluster.yaml'
     """
     # remove 'master' role from inventory before dump
-    for node_id, node in enumerate(inventory["nodes"]):
+    for node in inventory["nodes"]:
         if 'master' in node["roles"]:
-            cluster.log.debug(f"'master' role will be removed for {inventory['nodes'][node_id]['name']} node before saving")
-            inventory["nodes"][node_id]["roles"].remove("master")
+            cluster.log.debug(f"'master' role will be removed for {node['name']} node before saving")
+            node["roles"].remove("master")
 
     return inventory
