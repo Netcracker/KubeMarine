@@ -182,7 +182,6 @@ def get_final_inventory(cluster, initial_inventory=None):
         inventory = deepcopy(initial_inventory)
 
     from kubemarine import admission
-    from kubemarine import controlplane
     from kubemarine.procedures import add_node, remove_node, upgrade, migrate_cri
 
     inventory_finalize_functions = {
