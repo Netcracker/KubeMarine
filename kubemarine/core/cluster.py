@@ -393,7 +393,6 @@ class KubernetesCluster(Environment):
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
         inventory_for_dump = controlplane.controlplane_finalize_inventory(self, prepared_inventory)
         utils.dump_file(self, yaml.dump(inventory_for_dump), "cluster_finalized.yaml")
-        #utils.dump_file(self, yaml.dump(prepared_inventory), "cluster_finalized.yaml")
 
     def escape_jinja_characters_for_inventory(self, obj):
         if isinstance(obj, dict):
