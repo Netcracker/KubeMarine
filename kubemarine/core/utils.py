@@ -196,7 +196,7 @@ def get_final_inventory(cluster, initial_inventory=None):
 
     for finalize_fn in inventory_finalize_functions:
         inventory = finalize_fn(cluster, inventory)
-    
+
     return inventory
 
 
