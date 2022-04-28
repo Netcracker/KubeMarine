@@ -510,7 +510,7 @@ The following options are supported:
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no| |`22`|Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|roles|list|**yes**| |`["master"]`|Cluster member role. It can be `balancer`, `master` or `worker`.|
+|roles|list|**yes**| |`["master"]`|Cluster member role. It can be `balancer`, `worker`, `master` or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
 
@@ -545,6 +545,10 @@ nodes:
 ```
 
 The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
+
+**Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The `master` 
+and `control-plane` roles are interchangeable at the moment. Therefore it's possible to use the `master` and `control-plane` roles 
+in any procedure.
 
 ### cluster_name
 
