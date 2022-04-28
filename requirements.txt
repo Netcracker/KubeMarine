@@ -3,10 +3,10 @@ deepmerge==1.0.1
 fabric==2.6.0
 jinja2==2.11.*
 MarkupSafe==2.0.1
-invoke=1.6.0
+invoke==1.6.0
 ruamel.yaml==0.17.20
 ansible==2.9.9
 pygelf==0.4.2
 toml==0.10.2
-python-dateutil=2.8.2
+python-dateutil==2.8.2
 deepdiff==5.7.0
