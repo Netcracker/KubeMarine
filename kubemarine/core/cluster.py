@@ -343,13 +343,15 @@ class KubernetesCluster(Environment):
         output = yaml.dump(prepared_inventory)
         utils.dump_file(self, output, "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
-        if self.context.get('initial_procedure') == 'add_node':
-            cluster_storage.collect_info_all_master(self)
-            cluster_storage.upload_info_new_node(self)
-        cluster_storage.collect_procedure_info(self)
-        cluster_storage.comprese_and_upload_archive(self)
-        cluster_storage.rotation_file(self)
-
+        if self.context["initial_procedure"] in ('paas', 'iaas'):
+            self.log.verbose(self.context["initial_procedure"] + ' procedure')
+        else:
+            if self.context.get('initial_procedure') == 'add_node':
+                cluster_storage.collect_info_all_master(self)
+                cluster_storage.upload_info_new_node(self)
+            cluster_storage.collect_procedure_info(self)
+            cluster_storage.comprese_and_upload_archive(self)
+            cluster_storage.rotation_file(self)
 
     def escape_jinja_characters_for_inventory(self, obj):
         if isinstance(obj, dict):

@@ -339,52 +339,42 @@ class ClusterStorage:
         not_pack_file = cluster.inventory['procedure_history']['not_archive_threshold']
         delete_old = cluster.inventory['procedure_history']['delete_threshold']
 
+
         command = f'ls {self.dir_path} | grep -v latest_dump'
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["master"].sudo(command)
-        node_group_results = exe.get_merged_nodegroup_results()
-        for cxn, result in node_group_results.items():
-            files = result.stdout.split()
-            files.sort(reverse=True)
-            files_unsort = result.stdout.split()
-            files_unsort.sort()
-            count = len(files)
-            if count > not_pack_file:
-                for i in range(not_pack_file, delete_old):
-                    if 'tar.gz' not in files[i] and i < count:
-                        cxn.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
-                                   f'sudo rm -r {self.dir_path + files[i]}')
-                    break
-            if count > delete_old:
-                for j in range(len(files_unsort)):
-                    diff = count - delete_old
-                    if j < diff:
-                        cluster.log.verbose('Deleting backup file from nodes...')
-                        cxn.sudo(f'rm -rf {self.dir_path + files_unsort[j]}')
+        node_group_results = self.cluster.nodes["master"].sudo(command)
+        with RemoteExecutor(self.cluster):
+            for cxn, result in node_group_results.items():
+                files = result.stdout.split()
+                files.sort(reverse=True)
+                for i, file in enumerate(files):
+                    if i >= not_pack_file and i < delete_old:
+                        if 'tar.gz' not in files[i] and i < enumerate(files):
+                            cxn.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
+                                       f'sudo rm -r {self.dir_path + files[i]}')
+                    elif i >= delete_old:
+                        cxn.sudo(f'rm -rf {self.dir_path + files[i]}')
+
 
     def comprese_and_upload_archive(self, cluster):
         """
         This method compose dump files and sends the collected files to the nodes.
         """
-        if self.cluster.context["initial_procedure"] in ('paas', 'iaas'):
-            self.cluster.log.verbose(self.cluster.context["initial_procedure"] + ' procedure')
-        else:
-            if self.cluster.context["initial_procedure"] != None:
-                self._make_dir(cluster)
-                dump_dir = self.cluster.context['execution_arguments']['dump_location']
-                files_dump = ['procedure_parameters','version','cluster_precompiled.yaml','cluster.yaml',
-                      'cluster_default.yaml','cluster_finalized.yaml','procedure.yaml']
-                onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
-                archive = dump_dir + "local.tar.gz"
-                with tarfile.open(archive, "w:gz") as tar:
-                    for name in files_dump:
-                        if name in onlyfiles:
-                            output = dump_dir + name
-                            tar.add(output)
-                self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
-                self.cluster.log.debug('File upload local.tar.gz')
-                self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
-                                                  f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
+        if self.cluster.context["initial_procedure"] != None:
+            self._make_dir(cluster)
+            dump_dir = self.cluster.context['execution_arguments']['dump_location']
+            files_dump = ['procedure_parameters','version','cluster_precompiled.yaml','cluster.yaml',
+                  'cluster_default.yaml','cluster_finalized.yaml','procedure.yaml']
+            onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
+            archive = dump_dir + "local.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                for name in files_dump:
+                    if name in onlyfiles:
+                        output = dump_dir + name
+                        tar.add(output)
+            self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
+            self.cluster.log.debug('File upload local.tar.gz')
+            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
+                                              f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
         """
@@ -407,19 +397,16 @@ class ClusterStorage:
         """
         This method is used to transfer backup logs from the main master to the new master.
         """
-        for node in self.cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-            ip = node['address']
-            if self.cluster.context['nodes'][ip]['online']:
-                group = cluster.make_group([node['connect_to']])
-                data_copy_res = group.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
-                self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
-                group.get('/tmp/kubemarine-backup.tar.gz',
-                                       os.path.join(self.cluster.context['execution_arguments']['dump_location'],
-                                                    'dump_log_cluster.tar.gz'))
-                self.cluster.log.debug('Backup downloaded')
-                return
-            else:
-                self.cluster.log.debug('Masters offline %s' % node['name'])
+
+        node = self.cluster.nodes['master'].get_first_member(provide_node_configs=True)
+        master = cluster.make_group([node['connect_to']])
+        data_copy_res = master.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
+        self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
+        master.get('/tmp/kubemarine-backup.tar.gz',
+                                   os.path.join(self.cluster.context['execution_arguments']['dump_location'],
+                                                'dump_log_cluster.tar.gz'))
+        self.cluster.log.debug('Backup downloaded')
+
 
     def upload_info_new_node(self,cluster):
 
@@ -430,7 +417,7 @@ class ClusterStorage:
             if 'master' in new_node['roles']:
                 group.put(
                     cluster.context['execution_arguments']['dump_location'] + "dump_log_cluster.tar.gz",
-                    "/tmp/dump_log_cluster.tar.gz", sudo=True, binary=False)
+                    "/tmp/dump_log_cluster.tar.gz", sudo=True)
                 group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
             else:
                 cluster.log.debug('Master not found')
