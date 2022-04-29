@@ -348,11 +348,11 @@ class ClusterStorage:
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
                     if i >= not_pack_file and i < delete_old:
-                        if 'tar.gz' not in files[i] and i < enumerate(files):
-                            cxn.sudo(f'tar -czvf {self.dir_path + files[i] + ".tar.gz"} {self.dir_path + files[i]} &&'
-                                       f'sudo rm -r {self.dir_path + files[i]}')
+                        if 'tar.gz' not in file:
+                            cxn.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
+                                       f'sudo rm -r {self.dir_path + file}')
                     elif i >= delete_old:
-                        cxn.sudo(f'rm -rf {self.dir_path + files[i]}')
+                        cxn.sudo(f'rm -rf {self.dir_path + file}')
 
 
     def comprese_and_upload_archive(self, cluster):
