@@ -117,37 +117,38 @@ def upgrade_containerd(cluster):
         index_pos = target_kubernetes_version.rfind(".")
         target_kubernetes_version = target_kubernetes_version[:index_pos]
         pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
-        last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
-        if last_pause_version != pause_version:
-            sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
-            param_begin_pos = sandbox.rfind(":")
-            sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
-            cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"] = sandbox
-            config_string = ""
-            containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-            runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-            if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-                containerd_config[runc_options_path]['SystemdCgroup'] = \
-                    bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
-            for key, value in containerd_config.items():
-                # first we process all "simple" `key: value` pairs
-                if not isinstance(value, dict):
-                    config_string += f"{toml.dumps({key: value})}"
-            for key, value in containerd_config.items():
-                # next we process all "complex" `key: dict_value` pairs, representing named sections
-                if isinstance(value, dict):
-                    config_string += f"\n[{key}]\n{toml.dumps(value)}"
-            utils.dump_file(cluster, config_string, 'containerd-config.toml')
-            with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
-                        provide_node_configs=True):
-                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
-                    node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
-                                           backup=True,
-                                           sudo=True, mkdir=True)
-                    node['connection'].sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                                            f"systemctl status {os_specific_associations['service_name']}")
-            return exe.get_last_results_str()
+        if cluster.inventory["services"]["cri"]['containerdConfig'].get(path):
+            last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
+            if last_pause_version != pause_version:
+                sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
+                param_begin_pos = sandbox.rfind(":")
+                sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
+                cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"] = sandbox
+                config_string = ""
+                containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
+                runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
+                if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+                    containerd_config[runc_options_path]['SystemdCgroup'] = \
+                        bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+                for key, value in containerd_config.items():
+                    # first we process all "simple" `key: value` pairs
+                    if not isinstance(value, dict):
+                        config_string += f"{toml.dumps({key: value})}"
+                for key, value in containerd_config.items():
+                    # next we process all "complex" `key: dict_value` pairs, representing named sections
+                    if isinstance(value, dict):
+                        config_string += f"\n[{key}]\n{toml.dumps(value)}"
+                utils.dump_file(cluster, config_string, 'containerd-config.toml')
+                with RemoteExecutor(cluster) as exe:
+                    for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
+                            provide_node_configs=True):
+                        os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
+                        node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
+                                               backup=True,
+                                               sudo=True, mkdir=True)
+                        node['connection'].sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                                                f"systemctl status {os_specific_associations['service_name']}")
+                return exe.get_last_results_str()
 
 
 tasks = OrderedDict({
