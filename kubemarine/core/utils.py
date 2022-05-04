@@ -361,19 +361,21 @@ class ClusterStorage:
         """
         if self.cluster.context["initial_procedure"] != None:
             self._make_dir(cluster)
-            dump_dir = self.cluster.context['execution_arguments']['dump_location']
-            files_dump = ['procedure_parameters','version','cluster_precompiled.yaml','cluster.yaml',
-                  'cluster_default.yaml','cluster_finalized.yaml','procedure.yaml']
+            dump_dir = get_resource_absolute_path(self.cluster.context['execution_arguments']['dump_location'])
+            files_dump = ['cluster_precompiled.yaml', 'cluster.yaml', 'cluster_finalized.yaml', 'procedure.yaml']
             onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
             archive = dump_dir + "local.tar.gz"
             with tarfile.open(archive, "w:gz") as tar:
                 for name in files_dump:
                     if name in onlyfiles:
                         output = dump_dir + name
-                        tar.add(output)
+                        tar.add(output, 'dump/' + name)
+                tar.add(cluster.context['execution_arguments']['config'], 'cluster.yaml')
+                tar.add(dump_dir + 'procedure_parameters', 'procedure_parameters')
+                tar.add(dump_dir + 'version', 'version')
             self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
             self.cluster.log.debug('File upload local.tar.gz')
-            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"} --strip-components=2 && '
+            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"}  && '
                                               f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):

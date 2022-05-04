@@ -406,7 +406,8 @@ def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
 
-
+    cluster_precompiled = yaml.dump(prepare_for_dump(inventory))
+    utils.dump_file(cluster, cluster_precompiled, "cluster_precompiled.yaml")
 
     return inventory
 
@@ -438,8 +439,8 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
 
         if make_dumps:
-            cluster_default = yaml.dump(prepare_for_dump(inventory), )
-            utils.dump_file(cluster, cluster_default, "cluster_enrich.yaml")
+            cluster = yaml.dump(prepare_for_dump(inventory), )
+            utils.dump_file(cluster, cluster, "cluster.yaml")
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
