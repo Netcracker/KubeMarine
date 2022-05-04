@@ -130,7 +130,7 @@ def enrich_inventory(inventory, cluster):
 
     # do not overwrite apiServer.certSANs, but append - may be user specified something already there?
     for node in inventory["nodes"]:
-        if 'balancer' in node['roles'] or 'master' in node['roles']:
+        if 'balancer' in node['roles'] or 'control-plane' in node['roles']:
             inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['internal_address'])
             inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['name'])
             if node.get('address') is not None and node['address'] not in certsans:
@@ -150,12 +150,12 @@ def enrich_inventory(inventory, cluster):
 
     # validating node labels and configuring additional labels
     for node in inventory["nodes"]:
-        if "master" not in node["roles"] and "worker" not in node["roles"]:
+        if "control-plane" not in node["roles"] and "worker" not in node["roles"]:
             if "labels" in node:
-                raise Exception("Only 'worker' or 'master' nodes can have labels, "
+                raise Exception("Only 'worker' or 'control-plane' nodes can have labels, "
                                 "but found label on %s, roles: %s" % (node["name"], node["roles"]))
             if "taints" in node:
-                raise Exception("Only 'worker' or 'master' nodes can have taints, "
+                raise Exception("Only 'worker' or 'control-plane' nodes can have taints, "
                                 "but found taints on %s, roles: %s" % (node["name"], node["roles"]))
             continue
 
@@ -166,8 +166,8 @@ def enrich_inventory(inventory, cluster):
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
 
-            if "master" in node["roles"]:
-                # node is both master and worker, thus we remove NoSchedule taint
+            if "control-plane" in node["roles"]:
+                # node is both control-plane and worker, thus we remove NoSchedule taint
                 if "taints" not in node:
                     node["taints"] = []
                 # TODO delete if-else case when oldest supported version become higher or equal v1.24
@@ -262,8 +262,8 @@ def reset_installation_env(group: NodeGroup):
 def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=None):
     log = group.cluster.log
 
-    master = group.cluster.nodes['master'].get_final_nodes().get_first_member()
-    result = master.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
+    control_plane = group.cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
     log.verbose("Detected the following nodes in cluster:\n%s" % stdout)
@@ -271,21 +271,21 @@ def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=
     for node in group.get_ordered_members_list(provide_node_configs=True):
         if node["name"] in stdout:
             log.debug("Draining node %s..." % node["name"])
-            master.sudo(prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
+            control_plane.sudo(prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                               group.cluster.globals, disable_eviction, group.cluster.nodes,
                                               drain_timeout, grace_period),
                         hide=False)
         else:
             log.warning("Node %s is not found in cluster and can't be drained" % node["name"])
 
-    return master.sudo("kubectl get nodes")
+    return control_plane.sudo("kubectl get nodes")
 
 
 def delete_nodes(group):
     log = group.cluster.log
 
-    master = group.cluster.nodes['master'].get_final_nodes().get_first_member()
-    result = master.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
+    control_plane = group.cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
     log.verbose("Detected the following nodes in cluster:\n%s" % stdout)
@@ -293,15 +293,15 @@ def delete_nodes(group):
     for node in group.get_ordered_members_list(provide_node_configs=True):
         if node["name"] in stdout:
             log.debug("Deleting node %s from the cluster..." % node["name"])
-            master.sudo("kubectl delete node %s" % node["name"], hide=False)
+            control_plane.sudo("kubectl delete node %s" % node["name"], hide=False)
         else:
             log.warning("Node %s is not found in cluster and can't be removed" % node["name"])
 
-    return master.sudo("kubectl get nodes")
+    return control_plane.sudo("kubectl get nodes")
 
 
-def is_available_master(master):
-    return not ("new_node" in master["roles"] or "remove_node" in master["roles"])
+def is_available_control_plane(control_plane):
+    return not ("new_node" in control_plane["roles"] or "remove_node" in control_plane["roles"])
 
 
 def install(group):
@@ -326,25 +326,25 @@ def install(group):
     return group.sudo('systemctl status kubelet', warn=True)
 
 
-def join_other_masters(group):
-    other_masters_group = group.get_ordered_members_list(provide_node_configs=True)[1:]
+def join_other_control_planes(group):
+    other_control_planes_group = group.get_ordered_members_list(provide_node_configs=True)[1:]
 
     join_dict = group.cluster.context["join_dict"]
-    for node in other_masters_group:
-        join_master(group, node, join_dict)
+    for node in other_control_planes_group:
+        join_control_plane(group, node, join_dict)
 
     group.cluster.log.debug("Verifying installation...")
-    first_master = group.get_first_member(provide_node_configs=True)
-    return first_master['connection'].sudo("kubectl get pods --all-namespaces -o=wide")
+    first_control_plane = group.get_first_member(provide_node_configs=True)
+    return first_control_plane['connection'].sudo("kubectl get pods --all-namespaces -o=wide")
 
 
-def join_new_master(group):
+def join_new_control_plane(group):
     join_dict = get_join_dict(group)
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        join_master(group, node, join_dict)
+        join_control_plane(group, node, join_dict)
 
 
-def join_master(group, node, join_dict):
+def join_control_plane(group, node, join_dict):
     log = group.cluster.log
 
     join_config = {
@@ -381,21 +381,21 @@ def join_master(group, node, join_dict):
 
     utils.dump_file(group.cluster, config, 'join-config_%s.yaml' % node['name'])
 
-    log.debug("Uploading init config to master '%s'..." % node['name'])
+    log.debug("Uploading init config to control-plane '%s'..." % node['name'])
     node['connection'].sudo("mkdir -p /etc/kubernetes")
     node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
-    # copy admission config to master
+    # copy admission config to control-plane
     admission.copy_pss(node['connection'])
 
-    # ! ETCD on masters can't be initialized in async way, that is why it is necessary to disable async mode !
-    log.debug('Joining master \'%s\'...' % node['name'])
+    # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
+    log.debug('Joining control-plane \'%s\'...' % node['name'])
     node['connection'].sudo("kubeadm join "
                             " --config=/etc/kubernetes/join-config.yaml"
                             " --ignore-preflight-errors=Port-6443 --v=5",
                             is_async=False, hide=False)
 
-    log.debug("Patching apiServer bind-address for master %s" % node['name'])
+    log.debug("Patching apiServer bind-address for control-plane %s" % node['name'])
 
     with RemoteExecutor(group.cluster):
         node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
@@ -412,8 +412,8 @@ def copy_admin_config(log, nodes):
 
 
 def get_join_dict(group):
-    first_master = group.cluster.nodes["master"].get_first_member(provide_node_configs=True)
-    token_result = first_master['connection'].sudo("kubeadm token create --print-join-command", hide=False)
+    first_control_plane = group.cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
+    token_result = first_control_plane['connection'].sudo("kubeadm token create --print-join-command", hide=False)
     join_strings = list(token_result.values())[0].stdout.rstrip("\n")
 
     join_dict = {"worker_join_command": join_strings}
@@ -423,28 +423,28 @@ def get_join_dict(group):
         if "--" in current_string:
             join_dict[current_string.lstrip("--")] = join_array[idx + 1]
 
-    cert_key_result = first_master['connection'].sudo("kubeadm init phase upload-certs --upload-certs")
+    cert_key_result = first_control_plane['connection'].sudo("kubeadm init phase upload-certs --upload-certs")
     cert_key = list(cert_key_result.values())[0].stdout.split("Using certificate key:\n")[1].rstrip("\n")
     join_dict["certificate-key"] = cert_key
     return join_dict
 
 
-def init_first_master(group):
+def init_first_control_plane(group):
     log = group.cluster.log
 
-    first_master = group.get_first_member(provide_node_configs=True)
-    first_master_group = first_master["connection"]
+    first_control_plane = group.get_first_member(provide_node_configs=True)
+    first_control_plane_group = first_control_plane["connection"]
 
-    # setting global apiServer bind-address to first master internal address
-    # for other masters we override it during initialization
+    # setting global apiServer bind-address to first control-plane internal address
+    # for other control-planes we override it during initialization
     group.cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = \
-        first_master['internal_address']
+        first_control_plane['internal_address']
 
     init_config = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
-            'advertiseAddress': first_master['internal_address']
+            'advertiseAddress': first_control_plane['internal_address']
         }
     }
 
@@ -460,17 +460,17 @@ def init_first_master(group):
 
     config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
-    utils.dump_file(group.cluster, config, 'init-config_%s.yaml' % first_master['name'])
+    utils.dump_file(group.cluster, config, 'init-config_%s.yaml' % first_control_plane['name'])
 
-    log.debug("Uploading init config to initial master...")
-    first_master_group.sudo("mkdir -p /etc/kubernetes")
-    first_master_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
+    log.debug("Uploading init config to initial control_plane...")
+    first_control_plane_group.sudo("mkdir -p /etc/kubernetes")
+    first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
     
-    # copy admission config to first master
-    first_master_group.call(admission.copy_pss)
+    # copy admission config to first control-plane
+    first_control_plane_group.call(admission.copy_pss)
 
-    log.debug("Initializing first master...")
-    result = first_master_group.sudo("kubeadm init"
+    log.debug("Initializing first control_plane...")
+    result = first_control_plane_group.sudo("kubeadm init"
                                      " --upload-certs"
                                      " --config=/etc/kubernetes/init-config.yaml"
                                      " --ignore-preflight-errors=Port-6443"
@@ -478,24 +478,24 @@ def init_first_master(group):
                                      hide=False)
 
     log.debug("Setting up admin-config...")
-    first_master_group.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
+    first_control_plane_group.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
     # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
-    first_master_group.call(admission.apply_admission)
+    first_control_plane_group.call(admission.apply_admission)
 
     log.debug('Downloading admin.conf...')
     group.cluster.context['kube_config'] = \
-        list(first_master_group.sudo('cat /etc/kubernetes/admin.conf').values())[0].stdout
+        list(first_control_plane_group.sudo('cat /etc/kubernetes/admin.conf').values())[0].stdout
 
     # Preparing join_dict to init other nodes
-    master_lines = list(result.values())[0].stdout. \
+    control_plane_lines = list(result.values())[0].stdout. \
                        split("You can now join any number of the control-plane")[1].splitlines()[2:5]
     worker_lines = list(result.values())[0].stdout. \
                        split("Then you can join any number of worker")[1].splitlines()[2:4]
-    master_join_command = " ".join([x.replace("\\", "").strip() for x in master_lines])
+    control_plane_join_command = " ".join([x.replace("\\", "").strip() for x in control_plane_lines])
     worker_join_command = " ".join([x.replace("\\", "").strip() for x in worker_lines])
 
     # TODO: Get rid of this code and use get_join_dict() method
-    args = master_join_command.split("--")
+    args = control_plane_join_command.split("--")
     join_dict = {}
     for arg in args:
         key_val = arg.split(" ")
@@ -504,7 +504,7 @@ def init_first_master(group):
     join_dict["worker_join_command"] = worker_join_command
     group.cluster.context["join_dict"] = join_dict
 
-    wait_for_any_pods(group.cluster, first_master_group, apply_filter=first_master['name'])
+    wait_for_any_pods(group.cluster, first_control_plane_group, apply_filter=first_control_plane['name'])
     # refresh cluster installation status in cluster context
     is_cluster_installed(group.cluster)
 
@@ -529,7 +529,7 @@ def wait_for_any_pods(cluster, connection, apply_filter=None):
 def wait_for_nodes(group):
     log = group.cluster.log
 
-    first_master = group.cluster.nodes["master"].get_first_member()
+    first_control_plane = group.cluster.nodes["control-plane"].get_first_member()
     node_names = group.get_nodes_names()
 
     wait_conditions = {
@@ -547,7 +547,7 @@ def wait_for_nodes(group):
     while retries > 0:
         correct_conditions = 0
         for condition, cond_value in wait_conditions.items():
-            result = first_master.sudo(status_cmd % (" ".join(node_names), condition))
+            result = first_control_plane.sudo(status_cmd % (" ".join(node_names), condition))
             condition_results = list(result.values())[0].stdout.split(" ")
             correct_values = [value for value in condition_results if value == cond_value]
             if len(correct_values) == len(node_names):
@@ -619,12 +619,12 @@ def apply_labels(group):
                 continue
             log.verbose("Found additional labels for %s: %s" % (node['name'], node['labels']))
             for key, value in node["labels"].items():
-                group.cluster.nodes["master"].get_first_member() \
+                group.cluster.nodes["control-plane"].get_first_member() \
                     .sudo("kubectl label node %s %s=%s" % (node["name"], key, value))
 
     log.debug("Successfully applied additional labels")
 
-    return group.cluster.nodes["master"].get_first_member() \
+    return group.cluster.nodes["control-plane"].get_first_member() \
         .sudo("kubectl get nodes --show-labels")
     # TODO: Add wait for pods on worker nodes
 
@@ -640,12 +640,12 @@ def apply_taints(group):
                 continue
             log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
             for taint in node["taints"]:
-                group.cluster.nodes["master"].get_first_member() \
+                group.cluster.nodes["control-plane"].get_first_member() \
                     .sudo("kubectl taint node %s %s" % (node["name"], taint))
 
     log.debug("Successfully applied additional taints")
 
-    return group.cluster.nodes["master"].get_first_member() \
+    return group.cluster.nodes["control-plane"].get_first_member() \
         .sudo("kubectl get nodes -o=jsonpath="
               "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
 
@@ -653,7 +653,7 @@ def apply_taints(group):
 def is_cluster_installed(cluster):
     cluster.log.verbose('Searching for already installed cluster...')
     try:
-        result = cluster.nodes['master'].sudo('kubectl cluster-info', warn=True, timeout=15)
+        result = cluster.nodes['control-plane'].sudo('kubectl cluster-info', warn=True, timeout=15)
         for conn, result in result.items():
             if 'is running at' in result.stdout:
                 cluster.log.verbose('Detected running Kubernetes cluster on %s' % conn.host)
@@ -674,47 +674,47 @@ def get_kubeadm_config(inventory):
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
 
-def upgrade_first_master(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
-    first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
+def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
-    if not upgrade_group.has_node(first_master['name']):
-        cluster.log.debug("First master \"%s\" upgrade is not required" % first_master['name'])
+    if not upgrade_group.has_node(first_control_plane['name']):
+        cluster.log.debug("First control-plane \"%s\" upgrade is not required" % first_control_plane['name'])
         return
 
-    cluster.log.debug("Upgrading first master \"%s\"" % first_master)
+    cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
 
     flags = "-f --certificate-renewal=true --ignore-preflight-errors=CoreDNSUnsupportedPlugins"
-    if patch_kubeadm_configmap(first_master, cluster):
+    if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"
 
     disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
-    drain_cmd = prepare_drain_command(first_master, version, cluster.globals, disable_eviction, cluster.nodes,
+    drain_cmd = prepare_drain_command(first_control_plane, version, cluster.globals, disable_eviction, cluster.nodes,
                                       drain_timeout, grace_period)
-    first_master['connection'].sudo(drain_cmd, is_async=False, hide=False)
+    first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
 
-    upgrade_cri_if_required(first_master['connection'])
+    upgrade_cri_if_required(first_control_plane['connection'])
 
-    first_master['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
-                                    f"sudo kubectl uncordon {first_master['name']} && "
+    first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
+                                    f"sudo kubectl uncordon {first_control_plane['name']} && "
                                     f"sudo systemctl restart kubelet", is_async=False, hide=False)
 
-    copy_admin_config(cluster.log, first_master['connection'])
+    copy_admin_config(cluster.log, first_control_plane['connection'])
 
-    expect_kubernetes_version(cluster, version, apply_filter=first_master['name'])
-    wait_for_any_pods(cluster, first_master['connection'], apply_filter=first_master['name'])
-    exclude_node_from_upgrade_list(first_master['connection'], first_master['name'])
+    expect_kubernetes_version(cluster, version, apply_filter=first_control_plane['name'])
+    wait_for_any_pods(cluster, first_control_plane['connection'], apply_filter=first_control_plane['name'])
+    exclude_node_from_upgrade_list(first_control_plane['connection'], first_control_plane['name'])
 
 
-def upgrade_other_masters(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
-    first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
-    for node in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-        if node['name'] != first_master['name']:
+def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    for node in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+        if node['name'] != first_control_plane['name']:
 
             if not upgrade_group.has_node(node['name']):
                 cluster.log.debug("Master \"%s\" upgrade is not required" % node['name'])
                 continue
 
-            cluster.log.debug("Upgrading master \"%s\"" % node['name'])
+            cluster.log.debug("Upgrading control-plane \"%s\"" % node['name'])
 
             disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
             drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
@@ -732,17 +732,17 @@ def upgrade_other_masters(version, upgrade_group, cluster, drain_timeout=None, g
             expect_kubernetes_version(cluster, version, apply_filter=node['name'])
             copy_admin_config(cluster.log, node['connection'])
             wait_for_any_pods(cluster, node['connection'], apply_filter=node['name'])
-            exclude_node_from_upgrade_list(first_master, node['name'])
+            exclude_node_from_upgrade_list(first_control_plane, node['name'])
 
 
-def patch_kubeadm_configmap(first_master, cluster):
+def patch_kubeadm_configmap(first_control_plane, cluster):
     '''
     Сhecks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
     '''
     # TODO: get rid of this method after k8s 1.21 support stop
     current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    kubeadm_config_map = first_master["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
+    kubeadm_config_map = first_control_plane["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
     ryaml = ruamel.yaml.YAML()
     config_map = ryaml.load(kubeadm_config_map)
@@ -770,17 +770,17 @@ def patch_kubeadm_configmap(first_master, cluster):
     if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
         cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
-    kubelet_config = first_master["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
+    kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
     result_config = kubelet_config + "---\n" + updated_config.getvalue()
-    first_master["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
+    first_control_plane["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
 
     return True
 
 
 def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
-    first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
-    for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['master']).get_ordered_members_list(
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['control-plane']).get_ordered_members_list(
             provide_node_configs=True):
 
         if not upgrade_group.has_node(node['name']):
@@ -792,18 +792,18 @@ def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_p
         disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
         drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
                                           drain_timeout, grace_period)
-        first_master['connection'].sudo(drain_cmd, is_async=False, hide=False)
+        first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
 
         upgrade_cri_if_required(node['connection'])
 
         node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true && "
                                 "sudo systemctl restart kubelet")
 
-        first_master['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False)
+        first_control_plane['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False)
 
         expect_kubernetes_version(cluster, version, apply_filter=node['name'])
         # workers do not have system pods to wait for their start
-        exclude_node_from_upgrade_list(first_master, node['name'])
+        exclude_node_from_upgrade_list(first_control_plane, node['name'])
 
 
 def prepare_drain_command(node, version: str, globals, disable_eviction: bool, nodes,
@@ -839,13 +839,13 @@ def upgrade_cri_if_required(group):
 
 
 def verify_upgrade_versions(cluster):
-    first_master = cluster.nodes['master'].get_first_member(provide_node_configs=True)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
     upgrade_version = cluster.context["upgrade_version"]
 
-    k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['master'])
+    k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['control-plane'])
     for node in k8s_nodes_group.get_ordered_members_list(provide_node_configs=True):
         cluster.log.debug(f"Verifying current k8s version for node {node['name']}")
-        result = first_master['connection'].sudo("kubectl get nodes -o custom-columns="
+        result = first_control_plane['connection'].sudo("kubectl get nodes -o custom-columns="
                                                  "'VERSION:.status.nodeInfo.kubeletVersion,NAME:.metadata.name' "
                                                  f"| grep -w {node['name']} "
                                                  "| awk '{ print $1 }'")
@@ -882,7 +882,7 @@ def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node
     cluster.log.debug("Waiting for nodes...\n")
 
     if node is None:
-        node = cluster.nodes['master'].get_first_member()
+        node = cluster.nodes['control-plane'].get_first_member()
 
     command = 'kubectl get nodes -o=wide'
     if apply_filter is not None:
@@ -966,7 +966,7 @@ def test_version_upgrade_possible(old, new, skip_equal=False):
 
 def recalculate_proper_timeout(nodes, timeout):
     try:
-        amount_str = nodes['master'].get_first_member().sudo('kubectl get pods -A | wc -l').get_simple_out()
+        amount_str = nodes['control-plane'].get_first_member().sudo('kubectl get pods -A | wc -l').get_simple_out()
         return timeout * int(amount_str)
     except Exception:
         return timeout * 10 * nodes['all'].nodes_amount()
@@ -985,16 +985,16 @@ def configure_container_runtime(cluster, kubeadm_config):
             'unix:///run/containerd/containerd.sock'
 
 
-def exclude_node_from_upgrade_list(first_master, node_name):
-    if isinstance(first_master, dict):
-        first_master = first_master['connection']
-    return first_master.sudo('sed -i \'/%s/d\' /etc/kubernetes/nodes-k8s-versions.txt' % node_name, warn=True)
+def exclude_node_from_upgrade_list(first_control_plane, node_name):
+    if isinstance(first_control_plane, dict):
+        first_control_plane = first_control_plane['connection']
+    return first_control_plane.sudo('sed -i \'/%s/d\' /etc/kubernetes/nodes-k8s-versions.txt' % node_name, warn=True)
 
 
 def autodetect_non_upgraded_nodes(cluster, future_version) -> List[str]:
-    first_master = cluster.nodes['master'].get_first_member()
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
     try:
-        nodes_list_result = first_master.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] && '
+        nodes_list_result = first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] && '
                                               'sudo kubectl get nodes -o custom-columns=\''
                                               'VERSION:.status.nodeInfo.kubeletVersion,'
                                               'NAME:.metadata.name,'
@@ -1053,7 +1053,7 @@ def get_group_for_upgrade(cluster, ignore_cache=False):
                 node_name = node['name']
             nodes_for_upgrade.append(node_name)
             cluster.log.verbose("Node \"%s\" manually scheduled for upgrade." % node_name)
-            cluster.nodes['master'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt', warn=True)
+            cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt', warn=True)
     else:
         nodes_for_upgrade = autodetect_non_upgraded_nodes(cluster, version)
 

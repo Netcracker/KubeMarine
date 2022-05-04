@@ -22,16 +22,16 @@ supported_k8s_certs = ["all",
 version_kubectl_alpha_removed = "v1.21.0"
 
 
-def k8s_certs_overview(masters):
-    if kubernetes.version_higher_or_equal(masters.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
+def k8s_certs_overview(control_planes):
+    if kubernetes.version_higher_or_equal(control_planes.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                           version_kubectl_alpha_removed):
-        for master in masters.get_ordered_members_list(provide_node_configs=True):
-            masters.cluster.log.debug(f"Checking certs expiration for master {master['name']}")
-            master['connection'].sudo("kubeadm certs check-expiration", hide=False)
+        for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
+            control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
+            control_plane['connection'].sudo("kubeadm certs check-expiration", hide=False)
     else:
-        for master in masters.get_ordered_members_list(provide_node_configs=True):
-            masters.cluster.log.debug(f"Checking certs expiration for master {master['name']}")
-            master['connection'].sudo("kubeadm alpha certs check-expiration", hide=False)
+        for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
+            control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
+            control_plane['connection'].sudo("kubeadm alpha certs check-expiration", hide=False)
 
 
 def renew_verify(inventory, cluster):
@@ -46,50 +46,50 @@ def renew_verify(inventory, cluster):
     return inventory
 
 
-def renew_apply(masters):
-    log = masters.cluster.log
+def renew_apply(control_planes):
+    log = control_planes.cluster.log
 
-    procedure = masters.cluster.procedure_inventory["kubernetes"]
+    procedure = control_planes.cluster.procedure_inventory["kubernetes"]
     cert_list = remove_certs_duplicates(procedure["cert-list"])
 
-    if kubernetes.version_higher_or_equal(masters.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
+    if kubernetes.version_higher_or_equal(control_planes.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                           version_kubectl_alpha_removed):
         for cert in cert_list:
-            masters.sudo(f"kubeadm certs renew {cert}")
+            control_planes.sudo(f"kubeadm certs renew {cert}")
     else:
         for cert in cert_list:
-            masters.sudo(f"kubeadm alpha certs renew {cert}")
+            control_planes.sudo(f"kubeadm alpha certs renew {cert}")
 
     if "all" in cert_list or "admin.conf" in cert_list:
         # need to update cluster-admin config
-        kubernetes.copy_admin_config(log, masters)
+        kubernetes.copy_admin_config(log, control_planes)
 
-    masters.call(force_renew_kubelet_serving_certs)
+    control_planes.call(force_renew_kubelet_serving_certs)
 
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
-    masters.call(force_restart_control_plane)
+    control_planes.call(force_restart_control_plane)
 
-    for master in masters.get_ordered_members_list(provide_node_configs=True):
-        kubernetes.wait_for_any_pods(masters.cluster, master["connection"], apply_filter=master["name"])
+    for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
+        kubernetes.wait_for_any_pods(control_planes.cluster, control_plane["connection"], apply_filter=control_plane["name"])
 
 
-def force_restart_control_plane(masters):
-    cri_impl = masters.cluster.inventory['services']['cri']['containerRuntime']
+def force_restart_control_plane(control_planes):
+    cri_impl = control_planes.cluster.inventory['services']['cri']['containerRuntime']
     restart_containers = ["etcd", "kube-scheduler", "kube-apiserver", "kube-controller-manager"]
     c_filter = "grep -e %s" % " -e ".join(restart_containers)
 
     if cri_impl == "docker":
-        masters.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
     else:
-        masters.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
 
 
-def force_renew_kubelet_serving_certs(masters):
+def force_renew_kubelet_serving_certs(control_planes):
     # Delete *serving* kubelet cert (kubelet.crt) and restart kubelet to create new up-to-date cert.
     # Client kubelet cert (kubelet.conf) is assumed to be updated automatically by kubelet.
-    for master in masters.get_ordered_members_list():
-        master.sudo(f"rm -f /var/lib/kubelet/pki/kubelet.crt /var/lib/kubelet/pki/kubelet.key")
-    masters.sudo("systemctl restart kubelet")
+    for control_plane in control_planes.get_ordered_members_list():
+        control_plane.sudo(f"rm -f /var/lib/kubelet/pki/kubelet.crt /var/lib/kubelet/pki/kubelet.key")
+    control_planes.sudo("systemctl restart kubelet")
 
 
 def verify_cert_list_format(cert_list):

@@ -302,7 +302,7 @@ def append_controlplain(inventory, cluster):
         cluster.log.warning('VRRP_IPs has an internal address, but do not have an external one. Your configuration may be incorrect. Trying to handle this problem automatically...')
 
     if internal_address is None or external_address is None:
-        for role in ['balancer', 'master']:
+        for role in ['balancer', 'control-plane']:
             # nodes are not compiled to groups yet
             for node in inventory['nodes']:
                 if role in node['roles'] and 'remove_node' not in node['roles']:
@@ -370,7 +370,7 @@ def recursive_apply_defaults(defaults, section):
 def calculate_node_names(inventory, cluster):
     roles_iterators = {}
     for i, node in enumerate(inventory['nodes']):
-        for role_name in ['master', 'worker', 'balancer']:
+        for role_name in ['control-plane', 'worker', 'balancer']:
             if role_name in node.get('roles', []):
                 # The idea is this:
                 # If the name is already specified, we must skip this node,
@@ -378,15 +378,15 @@ def calculate_node_names(inventory, cluster):
                 # and increase this type iterator
                 # As a result, we get such an algorithm. For example, with the following inventory:
                 #
-                # - name: k8s-master-1, roles: ['master']
-                # - roles: ['master']
-                # - name: k8s-master-3, roles: ['master']
+                # - name: k8s-control-plane-1, roles: ['control-plane']
+                # - roles: ['control-plane']
+                # - name: k8s-control-plane-3, roles: ['control-plane']
                 #
                 # We should get the following calculation result:
                 #
-                # - name: k8s-master-1, roles: ['master']
-                # - name: master-2, roles: ['master']
-                # - name: k8s-master-3, roles: ['master']
+                # - name: k8s-control-plane-1, roles: ['control-plane']
+                # - name: control-plane-2, roles: ['control-plane']
+                # - name: k8s-control-plane-3, roles: ['control-plane']
                 #
                 role_i = roles_iterators.get(role_name, 1)
                 roles_iterators[role_name] = role_i + 1
