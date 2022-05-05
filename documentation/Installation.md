@@ -3035,7 +3035,11 @@ An example is also available in [Full Inventory Example](../examples/cluster.yam
 
 ###### Calico with Route Reflectors
 
-By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh. To enable route reflector topology during installation the next steps are required:
+By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh. 
+
+**Note**: change BGP topology is possible for calico v3.20.1 or higher.
+
+To enable route reflector topology during installation the next steps are required:
 
 1. Choose the nodes to be route reflectors and add the label `route-reflector=true` to their description in the cluster.yaml. It is recommended to use control-plane nodes for route reflectors, but not necessarily.
 
@@ -3047,6 +3051,8 @@ plugins:
 ```
 
 It is also possible to change BGP topology at the running cluster. 
+
+**Warning**: short downtime is possible during BGP peering sessions reestablishing.
 
 To switch from "full mesh" to "route reflector" topology:
 - add the labels `route-reflector=true` to the route reflector nodes manually
