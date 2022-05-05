@@ -27,7 +27,7 @@ class TestInventoryValidation(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory, fake=False)
 
-        self.assertIn("Only 'worker' or 'master' nodes can have labels", str(context.exception))
+        self.assertIn("Only 'worker' or 'control-plane' nodes can have labels", str(context.exception))
 
     def test_taints_check(self):
         inventory = demo.generate_inventory(master=0, balancer=1, worker=0)
@@ -35,7 +35,7 @@ class TestInventoryValidation(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             demo.new_cluster(inventory, fake=False)
 
-        self.assertIn("Only 'worker' or 'master' nodes can have taints", str(context.exception))
+        self.assertIn("Only 'worker' or 'control-plane' nodes can have taints", str(context.exception))
 
     def test_invalid_node_name(self):
         inventory = demo.generate_inventory(master=1, balancer=0, worker=0)
