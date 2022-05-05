@@ -346,6 +346,7 @@ class KubernetesCluster(Environment):
         if self.context["initial_procedure"] in ('paas', 'iaas'):
             self.log.verbose(self.context["initial_procedure"] + ' procedure')
         else:
+            cluster_storage.make_dir(self)
             if self.context.get('initial_procedure') == 'add_node':
                 cluster_storage.collect_info_all_master(self)
                 cluster_storage.upload_info_new_node(self)

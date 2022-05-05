@@ -92,16 +92,6 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
 
     return inventory_to_finalize
 
-def upload_info_new_node(cluster):
-
-    new_nodes = cluster.nodes['all'].get_new_nodes()
-
-    for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
-        if 'master' in new_node['roles']:
-                new_node['connection'].put(cluster.context['execution_arguments']['dump_location'] + "dump_log_cluster.tar.gz", "/tmp/dump_log_cluster.tar.gz", sudo=True, binary=False)
-                new_node['connection'].sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
-        else:
-            cluster.log.debug('Master not found')
 
 def cache_installed_packages(cluster):
     """

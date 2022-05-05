@@ -227,7 +227,14 @@ def dump_file(cluster, data, filename):
         with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
                   'w') as file:
             file.write(data)
+    else:
+        files_obligatory = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
+                          'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml','version']
+        for filename in files_obligatory:
 
+            with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
+                      'w') as file:
+                file.write(data)
 
 def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
     log = group.cluster.log
@@ -321,7 +328,7 @@ class ClusterStorage:
             cls.__instance = ClusterStorage(cluster)
         return cls.__instance
 
-    def _make_dir(self, cluster):
+    def make_dir(self, cluster):
         """
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
@@ -344,15 +351,16 @@ class ClusterStorage:
         node_group_results = self.cluster.nodes["master"].sudo(command)
         with RemoteExecutor(self.cluster):
             for cxn, result in node_group_results.items():
+                master = self.cluster.make_group([cxn.host])
                 files = result.stdout.split()
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
                     if i >= not_pack_file and i < delete_old:
                         if 'tar.gz' not in file:
-                            cxn.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
+                            master.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
                                        f'sudo rm -r {self.dir_path + file}')
                     elif i >= delete_old:
-                        cxn.sudo(f'rm -rf {self.dir_path + file}')
+                        master.sudo(f'rm -rf {self.dir_path + file}')
 
 
     def comprese_and_upload_archive(self, cluster):
@@ -360,10 +368,9 @@ class ClusterStorage:
         This method compose dump files and sends the collected files to the nodes.
         """
         if self.cluster.context["initial_procedure"] != None:
-            self._make_dir(cluster)
             dump_dir = get_resource_absolute_path(self.cluster.context['execution_arguments']['dump_location'])
             files_dump = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
-                          'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml', 'procedure.yaml']
+                          'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml']
             onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
             archive = dump_dir + "local.tar.gz"
             with tarfile.open(archive, "w:gz") as tar:

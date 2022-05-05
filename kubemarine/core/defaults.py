@@ -406,9 +406,6 @@ def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
 
-    cluster_precompiled = yaml.dump(prepare_for_dump(inventory))
-    utils.dump_file(cluster, cluster_precompiled, "cluster_precompiled.yaml")
-
     return inventory
 
 
@@ -418,8 +415,9 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
 
-        cluster_initial = yaml.dump(custom_inventory)
-        utils.dump_file(cluster, cluster_initial, "cluster_initial.yaml")
+        if make_dumps:
+            cluster_initial = yaml.dump(custom_inventory)
+            utils.dump_file(cluster, cluster_initial, "cluster_initial.yaml")
 
         inventory = default_merger.merge(base_inventory, custom_inventory)
 
@@ -459,6 +457,7 @@ def compile_inventory(inventory, cluster):
     root = deepcopy(inventory)
     root['globals'] = cluster.globals
 
+
     while iterations > 0:
 
         cluster.log.verbose('Inventory is not rendered yet...')
@@ -478,6 +477,8 @@ def compile_inventory(inventory, cluster):
 
     inventory = compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
 
+    cluster_precompiled = yaml.dump(prepare_for_dump(inventory))
+    utils.dump_file(cluster, cluster_precompiled, "cluster_precompiled.yaml")
 
     return inventory
 
