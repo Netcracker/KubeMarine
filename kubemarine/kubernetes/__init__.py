@@ -711,7 +711,7 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=
         if node['name'] != first_control_plane['name']:
 
             if not upgrade_group.has_node(node['name']):
-                cluster.log.debug("Master \"%s\" upgrade is not required" % node['name'])
+                cluster.log.debug("Control-plane \"%s\" upgrade is not required" % node['name'])
                 continue
 
             cluster.log.debug("Upgrading control-plane \"%s\"" % node['name'])

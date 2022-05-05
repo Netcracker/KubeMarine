@@ -792,9 +792,9 @@ def control_plane_configuration_status(cluster):
                 if result[static_pod_name]['correct_version'] and \
                    result[static_pod_name]['correct_properties'] and \
                    result[static_pod_name]['correct_volumes']:
-                    cluster.log.verbose(f'Master {result["name"]} has correct configuration for {static_pod_name}')
+                    cluster.log.verbose(f'Control-plane {result["name"]} has correct configuration for {static_pod_name}')
                 else:
-                    message += f"Master {result['name']} has incorrect configuration for {static_pod_name} \n"
+                    message += f"Control-plane {result['name']} has incorrect configuration for {static_pod_name} \n"
         if not_presented_static_pods:
             message += f"{not_presented_static_pods} static pods doesn't presented"
 
