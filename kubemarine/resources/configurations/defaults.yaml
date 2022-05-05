@@ -390,10 +390,17 @@ plugins:
             source: templates/plugins/calico-ippool.yaml.j2
             destination: /etc/calico/ippool.yaml
             apply_command: 'calicoctl apply -f /etc/calico/ippool.yaml'
+        - template:
+            source: templates/plugins/calico-rr.sh.j2
+            destination: /tmp/calico_rr.sh
+            apply_required: true
+            apply_command: /bin/sh /tmp/calico_rr.sh
+            sudo: true
     mode: ipip
     crossSubnet: true
     natOutgoing: true
     mtu: 1440
+    fullmesh: true
     typha:
       enabled: false
       replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'
