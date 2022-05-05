@@ -58,7 +58,7 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
 
     new_nodes = cluster.nodes['all'].get_new_nodes()
 
-    # add nodes to inventory if they in new nodes and transfer log on the new node
+    # add nodes to inventory if they in new nodes
     for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
         new_node_found = False
         for i, node in enumerate(inventory_to_finalize['nodes']):

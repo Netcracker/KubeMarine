@@ -230,8 +230,7 @@ def dump_file(cluster, data, filename):
     else:
         files_obligatory = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
                           'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml','version']
-        for filename in files_obligatory:
-
+        if filename in files_obligatory:
             with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
                       'w') as file:
                 file.write(data)
@@ -407,7 +406,7 @@ class ClusterStorage:
         This method is used to transfer backup logs from the main master to the new master.
         """
 
-        node = self.cluster.nodes['master'].get_first_member(provide_node_configs=True)
+        node = self.cluster.nodes['master'].get_initial_nodes().get_first_member(provide_node_configs=True)
         master = cluster.make_group([node['connect_to']])
         data_copy_res = master.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
         self.cluster.log.debug('Backup created:\n%s' % data_copy_res)

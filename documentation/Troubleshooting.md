@@ -655,10 +655,13 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
   * Logs are a set of files, namely:
   ```
   data_time_initial_procedure
-    cluster_finalized.yaml    
-    version
-    cluster_precompiled.yaml
     cluster.yaml
-    procedure_parameters
+    version
+    dump/
+      
+      cluster_finalized.yaml
+      cluster_precompiled.yaml
+      cluster.yaml
+      procedure_parameters
   ```
 The user can analyze these files and try to find the reason for the failed installation of kubemarine
