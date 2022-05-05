@@ -418,6 +418,9 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
 
+        cluster_initial = yaml.dump(custom_inventory)
+        utils.dump_file(cluster, cluster_initial, "cluster_initial.yaml")
+
         inventory = default_merger.merge(base_inventory, custom_inventory)
 
         # it is necessary to temporary put half-compiled inventory to cluster inventory field
@@ -439,8 +442,8 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
 
         if make_dumps:
-            cluster = yaml.dump(prepare_for_dump(inventory), )
-            utils.dump_file(cluster, cluster, "cluster.yaml")
+            cluster_original = yaml.dump(prepare_for_dump(inventory), )
+            utils.dump_file(cluster, cluster_original, "cluster.yaml")
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
