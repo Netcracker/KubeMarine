@@ -62,7 +62,7 @@ In this case, your custom TCP load balancer should meet the following requiremen
 * The load balancer should be Highly Available.
 * The load balancer should have HTTPS (port 443) and Kubernetes API (port 6443) frontends.
 * The HTTPS frontend should point to backend port 443 of worker nodes where Nginx Ingress Controller is installed.
-* The Kubernetes API frontend should point to backend port 6443 of all master nodes.
+* The Kubernetes API frontend should point to backend port 6443 of all control-plane nodes.
 * The load balancer backend configuration should be updated accordingly when new nodes are added or removed from a cluster.
 
 ## Advanced Load Balancing techniques

@@ -36,7 +36,7 @@ Traceback (most recent call last):
   File "/home/centos/repos/kubemarine/kubemarine/src/core/flow.py", line 131, in run_flow
     task(cluster)
   File "/home/centos/repos/kubemarine/kubemarine/install", line 193, in deploy_kubernetes_init
-    cluster.nodes["worker"].new_group(apply_filter=lambda node: 'master' not in node['roles']).call(kubernetes.init_workers)
+    cluster.nodes["worker"].new_group(apply_filter=lambda node: 'control-plane' not in node['roles']).call(kubernetes.init_workers)
   File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 165, in call
     return self.call_batch([action], **{action.__name__: kwargs})
   File "/home/centos/repos/kubemarine/kubemarine/src/core/group.py", line 179, in call_batch
@@ -165,16 +165,16 @@ An error related with the absence of any worker role in the inventory file. The 
 the payload is executed on the cluster.
 
 To fix it, you need to either specify new nodes with the `worker` role, or add the `worker` role to 
-the existing masters nodes.
+the existing control-planes nodes.
 
-An example of specifying different nodes with separate `master` and `worker` roles is as follows.
+An example of specifying different nodes with separate `control-plane` and `worker` roles is as follows.
 
 ```yaml
 - address: 10.101.1.1
   internal_address: 192.168.101.1
-  name: master-1
+  name: control-plane-1
   roles:
-  - master
+  - control-plane
 - address: 10.101.1.2
   internal_address: 192.168.101.2
   name: worker-1
@@ -182,18 +182,18 @@ An example of specifying different nodes with separate `master` and `worker` rol
   - worker
 ```
 
-An example of specifying multiple `master` and `worker` roles for a single node is as follows.
+An example of specifying multiple `control-plane` and `worker` roles for a single node is as follows.
 
 ```yaml
 - address: 10.101.1.1
   internal_address: 192.168.101.1
-  name: master-1
+  name: control-plane-1
   roles:
-  - master
+  - control-plane
   - worker
 ```
 
-**Note**: Masters with a `worker` role remain as control planes, however, they start scheduling
+**Note**: Control-planes with a `worker` role remain as control planes, however, they start scheduling
 applications pods.
 
 
@@ -228,11 +228,11 @@ This section describes the additional tools that Kubemarine provides for conveni
 
 ## etcdctl script
 
-This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all masters and requires root privileges.
+This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
 To execute a command through this script, make sure you meet all the following prerequisites:
 
-* You run the command from the master node with root privileges.
+* You run the command from the control-plane node with root privileges.
 * You have configured `admin.conf` on node.
 * The node with which you are running has all the necessary ETCD certificates and they are located in the correct paths.
 
@@ -288,7 +288,7 @@ Choose the number of replicas at your discretion. In addition to increasing the 
 * If the controller is just temporarily unavailable, then `CustomResource` is deleted as soon as the controller starts running. You just have to make the controller operational. This is the recommended approach as the controller is able to perform on-delete logic.
 * If the controller is removed, or you do not want to deal with an unavailable controller, remove `CustomResource` by manually deleting its finalizers. This approach is not recommended as the required on-delete logic for `CustomResource` is not executed by the controller.
 
-To manually delete a finalizer for `CustomResource`, execute the following command on one of the master nodes:
+To manually delete a finalizer for `CustomResource`, execute the following command on one of the control-plane nodes:
 
 ```bash
 kubectl patch <cr-singular-alias/cr-name> -p '{"metadata":{"finalizers":[]}}' --type=merge
@@ -306,7 +306,7 @@ kubectl patch crontab/my-new-cron-object -p '{"metadata":{"finalizers":[]}}' --t
 
 **Root Cause**: Default kubernetes installation uses calico network plugin and set ipip mode with CrossSubnet. In that case all packets between pods running on nodes in one networks go to each other directly, but packets between pods running on nodes in two or more networks go to each other by tunnel. As described in [calico documentation](https://docs.projectcalico.org/networking/mtu) MTU on calico tunl interfaces should be less by 20 than MTU on main network interface.
 
-**Solution**: To change MTU size to required value run following command on any master node:
+**Solution**: To change MTU size to required value run following command on any control-plane node:
 
 ```
 # kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1440"}}'
@@ -345,7 +345,7 @@ The maximum size cannot be changed, so `kubectl apply` is unable to apply large 
 * `--max-mutating-requests-inflight` is the maximum number of mutating requests. The default value is 200.
 
 `kube-apiserver` configration file is stored in /etc/kubernetes/manifests/kube-apiserver.yaml. This file should be changed 
-on all masters. Also, the configuration map `kubeadm-config` from kube-system namespace should have the same values 
+on all control-planes. Also, the configuration map `kubeadm-config` from kube-system namespace should have the same values 
 in `apiServer` section.
 
 ```yaml
@@ -371,7 +371,7 @@ data:
 **Solution**: Reduce the timeouts related to the node status discovery and pods eviction.
 
 It can be done by tuning the following variables:
-- `nodeStatusUpdateFrequency` - A kubelet's variable that specifies the frequency kubelet computes the node status and posts it to master. The default value is 10s. It should be twice the value of `node-monitor-period`.
+- `nodeStatusUpdateFrequency` - A kubelet's variable that specifies the frequency kubelet computes the node status and posts it to control-plane. The default value is 10s. It should be twice the value of `node-monitor-period`.
 - `node-monitor-period` - A kube-controller-manager's variable that specifies the period for syncing NodeStatus in NodeController. The default value is 5s. It should be half the value of `nodeStatusUpdateFrequency`.
 - `node-monitor-grace-period` - A kube-controller-manager's variable that specifies the amount of time that a running node is allowed to be unresponsive before marking it unhealthy. The default value is 40s. It must be (N-1) times more than kubelet's `nodeStatusUpdateFrequency`, where N is the number of retries allowed for kubelet to post the node status. Currently N is hardcoded to 5. 
 - `pod-eviction-timeout` - A kube-controller-manager's variable that specifies the grace period for deleting pods on failed nodes. The default value is 5 min.
@@ -392,7 +392,7 @@ services:
 
 The exact numbers should be chosen according to the environment state. If the network or hosts are unstable, these values should cover short nodes unavailability without redeployment of the pods. Often redeployment may cause significant load increase and cluster instability.
 
-At working clusters, these variables can be adjusted manually by updating `/var/lib/kubelet/config.yaml` (for kubelet, at all the nodes) and `/etc/kubernetes/manifests/kube-controller-manager.yaml` (for controller-manager, at the masters).
+At working clusters, these variables can be adjusted manually by updating `/var/lib/kubelet/config.yaml` (for kubelet, at all the nodes) and `/etc/kubernetes/manifests/kube-controller-manager.yaml` (for controller-manager, at the control-planes).
 
 
 ## `kube-controller-manager` unable to sync caches for garbage collector
@@ -404,9 +404,9 @@ E0402 10:52:00.858600 8 garbagecollector.go:233] timed out waiting for dependenc
 I0402 10:52:00.883519 8 graph_builder.go:272] garbage controller monitor not yet synced 
 ```
  
-**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects master API and etcd cluster and it also affects the garbage collector of the master controller manager tasks due to sync failure. 
+**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects control-plane API and etcd cluster and it also affects the garbage collector of the control-plane controller manager tasks due to sync failure. 
 
-**Solution**: Increase resources for master nodes to match the load on the kube-api or reduce the load on the kube-api.
+**Solution**: Increase resources for control-plane nodes to match the load on the kube-api or reduce the load on the kube-api.
 
 ## etcdctl compaction and defragmentation
 

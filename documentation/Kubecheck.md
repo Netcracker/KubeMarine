@@ -10,16 +10,16 @@ This section provides information about the Kubecheck functionality.
     - [005 Items Amount](#005-items-amount)
       - [005 VIPs Amount](#005-vips-amount)
       - [005 Balancers Amount](#005-balancers-amount)
-      - [005 Masters Amount](#005-masters-amount)
+      - [005 Control-planes Amount](#005-control-planes-amount)
       - [005 Workers Amount](#005-workers-amount)
       - [005 Total Nodes Amount](#005-total-nodes-amount)
     - [006 VCPUs Amount](#006-vcpus-amount)
       - [006 VCPUs Amount - Balancers](#006-vcpus-amount-balancers)
-      - [006 VCPUs Amount - Masters](#006-vcpus-amount-masters)
+      - [006 VCPUs Amount - Control-planes](#006-vcpus-amount-control-planes)
       - [006 VCPUs Amount - Workers](#006-vcpus-amount-workers)
     - [007 RAM Amount](#007-ram-amount)
       - [007 RAM Amount - Balancers](#007-ram-amount-balancers)
-      - [007 RAM Amount - Masters](#007-ram-amount-masters)
+      - [007 RAM Amount - Control-planes](#007-ram-amount-control-planes)
       - [007 RAM Amount - Workers](#007-ram-amount-workers)
     - [008 Distributive](#008-distributive)
   - [PAAS Procedure](#paas-procedure)
@@ -136,16 +136,16 @@ The task tree is as follows:
   * members_amount
     * vips
     * balancers
-    * masters
+    * control-planes
     * workers
     * total
   * cpu
     * balancers
-    * masters
+    * control-planes
     * workers
   * ram
     * balancers
-    * masters
+    * control-planes
     * workers
 * system
   * distributive
@@ -195,11 +195,11 @@ This test checks the number of VIPs present for Keepalived.
 
 This test checks the number of nodes present with the `balancer` role.
 
-###### 005 Masters Amount
+###### 005 Control-planes Amount
 
-*Task*: `hardware.members_amount.masters`
+*Task*: `hardware.members_amount.control-planes`
 
-This test checks the number of nodes present with the `master` role.
+This test checks the number of nodes present with the `control-plane` role.
 
 ###### 005 Workers Amount
 
@@ -223,11 +223,11 @@ Tests of this type check the availability of the required number of processors.
 
 This test checks the number of processors on the nodes with the `balancer` role.
 
-###### 006 VCPUs Amount - Masters
+###### 006 VCPUs Amount - Control-planes
 
-*Task*: `hardware.cpu.masters`
+*Task*: `hardware.cpu.control-planes`
 
-This test checks the number of processors on the nodes with the `master` role.
+This test checks the number of processors on the nodes with the `control-plane` role.
 
 ###### 006 VCPUs Amount - Workers
 
@@ -245,11 +245,11 @@ Tests of this type check the availability of the required number of RAM.
 
 This test checks the amount of RAM on nodes with the `balancer` role.
 
-###### 007 RAM Amount - Masters
+###### 007 RAM Amount - Control-planes
 
-*Task*: `hardware.ram.masters`
+*Task*: `hardware.ram.control-planes`
 
-This test checks the amount of RAM on nodes with the `master` role.
+This test checks the amount of RAM on nodes with the `control-plane` role.
 
 ###### 007 RAM Amount - Workers
 
