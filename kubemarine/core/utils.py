@@ -336,7 +336,7 @@ class ClusterStorage:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
-        not_pack_file = cluster.inventory['procedure_history']['not_archive_threshold']
+        not_pack_file = cluster.inventory['procedure_history']['archive_threshold']
         delete_old = cluster.inventory['procedure_history']['delete_threshold']
 
 

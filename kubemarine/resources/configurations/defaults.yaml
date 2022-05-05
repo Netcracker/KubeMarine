@@ -600,5 +600,5 @@ rbac:
       namespaces: ["kube-system"]
 
 procedure_history:
-  not_archive_threshold: 5
+  archive_threshold: 5
   delete_threshold: 10
