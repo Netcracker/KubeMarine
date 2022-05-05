@@ -42,8 +42,14 @@ provided_oob_policies = ["default", "host-network", "anyuid"]
 
 valid_switches = ["pss", "psp"]
 valid_profiles = ["privileged", "baseline", "restricted"]
+valid_modes = ['enforce', 'audit', 'warn']
 valid_exemptions = ["usernames", "runtimeClasses", "namespaces"]
 valid_versions_templ = r"^v1\.\d{1,2}$"
+
+baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard"} 
+privileged_plugins = {"nginx-ingress-controller": "ingress-nginx", 
+                      "local-path-provisioner": "local-path-storage", 
+                      "haproxy-ingress-controller": "haproxy-controller"}
 
 loaded_oob_policies = {}
 
@@ -71,25 +77,23 @@ def enrich_inventory_psp(inventory, _):
     if 'PodSecurityPolicy' not in enabled_admissions:
         enabled_admissions = "%s,PodSecurityPolicy" % enabled_admissions
         inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = enabled_admissions
-
+        
     return inventory
 
 
 def enrich_inventory_pss(inventory, _):
+    if not is_security_enabled(inventory):
+        return inventory
     # check flags, enforce and logs parameters
     minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
     if minor_version < 23:
         raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
     verify_parameter("pod-security", inventory["rbac"]["pss"]["pod-security"], valid_flags)
-    verify_parameter("enforce", inventory["rbac"]["pss"]["defaults"]["enforce"], valid_profiles)
-    verify_version("enforce-version", inventory["rbac"]["pss"]["defaults"]["enforce-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce"], minor_version)
-    verify_equal("audit", inventory["rbac"]["pss"]["defaults"]["audit"], inventory["rbac"]["pss"]["defaults"]["enforce"])
-    verify_equal("warn", inventory["rbac"]["pss"]["defaults"]["warn"], inventory["rbac"]["pss"]["defaults"]["enforce"])
-    verify_equal("audit-version", inventory["rbac"]["pss"]["defaults"]["audit-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
-    verify_equal("warn-version", inventory["rbac"]["pss"]["defaults"]["warn-version"], 
-            inventory["rbac"]["pss"]["defaults"]["enforce-version"])
+    for item in inventory["rbac"]["pss"]["defaults"]:
+        if item.endswith("version"):
+            verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
+        else:
+            verify_parameter(item, inventory["rbac"]["pss"]["defaults"][item], valid_profiles)
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
     # add extraArgs to kube-apiserver config
     if enabled_admissions:
@@ -157,11 +161,6 @@ def verify_parameter(owner, value, parameters):
         raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
 
 
-def verify_equal(owner, value, standard):
-    if value != standard:
-        raise Exception("incorrect value for %s, it should be: %s" % (owner, standard))
-
-
 def verify_custom(custom_scope):
     psp_list = custom_scope.get(psp_list_option, None)
     if psp_list:
@@ -185,14 +184,12 @@ def verify_custom_list(custom_list, type, supported_kinds):
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
 
 
-def verify_version(owner, version, enforce, minor_version_cfg):
+def verify_version(owner, version, minor_version_cfg):
     # check Kubernetes version and admission config matching
-    if enforce == "restricted" and version != "latest":
+    if version != "latest":
         result = re.match(valid_versions_templ, version)
         if result is None:
-            raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
-    elif enforce != "restricted" and version != "latest":
-        raise Exception("incorrect value for %s, valid value is 'latest'" % owner)
+            raise Exception("incorrect Kubernetes version %s, valid version(for example): v1.23" % owner)
         minor_version = int(version.split('.')[1])
         if minor_version > minor_version_cfg:
             raise Exception("%s version must not be higher than Kubernetes version" % owner)
@@ -355,6 +352,13 @@ def reconfigure_plugin_task(cluster):
 
 
 def restart_pods_task(cluster, disable_eviction=False):
+    if cluster.context.get('initial_procedure') == 'manage_pss':
+        # check if pods restart is enabled
+        is_restart = cluster.procedure_inventory.get("restart-pods", False)
+        if not is_restart:
+            cluster.log.debug("'restart-pods' is disabled, pods won't be restarted")
+            return
+
     first_master = cluster.nodes["master"].get_first_member()
 
     cluster.log.debug("Drain-Uncordon all nodes to restart pods")
@@ -366,7 +370,7 @@ def restart_pods_task(cluster, disable_eviction=False):
         first_master.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")
-    daemon_sets = yaml.safe_load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
+    daemon_sets = ruamel.yaml.YAML().load(list(first_master.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
     for ds in daemon_sets["items"]:
         first_master.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
 
@@ -467,11 +471,26 @@ def apply_admission(group):
             apply_privileged_policy(group)
         elif admission_impl == "pss":
             group.cluster.log.debug("Setting up default pss...")
-            apply_default_pss(group)
+            apply_default_pss(group.cluster)
 
 
-def apply_default_pss(group):
-    return manage_pss(group, "apply")
+def apply_default_pss(cluster):
+    if cluster.context.get('initial_procedure') == 'manage_pss':
+        procedure_config = cluster.procedure_inventory["pss"]
+        current_config = cluster.inventory["rbac"]["pss"]
+        if procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "enabled":
+            return manage_pss(cluster, "apply")
+        elif procedure_config["pod-security"] == "enabled" and current_config["pod-security"] == "disabled":
+            return manage_pss(cluster, "install")
+    else:
+            return manage_pss(cluster, "init")
+
+
+def delete_default_pss(cluster):
+    procedure_config = cluster.procedure_inventory["pss"]
+    current_config = cluster.inventory["rbac"]["pss"]
+    if procedure_config["pod-security"] == "disabled" and current_config["pod-security"] == "enabled":
+        return manage_pss(cluster, "delete")
 
 
 def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
@@ -579,19 +598,6 @@ def install(cluster):
     admission_impl = cluster.inventory['rbac']['admission']
     if admission_impl == "psp":
         return install_psp_task(cluster)
-    elif admission_impl == "pss":
-        return install_pss_task(cluster)
-
-
-def install_pss_task(cluster):
-    if not is_security_enabled(cluster.inventory):
-        cluster.log.debug("Pod security disabled, skipping pod admission installation...")
-        return
-
-    first_master = cluster.nodes["master"].get_first_member()
-
-    cluster.log.debug("Installing default configuration...")
-    first_master.call(manage_pss, manage_type="apply")
 
 
 def manage_pss_enrichment(inventory, cluster):
@@ -599,13 +605,48 @@ def manage_pss_enrichment(inventory, cluster):
         return inventory
     if "pss" not in cluster.procedure_inventory:
         raise Exception("'manage_pss' config should have 'pss' in its root")
+    if "pod-security" not in cluster.procedure_inventory["pss"]:
+        raise Exception("Procedure config should include 'pod-security'")
 
     procedure_config = cluster.procedure_inventory["pss"]
     current_config = cluster.inventory["rbac"]["pss"]
+    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+        
+    if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
+        raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
 
-    # check flags, profiles, and exemptions
-    if "pod-security" in procedure_config:
-        verify_config(inventory)
+    # check flags, profiles; enrich inventory
+    if minor_version < 23:
+        raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
+    verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
+    if "defaults" in procedure_config:
+        for item in procedure_config["defaults"]:
+            if item.endswith("version"):
+                verify_version(item, procedure_config["defaults"][item], minor_version)
+            else:
+                verify_parameter(item, procedure_config["defaults"][item], valid_profiles)
+            inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
+    if "exemptions" in procedure_config:
+        for item in procedure_config["exemptions"]:
+            if type(procedure_config["exemptions"][item]) is list:
+                inventory["rbac"]["pss"]["exemptions"][item] = procedure_config["exemptions"][item]
+    if "namespaces" in procedure_config:
+        for namespace in procedure_config["namespaces"]:
+            # check if the namespace has its own profiles
+            if type(namespace) is dict:
+                for item in namespace:
+                    # exclude name of namespace
+                    if namespace[item]:
+                        if item.endswith("version"):
+                            verify_version(item, namespace[item], minor_version)
+                        else:
+                            verify_parameter(item, namespace[item], valid_profiles)
+    if "namespaces_defaults" in procedure_config:
+        for item in procedure_config["namespaces_defaults"]:
+            if item.endswith("version"):
+                verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
+            else:
+                verify_parameter(item, procedure_config["namespaces_defaults"][item], valid_profiles)
 
     return inventory
 
@@ -618,19 +659,59 @@ def manage_enrichment(inventory, cluster):
         return manage_pss_enrichment(inventory, cluster)
 
 
-def manage_pss(group, manage_type):
-    if group.cluster.context.get('initial_procedure') != 'install':
-        copy_pss(group)
-        first_master = cluster.nodes["master"].get_first_member()
-    
+def manage_pss(cluster, manage_type):
+    first_master = cluster.nodes["master"].get_first_member()
+    masters = cluster.nodes["master"]
+    # 'apply' - change options in admission.yaml, PSS is enabled
+    if manage_type == "apply":
+        # set labels for predifined plugins namespaces and namespaces defined in procedure config
+        label_namespace_pss(cluster, manage_type)
+        # copy admission config on masters
+        copy_pss(masters)
+        for master in masters.get_ordered_members_list():
+            # force kube-apiserver pod restart, then wait for api to become available
+            if master.cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+                master.call(utils.wait_command_successful, command="crictl rm -f "
+                                                       "$(sudo crictl ps --name kube-apiserver -q)")
+            else:
+                master.call(utils.wait_command_successful, command="docker stop "
+                                                       "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
+                                                       " | awk '{print $1}')")
+            masters.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+    # 'install' - enable PSS
+    elif manage_type == "install":
+        # set labels for predifined plugins namespaces and namespaces defined in procedure config
+        label_namespace_pss(cluster, manage_type)
+        # copy admission config on masters
+        copy_pss(cluster.nodes["master"])
+
         cluster.log.debug("Updating kubeadm config map")
-        result = first_master.call(update_kubeadm_configmap, target_state=target_state)
+        result = first_master.call(update_kubeadm_configmap_pss, target_state="enabled")
         final_features_list = list(result.values())[0]
-    
+
         # update api-server config on all masters
         cluster.log.debug("Updating kube-apiserver configs on masters")
-        cluster.nodes["master"].call(update_kubeapi_config, features_list=final_features_list)
-        return result
+        cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
+    # 'init' make changes during init Kubernetes cluster
+    elif manage_type == "init":
+        cluster.log.debug("Updating kubeadm config map")
+        result = first_master.call(update_kubeadm_configmap_pss, target_state="enabled")
+    # 'delete' - disable PSS
+    elif manage_type == "delete":
+        # set labels for predifined plugins namespaces and namespaces defined in procedure config
+        label_namespace_pss(cluster, manage_type)
+
+        result = first_master.call(update_kubeadm_configmap, target_state="disabled")
+        final_features_list = list(result.values())[0]
+
+        # update api-server config on all masters
+        cluster.log.debug("Updating kube-apiserver configs on masters")
+        cluster.nodes["master"].call(update_kubeapi_config_pss, features_list=final_features_list)
+
+        # erase PSS admission config 
+        cluster.log.debug("Erase admission configuration... %s" % admission_path)
+        group = cluster.nodes["master"]
+        group.sudo("rm -f %s" % admission_path, warn=True)
 
 
 def update_kubeapi_config_pss(masters, features_list):
@@ -639,11 +720,24 @@ def update_kubeapi_config_pss(masters, features_list):
     for master in masters.get_ordered_members_list():
         result = master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
 
-        # update kube-apiserver config with updated features list
+        # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
         conf = yaml.load(list(result.values())[0].stdout)
-        new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"] if "feature-gates" not in cmd]
-        new_command.append("--feature-gates=%s" % features_list)
-        new_command.append("--admission-control-config-file=%s" % admission_path)
+        new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
+        if len(features_list) != 0:
+            if 'PodSecurity=true' in features_list:
+                new_command.append("--admission-control-config-file=%s" % admission_path)
+            else:
+                new_command.append("--admission-control-config-file=''")
+            new_command.append("--feature-gates=%s" % features_list)
+        else:
+            for item in conf["spec"]["containers"][0]["command"]:
+                if item.startswith("--"):
+                    key = re.split('=',item)[0]
+                    value = re.search('=(.*)$', item).group(1)
+                    if key in ["--feature-gates", "--admission-control-config-file"]:
+                        del_option = "%s=%s" % (key, value)
+                        new_command.remove(del_option)
+
         conf["spec"]["containers"][0]["command"] = new_command
 
         # place updated config on master
@@ -651,28 +745,53 @@ def update_kubeapi_config_pss(masters, features_list):
         yaml.dump(conf, buf)
         master.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
-    # force kube-apiserver pod restart, then wait for api to become available
-    masters.get_first_member().call(utils.wait_command_successful,
-                                    command="kubectl delete pod -n kube-system "
-                                            "$(sudo kubectl get pod -n kube-system "
-                                            "| grep 'kube-apiserver' | awk '{ print $1 }')")
-    masters.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
+        # force kube-apiserver pod restart, then wait for api to become available
+        if master.cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+            master.call(utils.wait_command_successful, command="crictl rm -f "
+                                                       "$(sudo crictl ps --name kube-apiserver -q)")
+        else:
+            master.call(utils.wait_command_successful, command="docker stop "
+                                                       "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
+                                                       " | awk '{print $1}')")
+        masters.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def update_kubeadm_configmap_pss(first_master, target_state):
     yaml = ruamel.yaml.YAML()
 
+    final_feature_list = ""
+
     # load kubeadm config map and retrieve cluster config
     result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
     kubeadm_cm = yaml.load(list(result.values())[0].stdout)
     cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+    
+    # update kubeadm config map with feature list
+    if target_state == "enabled":
+        if "feature-gates" in cluster_config["apiServer"]["extraArgs"]:
+            enabled_admissions = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+            if 'PodSecurity=true' not in enabled_admissions:
+                enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
+                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+                cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+                final_feature_list = enabled_admissions
+            else:
+                cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+                final_feature_list = enabled_admissions
+        else:
+            cluster_config["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
+            cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+            final_feature_list = "PodSecurity=true"
+    elif target_state == "disabled":
+        feature_list = cluster_config["apiServer"]["extraArgs"]["feature-gates"].replace("PodSecurity=true", "")
+        final_feature_list = feature_list.replace(",,", ",")
+        if len(final_feature_list) == 0:
+            del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+            del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+        else:
+            cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_feature_list
+            del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
 
-    # resolve resulting admission plugins list
-    final_features_string = resolve_final_plugins_list(cluster_config, target_state)
-
-    # update kubeadm config map with updated plugins list
-    cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_features_string
-    cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
     buf = io.StringIO()
     yaml.dump(cluster_config, buf)
     kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
@@ -685,7 +804,7 @@ def update_kubeadm_configmap_pss(first_master, target_state):
     first_master.sudo("kubectl apply -f /tmp/%s.yaml" % filename)
     first_master.sudo("rm -f /tmp/%s.yaml" % filename)
 
-    return final_plugins_string
+    return final_feature_list
 
 
 def finalize_inventory(cluster, inventory_to_finalize):
@@ -727,22 +846,129 @@ def finalize_inventory_pss(cluster, inventory_to_finalize):
 
 
 def copy_pss(group):
-    admission_impl = group.cluster.inventory['rbac']['admission']
-    if admission_impl == "pss":
-        defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
-        exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
-        # create admission config from template and cluster.yaml
-        admission_config = Template(open(utils.get_resource_absolute_path(admission_template, script_relative=True)).read())\
-                           .render(defaults=defaults,exemptions=exemptions)
-    
-        # put admission config on every masters
-        filename = uuid.uuid4().hex
-        remote_path = tmp_filepath_pattern % filename
-        group.cluster.log.debug("Copy admission config: %s, %s" % (remote_path, admission_path))
-        group.put(io.StringIO(admission_config), remote_path, backup=True, sudo=True)
-        group.sudo("mkdir -p %s" % admission_dir, warn=True)
-        result = group.sudo("cp %s %s" % (remote_path, admission_path), warn=True)
-        group.sudo("rm -f %s" % remote_path)
+    if  group.cluster.inventory['rbac']['admission'] !=  "pss":
+        return
+    if group.cluster.context.get('initial_procedure') == 'manage_pss':
+        if not is_security_enabled(group.cluster.inventory) and \
+                group.cluster.procedure_inventory["pss"]["pod-security"] != "enabled":
+            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+            return
+    if group.cluster.context.get('initial_procedure') == 'install':
+        if not is_security_enabled(group.cluster.inventory):
+            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+            return
 
-        return result
+    defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
+    exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
+    # create admission config from template and cluster.yaml
+    admission_config = Template(open(utils.get_resource_absolute_path(admission_template, script_relative=True)).read())\
+                       .render(defaults=defaults,exemptions=exemptions)
 
+    # put admission config on every masters
+    filename = uuid.uuid4().hex
+    remote_path = tmp_filepath_pattern % filename
+    group.cluster.log.debug("Copy admission config: %s, %s" % (remote_path, admission_path))
+    group.put(io.StringIO(admission_config), remote_path, backup=True, sudo=True)
+    group.sudo("mkdir -p %s" % admission_dir, warn=True)
+    result = group.sudo("cp %s %s" % (remote_path, admission_path), warn=True)
+    group.sudo("rm -f %s" % remote_path)
+
+    return result
+
+
+def label_namespace_pss(cluster, manage_type):
+    first_master = cluster.nodes["master"].get_first_member()
+    # get default PSS profile
+    profile = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
+    for plugin in cluster.inventory["plugins"]:
+        is_install = cluster.inventory["plugins"][plugin].get("install")
+        # set/delete label 'pod-security.kubernetes.io/enforce: privileged' for local provisioner and ingress namespaces
+        if manage_type in ["apply", "install"]:
+            if is_install and plugin in privileged_plugins.keys() and profile != "privileged":
+                cluster.log.debug("Set PSS labels on namespace %s" % privileged_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                      % (privileged_plugins[plugin], mode, "privileged"))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version=%s --overwrite" 
+                                      % (privileged_plugins[plugin], mode, "latest"))
+            # set/delete label 'pod-security.kubernetes.io/enforce: baseline' for kubernetes dashboard
+            elif is_install and plugin in baseline_plugins.keys() and profile == "restricted":
+                cluster.log.debug("Set PSS labels on namespace %s" % baseline_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                      % (baseline_plugins[plugin], mode, "baseline"))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version=%s --overwrite" 
+                                      % (baseline_plugins[plugin], mode, "latest"))
+        elif manage_type == "delete":
+            if is_install and plugin in privileged_plugins.keys():
+                cluster.log.debug("Delete PSS labels from namespace %s" % privileged_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
+                                      % (privileged_plugins[plugin], mode))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
+                                      % (privileged_plugins[plugin], mode))
+            elif is_install and plugin in baseline_plugins.keys():
+                cluster.log.debug("Delete PSS labels from namespace %s" % baseline_plugins[plugin])
+                for mode in valid_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
+                                      % (baseline_plugins[plugin], mode))
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
+                                      % (baseline_plugins[plugin], mode))
+
+    procedure_config = cluster.procedure_inventory["pss"]
+    namespaces = procedure_config.get("namespaces")
+    # get the list of namespaces that should be labeled then set/delete labels
+    if namespaces:
+        default_modes = {}
+        # check if procedure config has default values for labels
+        namespaces_defaults = procedure_config.get("namespaces_defaults")
+        if namespaces_defaults:
+            for default_mode in namespaces_defaults:
+                 default_modes[default_mode] = namespaces_defaults[default_mode]
+        for namespace in namespaces:
+            if manage_type in ["apply", "install"]:
+                # define name of namespace
+                if type(namespace) is dict:
+                    for item in namespace:
+                        if not namespace[item]:
+                            ns_name = item
+                else:
+                    ns_name = namespace
+                if default_modes:
+                    # set labels that are set in default section
+                    cluster.log.debug("Set PSS labels on %s namespace from defaults" % ns_name)
+                    for mode in default_modes:
+                        first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                          % (ns_name, mode, default_modes[mode]))
+                if type(namespace) is dict:
+                    # set labels that are set in namespaces section
+                    cluster.log.debug("Set PSS labels on %s namespace" % ns_name)
+                    for mode in namespace: 
+                        if namespace[mode]:
+                            first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
+                                              % (ns_name, mode, namespace[mode]))
+            elif manage_type == "delete":
+                # define name of namespace
+                if type(namespace) is dict:
+                    for item in namespace:
+                        if not namespace[item]:
+                            ns_name = item
+                else:
+                    ns_name = namespace
+                # delete labels that are set in default section
+                cluster.log.debug("Delete PSS labels on %s namespace from defaults" % ns_name)
+                for mode in default_modes:
+                    first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
+                # delete labels that are set in namespaces section
+                cluster.log.debug("Delete PSS labels on %s namespace" % ns_name)
+                if type(namespace) is dict:
+                    for mode in namespace:
+                        if namespace[mode]:
+                            first_master.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
+
+
+def check_inventory(cluster):
+    # check if 'admission' option in cluster.yaml and procedure.yaml are inconsistent 
+    if cluster.context.get('initial_procedure') == 'manage_pss' and cluster.inventory["rbac"]["admission"] != "pss" or \
+        cluster.context.get('initial_procedure') == 'manage_psp' and cluster.inventory["rbac"]["admission"] != "psp":
+        raise Exception("Procedure config and cluster config are inconsistent. Please check 'admission' option")

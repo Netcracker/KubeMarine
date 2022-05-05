@@ -17,7 +17,8 @@
 from collections import OrderedDict
 import fabric
 import yaml
-
+import os
+import io
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
@@ -26,16 +27,21 @@ from kubemarine.core.executor import RemoteExecutor
 
 
 def system_prepare_check_sudoer(cluster):
+    not_sudoers = []
     for host, node_context in cluster.context['nodes'].items():
-        if node_context['online'] and node_context['hasroot']:
+        access_info = node_context['access']
+        if access_info['online'] and access_info['sudo'] == 'Root':
             cluster.log.debug("%s online and has root" % host)
         else:
-            raise KME("KME0005", hostname=host)
+            not_sudoers.append(host)
+
+    if not_sudoers:
+        raise KME("KME0005", hostnames=not_sudoers)
 
 
 def system_prepare_check_system(cluster):
     group = cluster.nodes['all'].get_new_nodes_or_self()
-    cluster.log.debug(system.detect_os_family(cluster, suppress_exceptions=True))
+    cluster.log.debug(system.fetch_os_versions(cluster))
     for address, context in cluster.context["nodes"].items():
         if address not in group.nodes or not context.get('os'):
             continue
@@ -110,9 +116,49 @@ def system_install_audit(cluster):
     cluster.log.debug(group.call(audit.install))
 
 
-def system_prepare_audit(cluster):
+def system_prepare_audit_daemon(cluster):
     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
+
+    
+def system_prepare_policy(cluster):
+    """
+    Task generates rules for logging kubernetes and on audit
+    """
+
+    audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
+    audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
+    cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+    audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
+    policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+    collect_node = cluster.nodes['master'].get_new_nodes_or_self().get_ordered_members_list()
+
+    if policy_config:
+        policy_config_file = yaml.dump(policy_config)
+        utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+        #download rules in cluster
+        for node in collect_node:
+            node.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+            audit_config = True
+        cluster.log.debug("Audit cluster policy config")
+    else:
+        audit_config = False
+        cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
+
+    if kubernetes.is_cluster_installed(cluster) and audit_config == True and cluster.context['initial_procedure'] != 'add_node':
+        for master in collect_node:
+            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
+            master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
+            if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+                master.call(utils.wait_command_successful, command="crictl rm -f "
+                                                            "$(sudo crictl ps --name kube-apiserver -q)")
+            else:
+                master.call(utils.wait_command_successful, command="docker stop "
+                                                               "$(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
+                                                               " | awk '{print $1}')")
+            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def system_prepare_dns_hostname(cluster):
@@ -469,7 +515,8 @@ tasks = OrderedDict({
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
-                "configure": system_prepare_audit
+                "configure_daemon": system_prepare_audit_daemon,
+                "configure_policy": system_prepare_policy
             }
         },
         "cri": {

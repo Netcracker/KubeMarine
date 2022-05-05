@@ -22,10 +22,14 @@ from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine import controlplane 
 
+# All enrichment procedures should not connect to any node.
+# The information about nodes should be collected within KubernetesCluster#_detect_nodes_context().
 DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
+    "kubemarine.controlplane.controlplane_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
     "kubemarine.kubernetes.enrich_upgrade_inventory",
     "kubemarine.plugins.enrich_upgrade_inventory",
@@ -440,8 +444,8 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
 
         if make_dumps:
-            cluster_original = yaml.dump(prepare_for_dump(inventory), )
-            utils.dump_file(cluster, cluster_original, "cluster.yaml")
+            inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump((inventory)))
+            utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
             procedure_config = cluster.context["execution_arguments"].get("procedure_config")
             if procedure_config:
                 with open(procedure_config, 'r') as stream:
@@ -477,8 +481,9 @@ def compile_inventory(inventory, cluster):
 
     inventory = compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
 
-    cluster_precompiled = yaml.dump(prepare_for_dump(inventory))
-    utils.dump_file(cluster, cluster_precompiled, "cluster_precompiled.yaml")
+    inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
+    merged_inventory = yaml.dump(inventory_for_dump)
+    utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
 
     return inventory
 

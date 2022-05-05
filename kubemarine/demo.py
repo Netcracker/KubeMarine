@@ -13,89 +13,116 @@
 # limitations under the License.
 
 import io
-from typing import List, Dict, Union, Any
+import re
+import threading
+from copy import deepcopy
+from typing import List, Dict, Union, Any, IO
 
 import fabric
 from invoke import UnexpectedExit
 
-from kubemarine.core import cluster, group, flow
+from kubemarine.core import group, flow, connections
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.connections import Connections
-from kubemarine.core.group import NodeGroup, _HostToResult, NodeGroupResult
-from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.group import NodeGroup, NodeGroupResult, _GenericResult, _HostToResult
+
+ShellResult = Dict[str, Union[NodeGroupResult, Any]]
 
 
 class FakeShell:
-    def __init__(self, _cluster):
-        self.cluster = _cluster
-        self.results: List[Dict[str, Union[NodeGroupResult, Any]]] = []
-        self.history = []
+    def __init__(self):
+        self.results: Dict[str, List[ShellResult]] = {}
+        self.history: Dict[str, List[ShellResult]] = {}
+        self._lock = threading.Lock()
+
+    def __deepcopy__(self, memodict={}):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memodict[id(self)] = result
+        result.results = deepcopy(self.results, memodict)
+        result.history = deepcopy(self.history, memodict)
+        result._lock = threading.Lock()
+        return result
 
     def reset(self):
-        self.results = []
-        self.history = []
+        self.results = {}
+        self.history = {}
 
-    def add(self, result: NodeGroupResult, do_type, args, usage_limit=0):
+    def add(self, results: Union[NodeGroupResult, _HostToResult], do_type, args, usage_limit=0):
         args.sort()
 
-        result = {
-            'result': result,
-            'do_type': do_type,
-            'args': args,
-            'used_times': 0
-        }
+        for host, result in results.items():
+            host = host.host if isinstance(host, fabric.connection.Connection) else host
+            result = {
+                'result': result,
+                'do_type': do_type,
+                'args': args,
+                'used_times': 0
+            }
 
-        if usage_limit > 0:
-            result['usage_limit'] = usage_limit
+            if usage_limit > 0:
+                result['usage_limit'] = usage_limit
 
-        self.results.append(result)
+            self.results.setdefault(host, []).append(result)
 
-    def find(self, do_type, args, kwargs):
+    def find(self, host: str, do_type, args, kwargs) -> _GenericResult:
         # TODO: Support kwargs
-        if isinstance(args, tuple):
-            args = list(args)
-        for i, item in enumerate(self.results):
-            if item['do_type'] == do_type and item['args'] == args:
-                self.history.append(item)
-                self.results[i]['used_times'] += 1
-                if item.get('usage_limit') is not None:
-                    self.results[i]['usage_limit'] -= 1
-                    if self.results[i]['usage_limit'] < 1:
-                        del self.results[i]
-                return item['result']
-        return None
+        with self._lock:
+            if isinstance(args, tuple):
+                args = list(args)
+            results = self.results.get(host, [])
+            for i, item in enumerate(results):
+                if item['do_type'] == do_type and item['args'] == args:
+                    history_found = any(history_item is item for history_item in self.history.get(host, []))
+                    if not history_found:
+                        self.history.setdefault(host, []).append(item)
+
+                    item['used_times'] += 1
+                    if item.get('usage_limit') is not None:
+                        item['usage_limit'] -= 1
+                        if item['usage_limit'] < 1:
+                            del results[i]
+                    return item['result']
+            return None
 
     # covered by test.test_demo.TestFakeShell.test_calculate_calls
-    def history_find(self, do_type, args):
+    def history_find(self, host: str, do_type, args):
         # TODO: Support kwargs
         result = []
         if isinstance(args, tuple):
             args = list(args)
-        for item in self.history:
+        for item in self.history.get(host, []):
             if item['do_type'] == do_type and item['args'] == args:
                 result.append(item)
         return result
 
-    def is_called(self, do_type: str, args: list) -> bool:
+    def is_called_each(self, hosts: List[str], do_type: str, args: list) -> bool:
+        return all((self.is_called(host, do_type, args) for host in hosts))
+
+    def is_called(self, host: str, do_type: str, args: list) -> bool:
         """
-        Returns true if the specified command has already been executed in FakeShell. If there is no such command in the
-        FakeShell expected ones, or if several commands are found, exceptions will be thrown.
+        Returns true if the specified command has already been executed in FakeShell for the specified connection.
+        :param host: host to check, for which the desirable command should have been executed.
         :param do_type: The type of required command
         :param args: Required command arguments
         :return: Boolean
         """
-        found_entry = self.history_find(do_type, args)
-        if not found_entry:
-            raise Exception('Failed to found entry %s %s in history' % (do_type, str(args)))
-        elif len(found_entry) > 1:
-            raise Exception('Too many entries found for request in history: %s %s' % (do_type, str(args)))
-        return self.history_find(do_type, args)[0]['used_times'] > 0
+        found_entries = self.history_find(host, do_type, args)
+        return sum(found_entry['used_times'] for found_entry in found_entries) > 0
 
 
 class FakeFS:
-    def __init__(self, _cluster):
-        self.cluster = _cluster
-        self.storage = {}
+    def __init__(self):
+        self.storage: Dict[str, Dict[str, str]] = {}
+        self._lock = threading.Lock()
+
+    def __deepcopy__(self, memodict={}):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memodict[id(self)] = result
+        result.storage = deepcopy(self.storage, memodict)
+        result._lock = threading.Lock()
+        return result
 
     def reset(self):
         self.storage = {}
@@ -105,17 +132,21 @@ class FakeFS:
 
     # covered by test.test_demo.TestFakeFS.test_put_string
     # covered by test.test_demo.TestFakeFS.test_put_stringio
-    def write(self, host, filename, data):
-        if isinstance(data, io.StringIO):
-            data = data.getvalue()
-        if self.storage.get(host) is None:
-            self.storage[host] = {}
-        self.storage[host][filename] = data
-
     # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
-    def group_write(self, _group, filename, data):
-        for host, connection in _group.nodes.items():
-            self.write(host, filename, data)
+    def write(self, host, filename, data):
+        with self._lock:
+            if isinstance(data, io.StringIO):
+                data = data.getvalue()
+            elif isinstance(data, str):
+                # this is for self-testing purpose
+                pass
+            elif isinstance(data, io.IOBase):
+                data = data.read()
+            else:
+                raise ValueError("Unsupported data type " + str(type(data)))
+            if self.storage.get(host) is None:
+                self.storage[host] = {}
+            self.storage[host][filename] = data
 
     # covered by test.test_demo.TestFakeFS.test_put_string
     # covered by test.test_demo.TestFakeFS.test_get_nonexistent
@@ -123,9 +154,9 @@ class FakeFS:
         return self.storage.get(host, {}).get(filename)
 
     # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
-    def group_read(self, _group, filename):
+    def read_all(self, hosts: List[str], filename):
         result = {}
-        for host, connection in _group.nodes.items():
+        for host in hosts:
             result[host] = self.read(host, filename)
         return result
 
@@ -140,12 +171,14 @@ class FakeFS:
                 del self.storage[host][_path]
 
 
-class FakeKubernetesCluster(cluster.KubernetesCluster):
+class FakeKubernetesCluster(KubernetesCluster):
 
-    def __init__(self, inventory, execution_arguments):
-        self.fake_shell = FakeShell(self)
-        self.fake_fs = FakeFS(self)
-        super().__init__(inventory, execution_arguments)
+    def __init__(self, *args, **kwargs):
+        self.fake_shell = kwargs.pop("fake_shell", FakeShell())
+        self.fake_fs = kwargs.pop("fake_fs", FakeFS())
+        super().__init__(*args, **kwargs)
+        self._connection_pool = FakeConnectionPool(self)
+
 
     def make_group(self, ips) -> NodeGroup:
         nodegroup = super().make_group(ips)
@@ -155,63 +188,159 @@ class FakeKubernetesCluster(cluster.KubernetesCluster):
         return
 
 
-class FakeNodeGroupResult(group.NodeGroupResult):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class FakeConnection(fabric.connection.Connection):
+
+    def __init__(self, ip, cluster: FakeKubernetesCluster, **kw):
+        super().__init__(ip, **kw)
+        self.fake_shell = cluster.fake_shell
+        self.fake_fs = cluster.fake_fs
+
+        command_sep = r'[=\-_]{32}'
+        sep_symbol = r'\&\&|;'
+        final_sep = rf" ({sep_symbol}) " \
+                    rf"echo \"({command_sep})\" \1 " \
+                    rf"echo \$\? \1 " \
+                    rf"echo \"\2\" \1 " \
+                    rf"echo \"\2\" 1>\&2 \1 (sudo )?"
+
+        self.separator_ptrn = re.compile(final_sep)
+
+    def __setattr__(self, key, value):
+        # fabric Connection has special handling of this method. Call default behaviour for custom attributes.
+        if key in ('fake_shell', 'fake_fs', 'separator_ptrn'):
+            return object.__setattr__(self, key, value)
+        super().__setattr__(key, value)
+
+    def run(self, command, **kwargs) -> fabric.runners.Result:
+        return self._do("run", command, **kwargs)
+
+    def sudo(self, command, **kwargs) -> fabric.runners.Result:
+        return self._do("sudo", command, **kwargs)
+
+    # not implemented
+    def get(self, *args, **kwargs):
+        return self._do("get", *args, **kwargs)
+
+    def put(self, *args, **kwargs):
+        return self._do("put", *args, **kwargs)
+
+    def _do(self, do_type, *args, **kwargs) -> fabric.runners.Result:
+        if do_type in ['sudo', 'run']:
+            # start fake execution of commands
+            command = list(args)[0]
+            commands, sep_symbol, command_sep = self._split_command(do_type, command)
+
+            stdout = ""
+            stderr = ""
+            prev_exited = None
+            i = 0
+            for command in commands:
+                found_result = self.fake_shell.find(self.host, do_type, [command], kwargs)
+
+                if found_result is None:
+                    raise Exception('Fake result not found for requested action type \'%s\' and command %s' % (do_type, [command]))
+
+                if isinstance(found_result, Exception):
+                    if i > 0:
+                        raise ValueError("Exception can be thrown only for the whole command")
+                    else:
+                        raise found_result
+
+                if i > 0:
+                    stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
+                    stderr += command_sep + '\n'
+                i += 1
+
+                stdout += found_result.stdout
+                stderr += found_result.stderr
+                prev_exited = found_result.exited
+                if prev_exited != 0:
+                    if sep_symbol == ';':
+                        prev_exited = 0  # todo bug of RemoteExecutor
+                    else:
+                        # stop fake execution
+                        break
+
+            final_res = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=prev_exited, connection=self)
+            if prev_exited == 0 or kwargs.get('warn', False):
+                return final_res
+
+            raise UnexpectedExit(final_res)
+
+        elif do_type == 'put':
+            # It should return fabric.transfer.Result, but currently returns None.
+            # Transfer Result is currently never handled.
+            return self.fake_fs.write(self.host, args[1], args[0])
+
+        raise Exception('Unsupported do type')
+
+    def _split_command(self, do_type, command: str):
+        """
+        This is a reverse operation to the RemoteExecutor#_merge_actions
+        """
+        tokens = self.separator_ptrn.split(command)
+        commands = []
+        i = 0
+        sep_symbol = None
+        command_sep = None
+        while i < len(tokens):
+            commands.append(tokens[i])
+            i += 1
+            if i < len(tokens):
+                sep_symbol = self._compare_and_return(sep_symbol, tokens[i], "Separator symbols are not equal")
+                command_sep = self._compare_and_return(command_sep, tokens[i + 1], "Command separators are not equal")
+                resolved_do_type = "sudo" if tokens[i + 2] == 'sudo ' else "run"
+                self._compare_and_return(do_type, resolved_do_type, "Do types are not equal")
+                i += 3
+
+        return commands, sep_symbol, command_sep
+
+    def _compare_and_return(self, one, another, msg):
+        if one is None or one == another:
+            return another
+        else:
+            raise ValueError(msg)
+
+    def close(self):
+        pass
 
 
 class FakeNodeGroup(group.NodeGroup):
 
     def __init__(self, connections: Connections, cluster_: FakeKubernetesCluster):
         super().__init__(connections, cluster_)
-        self.cluster = cluster_
 
-    def _do(self, do_type, nodes: Connections, is_async, *args, **kwargs) -> _HostToResult:
+    def get_local_file_sha1(self, filename):
+        return '0'
 
-        if do_type in ['sudo', 'run']:
-            found_result = self.cluster.fake_shell.find(do_type, args, kwargs)
+    def get_remote_file_sha1(self, filename):
+        return {host: '1' for host in self.nodes.keys()}
 
-            if found_result is None:
-                raise Exception('Fake result not found for requested action type \'%s\' and args %s' % (do_type, args))
+    def _put(self, local_stream: IO, remote_file: str, **kwargs):
+        kwargs.pop("sudo", None)
+        kwargs.pop("backup", None)
+        kwargs.pop("immutable", None)
+        super()._put(local_stream, remote_file, **kwargs)
 
-            found_result = {((isinstance(host, fabric.connection.Connection) and host.host) or host): result for host, result in found_result.items() if (isinstance(host, fabric.connection.Connection) and host.host in nodes.keys()) or host in nodes.keys()}
 
-            if not found_result:
-                raise Exception('Fake results were found, but all of them were filtered')
+class FakeConnectionPool(connections.ConnectionPool):
+    def __init__(self, cluster: FakeKubernetesCluster):
+        super().__init__(cluster)
+        self.cluster = cluster
 
-            for host, result in found_result.items():
-                if isinstance(result, UnexpectedExit) and kwargs.get('warn', False):
-                    found_result[host] = result.result
-
-            # Remote Executor support code
-            gre = RemoteExecutor(self.cluster)
-            executor = gre._get_active_executor()
-            batch_results = {}
-            for host, result in found_result.items():
-                batch_results[host] = {0: result}
-            executor.results.append(batch_results)
-
-            return found_result
-
-        raise Exception('Unsupported do type')
-
-    def put(self, *args, **kwargs):
-        self.cluster.fake_fs.group_write(self, args[1], args[0])
-
-    def disconnect(self, hosts: List[str] = None):
-        return
-
-    def _make_result(self, results: _HostToResult) -> FakeNodeGroupResult:
-        group_result = FakeNodeGroupResult(self.cluster, results)
-        return group_result
+    def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
+        return FakeConnection(
+            ip, self.cluster,
+            user=conn_details.get('username', self._env.globals['connection']['defaults']['username']),
+            port=conn_details.get('connection_port', self._env.globals['connection']['defaults']['port'])
+        )
 
 
 def new_cluster(inventory, procedure=None, fake=True,
                 os_name='centos', os_version='7.9', net_interface='eth0'):
 
     context = flow.create_context({
-        'disable_dump': True,
-        'nodes': []
+        'disable_dump': True
     }, procedure=procedure)
 
     os_family = None
@@ -221,11 +350,18 @@ def new_cluster(inventory, procedure=None, fake=True,
     elif os_name in ['ubuntu', 'debian']:
         os_family = 'debian'
 
+    nodes_context = {
+        "nodes": {}
+    }
+
     for node in inventory['nodes']:
         node_context = {
             'name': node['name'],
-            'online': True,
-            'hasroot': True,
+            'access': {
+                'online': True,
+                'accessible': True,
+                'sudo': 'Root'
+            },
             'active_interface': net_interface,
             'os': {
                 'name': os_name,
@@ -236,15 +372,18 @@ def new_cluster(inventory, procedure=None, fake=True,
         connect_to = node['internal_address']
         if node.get('address'):
             connect_to = node['address']
-        context['nodes'][connect_to] = node_context
+        nodes_context['nodes'][connect_to] = node_context
 
-    context['os'] = os_family
+    nodes_context['os'] = os_family
 
     # It is possible to disable FakeCluster and create real cluster Object for some business case
     if fake:
-        return FakeKubernetesCluster(inventory, context)
+        cluster = FakeKubernetesCluster(inventory, context)
     else:
-        return KubernetesCluster(inventory, context)
+        cluster = KubernetesCluster(inventory, context)
+
+    cluster.enrich(nodes_context=nodes_context)
+    return cluster
 
 
 def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
@@ -307,16 +446,25 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
 
 
 def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
-    return NodeGroupResult(group_.cluster, {host: exception for host in group_.nodes.keys()})
+    return NodeGroupResult(group_.cluster, create_hosts_exception_result(group_.get_hosts(), exception))
+
+
+def create_hosts_exception_result(hosts: List[str], exception: Exception) -> _HostToResult:
+    return {host: exception for host in hosts}
 
 
 def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
-    results = {}
-    for host, cxn in group_.nodes.items():
-        results[host] = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=cxn)
-        if code == -1:
-            results[host] = UnexpectedExit(results[host])
-    return NodeGroupResult(group_.cluster, results)
+    return NodeGroupResult(group_.cluster, create_hosts_result(group_.get_hosts(), stdout, stderr, code))
+
+
+def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> _HostToResult:
+    # each host should have its own result instance.
+    return {host: create_result(stdout, stderr, code) for host in hosts}
+
+
+def create_result(stdout='', stderr='', code=0) -> _GenericResult:
+    # connection will be later replaced to fake
+    return fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=None)
 
 
 def empty_action(*args, **kwargs) -> None:

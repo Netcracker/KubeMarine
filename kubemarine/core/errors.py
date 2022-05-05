@@ -31,7 +31,7 @@ KME_DICTIONARY = {
         "name": "There are no workers defined in the cluster scheme"
     },
     "KME0005": {
-        "name": "{hostname} is not a sudoer"
+        "name": "{hostnames} are not sudoers"
     },
     "KME0006": {
         "name": "You cannot use the new and old format in the registry section. "

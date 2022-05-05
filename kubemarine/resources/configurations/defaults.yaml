@@ -27,10 +27,22 @@ services:
       extraArgs:
         enable-admission-plugins: NodeRestriction
         profiling: "false"
-        audit-log-path: /var/log/audit.log
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
         audit-log-maxage: "30"
-        audit-log-maxbackup: "10"
-        audit-log-maxsize: "100"
+        audit-log-maxbackup: "5"
+        audit-log-maxsize: "20"
+      extraVolumes:
+        - name: audit
+          hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
+          mountPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
+          readOnly: True
+          pathType: File
+        - name: audit-log
+          hostPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
+          mountPath: '{% set path = services["kubeadm"]["apiServer"]["extraArgs"]["audit-log-path"].split("/") %}{{"/" + path[1] + "/" + path[2] + "/" + path[3] + "/" + path[4] + "/"}}'
+          readOnly: False
+          pathType: DirectoryOrCreate
     scheduler:
       extraArgs:
         profiling: "false"
@@ -132,6 +144,19 @@ services:
       - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost.localdomain{% endif %}'
 
   audit:
+    cluster_policy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+        - "RequestReceived"
+      rules:
+        - level: Metadata
+          resources:
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
+            - group: "rbac.authorization.k8s.io"
+
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /etc/docker -k docker{% endif %}'

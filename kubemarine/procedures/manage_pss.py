@@ -21,10 +21,8 @@ from kubemarine.core import flow
 
 tasks = OrderedDict({
     "check_inventory": admission.check_inventory,
-    "delete_custom": admission.delete_custom_task,
-    "add_custom": admission.add_custom_task,
-    "reconfigure_oob": admission.reconfigure_oob_task,
-    "reconfigure_plugin": admission.reconfigure_plugin_task,
+    "delete_default_pss": admission.delete_default_pss,
+    "apply_default_pss": admission.apply_default_pss,
     "restart_pods": admission.restart_pods_task
 })
 
@@ -32,7 +30,7 @@ tasks = OrderedDict({
 def main(cli_arguments=None):
 
     cli_help = '''
-    Script for managing psp on existing Kubernetes cluster.
+    Script for managing pss on existing Kubernetes cluster.
 
     How to use:
 
@@ -61,7 +59,7 @@ def main(cli_arguments=None):
     if args.exclude != '':
         defined_excludes = args.exclude.split(",")
 
-    context = flow.create_context(args, procedure='manage_psp',
+    context = flow.create_context(args, procedure='manage_pss',
                                   included_tasks=defined_tasks, excluded_tasks=defined_excludes)
     context['inventory_regenerate_required'] = True
 

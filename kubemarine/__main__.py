@@ -64,6 +64,10 @@ procedures = OrderedDict({
         'description': "Manage PSP on Kubernetes cluster",
         'group': 'maintenance'
     },
+    'manage_pss': {
+        'description': "Manage PSS on Kubernetes cluster",
+        'group': 'maintenance'
+    },
     'cert_renew': {
         'description': "Renew certificates on Kubernetes cluster",
         'group': 'maintenance'

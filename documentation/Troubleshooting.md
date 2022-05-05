@@ -5,7 +5,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
   - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
   - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
-  - [KME0005: {hostname} is not a sudoer](#kme0005-hostname-is-not-a-sudoer)
+  - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
@@ -197,16 +197,16 @@ An example of specifying multiple `master` and `worker` roles for a single node 
 applications pods.
 
 
-## KME0005: {hostname} is not a sudoer
+## KME0005: {hostnames} are not sudoers
 
 ```
 FAILURE!
 TASK FAILED prepare.check.sudoer
-KME0005: 10.101.1.1 is not a sudoer
+KME0005: ['10.101.1.1'] are not sudoers
 ```
 
-The error reports that the specified node does not have superuser rights. The error occurs 
-before the payload is executed on the cluster when running the `install` or `add_node` procedure.
+The error reports that connection users in the specified nodes either do not have superuser rights, or require passwords to run `sudo` commands.
+The error occurs before the payload is executed on the cluster when running the `install` or `add_node` procedure.
 
 To fix this, add a connection user to the sudoer group on the cluster node. 
 
@@ -216,6 +216,11 @@ An example for Ubuntu (reboot required) is as given below.
 sudo adduser <username> sudo
 ```
 
+To run `sudo` commands without being asked for a password, add
+```bash
+username  ALL=(ALL) NOPASSWD:ALL
+```
+in the end of `/etc/sudoers` file, where `username` is a name of the connection user.
 
 # Troubleshooting Tools
 
@@ -466,6 +471,47 @@ After the cause of the failure is fixed, you need to run the `upgrade` procedure
 For example, imagine you are doing the following upgrade: `1.16.12 -> 1.17.7 -> 1.18.8`. 
 In this case, if the upgrade fails on version `1.18.8`, but is completed for version `1.17.7`, you have to update `cluster.yaml` with the latest information available in the regenerated inventory (`cluster.yaml` is regenerated after each minor version upgrade) and also remove version `1.17.7` from the procedure inventory. It is absolutely fine to retry upgrades for version `X.Y.Z`, but only until the moment the upgrade starts for next version `X.Y+1.M`. It is incorrect to start upgrade to version `1.17.7` after the upgrade to version `1.18.8` is started.
 
+### Upgrade procedure failure, when using custom kubernetes audit settings
+
+**Symptoms**: The `upgrade` procedure fails at some point, leaving the upgrade process incomplete. When the cluster has custom audit settings
+
+**Root cause**: Using custom audit settings without specifying them in cluster.yaml will cause the process to fail.
+
+**Solution**:  In order for the `upgrade` procedure to complete with custom audit settings, you need to specify them in cluster.yaml in the service section.
+
+**Example**:
+```yaml
+services:
+  kubeadm:
+    apiServer:
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+      extraVolumes:
+        - name: audit
+          hostPath: /etc/kubernetes/audit-policy.yaml
+          mountPath: /etc/kubernetes/audit-policy.yaml
+          readOnly: True
+          pathType: File
+        - name: audit-log
+          hostPath: /var/log/kubernetes/audit/
+          mountPath: /var/log/kubernetes/audit/
+          readOnly: False
+          pathType: DirectoryOrCreate
+
+  audit:
+    cluster_policy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+        - "RequestReceived"
+      rules:
+        - level: Metadata
+          resources:
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+            - group: "authorization.k8s.io"
+            - group: "rbac.authorization.k8s.io"
+```
 ### Cannot drain node because of PodDisruptionBudget
 
 **Symptoms**: The `upgrade` procedure fails during node drain because of PodDisruptionBudget (PDB) limits.

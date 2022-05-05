@@ -1,3 +1,5 @@
+![Kubemarine_1280х640_3_JPEG](https://user-images.githubusercontent.com/5212888/162978291-63d55f19-7dc0-4126-ad39-cd69191e7e19.jpg)
+
 # Kubemarine
 
 Kubemarine is an open source, lightweight and powerful management tool built for end-to-end Kubernetes cluster deployment and maintenance. It's applicable for many purposes like simple and quick onboarding Kubernetes on local and production environments in different HA schemes depending on your aims, budget and capabilities. Together with simplicity Kubemarine can be very flexible and customizable tool covering specific configurability cases on both deployment and maintenance stages. This library provides powerfull CLI commands, as well as can be customized via Python extension API.
