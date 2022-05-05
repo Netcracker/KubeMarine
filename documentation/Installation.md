@@ -3017,7 +3017,7 @@ After applying the plugin configurations, the plugin installation procedure wait
 
 If the pods do not have time to start at a specific timeout, then the plugin configuration is incorrect. In this case, the installation is aborted.
 
-By default, no additional settings are required for the plugin. However, you can change the default settings. To do this, in the `plugins` section of the config file, specify the `calico` plugin section and list all the necessary parameters and their values ​​in it.
+By default, no additional settings are required for the plugin. However, you can change the default settings. To do this, in the `plugins` section of the config file, specify the `calico` plugin section and list all the necessary parameters and their values in it.
 For example:
 
 ```yaml
@@ -3033,6 +3033,32 @@ plugins:
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
+By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh. To enable route reflector topology during installation the next steps are required:
+
+1. Choose the nodes to be route reflectors and add the label `route-reflector=true` to their description in the cluster.yaml. It is recommended to use control-plane nodes for route reflectors, but not necessarily.
+
+2. Add `fullmesh: false` parameter in the `calico` plugin section:
+```yaml
+plugins:
+  calico:
+    fullmesh: false
+```
+
+It is also possible to change BGP topology at the running cluster. 
+
+To switch from "full mesh" to "route reflector" topology:
+- add the labels `route-reflector=true` to the route reflector nodes manually
+- add `fullmesh: false` parameter to the `calico` plugin section in the cluster.yaml
+- run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step.
+
+**Note**: for the topology with route reflectors the predefined value `routeReflectorClusterID=244.0.0.1` is used.
+
+To switch from "route reflector" to "full mesh" topology:
+- change `fullmesh` parameter value to `true` in the `calico` plugin section in the cluster.yaml (it also may be removed so the default value of `fullmesh` is being used)
+- run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step
+- remove the labels `route-reflector=true` from the route reflector nodes manually. If necessary, remove these labels from the cluster.yaml as well.
+
+
 **Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see mor details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
 
 **Note**: If the cluster size is more than 50 nodes, it is recommended to enable the Calico Typha daemon and adjust the size of its replicas.
@@ -3044,6 +3070,7 @@ The plugin configuration supports the following parameters:
 |mode|string|`ipip`|`ipip` / `vxlan`|Network protocol to be used in network plugin|
 |crossSubnet|boolean|`true`| |Enables crossing subnet boundaries to improve network performance|
 |mtu|int|`1440`|MTU size on interface - 50|MTU size for Calico interface|
+|fullmesh|boolean|true|true/false|Enable of disable full mesh BGP topology|
 |typha.enabled|boolean|`false`|Enable if you have more than 50 nodes in cluster|Enables the [Typha Daemon](https://github.com/projectcalico/typha)|
 |typha.replicas|int|`{{ (((nodes\|length)/50) + 1) \| round(1) }}`|1 replica for every 50 cluster nodes|Number of Typha running replicas|
 |typha.image|string|`calico/typha:v3.10.1`|Should contain both image name and version|Calico Typha image|
