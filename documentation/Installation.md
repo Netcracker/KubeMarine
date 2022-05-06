@@ -3041,7 +3041,7 @@ By default, calico is installed with "full mesh" BGP topology, that is every nod
 
 To enable route reflector topology during installation the next steps are required:
 
-1. Choose the nodes to be route reflectors and add the label `route-reflector=true` to their description in the cluster.yaml. It is recommended to use control-plane nodes for route reflectors, but not necessarily.
+1. Choose the nodes to be route reflectors and add the label `route-reflector: true` to their description in the cluster.yaml. It is recommended to use control-plane nodes for route reflectors, but not necessarily.
 
 2. Add `fullmesh: false` parameter in the `calico` plugin section:
 ```yaml
@@ -3055,7 +3055,7 @@ It is also possible to change BGP topology at the running cluster.
 **Warning**: short downtime is possible during BGP peering sessions reestablishing.
 
 To switch from "full mesh" to "route reflector" topology:
-- add the labels `route-reflector=true` to the route reflector nodes manually
+- add the label `route-reflector: true` to the route reflector nodes manually
 - add `fullmesh: false` parameter to the `calico` plugin section in the cluster.yaml
 - run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step.
 
@@ -3064,7 +3064,7 @@ To switch from "full mesh" to "route reflector" topology:
 To switch from "route reflector" to "full mesh" topology:
 - change `fullmesh` parameter value to `true` in the `calico` plugin section in the cluster.yaml (it also may be removed so the default value of `fullmesh` is being used)
 - run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step
-- remove the labels `route-reflector=true` from the route reflector nodes manually. If necessary, remove these labels from the cluster.yaml as well.
+- remove the labels `route-reflector: true` from the route reflector nodes manually. If necessary, remove these labels from the cluster.yaml as well.
 
 
 **Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see mor details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
