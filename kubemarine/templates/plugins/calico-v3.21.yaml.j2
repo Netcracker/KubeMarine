@@ -4618,35 +4618,6 @@ spec:
       k8s-app: calico-kube-controllers
 
 ---
-
-# This is default bgp configuration for calico bird
-
-apiVersion: crd.projectcalico.org/v1
-kind: BGPConfiguration
-metadata:
-  name: default
-spec:
-  nodeToNodeMeshEnabled: {{ plugins['calico']['fullmesh'] }}
-
-{% if not plugins['calico']['fullmesh'] %}
----
-
-# This is for peering with route-reflectors
-
-apiVersion: crd.projectcalico.org/v1
-kind: BGPPeer
-metadata:
-  name: peer-with-route-reflectors
-spec:
-  nodeSelector: all()
-  peerSelector: route-reflector == 'true'
-
-{% endif %}
-
----
-
-# 
----
 # Source: calico/templates/calico-etcd-secrets.yaml
 
 ---
