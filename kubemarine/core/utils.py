@@ -223,6 +223,8 @@ def dump_file(cluster, data, filename):
     if cluster.context.get("dump_filename_prefix"):
         filename = f"{cluster.context['dump_filename_prefix']}_{filename}"
 
+    prepare_dump_directory(get_resource_absolute_path(cluster.context['execution_arguments'].get('dump_location')))
+
     if not cluster.context['execution_arguments'].get('disable_dump', True):
         with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
                   'w') as file:
