@@ -339,9 +339,8 @@ class FakeConnectionPool(connections.ConnectionPool):
 def new_cluster(inventory, procedure=None, fake=True,
                 os_name='centos', os_version='7.9', net_interface='eth0'):
 
-    context = flow.create_context({
-        'disable_dump': True
-    }, procedure=procedure)
+    context = flow.create_context(
+        flow.new_parser("Help text").parse_args(['--disable-dump']), procedure=procedure)
 
     os_family = None
 
