@@ -219,14 +219,10 @@ def dump_file(cluster, data, filename):
         data = data.getvalue()
     if isinstance(data, io.TextIOWrapper):
         data = data.read()
-
-    if cluster.context.get("dump_filename_prefix"):
-        filename = f"{cluster.context['dump_filename_prefix']}_{filename}"
-
-
+    file_path = get_dump_filepath(cluster, filename)
 
     if not cluster.context['execution_arguments'].get('disable_dump', True):
-        with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
+        with open(get_resource_absolute_path(file_path),
                   'w') as file:
             file.write(data)
     else:
@@ -234,9 +230,17 @@ def dump_file(cluster, data, filename):
                           'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml','version']
         prepare_dump_directory(get_resource_absolute_path(cluster.context['execution_arguments'].get('dump_location')))
         if filename in files_obligatory:
-            with open(get_resource_absolute_path(cluster.context['execution_arguments']['dump_location'] + '/' + filename),
+            with open(get_resource_absolute_path(file_path),
                       'w') as file:
                 file.write(data)
+
+def get_dump_filepath(cluster, filename):
+    if cluster.context.get("dump_filename_prefix"):
+        filename = f"{cluster.context['dump_filename_prefix']}_{filename}"
+
+    return get_resource_absolute_path(cluster.context['execution_arguments']['dump_location']+'/'+filename)
+
+
 
 def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
     log = group.cluster.log
@@ -370,18 +374,16 @@ class ClusterStorage:
         This method compose dump files and sends the collected files to the nodes.
         """
         if self.cluster.context["initial_procedure"] != None:
-            dump_dir = get_resource_absolute_path(self.cluster.context['execution_arguments']['dump_location'])
             files_dump = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
                           'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml']
-            onlyfiles = [f for f in listdir(dump_dir) if isfile(join(dump_dir, f))]
-            archive = dump_dir + "local.tar.gz"
+            archive = get_dump_filepath(cluster,"local.tar.gz")
             with tarfile.open(archive, "w:gz") as tar:
                 for name in files_dump:
-                    if name in onlyfiles:
-                        output = dump_dir + '/' + name
-                        tar.add(output, 'dump/' + name)
+                    source = get_dump_filepath(cluster, name)
+                    if os.path.exists(source):
+                        tar.add(source, 'dump/' + name)
                 tar.add(cluster.context['execution_arguments']['config'], 'cluster.yaml')
-                tar.add(dump_dir + '/' + 'version', 'version')
+                tar.add(get_dump_filepath(cluster,"version"), 'version')
             self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
             self.cluster.log.debug('File upload local.tar.gz')
             self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"}  && '
@@ -414,8 +416,8 @@ class ClusterStorage:
         data_copy_res = master.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
         self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
         master.get('/tmp/kubemarine-backup.tar.gz',
-                                   os.path.join(self.cluster.context['execution_arguments']['dump_location'],
-                                                'dump_log_cluster.tar.gz'))
+                                   get_dump_filepath(cluster, "dump_log_cluster.tar.gz"), 'dump_log_cluster.tar.gz')
+
         self.cluster.log.debug('Backup downloaded')
 
 
@@ -425,9 +427,8 @@ class ClusterStorage:
 
         for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
             group = cluster.make_group([new_node['connect_to']])
-            if 'master' in new_node['roles']:
-                group.put(
-                    cluster.context['execution_arguments']['dump_location'] + "dump_log_cluster.tar.gz",
+            if 'control-plane' in new_node['roles'] or 'master' in new_node['roles']:
+                group.put(get_dump_filepath(cluster, "dump_log_cluster.tar.gz"),
                     "/tmp/dump_log_cluster.tar.gz", sudo=True)
                 group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
             else:
