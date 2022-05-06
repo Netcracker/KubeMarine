@@ -219,20 +219,21 @@ def dump_file(cluster, data, filename):
         data = data.getvalue()
     if isinstance(data, io.TextIOWrapper):
         data = data.read()
-    file_path = get_dump_filepath(cluster, filename)
 
-    if not cluster.context['execution_arguments'].get('disable_dump', True):
-        with open(get_resource_absolute_path(file_path),
-                  'w') as file:
-            file.write(data)
-    else:
-        files_obligatory = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
-                          'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml','version']
-        prepare_dump_directory(get_resource_absolute_path(cluster.context['execution_arguments'].get('dump_location')))
-        if filename in files_obligatory:
+    if cluster.context["initial_procedure"] != None:
+        file_path = get_dump_filepath(cluster, filename)
+        if not cluster.context['execution_arguments'].get('disable_dump', True):
             with open(get_resource_absolute_path(file_path),
                       'w') as file:
                 file.write(data)
+        else:
+            files_obligatory = ['procedure.yaml', 'procedure_parameters','cluster_precompiled.yaml',
+                              'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml','version']
+            prepare_dump_directory(get_resource_absolute_path(cluster.context['execution_arguments'].get('dump_location')))
+            if filename in files_obligatory:
+                with open(get_resource_absolute_path(file_path),
+                          'w') as file:
+                    file.write(data)
 
 def get_dump_filepath(cluster, filename):
     if cluster.context.get("dump_filename_prefix"):
