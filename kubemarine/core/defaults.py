@@ -302,8 +302,7 @@ def append_controlplain(inventory, cluster):
         cluster.log.warning('VRRP_IPs has an internal address, but do not have an external one. Your configuration may be incorrect. Trying to handle this problem automatically...')
 
     if internal_address is None or external_address is None:
-        # TODO change this part later
-        for role in ['balancer', 'master']:
+        for role in ['balancer', 'master', 'control-plane']:
             # nodes are not compiled to groups yet
             for node in inventory['nodes']:
                 if role in node['roles'] and 'remove_node' not in node['roles']:
