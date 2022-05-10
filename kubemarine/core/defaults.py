@@ -409,12 +409,10 @@ def verify_node_names(inventory, cluster):
 def calculate_nodegroups(inventory, cluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
-
     return inventory
 
 
 def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True, custom_fns=None):
-
     with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
@@ -441,7 +439,6 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
                 inventory = getattr(mod, fn_method_name)(inventory, cluster)
 
         cluster.log.verbose('Enrichment finished!')
-
 
         if make_dumps:
             inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump((inventory)))
