@@ -458,7 +458,6 @@ def compile_inventory(inventory, cluster):
     root = deepcopy(inventory)
     root['globals'] = cluster.globals
 
-
     while iterations > 0:
 
         cluster.log.verbose('Inventory is not rendered yet...')
