@@ -16,7 +16,6 @@
 
 import copy
 
-
 from collections import OrderedDict
 from kubemarine import kubernetes, system
 from kubemarine.core import flow, utils
@@ -48,8 +47,6 @@ def deploy_kubernetes_join(cluster):
     else:
         cluster.log.debug("Waiting for new kubernetes nodes...")
         kubernetes.wait_for_nodes(group)
-
-
 
 
 def add_node_finalize_inventory(cluster, inventory_to_finalize):
