@@ -16,10 +16,8 @@ import re
 from copy import deepcopy
 from typing import Dict, List, Union
 
-
 import fabric
 import yaml
-
 
 from kubemarine.core import log
 from kubemarine.core.connections import ConnectionPool, Connections
@@ -393,7 +391,6 @@ class KubernetesCluster(Environment):
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)
         prepared_inventory = defaults.prepare_for_dump(prepared_inventory, copy=False)
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
-
         inventory_for_dump = controlplane.controlplane_finalize_inventory(self, prepared_inventory)
         utils.dump_file(self, yaml.dump(inventory_for_dump), "cluster_finalized.yaml")
         cluster_storage = utils.ClusterStorage.get_instance(self)
