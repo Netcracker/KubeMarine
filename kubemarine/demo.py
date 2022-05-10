@@ -179,7 +179,6 @@ class FakeKubernetesCluster(KubernetesCluster):
         super().__init__(*args, **kwargs)
         self._connection_pool = FakeConnectionPool(self)
 
-
     def make_group(self, ips) -> NodeGroup:
         nodegroup = super().make_group(ips)
         return FakeNodeGroup(nodegroup.nodes, self)
