@@ -370,7 +370,7 @@ class ClusterStorage:
                         master.sudo(f'rm -rf {self.dir_path + file}')
 
 
-    def comprese_and_upload_archive(self, cluster):
+    def compress_and_upload_archive(self, cluster):
         """
         This method compose dump files and sends the collected files to the nodes.
         """
