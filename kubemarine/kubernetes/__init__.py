@@ -170,7 +170,12 @@ def enrich_inventory(inventory, cluster):
                 # node is both master and worker, thus we remove NoSchedule taint
                 if "taints" not in node:
                     node["taints"] = []
-                node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                # TODO delete if-else case when oldest supported version become higher or equal v1.24
+                minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+                if minor_version < 24:
+                    node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                else:
+                    node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     if not any_worker_found:
         raise KME("KME0004")
@@ -755,6 +760,13 @@ def patch_kubeadm_configmap(first_master, cluster):
     if cluster.context.get('patch_image_repo', False):
         cluster_config["imageRepository"] = cluster_config["imageRepository"].replace('/k8s.gcr.io', '')
 
+    new_image_repo_port = cluster.context.get('patch_image_repo_port', '')
+    old_image_repo_port = cluster.context.get('old_image_repo_port', '')
+    if new_image_repo_port and old_image_repo_port:
+        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace('/k8s.gcr.io', '')
+        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace(old_image_repo_port,
+                                                                                      new_image_repo_port)
+
     if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
         cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
@@ -1101,4 +1113,3 @@ def images_prepull(group: NodeGroup):
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
-
