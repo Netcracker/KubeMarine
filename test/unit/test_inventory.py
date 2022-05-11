@@ -84,6 +84,17 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertIn('master-2', node_names)
         self.assertIn('master-3', node_names)
 
+    def test_roles_in_inventory(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        cluster = demo.new_cluster(inventory)
+
+        nodes = cluster.nodes['master'].get_ordered_members_list()
+        self.assertEqual(3, len(nodes))
+        nodes = cluster.nodes['control-plane'].get_ordered_members_list()
+        self.assertEqual(3, len(nodes))
+        roles = cluster.roles
+        self.assertIn('master', roles)
+        self.assertIn('control-plane', roles)
 
 if __name__ == '__main__':
     unittest.main()
