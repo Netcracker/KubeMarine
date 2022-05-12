@@ -26,6 +26,7 @@ from kubemarine.cri import docker
 from kubemarine.procedures import install
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine import packages
+from kubemarine import podman
 
 
 def enrich_inventory(inventory, cluster):
@@ -185,6 +186,8 @@ def _migrate_cri(cluster, node_group):
         cluster.log.debug('Reinstalling CRI...')
         cri.install(node["connection"])
         cri.configure(node["connection"])
+        podman.install(node["connection"])
+        podman.configure(node["connection"])
 
         cluster.log.debug(f'CRI configured! Restoring pods on node "{node["connect_to"]}"')
 
