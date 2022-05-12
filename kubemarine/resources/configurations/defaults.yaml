@@ -192,9 +192,6 @@ services:
             resources:
             - podsecuritypolicies
           - group: "rbac.authorization.k8s.io"
-		  - group: "authentication.k8s.io"
-            resources: ["tokenreviews"]
-          - group: "authorization.k8s.io"
             resources:
             - clusterrolebindings
             - clusterroles
