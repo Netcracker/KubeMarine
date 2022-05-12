@@ -164,6 +164,9 @@ def _migrate_cri(cluster, node_group):
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
                                                 is_async=False).get_simple_out()
 
+        if kubeadm_flags.find('--network-plugin=cni') != -1:
+            kubeadm_flags = kubeadm_flags.replace('--network-plugin=cni', '')
+
         kubeadm_flags = edit_config(kubeadm_flags)
 
         node["connection"].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
