@@ -209,7 +209,7 @@ services:
             - ingresses
             - ingressclasses
             - networkpolicies
-		  - group: "authentication.k8s.io"
+          - group: "authentication.k8s.io"
             resources: ["tokenreviews"]
           - group: "authorization.k8s.io"
 
