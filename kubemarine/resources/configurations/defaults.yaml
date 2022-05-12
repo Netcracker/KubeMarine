@@ -328,10 +328,13 @@ services:
           config_location: '/etc/docker/daemon.json'
         containerd:
           executable_name: 'containerd'
-          package_name:
-            - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
-            - 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
+          package_name: 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'containerd'
+          config_location: '/etc/containerd/config.toml'
+        podman:
+          executable_name: 'podman'
+          package_name: 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
+          service_name: 'podman'
           config_location: '/etc/containerd/config.toml'
         haproxy:
           executable_name: '/usr/sbin/haproxy'
