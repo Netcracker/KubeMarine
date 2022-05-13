@@ -5346,7 +5346,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.23.2</td>
+    <td colspan="4">v3.22.2</td>
     <td>SHA1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2<br>Required only if calico is installed.</td>
   </tr>
   <tr>
@@ -5427,7 +5427,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.23.2</td>
+    <td colspan="4" rowspan="5">v3.22.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
