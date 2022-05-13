@@ -387,7 +387,7 @@ class ClusterStorage:
                 tar.add(get_dump_filepath(cluster,"version"), 'version')
             self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
             self.cluster.log.debug('File upload local.tar.gz')
-            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzvf {self.dir_location + "local.tar.gz"}  && '
+            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
                                               f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
