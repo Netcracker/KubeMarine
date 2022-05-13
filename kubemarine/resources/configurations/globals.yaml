@@ -1,11 +1,11 @@
 kubernetes_versions:
-  v1.20:
-    supported: true
   v1.21:
     supported: true
   v1.22:
     supported: true
   v1.23:
+    supported: true
+  v1.24:
     supported: true
 
 connection:
@@ -86,7 +86,6 @@ error_handling:
     Follow the instructions from the Troubleshooting Guide available to you.
     If it is impossible to solve the problem, provide the dump and the technical information above
     to the support team.
-
     You can restart the procedure from the last task with the following command:
     %s --tasks="%s"
 keepalived:
@@ -106,19 +105,11 @@ workaround:
 compatibility_map:
   software:
     docker:
-      v1.20.2:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:19.03.*
-      v1.20.11:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:19.03.*
-      v1.21.2:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:19.03.*
       v1.21.5:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.21.12:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
@@ -126,43 +117,50 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
+      v1.22.9:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
       v1.23.1:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.23.6:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
+      v1.24.0:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
     containerd:
-      v1.20.2:
-        version_rhel8: 1.4*
-        version_debian: 1.5.*
-      v1.20.11:
-        version_rhel8: 1.4*
-        version_debian: 1.5.*
-      v1.21.2:
-        version_rhel8: 1.4*
-        version_debian: 1.5.*
       v1.21.5:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.21.12:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.22.2:
         version_rhel8: 1.4*
         version_debian: 1.5.*
+      v1.22.9:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
       v1.23.1:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.23.6:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.24.0:
         version_rhel8: 1.4*
         version_debian: 1.5.*
     containerdio:
-      v1.20.2:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
-        version_debian: 1.4.*
-      v1.20.11:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
-        version_debian: 1.4.*
-      v1.21.2:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
-        version_debian: 1.4.*
       v1.21.5:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.21.12:
         version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.4.*
@@ -170,24 +168,28 @@ compatibility_map:
         version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.4.*
+      v1.22.9:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
       v1.23.1:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.23.6:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.24.0:
         version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.4.*
     podman:
-      v1.20.2:
-        version_rhel: 1.6.4*
-        version_rhel8: "*"
-        version_debian: "*"
-      v1.20.11:
-        version_rhel: 1.6.4*
-        version_rhel8: "*"
-        version_debian: "*"
-      v1.21.2:
-        version_rhel: 1.6.4*
-        version_rhel8: "*"
-        version_debian: "*"
       v1.21.5:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
+      v1.21.12:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
@@ -195,24 +197,28 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
+      v1.22.9:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.23.1:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
+      v1.23.6:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
+      v1.24.0:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
     haproxy:
-      v1.20.2:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.0.*
-      v1.20.11:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.0.*
-      v1.21.2:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.0.*
       v1.21.5:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.21.12:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
@@ -220,24 +226,28 @@ compatibility_map:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
+      v1.22.9:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
       v1.23.1:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.23.6:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.24.0:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
     keepalived:
-      v1.20.2:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.0.*
-      v1.20.11:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.0.*
-      v1.21.2:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.0.*
       v1.21.5:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.21.12:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
@@ -245,129 +255,150 @@ compatibility_map:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
+      v1.22.9:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
       v1.23.1:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.23.6:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
+      v1.24.0:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
     crictl:
-      v1.20.2:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.20.11:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
-      v1.21.2:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
       v1.21.5:
-        version: v1.20.0
-        sha1: eaf4ffa1cfac5c69ec522d9562c8ee6ddd873f3e
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.21.12:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
       v1.22.2:
-        version: v1.22.0
-        sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.22.9:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
       v1.23.1:
-        version: v1.22.0
-        sha1: b840ddd1a8a35b12fd22d2657c7d17cb2f6f2e05
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.23.6:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.24.0:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
     kubeadm:
-      v1.20.2:
-        sha1: 4c025ebf29eb7aa32012a1c8f81e7b85df2bf92f
-      v1.20.11:
-        sha1: 59f904f50ea10cbc69007891301a2169f42f3537
-      v1.21.2:
-        sha1: cbb07d380de4ef73d43d594a1055839fa9753138
       v1.21.5:
         sha1: 2ee056ac1d0b9c2289bdb03cb7bb0cd21ee29a8b
+      v1.21.12:
+        sha1: b566840ac2bd50d9c83165ac61331ba7998bf7ce
       v1.22.2:
         sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
+      v1.22.9:
+        sha1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d
       v1.23.1:
         sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
+      v1.23.6:
+        sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
+      v1.24.0:
+        sha1: a60b0adcdc6f19e79bd98663914b694a325db819
     kubelet:
-      v1.20.2:
-        sha1: 25ca655cce261cdbeb7c3337185f669ee0b53cc3
-      v1.20.11:
-        sha1: 00c0b6a8dda55616343baafee9e9aa2775bc3c22
-      v1.21.2:
-        sha1: 024e458aa0f74cba6b773401b779590437812fc6
       v1.21.5:
         sha1: 61da22475b977cb678cca8cf7249bf727d72ee89
+      v1.21.12:
+        sha1: 45a50b60122f35505ecd08479be1ae232b0ac524
       v1.22.2:
         sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
+      v1.22.9:
+        sha1: 21b4104937b65fdf0fdf9fbb57ff22a879b21e3f
       v1.23.1:
         sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
+      v1.23.6:
+        sha1: 326110dcb62b66e69490d039b170682fb71c5560
+      v1.24.0:
+        sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
     kubectl:
-      v1.20.2:
-        sha1: 202e00c35fa2a4085135061e5d0965ebbffed19c
-      v1.20.11:
-        sha1: 0feee9301e7f6cb6fba1d841a6fd8f378589145f
-      v1.21.2:
-        sha1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468
       v1.21.5:
         sha1: c4648e31ca16fb00e3826f8ab7c653da81eff367
+      v1.21.12:
+        sha1: 54a381297eb3a94ab968bb8bfff5f91e3d08805a
       v1.22.2:
         sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
+      v1.22.9:
+        sha1: e4137d683b9f93211bb6d9fa155d0bb423e871c9
       v1.23.1:
         sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
+      v1.23.6:
+        sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
+      v1.24.0:
+        sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
     calico:
-      v1.20:
-        version: v3.21.2
-        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
       v1.21:
-        version: v3.21.2
-        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
+        version: v3.22.2
+        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
       v1.22:
-        version: v3.21.2
-        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
+        version: v3.22.2
+        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
       v1.23:
-        version: v3.21.2
-        sha1: a91680d2d2c4081fedd685c5eb6c842685bcb6b2
+        version: v3.22.2
+        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+      v1.24:
+        version: v3.22.2
+        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
     nginx-ingress-controller:
-      v1.20:
-        image-name: ingress-nginx/controller
-        version: v1.1.0
-        pod-name: ingress-nginx-controller
       v1.21:
         image-name: ingress-nginx/controller
-        version: v1.1.0
+        version: v1.2.0
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: ingress-nginx/controller
-        version: v1.1.0
+        version: v1.2.0
         pod-name: ingress-nginx-controller
       v1.23:
         image-name: ingress-nginx/controller
-        version: v1.1.0
+        version: v1.2.0
+        pod-name: ingress-nginx-controller
+      v1.24:
+        image-name: ingress-nginx/controller
+        version: v1.2.0
         pod-name: ingress-nginx-controller
     kubernetes-dashboard:
-      v1.20:
-        version: v2.4.0
-        metrics-scraper-version: v1.0.7
       v1.21:
-        version: v2.4.0
+        version: v2.5.1
         metrics-scraper-version: v1.0.7
       v1.22:
-        version: v2.4.0
+        version: v2.5.1
         metrics-scraper-version: v1.0.7
       v1.23:
-        version: v2.4.0
+        version: v2.5.1
+        metrics-scraper-version: v1.0.7
+      v1.24:
+        version: v2.5.1
         metrics-scraper-version: v1.0.7
     local-path-provisioner:
-      v1.20:
-        version: v0.0.20
       v1.21:
-        version: v0.0.20
+        version: v0.0.22
       v1.22:
-        version: v0.0.20
+        version: v0.0.22
       v1.23:
-        version: v0.0.20
+        version: v0.0.22
+      v1.24:
+        version: v0.0.22
     pause:
-      v1.20:
-        version: 3.2
       v1.21:
         version: 3.4.1
       v1.22:
         version: 3.5
       v1.23:
         version: 3.6
+      v1.24:
+        version: 3.7
 
   hardware:
     minimal:
