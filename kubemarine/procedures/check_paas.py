@@ -393,12 +393,14 @@ def kubernetes_nodes_roles(cluster):
             for node_description in nodes_description['items']:
                 node_name = node_description['metadata']['name']
                 if node['name'] == node_name:
-                    if 'master' in node['roles']:
-                        if 'node-role.kubernetes.io/master' not in node_description['metadata']['labels']:
+                    if 'control-plane' in node['roles']:
+                        # TODO check label accordingly to Kubernetes version
+                        if 'node-role.kubernetes.io/master' not in node_description['metadata']['labels'] and \
+                           'node-role.kubernetes.io/control-plane' not in node_description['metadata']['labels']:
                             nodes_with_bad_roles.append(node['name'])
-                            cluster.log.error("Node \"%s\" has to be master, but has invalid role" % node['name'])
+                            cluster.log.error("Node \"%s\" has to be control-plane, but has invalid role" % node['name'])
                         else:
-                            cluster.log.debug("Node \"%s\" has correct master role" % node['name'])
+                            cluster.log.debug("Node \"%s\" has correct control-plane role" % node['name'])
                     elif 'worker' in node['roles']:
                         if 'node-role.kubernetes.io/worker' not in node_description['metadata']['labels']:
                             nodes_with_bad_roles.append(node['name'])
