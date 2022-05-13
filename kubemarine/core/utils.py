@@ -324,7 +324,7 @@ class ClusterStorage:
 
     def __init__(self, cluster):
         self.cluster = cluster
-        self.dir_path = "/etc/kubemarine/kube_tasks/"
+        self.dir_path = "/etc/kubemarine/procedures/"
         self.dir_name = ''
         self.dir_location = ''
         self.cluster.log.debug("New storage created")
