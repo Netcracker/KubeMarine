@@ -1,0 +1,6 @@
+{% if not plugins.calico.fullmesh %}
+kubectl get nodes -l route-reflector=True 2>/dev/null | awk '{print $1}' | grep -vw NAME | xargs -I NODENAME calicoctl patch node NODENAME -p '{"spec": {"bgp": {"routeReflectorClusterID": "244.0.0.1"}}}'
+{% else %}
+kubectl get nodes 2>/dev/null | awk '{print $1}' | grep -vw NAME | xargs -I NODENAME calicoctl patch node NODENAME -p '{"spec": {"bgp": {"routeReflectorClusterID": ""}}}'
+{% endif %}
+
