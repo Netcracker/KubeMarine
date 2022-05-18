@@ -28,8 +28,8 @@ def install(group):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
 
-            group.cluster.log.debug("Installing latest containerd and podman on %s node" % node['name'])
-            # always install latest available containerd and podman
+            group.cluster.log.debug("Installing latest containerd on %s node" % node['name'])
+            # always install latest available containerd
             packages.install(node['connection'], include=os_specific_associations['package_name'])
 
             # remove previous config.toml to avoid problems in case when previous config was broken
@@ -64,28 +64,6 @@ def configure(group):
         # next we process all "complex" `key: dict_value` pairs, representing named sections
         if isinstance(value, dict):
             config_string += f"\n[{key}]\n{toml.dumps(value)}"
-
-    # if there are any insecure registries in containerd config, then it is required to configure them for podman too
-    config_toml = toml.loads(config_string)
-    insecure_registries = []
-    if config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {}).get('mirrors'):
-        for mirror, mirror_conf in config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['mirrors'].items():
-            is_insecure = False
-            for endpoint in mirror_conf.get('endpoint', []):
-                if "http://" in endpoint:
-                    is_insecure = True
-                    break
-            if is_insecure:
-                insecure_registries.append(mirror)
-    if insecure_registries:
-        log.debug("Uploading podman configuration...")
-        podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"
-        utils.dump_file(group.cluster, podman_registries, 'podman_registries.conf')
-        group.sudo("mkdir -p /etc/containers/")
-        group.put(StringIO(podman_registries), "/etc/containers/registries.conf", backup=True, sudo=True)
-    else:
-        log.debug("Removing old podman configuration...")
-        group.sudo("rm -f /etc/containers/registries.conf")
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     with RemoteExecutor(group.cluster) as exe:
