@@ -335,7 +335,7 @@ services:
           executable_name: 'podman'
           package_name: 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'podman'
-          config_location: '/etc/containerd/config.toml'
+          config_location: '/etc/containers/containers.conf'
         haproxy:
           executable_name: '/usr/sbin/haproxy'
           package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
