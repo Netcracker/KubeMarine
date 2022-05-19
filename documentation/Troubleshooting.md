@@ -19,6 +19,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
   - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
+  - [Troubleshooting an installation that ended incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
 
 # KubeMarine Errors
 
@@ -690,3 +691,23 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
     ```bash
     cloud-init status
     ```
+## Troubleshooting an installation that ended incorrectly
+
+* Sometimes the installation of kubemarine may not complete correctly, and for further analysis of the situation, kubemarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
+
+### Analysis of the situation
+
+* When a user enters the node, along the path `/etc/kubemarine/kube_tasks` he can see the collected logs that were collected during the installation.
+  * Logs are a set of files, namely:
+  ```
+  data_time_initial_procedure
+    cluster.yaml
+    version
+    dump/
+      
+      cluster_finalized.yaml
+      cluster_precompiled.yaml
+      cluster.yaml
+      procedure_parameters
+  ```
+The user can analyze these files and try to find the reason for the failed installation of kubemarine

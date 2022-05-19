@@ -631,3 +631,7 @@ rbac:
       usernames: []
       runtimeClasses: []
       namespaces: ["kube-system"]
+
+procedure_history:
+  archive_threshold: 5
+  delete_threshold: 10
