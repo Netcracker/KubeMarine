@@ -399,7 +399,7 @@ class KubernetesCluster(Environment):
         else:
             cluster_storage.make_dir(self)
             if self.context.get('initial_procedure') == 'add_node':
-                cluster_storage.collect_info_all_master(self)
+                cluster_storage.collect_info_all_control_plane(self)
                 cluster_storage.upload_info_new_node(self)
             cluster_storage.collect_procedure_info(self)
             cluster_storage.compress_and_upload_archive(self)
