@@ -86,7 +86,7 @@ services:
       sha1: '{{ globals.compatibility_map.software.kubectl[services.kubeadm.kubernetesVersion].sha1 }}'
       group: master
     /usr/bin/calicoctl:
-      source: 'https://github.com/projectcalico/calicoctl/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
+      source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
       sha1: '{{ globals.compatibility_map.software.calico[services.kubeadm.kubernetesVersion|minorversion].sha1 }}'
       group: master
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
