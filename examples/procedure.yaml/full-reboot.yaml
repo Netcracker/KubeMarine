@@ -1,6 +1,6 @@
 graceful_reboot: True
 
 nodes:
-  - name: master-1
-  - name: master-2
-  - name: master-3
+  - name: control-plane-1
+  - name: control-plane-2
+  - name: control-plane-3

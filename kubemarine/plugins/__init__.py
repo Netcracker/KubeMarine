@@ -198,7 +198,7 @@ def expect_daemonset(cluster: KubernetesCluster,
     while retries > 0:
         up_to_date = True
         for daemonset in daemonsets:
-            if not daemonset.reload(master=node, suppress_exceptions=True).is_up_to_date():
+            if not daemonset.reload(control_plane=node, suppress_exceptions=True).is_up_to_date():
                 up_to_date = False
 
         if up_to_date:
@@ -248,7 +248,7 @@ def expect_replicaset(cluster: KubernetesCluster,
     while retries > 0:
         up_to_date = True
         for replicaset in replicasets:
-            if not replicaset.reload(master=node, suppress_exceptions=True).is_available():
+            if not replicaset.reload(control_plane=node, suppress_exceptions=True).is_available():
                 up_to_date = False
 
         if up_to_date:
@@ -298,7 +298,7 @@ def expect_statefulset(cluster: KubernetesCluster,
     while retries > 0:
         up_to_date = True
         for statefulset in statefulsets:
-            if not statefulset.reload(master=node, suppress_exceptions=True).is_updated():
+            if not statefulset.reload(control_plane=node, suppress_exceptions=True).is_updated():
                 up_to_date = False
 
         if up_to_date:
@@ -348,7 +348,7 @@ def expect_deployment(cluster: KubernetesCluster,
     while retries > 0:
         up_to_date = True
         for deployment in deployments:
-            if not deployment.reload(master=node, suppress_exceptions=True).is_actual_and_ready():
+            if not deployment.reload(control_plane=node, suppress_exceptions=True).is_actual_and_ready():
                 up_to_date = False
 
         if up_to_date:
@@ -380,7 +380,7 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
     failures = 0
 
     if node is None:
-        node = cluster.nodes['master'].get_first_member()
+        node = cluster.nodes['control-plane'].get_first_member()
 
     namespace_filter = '-A'
     if namespace is not None:
@@ -626,7 +626,7 @@ def apply_shell(cluster, step, plugin_name=None):
     vars_separator = "~~~~EXPORTED_VARIABLE~~~~"
 
     if not groups and not nodes:
-        common_group = cluster.nodes['master'].get_any_member()
+        common_group = cluster.nodes['control-plane'].get_any_member()
     else:
         common_group = cluster.create_group_from_groups_nodes_names(groups, nodes)
 
@@ -745,9 +745,9 @@ def apply_helm(cluster, config, plugin_name=None):
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
-    common_group = cluster.nodes['master'].get_first_member()
+    common_group = cluster.nodes['control-plane'].get_first_member()
 
-    cluster.log.debug('Loading kubeconfig from master...')
+    cluster.log.debug('Loading kubeconfig from control-plane...')
     kubeconfig = common_group.sudo("cat /root/.kube/config")
 
     kubeconfig_stdout = list(kubeconfig.values())[0].stdout
@@ -938,13 +938,13 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
         apply_command = config.get('apply_command', 'kubectl apply -f %s' % destination_path)
 
         if not destination_groups and not destination_nodes:
-            destination_common_group = cluster.nodes['master']
+            destination_common_group = cluster.nodes['control-plane']
         else:
             destination_common_group = cluster.create_group_from_groups_nodes_names(destination_groups,
                                                                                     destination_nodes)
 
         if not apply_groups and not apply_nodes:
-            apply_common_group = cluster.nodes['master'].get_any_member()
+            apply_common_group = cluster.nodes['control-plane'].get_any_member()
         else:
             apply_common_group = cluster.create_group_from_groups_nodes_names(apply_groups, apply_nodes)
 

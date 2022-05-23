@@ -103,33 +103,33 @@ def manage_custom_certificate(cluster):
     secret_name = "default-ingress-cert"
     secret_namespace = "kube-system"
 
-    first_master = cluster.nodes["master"].get_first_member()
+    first_control_plane = cluster.nodes["control-plane"].get_first_member()
     default_cert = cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"]["default-certificate"]
 
-    # first, we need to load cert and key files to first master to known locations
-    first_master.sudo(f"mkdir -p {base_path}")
+    # first, we need to load cert and key files to first control-plane to known locations
+    first_control_plane.sudo(f"mkdir -p {base_path}")
     try:
-        first_master.call(put_custom_certificate,
+        first_control_plane.call(put_custom_certificate,
                           default_cert=default_cert,
                           crt_path=certificate_path,
                           key_path=private_key_path)
 
         # second, we need to validate cert and key using openssl
-        first_master.call(verify_certificate_and_key, crt_path=certificate_path, key_path=private_key_path)
+        first_control_plane.call(verify_certificate_and_key, crt_path=certificate_path, key_path=private_key_path)
 
         # third, we need to create tls secret under well-known name
         # this certificate is already configured to be used by controller
-        first_master.call(create_tls_secret,
+        first_control_plane.call(create_tls_secret,
                           crt_path=certificate_path,
                           key_path=private_key_path,
                           name=secret_name,
                           namespace=secret_namespace)
     finally:
         # fourth, we need to remove base path dir
-        first_master.sudo(f"rm -rf {base_path}")
+        first_control_plane.sudo(f"rm -rf {base_path}")
 
 
-def put_custom_certificate(first_master: NodeGroup, default_cert, crt_path, key_path):
+def put_custom_certificate(first_control_plane: NodeGroup, default_cert, crt_path, key_path):
     if default_cert.get("data"):
         cert = io.StringIO(default_cert["data"]["cert"])
         key = io.StringIO(default_cert["data"]["key"])
@@ -137,17 +137,17 @@ def put_custom_certificate(first_master: NodeGroup, default_cert, crt_path, key_
         cert = utils.get_resource_absolute_path(default_cert["paths"]["cert"])
         key = utils.get_resource_absolute_path(default_cert["paths"]["key"])
 
-    first_master.put(cert, crt_path, sudo=True, binary=False)
-    first_master.put(key, key_path, sudo=True, binary=False)
+    first_control_plane.put(cert, crt_path, sudo=True, binary=False)
+    first_control_plane.put(key, key_path, sudo=True, binary=False)
 
 
-def verify_certificate_and_key(first_master: NodeGroup, crt_path, key_path):
-    crt_md5 = first_master.sudo(f"openssl x509 -noout -modulus -in {crt_path} | openssl md5").get_simple_out()
-    key_md5 = first_master.sudo(f"openssl rsa -noout -modulus -in {key_path} | openssl md5").get_simple_out()
+def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path, key_path):
+    crt_md5 = first_control_plane.sudo(f"openssl x509 -noout -modulus -in {crt_path} | openssl md5").get_simple_out()
+    key_md5 = first_control_plane.sudo(f"openssl rsa -noout -modulus -in {key_path} | openssl md5").get_simple_out()
     if crt_md5 != key_md5:
         raise Exception("Custom default ingress certificate and key are not compatible!")
 
 
-def create_tls_secret(first_master, crt_path, key_path, name, namespace):
-    first_master.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
+def create_tls_secret(first_control_plane, crt_path, key_path, name, namespace):
+    first_control_plane.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
                       f"--dry-run -o yaml | sudo kubectl apply -f -", timeout=300)

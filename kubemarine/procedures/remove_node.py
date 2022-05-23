@@ -56,7 +56,7 @@ def loadbalancer_remove_keepalived(cluster: KubernetesCluster):
 
 
 def remove_kubernetes_nodes(cluster: KubernetesCluster):
-    cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal() \
+    cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal() \
         .call(kubernetes.reset_installation_env)
 
 

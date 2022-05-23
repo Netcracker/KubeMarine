@@ -446,20 +446,20 @@ def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
 
     log.verbose('Graceful reboot required')
 
-    first_master = group.cluster.nodes['master'].get_first_member()
+    first_control_plane = group.cluster.nodes['control-plane'].get_first_member()
     results = NodeGroupResult(group.cluster)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        cordon_required = cordone_on_graceful and ('master' in node['roles'] or 'worker' in node['roles'])
+        cordon_required = cordone_on_graceful and ('control-plane' in node['roles'] or 'worker' in node['roles'])
         if cordon_required:
-            res = first_master.sudo(
+            res = first_control_plane.sudo(
                 kubernetes.prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                                  group.cluster.globals, False, group.cluster.nodes), warn=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node["name"]}"')
         raw_results = perform_group_reboot(node['connection'])
         if cordon_required:
-            res = first_master.sudo(f'kubectl uncordon {node["name"]}', warn=True)
+            res = first_control_plane.sudo(f'kubectl uncordon {node["name"]}', warn=True)
             log.verbose(res)
         results.update(raw_results)
 

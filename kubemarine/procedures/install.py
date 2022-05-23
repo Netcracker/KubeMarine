@@ -112,12 +112,12 @@ def system_prepare_system_modprobe(cluster):
 
 
 def system_install_audit(cluster):
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.install))
 
 
 def system_prepare_audit_daemon(cluster):
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
     
@@ -128,10 +128,10 @@ def system_prepare_policy(cluster):
 
     audit_log_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path'])
     audit_policy_dir = os.path.dirname(cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file'])
-    cluster.nodes['master'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+    cluster.nodes['control-plane'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-    collect_node = cluster.nodes['master'].get_new_nodes_or_self().get_ordered_members_list()
+    collect_node = cluster.nodes['control-plane'].get_new_nodes_or_self().get_ordered_members_list()
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
@@ -146,19 +146,19 @@ def system_prepare_policy(cluster):
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
 
     if kubernetes.is_cluster_installed(cluster) and audit_config == True and cluster.context['initial_procedure'] != 'add_node':
-        for master in collect_node:
+        for control_plane in collect_node:
             config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-            master.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-            master.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
-            master.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
+            control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            control_plane.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
+            control_plane.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-                master.call(utils.wait_command_successful, command="crictl rm -f "
+                control_plane.call(utils.wait_command_successful, command="crictl rm -f "
                                                             "$(sudo crictl ps --name kube-apiserver -q)")
             else:
-                master.call(utils.wait_command_successful, command="docker stop "
+                control_plane.call(utils.wait_command_successful, command="docker stop "
                                                                "$(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
                                                                " | awk '{print $1}')")
-            cluster.nodes['master'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            cluster.nodes['control-plane'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def system_prepare_dns_hostname(cluster):
@@ -268,7 +268,7 @@ def system_cri_install(cluster):
     """
     Task which is used to install CRI. Could be skipped, if CRI already installed.
     """
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node':
         group = group.get_new_nodes()
@@ -280,7 +280,7 @@ def system_cri_configure(cluster):
     """
     Task which is used to configure CRI. Could be skipped, if CRI already configured.
     """
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node':
         group = group.get_new_nodes()
@@ -326,7 +326,7 @@ def deploy_loadbalancer_haproxy_configure(cluster):
         if cluster.context['initial_procedure'] != 'remove_node':
             group = cluster.nodes['balancer'].get_new_nodes_or_self()
 
-        if not cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_changed_nodes().is_empty():
+        if not cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_changed_nodes().is_empty():
             group = cluster.nodes['balancer'].get_final_nodes()
 
     if group is None or group.is_empty():
@@ -386,7 +386,7 @@ def deploy_loadbalancer_keepalived_configure(cluster):
 
 
 def deploy_kubernetes_reset(cluster):
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node' and group.get_new_nodes().is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
@@ -398,7 +398,7 @@ def deploy_kubernetes_reset(cluster):
 def deploy_kubernetes_install(cluster):
     cluster.log.debug("Setting up Kubernetes...")
 
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node' and group.get_new_nodes().is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
@@ -412,7 +412,7 @@ def deploy_kubernetes_install(cluster):
 def deploy_kubernetes_prepull_images(cluster):
     cluster.log.debug("Prepulling Kubernetes images...")
 
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node' and group.get_new_nodes().is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
@@ -422,20 +422,20 @@ def deploy_kubernetes_prepull_images(cluster):
 
 
 def deploy_kubernetes_init(cluster):
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
     if cluster.context['initial_procedure'] == 'add_node' and group.get_new_nodes().is_empty():
         cluster.log.debug("No kubernetes nodes for installation")
         return
 
-    cluster.nodes['master'].get_new_nodes_or_self().call_batch([
-        kubernetes.init_first_master,
-        kubernetes.join_other_masters
+    cluster.nodes['control-plane'].get_new_nodes_or_self().call_batch([
+        kubernetes.init_first_control_plane,
+        kubernetes.join_other_control_planes
     ])
 
     if 'worker' in cluster.nodes:
         cluster.nodes.get('worker').get_new_nodes_or_self().new_group(
-            apply_filter=lambda node: 'master' not in node['roles']) \
+            apply_filter=lambda node: 'control-plane' not in node['roles']) \
             .call(kubernetes.init_workers)
 
     cluster.nodes['all'].get_new_nodes_or_self().call_batch([
@@ -465,25 +465,25 @@ def deploy_accounts(cluster):
 
 def overview(cluster):
     cluster.log.debug("Retrieving cluster status...")
-    master = cluster.nodes["master"].get_final_nodes().get_first_member()
+    control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
     cluster.log.debug("\nNAMESPACES:")
-    master.sudo("kubectl get namespaces", hide=False)
+    control_plane.sudo("kubectl get namespaces", hide=False)
     cluster.log.debug("\nNODES:")
-    master.sudo("kubectl get nodes -o wide", hide=False)
+    control_plane.sudo("kubectl get nodes -o wide", hide=False)
     cluster.log.debug("\nPODS:")
-    master.sudo("kubectl get pods -A -o=wide", hide=False)
+    control_plane.sudo("kubectl get pods -A -o=wide", hide=False)
     cluster.log.debug("\nREPLICA SETS:")
-    master.sudo("kubectl get rs -A", hide=False)
+    control_plane.sudo("kubectl get rs -A", hide=False)
     cluster.log.debug("\nDAEMON SETS:")
-    master.sudo("kubectl get ds -A", hide=False)
+    control_plane.sudo("kubectl get ds -A", hide=False)
     cluster.log.debug("\nSERVICES:")
-    master.sudo("kubectl get svc -A -o wide", hide=False)
+    control_plane.sudo("kubectl get svc -A -o wide", hide=False)
     cluster.log.debug("\nINGRESS:")
-    master.sudo("kubectl get ing -A -o wide", hide=False)
+    control_plane.sudo("kubectl get ing -A -o wide", hide=False)
     cluster.log.debug("\nDESCRIPTION:")
-    master.sudo("kubectl describe nodes", hide=False)
+    control_plane.sudo("kubectl describe nodes", hide=False)
     cluster.log.debug("\n")
-    master.sudo("kubectl cluster-info", hide=False, warn=True)
+    control_plane.sudo("kubectl cluster-info", hide=False, warn=True)
 
 
 tasks = OrderedDict({

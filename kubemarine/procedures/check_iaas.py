@@ -444,18 +444,18 @@ tasks = OrderedDict({
         'members_amount': {
             'vips': lambda cluster: hardware_members_amount(cluster, 'vip'),
             'balancers': lambda cluster: hardware_members_amount(cluster, 'balancer'),
-            'masters': lambda cluster: hardware_members_amount(cluster, 'master'),
+            'control-planes': lambda cluster: hardware_members_amount(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_members_amount(cluster, 'worker'),
             'total': lambda cluster: hardware_members_amount(cluster, 'all'),
         },
         'cpu': {
             'balancers': lambda cluster: hardware_cpu(cluster, 'balancer'),
-            'masters': lambda cluster: hardware_cpu(cluster, 'master'),
+            'control-planes': lambda cluster: hardware_cpu(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_cpu(cluster, 'worker')
         },
         'ram': {
             'balancers': lambda cluster: hardware_ram(cluster, 'balancer'),
-            'masters': lambda cluster: hardware_ram(cluster, 'master'),
+            'control-planes': lambda cluster: hardware_ram(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_ram(cluster, 'worker')
         }
     },

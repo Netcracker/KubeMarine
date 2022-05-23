@@ -23,7 +23,7 @@ from kubemarine.core import flow
 def main():
     context = flow.create_empty_context()
     cluster = KubernetesCluster('cluster.yaml', context)
-    results = cluster.nodes['master'].sudo('whoami')
+    results = cluster.nodes['control-plane'].sudo('whoami')
     print(results)
 
 
