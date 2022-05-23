@@ -29,7 +29,7 @@ def enrich_inventory(inventory, cluster):
     for node in inventory["nodes"]:
         if 'balancer' in node['roles'] and len(node['roles']) > 1:
 
-            # ok, seems we have combination of balancer-master / balancer-worker
+            # ok, seems we have combination of balancer-control-plane / balancer-worker
             # in that case VRRP IP should be defined
 
             # let's check vrrp ip section is defined

@@ -2,7 +2,7 @@ backup_location: /home/centos
 
 backup_plan:
   etcd:
-    source_node: master-1
+    source_node: control-plane-1
     certificates:
       cert: /etc/kubernetes/pki/etcd/server.crt
       key: /etc/kubernetes/pki/etcd/server.key

@@ -6,17 +6,17 @@ vrrp_ips:
 - 192.168.0.250
 
 nodes:
-  - name: "k8s-master-1"
+  - name: "k8s-control-plane-1"
     address: "10.101.0.1"
     internal_address: "192.168.0.1"
-    roles: ["balancer", "master", "worker"]
-  - name: "k8s-master-2"
+    roles: ["balancer", "control-plane", "worker"]
+  - name: "k8s-control-plane-2"
     address: "10.101.0.2"
     internal_address: "192.168.0.2"
-    roles: ["balancer", "master", "worker"]
-  - name: "k8s-master-3"
+    roles: ["balancer", "control-plane", "worker"]
+  - name: "k8s-control-plane-3"
     address: "10.101.0.3"
     internal_address: "192.168.0.3"
-    roles: ["balancer", "master", "worker"]
+    roles: ["balancer", "control-plane", "worker"]
 
 cluster_name: "k8s.example.com"

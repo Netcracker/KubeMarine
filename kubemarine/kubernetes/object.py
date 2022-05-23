@@ -78,24 +78,24 @@ class KubernetesObject:
     def is_reloaded(self):
         return self._reload_t > -1
 
-    def reload(self, master=None, suppress_exceptions=False) -> KubernetesObject:
-        if not master:
-            master = self._cluster.nodes['master'].get_any_member()
+    def reload(self, control_plane=None, suppress_exceptions=False) -> KubernetesObject:
+        if not control_plane:
+            control_plane = self._cluster.nodes['control-plane'].get_any_member()
         cmd = f'kubectl get {self.kind} -n {self.namespace} {self.name} -o json'
-        result = master.sudo(cmd, warn=suppress_exceptions)
+        result = control_plane.sudo(cmd, warn=suppress_exceptions)
         self._cluster.log.verbose(result)
         if not result.is_any_failed():
             self._obj = json.loads(result.get_simple_out())
             self._reload_t = time.time()
         return self
 
-    def apply(self, master=None):
-        if not master:
-            master = self._cluster.nodes['master'].get_any_member()
+    def apply(self, control_plane=None):
+        if not control_plane:
+            control_plane = self._cluster.nodes['control-plane'].get_any_member()
 
         json_str = self.to_json()
         obj_filename = "_".join([self.kind, self.namespace, self.name, self.uid]) + '.json'
         obj_path = f'/tmp/{obj_filename}'
 
-        master.put(io.StringIO(json_str), obj_path, sudo=True)
-        master.sudo(f'kubectl apply -f {obj_path} && sudo rm -f {obj_path}')
+        control_plane.put(io.StringIO(json_str), obj_path, sudo=True)
+        control_plane.sudo(f'kubectl apply -f {obj_path} && sudo rm -f {obj_path}')

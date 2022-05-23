@@ -104,7 +104,7 @@ Based on the example above, only the nodes `worker-10` and `worker-11` are updat
 
 #### Nodes Saved Versions Before Upgrade
 
-During the upgrade, a temporary file `/etc/kubernetes/nodes-k8s-versions.txt` is created on first master node that saves the state and versions of the nodes prior to the initial upgrade.
+During the upgrade, a temporary file `/etc/kubernetes/nodes-k8s-versions.txt` is created on first control-plane node that saves the state and versions of the nodes prior to the initial upgrade.
 If the procedure fails and certain nodes for the upgrade are not manually specified, the saved versions of the nodes before the upgrade are used to determine the initial state of the nodes.
 In case of a successful upgrade of a node, the information about it is deleted from the state file so as to not upgrade it again.
 If the entire update cycle completes successfully, this temporary file is deleted, and in further upgrades it is generated anew.
@@ -199,10 +199,10 @@ v1.18.10:
               destination: /etc/example/configuration.yaml
               apply_required: true
               sudo: true
-              destination_groups: ['master']
+              destination_groups: ['control-plane']
               destination_nodes: ['worker-1']
               apply_groups: None
-              apply_nodes: ['master-1', 'worker-1']
+              apply_nodes: ['control-plane-1', 'worker-1']
               apply_command: 'testctl apply -f /etc/example/configuration.yaml'
 ```
 
@@ -285,9 +285,9 @@ backup-Jan-01-21-09-00-00.tar.gz
 │       └── services.yaml
 └── nodes_data
     ├── balancer-1.tar.gz
-    ├── master-1.tar.gz
-    ├── master-2.tar.gz
-    └── master-3.tar.gz
+    ├── control-plane-1.tar.gz
+    ├── control-plane-2.tar.gz
+    └── control-plane-3.tar.gz
 ```
 
 ### Backup Procedure Parameters
@@ -311,7 +311,7 @@ You can specify two types of path in it:
 
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
 
-* `source_node` - the name of the node to create snapshot from. The node must be a master and have a ETCD data located on it.
+* `source_node` - the name of the node to create snapshot from. The node must be a control-plane and have a ETCD data located on it.
 * `certificates` - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. You must specify the paths of certificates on the node from which the copy is made.
 
 Parameters example:
@@ -319,7 +319,7 @@ Parameters example:
 ```yaml
 backup_plan:
   etcd:
-    source_node: master-1
+    source_node: control-plane-1
     certificates:
       cert: /etc/kubernetes/pki/etcd/server.crt
       key: /etc/kubernetes/pki/etcd/server.key
@@ -518,7 +518,7 @@ The procedure works as shown in the following table:
 |---|---|---|
 |Add load balancer|A new load balancer is configured. If `vrrp_ip` is present, then all the Keepalived nodes are reconfigured and restarted.|Kubernetes and Keepalived installations should not start.|
 |Add load balancer + Keepalived|A new load balancer is configured. Keepalived is installed and configured on all the load balancers.|Kubernetes installation should not start.|
-|Add master|Kubernetes is installed only on a new node. A new master is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy installation should not start.|
+|Add control-plane|Kubernetes is installed only on a new node. A new control-plane is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy installation should not start.|
 |Add worker|Kubernetes is installed only on a new node. A new worker is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy installation should not start.|
 
 Also pay attention to the following:
@@ -546,9 +546,9 @@ nodes:
   - name: "lb"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
-  - name: "master"
+  - name: "control-plane"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
 ```
 
 **Note**:
@@ -608,7 +608,7 @@ The procedure works as follows:
 |Case|Expected Result|Important Note|
 |---|---|---|
 |Remove load balancer|Haproxy and Keepalived are disabled on removed nodes. Keepalived is reconfigured on all balancers.|Keepalived installation should not start.|
-|Remove master|Kubernetes node is deleted from the cluster and Haproxy is reconfigured on all balancers.|Haproxy and Keepalived installation should not start. Keepalived should not be reconfigured.|
+|Remove control-plane|Kubernetes node is deleted from the cluster and Haproxy is reconfigured on all balancers.|Haproxy and Keepalived installation should not start. Keepalived should not be reconfigured.|
 |Remove worker|Kubernetes node is deleted from the cluster and Haproxy is reconfigured on all balancers.|Haproxy and Keepalived installation should not start. Keepalived should not be reconfigured.|
 
 Also pay attention to the following:
@@ -639,9 +639,9 @@ nodes:
   - name: "lb"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
-  - name: "master"
+  - name: "control-plane"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
 ```
 
 However, it is allowed to use a simple configuration, where only the node `name` is present.
@@ -651,7 +651,7 @@ For example:
 ```yaml
 nodes:
   - name: "lb"
-  - name: "master"
+  - name: "control-plane"
 ```
 
 ### Remove Node Tasks Tree
@@ -848,9 +848,9 @@ This parameter allows you to specify which nodes should be rebooted. Other nodes
 
 ```yaml
 nodes:
-  - name: master-1
-  - name: master-2
-  - name: master-3
+  - name: control-plane-1
+  - name: control-plane-2
+  - name: control-plane-3
 ```
 
 
@@ -1019,7 +1019,7 @@ thirdparties:
 1. Verify and merge all the specified parameters into the inventory.
 2. Install and configure containerd and podman.
 3. Install crictl.
-4. Implement the following steps on each master and worker node by node. 
+4. Implement the following steps on each control-plane and worker node by node. 
     1. Drain the node.
     2. Update configurations on the node for migration to containerd.
     3. Move the pods on the node from the docker's containers to those of containerd.

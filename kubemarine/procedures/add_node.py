@@ -24,16 +24,16 @@ from kubemarine.procedures import install
 
 def deploy_kubernetes_join(cluster):
 
-    group = cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_new_nodes()
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes()
 
     if cluster.context['initial_procedure'] == 'add_node' and group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
         return
 
-    cluster.nodes['master'].get_new_nodes().call(kubernetes.join_new_master)
+    cluster.nodes['control-plane'].get_new_nodes().call(kubernetes.join_new_control_plane)
 
     if "worker" in cluster.nodes:
-        cluster.nodes["worker"].get_new_nodes().new_group(apply_filter=lambda node: 'master' not in node['roles']) \
+        cluster.nodes["worker"].get_new_nodes().new_group(apply_filter=lambda node: 'control-plane' not in node['roles']) \
             .call(kubernetes.init_workers)
 
     group.call_batch([

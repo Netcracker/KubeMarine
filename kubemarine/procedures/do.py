@@ -87,7 +87,7 @@ def main(cli_arguments=None):
                     executor_lists[executors_type].append(executors_str.strip())
         executors_group = cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
     else:
-        executors_group = cluster.nodes['master'].get_any_member()
+        executors_group = cluster.nodes['control-plane'].get_any_member()
 
     if not executors_group or executors_group.nodes_amount() < 1:
         print('Failed to find any of specified nodes or groups')

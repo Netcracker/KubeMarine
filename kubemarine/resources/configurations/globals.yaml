@@ -406,7 +406,7 @@ compatibility_map:
         amount: 1
         vcpu: 1
         ram: 1
-      master:
+      control-plane:
         amount: 3
         vcpu: 2
         ram: 2
@@ -423,7 +423,7 @@ compatibility_map:
         amount: 2
         vcpu: 2
         ram: 1
-      master:
+      control-plane:
         amount: 3
         vcpu: 4
         ram: 4

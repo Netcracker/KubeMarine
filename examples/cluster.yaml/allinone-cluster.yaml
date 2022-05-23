@@ -3,9 +3,9 @@ node_defaults:
   username: "centos"
 
 nodes:
-  - name: "k8s-master"
+  - name: "k8s-control-plane"
     address: "10.101.0.1"
     internal_address: "192.168.0.1"
-    roles: ["master", "worker"]
+    roles: ["control-plane", "worker"]
 
 cluster_name: "k8s.example.com"

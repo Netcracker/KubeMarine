@@ -102,7 +102,7 @@ This section provides information about the inventory, features, and steps for i
     - [Contents](#contents)
       - [[all]](#all)
       - [[cluster:children]](#clusterchildren)
-      - [[balancer], [master], [worker]](#balancer-master-worker)
+      - [[balancer], [control-plane], [worker]](#balancer-control-plane-worker)
       - [[cluster:vars]](#clustervars)
   - [Cumulative Points](#cumulative-points)
 - [Supported Versions](#supported-versions)
@@ -249,7 +249,7 @@ The minimum hardware requirements for cluster machines are as follows:
 * 1GB RAM
 * 10GB HDD
 
-**Master**
+**Control-plane**
 * 2 CPU
 * 2GB RAM
 * 40GB HDD
@@ -268,7 +268,7 @@ The recommended hardware requirements are as follows:
 * 1GB RAM
 * 10GB HDD
 
-**Master**
+**Control-plane**
 * 4 CPU
 * 4GB RAM
 
@@ -281,11 +281,11 @@ The recommended hardware requirements are as follows:
 
 Kubernetes clusters use the following important folders:
 
-**/var/lib/etcd** - It is used for the etcd database storage at the master nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
+**/var/lib/etcd** - It is used for the etcd database storage at the control-plane nodes. Etcd is very sensitive to disk performance so it is recommended to put /var/lib/etcd to a separate fast disk (for example, SSD). The size of this disk depends on the etcd database size, but not less than 4 GB. 
 For more information about etcd disks, refer to the [ETCD Recommendation](#etcd-recommendation) section.
 
 **/var/lib/containerd** - It is a working directory of containerd, and is used for active container runtimes and storage of local images. 
-For master nodes, it should be at least 20 GB, whereas, for worker nodes, it should be 50 GB or more, depending on the application requirements.
+For control-plane nodes, it should be at least 20 GB, whereas, for worker nodes, it should be 50 GB or more, depending on the application requirements.
 
 **/var/lib/kubelet** - It is a working directory for kubelet. It includes kubelet's configuration files, pods runtime data, environment variables, kube secrets, emptyDirs and data volumes not backed by persistent storage PVs. Its size varies depending on the running applications.
 
@@ -303,7 +303,7 @@ If `nodefs` or `imagefs` reach the eviction thresholds (`100% - nodefs.available
 
 ### ETCD Recommendation
 
-For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Master before the installation.
+For a cluster with a high load on the ETCD, it is strongly recommended to mount dedicated SSD-volumes in the ETCD-storage directory (4 GB size at least is recommended) on each Control-plane before the installation.
 Mount point:
 
 ```
@@ -333,11 +333,11 @@ There are two major deployment schemes as follows:
 
 ### Non-HA Deployment Schemes
 
-This deployment provides a single Kubemarine master.
+This deployment provides a single Kubemarine control-plane.
 
 #### All-in-one Scheme
 
-This scheme has one node assigned as master and worker roles; balancer role is optional. This scheme is used for developing and demonstrating purposes only.
+This scheme has one node assigned as control-plane and worker roles; balancer role is optional. This scheme is used for developing and demonstrating purposes only.
 An example of this scheme is available in the [All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml).
 
 The following image illustrates the All-in-one scheme.
@@ -350,7 +350,7 @@ This deployment type provides a highly available and reliable solution.
 
 #### Mini-HA Scheme
 
-In this scheme, the master, balancer, and worker roles are all assigned to odd number of identical nodes (at least 3).
+In this scheme, the control-plane, balancer, and worker roles are all assigned to odd number of identical nodes (at least 3).
 In this scheme, it is mandatory to enable VRRP to leverage balancing. An example of this scheme is available in the [Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml).
 
 The following image illustrates the Mini-HA scheme.
@@ -359,7 +359,7 @@ The following image illustrates the Mini-HA scheme.
 
 #### Full-HA Scheme
 
-In this scheme, several nodes are assigned different roles. The number of master nodes should be odd, three, or more.
+In this scheme, several nodes are assigned different roles. The number of control-plane nodes should be odd, three, or more.
 The number of worker nodes should be greater than one or more than three. The recommended number of balancer nodes is two, with configured VRRP, but one balancer without VRRP is also supported.
 An example of this scheme presented is available in the [Minimal Full-HA Inventory Example](../examples/cluster.yaml/minimal-cluster.yaml) and [Typical Full-HA Inventory Example](../examples/cluster.yaml/typical-cluster.yaml).
 
@@ -473,10 +473,10 @@ node:
   - name: "lb"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
-  - name: "master"
+  - name: "control-plane"
     keyfile: "/home/username/another.key"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
 ```
 
 After executing the above example, the final result is displayed as follows:
@@ -488,11 +488,11 @@ node:
     keyfile: "/home/username/.ssh/id_rsa"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
-  - name: "master"
+  - name: "control-plane"
     username: "centos"
     keyfile: "/home/username/another.key"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
 ```
 
 ### nodes
@@ -505,12 +505,12 @@ The following options are supported:
 |---|---|---|---|---|---|
 |keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
 |username|string|no|`centos`|`root`|Username for SSH-access the cluster machines|
-|name|string|**yes**| |`k8s-master-1`|Cluster member name|
+|name|string|**yes**| |`k8s-control-plane-1`|Cluster member name|
 |address|ip address|no|`10.101.0.1`|External node's IP-address|
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no| |`22`|Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|roles|list|**yes**| |`["master"]`|Cluster member role. It can be `balancer`, `worker`, `master` or `control-plane`.|
+|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, `control-plane` or `master`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
 
@@ -526,10 +526,10 @@ nodes:
     address: "10.101.0.1"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
-  - name: "k8s-master-1"
+  - name: "k8s-control-plane-1"
     address: "10.101.0.2"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
     labels:
       region: asia
     taints:
@@ -546,9 +546,9 @@ nodes:
 
 The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
-**Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The `master` 
-and `control-plane` roles are interchangeable at the moment. Therefore it's possible to use the `master` and `control-plane` roles 
-in any procedure.
+**Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The 
+`control-plane` and `master` roles are interchangeable at the moment. Therefore it's possible to use the `control-plane` and 
+`master` roles in any procedure.
 
 ### cluster_name
 
@@ -602,7 +602,7 @@ Addresses are taken from the following groups in order:
 
 1. VRRP IP
 1. Balancer
-1. Master
+1. Control-plane
 
 **Note**: It is important to notice that addresses may not necessarily be taken from a single group. There may be situation that the internal address is taken from the VRRP, and the external one from the Balancer. This situation is not recommended, but it is possible. If the inventory is correctly filled in and all the addresses that are available are indicated, the algorithm automatically selects the best pair of addresses.
 
@@ -846,15 +846,15 @@ An example is as follows:
 
 ```yaml
 nodes:
-  - name: "k8s-master-1"
+  - name: "k8s-control-plane-1"
     address: "10.101.0.2"
     internal_address: "192.168.0.2"
-    roles: ["master"]
+    roles: ["control-plane"]
     gateway: k8s-gateway-1
-  - name: "k8s-master-2"
+  - name: "k8s-control-plane-2"
     address: "10.101.0.3"
     internal_address: "192.168.0.3"
-    roles: ["master"]
+    roles: ["control-plane"]
     gateway: k8s-gateway-2
 ```
 
@@ -1085,12 +1085,12 @@ In this case, Kubemarine automatically initializes and joins new cluster nodes w
             k8s-app: openstack-cloud-controller-manager
         spec:
           nodeSelector:
-            node-role.kubernetes.io/master: ""
+            node-role.kubernetes.io/control-plane: ""
           tolerations:
           - key: node.cloudprovider.kubernetes.io/uninitialized
             value: "true"
             effect: NoSchedule
-          - key: node-role.kubernetes.io/master
+          - key: node-role.kubernetes.io/control-plane
             effect: NoSchedule
           - effect: NoSchedule
             key: node.kubernetes.io/not-ready
@@ -1157,13 +1157,13 @@ In this case, Kubemarine automatically initializes and joins new cluster nodes w
          procedures:
            - shell:
              command: sudo kubectl create secret -n kube-system generic cloud-config --from-literal=cloud.conf="$(sudo cat /etc/kubernetes/cloud-config)" --dry-run -o yaml > cloud-config-secret.yaml && sudo kubectl apply -f cloud-config-secret.yaml
-             nodes: ['master-1']
+             nodes: ['control-plane-1']
            - shell:
              command: sudo kubectl apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/release-1.15/cluster/addons/rbac/cloud-controller-manager-roles.yaml
-             nodes: ['master-1']
+             nodes: ['control-plane-1']
            - shell:
              command: sudo kubectl apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/release-1.15/cluster/addons/rbac/cloud-controller-manager-role-bindings.yaml
-             nodes: ['master-1']
+             nodes: ['control-plane-1']
            - template:
              source: ./openstack-cloud-controller-manager-ds.yaml
    ```
@@ -1882,7 +1882,7 @@ This is configured in the `services.thirdparties` section. The contents of this 
 
 **Note**: Groups and nodes can be combined.
 
-**Note**: If no groups and nodes are present, then the file is uploaded to masters and workers by default.
+**Note**: If no groups and nodes are present, then the file is uploaded to control-planes and workers by default.
 
 **Note**: If the file is already uploaded to hosts and its hash matches with the hash in the config, then the file is not downloaded again.
 
@@ -1902,16 +1902,16 @@ services:
     /usr/bin/kubectl:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
       sha1: f684dd035bd44e0899ab43ce2ad4aea0baf86c2e
-      group: master
+      group: control-plane
     /usr/bin/calicoctl:
       source: 'https://github.com/projectcalico/calicoctl/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
       sha1: bc6cc7869ebbb0e1799dfbe10795f680fba4321b
-      group: master
+      group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
       sha1: '{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].sha1 }}'
-      group: master
+      group: control-plane
       unpack: /usr/bin/
 ```
 
@@ -2094,7 +2094,7 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
 
-**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
+**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
 You can specify your own parameters instead of the standard parameters. You need to specify the parameter key and its value. If the value is empty, the key is ignored. For example:
 
@@ -2323,7 +2323,7 @@ By default, the generated file contains the following address associations:
 
 * Localhost for IPv4 and IPv6
 * Internal control-plain address as `control-plain` and FQDN name
-* Balancers, masters, workers names and theirs FQDNs
+* Balancers, control-planes, workers names and theirs FQDNs
 
 In order to setup your custom address, you need to specify the IP-address as the key and DNS-name as the list item. Example:
 
@@ -2341,9 +2341,9 @@ Example of generated file:
 ::1              localhost localhost.localdomain localhost6 localhost6.localdomain6
 1.1.1.1          example.com
 100.100.100.101  k8s-stack.example.com control-plain balancer-1.k8s-stack.sdntest.example.com balancer-1
-100.100.100.102  master-1.k8s-stack.example.com master-1
-100.100.100.103  master-2.k8s-stack.example.com master-2
-100.100.100.104  master-3.k8s-stack.example.com master-3
+100.100.100.102  control-plane-1.k8s-stack.example.com control-plane-1
+100.100.100.103  control-plane-2.k8s-stack.example.com control-plane-2
+100.100.100.104  control-plane-3.k8s-stack.example.com control-plane-3
 100.100.100.105  worker-1.k8s-stack.example.com worker-1
 100.100.100.106  worker-2.k8s-stack.example.com worker-2
 100.100.100.107  worker-3.k8s-stack.example.com worker-3
@@ -3679,14 +3679,14 @@ The following table contains details about existing tolerations configuration op
     </tr>
 </table>
 
-For example, if you want to customize the nginx-ingress-controller pods to allow scheduling on master nodes, you need to specify the following tolerations in your `cluster.yml` file:
+For example, if you want to customize the nginx-ingress-controller pods to allow scheduling on control-plane nodes, you need to specify the following tolerations in your `cluster.yml` file:
 
 ```yaml
 plugins:
   nginx-ingress-controller:
     controller:
       tolerations:
-        - key: node-role.kubernetes.io/master
+        - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
 ```
@@ -3748,7 +3748,7 @@ These runtime variables can also be used in templates by accessing `runtime_vars
 
 **Note**: You can specify nodes and groups at the same time.
 
-**Note**: If no groups and nodes defined, by default master group is used for destination and the first master node is used for applying.
+**Note**: If no groups and nodes defined, by default control-plane group is used for destination and the first control-plane node is used for applying.
 
 **Note**: You can use wildcard source. For example: 
 `/tmp/my_templates/*.yaml`. This source argument matches every `.yaml` template in the `my_templates` directory.
@@ -3765,10 +3765,10 @@ plugins:
             destination: /etc/example/configuration.yaml
             apply_required: true
             sudo: true
-            destination_groups: ['master']
+            destination_groups: ['control-plane']
             destination_nodes: ['worker-1']
             apply_groups: None
-            apply_nodes: ['master-1', 'worker-1']
+            apply_nodes: ['control-plane-1', 'worker-1']
             apply_command: 'testctl apply -f /etc/example/configuration.yaml'
 ```
 
@@ -3796,7 +3796,7 @@ plugins:
             apply_command: 'calicoctl apply -f /etc/calico/ippool.yaml'
 ```
 
-The following is an example of uploading a compiled Jinja2 template to masters and workers without applying it:
+The following is an example of uploading a compiled Jinja2 template to control-planes and workers without applying it:
 
 ```yaml
 plugins:
@@ -3806,7 +3806,7 @@ plugins:
         - template:
             source: /var/data/plugins/calicoctl.cfg.j2
             destination: /etc/calico/calicoctl.cfg
-            destination_groups: ['master', 'worker']
+            destination_groups: ['control-plane', 'worker']
             apply_required: false
 ```
 
@@ -3950,7 +3950,7 @@ This procedure allows you to execute shell code on remote hosts. The following p
 
 **Note**: You can specify nodes and groups at the same time.
 
-**Note**: If no groups or nodes are specified, then by default the first master is used.
+**Note**: If no groups or nodes are specified, then by default the first control-plane is used.
 
 For example:
 
@@ -3961,7 +3961,7 @@ plugins:
       procedures:
         - shell:
             command: mkdir -p /etc/calico
-            groups: ['master']
+            groups: ['control-plane']
             sudo: true
 ```
 
@@ -4008,11 +4008,11 @@ plugins:
         - template:
             source: /var/data/plugins/script.sh
             destination: /etc/calico/script.sh
-            destination_nodes: ['master-1']
+            destination_nodes: ['control-plane-1']
             apply_required: false
         - shell:
             command: bash -x /etc/calico/script.sh
-            nodes: ['master-1']
+            nodes: ['control-plane-1']
             sudo: true
 ```
 
@@ -4071,7 +4071,7 @@ plugins:
             vars:
               foo: bar
             become: True
-            groups: ['master', 'worker']
+            groups: ['control-plane', 'worker']
 ```
 
 There is support for a shortened format. In this case, you need to specify only path to the playbook, all other parameters are set by default. For example:
@@ -4728,9 +4728,9 @@ For example:
 [all]
 localhost ansible_connection=local
 k8s-lb ansible_host=10.101.10.1 ip=192.168.0.1 external_ip=10.101.10.1
-k8s-master-1 ansible_host=10.101.10.2 ip=192.168.0.2 external_ip=10.101.10.2
-k8s-master-2 ansible_host=10.101.10.3 ip=192.168.0.3 external_ip=10.101.10.3
-k8s-master-3 ansible_host=10.101.10.4 ip=192.168.0.4 external_ip=10.101.10.4
+k8s-control-plane-1 ansible_host=10.101.10.2 ip=192.168.0.2 external_ip=10.101.10.2
+k8s-control-plane-2 ansible_host=10.101.10.3 ip=192.168.0.3 external_ip=10.101.10.3
+k8s-control-plane-3 ansible_host=10.101.10.4 ip=192.168.0.4 external_ip=10.101.10.4
 k8s-worker-1 ansible_host=10.101.10.5 ip=192.168.0.5 external_ip=10.101.10.5
 k8s-worker-2 ansible_host=10.101.10.6 ip=192.168.0.6 external_ip=10.101.10.6
 ```
@@ -4739,7 +4739,7 @@ k8s-worker-2 ansible_host=10.101.10.6 ip=192.168.0.6 external_ip=10.101.10.6
 
 The `[cluster:children]` section contains the following node roles presented in cluster:
 * balancer (if any presented)
-* master
+* control-plane
 * worker (if any presented)
 
 For example:
@@ -4747,13 +4747,13 @@ For example:
 ```ini
 [cluster:children]
 balancer
-master
+control-plane
 worker
 ```
 
-#### [balancer], [master], [worker]
+#### [balancer], [control-plane], [worker]
 
-The `[balancer]`, `[master]`, `[worker]` sections contain nodes names, which are included in this sections.
+The `[balancer]`, `[control-plane]`, `[worker]` sections contain nodes names, which are included in this sections.
 
 For example:
 
@@ -4761,10 +4761,10 @@ For example:
 [balancer]
 k8s-lb
 
-[master]
-k8s-master-1
-k8s-master-2
-k8s-master-3
+[control-plane]
+k8s-control-plane-1
+k8s-control-plane-2
+k8s-control-plane-3
 
 [worker]
 k8s-worker-1

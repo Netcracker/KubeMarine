@@ -14,18 +14,18 @@ nodes:
     address: "10.101.0.2"
     internal_address: "192.168.0.2"
     roles: ["balancer"]
-  - name: "k8s-master-1"
+  - name: "k8s-control-plane-1"
     address: "10.101.0.3"
     internal_address: "192.168.0.3"
-    roles: ["master"]
-  - name: "k8s-master-2"
+    roles: ["control-plane"]
+  - name: "k8s-control-plane-2"
     address: "10.101.0.4"
     internal_address: "192.168.0.4"
-    roles: ["master"]
-  - name: "k8s-master-3"
+    roles: ["control-plane"]
+  - name: "k8s-control-plane-3"
     address: "10.101.0.5"
     internal_address: "192.168.0.5"
-    roles: ["master"]
+    roles: ["control-plane"]
   - name: "k8s-worker-1"
     address: "10.101.0.6"
     internal_address: "192.168.0.6"

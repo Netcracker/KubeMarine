@@ -55,15 +55,15 @@ frontend kubernetes_api
 {%- endfor %}
     option              tcplog
     mode                tcp
-    default_backend     kubernetes_master_nodes
+    default_backend     kubernetes_control_plane_nodes
 
-backend kubernetes_master_nodes
+backend kubernetes_control_plane_nodes
     mode                tcp
     balance             roundrobin
     option              tcp-check
     default-server      inter 2s fall 2 rise 3
 {%- for node in nodes -%}
-{% if 'master' in node['roles'] %}
+{% if 'control-plane' in node['roles'] %}
     server {{ node['name'] }} {{ node['internal_address'] }}:6443 check port 6443
 {%- endif %}
 {%- endfor %}
