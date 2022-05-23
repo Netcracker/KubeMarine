@@ -510,7 +510,7 @@ The following options are supported:
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no| |`22`|Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, `control-plane` or `control-plane`.|
+|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, `control-plane` or `master`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
 
@@ -546,9 +546,9 @@ nodes:
 
 The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
-**Warning**: Please be informed that the `control-plane` role is obsolete and will be changed by `control-plane`in the future. The `control-plane` 
-and `control-plane` roles are interchangeable at the moment. Therefore it's possible to use the `control-plane` and `control-plane` roles 
-in any procedure.
+**Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The 
+`control-plane` and `master` roles are interchangeable at the moment. Therefore it's possible to use the `control-plane` and 
+`master` roles in any procedure.
 
 ### cluster_name
 
