@@ -343,7 +343,7 @@ class ClusterStorage:
         initial_procedure = cluster.context["initial_procedure"]
         self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
         self.dir_location = self.dir_path + self.dir_name
-        cluster.nodes['master'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
+        cluster.nodes['control-plane'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                      f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
     def rotation_file(self, cluster):
@@ -355,19 +355,19 @@ class ClusterStorage:
 
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
-        node_group_results = self.cluster.nodes["master"].sudo(command)
+        node_group_results = self.cluster.nodes["control-plane"].sudo(command)
         with RemoteExecutor(self.cluster):
             for cxn, result in node_group_results.items():
-                master = self.cluster.make_group([cxn.host])
+                control_plane = self.cluster.make_group([cxn.host])
                 files = result.stdout.split()
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
                     if i >= not_pack_file and i < delete_old:
                         if 'tar.gz' not in file:
-                            master.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
+                            control_plane.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
                                        f'sudo rm -r {self.dir_path + file}')
                     elif i >= delete_old:
-                        master.sudo(f'rm -rf {self.dir_path + file}')
+                        control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
 
     def compress_and_upload_archive(self, cluster):
@@ -385,9 +385,9 @@ class ClusterStorage:
                         tar.add(source, 'dump/' + name)
                 tar.add(cluster.context['execution_arguments']['config'], 'cluster.yaml')
                 tar.add(get_dump_filepath(cluster,"version"), 'version')
-            self.cluster.nodes['master'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
+            self.cluster.nodes['control-plane'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
             self.cluster.log.debug('File upload local.tar.gz')
-            self.cluster.nodes['master'].sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
+            self.cluster.nodes['control-plane'].sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
                                               f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self, cluster):
@@ -407,16 +407,16 @@ class ClusterStorage:
             dump_file(cluster, stream, "version")
 
 
-    def collect_info_all_master(self, cluster):
+    def collect_info_all_control_plane(self, cluster):
         """
-        This method is used to transfer backup logs from the main master to the new master.
+        This method is used to transfer backup logs from the main control-plane to the new control-plane.
         """
 
-        node = self.cluster.nodes['master'].get_initial_nodes().get_first_member(provide_node_configs=True)
-        master = cluster.make_group([node['connect_to']])
-        data_copy_res = master.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
+        node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member(provide_node_configs=True)
+        control_plane = cluster.make_group([node['connect_to']])
+        data_copy_res = control_plane.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
         self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
-        master.get('/tmp/kubemarine-backup.tar.gz',
+        control_plane.get('/tmp/kubemarine-backup.tar.gz',
                                    get_dump_filepath(cluster, "dump_log_cluster.tar.gz"), 'dump_log_cluster.tar.gz')
 
         self.cluster.log.debug('Backup downloaded')
@@ -428,7 +428,7 @@ class ClusterStorage:
 
         for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
             group = cluster.make_group([new_node['connect_to']])
-            if 'control-plane' in new_node['roles'] or 'master' in new_node['roles']:
+            if 'control-plane' in new_node['roles'] or 'control-plane' in new_node['roles']:
                 group.put(get_dump_filepath(cluster, "dump_log_cluster.tar.gz"),
                     "/tmp/dump_log_cluster.tar.gz", sudo=True)
                 group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')

@@ -37,11 +37,11 @@ def k8s_certs_renew_task(cluster):
         return
 
     cluster.log.debug("Starting certificate renewal for kubernetes")
-    cluster.nodes['master'].call(k8s_certs.renew_apply)
+    cluster.nodes['control-plane'].call(k8s_certs.renew_apply)
 
 
 def k8s_certs_overview_task(cluster):
-    cluster.nodes['master'].call(k8s_certs.k8s_certs_overview)
+    cluster.nodes['control-plane'].call(k8s_certs.k8s_certs_overview)
 
 
 tasks = OrderedDict({

@@ -8,7 +8,7 @@ nodes:
   - name: "k8s3"
     address: "10.101.0.2"
     internal_address: "192.168.1.9"
-    roles: ["master", "worker", "balancer"]
+    roles: ["control-plane", "worker", "balancer"]
 cluster_name: "k8s.oracle.com"
 
 services:

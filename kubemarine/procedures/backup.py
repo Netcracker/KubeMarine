@@ -186,7 +186,7 @@ def export_etcd(cluster: KubernetesCluster):
         if etcd_leader_name:
             cluster.log.verbose('Detected ETCD leader: %s' % etcd_leader_name)
             cluster.context['backup_descriptor']['etcd']['source'] = etcd_leader_name
-            etcd_node = cluster.nodes['master'].get_member_by_name(etcd_leader_name)
+            etcd_node = cluster.nodes['control-plane'].get_member_by_name(etcd_leader_name)
         else:
             raise Exception('Failed to detect ETCD leader - not possible to create backup from actual DB')
 
@@ -213,7 +213,7 @@ def select_etcd_node(cluster):
             raise Exception('Unknown ETCD node selected as source')
         return etcd_node, True
     else:
-        return cluster.nodes['master'].get_any_member(), False
+        return cluster.nodes['control-plane'].get_any_member(), False
 
 
 def retrieve_etcd_image(cluster, etcd_node):
@@ -245,14 +245,14 @@ def retrieve_etcd_image(cluster, etcd_node):
 
 
 def export_kubernetes_version(cluster: KubernetesCluster):
-    master = cluster.nodes['master'].get_any_member()
-    version = master.sudo('kubectl get nodes --no-headers | head -n 1 | awk \'{print $5; exit}\'').get_simple_out()
+    control_plane = cluster.nodes['control-plane'].get_any_member()
+    version = control_plane.sudo('kubectl get nodes --no-headers | head -n 1 | awk \'{print $5; exit}\'').get_simple_out()
     cluster.context['backup_descriptor']['kubernetes']['version'] = version.strip()
 
 
 # There is no way to parallel resources connection via Queue or Pool:
 # the ssh connection is not possible to parallelize due to thread lock
-def download_resources(log, resources, location, master: NodeGroup, namespace=None):
+def download_resources(log, resources, location, control_plane: NodeGroup, namespace=None):
 
     if namespace:
         log.debug('Downloading resources from namespace "%s"...' % namespace)
@@ -274,8 +274,8 @@ def download_resources(log, resources, location, master: NodeGroup, namespace=No
         else:
             cmd += 'sudo kubectl get --ignore-not-found %s -o yaml' % resource
 
-    result = master.sudo(cmd).get_simple_out()
-    master.cluster.log.verbose(result)
+    result = control_plane.sudo(cmd).get_simple_out()
+    control_plane.cluster.log.verbose(result)
 
     found_resources_results = result.split(resource_separator)
     for i, result in enumerate(found_resources_results):
@@ -292,10 +292,10 @@ def download_resources(log, resources, location, master: NodeGroup, namespace=No
 
 def export_kubernetes(cluster):
     backup_directory = prepare_backup_tmpdir(cluster)
-    master = cluster.nodes['master'].get_any_member()
+    control_plane = cluster.nodes['control-plane'].get_any_member()
 
     cluster.log.debug('Loading namespaces:')
-    namespaces_result = master.sudo('kubectl get ns -o yaml')
+    namespaces_result = control_plane.sudo('kubectl get ns -o yaml')
     cluster.log.verbose(namespaces_result)
     namespaces_string = list(namespaces_result.values())[0].stdout.strip()
     namespaces_yaml = yaml.safe_load(namespaces_string)
@@ -320,7 +320,7 @@ def export_kubernetes(cluster):
     os.mkdir(kubernetes_res_dir)
 
     cluster.log.debug('Loading namespaced resources:')
-    resources_result = master.sudo('kubectl api-resources --verbs=list --namespaced -o name '
+    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced -o name '
                                    '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
     cluster.log.verbose(resources_result)
     parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
@@ -345,13 +345,13 @@ def export_kubernetes(cluster):
     for namespace in namespaces:
         namespace_dir = os.path.join(kubernetes_res_dir, namespace)
         os.mkdir(namespace_dir)
-        actual_resources = download_resources(cluster.log, resources, namespace_dir, master, namespace)
+        actual_resources = download_resources(cluster.log, resources, namespace_dir, control_plane, namespace)
         if actual_resources:
             total_files += len(actual_resources)
             namespaced_resources_map[namespace] = actual_resources
 
     cluster.log.debug('Loading non-namespaced resources:')
-    resources_result = master.sudo('kubectl api-resources --verbs=list --namespaced=false -o name '
+    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced=false -o name '
                                    '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
     cluster.log.verbose(resources_result)
     parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
@@ -370,7 +370,7 @@ def export_kubernetes(cluster):
 
     cluster.log.debug(resources)
 
-    nonnamespaced_resources_list = download_resources(cluster.log, resources, kubernetes_res_dir, master)
+    nonnamespaced_resources_list = download_resources(cluster.log, resources, kubernetes_res_dir, control_plane)
     total_files += len(nonnamespaced_resources_list)
 
     cluster.log.verbose('Total files saved: %s' % total_files)

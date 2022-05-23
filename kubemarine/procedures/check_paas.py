@@ -50,7 +50,7 @@ def services_status(cluster, service_type):
         elif service_type == 'keepalived':
             group = cluster.nodes.get('keepalived', {})
         elif service_type == 'docker' or service_type == "containerd" or service_type == 'kubelet':
-            group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+            group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
 
         if not group or group.is_empty():
             raise TestWarn("No nodes to check service status",
@@ -173,7 +173,7 @@ def system_packages_versions(cluster, pckg_alias):
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
         if pckg_alias == "docker" or pckg_alias == "containerd":
-            group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
+            group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
         elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
             if "balancer" in cluster.nodes and not cluster.nodes['balancer'].is_empty():
                 group = cluster.nodes['balancer']
@@ -236,7 +236,7 @@ def check_packages_versions(cluster, tc, group, packages, warn_on_bad_result=Fal
 
 
 def get_nodes_description(cluster):
-    result = cluster.nodes['master'].get_any_member().sudo('kubectl get node -o yaml')
+    result = cluster.nodes['control-plane'].get_any_member().sudo('kubectl get node -o yaml')
     cluster.log.verbose(result)
     return yaml.safe_load(list(result.values())[0].stdout)
 
@@ -365,7 +365,7 @@ def kubernetes_nodes_existence(cluster):
         nodes_description = get_nodes_description(cluster)
         not_found = []
         for node in cluster.inventory['nodes']:
-            if 'master' in node['roles'] or 'worker' in node['roles']:
+            if 'control-plane' in node['roles'] or 'worker' in node['roles']:
                 found = False
                 for node_description in nodes_description['items']:
                     node_name = node_description['metadata']['name']
@@ -452,7 +452,7 @@ def kubernetes_nodes_condition(cluster, condition_type):
 
 def get_not_running_pods(cluster):
     get_pods_cmd = 'kubectl get pods -A --field-selector status.phase!=Running | awk \'{ print $1" "$2" "$4 }\''
-    result = cluster.nodes['master'].get_any_member().sudo(get_pods_cmd)
+    result = cluster.nodes['control-plane'].get_any_member().sudo(get_pods_cmd)
     cluster.log.verbose(result)
     return list(result.values())[0].stdout.strip()
 
@@ -497,13 +497,13 @@ def kubernetes_dashboard_status(cluster):
         while not test_succeeded and i < retries:
             i += 1
             if cluster.inventory['plugins']['kubernetes-dashboard']['install']:
-                results = cluster.nodes['master'].get_first_member().sudo("kubectl get svc -n kubernetes-dashboard kubernetes-dashboard -o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
-                for master, result in results.items():
+                results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl get svc -n kubernetes-dashboard kubernetes-dashboard -o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
+                for control_plane, result in results.items():
                     if result.failed:
                        cluster.log.debug(f'Can not resolve dashboard IP: {result.stderr} ')
                        raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
                 found_url = result.stdout
-                check_url = cluster.nodes['master'].get_first_member().sudo(f'curl -k -I https://{found_url}:443', warn=True)
+                check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443', warn=True)
                 status = list(check_url.values())[0].stdout
                 if '200' in status:
                     cluster.log.debug(status)
@@ -522,12 +522,12 @@ def kubernetes_dashboard_status(cluster):
 
 def nodes_pid_max(cluster):
     with TestCase(cluster.context['testsuite'], '202', "Nodes", "Nodes pid_max correctly installed") as tc:
-        master = cluster.nodes['master'].get_any_member()
+        control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
-        for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
 
-            node_info = master.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
+            node_info = control_plane.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
             config = yaml.load(node_info)
             max_pods = int(config['status']['capacity']['pods'])
 
@@ -737,7 +737,7 @@ def etcd_health_status(cluster):
     """
     with TestCase(cluster.context['testsuite'], '219', "ETCD", "Health status ETCD") as tc:
         try:
-            etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
+            etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['control-plane'].get_any_member())
         except Exception as e:
             cluster.log.verbose('Failed to load and parse ETCD status')
             raise TestFailure('invalid',
@@ -760,9 +760,9 @@ def control_plane_configuration_status(cluster):
                             'kube-scheduler': 'scheduler'}
         static_pods_content = []
         not_presented_static_pods = []
-        for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
             for static_pod_name, value in static_pod_names.items():
-                result = master['connection'].sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
+                result = control_plane['connection'].sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
                 exit_code = list(result.values())[0].exited
                 result = result.get_simple_out()
                 if exit_code == 0:
@@ -775,7 +775,7 @@ def control_plane_configuration_status(cluster):
                 del static_pod_names[not_presented_static_pod]
 
             result = dict()
-            result['name'] = master['name']
+            result['name'] = control_plane['name']
             version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
 
             for static_pod in static_pods_content:
@@ -792,9 +792,9 @@ def control_plane_configuration_status(cluster):
                 if result[static_pod_name]['correct_version'] and \
                    result[static_pod_name]['correct_properties'] and \
                    result[static_pod_name]['correct_volumes']:
-                    cluster.log.verbose(f'Master {result["name"]} has correct configuration for {static_pod_name}')
+                    cluster.log.verbose(f'Control-plane {result["name"]} has correct configuration for {static_pod_name}')
                 else:
-                    message += f"Master {result['name']} has incorrect configuration for {static_pod_name} \n"
+                    message += f"Control-plane {result['name']} has incorrect configuration for {static_pod_name} \n"
         if not_presented_static_pods:
             message += f"{not_presented_static_pods} static pods doesn't presented"
 
@@ -858,14 +858,14 @@ def control_plane_health_status(cluster):
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
-        for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
+        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
             for static_pod in static_pods:
-                static_pod_names.append(static_pod + '-' + master['name'])
+                static_pod_names.append(static_pod + '-' + control_plane['name'])
 
-        first_master = cluster.nodes['master'].get_first_member()
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_found_pod = []
         for static_pod_name in static_pod_names:
-            result = first_master.sudo(f"kubectl get pod -n kube-system -oyaml {static_pod_name}", warn=True)
+            result = first_control_plane.sudo(f"kubectl get pod -n kube-system -oyaml {static_pod_name}", warn=True)
             exit_code = list(result.values())[0].exited
             if exit_code == 0:
                 result = result.get_simple_out()
@@ -887,10 +887,10 @@ def default_services_configuration_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '222', "Default services", "configuration status") as tc:
-        first_master = cluster.nodes['master'].get_first_member()
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
         original_coredns_cm = generate_configmap(cluster.inventory)
         original_coredns_cm = yaml.safe_load(original_coredns_cm)
-        coredns_cm = first_master.sudo('kubectl get cm coredns -n kube-system -oyaml').get_simple_out()
+        coredns_cm = first_control_plane.sudo('kubectl get cm coredns -n kube-system -oyaml').get_simple_out()
         coredns_cm = yaml.safe_load(coredns_cm)
         ddiff = DeepDiff(coredns_cm['data'], original_coredns_cm['data'], ignore_order=True)
         coredns_result = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
@@ -899,7 +899,7 @@ def default_services_configuration_status(cluster):
         if coredns_result:
             message += f"CoreDNS config is outdated: \n {coredns_result} \n"
 
-        coredns_version = first_master.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
+        coredns_version = first_control_plane.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
         version = ".".join(cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
         entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
                                                             {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
@@ -916,7 +916,7 @@ def default_services_configuration_status(cluster):
                             if service_name == "ingress-nginx-controller":
                                 if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
-                            content = first_master.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
+                            content = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
                             content = yaml.safe_load(content)
                             if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
                                 results[service_name] = True
@@ -943,7 +943,7 @@ def default_services_health_status(cluster):
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
 
-        first_master = cluster.nodes['master'].get_first_member()
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
         for namespace, types_dict in entities_to_check.items():
             for type_dict in types_dict:
@@ -954,13 +954,13 @@ def default_services_health_status(cluster):
                                 if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
                             daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
-                            ready = daemon_set.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                            ready = daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
                             if not ready:
                                 not_ready_entities.append(service)
                     elif type == 'Deployment':
                         for service in services:
                             deployment = Deployment(cluster, name=service, namespace=namespace)
-                            ready = deployment.reload(master=first_master, suppress_exceptions=True).is_actual_and_ready()
+                            ready = deployment.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
                             if not ready:
                                 not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
@@ -978,8 +978,8 @@ def calico_config_check(cluster):
     with TestCase(cluster.context['testsuite'], '224', "Calico", "configuration check") as tc:
         message = ""
         correct_config = True
-        first_master = cluster.nodes['master'].get_first_member()
-        result = first_master.sudo(f"kubectl get DaemonSet calico-node -n kube-system -oyaml")
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        result = first_control_plane.sudo(f"kubectl get DaemonSet calico-node -n kube-system -oyaml")
         result = result.get_simple_out()
         result = yaml.safe_load(result)
         for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
@@ -989,7 +989,7 @@ def calico_config_check(cluster):
         if not correct_config:
             message += "calico-node env configuration is outdated\n"
 
-        result = first_master.sudo(f"kubectl get cm calico-config -n kube-system -oyaml").get_simple_out()
+        result = first_control_plane.sudo(f"kubectl get cm calico-config -n kube-system -oyaml").get_simple_out()
         result = yaml.safe_load(result)
         result = yaml.safe_load(result["data"]["cni_network_config"])
         if isinstance(cluster.inventory["services"]["kubeadm"]["networking"]["podSubnet"], ipaddress.IPv4Address):
@@ -1001,7 +1001,7 @@ def calico_config_check(cluster):
         if ipam_diff:
             message += f"calico cm is outdated: {ipam_diff}\n"
 
-        result = first_master.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'").get_simple_out()
+        result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'").get_simple_out()
         if int(result) > 0:
             message += "ipam check indicates some problems," \
                        " for more info you can use `calicoctl ipam check --show-problem-ips`"
@@ -1016,16 +1016,16 @@ def kubernetes_admission_status(cluster):
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
     with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
-        first_master = cluster.nodes['master'].get_first_member()
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
         profile_inv = ""
         if cluster.inventory["rbac"]["admission"] == "pss" and \
                 cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
             profile_inv = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
         profile = ""
-        result = first_master.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
+        result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
         kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
         cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
-        api_result = first_master.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+        api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
         ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
         for item in ext_args:
@@ -1034,7 +1034,7 @@ def kubernetes_admission_status(cluster):
                 value = re.search('=(.*)$', item).group(1)
                 if key == "--admission-control-config-file":
                     admission_path = value
-                    adm_result = first_master.sudo("cat %s" % admission_path)
+                    adm_result = first_control_plane.sudo("cat %s" % admission_path)
                     adm_conf = yaml.safe_load(list(adm_result.values())[0].stdout)
                     profile = adm_conf["plugins"][0]["configuration"]["defaults"]["enforce"]
                 if key == "--feature-gates":

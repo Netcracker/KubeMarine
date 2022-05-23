@@ -54,7 +54,7 @@ spec:
               - key: kubernetes.io/role
                 operator: In
                 values:
-                - master
+                - control-plane
       serviceAccountName: iperf3
       containers:
       - name: iperf3-server

@@ -123,8 +123,8 @@ def _merge_containerd(cluster, inventory):
 
 
 def migrate_cri(cluster):
-    _migrate_cri(cluster, cluster.nodes["master"].get_ordered_members_list(provide_node_configs=True))
-    _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["master"])
+    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
+    _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"])
                  .get_ordered_members_list(provide_node_configs=True))
 
 
@@ -137,10 +137,10 @@ def _migrate_cri(cluster, node_group):
     """
 
     for node in node_group:
-        if "master" in node["roles"]:
-            master = node
+        if "control-plane" in node["roles"]:
+            control_plane = node
         else:
-            master = cluster.nodes["master"].get_first_member(provide_node_configs=True)
+            control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
 
         cluster.log.debug(f'Updating thirdparties for node "{node["connect_to"]}..."')
         thirdparties.install_all_thirparties(node["connection"])
@@ -149,9 +149,9 @@ def _migrate_cri(cluster, node_group):
         cluster.log.debug("Migrating \"%s\"..." % node["name"])
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
-        master["connection"].sudo(drain_cmd, is_async=False, hide=False)
+        control-plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
         # `kubectl drain` ignores system pods, delete them explicitly
-        if "master" in node["roles"]:
+        if "control-plane" in node["roles"]:
             node["connection"].sudo(f"kubectl -n kube-system delete pod etcd-{node['name']} "
                                     f"kube-apiserver-{node['name']} "
                                     f"kube-controller-manager-{node['name']} "
@@ -203,8 +203,8 @@ def _migrate_cri(cluster, node_group):
                                 "sudo iptables -t filter -F && "
                                 # start kubelet
                                 "sudo systemctl restart kubelet")
-        master["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
-        if "master" in node["roles"]:
+        control-plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
+        if "control-plane" in node["roles"]:
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
             # check ETCD health
             etcd.wait_for_health(cluster, node["connection"])
@@ -218,7 +218,7 @@ def _migrate_cri(cluster, node_group):
             packages.remove(node["connection"], include=packages_list, warn=True, hide=False)
 
         # change annotation for cri-socket
-        master["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
+        control-plane["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
                                   f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
                                   is_async=False, hide=True)
 

@@ -69,7 +69,7 @@ def enrich_inventory_apply_defaults(inventory, cluster):
             del config['node']
 
         if config.get('groups') is None and config.get('nodes') is None:
-            config['groups'] = ['master', 'worker']
+            config['groups'] = ['control-plane', 'worker']
 
         if config.get('nodes') is not None:
             all_nodes_names = cluster.nodes['all'].get_nodes_names()

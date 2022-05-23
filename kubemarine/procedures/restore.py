@@ -108,14 +108,14 @@ def stop_cluster(cluster):
     cluster.log.debug('Stopping the existing cluster...')
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":
-        result = cluster.nodes['master'].sudo('systemctl stop kubelet; '
+        result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
                                               'sudo docker kill $(sudo docker ps -q); '
                                               'sudo docker rm -f $(sudo docker ps -a -q); '
                                               'sudo docker ps -a; '
                                               'sudo rm -rf /var/lib/etcd; '
                                               'sudo mkdir -p /var/lib/etcd', warn=True)
     else:
-        result = cluster.nodes['master'].sudo('systemctl stop kubelet; '
+        result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
                                               'sudo crictl rm -fa; '
                                               'sudo crictl ps -a; '
                                               'sudo rm -rf /var/lib/etcd; '
@@ -165,13 +165,13 @@ def import_etcd(cluster: KubernetesCluster):
 
     cluster.log.debug('Uploading ETCD snapshot...')
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
-    cluster.nodes['master'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name, sudo=True)
+    cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name, sudo=True)
 
     initial_cluster_list = []
     initial_cluster_list_without_names = []
-    for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-        initial_cluster_list.append(master['name'] + '=https://' + master["internal_address"] + ":2380")
-        initial_cluster_list_without_names.append(master["internal_address"] + ":2379")
+    for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+        initial_cluster_list.append(control_plane['name'] + '=https://' + control_plane["internal_address"] + ":2380")
+        initial_cluster_list_without_names.append(control_plane["internal_address"] + ":2379")
     initial_cluster = ','.join(initial_cluster_list)
 
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
@@ -180,20 +180,20 @@ def import_etcd(cluster: KubernetesCluster):
         cont_runtime = "podman"
 
     etcd_instances = 0
-    for master in cluster.nodes['master'].get_ordered_members_list(provide_node_configs=True):
-        cluster.log.debug('Restoring ETCD member ' + master['name'])
-        master_conn: NodeGroup = master['connection']
-        master_conn.sudo(
+    for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+        cluster.log.debug('Restoring ETCD member ' + control_plane['name'])
+        control_plane_conn: NodeGroup = control_plane['connection']
+        control_plane_conn.sudo(
             f'chmod 777 {snap_name} && '
             f'sudo ls -la {snap_name} && '
             f'sudo etcdctl snapshot restore {snap_name} '
-            f'--name={master["name"]} '
+            f'--name={control_plane["name"]} '
             f'--data-dir=/var/lib/etcd/snapshot '
             f'--initial-cluster={initial_cluster} '
-            f'--initial-advertise-peer-urls=https://{master["internal_address"]}:2380',
+            f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380',
             hide=False)
 
-        etcd_id = master_conn.sudo(
+        etcd_id = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
             f'sudo rm -rf /var/lib/etcd/snapshot {snap_name} && '
             f'sudo {cont_runtime} run -d --network host -p 2379:2379 -p 2380:2380 '
@@ -201,29 +201,29 @@ def import_etcd(cluster: KubernetesCluster):
             f'-v /var/lib/etcd:/var/lib/etcd '
             f'-v /etc/kubernetes/pki:/etc/kubernetes/pki '
             f'{etcd_image} etcd '
-            f'--advertise-client-urls=https://{master["internal_address"]}:2379 '
+            f'--advertise-client-urls=https://{control_plane["internal_address"]}:2379 '
             f'--cert-file={etcd_cert} '
             f'--key-file={etcd_key} '
             f'--trusted-ca-file={etcd_cacert} '
             f'--client-cert-auth=true '
             f'--data-dir=/var/lib/etcd '
-            f'--initial-advertise-peer-urls=https://{master["internal_address"]}:2380 '
+            f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380 '
             f'--initial-cluster={initial_cluster} '
-            f'--listen-client-urls=https://127.0.0.1:2379,https://{master["internal_address"]}:2379 '
-            f'--listen-peer-urls=https://{master["internal_address"]}:2380 '
-            f'--name={master["name"]} '
+            f'--listen-client-urls=https://127.0.0.1:2379,https://{control_plane["internal_address"]}:2379 '
+            f'--listen-peer-urls=https://{control_plane["internal_address"]}:2380 '
+            f'--name={control_plane["name"]} '
             f'--peer-client-cert-auth=true '
             f'--peer-cert-file={etcd_peer_cert} '
             f'--peer-key-file={etcd_peer_key} '
             f'--peer-trusted-ca-file={etcd_peer_cacert} '
         ).get_simple_out().strip()
 
-        master_conn.sudo(f'{cont_runtime} logs {etcd_id}', hide=False)
+        control_plane_conn.sudo(f'{cont_runtime} logs {etcd_id}', hide=False)
         etcd_instances += 1
 
     # After restore check db size equal, cluster health and leader elected
     # Checks should be changed
-    cluster_status = etcd.wait_for_health(cluster, cluster.nodes['master'].get_any_member())
+    cluster_status = etcd.wait_for_health(cluster, cluster.nodes['control-plane'].get_any_member())
 
     # Check DB size is correct
     backup_source = cluster.context['backup_descriptor'].get('etcd', {}).get('source')
@@ -245,7 +245,7 @@ def import_etcd(cluster: KubernetesCluster):
 
 def reboot(cluster):
     system.reboot_nodes(cluster.nodes['all'], try_graceful=False)
-    kubernetes.wait_for_nodes(cluster.nodes['master'])
+    kubernetes.wait_for_nodes(cluster.nodes['control-plane'])
 
 
 tasks = OrderedDict({

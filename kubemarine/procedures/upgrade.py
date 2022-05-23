@@ -57,27 +57,27 @@ def kubernetes_upgrade(cluster):
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
 
-    kubernetes.upgrade_first_master(version, upgrade_group, cluster,
+    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster,
                                     drain_timeout=drain_timeout, grace_period=grace_period)
 
-    # After first master upgrade is finished we may loose our CoreDNS changes.
-    # Thus, we need to re-apply our CoreDNS changes immediately after first master upgrade.
+    # After first control-plane upgrade is finished we may loose our CoreDNS changes.
+    # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_masters(version, upgrade_group, cluster,
+    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster,
                                      drain_timeout=drain_timeout, grace_period=grace_period)
     if cluster.nodes.get('worker', []):
         kubernetes.upgrade_workers(version, upgrade_group, cluster,
                                    drain_timeout=drain_timeout, grace_period=grace_period)
 
-    cluster.nodes['master'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+    cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     cluster.context['cached_nodes_versions_cleaned'] = True
 
 
 def kubernetes_cleanup_nodes_versions(cluster):
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
-        cluster.nodes['master'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+        cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
 
@@ -139,7 +139,7 @@ def upgrade_containerd(cluster):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
             with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['master'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
+                for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
                         provide_node_configs=True):
                     os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
@@ -294,8 +294,8 @@ def fix_cri_socket(cluster):
     """
 
     if cluster.inventory["services"]["cri"]["containerRuntime"] == "containerd":
-        master = cluster.nodes["master"].get_first_member(provide_node_configs=True)
-        master["connection"].sudo(f"sudo kubectl annotate nodes --all \
+        control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
+        control_plane["connection"].sudo(f"sudo kubectl annotate nodes --all \
                                      --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
                                      , is_async=False, hide=True)
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
