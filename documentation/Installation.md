@@ -2119,21 +2119,86 @@ services:
 *Can restart service*: Always yes, container kube-apiserver.
 
 *OS specific*: No.
+
+*OS specific*: No.
+
+*Logging level*:
+`None` - do not log;
+`Metadata` — log request metadata: user, request time, target resource (pod, namespace, etc.), action type (verb), etc.;
+`Request` — log metadata and request body;
+`RequestResponse` - log metadata, request body and response body.
+
+*omitStages*: To skip any stages.
+
 ```yaml
 services:
   audit:
     cluster_policy:
       apiVersion: audit.k8s.io/v1
       kind: Policy
+      # Don't generate audit events for all requests in RequestReceived stage.
       omitStages:
         - "RequestReceived"
       rules:
+        # Don't log read-only requests
+        - level: None
+          verbs: ["watch", "get", "list"]
+        # Log all other resources in core and extensions at the request level.
         - level: Metadata
+          verbs: ["create", "update", "patch", "delete", "deletecollection"]
           resources:
-            - group: "authentication.k8s.io"
-              resources: ["tokenreviews"]
-            - group: "authorization.k8s.io"
-            - group: "rbac.authorization.k8s.io"
+          - group: ""
+            resources:
+            - configmaps
+            - endpoints
+            - limitranges
+            - namespaces
+            - nodes
+            - persistentvolumeclaims
+            - persistentvolumes
+            - pods
+            - replicationcontrollers
+            - resourcequotas
+            - secrets
+            - serviceaccounts
+            - services
+          - group: "apiextensions.k8s.io"
+            resources:
+            - customresourcedefinitions
+          - group: "apps"
+            resources:
+            - daemonsets
+            - deployments
+            - replicasets
+            - statefulsets
+          - group: "batch"
+            resources:
+            - cronjobs
+            - jobs
+          - group: "policy"
+            resources:
+            - podsecuritypolicies
+          - group: "rbac.authorization.k8s.io"
+            resources:
+            - clusterrolebindings
+            - clusterroles
+            - rolebindings
+            - roles
+          - group: "autoscaling"
+            resources:
+            - horizontalpodautoscalers
+          - group: "storage.k8s.io"
+            resources:
+            - storageclasses
+            - volumeattachments
+          - group: "networking.k8s.io"
+            resources:
+            - ingresses
+            - ingressclasses
+            - networkpolicies
+          - group: "authentication.k8s.io"
+            resources: ["tokenreviews"]
+          - group: "authorization.k8s.io"
 ```
 
 #### audit-daemon
