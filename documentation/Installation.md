@@ -2119,11 +2119,20 @@ services:
 *Can restart service*: Always yes, container kube-apiserver.
 
 *OS specific*: No.
+
+*Logging level*:
+`None` - do not log;
+`Metadata` — log request metadata: user, request time, target resource (pod, namespace, etc.), action type (verb), etc.;
+`Request` — log metadata and request body;
+`RequestResponse` - log metadata, request body and response body.
+
+*omitStages*: To skip any stages.
+
 ```yaml
 services:
   audit:
     cluster_policy:
-      apiVersion: audit.k8s.io/v1beta1
+      apiVersion: audit.k8s.io/v1
       kind: Policy
       # Don't generate audit events for all requests in RequestReceived stage.
       omitStages:
