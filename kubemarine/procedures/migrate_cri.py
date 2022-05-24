@@ -149,7 +149,7 @@ def _migrate_cri(cluster, node_group):
         cluster.log.debug("Migrating \"%s\"..." % node["name"])
         disable_eviction = True
         drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
-        control-plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
+        control_plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
         # `kubectl drain` ignores system pods, delete them explicitly
         if "control-plane" in node["roles"]:
             node["connection"].sudo(f"kubectl -n kube-system delete pod etcd-{node['name']} "
@@ -203,7 +203,7 @@ def _migrate_cri(cluster, node_group):
                                 "sudo iptables -t filter -F && "
                                 # start kubelet
                                 "sudo systemctl restart kubelet")
-        control-plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
+        control_plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
         if "control-plane" in node["roles"]:
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
             # check ETCD health
@@ -218,7 +218,7 @@ def _migrate_cri(cluster, node_group):
             packages.remove(node["connection"], include=packages_list, warn=True, hide=False)
 
         # change annotation for cri-socket
-        control-plane["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
+        control_plane["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
                                   f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
                                   is_async=False, hide=True)
 
