@@ -1,0 +1,81 @@
+import kubemarine.patches
+from kubemarine.core import flow, utils
+
+
+def main(cli_arguments=None):
+    cli_help = '''
+    Script for automated update of the environment for the current version of Kubemarine.
+
+    How to use:
+
+    '''
+
+    parser = flow.new_common_parser(cli_help)
+    parser.add_argument('--force-skip', dest='skip', metavar='SKIP',
+                        default='',
+                        help='define comma-separated patches to skip')
+
+    parser.add_argument('--force-apply', dest='apply', metavar='APPLY',
+                        default='',
+                        help='define explicit comma-separated set of patches to apply')
+
+    parser.add_argument('--list',
+                        action='store_true',
+                        help='list all patches')
+
+    parser.add_argument('--describe', metavar='PATCH',
+                        help='describe the specified patch')
+
+    args = flow.parse_args(parser, cli_arguments)
+
+    patches = kubemarine.patches.patches
+    patch_ids = [patch.identifier for patch in patches]
+
+    if args.list:
+        for patch_id in patch_ids:
+            print(patch_id)
+        exit(0)
+
+    if args.describe:
+        for patch in patches:
+            if patch.identifier == args.describe:
+                print(patch.description)
+                exit(0)
+        print(f"Unknown patch '{args.describe}'")
+        exit(1)
+
+    skip = [] if not args.skip else args.skip.split(",")
+    apply = [] if not args.apply else args.apply.split(",")
+
+    if apply and (set(apply) - set(patch_ids)):
+        print(f"Unknown patches {list(set(apply) - set(patch_ids))}")
+        exit(1)
+
+    if skip and (set(skip) - set(patch_ids)):
+        print(f"Unknown patches {list(set(skip) - set(patch_ids))}")
+        exit(1)
+
+    if apply:
+        positions = [patch_ids.index(apply_id) for apply_id in apply]
+        if not all(positions[i] < positions[i + 1] for i in range(len(positions) - 1)):
+            print("Incorrect order of patches to apply. See --list for correct order of patches.")
+            exit(1)
+
+    context = flow.create_context(args, procedure="migrate_kubemarine")
+
+    actions = []
+    for patch in patches:
+        if apply:
+            if patch.identifier in apply:
+                actions.append(patch.action)
+        elif skip:
+            if patch.identifier not in skip:
+                actions.append(patch.action)
+        else:
+            actions.append(patch.action)
+
+    flow.run_actions(context, actions)
+
+
+if __name__ == '__main__':
+    main()

@@ -21,7 +21,8 @@ import time
 from collections import OrderedDict
 import yaml
 
-from kubemarine.core import utils, flow, defaults
+from kubemarine.core import utils, flow, defaults, resources
+from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.procedures import install, backup
@@ -265,6 +266,14 @@ tasks = OrderedDict({
 })
 
 
+class RestoreAction(Action):
+    def __init__(self):
+        super().__init__('restore')
+
+    def run(self, res: 'resources.DynamicResources'):
+        flow.run_tasks(res, tasks)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for restoring Kubernetes resources and nodes contents from backup file.
@@ -273,44 +282,14 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
-
-    parser.add_argument('procedure_config', metavar='procedure_config', type=str,
-                        help='config file for restore procedure')
+    parser = flow.new_procedure_parser(cli_help)
 
     args = flow.parse_args(parser, cli_arguments)
-
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    context = flow.create_context(args, procedure='restore',
-                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
-    context['inventory_regenerate_required'] = False
+    context = flow.create_context(args, procedure='restore')
 
     replace_config_from_backup_if_needed(args.procedure_config, args.config)
 
-    flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        context,
-        procedure_inventory_filepath=args.procedure_config,
-        cumulative_points=install.cumulative_points
-    )
+    flow.run_actions(context, [RestoreAction()])
 
 
 if __name__ == '__main__':
