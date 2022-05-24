@@ -17,7 +17,8 @@
 from collections import OrderedDict
 
 from kubemarine import admission
-from kubemarine.core import flow
+from kubemarine.core import flow, resources
+from kubemarine.core.action import Action
 
 tasks = OrderedDict({
     "check_inventory": admission.check_inventory,
@@ -29,6 +30,15 @@ tasks = OrderedDict({
 })
 
 
+class PSPAction(Action):
+    def __init__(self):
+        super().__init__('manage psp', recreate_inventory=True)
+
+    def run(self, res: 'resources.DynamicResources'):
+        flow.run_tasks(res, tasks)
+        res.make_final_inventory()
+
+
 def main(cli_arguments=None):
 
     cli_help = '''
@@ -38,41 +48,12 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
-
-    parser.add_argument('procedure_config', metavar='procedure_config', type=str,
-                        help='config file for add_node procedure')
+    parser = flow.new_procedure_parser(cli_help)
 
     args = flow.parse_args(parser, cli_arguments)
+    context = flow.create_context(args, procedure='manage_psp')
 
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    context = flow.create_context(args, procedure='manage_psp',
-                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
-    context['inventory_regenerate_required'] = True
-
-    flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        context,
-        procedure_inventory_filepath=args.procedure_config,
-    )
+    flow.run_actions(context, [PSPAction()])
 
 
 if __name__ == '__main__':

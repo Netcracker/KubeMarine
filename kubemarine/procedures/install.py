@@ -19,10 +19,12 @@ import fabric
 import yaml
 import os
 import io
+
+from kubemarine.core.action import Action
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
-from kubemarine.core import flow, utils
+from kubemarine.core import flow, utils, resources
 from kubemarine.core.executor import RemoteExecutor
 
 
@@ -571,6 +573,22 @@ cumulative_points = {
 }
 
 
+class InstallAction(Action):
+    def __init__(self):
+        super().__init__('install')
+        self.verification_version_result = ""
+
+    def run(self, res: 'resources.DynamicResources'):
+        cluster_yml = res.raw_inventory()
+        if (cluster_yml.get("services", {})
+                and cluster_yml["services"].get("kubeadm", {})
+                and cluster_yml["services"]["kubeadm"].get("kubernetesVersion")):
+            target_version = cluster_yml["services"]["kubeadm"].get("kubernetesVersion")
+            self.verification_version_result = kubernetes.verify_target_version(target_version)
+
+        flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for installing Kubernetes cluster.
@@ -579,47 +597,16 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
+    parser = flow.new_tasks_flow_parser(cli_help)
 
     args = flow.parse_args(parser, cli_arguments)
+    context = flow.create_context(args, procedure='install')
 
-    defined_tasks = []
-    defined_excludes = []
+    install = InstallAction()
+    flow.run_actions(context, [install])
 
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    with open(args.config, 'r') as stream:
-        cluster_yml = yaml.safe_load(stream)
-    verification_version_result = ""
-    if (cluster_yml.get("services", {})
-            and cluster_yml["services"].get("kubeadm", {})
-            and cluster_yml["services"]["kubeadm"].get("kubernetesVersion")):
-        target_version = cluster_yml["services"]["kubeadm"].get("kubernetesVersion")
-        verification_version_result = kubernetes.verify_target_version(target_version)
-
-    flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        flow.create_context(args, procedure='install',
-                            included_tasks=defined_tasks, excluded_tasks=defined_excludes),
-        cumulative_points=cumulative_points
-    )
-    if verification_version_result:
-        print(verification_version_result)
+    if install.verification_version_result:
+        print(install.verification_version_result)
 
 
 if __name__ == '__main__':

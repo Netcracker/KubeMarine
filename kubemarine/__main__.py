@@ -40,6 +40,11 @@ procedures = OrderedDict({
         'description': "Install a cluster from scratch",
         'group': 'installation'
     },
+    'migrate_kubemarine': {
+        'description': "Automatically perform migration to update the environment for the "
+                       "current version of Kubemarine",
+        'group': 'maintenance'
+    },
     'upgrade': {
         'description': "Automatically upgrade the entire Kubernetes cluster to a new version",
         'group': 'maintenance'
@@ -178,7 +183,7 @@ def selftest():
 
         if "main" not in dir(module):
             raise Exception("No main method in %s" % procedure)
-        if procedure != "do":
+        if procedure not in ["do", "migrate_kubemarine"]:
             if "tasks" not in dir(module):
                 raise Exception("Tasks tree is not presented in %s" % procedure)
             if not isinstance(module.tasks, OrderedDict):

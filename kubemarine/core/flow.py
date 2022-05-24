@@ -19,88 +19,139 @@ import time
 from copy import deepcopy
 from typing import Type, Optional, List
 
-import yaml
 import importlib
 
-from kubemarine.core import utils, cluster as c
+from kubemarine.core import utils, cluster as c, action, resources as res, errors
 
-DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
+DEFAULT_CLUSTER_OBJ: Optional[Type['c.KubernetesCluster']] = None
 
 
-def run(tasks,
-        tasks_filter,
-        excluded_tasks,
-        inventory_filepath,
-        context,
-        procedure_inventory_filepath=None,
-        cumulative_points=None,
-        print_final_message=True):
+def run_actions(context: dict, actions: List['action.Action'],
+                print_final_message=True, silent=False) -> Optional['c.KubernetesCluster']:
+    """
+    Runs actions one by one, recreates inventory when necessary,
+    managing such resources as cluster object and raw inventory.
 
+    For each initialized cluster object, preserves inventory if any action is succeeded.
+    """
     time_start = time.time()
+
+    args: dict = context['execution_arguments']
+    if not args.get('disable_dump', True):
+        utils.prepare_dump_directory(args.get('dump_location'),
+                                     reset_directory=not args.get('disable_dump_cleanup', False))
+
+    resources = res.DynamicResources(context, silent)
+    log = resources.logger()
+
+    successfully_performed = []
+    last_cluster = None
+    for act in actions:
+        act.prepare_context(resources.context)
+
+        if not successfully_performed:
+            # first action in group
+            with open(resources.inventory_filepath, "r") as stream:
+                utils.dump_file(context, stream, "cluster_initial.yaml")
+
+            if resources.procedure_inventory_filepath is not None:
+                with open(resources.procedure_inventory_filepath, "r") as stream:
+                    utils.dump_file(context, stream, "procedure.yaml")
+        try:
+            log.info(f"Running action '{act.identifier}'")
+            act.run(resources)
+            successfully_performed.append(act.identifier)
+        except Exception as exc:
+            if successfully_performed:
+                _post_process_actions_group(last_cluster, context, successfully_performed, failed=True)
+
+            if isinstance(exc, errors.FailException):
+                utils.do_fail(exc.message, exc.reason, exc.hint, log=log)
+            else:
+                utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
+                              log=log)
+
+        last_cluster = resources.cluster_if_initialized()
+
+        if act.recreate_inventory:
+            with open(resources.inventory_filepath, "r") as stream:
+                # write original file data to backup file with timestamp
+                timestamp = utils.get_current_timestamp_formatted()
+                inventory_file_basename = os.path.basename(resources.inventory_filepath)
+                utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
+
+            resources.recreate_inventory()
+            _post_process_actions_group(last_cluster, context, successfully_performed)
+            successfully_performed = []
+            last_cluster = None
+
+    if successfully_performed:
+        _post_process_actions_group(last_cluster, context, successfully_performed)
+
+    time_end = time.time()
+
+    if print_final_message:
+        log.info("")
+        log.info("SUCCESSFULLY FINISHED")
+        log.info("Elapsed: " + utils.get_elapsed_string(time_start, time_end))
+
+    return last_cluster
+
+
+def _post_process_actions_group(last_cluster: 'c.KubernetesCluster', context: dict,
+                                successfully_performed: list, failed=False):
+    if last_cluster is None:
+        return
+    try:
+        last_cluster.dump_finalized_inventory()
+    finally:
+        if context['preserve_inventory']:
+            last_cluster.context['successfully_performed'] = successfully_performed
+            last_cluster.context['status'] = 'failed' if failed else 'successful'
+            last_cluster.preserve_inventory()
+
+
+def run_tasks(resources: 'res.DynamicResources', tasks, cumulative_points=None):
+    """
+    Filters and runs tasks and immediately exits in case any task fails.
+    It is preferable to use the method only in case the only action is executed.
+    """
 
     if cumulative_points is None:
         cumulative_points = {}
+
+    args: dict = resources.context['execution_arguments']
+
+    tasks_filter = [] if not args['tasks'] else args['tasks'].split(",")
+    excluded_tasks = [] if not args['exclude'] else args['exclude'].split(",")
 
     print("Excluded tasks:")
     filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks)
     if filtered_tasks == tasks:
         print("\tNo excluded tasks")
 
-    if not context.get('scheduled_tasks'):
-        context['scheduled_tasks'] = {}
-    if context['scheduled_tasks'].get('included') is None:
-        context['scheduled_tasks']['included'] = tasks_filter
-    if context['scheduled_tasks'].get('excluded') is None:
-        context['scheduled_tasks']['excluded'] = excluded_tasks
-    context['scheduled_tasks']['final'] = final_list
+    cluster = resources.cluster()
 
-    if not context['execution_arguments'].get('disable_dump', True):
-        utils.prepare_dump_directory(context['execution_arguments'].get('dump_location'),
-                                     reset_directory=not context['execution_arguments'].get('disable_dump_cleanup', False))
-
-    cluster = load_inventory(inventory_filepath, context, procedure_inventory_filepath=procedure_inventory_filepath)
-
-    if 'ansible_inventory_location' in cluster.context['execution_arguments']:
-        utils.make_ansible_inventory(cluster.context['execution_arguments']['ansible_inventory_location'], cluster)
-
-    if cluster.context.get('execution_arguments', {}).get('without_act', False):
-        if cluster.context.get('inventory_regenerate_required', False) is True:
-            utils.recreate_final_inventory_file(cluster)
+    if args.get('without_act', False):
+        resources.context['preserve_inventory'] = False
         cluster.log.debug('\nFurther acting manually disabled')
-        return cluster
+        return
 
+    init_tasks_flow(cluster)
     run_flow(filtered_tasks, cluster, cumulative_points)
-
-    if cluster.context.get('inventory_regenerate_required', False) is True:
-        utils.recreate_final_inventory_file(cluster)
-
-    cluster.finish()
-
-    time_end = time.time()
-
-    if print_final_message:
-        cluster.log.info("")
-        cluster.log.info("SUCCESSFULLY FINISHED")
-        cluster.log.info("Elapsed: "+utils.get_elapsed_string(time_start, time_end))
-
-    return cluster
 
 
 def create_empty_context(procedure=None):
     return {
         "execution_arguments": {},
-        "proceeded_tasks": [],
-        "scheduled_tasks": {
-            'included': [],
-            'excluded': [],
-            'final': []
-        },
         "nodes": {},
-        'initial_procedure': procedure
+        'initial_procedure': procedure,
+        'preserve_inventory': True,
+        'runtime_vars': {}
     }
 
 
-def create_context(execution_arguments, procedure=None, included_tasks=None, excluded_tasks=None):
+def create_context(execution_arguments, procedure=None):
 
     if isinstance(execution_arguments, argparse.Namespace):
         execution_arguments = vars(execution_arguments)
@@ -116,61 +167,7 @@ def create_context(execution_arguments, procedure=None, included_tasks=None, exc
     else:
         context['execution_arguments']['exclude_cumulative_points_methods'] = []
 
-    if included_tasks:
-        context['scheduled_tasks']['included'] = included_tasks
-
-    if excluded_tasks:
-        context['scheduled_tasks']['excluded'] = excluded_tasks
-
     return context
-
-
-def load_inventory(inventory_filepath, context, silent=False, procedure_inventory_filepath=None):
-    silent = silent or isinstance(inventory_filepath, dict)
-    if not silent:
-        print("Loading inventory file '%s'" % inventory_filepath)
-
-    log = None
-    try:
-        cluster = _load_operational_cluster(inventory_filepath, context, procedure_inventory_filepath)
-        log = cluster.log
-        light_cluster = _load_light_cluster(cluster)
-        light_cluster.enrich(custom_enrichment_fns=cluster.get_facts_enrichment_fns())
-        cluster.enrich(nodes_context=light_cluster.context)
-
-        if not silent:
-            cluster.log.debug("Inventory file loaded:")
-            for role in cluster.roles:
-                cluster.log.debug("  %s %i" % (role, len(cluster.ips[role])))
-                for ip in cluster.ips[role]:
-                    cluster.log.debug("    %s" % ip)
-        return cluster
-    except yaml.YAMLError as exc:
-        utils.do_fail("Failed to load inventory file", exc, log=log)
-    except Exception as exc:
-        utils.do_fail("Failed to proceed inventory file", exc, log=log)
-
-
-def _provide_cluster(*args, **kw):
-    return DEFAULT_CLUSTER_OBJ(*args, **kw) if DEFAULT_CLUSTER_OBJ is not None \
-        else c.KubernetesCluster(*args, **kw)
-
-
-def _load_operational_cluster(inventory_filepath, context, procedure_inventory_filepath):
-    """
-    Initialize main cluster instance to be used in tasks.
-    """
-    return _provide_cluster(inventory_filepath, context,
-                            procedure_inventory=procedure_inventory_filepath)
-
-
-def _load_light_cluster(cluster: c.KubernetesCluster):
-    """
-    Initialize temporary cluster instance to detect initial nodes context.
-    """
-    return _provide_cluster(cluster.raw_inventory, cluster.context,
-                            procedure_inventory=cluster.procedure_inventory,
-                            shallow_copy_env_from=cluster)
 
 
 def filter_flow(tasks, tasks_filter: List[str], excluded_tasks: List[str]):
@@ -241,22 +238,14 @@ def run_flow(tasks, cluster, cumulative_points, _task_path=''):
             run_flow(task, cluster, cumulative_points, __task_path)
 
 
-def new_parser(cli_help):
+def new_common_parser(cli_help):
 
     parser = argparse.ArgumentParser(description=cli_help,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('-v', '--verbose',
-                        action='store_true',
-                        help='enable the verbosity mode')
-
     parser.add_argument('-c', '--config',
                         default='cluster.yaml',
                         help='define main cluster configuration file')
-
-    parser.add_argument('--without-act',
-                        action='store_true',
-                        help='prevent tasks to be executed')
 
     parser.add_argument('--ansible-inventory-location',
                         default='./ansible-inventory.ini',
@@ -274,6 +263,33 @@ def new_parser(cli_help):
                         action='store_true',
                         help='prevent dump directory cleaning on process launch')
 
+    parser.add_argument('--log',
+                        action='append',
+                        nargs='*',
+                        help='Logging options, can be specified multiple times')
+
+    parser.add_argument('-w', '--workdir',
+                        default='',
+                        help='Custom path of the workdir')
+
+    return parser
+
+
+def new_tasks_flow_parser(cli_help):
+    parser = new_common_parser(cli_help)
+
+    parser.add_argument('--without-act',
+                        action='store_true',
+                        help='prevent tasks to be executed')
+
+    parser.add_argument('--tasks',
+                        default='',
+                        help='define comma-separated tasks to be executed')
+
+    parser.add_argument('--exclude',
+                        default='',
+                        help='exclude comma-separated tasks from execution')
+
     parser.add_argument('--disable-cumulative-points',
                         action='store_true',
                         help='disable cumulative points execution (use only when you understand what you are doing!)')
@@ -287,14 +303,14 @@ def new_parser(cli_help):
                         default='',
                         help='comma-separated cumulative points methods names to be excluded from execution')
 
-    parser.add_argument('--log',
-                        action='append',
-                        nargs='*',
-                        help='Logging options, can be specified multiple times')
+    return parser
 
-    parser.add_argument('-w', '--workdir',
-                        default='',
-                        help='Custom path of the workdir')
+
+def new_procedure_parser(cli_help):
+    parser = new_tasks_flow_parser(cli_help)
+
+    parser.add_argument('procedure_config', metavar='procedure_config', type=str,
+                        help='config file for the procedure')
 
     return parser
 
@@ -312,6 +328,7 @@ def parse_args(parser, arguments: None):
 
 
 def schedule_cumulative_point(cluster, point_method):
+    _check_within_flow(cluster)
 
     point_fullname = point_method.__module__ + '.' + point_method.__qualname__
 
@@ -334,6 +351,7 @@ def schedule_cumulative_point(cluster, point_method):
 
 
 def proceed_cumulative_point(cluster, points_list, point_task_path):
+    _check_within_flow(cluster)
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
         return
@@ -364,6 +382,11 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
     return results
 
 
+def init_tasks_flow(cluster):
+    _check_within_flow(cluster, False)
+    cluster.context['proceeded_tasks'] = []
+
+
 def add_task_to_proceeded_list(cluster, task_path):
     if not is_task_completed(cluster, task_path):
         cluster.context['proceeded_tasks'].append(task_path)
@@ -371,4 +394,10 @@ def add_task_to_proceeded_list(cluster, task_path):
 
 
 def is_task_completed(cluster, task_path):
+    _check_within_flow(cluster)
     return task_path in cluster.context['proceeded_tasks']
+
+
+def _check_within_flow(cluster: 'c.KubernetesCluster', check=True):
+    if check != ('proceeded_tasks' in cluster.context):
+        raise NotImplementedError(f"The method is called {'not ' if check else ''}within tasks flow execution")

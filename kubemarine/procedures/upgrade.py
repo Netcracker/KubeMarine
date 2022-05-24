@@ -21,11 +21,12 @@ import yaml
 import toml
 
 from distutils.util import strtobool
-from kubemarine.core.flow import load_inventory
+
+from kubemarine.core.action import Action
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core import flow
+from kubemarine.core import flow, resources
 from kubemarine.procedures import install
-from kubemarine import kubernetes, plugins, system
+from kubemarine import kubernetes, plugins
 from itertools import chain
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
@@ -195,6 +196,20 @@ def upgrade_finalize_inventory(cluster, inventory):
     return inventory
 
 
+class UpgradeAction(Action):
+    def __init__(self, upgrade_version: str):
+        super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
+        self.upgrade_version = upgrade_version
+
+    def run(self, res: 'resources.DynamicResources'):
+        flow.run_tasks(res, tasks)
+        res.make_final_inventory()
+
+    def prepare_context(self, context: dict):
+        context['upgrade_version'] = self.upgrade_version
+        context['dump_filename_prefix'] = self.upgrade_version
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for automated upgrade of the entire Kubernetes cluster to a new version.
@@ -203,64 +218,25 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
-
-    parser.add_argument('procedure_config', metavar='procedure_config', type=str,
-                        help='config file for upgrade parameters')
+    parser = flow.new_procedure_parser(cli_help)
 
     args = flow.parse_args(parser, cli_arguments)
-
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
 
     with open(args.procedure_config, 'r') as stream:
         procedure_config = yaml.safe_load(stream)
 
-    os_family = preload_os_family(args.config)
     upgrade_plan = verify_upgrade_plan(procedure_config.get('upgrade_plan'))
     verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
 
     if (args.tasks or args.exclude) and len(upgrade_plan) > 1:
         raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
-    # We need to save dumps for all iterations, so we forcefully disable dump cleanup after first iteration onwards.
-    disable_dump_cleanup = False
-    for version in upgrade_plan:
+    context = flow.create_context(args, procedure='upgrade')
 
-        # reset context from previous installation
-        context = flow.create_context(args, procedure='upgrade',
-                                      included_tasks=defined_tasks, excluded_tasks=defined_excludes)
-        context['inventory_regenerate_required'] = True
-        context['upgrade_version'] = version
-        context['dump_filename_prefix'] = version
-        context['os'] = os_family
-        if disable_dump_cleanup:
-            context['execution_arguments']['disable_dump_cleanup'] = True
+    # todo inventory is preserved few times, probably need to preserve it once instead.
+    actions = [UpgradeAction(version) for version in upgrade_plan]
+    flow.run_actions(context, actions)
 
-        flow.run(
-            tasks,
-            defined_tasks,
-            defined_excludes,
-            args.config,
-            context,
-            procedure_inventory_filepath=args.procedure_config,
-            cumulative_points=install.cumulative_points
-        )
-
-        disable_dump_cleanup = True
     if verification_version_result:
         print(verification_version_result)
 
@@ -281,11 +257,6 @@ def verify_upgrade_plan(upgrade_plan):
     print('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
 
     return upgrade_plan
-
-
-def preload_os_family(inventory_filepath):
-    cluster = load_inventory(inventory_filepath, flow.create_context({'disable_dump': True}))
-    return system.get_os_family(cluster)
 
 
 def fix_cri_socket(cluster):
