@@ -23,7 +23,7 @@ import yaml
 from jinja2 import Template
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, resources
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
@@ -865,15 +865,13 @@ def verify_target_version(target_version):
 
     pos = target_version.rfind(".")
     target_version = target_version[:pos]
-    with open(utils.get_resource_absolute_path('resources/configurations/globals.yaml',
-                                               script_relative=True), 'r') as stream:
-        globals_yml = yaml.safe_load(stream)
-        if target_version not in globals_yml["kubernetes_versions"]:
-            raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-        if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
-            message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
-            print(message)
-            return message
+    globals_yml = resources.GLOBALS
+    if target_version not in globals_yml["kubernetes_versions"]:
+        raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
+    if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
+        message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
+        print(message)
+        return message
     return ""
 
 

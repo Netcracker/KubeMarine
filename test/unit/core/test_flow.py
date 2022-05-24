@@ -18,14 +18,16 @@ import socket
 import unittest
 import ast
 from typing import Optional
-from unittest import mock
 
 import invoke
 
-from kubemarine.core import flow
+from kubemarine.core import flow, resources, errors
 from kubemarine import demo
 
 test_msg = "test_function_return_result"
+
+
+resources.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
 def test_func(cluster):
@@ -158,6 +160,7 @@ class FlowTest(unittest.TestCase):
 
     def test_schedule_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
         flow.schedule_cumulative_point(cluster, test_func)
         points = cluster.context["scheduled_cumulative_points"]
         self.assertIn(test_func, points, "Test cumulative point was not added to cluster context")
@@ -165,6 +168,7 @@ class FlowTest(unittest.TestCase):
     def test_add_task_to_proceeded_list(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         task_path = "prepare"
+        flow.init_tasks_flow(cluster)
         flow.add_task_to_proceeded_list(cluster, task_path)
         proceeded_tasks = cluster.context["proceeded_tasks"]
         self.assertIn(task_path, proceeded_tasks, "Test proceeded task was not added to cluster context")
@@ -175,114 +179,99 @@ class FlowTest(unittest.TestCase):
         cumulative_points = {
             method_full_name: ['prepare.system.modprobe']
         }
+        flow.init_tasks_flow(cluster)
         flow.schedule_cumulative_point(cluster, test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
 
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        flow.init_tasks_flow(cluster)
         flow.run_flow(tasks, cluster, {})
 
         self.assertEqual(4, cluster.context["test_info"], "Here should be 4 calls of test_func for: \
          deploy.loadbalancer.haproxy, deploy.loadbalancer.keepalived, deploy.accounts, overview.")
 
-    @mock.patch('kubemarine.core.flow.load_inventory', return_value=demo.new_cluster(demo.generate_inventory(**demo.FULLHA)))
-    def test_run(self, patched_func):
-        test_tasks = ["deploy.loadbalancer.haproxy"]
-        args = flow.new_parser("Help text").parse_args(['-v', '--disable-dump'])
-        flow.run(tasks, test_tasks, [], {}, flow.create_context(args))
-        cluster = patched_func.return_value
+    def test_run_tasks(self):
+        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"),
+                                             ['--tasks', 'deploy.loadbalancer.haproxy'])
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks)
         self.assertEqual(1, cluster.context["test_info"],
                          "It had to be one call of test_func for deploy.loadbalancer.haproxy action")
 
-    @mock.patch('kubemarine.core.flow._provide_cluster')
-    def test_detect_nodes_context(self, patched_func):
+    def test_detect_nodes_context(self):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, hosts)
-        patched_func.side_effect = lambda *args, **kw: self._provide_cluster(*args, **kw)
-        args = flow.new_parser("Help text").parse_args(['-v', '--disable-dump'])
+        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
         # not throws any exception during cluster initialization
-        flow.run(tasks, [], [], inventory, flow.create_context(args))
-        self.assertEqual(4, self.cluster.context["test_info"],
+        flow.run_tasks(res, tasks)
+        cluster = res.cluster()
+        self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", self.cluster.context["os"])
-        for host, node_context in self.cluster.context["nodes"].items():
+        self.assertEqual("rhel", cluster.context["os"])
+        for host, node_context in cluster.context["nodes"].items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
-    @mock.patch('kubemarine.core.flow._provide_cluster')
-    def test_not_sudoer_does_not_interrupt_enrichment(self, patched_func):
+    def test_not_sudoer_does_not_interrupt_enrichment(self):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, [])
-        patched_func.side_effect = lambda *args, **kw: self._provide_cluster(*args, **kw)
-        args = flow.new_parser("Help text").parse_args(['-v', '--disable-dump'])
-        flow.run(tasks, [], [], inventory, flow.create_context(args))
-        self.assertEqual(4, self.cluster.context["test_info"],
+        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
+        flow.run_tasks(res, tasks)
+        cluster = res.cluster()
+        self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", self.cluster.context["os"])
-        for host, node_context in self.cluster.context["nodes"].items():
+        self.assertEqual("rhel", cluster.context["os"])
+        for host, node_context in cluster.context["nodes"].items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
 
-    @mock.patch('kubemarine.core.flow._provide_cluster')
-    @mock.patch('kubemarine.core.utils.do_fail')
-    def test_any_offline_node_interrupts(self, do_fail, _provide_cluster):
-        def rethrow(*args, **kw):
-            raise args[1]
-        do_fail.side_effect = rethrow
-
+    def test_any_offline_node_interrupts(self):
         inventory = demo.generate_inventory(**demo.FULLHA)
         online_hosts = [node["address"] for node in inventory["nodes"]]
         offline = online_hosts.pop(random.randrange(len(online_hosts)))
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        _provide_cluster.side_effect = lambda *args, **kw: self._provide_cluster(*args, **kw)
-        args = flow.new_parser("Help text").parse_args(['-v', '--disable-dump'])
+        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
         exc = None
         try:
-            flow.run(tasks, [], [], inventory, flow.create_context(args))
+            flow.run_tasks(res, tasks)
         except Exception as e:
             exc = e
 
         self.assertIsNotNone(exc, msg="Exception should be raised")
-        self.assertTrue(f"['{offline}'] are not reachable." in str(exc))
+        self.assertIsInstance(exc, errors.FailException, msg="Exception should be raised")
+        self.assertTrue(f"['{offline}'] are not reachable." in str(exc.reason))
 
-    @mock.patch('kubemarine.core.flow._provide_cluster')
-    def test_removed_node_can_be_offline(self, _provide_cluster):
+    def test_removed_node_can_be_offline(self):
         inventory = demo.generate_inventory(**demo.FULLHA)
         online_hosts = [node["address"] for node in inventory["nodes"]]
+        masters = [i for i, node in enumerate(inventory["nodes"]) if 'master' in node['roles']]
 
-        i = random.randrange(len(online_hosts))
-        online_hosts.pop(i)
-        procedure_inventory = {"nodes": [{"name": inventory["nodes"][i]["name"]}]}
+        i = random.randrange(len(masters))
+        online_hosts.pop(masters[i])
+        procedure_inventory = {"nodes": [{"name": inventory["nodes"][masters[i]]["name"]}]}
 
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        _provide_cluster.side_effect = lambda *args, **kw: self._provide_cluster(*args, **kw)
-
-        args = flow.new_parser("Help text").parse_args(['-v', '--disable-dump'])
+        context = demo.create_silent_context(flow.new_procedure_parser("Help text"), ['fake_path.yaml'],
+                                             procedure='remove_node')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
 
         # no exception should occur
-        flow.run(tasks, [], [], inventory, flow.create_context(args, procedure='remove_node'),
-                 procedure_inventory_filepath=procedure_inventory)
-
-    def _provide_cluster(self, *args, **kw) -> demo.FakeKubernetesCluster:
-        is_light = "shallow_copy_env_from" in kw
-        if is_light:
-            kw["fake_shell"] = self.light_fake_shell
-            cluster = demo.FakeKubernetesCluster(*args, **kw)
-            cluster.globals["nodes"]["remove"]["check_active_timeout"] = 0
-        else:
-            cluster = demo.FakeKubernetesCluster(*args, **kw)
-            self.cluster = cluster
-
-        return cluster
+        flow.run_tasks(res, tasks)
 
     def _stub_detect_nodes_context(self, inventory: dict, online_nodes: list, sudoer_nodes: list):
         hosts = [node["address"] for node in inventory["nodes"]]
@@ -311,7 +300,7 @@ class FlowTest(unittest.TestCase):
                 results[host] = invoke.AuthFailure(None, None)
             else:
                 results[host] = demo.create_result(stdout=stdout)
-        self.light_fake_shell.add(results, do_type, command)
+        self.light_fake_shell.add(results, do_type, command, usage_limit=1)
 
 
 if __name__ == '__main__':

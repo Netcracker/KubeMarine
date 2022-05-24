@@ -16,8 +16,36 @@
 
 import argparse
 import sys
-from kubemarine.core import utils
-from kubemarine.core.flow import load_inventory, create_context
+from typing import Callable
+
+from kubemarine.core import flow, resources
+from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.flow import create_context
+from kubemarine.core.group import NodeGroup
+
+
+class CLIAction(Action):
+    def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup], remote_args, no_stream):
+        super().__init__('do')
+        self.node_group_provider = node_group_provider
+        self.remote_args = remote_args
+        self.no_stream = no_stream
+
+    def run(self, res: 'resources.DynamicResources'):
+        executors_group = self.node_group_provider(res.cluster())
+        if not executors_group or executors_group.nodes_amount() < 1:
+            print('Failed to find any of specified nodes or groups')
+            sys.exit(1)
+
+        res = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True)
+        if self.no_stream:
+            res.print()
+
+        if res.is_any_failed():
+            sys.exit(1)
+
+        sys.exit(0)
 
 
 def main(cli_arguments=None):
@@ -64,42 +92,35 @@ def main(cli_arguments=None):
         arguments = vars(parser.parse_args(kubemarine_args))
         configfile_path = arguments.get('config')
 
-    cluster = load_inventory(utils.get_resource_absolute_path(configfile_path, script_relative=False),
-                             create_context({
-                                 'disable_dump': True,
-                                 'log': [
-                                    ['stdout;level=error;colorize=true;correct_newlines=true']
-                                 ]
-                             }), silent=True)
+    context = create_context({
+        'disable_dump': True,
+        'log': [
+            ['stdout;level=error;colorize=true;correct_newlines=true']
+        ],
+        'config': configfile_path
+    })
+    context['preserve_inventory'] = False
 
-    if kubemarine_args:
-        executor_lists = {
-                'node': [],
-                'group': []
-        }
-        for executors_type in executor_lists.keys():
-            executors_str = arguments.get(executors_type)
-            if executors_str:
-                if "," in executors_str:
-                    for executor_name in executors_str.split(','):
-                        executor_lists[executors_type].append(executor_name.strip())
-                else:
-                    executor_lists[executors_type].append(executors_str.strip())
-        executors_group = cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
-    else:
-        executors_group = cluster.nodes['control-plane'].get_any_member()
-
-    if not executors_group or executors_group.nodes_amount() < 1:
-        print('Failed to find any of specified nodes or groups')
-        sys.exit(1)
+    def node_group_provider(cluster: KubernetesCluster):
+        if kubemarine_args:
+            executor_lists = {
+                    'node': [],
+                    'group': []
+            }
+            for executors_type in executor_lists.keys():
+                executors_str = arguments.get(executors_type)
+                if executors_str:
+                    if "," in executors_str:
+                        for executor_name in executors_str.split(','):
+                            executor_lists[executors_type].append(executor_name.strip())
+                    else:
+                        executor_lists[executors_type].append(executors_str.strip())
+            return cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
+        else:
+            return cluster.nodes['control-plane'].get_any_member()
 
     no_stream = arguments.get('no_stream')
-    res = executors_group.sudo(" ".join(remote_args), hide=no_stream, warn=True)
-    if no_stream:
-        res.print()
-
-    if res.is_any_failed():
-        sys.exit(1)
+    flow.run_actions(context, [CLIAction(node_group_provider, remote_args, no_stream)], silent=True)
 
 
 if __name__ == '__main__':
