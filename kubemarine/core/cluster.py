@@ -218,11 +218,13 @@ class KubernetesCluster(Environment):
         self.remove_invalid_cri_config(self.inventory)
         # Method "kubemarine.system.is_multiple_os_detected" is not used because it detects OS family for new nodes
         # only, while package versions caching performs on all nodes.
-        if self.nodes['all'].get_accessible_nodes().get_nodes_os(suppress_exceptions=True, force_all_nodes=True) != 'multiple':
-            self.cache_package_versions()
-            self.log.verbose('Package versions detection finished')
-        else:
-            self.log.verbose('Package versions detection cancelled - cluster in multiple OS state')
+        # Cache packages only if it's set in configuration
+        if self.inventory['services']['packages']['cache_versions']:
+            if self.nodes['all'].get_accessible_nodes().get_nodes_os(suppress_exceptions=True, force_all_nodes=True) != 'multiple':
+                self.cache_package_versions()
+                self.log.verbose('Package versions detection finished')
+            else:
+                self.log.verbose('Package versions detection cancelled - cluster in multiple OS state')
 
         self.log.debug('Gathering facts after tasks execution finished!')
 
@@ -369,13 +371,14 @@ class KubernetesCluster(Environment):
             final_packages_list = []
             for package in self.inventory['services']['packages']['install']['include']:
                 package_versions_list = []
-                detected_package_versions = list(detected_packages[package].keys())
-                for version in detected_package_versions:
-                    # skip version, which ended with special symbol = or -
-                    # (it is possible in some cases)
-                    if "not installed" not in version and version[-1] != '=' and version[-1] != '-':
-                        # add package version to list only if it was found as installed
-                        package_versions_list.append(version)
+                if package in self.globals['compatibility_map']['software']:
+                    detected_package_versions = list(detected_packages[package].keys())
+                    for version in detected_package_versions:
+                        # skip version, which ended with special symbol = or -
+                        # (it is possible in some cases)
+                        if "not installed" not in version and version[-1] != '=' and version[-1] != '-':
+                            # add package version to list only if it was found as installed
+                            package_versions_list.append(version)
                 # if there no versions detected, then set package version to default
                 if not package_versions_list:
                     package_versions_list = [package]

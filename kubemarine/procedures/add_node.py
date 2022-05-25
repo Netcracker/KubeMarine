@@ -106,7 +106,9 @@ def cache_installed_packages(cluster):
                               "packages will not be cached.")
             return
 
-    cluster.cache_package_versions()
+    # Cache packages only if it's set in configuration
+    if cluster.inventory['services']['packages'].get('cache_versions', False):
+        cluster.cache_package_versions()
 
 
 tasks = OrderedDict(copy.deepcopy(install.tasks))
