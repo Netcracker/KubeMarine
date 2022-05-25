@@ -2,6 +2,7 @@ This section describes the features and steps for performing maintenance procedu
 
 - [Prerequisites](#prerequisites)
 - [Provided Procedures](#provided-procedures)
+    - [Kubemarine Migration Procedure](#kubemarine-migration-procedure)
     - [Upgrade Procedure](#upgrade-procedure)
     - [Backup Procedure](#backup-procedure)
     - [Restore Procedure](#restore-procedure)
@@ -42,6 +43,34 @@ Before you start any maintenance procedure, you must complete the following mand
 # Provided Procedures
 
 The information about the procedures for nodes is described in the following sections.
+
+## Kubemarine Migration Procedure
+
+The kubemarine migration procedure allows you to automatically adopt your current Kubernetes cluster and **cluster.yaml** to newer version of kubemarine.
+This procedure should always be considered when taking new versions of kubemarine, if it is going to be used on existing clusters, managed by previous versions of kubemarine.
+
+When upgrading of kubemarine, one must do the following:
+* Inspect all kubemarine intermediate tags if they require some additional steps for migration.
+* Decide whether these steps should be applied.
+* If the steps should be done manually, perform them.
+  If they can be automated, checkout the necessary kubemarine tag and apply the necessary *patches*.
+  For more information, refer to the [Patch identifiers](#patch-identifiers).
+
+#### Patch identifiers
+
+In order to learn if the given kubemarine tag provides any automatic patch, it is necessary to inspect its release notes.
+Alternatively, it is possible to check out this tag and call `migrate_kubemarine --list`.
+The output will contain zero or more *patch identifiers* each listed on a new line.
+
+In order to receive more information regarding the chosen patch, it is necessary to call `migrate_kubemarine --describe <patch identifier>`.
+
+#### Migration process
+
+If called without arguments, `migrate_kubemarine` will try to apply all patches in the current tag.
+Kubemarine applies the patches in the strict order.
+Though, it is possible to choose only subset of patches, or skip not necessary patches.
+Use `migrate_kubemarine --force-apply <patches>` or `migrate_kubemarine --force-skip <patches>` correspondingly,
+where `<patches>` are patch identifiers separated by comma.
 
 ## Upgrade Procedure
 
