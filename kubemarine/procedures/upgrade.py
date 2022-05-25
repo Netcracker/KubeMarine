@@ -17,14 +17,14 @@
 from collections import OrderedDict
 from io import StringIO
 
-import yaml
 import toml
 
 from distutils.util import strtobool
 
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.procedures import install
 from kubemarine import kubernetes, plugins
 from itertools import chain
@@ -201,7 +201,7 @@ class UpgradeAction(Action):
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
         self.upgrade_version = upgrade_version
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
@@ -221,21 +221,18 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help)
 
     args = flow.parse_args(parser, cli_arguments)
+    context = flow.create_context(args, procedure='upgrade')
+    resources = DynamicResources(context)
 
-    with open(args.procedure_config, 'r') as stream:
-        procedure_config = yaml.safe_load(stream)
-
-    upgrade_plan = verify_upgrade_plan(procedure_config.get('upgrade_plan'))
+    upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
     verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
 
     if (args.tasks or args.exclude) and len(upgrade_plan) > 1:
         raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
-    context = flow.create_context(args, procedure='upgrade')
-
     # todo inventory is preserved few times, probably need to preserve it once instead.
     actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(context, actions)
+    flow.run_actions(context, actions, resources=resources)
 
     if verification_version_result:
         print(verification_version_result)

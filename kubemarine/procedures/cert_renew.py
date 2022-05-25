@@ -17,8 +17,9 @@
 from collections import OrderedDict
 
 from kubemarine import plugins, k8s_certs
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 
 
 def renew_nginx_ingress_certs_task(cluster):
@@ -56,7 +57,7 @@ class CertRenewAction(Action):
     def __init__(self):
         super().__init__('cert renew', recreate_inventory=True)
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 

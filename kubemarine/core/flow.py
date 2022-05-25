@@ -23,11 +23,12 @@ import importlib
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors
 
-DEFAULT_CLUSTER_OBJ: Optional[Type['c.KubernetesCluster']] = None
+DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 
 
-def run_actions(context: dict, actions: List['action.Action'],
-                print_final_message=True, silent=False) -> Optional['c.KubernetesCluster']:
+def run_actions(context: dict, actions: List[action.Action],
+                resources: res.DynamicResources = None,
+                print_final_message=True, silent=False) -> Optional[c.KubernetesCluster]:
     """
     Runs actions one by one, recreates inventory when necessary,
     managing such resources as cluster object and raw inventory.
@@ -41,7 +42,8 @@ def run_actions(context: dict, actions: List['action.Action'],
         utils.prepare_dump_directory(args.get('dump_location'),
                                      reset_directory=not args.get('disable_dump_cleanup', False))
 
-    resources = res.DynamicResources(context, silent)
+    if resources is None:
+        resources = res.DynamicResources(context, silent)
     log = resources.logger()
 
     successfully_performed = []
@@ -51,10 +53,11 @@ def run_actions(context: dict, actions: List['action.Action'],
 
         if not successfully_performed:
             # first action in group
-            with open(resources.inventory_filepath, "r") as stream:
-                utils.dump_file(context, stream, "cluster_initial.yaml")
+            if resources.inventory_filepath:
+                with open(resources.inventory_filepath, "r") as stream:
+                    utils.dump_file(context, stream, "cluster_initial.yaml")
 
-            if resources.procedure_inventory_filepath is not None:
+            if resources.procedure_inventory_filepath:
                 with open(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
         try:
@@ -74,11 +77,12 @@ def run_actions(context: dict, actions: List['action.Action'],
         last_cluster = resources.cluster_if_initialized()
 
         if act.recreate_inventory:
-            with open(resources.inventory_filepath, "r") as stream:
-                # write original file data to backup file with timestamp
-                timestamp = utils.get_current_timestamp_formatted()
-                inventory_file_basename = os.path.basename(resources.inventory_filepath)
-                utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
+            if resources.inventory_filepath:
+                with open(resources.inventory_filepath, "r") as stream:
+                    # write original file data to backup file with timestamp
+                    timestamp = utils.get_current_timestamp_formatted()
+                    inventory_file_basename = os.path.basename(resources.inventory_filepath)
+                    utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
 
             resources.recreate_inventory()
             _post_process_actions_group(last_cluster, context, successfully_performed)
@@ -98,7 +102,7 @@ def run_actions(context: dict, actions: List['action.Action'],
     return last_cluster
 
 
-def _post_process_actions_group(last_cluster: 'c.KubernetesCluster', context: dict,
+def _post_process_actions_group(last_cluster: c.KubernetesCluster, context: dict,
                                 successfully_performed: list, failed=False):
     if last_cluster is None:
         return
@@ -111,7 +115,7 @@ def _post_process_actions_group(last_cluster: 'c.KubernetesCluster', context: di
             last_cluster.preserve_inventory()
 
 
-def run_tasks(resources: 'res.DynamicResources', tasks, cumulative_points=None):
+def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None):
     """
     Filters and runs tasks and immediately exits in case any task fails.
     It is preferable to use the method only in case the only action is executed.
@@ -398,6 +402,6 @@ def is_task_completed(cluster, task_path):
     return task_path in cluster.context['proceeded_tasks']
 
 
-def _check_within_flow(cluster: 'c.KubernetesCluster', check=True):
+def _check_within_flow(cluster: c.KubernetesCluster, check=True):
     if check != ('proceeded_tasks' in cluster.context):
         raise NotImplementedError(f"The method is called {'not ' if check else ''}within tasks flow execution")

@@ -14,7 +14,7 @@
 
 from abc import ABC, abstractmethod
 
-from kubemarine.core import resources
+from kubemarine.core.resources import DynamicResources
 
 
 class Action(ABC):
@@ -33,7 +33,7 @@ class Action(ABC):
         self.recreate_inventory = recreate_inventory
 
     @abstractmethod
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         """
         Do some work based on provided DynamicResources.
 
