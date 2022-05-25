@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-import argparse
 import sys
 import time
 from collections import OrderedDict
@@ -28,8 +27,9 @@ import ipaddress
 from kubemarine import packages as pckgs, system, selinux, etcd
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
@@ -1163,7 +1163,7 @@ class PaasAction(Action):
     def __init__(self):
         super().__init__('check paas')
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
 
 

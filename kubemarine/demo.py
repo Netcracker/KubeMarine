@@ -196,7 +196,10 @@ class FakeResources(DynamicResources):
                  cluster: KubernetesCluster = None,
                  fake_shell: FakeShell = None, fake_fs: FakeFS = None):
         super().__init__(context, True)
+        self.inventory_filepath = None
+        self.procedure_inventory_filepath = None
         self._raw_inventory = raw_inventory
+        self._formatted_inventory = raw_inventory
         self._procedure_inventory = procedure_inventory
         self._cluster = cluster
         if cluster:

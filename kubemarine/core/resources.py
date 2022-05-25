@@ -17,26 +17,11 @@ from typing import Optional
 import yaml
 import ruamel.yaml
 
-from kubemarine.core import utils, cluster as c, flow, log, errors
-
-
-def _load_yaml(filepath) -> dict:
-    try:
-        with open(filepath, 'r') as stream:
-            return yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
-        utils.do_fail(f"Failed to load {filepath}", exc)
-
-
-GLOBALS = _load_yaml(
-    utils.get_resource_absolute_path('resources/configurations/globals.yaml', script_relative=True))
-
-DEFAULTS = _load_yaml(
-    utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True))
+from kubemarine.core import utils, cluster as c, log, errors, static
 
 
 class DynamicResources:
-    def __init__(self, context: dict, silent: bool):
+    def __init__(self, context: dict, silent=False):
         self.context = context
         """
         Context holding execution arguments and other auxiliary parameters which manage the execution flow.
@@ -77,7 +62,7 @@ class DynamicResources:
 
     def procedure_inventory(self):
         if self._procedure_inventory is None and self.procedure_inventory_filepath:
-            self._procedure_inventory = _load_yaml(self.procedure_inventory_filepath)
+            self._procedure_inventory = utils.load_yaml(self.procedure_inventory_filepath)
 
         return self._procedure_inventory
 
@@ -118,10 +103,10 @@ class DynamicResources:
         self._formatted_inventory = None
         self._cluster = None
 
-    def cluster_if_initialized(self) -> Optional['c.KubernetesCluster']:
+    def cluster_if_initialized(self) -> Optional[c.KubernetesCluster]:
         return self._cluster
 
-    def cluster(self) -> 'c.KubernetesCluster':
+    def cluster(self) -> c.KubernetesCluster:
         """Returns already initialized cluster object or initializes new cluster object."""
         if self._cluster is None:
             log = self.logger()
@@ -157,7 +142,7 @@ class DynamicResources:
                                 logger=self.logger())
 
     def _create_logger(self):
-        return log.init_log_from_context_args(GLOBALS, self.context, self.raw_inventory()).logger
+        return log.init_log_from_context_args(static.GLOBALS, self.context, self.raw_inventory()).logger
 
 
 def _yaml_structure_preserver():
@@ -168,5 +153,6 @@ def _yaml_structure_preserver():
 
 
 def _provide_cluster(*args, **kw):
+    from kubemarine.core import flow
     return flow.DEFAULT_CLUSTER_OBJ(*args, **kw) if flow.DEFAULT_CLUSTER_OBJ is not None \
         else c.KubernetesCluster(*args, **kw)

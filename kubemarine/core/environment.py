@@ -15,7 +15,7 @@
 import os
 from abc import ABC, abstractmethod
 
-from kubemarine.core import resources
+from kubemarine.core import static
 
 
 class Environment(ABC):
@@ -26,7 +26,7 @@ class Environment(ABC):
 
     @property
     def globals(self) -> dict:
-        return resources.GLOBALS
+        return static.GLOBALS
 
     @staticmethod
     def is_deploying_from_windows():

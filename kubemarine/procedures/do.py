@@ -18,11 +18,12 @@ import argparse
 import sys
 from typing import Callable
 
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.flow import create_context
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.resources import DynamicResources
 
 
 class CLIAction(Action):
@@ -32,7 +33,7 @@ class CLIAction(Action):
         self.remote_args = remote_args
         self.no_stream = no_stream
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         executors_group = self.node_group_provider(res.cluster())
         if not executors_group or executors_group.nodes_amount() < 1:
             print('Failed to find any of specified nodes or groups')

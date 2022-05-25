@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-import argparse
 import ipaddress
 import math
 import sys
@@ -23,9 +22,10 @@ import time
 
 import fabric
 
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine import system
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 
 
@@ -470,7 +470,7 @@ class IaasAction(Action):
     def __init__(self):
         super().__init__('check iaas')
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
 
 

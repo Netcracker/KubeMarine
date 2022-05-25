@@ -17,10 +17,11 @@
 from collections import OrderedDict
 
 from kubemarine import kubernetes, haproxy, keepalived, coredns
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
@@ -139,7 +140,7 @@ class RemoveNodeAction(Action):
     def __init__(self):
         super().__init__('remove node', recreate_inventory=True)
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 

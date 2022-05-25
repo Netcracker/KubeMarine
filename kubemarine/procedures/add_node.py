@@ -18,8 +18,9 @@ import copy
 
 from collections import OrderedDict
 from kubemarine import kubernetes, system
-from kubemarine.core import flow, utils, resources
+from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
@@ -122,7 +123,7 @@ class AddNodeAction(Action):
     def __init__(self):
         super().__init__('add node', recreate_inventory=True)
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks, cumulative_points=install.cumulative_points)
         res.make_final_inventory()
 

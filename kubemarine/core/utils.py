@@ -287,6 +287,14 @@ def determine_resource_absolute_dir(path: str) -> str:
         'Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
 
+def load_yaml(filepath) -> dict:
+    try:
+        with open(filepath, 'r') as stream:
+            return yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        do_fail(f"Failed to load {filepath}", exc)
+
+
 class ClusterStorage:
     """
     File preservation:
