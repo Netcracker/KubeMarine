@@ -15,7 +15,13 @@
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_patch_inventory import PatchInventory
+from kubemarine.patches.p2_remove_network_plugin import RemoveNetworkPlugin
+from kubemarine.patches.p3_install_plugins import InstallPlugins
 
 patches: List[Patch] = [
+    PatchInventory(),
+    RemoveNetworkPlugin(),
+    InstallPlugins()
 ]
 """List of patches which can be executed strictly in the declared order"""
