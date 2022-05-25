@@ -16,8 +16,9 @@
 
 from collections import OrderedDict
 
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 from kubemarine import system
 
@@ -52,7 +53,7 @@ class RebootAction(Action):
     def __init__(self):
         super().__init__('reboot')
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
 
 

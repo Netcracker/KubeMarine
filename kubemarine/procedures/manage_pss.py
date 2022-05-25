@@ -17,8 +17,9 @@
 from collections import OrderedDict
 
 from kubemarine import admission
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 
 tasks = OrderedDict({
     "check_inventory": admission.check_inventory,
@@ -32,7 +33,7 @@ class PSSAction(Action):
     def __init__(self):
         super().__init__('manage pss', recreate_inventory=True)
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 

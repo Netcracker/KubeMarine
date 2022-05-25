@@ -19,8 +19,9 @@ from collections import OrderedDict
 import io
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow, resources
+from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
 from kubemarine.core.yaml_merger import default_merger
@@ -272,7 +273,7 @@ class MigrateCRIAction(Action):
     def __init__(self):
         super().__init__('migrate cri', recreate_inventory=True)
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 

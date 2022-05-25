@@ -24,8 +24,9 @@ from kubemarine.core.action import Action
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
-from kubemarine.core import flow, utils, resources
+from kubemarine.core import flow, utils
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.resources import DynamicResources
 
 
 def system_prepare_check_sudoer(cluster):
@@ -578,7 +579,7 @@ class InstallAction(Action):
         super().__init__('install')
         self.verification_version_result = ""
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         cluster_yml = res.raw_inventory()
         if (cluster_yml.get("services", {})
                 and cluster_yml["services"].get("kubeadm", {})
