@@ -1,9 +1,7 @@
 name: Publish Artifacts
 on:
   release:
-    types:
-      - created
-      - released
+    types: [created, released]
   push:
     branches:
       - 'main'
@@ -15,6 +13,7 @@ env:
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.release.action == 'created'
     steps:
       - uses: actions/checkout@v2
       - run: echo ${{ env.TAG_NAME }}
@@ -28,8 +27,11 @@ jobs:
   manage_patches:
     needs: publish-docker
     runs-on: ubuntu-latest
-    if: github.event.release
+    if: github.event.release.action == 'released'
 #    if: github.event.tags
     steps:
       - uses: actions/checkout@v2
-      - run: echo ${{ github.event.release.tag_name }}
+      - env:
+          EVENT_CONTEXT: ${{ toJSON(github.event) }}
+        run: |
+          echo $EVENT_CONTEXT
