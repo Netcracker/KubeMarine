@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import kubemarine.patches
-from kubemarine.core import flow, utils
+from kubemarine.core import flow
 
 
 def main(cli_arguments=None):

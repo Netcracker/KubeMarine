@@ -202,6 +202,16 @@ def selftest():
 
     demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
+    print('\nValidating patch duplicates ...')
+
+    from kubemarine import patches
+    patches = patches.patches
+    patch_ids = [patch.identifier for patch in patches]
+    unique = set()
+    duplicates = [p_id for p_id in patch_ids if p_id in unique or unique.add(p_id)]
+    if duplicates:
+        raise Exception(f'Patches identifiers {duplicates} are duplicated ')
+
     print("Finished")
 
     time_end = int(round(time.time() * 1000))
