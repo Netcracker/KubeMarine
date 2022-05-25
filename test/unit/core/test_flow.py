@@ -21,13 +21,13 @@ from typing import Optional
 
 import invoke
 
-from kubemarine.core import flow, resources, errors
+from kubemarine.core import flow, static, errors
 from kubemarine import demo
 
 test_msg = "test_function_return_result"
 
 
-resources.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
+static.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
 def test_func(cluster):

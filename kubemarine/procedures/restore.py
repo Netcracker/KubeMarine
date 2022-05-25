@@ -21,10 +21,11 @@ import time
 from collections import OrderedDict
 import yaml
 
-from kubemarine.core import utils, flow, defaults, resources
+from kubemarine.core import utils, flow, defaults
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
 
@@ -270,7 +271,7 @@ class RestoreAction(Action):
     def __init__(self):
         super().__init__('restore')
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
 
 

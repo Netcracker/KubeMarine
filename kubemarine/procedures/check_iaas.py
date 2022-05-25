@@ -25,11 +25,12 @@ from contextlib import contextmanager
 
 import fabric
 
-from kubemarine.core import flow, utils, resources
+from kubemarine.core import flow, utils
 from kubemarine import system
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 
 
@@ -638,7 +639,7 @@ class IaasAction(Action):
     def __init__(self):
         super().__init__('check iaas')
 
-    def run(self, res: 'resources.DynamicResources'):
+    def run(self, res: DynamicResources):
         flow.run_tasks(res, tasks)
 
 

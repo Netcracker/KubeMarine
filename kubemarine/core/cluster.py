@@ -19,7 +19,7 @@ from typing import Dict, List, Union
 import fabric
 import yaml
 
-from kubemarine.core import log
+from kubemarine.core import log, defaults, utils
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup
@@ -137,9 +137,11 @@ class KubernetesCluster(Environment):
         return common_group
 
     def schedule_cumulative_point(self, point_method):
+        from kubemarine.core import flow
         return flow.schedule_cumulative_point(self, point_method)
 
     def is_task_completed(self, task_path) -> bool:
+        from kubemarine.core import flow
         return flow.is_task_completed(self, task_path)
 
     def get_final_inventory(self):
@@ -166,6 +168,7 @@ class KubernetesCluster(Environment):
                 "roles": node['roles']
             }
 
+        from kubemarine import system
         system.whoami(self)
         self.log.verbose('Whoami check finished')
 
@@ -225,7 +228,7 @@ class KubernetesCluster(Environment):
 
     def get_associations_for_os(self, os_family):
         package_associations = self.inventory['services']['packages']['associations']
-        active_os_family = system.get_os_family(self)
+        active_os_family = self.context.get("os")
         if active_os_family != os_family:
             package_associations = package_associations[os_family]
 
@@ -295,6 +298,7 @@ class KubernetesCluster(Environment):
 
     def cache_package_versions(self):
         # todo consider nodes not having sudo privileges
+        from kubemarine import packages
         detected_packages = packages.detect_installed_packages_version_groups(
             self.nodes['all'].get_unchanged_nodes().get_online_nodes(True))
         for os_family in ['debian', 'rhel', 'rhel8']:
@@ -400,6 +404,3 @@ class KubernetesCluster(Environment):
                 del inventory['services']['cri']['containerdConfig']
         elif inventory['services']['cri'].get('dockerConfig'):
             del inventory['services']['cri']['dockerConfig']
-
-from kubemarine import system, packages
-from kubemarine.core import defaults, flow, utils
