@@ -1,10 +1,15 @@
 name: Publish Artifacts
 on:
   release:
-    types: [created]
+    types:
+      - created
+      - released
   push:
     branches:
       - 'main'
+      - 'test/github_test'
+#    tags:
+#      - test.*
 env:
   TAG_NAME: ${{ github.event.release.tag_name || (github.ref == 'refs/heads/main' && 'main') || 'unknown' }}
 jobs:
@@ -12,6 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: docker build . -t ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
-      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
-      - run: docker push ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
+      - run: echo ${{ env.TAG_NAME }}
+      - env:
+          EVENT_CONTEXT: ${{ toJSON(github.event) }}
+        run: |
+          echo $EVENT_CONTEXT
+#      - run: docker build . -t ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
+#      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+#      - run: docker push ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
+  manage_patches:
+    needs: publish-docker
+    runs-on: ubuntu-latest
+    if: github.event.release
+#    if: github.event.tags
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo ${{ github.event.release.tag_name }}

@@ -43,7 +43,7 @@ class RemoveNetworkPlugin(Patch):
     """See Additional steps in https://git.netcracker.com/PROD.Platform.HA/KubeMarine/-/tags/0.1.15"""
 
     def __init__(self):
-        super().__init__("patch_inventory")
+        super().__init__("patch_network_plugin")
 
     @property
     def action(self) -> Action:
