@@ -107,7 +107,7 @@ def cache_installed_packages(cluster):
             return
 
     # Cache packages only if it's set in configuration
-    if cluster.inventory['services']['packages'].get('cache_versions', False):
+    if cluster.inventory['services']['packages'].get('cache_versions', True):
         cluster.cache_package_versions()
 
 
