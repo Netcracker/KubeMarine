@@ -110,6 +110,22 @@ In case of a successful upgrade of a node, the information about it is deleted f
 If the entire update cycle completes successfully, this temporary file is deleted, and in further upgrades it is generated anew.
 At the same time, there may be situations when this file interferes with a normal upgrade - in this case, you can erase it or use manually specified nodes for the upgrade.
 
+#### Custom settings preservation for system service
+
+If system service (`etcd`, `kube-apiserver`,`kube-controller`, `kube-scheduler`) configuration is changing during the operation
+process, the changes should be reflected in `kubeadm-config` configmap. The example for `etcd` and `kube-apiserver` is the following.
+Pay attention to the fact that the manifest file and configmap structure are different.
+
+```yaml
+...
+etcd:
+  local:
+    extraArgs:
+      heartbeat-interval: "1000"
+      election-timeout: "10000"
+...
+```
+
 #### Thirdparties Upgrade Section and Task
 
 If the cluster is located in an isolated environment, it is possible to specify the custom paths to new thirdparties with the same syntax as in the `cluster.yaml` as shown in the following script:
