@@ -1,7 +1,8 @@
 name: Publish Artifacts
 on:
   release:
-    types: [created, released]
+#    types: [created, released]
+    types: [created]
   push:
     branches:
       - 'main'
@@ -13,7 +14,7 @@ env:
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.release.action == 'created'
+    # if: github.event_name == 'push' || github.event.release.action == 'created'
     steps:
       - uses: actions/checkout@v2
       - run: echo ${{ env.TAG_NAME }}
