@@ -112,10 +112,20 @@ At the same time, there may be situations when this file interferes with a norma
 
 #### Custom settings preservation for system service
 
-If system service (`etcd`, `kube-apiserver`,`kube-controller`, `kube-scheduler`) configuration is changing during the operation
-process, the changes should be reflected in `kubeadm-config` configmap. The example for `etcd` and `kube-apiserver` is the following.
-Pay attention to the fact that the manifest file and configmap structure are different.
+If system service (`etcd`, `kube-apiserver`,`kube-controller`, `kube-scheduler`) configuration is changing during the operation process, the changes should be reflected in `kubeadm-config` configmap. The example for `etcd` is the following. Pay attention to the fact that the manifest file and configmap structure are different.
 
+`/etc/kubernetes/manifests/etcd.yaml`:
+```yaml
+...
+spec:
+  containers:
+  - command:
+    - etcd
+    - --heartbeat-interval=1000
+    - --election-timeout=10000
+...
+```
+`kubeadm-config` configmap:
 ```yaml
 ...
 etcd:
