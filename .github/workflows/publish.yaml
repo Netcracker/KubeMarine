@@ -14,7 +14,7 @@ env:
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'release' && github.event.action == 'created')
+#    if: github.event_name == 'push' || (github.event_name == 'release' && github.event.action == 'created')
     steps:
       - uses: actions/checkout@v2
       - run: echo ${{ env.TAG_NAME }}
