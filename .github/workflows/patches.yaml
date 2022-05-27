@@ -1,7 +1,7 @@
 name: Manage Patches
 on:
   release:
-    types: released
+    types: [released]
 jobs:
   delete_patches_on_release:
     runs-on: ubuntu-latest
