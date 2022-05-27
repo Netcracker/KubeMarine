@@ -1,8 +1,8 @@
 name: Publish Artifacts
 on:
   release:
-#    types: [created, released]
-    types: [created]
+    types: [created, released]
+#    types: [created]
   push:
     branches:
       - 'main'
@@ -14,7 +14,7 @@ env:
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
-    # if: github.event_name == 'push' || github.event.release.action == 'created'
+     if: github.event_name == 'push' || (github.event_name == 'release' && github.event.action == 'created')
     steps:
       - uses: actions/checkout@v2
       - run: echo ${{ env.TAG_NAME }}
@@ -24,18 +24,29 @@ jobs:
           echo $EVENT_CONTEXT
       - run: ls kubemarine/patches
       - run: git branch
+      - run: |
+         find kubemarine/patches/ -not -path "kubemarine/patches/__init__.py" -not -path "kubemarine/patches/" -delete
+         cp kubemarine/resources/etalons/patches/__init__.py kubemarine/patches/__init__.py
+      - run: git status
 #      - run: docker build . -t ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
 #      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
 #      - run: docker push ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
   manage_patches:
     needs: publish-docker
     runs-on: ubuntu-latest
-    if: github.event.release.action == 'released'
+#    if: github.event.release.action == 'released'
+    if: github.event_name == 'release' && github.event.action == 'released'
 #    if: github.event.tags
     steps:
       - uses: actions/checkout@v2
+        with:
+          - ref: 'test/github_test'
       - env:
           EVENT_CONTEXT: ${{ toJSON(github.event) }}
         run: |
           echo $EVENT_CONTEXT
       - run: git branch
+      - run: |
+         find kubemarine/patches/ -not -path "kubemarine/patches/__init__.py" -not -path "kubemarine/patches/" -delete
+         cp kubemarine/resources/etalons/patches/__init__.py kubemarine/patches/__init__.py
+      - run: git status
