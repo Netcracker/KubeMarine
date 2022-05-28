@@ -550,7 +550,7 @@ The procedure works as shown in the following table:
 Also pay attention to the following:
 
 * Thirdparties, if any, should be installed only on new nodes. They should not be installed or updated on other nodes.
-* Packages should be installed only on new nodes, and can be upgraded if the upgrade is available. Nodes that are already present in the cluster should not install or update packages. Revise the notes about installation procedure (`association` paragraph, `cache_versions` option) before run the procedure.
+* Packages should be installed only on new nodes, and can be upgraded if the upgrade is available. Nodes that are already present in the cluster should not install or update the packages. Before running the procedure, refer to the details about the `cache_versions` option under `associations` section in the installation procedure. 
 * Configs should be generated and applied only to new nodes. The only exceptions are balancers and Keepalived.
 * Plugins are not reinstalled.
 * System configurations like `selinux`, `modprobe`, `sysctl`, and others should be verified and configured only on new nodes.
