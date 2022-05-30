@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+All files and directories inside kubemarine/patches directory should participate only in patching mechanism,
+and relate to the current Kubemarine version.
+
+The whole directory is automatically cleared and reset after new version of Kubemarine is released.
+"""
+
 from typing import List
 
 from kubemarine.core.patch import Patch
