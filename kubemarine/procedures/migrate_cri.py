@@ -17,10 +17,12 @@
 from collections import OrderedDict
 
 import io
+from typing import Callable
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
@@ -162,18 +164,7 @@ def _migrate_cri(cluster, node_group):
                                     "grep -E 'kube-system\\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')",
                                     is_async=False, hide=False).get_simple_out()
 
-        kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
-        kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
-                                                is_async=False).get_simple_out()
-
-        #Removing the --network-plugin=cni switch after the cri migration procedure that was used to run Docker on the cluster.
-        #Support for this key has been removed in kubernetes 1.24.
-        if kubeadm_flags.find('--network-plugin=cni') != -1:
-            kubeadm_flags = kubeadm_flags.replace('--network-plugin=cni', '')
-
-        kubeadm_flags = edit_config(kubeadm_flags)
-
-        node["connection"].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+        patch_kubeadm_flags_unsafe(node["connection"], edit_config)
 
         node["connection"].sudo("systemctl stop kubelet")
         docker.prune(node["connection"])
@@ -228,7 +219,31 @@ def _migrate_cri(cluster, node_group):
         node["connection"].sudo("rm -rf /var/run/docker.sock", hide=False)
 
 
+def patch_kubeadm_flags_unsafe(node: NodeGroup, patcher: Callable[[str], str]):
+    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+    kubeadm_flags = node.sudo(f"cat {kubeadm_flags_file}",
+                              is_async=False).get_simple_out()
+
+    kubeadm_flags_updated = patcher(kubeadm_flags)
+
+    if kubeadm_flags_updated != kubeadm_flags:
+        node.put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+        return True
+
+    return False
+
+
+def remove_network_plugin(kubeadm_flags):
+    # Removing the --network-plugin=cni switch after the cri migration procedure that was used to run Docker on the cluster.
+    # Support for this key has been removed in kubernetes 1.24.
+    if kubeadm_flags.find('--network-plugin=cni') != -1:
+        return kubeadm_flags.replace('--network-plugin=cni', '')
+
+    return kubeadm_flags
+
+
 def edit_config(kubeadm_flags):
+    kubeadm_flags = remove_network_plugin(kubeadm_flags)
     kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")
     return _config_changer(kubeadm_flags,
                            "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
