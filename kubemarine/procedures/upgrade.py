@@ -80,6 +80,7 @@ def kubernetes_cleanup_nodes_versions(cluster):
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
+    kubernetes_apply_taints(cluster)
 
 
 def upgrade_packages(cluster):
@@ -117,6 +118,8 @@ def upgrade_containerd(cluster):
         index_pos = target_kubernetes_version.rfind(".")
         target_kubernetes_version = target_kubernetes_version[:index_pos]
         pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
+        if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
+            return
         last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
         if last_pause_version != pause_version:
             sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
@@ -301,6 +304,10 @@ def fix_cri_socket(cluster):
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
 
+def kubernetes_apply_taints(cluster):
+    # Apply taints after upgrade
+    group = cluster.nodes['control-plane']
+    kubernetes.apply_taints(group)
 
 if __name__ == '__main__':
     main()
