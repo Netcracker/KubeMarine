@@ -47,7 +47,7 @@ The information about the procedures for nodes is described in the following sec
 ## Kubemarine Migration Procedure
 
 The Kubemarine migration procedure allows you to automatically adopt your current Kubernetes cluster and **cluster.yaml** to newer version of Kubemarine.
-This procedure should always be considered when taking new versions of Kubemarine, if it is going to be used on existing clusters, and managed by previous versions of Kubemarine.
+This procedure should always be considered when taking new versions of Kubemarine, if it is going to be used on the existing clusters that are managed by the previous versions of Kubemarine.
 
 Remember the following when upgrading Kubemarine:
 * Inspect all Kubemarine intermediate tags if they require some additional steps for migration.
