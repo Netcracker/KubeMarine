@@ -990,8 +990,15 @@ services:
       extraArgs:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
+    etcd:
+      local:
+        extraArgs:
+          heartbeat-interval: "1000"
+          election-timeout: "10000"
 
 ```
+
+Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
 #### Kubernetes version
 
