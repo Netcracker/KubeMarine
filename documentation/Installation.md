@@ -998,7 +998,7 @@ services:
 
 ```
 
-Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
+**Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
 #### Kubernetes version
 
