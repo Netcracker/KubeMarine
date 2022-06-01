@@ -309,6 +309,7 @@ spec:
         - --controller-class=k8s.io/ingress-nginx
         - --ingress-class=nginx
         - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
+        - --watch-ingress-without-class=true
         {% if plugins['nginx-ingress-controller']['controller']['ssl']['enableSslPassthrough'] is true -%}
         - --enable-ssl-passthrough
         {%- endif %}
@@ -394,5 +395,7 @@ metadata:
     app.kubernetes.io/part-of: ingress-nginx
     app.kubernetes.io/version: 1.2.0
   name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
 spec:
   controller: k8s.io/ingress-nginx

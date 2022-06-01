@@ -433,5 +433,5 @@ class ClusterStorage:
                     "/tmp/dump_log_cluster.tar.gz", sudo=True)
                 group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
             else:
-                cluster.log.debug('Master not found')
+                cluster.log.debug('Control-plane not found')
 

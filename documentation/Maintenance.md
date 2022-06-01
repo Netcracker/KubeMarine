@@ -22,7 +22,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
   - [Changing Calico Settings](#changing-calico-settings)
-- [Common practice](#common-practice)
+- [Common Practice](#common-practice)
 
 # Prerequisites
 
@@ -109,6 +109,32 @@ If the procedure fails and certain nodes for the upgrade are not manually specif
 In case of a successful upgrade of a node, the information about it is deleted from the state file so as to not upgrade it again.
 If the entire update cycle completes successfully, this temporary file is deleted, and in further upgrades it is generated anew.
 At the same time, there may be situations when this file interferes with a normal upgrade - in this case, you can erase it or use manually specified nodes for the upgrade.
+
+#### Custom Settings Preservation for System Service
+
+If the system service (`etcd`, `kube-apiserver`,`kube-controller`, `kube-scheduler`) configuration changes during the operation process, the changes should be reflected in the `kubeadm-config` configmap. Following is an example for `etcd`. Pay attention to the fact that the manifest file and configmap structure are different.
+
+`/etc/kubernetes/manifests/etcd.yaml`:
+```yaml
+...
+spec:
+  containers:
+  - command:
+    - etcd
+    - --heartbeat-interval=1000
+    - --election-timeout=10000
+...
+```
+`kubeadm-config` configmap:
+```yaml
+...
+etcd:
+  local:
+    extraArgs:
+      heartbeat-interval: "1000"
+      election-timeout: "10000"
+...
+```
 
 #### Thirdparties Upgrade Section and Task
 
@@ -296,7 +322,7 @@ backup-Jan-01-21-09-00-00.tar.gz
 
 By default, no parameters are required. However, if necessary, you can specify custom.
 
-#### backup_location parameter
+#### backup_location Parameter
 
 By default, the backup is placed into the workdirectory. However, if you want to specify a different location, you can specify it through `backup_location` parameter.
 You can specify two types of path in it:
@@ -307,7 +333,7 @@ You can specify two types of path in it:
   /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### etcd parameters
+#### etcd Parameters
 
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
 
@@ -326,7 +352,7 @@ backup_plan:
       cacert: /etc/kubernetes/pki/etcd/ca.crt
 ```
 
-#### nodes parameter
+#### Nodes Parameter
 
 By default, the following files are backed up from all nodes in the cluster:
 
@@ -363,7 +389,7 @@ backup_plan:
     /etc/hosts: False
 ```
 
-#### kubernetes parameter
+#### Kubernetes Parameter
 
 The procedure exports all available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to restrict resources for export, you can specify which ones you need.
 
@@ -453,7 +479,7 @@ After recovery, the procedure reboots all cluster nodes.
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
 
 
-#### backup_location parameter
+#### backup_location Parameter
 
 You need to specify the required path to the file with the backup - the recovery is performed from it.
 
@@ -463,14 +489,14 @@ Example:
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### etcd parameters
+#### etcd Parameters
 
 By default, ETCD restore does not require additional parameters, however, if required, the following are supported:
 
 * image - the full name of the ETCD image, including the registry address. On its basis, the restoration is performed.
 * certificates - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
 
-#### thirdparties parameter
+#### Thirdparties Parameter
 
 The procedure recovers thirdparties based on the `cluster.yaml`. If rpm thirdparties outdated or incorrect, specify the correct ones in this section, in the same format. For example:
 
@@ -829,7 +855,7 @@ The `manage_pss procedure executes the following sequence of tasks:
 
 This procedure allows you to safely reboot all nodes in one click. By default, all nodes in the cluster are rebooted. Gracefully reboot is performed only if installed Kubernetes cluster is detected on nodes. You can customize the process by specifying additional parameters.
 
-### graceful_reboot parameter
+### graceful_reboot Parameter
 
 The parameter allows you to forcefully specify what type of reboot to perform. Possible values:
 
@@ -842,7 +868,7 @@ Example:
 graceful_reboot: False
 ```
 
-### nodes parameter
+### Nodes Parameter
 
 This parameter allows you to specify which nodes should be rebooted. Other nodes are not affected. In this parameter, you must specify a list of node names, as is follows:
 
@@ -938,13 +964,13 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 
 **Warning**: If for some reason, the migration to Containerd has been executed on an environment where Containerd was already used as Cri, Kubernetes dashboard may be unavailable. To resolve this issue, restart the pods of the ingress-nginx-controller service.
 
-**Warning** The migration procedure removes the docker daemon from all nodes in the cluster.
+**Warning**: The migration procedure removes the docker daemon from all nodes in the cluster.
 
-### migrate_cri parameters
+### migrate_cri Parameters
 
 The following sections describe the `migrate_cri` parameters.
 
-#### cri parameter
+#### cri Parameter
 
 In this parameter, you should specify `containerRuntime: containerd` and the configuration for it.
 
@@ -963,7 +989,7 @@ cri:
       - https://artifactory.example.com:5443
 ```
 
-#### yum-repositories parameter
+#### yum-repositories Parameter
 
 This parameter allows you to specify a new repository from where containerd could be downloaded.
 
@@ -981,7 +1007,7 @@ yum:
       baseurl: http://example.com/misc/epel/7/x86_64/
 ```
 
-#### packages-associations parameter
+#### packages-associations Parameter
 
 This parameter allows you to specify an association for containerd, thus you could set a concrete version which should be installed from the allowed repositories.
 
@@ -999,7 +1025,7 @@ packages:
       config_location: '/etc/containerd/config.toml'
 ```
 
-#### thirdparties parameter
+#### Thirdparties Parameter
 
 This parameter allows you to specify the link to a concrete version of a crictl third-party. In the absence of this parameter, crictl is downloaded from Github/registry in case you ran the procedure from CLI. 
 
@@ -1037,9 +1063,9 @@ for namespace. For proper matching see the following articles:
 * [Migrate from PodSecurityPolicy](https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/)
 * [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
-**Notes:** 
+**Notes**: 
 * KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
-* Before running migration procedure please be sure that all application in Kubernetes cluster match with prerequisites:
+* Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
 [Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
 
 ### Procedure Execution Steps
@@ -1129,7 +1155,7 @@ For the `add_nodes` and `upgrade` procedures, an images prepull task is availabl
 ```yaml
 prepull_group_size: 100
 ```
-# Additional procedures
+# Additional Procedures
 
 The following kubemarine procedures are available additionally: 
 - `version`      Print current release version

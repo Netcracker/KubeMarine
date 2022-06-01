@@ -154,6 +154,7 @@ tasks = OrderedDict({
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
     "prepull_images": prepull_images,
+    "configure_policy": install.system_prepare_policy,
     "kubernetes": kubernetes_upgrade,
     "kubernetes_cleanup": kubernetes_cleanup_nodes_versions,
     "packages": upgrade_packages,
