@@ -173,10 +173,16 @@ def enrich_inventory(inventory, cluster):
                 # TODO if-else case should be revised for future Kubernetes releases
                 minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
                 if minor_version < 24:
-                    node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                    # Do not add taints for upgrade procedure
+                    if cluster.context.get('initial_procedure') != 'upgrade':
+                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
                 else:
-                    node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                    node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                    # For Kubernetes v1.24 taints for upgrade procedure and installation procedure should be different
+                    if cluster.context.get('initial_procedure') != 'upgrade':
+                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
+                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
+                    else:
+                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     if not any_worker_found:
         raise KME("KME0004")
