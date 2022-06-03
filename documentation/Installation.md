@@ -1820,13 +1820,16 @@ The following associations are used by default:
   </tr>
 </table>
 
-**Note**: By default, the packages' versions are installed in accordance with the Kubernetes version specified in the [Supported versions](#supported-versions) section.
+**Notes**: 
+* By default, the packages' versions are installed according to the Kubernetes version specified in the [Supported versions](#supported-versions) section.
+* In the procedure for adding nodes, the package versions are taken from the current nodes in order to match the nodes in the cluster. For example, if `containerd.io-1.6.4-1` is installed on the nodes of the cluster, this version is installed on the new node. This behavior can be changed by setting the `cache_versions` option to `false`. The package versions are then used only with the template from the `associations` section.
 
 The following is an example of overriding docker associations:
 
 ```yaml
 services:
   packages:
+    cache_versions: true
     associations:
       docker:
         executable_name: 'docker'
@@ -1843,6 +1846,7 @@ In case when you should redefine associations for multiple OS families at once, 
 ```yaml
 services:
   packages:
+    cache_versions: true
     associations:
       debian:
         haproxy:

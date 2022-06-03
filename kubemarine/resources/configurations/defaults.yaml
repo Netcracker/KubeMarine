@@ -313,6 +313,7 @@ services:
       keep_configs_updated: True
 
   packages:
+    cache_versions: true
     package_manager:
       replace-repositories: false
     associations:
