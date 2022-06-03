@@ -772,7 +772,7 @@ services:
       - http://example.com:5443
   thirdparties:
     /usr/bin/calicoctl:
-      source: http://example.com/webserver/repository/raw/projectcalico/calicoctl/v3.20.1/calicoctl-linux-amd64
+      source: http://example.com/webserver/repository/raw/projectcalico/calico/v3.20.1/calicoctl-linux-amd64
     /usr/bin/kubeadm:
       source: http://example.com/webserver/repository/raw/kubernetes/kubeadm/v1.22.2/bin/linux/amd64/kubeadm
     /usr/bin/kubectl:
@@ -1911,7 +1911,7 @@ services:
       sha1: f684dd035bd44e0899ab43ce2ad4aea0baf86c2e
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://github.com/projectcalico/calicoctl/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
+      source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
       sha1: bc6cc7869ebbb0e1799dfbe10795f680fba4321b
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
@@ -3999,7 +3999,7 @@ For example:
 services:
   thirdparties:
     /usr/bin/calicoctl:
-      source: 'https://example.com/calicoctl/calicoctl-linux-amd64'
+      source: 'https://example.com/calico/calicoctl-linux-amd64'
 plugins:
   calico:
     installation:
