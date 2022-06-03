@@ -182,7 +182,7 @@ The actual information about the supported versions can be found at [global.yaml
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
-  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6.
+  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
@@ -952,7 +952,7 @@ By default, the installer uses the following parameters:
 |---|---|
 |kubernetesVersion|`v1.20.3`|
 |controlPlaneEndpoint|`{{ cluster_name }}:6443`|
-|networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6|
+|networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6|
 |networking.serviceSubnet|`172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6|
 |apiServer.certSANs|List with all nodes internal IPs, external IPs and names|
 |apiServer.extraArgs.enable-admission-plugins|`NodeRestriction`|

@@ -20,7 +20,7 @@ services:
     kubernetesVersion: v1.24.0
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     networking:
-      podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/80{% endif %}'
+      podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/48{% endif %}'
       serviceSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}172.30.0.0/16{% else %}fd03::/112{% endif %}'
     apiServer:
       certSANs: []
@@ -466,7 +466,7 @@ plugins:
       DATASTORE_TYPE: kubernetes
       WAIT_FOR_DATASTORE: true
       CLUSTER_TYPE: k8s,bgp
-      CALICO_ROUTER_ID: ''
+      CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% endif %}'
       IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
       IP_AUTODETECTION_METHOD: first-found
       CALICO_IPV4POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
@@ -495,7 +495,7 @@ plugins:
           assign_ipv4: 'false'
           assign_ipv6: 'true'
           ipv6_pools:
-            - '{% if not services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}fd02::/80{% endif %}'
+            - '{% if not services.kubeadm.networking.podSubnet|isipv4 %}{{ services.kubeadm.networking.podSubnet }}{% else %}fd02::/48{% endif %}'
             - default-ipv6-ippool
           type: calico-ipam
     node:
