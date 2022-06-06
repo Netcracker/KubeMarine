@@ -182,10 +182,11 @@ The actual information about the supported versions can be found at [global.yaml
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
-  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6.
+  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `Kubemarine` uses `firewalld` only as an IP firewall . If you have other solution, remove or switch off the IP firewall before the installation.
+**Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
+If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
 
@@ -951,7 +952,7 @@ By default, the installer uses the following parameters:
 |---|---|
 |kubernetesVersion|`v1.20.3`|
 |controlPlaneEndpoint|`{{ cluster_name }}:6443`|
-|networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/80` for IPv6|
+|networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6|
 |networking.serviceSubnet|`172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6|
 |apiServer.certSANs|List with all nodes internal IPs, external IPs and names|
 |apiServer.extraArgs.enable-admission-plugins|`NodeRestriction`|
@@ -1819,13 +1820,16 @@ The following associations are used by default:
   </tr>
 </table>
 
-**Note**: By default, the packages' versions are installed in accordance with the Kubernetes version specified in the [Supported versions](#supported-versions) section.
+**Notes**: 
+* By default, the packages' versions are installed according to the Kubernetes version specified in the [Supported versions](#supported-versions) section.
+* In the procedure for adding nodes, the package versions are taken from the current nodes in order to match the nodes in the cluster. For example, if `containerd.io-1.6.4-1` is installed on the nodes of the cluster, this version is installed on the new node. This behavior can be changed by setting the `cache_versions` option to `false`. The package versions are then used only with the template from the `associations` section.
 
 The following is an example of overriding docker associations:
 
 ```yaml
 services:
   packages:
+    cache_versions: true
     associations:
       docker:
         executable_name: 'docker'
@@ -1842,6 +1846,7 @@ In case when you should redefine associations for multiple OS families at once, 
 ```yaml
 services:
   packages:
+    cache_versions: true
     associations:
       debian:
         haproxy:

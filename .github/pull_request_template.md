@@ -51,5 +51,3 @@ Results:
 Indicate new or changed unit tests and what they do, if any.
 
 
-### Reviewers
-@koryaga @iLeonidze @zaborin @alexarefev @Yaroslav-Lahtachev @dmyar21
