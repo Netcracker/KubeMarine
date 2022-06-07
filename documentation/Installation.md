@@ -8,6 +8,7 @@ This section provides information about the inventory, features, and steps for i
     - [Disk Partitioning Recommendation](#disk-partitioning-recommendation)
     - [ETCD Recommendation](#etcd-recommendation)
     - [SSH key Recommendation](#ssh-key-recommendation)
+    - [Private Certificate Authority](#private-certificate-authority)
 - [Inventory Preparation](#inventory-preparation)
   - [Deployment Schemes](#deployment-schemes)
     - [Non-HA Deployment Schemes](#non-ha-deployment-schemes)
@@ -320,6 +321,20 @@ Example:
 ```
 ssh-keygen -t rsa -b 4096
 ```
+
+### Private Certificate Authority
+
+In internal environments certificates signed by custom CA root certificate can be used, for example, in private repository. 
+In this case custom CA root certificate should be added to all the cluster nodes.
+
+Example:
+```
+# yum install ca-certificates
+# curl -o /etc/pki/ca-trust/source/anchors/Custom_CA.crt http://example.com/misc/Custom_CA.crt
+# update-ca-trust extract
+```
+
+
 # Inventory Preparation
 
 Before you begin, select the deployment scheme and prepare the inventory.
