@@ -158,7 +158,7 @@ services:
       unpack: '/opt/cni/bin'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://example.com/calicoctl/v3.10.1/calicoctl-linux-amd64'
+      source: 'https://example.com/calico/v3.22.2/calicoctl-linux-amd64'
 
   kernel_security:
     # For RHEL OS use selinux:

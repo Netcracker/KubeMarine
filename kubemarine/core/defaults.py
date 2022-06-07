@@ -233,8 +233,8 @@ def apply_registry(inventory, cluster):
                                                     % (thirdparties_address, binary))
 
             if '/usr/bin/calicoctl' == destination:
-                new_source = new_source.replace('https://github.com/projectcalico/calicoctl/releases/download',
-                                                '%s/projectcalico/calicoctl'
+                new_source = new_source.replace('https://github.com/projectcalico/calico/releases/download',
+                                                '%s/projectcalico/calico'
                                                 % thirdparties_address)
 
             if '/usr/bin/crictl.tar.gz' == destination:
