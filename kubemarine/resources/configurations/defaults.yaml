@@ -662,6 +662,13 @@ rbac:
           kind: ClusterRole
         subjects:
           - kind: ServiceAccount
+    addition_configs:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        annotations: {}
+      type: kubernetes.io/service-account-token
+
   admission: psp
   psp:
     pod-security: enabled
