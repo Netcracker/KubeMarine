@@ -46,8 +46,12 @@ def main(cli_arguments=None):
     patch_ids = [patch.identifier for patch in patches]
 
     if args.list:
-        for patch_id in patch_ids:
-            print(patch_id)
+        if patch_ids:
+            print("Available patches list:")
+            for patch_id in patch_ids:
+                print(patch_id)
+        else:
+            print("No patches available.")
         exit(0)
 
     if args.describe:
