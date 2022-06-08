@@ -324,8 +324,8 @@ ssh-keygen -t rsa -b 4096
 
 ### Private Certificate Authority
 
-In internal environments certificates signed by custom CA root certificate can be used, for example, in private repository. 
-In this case custom CA root certificate should be added to all the cluster nodes.
+In internal environments, certificates signed by the custom CA root certificate can be used, for example, in a private repository. 
+In this case, the custom CA root certificate should be added to all the cluster nodes.
 
 Example:
 ```
@@ -333,7 +333,6 @@ Example:
 # curl -o /etc/pki/ca-trust/source/anchors/Custom_CA.crt http://example.com/misc/Custom_CA.crt
 # update-ca-trust extract
 ```
-
 
 # Inventory Preparation
 
