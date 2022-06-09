@@ -372,6 +372,7 @@ class ClusterStorage:
         """
         context = self.cluster.context
         out = dict()
+        out['arguments'] = context['initial_cli_arguments']
         if 'proceeded_tasks' in context:
             out['finished_tasks'] = context['proceeded_tasks']
         out["initial_procedure"] = context["initial_procedure"]

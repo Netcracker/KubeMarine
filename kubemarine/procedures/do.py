@@ -21,7 +21,6 @@ from typing import Callable
 from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.flow import create_context
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 
@@ -93,7 +92,7 @@ def main(cli_arguments=None):
         arguments = vars(parser.parse_args(kubemarine_args))
         configfile_path = arguments.get('config')
 
-    context = create_context({
+    context = flow.create_empty_context({
         'disable_dump': True,
         'log': [
             ['stdout;level=error;colorize=true;correct_newlines=true']

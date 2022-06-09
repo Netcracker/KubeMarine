@@ -223,14 +223,14 @@ def main(cli_arguments=None):
 
     parser = flow.new_procedure_parser(cli_help)
 
-    args = flow.parse_args(parser, cli_arguments)
-    context = flow.create_context(args, procedure='upgrade')
+    context = flow.create_context(parser, cli_arguments, procedure='upgrade')
+    args = context['execution_arguments']
     resources = DynamicResources(context)
 
     upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
     verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
 
-    if (args.tasks or args.exclude) and len(upgrade_plan) > 1:
+    if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
         raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
     # todo inventory is preserved few times, probably need to preserve it once instead.

@@ -16,14 +16,17 @@ For example, create new Kubernetes cluster and execute whoami on all nodes with 
 ```python
 #!/usr/bin/env python3
 
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.resources import DynamicResources
 from kubemarine.core import flow
 
 
 def main():
-    context = flow.create_empty_context()
-    cluster = KubernetesCluster('cluster.yaml', context)
-    results = cluster.nodes['control-plane'].sudo('whoami')
+    context = flow.create_empty_context(args={
+        'config': 'cluster.yaml',
+        'dump_location': './dump/'
+    })
+    resources = DynamicResources(context)
+    results = resources.cluster().nodes['control-plane'].sudo('whoami')
     print(results)
 
 

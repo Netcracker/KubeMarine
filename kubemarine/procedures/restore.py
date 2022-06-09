@@ -285,10 +285,10 @@ def main(cli_arguments=None):
 
     parser = flow.new_procedure_parser(cli_help)
 
-    args = flow.parse_args(parser, cli_arguments)
-    context = flow.create_context(args, procedure='restore')
+    context = flow.create_context(parser, cli_arguments, procedure='restore')
+    args = context['execution_arguments']
 
-    replace_config_from_backup_if_needed(args.procedure_config, args.config)
+    replace_config_from_backup_if_needed(args['procedure_config'], args['config'])
 
     flow.run_actions(context, [RestoreAction()])
 

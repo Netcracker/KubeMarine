@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import shlex
 import sys
 import time
 from copy import deepcopy
@@ -145,9 +146,11 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None):
     run_flow(filtered_tasks, cluster, cumulative_points)
 
 
-def create_empty_context(procedure=None):
+def create_empty_context(args: dict = None, procedure: str = None):
+    if args is None:
+        args = {}
     return {
-        "execution_arguments": {},
+        "execution_arguments": deepcopy(args),
         "nodes": {},
         'initial_procedure': procedure,
         'preserve_inventory': True,
@@ -155,21 +158,18 @@ def create_empty_context(procedure=None):
     }
 
 
-def create_context(execution_arguments, procedure=None):
+def create_context(parser: argparse.ArgumentParser, cli_arguments: list, procedure: str = None):
+    args = vars(parse_args(parser, cli_arguments))
 
-    if isinstance(execution_arguments, argparse.Namespace):
-        execution_arguments = vars(execution_arguments)
-
-    context = create_empty_context(procedure=procedure)
-    context["execution_arguments"] = deepcopy(execution_arguments)
-
-    if context['execution_arguments'].get('exclude_cumulative_points_methods', '').strip() != '':
-        context['execution_arguments']['exclude_cumulative_points_methods'] = \
-            context['execution_arguments']['exclude_cumulative_points_methods'].strip().split(",")
+    if args.get('exclude_cumulative_points_methods', '').strip() != '':
+        args['exclude_cumulative_points_methods'] = args['exclude_cumulative_points_methods'].strip().split(",")
         # print('The following cumulative points methods are marked for exclusion: [ %s ]' %
-        #               ', '.join(context['execution_arguments']['exclude_cumulative_points_methods']))
+        #               ', '.join(args['exclude_cumulative_points_methods']))
     else:
-        context['execution_arguments']['exclude_cumulative_points_methods'] = []
+        args['exclude_cumulative_points_methods'] = []
+
+    context = create_empty_context(args=args, procedure=procedure)
+    context["initial_cli_arguments"] = ' '.join(map(shlex.quote, cli_arguments))
 
     return context
 
@@ -319,7 +319,7 @@ def new_procedure_parser(cli_help):
     return parser
 
 
-def parse_args(parser, arguments: None):
+def parse_args(parser, arguments: list = None):
     if arguments is None:
         args = parser.parse_args()
     else:

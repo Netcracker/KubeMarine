@@ -673,8 +673,7 @@ def main(cli_arguments=None):
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    args = flow.parse_args(parser, cli_arguments)
-    context = flow.create_context(args, procedure='iaas')
+    context = flow.create_context(parser, cli_arguments, procedure='iaas')
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 

@@ -72,9 +72,7 @@ def main(cli_arguments=None):
     '''
 
     parser = flow.new_procedure_parser(cli_help)
-
-    args = flow.parse_args(parser, cli_arguments)
-    context = flow.create_context(args, procedure='cert_renew')
+    context = flow.create_context(parser, cli_arguments, procedure='cert_renew')
 
     flow.run_actions(context, [CertRenewAction()])
 

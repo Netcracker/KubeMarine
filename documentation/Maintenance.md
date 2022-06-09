@@ -54,7 +54,9 @@ Remember the following when upgrading Kubemarine:
 * Decide whether these steps should be applied.
 * If the steps should be done manually, perform them.
   If they can be automated, checkout the necessary Kubemarine tag and apply the necessary *patches*.
-  For more information, refer to the [Patch identifiers](#patch-identifiers) section.
+  For more information, refer to the [Patch Identifiers](#patch-identifiers) section.
+
+**Note**: As much as any other maintenance procedure, `migrate_kubemarine` can make the cluster temporarily unavailable.
 
 #### Patch Identifiers
 

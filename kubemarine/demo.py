@@ -368,7 +368,7 @@ def create_silent_context(parser: argparse.ArgumentParser, args: list, procedure
     if '--disable-dump' not in args:
         args.append('--disable-dump')
 
-    context = flow.create_context(parser.parse_args(args), procedure=procedure)
+    context = flow.create_context(parser, args, procedure=procedure)
     del context['execution_arguments']['ansible_inventory_location']
     context['preserve_inventory'] = False
 

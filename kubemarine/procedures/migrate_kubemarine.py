@@ -40,12 +40,13 @@ def main(cli_arguments=None):
     parser.add_argument('--describe', metavar='PATCH',
                         help='describe the specified patch')
 
-    args = flow.parse_args(parser, cli_arguments)
+    context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
+    args = context['execution_arguments']
 
     patches = kubemarine.patches.patches
     patch_ids = [patch.identifier for patch in patches]
 
-    if args.list:
+    if args['list']:
         if patch_ids:
             print("Available patches list:")
             for patch_id in patch_ids:
@@ -54,16 +55,16 @@ def main(cli_arguments=None):
             print("No patches available.")
         exit(0)
 
-    if args.describe:
+    if args['describe']:
         for patch in patches:
-            if patch.identifier == args.describe:
+            if patch.identifier == args['describe']:
                 print(patch.description)
                 exit(0)
-        print(f"Unknown patch '{args.describe}'")
+        print(f"Unknown patch '{args['describe']}'")
         exit(1)
 
-    skip = [] if not args.skip else args.skip.split(",")
-    apply = [] if not args.apply else args.apply.split(",")
+    skip = [] if not args['skip'] else args['skip'].split(",")
+    apply = [] if not args['apply'] else args['apply'].split(",")
 
     if apply and (set(apply) - set(patch_ids)):
         print(f"Unknown patches {list(set(apply) - set(patch_ids))}")
@@ -78,8 +79,6 @@ def main(cli_arguments=None):
         if not all(positions[i] < positions[i + 1] for i in range(len(positions) - 1)):
             print("Incorrect order of patches to apply. See --list for correct order of patches.")
             exit(1)
-
-    context = flow.create_context(args, procedure="migrate_kubemarine")
 
     actions = []
     for patch in patches:
