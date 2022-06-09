@@ -17,7 +17,6 @@ import io
 import yaml
 
 from kubemarine.core import utils
-from copy import deepcopy
 
 def enrich_inventory(inventory, cluster):
     rbac = inventory['rbac']
@@ -100,10 +99,17 @@ def install(cluster):
                 f"\"{account['name']}\")].data.token}}' | sudo base64 -d"
 
         token = []
+        retries = cluster.globals['accounts']['retries']
         # Token creation in Kubernetes 1.24 is not syncronus, therefore retries are necessary
-        while not token:
+        while retries > 0:
             result = cluster.nodes['control-plane'].get_first_member().sudo(load_tokens_cmd)
             token = list(result.values())[0].stdout
+            if not token:
+                retries -= 1
+            else:
+                break
+        if not token:
+            raise Exception(f"The token loading for {account['name']} 'ServiceAccount' failed")
 
         tokens.append({
             'name': account['name'],
