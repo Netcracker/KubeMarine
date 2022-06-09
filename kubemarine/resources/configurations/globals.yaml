@@ -157,32 +157,32 @@ compatibility_map:
         version_debian: 1.5.*
     containerdio:
       v1.21.5:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.21.12:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.22.2:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.22.9:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.23.1:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.23.6:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.24.0:
-        version_rhel: 1.4*
-        version_rhel8: 1.4*
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
         version_debian: 1.4.*
     podman:
       v1.21.5:
