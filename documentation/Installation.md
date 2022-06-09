@@ -3047,6 +3047,35 @@ In the `deploy.accounts` section, you can specify the account creation settings 
 
 In this section, you can describe any parameters that needs to be applied by default to each record in the [RBAC accounts](#rbac-accounts) section. It works the same way as [node_defaults](#node_defaults).
 
+The default settings for `account_defaults` are the following:
+
+```yaml
+rbac:
+  account_defaults:
+    namespace: kube-system
+    configs:
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata: {}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata: {}
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+        subjects:
+          - kind: ServiceAccount
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          annotations: {}
+        type: kubernetes.io/service-account-token
+```
+
+The yaml file that is created from the template above is applied to the cluster during the installation procedure.
+
+**Note:** The `Secret` section works only for Kubernetes v1.24. It's excluded for Kubernetes v1.23 and lower.
+
 ### Plugins
 
 *Installation task*: `deploy.plugins`
