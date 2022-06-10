@@ -150,8 +150,6 @@ def system_prepare_policy(cluster):
         for control_plane in collect_node:
             config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
             control_plane['connection'].put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-            # We should add "bind-address" manually every time kubeapi manifest is re-created.
-            # TODO: we could probably use "kubeadm control plane patches" to persist node-specific options
             control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
                                              f"--config=/etc/kubernetes/audit-on-config.yaml && "
                                              f"sudo sed -i 's/--bind-address=.*$/--bind-address="
