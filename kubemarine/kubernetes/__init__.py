@@ -184,6 +184,14 @@ def enrich_inventory(inventory, cluster):
                     else:
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
+    # use first control plane internal address as a default bind-address
+    # for other control-planes we override it during initialization
+    # todo: use patches approach for node-specific options
+    for node in inventory["nodes"]:
+        if "control-plane" in node["roles"] and "remove_node" not in node["roles"]:
+            inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
+            break
+
     if not any_worker_found:
         raise KME("KME0004")
 
@@ -441,11 +449,6 @@ def init_first_control_plane(group):
 
     first_control_plane = group.get_first_member(provide_node_configs=True)
     first_control_plane_group = first_control_plane["connection"]
-
-    # setting global apiServer bind-address to first control-plane internal address
-    # for other control-planes we override it during initialization
-    group.cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = \
-        first_control_plane['internal_address']
 
     init_config = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
