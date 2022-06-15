@@ -33,7 +33,7 @@ class TheAction(Action):
             .get_ordered_members_list(provide_node_configs=True)
 
         for node in nodes:
-            updated = migrate_cri.patch_kubeadm_flags_unsafe(node, migrate_cri.remove_network_plugin)
+            updated = migrate_cri.patch_kubeadm_flags_unsafe(node["connection"], migrate_cri.remove_network_plugin)
             if updated:
                 system.restart_service(node, 'kubelet')
                 res.logger().info(f"--network-plugin=cni is successfully removed "
