@@ -120,7 +120,7 @@ def system_prepare_audit_daemon(cluster):
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes_or_self()
     cluster.log.debug(group.call(audit.apply_audit_rules))
 
-    
+
 def system_prepare_policy(cluster):
     """
     Task generates rules for logging kubernetes and on audit
@@ -131,14 +131,15 @@ def system_prepare_policy(cluster):
     cluster.nodes['control-plane'].run(f"sudo mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     audit_file_name = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-policy-file']
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-    collect_node = cluster.nodes['control-plane'].get_new_nodes_or_self().get_ordered_members_list()
+    collect_node = cluster.nodes['control-plane'].get_new_nodes_or_self()\
+        .get_ordered_members_list(provide_node_configs=True)
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
         #download rules in cluster
         for node in collect_node:
-            node.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+            node['connection'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
             audit_config = True
         cluster.log.debug("Audit cluster policy config")
     else:
@@ -148,16 +149,21 @@ def system_prepare_policy(cluster):
     if kubernetes.is_cluster_installed(cluster) and audit_config == True and cluster.context['initial_procedure'] != 'add_node':
         for control_plane in collect_node:
             config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
-            control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-            control_plane.sudo("kubeadm init phase control-plane apiserver --config=/etc/kubernetes/audit-on-config.yaml")
-            control_plane.sudo("kubeadm init phase upload-config kubeadm --config=/etc/kubernetes/audit-on-config.yaml")
+            control_plane['connection'].put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
+                                             f"--config=/etc/kubernetes/audit-on-config.yaml && "
+                                             f"sudo sed -i 's/--bind-address=.*$/--bind-address="
+                                             f"{control_plane['internal_address']}/' "
+                                             f"/etc/kubernetes/manifests/kube-apiserver.yaml")
+            control_plane['connection'].sudo("kubeadm init phase upload-config kubeadm "
+                                             "--config=/etc/kubernetes/audit-on-config.yaml")
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-                control_plane.call(utils.wait_command_successful, command="crictl rm -f "
-                                                            "$(sudo crictl ps --name kube-apiserver -q)")
+                control_plane['connection'].call(utils.wait_command_successful,
+                                                 command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
             else:
-                control_plane.call(utils.wait_command_successful, command="docker stop "
-                                                               "$(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
-                                                               " | awk '{print $1}')")
+                control_plane['connection'].call(utils.wait_command_successful,
+                                                 command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
+                                                         " | awk '{print $1}')")
             cluster.nodes['control-plane'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
