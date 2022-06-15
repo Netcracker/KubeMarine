@@ -327,13 +327,20 @@ ssh-keygen -t rsa -b 4096
 In internal environments, certificates signed by the custom CA root certificate can be used, for example, in a private repository. 
 In this case, the custom CA root certificate should be added to all the cluster nodes.
 
-Example:
+Examples:
+* CentOS/RHEL/Oracle
 ```
 # yum install ca-certificates
 # curl -o /etc/pki/ca-trust/source/anchors/Custom_CA.crt http://example.com/misc/Custom_CA.crt
 # update-ca-trust extract
 ```
-
+* Ubuntu/Debian:
+```
+# apt install ca-certificates
+# curl -o /usr/share/ca-certificates/Custom_CA.crt http://example.com/misc/Custom_CA.crt
+# echo "Custom_CA.crt" >> /etc/ca-certificates.conf
+# update-ca-certificates
+```
 # Inventory Preparation
 
 Before you begin, select the deployment scheme and prepare the inventory.
