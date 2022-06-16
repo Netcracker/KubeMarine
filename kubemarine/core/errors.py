@@ -60,6 +60,14 @@ class KME(RuntimeError):
         return self.code + ": " + self.message
 
 
+class FailException(Exception):
+    def __init__(self, message='', reason: Union[str, Exception] = '', hint=''):
+        super().__init__()
+        self.message = message
+        self.reason = reason
+        self.hint = hint
+
+
 def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
     """
     Parses the passed error and nicely displays its name and structure depending on what was passed.
@@ -82,7 +90,7 @@ def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
         return
 
     for dictionary_code, dictionary_kme in KME_DICTIONARY.items():
-        if dictionary_kme.get('instance') and isinstance(reason, type(dictionary_kme['instance'])):
+        if dictionary_kme.get('instance') and isinstance(reason, dictionary_kme['instance']):
             kme = KME(dictionary_code)
 
             if log:
@@ -129,7 +137,7 @@ def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
 
     if isinstance(reason, Exception):
         if log:
-            log.critical('KME0001: Unexpected exception', exc_info=True)
+            log.critical('KME0001: Unexpected exception', exc_info=reason)
         else:
             sys.stderr.write("KME0001: Unexpected exception\n\n")
             print_exc()

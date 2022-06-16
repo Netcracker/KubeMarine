@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from abc import ABC, abstractmethod
 
-from kubemarine.core import static
+from kubemarine.core.action import Action
 
 
-class Environment(ABC):
+class Patch(ABC):
+    def __init__(self, identifier: str):
+        self.identifier = identifier
+
     @property
     @abstractmethod
-    def inventory(self) -> dict:
+    def action(self) -> Action:
         pass
 
     @property
-    def globals(self) -> dict:
-        return static.GLOBALS
-
-    @staticmethod
-    def is_deploying_from_windows():
-        return os.name == 'nt'
+    @abstractmethod
+    def description(self) -> str:
+        pass

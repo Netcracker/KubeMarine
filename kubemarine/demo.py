@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import argparse
 import io
 import re
 import threading
@@ -21,10 +21,11 @@ from typing import List, Dict, Union, Any, IO
 import fabric
 from invoke import UnexpectedExit
 
-from kubemarine.core import group, flow, connections
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core import group, flow, connections
 from kubemarine.core.connections import Connections
 from kubemarine.core.group import NodeGroup, NodeGroupResult, _GenericResult, _HostToResult
+from kubemarine.core.resources import DynamicResources
 
 ShellResult = Dict[str, Union[NodeGroupResult, Any]]
 
@@ -183,8 +184,34 @@ class FakeKubernetesCluster(KubernetesCluster):
         nodegroup = super().make_group(ips)
         return FakeNodeGroup(nodegroup.nodes, self)
 
-    def finish(self):
+    def dump_finalized_inventory(self):
         return
+
+    def preserve_inventory(self):
+        return
+
+
+class FakeResources(DynamicResources):
+    def __init__(self, context, raw_inventory: dict, procedure_inventory: dict = None,
+                 cluster: KubernetesCluster = None,
+                 fake_shell: FakeShell = None, fake_fs: FakeFS = None):
+        super().__init__(context, True)
+        self.inventory_filepath = None
+        self.procedure_inventory_filepath = None
+        self._raw_inventory = raw_inventory
+        self._formatted_inventory = raw_inventory
+        self._procedure_inventory = procedure_inventory
+        self._cluster = cluster
+        if cluster:
+            self._logger = cluster.log
+        self._fake_shell = fake_shell if fake_shell else FakeShell()
+        self._fake_fs = fake_fs if fake_fs else FakeFS()
+
+    def _create_cluster(self):
+        return FakeKubernetesCluster(self.raw_inventory(), self.context,
+                                     procedure_inventory=self.procedure_inventory(),
+                                     logger=self.logger(),
+                                     fake_shell=self._fake_shell, fake_fs=self._fake_fs)
 
 
 class FakeConnection(fabric.connection.Connection):
@@ -335,11 +362,23 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def new_cluster(inventory, procedure=None, fake=True,
-                os_name='centos', os_version='7.9', net_interface='eth0'):
+def create_silent_context(parser: argparse.ArgumentParser, args: list, procedure: str = None):
+    args = list(args)
+    # todo probably increase logging level to get rid of spam in logs.
+    if '--disable-dump' not in args:
+        args.append('--disable-dump')
 
-    context = flow.create_context(
-        flow.new_parser("Help text").parse_args(['--disable-dump']), procedure=procedure)
+    context = flow.create_context(parser, args, procedure=procedure)
+    del context['execution_arguments']['ansible_inventory_location']
+    context['preserve_inventory'] = False
+
+    return context
+
+
+def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
+                os_name='centos', os_version='7.9', net_interface='eth0'):
+    if context is None:
+        context = create_silent_context(flow.new_common_parser("Help text"), [], procedure=procedure)
 
     os_family = None
 

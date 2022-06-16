@@ -12,22 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from abc import ABC, abstractmethod
+"""
+All files and directories inside kubemarine/patches directory should participate only in patching mechanism,
+and relate to the current Kubemarine version.
 
-from kubemarine.core import static
+The whole directory is automatically cleared and reset after new version of Kubemarine is released.
+"""
 
+from typing import List
 
-class Environment(ABC):
-    @property
-    @abstractmethod
-    def inventory(self) -> dict:
-        pass
+from kubemarine.core.patch import Patch
 
-    @property
-    def globals(self) -> dict:
-        return static.GLOBALS
-
-    @staticmethod
-    def is_deploying_from_windows():
-        return os.name == 'nt'
+patches: List[Patch] = [
+]
+"""List of patches which can be executed strictly in the declared order"""
