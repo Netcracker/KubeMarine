@@ -63,7 +63,7 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
     if not force:
         log.verbose('Searching for already installed auditd package...')
         debian_group = group.get_subgroup_with_os('debian')
-        debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
+        debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name_alt')
         if isinstance(debian_package_name, list):
             raise Exception(f'Audit can not be installed, because nodes already contains different package versions: '
                             f'{str(debian_package_name)}')

@@ -305,7 +305,7 @@ class KubernetesCluster(Environment):
             if self.inventory['services']['packages']['associations'].get(os_family):
                 del self.inventory['services']['packages']['associations'][os_family]
         for association_name, associated_params in self.inventory['services']['packages']['associations'].items():
-            associated_packages = associated_params.get('package_name', [])
+            associated_packages = associated_params.get('package_name_alt', [])
             packages_list = []
             final_packages_list = []
             if isinstance(associated_packages, str):

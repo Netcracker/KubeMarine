@@ -19,7 +19,6 @@ from kubemarine import yum, system, apt
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 
-
 def enrich_inventory_associations(inventory, cluster):
     os_family = system.get_os_family(cluster)
 
@@ -29,6 +28,11 @@ def enrich_inventory_associations(inventory, cluster):
         return inventory
 
     os_specific_associations = deepcopy(associations[os_family])
+    # Cache packages versions only if the option is set in configuration, so we replace the 'package_name' with the 'package_name_alt'
+    if not cluster.inventory['services']['packages']['cache_versions']:
+        for package in os_specific_associations:
+            os_specific_associations[package]['package_name'] = \
+                os_specific_associations[package]['package_name_alt']
     os_specific_associations['debian'] = deepcopy(associations['debian'])
     os_specific_associations['rhel'] = deepcopy(associations['rhel'])
     os_specific_associations['rhel8'] = deepcopy(associations['rhel8'])
@@ -86,7 +90,7 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
-    :param package: RPM-compatible package name, which version should be detected
+    :param package: package name, which version should be detected (eg. 'podman' and 'containerd' without any version suggestion)
     :param warn: Suppress exception for non-found packages
     :return: NodeGroupResults with package version on each host
 
@@ -99,9 +103,7 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     if group.get_nodes_os() in ["rhel", "rhel8"]:
         cmd = r"rpm -q %s" % package
     else:
-        # in ubuntu it is much easier to parse package name
-        package_name = package.split("=")[0]
-        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
+        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package
 
     # This is WA for RemoteExecutor, since any package failed others are not checked
     # TODO: get rid of this WA and use warn=True in sudo
@@ -126,14 +128,12 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
         packages_list = []
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
-            associated_packages = associated_params.get('package_name', [])
+            # use 'package_name_alt' because it does not include version
+            associated_packages = associated_params.get('package_name_alt', [])
             if isinstance(associated_packages, str):
                 packages_list.append(associated_packages)
             else:
                 packages_list = packages_list + associated_packages
-        # packages from direct installation section
-        if cluster.inventory['services']['packages'].get('install', {}):
-            packages_list = packages_list + cluster.inventory['services']['packages']['install']['include']
 
     # dedup
     packages_list = list(set(packages_list))
