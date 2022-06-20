@@ -433,8 +433,10 @@ plugins:
               paths:
                 - path: /
                   backend:
-                    serviceName: kubernetes-dashboard
-                    servicePort: 443
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
 
   sock-shop:
     install: true
