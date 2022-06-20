@@ -19,6 +19,7 @@ from kubemarine import yum, system, apt
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 
+
 def enrich_inventory_associations(inventory, cluster):
     os_family = system.get_os_family(cluster)
 
@@ -129,6 +130,7 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     """
 
     cluster = group.cluster
+
     if not packages_list:
         packages_list = []
         excluded_dict = {}
