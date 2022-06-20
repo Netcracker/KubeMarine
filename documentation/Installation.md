@@ -3457,12 +3457,12 @@ If you enable the plugin, all other parameters are applied by default. The follo
   </tr>
   <tr>
     <td>dashboard.image</td>
-    <td><pre>kubernetesui/dashboard:v2.0.0-rc2</pre></td>
+    <td><pre>kubernetesui/dashboard:{{ plugins["kubernetes-dashboard"].version }}</pre></td>
     <td>Kubernetes Dashboard image.</td>
   </tr>
   <tr>
     <td>metrics-scraper.image</td>
-    <td><pre>kubernetesui/metrics-scraper:v1.0.2</pre></td>
+    <td><pre>kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion]["metrics-scraper-version"] }}</pre></td>
     <td>Kubernetes Dashboard Metrics Scraper image.</td>
   </tr>
   <tr>
@@ -3471,25 +3471,27 @@ If you enable the plugin, all other parameters are applied by default. The follo
 namespace: kubernetes-dashboard
 annotations:
   nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-  nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  nginx.ingress.kubernetes.io/rewrite-target: /
-  nginx.ingress.kubernetes.io/secure-backends: "true"
-  nginx.ingress.kubernetes.io/ssl-passthrough: "true"</pre></td>
+  </pre></td>
     <td>Ingress metadata, typically contains namespace and NGINX-specific parameters.</td>
   </tr>
   <tr>
     <td>ingress.spec</td>
-    <td><pre>tls:
-  - hosts:
-    - '{{ plugins["kubernetes-dashboard"].hostname }}'
-rules:
-  - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
-    http:
-      paths:
-        - path: /
-          backend:
-            serviceName: kubernetes-dashboard
-            servicePort: 443</pre></td>
+    <td><pre>
+        tls:
+          - hosts:
+            - '{{ plugins["kubernetes-dashboard"].hostname }}'
+        rules:
+          - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
+    </pre></td>
     <td>Ingress specs, determining where and on which port the Kubernetes Dashboard UI is located.</td>
   </tr>
 </table>
@@ -3543,8 +3545,10 @@ plugins:
               paths:
                 - path: /
                   backend:
-                    serviceName: kubernetes-dashboard
-                    servicePort: 443
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
 ```
  
 **Warning**: Be very careful when overriding these parameters.
