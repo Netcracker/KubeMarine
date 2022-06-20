@@ -33,6 +33,12 @@ def enrich_inventory_associations(inventory, cluster):
         for package in os_specific_associations:
             os_specific_associations[package]['package_name'] = \
                 os_specific_associations[package]['package_name_alt']
+    else:
+        # set 'skip_caching' for customer association
+        if cluster.raw_inventory.get('services', {}).get('packages', {}).get('associations', {}):
+            for package in cluster.raw_inventory['services']['packages']['associations']:
+                os_specific_associations[package]['skip_caching'] = "true"
+
     os_specific_associations['debian'] = deepcopy(associations['debian'])
     os_specific_associations['rhel'] = deepcopy(associations['rhel'])
     os_specific_associations['rhel8'] = deepcopy(associations['rhel8'])
@@ -123,9 +129,9 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     """
 
     cluster = group.cluster
-
     if not packages_list:
         packages_list = []
+        excluded_dict = {}
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
             # use 'package_name_alt' because it does not include version
@@ -134,6 +140,11 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
                 packages_list.append(associated_packages)
             else:
                 packages_list = packages_list + associated_packages
+            if associated_params.get('skip_caching', False):
+                # replace packages with asscotiatede version that shoud be excluded from full version list 
+                for excluded_package in associated_params['package_name_alt']:
+                    excluded_dict[excluded_package] = \
+                            associated_params['package_name'][(associated_params['package_name_alt'].index(excluded_package))]
 
     # dedup
     packages_list = list(set(packages_list))
@@ -151,6 +162,9 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
             node_detected_package = multiple_results[i].stdout.strip() + multiple_results[i].stderr.strip()
             if "not installed" in node_detected_package or "no packages found" in node_detected_package:
                 node_detected_package = f"not installed {package}"
+            else:
+                if package in excluded_dict.keys():
+                    node_detected_package = excluded_dict[package] 
             results[package][host] = node_detected_package
 
     return results
