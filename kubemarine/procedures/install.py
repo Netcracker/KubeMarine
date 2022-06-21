@@ -496,18 +496,6 @@ def configure_podman(cluster):
     group.call(podman.configure)
 
 
-# def system_cri_configure(cluster):
-#     """
-#     Task which is used to configure CRI. Could be skipped, if CRI already configured.
-#     """
-#     group = cluster.nodes['master'].include_group(cluster.nodes.get('worker'))
-
-#     if cluster.context['initial_procedure'] == 'add_node':
-#         group = group.get_new_nodes()
-
-#     group.call(cri.configure)
-
-
 def overview(cluster):
     cluster.log.debug("Retrieving cluster status...")
     control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
