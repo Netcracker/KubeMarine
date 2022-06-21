@@ -3544,6 +3544,7 @@ plugins:
             http:
               paths:
                 - path: /
+                  pathType: Prefix
                   backend:
                     service:
                       name: kubernetes-dashboard
