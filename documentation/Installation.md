@@ -2014,6 +2014,24 @@ services:
         - https://artifactory.example.com:5443
 ```
 
+When registry requires authentication the `containerdConfig` should be similar the following:
+
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".tls:
+        insecure_skip_verify: true
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".auth:
+        auth: "bmMtdXNlcjperfr="
+      plugins."io.containerd.grpc.v1.cri".registry.mirrors."private-registry:5000":
+        endpoint:
+        - https://private-registry:5000
+```
+
+Where `auth: "bmMtdXNlcjperfr="` field is `username:password` string in base64 enconing
+
 Note how `containerdConfig` section reflects the toml format structure.
 For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
 By default, the following parameters are used for `containerdConfig`:
