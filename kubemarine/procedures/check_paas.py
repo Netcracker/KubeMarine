@@ -784,7 +784,8 @@ def control_plane_configuration_status(cluster):
                 result[static_pod['metadata']['name']] = dict()
                 if version in static_pod["spec"]["containers"][0].get("image", ""):
                     result[static_pod['metadata']['name']]['correct_version'] = True
-                result[static_pod['metadata']['name']]['correct_properties'] = check_extra_args(cluster, static_pod)
+                result[static_pod['metadata']['name']]['correct_properties'] = \
+                    check_extra_args(cluster, static_pod, control_plane)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
             results.append(result)
 
@@ -806,9 +807,12 @@ def control_plane_configuration_status(cluster):
             raise TestFailure('invalid', hint=message)
 
 
-def check_extra_args(cluster, static_pod):
+def check_extra_args(cluster, static_pod, node):
     static_pod_name = static_pod[static_pod['metadata']['name']]
     for arg, value in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraArgs", {}).items():
+        if arg == "bind-address":
+            # for "bind-address" we do not take default value into account, because its patched to node internal-address
+            value = node["internal_address"]
         correct_property = False
         original_property = arg + "=" + value
         properties = static_pod["spec"]["containers"][0].get("command", [])
