@@ -29,16 +29,10 @@ def enrich_inventory_associations(inventory, cluster):
         return inventory
 
     os_specific_associations = deepcopy(associations[os_family])
-    # Cache packages versions only if the option is set in configuration, so we replace the 'package_name' with the 'package_name_alt'
-    if not cluster.inventory['services']['packages']['cache_versions']:
-        for package in os_specific_associations:
-            os_specific_associations[package]['package_name'] = \
-                os_specific_associations[package]['package_name_alt']
-    else:
-        # set 'skip_caching' for customer association
-        if cluster.raw_inventory.get('services', {}).get('packages', {}).get('associations', {}):
-            for package in cluster.raw_inventory['services']['packages']['associations']:
-                os_specific_associations[package]['skip_caching'] = "true"
+    # set 'skip_caching' for customer association
+    if cluster.raw_inventory.get('services', {}).get('packages', {}).get('associations', {}):
+        for package in cluster.raw_inventory['services']['packages']['associations']:
+            os_specific_associations[package]['skip_caching'] = "true"
 
     os_specific_associations['debian'] = deepcopy(associations['debian'])
     os_specific_associations['rhel'] = deepcopy(associations['rhel'])
@@ -107,10 +101,12 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     (for example docker-ce* returns docker-ce and docker-ce-cli).
     """
 
+    package_name = get_package_name(group, package)
+
     if group.get_nodes_os() in ["rhel", "rhel8"]:
-        cmd = r"rpm -q %s" % package
+        cmd = r"rpm -q %s" % package_name
     else:
-        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package
+        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
 
     # This is WA for RemoteExecutor, since any package failed others are not checked
     # TODO: get rid of this WA and use warn=True in sudo
@@ -136,24 +132,26 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
         excluded_dict = {}
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
-            # use 'package_name_alt' because it does not include version
-            associated_packages = associated_params.get('package_name_alt', [])
+            associated_packages = associated_params.get('package_name', [])
             if isinstance(associated_packages, str):
-                packages_list.append(associated_packages)
+                packages_list.append(get_package_name(group, associated_packages))
             else:
-                packages_list = packages_list + associated_packages
+                associated_packages_clean = []
+                for package in associated_packages:
+                     associated_packages_clean.append(get_package_name(group, package))
+                packages_list = packages_list + associated_packages_clean
             if associated_params.get('skip_caching', False):
-                # replace packages with asscotiatede version that shoud be excluded from full version list 
-                for excluded_package in associated_params['package_name_alt']:
-                    excluded_dict[excluded_package] = \
-                            associated_params['package_name'][(associated_params['package_name_alt'].index(excluded_package))]
+                # replace packages with associated version that shoud be excluded from cache
+                for excluded_package in associated_params['package_name']:
+                    excluded_dict[get_package_name(group, excluded_package)] = excluded_package
 
     # dedup
     packages_list = list(set(packages_list))
 
     with RemoteExecutor(cluster) as exe:
         for package in packages_list:
-            detect_installed_package_version(group, package, warn=True)
+            package_name = get_package_name(group, package)
+            detect_installed_package_version(group, package_name, warn=True)
 
     raw_result = exe.get_last_results()
     results: dict[str, NodeGroupResult] = {}
@@ -204,3 +202,23 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
         grouped_packages[queried_package] = detected_grouped_packages
 
     return grouped_packages
+
+
+def get_package_name(group: NodeGroup, package: str) -> str:
+    """
+
+    """
+
+    import re
+
+    package_name = ""
+    
+    if package:
+        if group.get_nodes_os() in ["rhel", "rhel8"]:
+            # regexp is needed to split package and its version, the pattern start with '-' then should be number or '*'
+            package_name = re.split(r'-[\d,\*]', package)[0]
+        else:
+            # in ubuntu it is much easier to parse package name
+            package_name = package.split("=")[0]
+
+    return package_name
