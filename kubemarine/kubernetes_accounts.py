@@ -27,8 +27,6 @@ def enrich_inventory(inventory, cluster):
         if account.get('name') is None or account.get('role') is None:
             raise Exception('Invalid account definition - name or role not defined')
 
-        cluster.log.debug("ACCOUNTS: %s" % rbac["accounts"][i]['configs'][0])
-
         if account['configs'][0]['metadata'].get('name') is None:
             rbac["accounts"][i]['configs'][0]['metadata']['name'] = account['name']
             rbac["accounts"][i]['configs'][0]['secrets'].append({})
@@ -60,7 +58,6 @@ def enrich_inventory(inventory, cluster):
             if account['configs'][2]['metadata'].get('namespace') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
 
-    cluster.log.debug("ACCOUNTS: %s" % rbac["accounts"][i]['configs'][0])
     return inventory
 
 
