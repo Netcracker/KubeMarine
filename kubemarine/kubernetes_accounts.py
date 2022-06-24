@@ -29,8 +29,6 @@ def enrich_inventory(inventory, cluster):
 
         if account['configs'][0]['metadata'].get('name') is None:
             rbac["accounts"][i]['configs'][0]['metadata']['name'] = account['name']
-            rbac["accounts"][i]['configs'][0]['secrets'].append({})
-            rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"
         if account['configs'][0]['metadata'].get('namespace') is None:
             rbac["accounts"][i]['configs'][0]['metadata']['namespace'] = account['namespace']
 
@@ -49,12 +47,15 @@ def enrich_inventory(inventory, cluster):
         minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
         if minor_version < 24:
             rbac["accounts"][i]['configs'].pop(2)
+            rbac["accounts"][i]['configs'][0].pop('secrets')
         else:
            # This part is applicable for Kubernetes v1.24 and higher
            # It has 'Secret' in addition 
             if account['configs'][2]['metadata'].get('name') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['annotations']['kubernetes.io/service-account.name'] = account['name']
                 rbac["accounts"][i]['configs'][2]['metadata']['name'] = f"{account['name']}-token"
+                rbac["accounts"][i]['configs'][0]['secrets'].append({})
+                rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"
             if account['configs'][2]['metadata'].get('namespace') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
 
