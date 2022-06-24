@@ -1022,6 +1022,34 @@ services:
 
 **Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
+During init, join, ugrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
+
+KubeMarine allows to configure kubeadm preflight errors to be ignored.
+
+Example:
+
+```yaml
+services:
+  kubeadm:
+  kubeadm_flags:
+    ignorePreflightErrors:
+    - Port-6443
+    - CoreDNSUnsupportedPlugins
+    - DirAvailable--var-lib-etcd
+```
+
+**Note**: Defaulte settings for `ignorePreflightErrors` are:
+
+```yaml
+services:
+  kubeadm:
+  kubeadm_flags:
+    ignorePreflightErrors:
+    - Port-6443
+    - CoreDNSUnsupportedPlugins
+```
+If you want more errors to be ignored it is mandatory to include `Port-6443`, `CoreDNSUnsupportedPlugins` in the list of `ignorePreflightErrors` in the cluster.yaml.
+
 #### Kubernetes version
 
 By default, the `1.20.2` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
