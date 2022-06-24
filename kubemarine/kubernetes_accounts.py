@@ -27,8 +27,12 @@ def enrich_inventory(inventory, cluster):
         if account.get('name') is None or account.get('role') is None:
             raise Exception('Invalid account definition - name or role not defined')
 
+        cluster.log.debug("ACCOUNTS: %s" % rbac["accounts"][i]['configs'][0])
+
         if account['configs'][0]['metadata'].get('name') is None:
             rbac["accounts"][i]['configs'][0]['metadata']['name'] = account['name']
+            rbac["accounts"][i]['configs'][0]['secrets'].append({})
+            rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"
         if account['configs'][0]['metadata'].get('namespace') is None:
             rbac["accounts"][i]['configs'][0]['metadata']['namespace'] = account['namespace']
 
@@ -52,10 +56,11 @@ def enrich_inventory(inventory, cluster):
            # It has 'Secret' in addition 
             if account['configs'][2]['metadata'].get('name') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['annotations']['kubernetes.io/service-account.name'] = account['name']
-                rbac["accounts"][i]['configs'][2]['metadata']['name'] = account['name']
+                rbac["accounts"][i]['configs'][2]['metadata']['name'] = f"{account['name']}-token"
             if account['configs'][2]['metadata'].get('namespace') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
 
+    cluster.log.debug("ACCOUNTS: %s" % rbac["accounts"][i]['configs'][0])
     return inventory
 
 
@@ -87,16 +92,9 @@ def install(cluster):
         cluster.nodes['control-plane'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False)
 
         cluster.log.debug('Loading token...')
-        # The token getting procedure has difference for Kubernetes version 1.24 and higher
-        minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-        if minor_version < 24:
-            load_tokens_cmd = 'kubectl -n %s get secret ' \
+        load_tokens_cmd = 'kubectl -n %s get secret ' \
                           '$(sudo kubectl -n %s get sa %s -o \'jsonpath={.secrets[0].name}\') -o \'jsonpath={.data.token}\'' \
                           '| sudo base64 -d' % (account['namespace'], account['namespace'], account['name'])
-        else:
-            load_tokens_cmd = f"kubectl -n {account['namespace']} get secret " \
-                f"-o=jsonpath='{{.items[?(@.metadata.annotations.kubernetes\.io/service-account\.name==" \
-                f"\"{account['name']}\")].data.token}}' | sudo base64 -d"
 
         token = []
         retries = cluster.globals['accounts']['retries']
