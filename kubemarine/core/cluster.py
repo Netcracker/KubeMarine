@@ -309,11 +309,11 @@ class KubernetesCluster(Environment):
             packages_list = []
             final_packages_list = []
             if isinstance(associated_packages, str):
-                packages_list.append(packages.get_package_name(self.nodes['all'], associated_packages))
+                packages_list.append(packages.get_package_name(os_family, associated_packages))
             elif isinstance(associated_packages, list):
                 associated_packages_clean = []
                 for package in associated_packages:
-                     associated_packages_clean.append(packages.get_package_name(self.nodes['all'], package))
+                     associated_packages_clean.append(packages.get_package_name(os_family, package))
                 packages_list = packages_list + associated_packages_clean
             else:
                 raise Exception('Unsupported associated packages object type')
@@ -358,7 +358,6 @@ class KubernetesCluster(Environment):
                     package_versions_list = [package]
                 final_packages_list = final_packages_list + package_versions_list
             self.inventory['services']['packages']['install']['include'] = list(set(final_packages_list))
-        self.log.debug("PACKAGES: %s" % detected_packages)
         return detected_packages
 
     def dump_finalized_inventory(self):
