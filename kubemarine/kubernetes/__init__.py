@@ -195,6 +195,15 @@ def enrich_inventory(inventory, cluster):
     if not any_worker_found:
         raise KME("KME0004")
 
+    # check ignorePreflightErrors value and add mandatory errors from defaults.yaml if they're absent
+    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
+            as stream:
+        default_preflight_errors = yaml.safe_load(stream)["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
+    preflight_errors = inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
+
+    preflight_errors.extend(default_preflight_errors)
+    inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
+
     return inventory
 
 
