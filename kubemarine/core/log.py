@@ -77,7 +77,7 @@ LOGGING_NAMES_BY_LEVEL = {
 }
 
 
-class EnhancedLogger(logging.getLoggerClass()):
+class EnhancedLogger(logging.Logger):
     def __init__(self, name, level=logging.NOTSET):
         super().__init__(name, level)
         logging.addLevelName(VERBOSE, 'VERBOSE')
@@ -248,9 +248,8 @@ class LogHandler:
 
 class Log:
 
-    def __init__(self, cluster, handlers: List[LogHandler]):
-        self._cluster = cluster
-        self._logger = logging.getLogger(cluster.raw_inventory.get('cluster_name', 'cluster.local'))
+    def __init__(self, raw_inventory, handlers: List[LogHandler]):
+        self._logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
         self._logger.setLevel(VERBOSE)
 
         if self._logger.hasHandlers():
@@ -289,18 +288,21 @@ def parse_log_argument(argument: str) -> LogHandler:
     return LogHandler(**parameters)
 
 
-def init_log_from_context_args(cluster) -> Log:
+def init_log_from_context_args(globals, context, raw_inventory) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
-    :param cluster: Cluster for which logging is created. It may not be fully initialized, it is enough to be globals and raw_inventory loaded.
+    :param globals: parsed globals collection
+    :param context: context holding execution arguments.
+    :param raw_inventory: parsed but not yet enriched inventory
     :return: Initialized Log, based on all parsed logging arguments
     """
 
     handlers = []
     stdout_specified = False
 
-    if cluster.context['execution_arguments'].get('log') is not None:
-        for argument in cluster.context['execution_arguments'].get('log'):
+    args = context['execution_arguments']
+    if args.get('log') is not None:
+        for argument in args.get('log'):
             handler = parse_log_argument(argument[0])
             if handler.has_stdout_target():
                 if stdout_specified:
@@ -309,15 +311,15 @@ def init_log_from_context_args(cluster) -> Log:
                     stdout_specified = True
             handlers.append(handler)
 
-    if not cluster.context['execution_arguments'].get('disable_dump', True):
-        handlers.append(LogHandler(target=os.path.join(cluster.context['execution_arguments']['dump_location'], 'debug.log'),
-                                   **cluster.globals['logging']['default_targets']['dump']))
+    if not args.get('disable_dump', True):
+        handlers.append(LogHandler(target=os.path.join(args['dump_location'], 'debug.log'),
+                                   **globals['logging']['default_targets']['dump']))
 
     if not stdout_specified:
         handlers.append(LogHandler(target='stdout',
-                                   **cluster.globals['logging']['default_targets']['stdout']))
+                                   **globals['logging']['default_targets']['stdout']))
 
-    log = Log(cluster, handlers)
+    log = Log(raw_inventory, handlers)
 
     log.logger.verbose('Using the following loggers: \n\t%s' % "\n\t".join("- " + str(x) for x in handlers))
 

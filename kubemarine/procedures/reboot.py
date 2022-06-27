@@ -17,6 +17,8 @@
 from collections import OrderedDict
 
 from kubemarine.core import flow
+from kubemarine.core.action import Action
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 from kubemarine import system
 
@@ -47,6 +49,14 @@ tasks = OrderedDict({
 })
 
 
+class RebootAction(Action):
+    def __init__(self):
+        super().__init__('reboot')
+
+    def run(self, res: DynamicResources):
+        flow.run_tasks(res, tasks)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for Kubernetes nodes graceful rebooting.
@@ -55,42 +65,14 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
+    parser = flow.new_tasks_flow_parser(cli_help)
 
     parser.add_argument('procedure_config', nargs='?', metavar='procedure_config', type=str,
                         help='config file for reboot procedure')
 
-    args = flow.parse_args(parser, cli_arguments)
+    context = flow.create_context(parser, cli_arguments, procedure='reboot')
 
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    context = flow.create_context(args, procedure='reboot',
-                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
-    context['inventory_regenerate_required'] = False
-
-    flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        context,
-        procedure_inventory_filepath=args.procedure_config,
-        cumulative_points=install.cumulative_points
-    )
+    flow.run_actions(context, [RebootAction()])
 
 
 if __name__ == '__main__':

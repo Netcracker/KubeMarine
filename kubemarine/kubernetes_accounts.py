@@ -18,7 +18,6 @@ import yaml
 
 from kubemarine.core import utils
 
-
 def enrich_inventory(inventory, cluster):
     rbac = inventory['rbac']
     if not rbac.get("accounts"):
@@ -42,6 +41,23 @@ def enrich_inventory(inventory, cluster):
             rbac["accounts"][i]['configs'][1]['subjects'][0]['name'] = account['name']
         if account['configs'][1]['subjects'][0].get('namespace') is None:
             rbac["accounts"][i]['configs'][1]['subjects'][0]['namespace'] = account['namespace']
+
+        # For Kubernetes v1.23 and lower are used legacy enrichment
+        # It has only 'ServiceAccount' and 'ClusterRoleBinding'
+        minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+        if minor_version < 24:
+            rbac["accounts"][i]['configs'].pop(2)
+            rbac["accounts"][i]['configs'][0].pop('secrets')
+        else:
+           # This part is applicable for Kubernetes v1.24 and higher
+           # It has 'Secret' in addition 
+            if account['configs'][2]['metadata'].get('name') is None:
+                rbac["accounts"][i]['configs'][2]['metadata']['annotations']['kubernetes.io/service-account.name'] = account['name']
+                rbac["accounts"][i]['configs'][2]['metadata']['name'] = f"{account['name']}-token"
+                rbac["accounts"][i]['configs'][0]['secrets'].append({})
+                rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"
+            if account['configs'][2]['metadata'].get('namespace') is None:
+                rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
 
     return inventory
 
@@ -74,11 +90,22 @@ def install(cluster):
         cluster.nodes['control-plane'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False)
 
         cluster.log.debug('Loading token...')
-        load_tokens_cmd = 'kubectl -n kube-system get secret ' \
-                          '$(sudo kubectl -n kube-system get sa %s -o \'jsonpath={.secrets[0].name}\') ' \
-                          '-o \'jsonpath={.data.token}\' | sudo base64 -d' % account['name']
-        result = cluster.nodes['control-plane'].get_first_member().sudo(load_tokens_cmd)
-        token = list(result.values())[0].stdout
+        load_tokens_cmd = 'kubectl -n %s get secret ' \
+                          '$(sudo kubectl -n %s get sa %s -o \'jsonpath={.secrets[0].name}\') -o \'jsonpath={.data.token}\'' \
+                          '| sudo base64 -d' % (account['namespace'], account['namespace'], account['name'])
+
+        token = []
+        retries = cluster.globals['accounts']['retries']
+        # Token creation in Kubernetes 1.24 is not syncronus, therefore retries are necessary
+        while retries > 0:
+            result = cluster.nodes['control-plane'].get_first_member().sudo(load_tokens_cmd)
+            token = list(result.values())[0].stdout
+            if not token:
+                retries -= 1
+            else:
+                break
+        if not token:
+            raise Exception(f"The token loading for {account['name']} 'ServiceAccount' failed")
 
         tokens.append({
             'name': account['name'],

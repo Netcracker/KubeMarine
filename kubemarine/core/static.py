@@ -12,22 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from abc import ABC, abstractmethod
+from kubemarine.core import utils
 
-from kubemarine.core import static
+GLOBALS = utils.load_yaml(
+    utils.get_resource_absolute_path('resources/configurations/globals.yaml', script_relative=True))
 
-
-class Environment(ABC):
-    @property
-    @abstractmethod
-    def inventory(self) -> dict:
-        pass
-
-    @property
-    def globals(self) -> dict:
-        return static.GLOBALS
-
-    @staticmethod
-    def is_deploying_from_windows():
-        return os.name == 'nt'
+DEFAULTS = utils.load_yaml(
+    utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True))

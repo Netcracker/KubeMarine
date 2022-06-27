@@ -27,8 +27,10 @@ import fabric
 
 from kubemarine.core import flow, utils
 from kubemarine import system
+from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 
 
@@ -633,6 +635,14 @@ tasks = OrderedDict({
 })
 
 
+class IaasAction(Action):
+    def __init__(self):
+        super().__init__('check iaas')
+
+    def run(self, res: DynamicResources):
+        flow.run_tasks(res, tasks)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for checking Kubernetes cluster IAAS layer.
@@ -641,15 +651,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
+    parser = flow.new_tasks_flow_parser(cli_help)
 
     parser.add_argument('--csv-report',
                         default='report.csv',
@@ -671,29 +673,11 @@ def main(cli_arguments=None):
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    args = flow.parse_args(parser, cli_arguments)
-
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    context = flow.create_context(args, procedure='iaas',
-                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
+    context = flow.create_context(parser, cli_arguments, procedure='iaas')
     context['testsuite'] = TestSuite()
+    context['preserve_inventory'] = False
 
-    cluster = flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        context,
-        print_final_message=False
-    )
+    cluster = flow.run_actions(context, [IaasAction()], print_final_message=False)
 
     # Final summary should be printed only to stdout with custom formatting
     # If test results are required for parsing, they can be found in the test results files
