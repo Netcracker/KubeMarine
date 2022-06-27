@@ -408,7 +408,7 @@ def join_control_plane(group, node, join_dict):
 
     node['connection'].sudo("kubeadm join "
                             " --config=/etc/kubernetes/join-config.yaml"
-                            " --ignore-preflight-errors='" + get_kubeadm_preflight_errors(group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']) + "'"
+                            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
                             " --v=5",
                             is_async=False, hide=False)
 
@@ -485,7 +485,7 @@ def init_first_control_plane(group):
     result = first_control_plane_group.sudo("kubeadm init"
                                      " --upload-certs"
                                      " --config=/etc/kubernetes/init-config.yaml"
-                                     " --ignore-preflight-errors='" + get_kubeadm_preflight_errors(group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']) + "'"
+                                     " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
                                      " --v=5",
                                      hide=False)
 
@@ -615,7 +615,7 @@ def init_workers(group):
     group.cluster.log.debug('Joining workers...')
     return group.sudo(
         "kubeadm join --config=/etc/kubernetes/join-config.yaml"
-        " --ignore-preflight-errors='" + get_kubeadm_preflight_errors(group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']) + "'"
+        " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
         " --v=5",
         is_async=False, hide=False)
 
@@ -686,13 +686,6 @@ def get_kubeadm_config(inventory):
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
-def get_kubeadm_preflight_errors(preflight_errors):
-# take list of ignored preflight errors from inventory and create a line to be used as a kubeadm flag
-    ignore_preflight_errors = ""
-    for e in preflight_errors:
-        ignore_preflight_errors += '%s,' % e
-    return ignore_preflight_errors.rstrip(",")
-
 def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
@@ -702,7 +695,7 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=N
 
     cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
 
-    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % get_kubeadm_preflight_errors(cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'])
+    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
 
     if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"

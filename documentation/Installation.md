@@ -1032,10 +1032,7 @@ Example:
 services:
   kubeadm:
   kubeadm_flags:
-    ignorePreflightErrors:
-    - Port-6443
-    - CoreDNSUnsupportedPlugins
-    - DirAvailable--var-lib-etcd
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins,DirAvailable--var-lib-etcd
 ```
 
 **Note**: Defaulte settings for `ignorePreflightErrors` are:
@@ -1044,9 +1041,7 @@ services:
 services:
   kubeadm:
   kubeadm_flags:
-    ignorePreflightErrors:
-    - Port-6443
-    - CoreDNSUnsupportedPlugins
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
 ```
 If you want more errors to be ignored it is mandatory to include `Port-6443`, `CoreDNSUnsupportedPlugins` in the list of `ignorePreflightErrors` in the cluster.yaml.
 
