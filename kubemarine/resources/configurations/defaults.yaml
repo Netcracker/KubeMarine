@@ -14,6 +14,8 @@ services:
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
+  kubeadm_flags:
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
     apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
