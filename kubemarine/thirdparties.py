@@ -14,7 +14,7 @@
 
 from copy import deepcopy
 
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 
 
@@ -24,13 +24,13 @@ def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
         upgrade_thirdparties = cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties')
         if upgrade_thirdparties:
             upgrade_thirdparties = deepcopy(upgrade_thirdparties)
-            default_thirdparties = cluster.defaults['services']['thirdparties']
+            default_thirdparties = static.DEFAULTS['services']['thirdparties']
 
             # keep some configurations (unpack) from default thirdparties, if they are not re-defined
             for destination, config in upgrade_thirdparties.items():
                 if destination in default_thirdparties and 'unpack' in default_thirdparties[destination]\
                         and 'unpack' not in config:
-                    config['unpack'] = default_thirdparties[destination]['unpack']
+                    config['unpack'] = deepcopy(default_thirdparties[destination]['unpack'])
 
             inventory['services']['thirdparties'] = upgrade_thirdparties
         else:

@@ -23,7 +23,7 @@ import yaml
 from jinja2 import Template
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
@@ -184,8 +184,25 @@ def enrich_inventory(inventory, cluster):
                     else:
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
+    # use first control plane internal address as a default bind-address
+    # for other control-planes we override it during initialization
+    # todo: use patches approach for node-specific options
+    for node in inventory["nodes"]:
+        if "control-plane" in node["roles"] and "remove_node" not in node["roles"]:
+            inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
+            break
+
     if not any_worker_found:
         raise KME("KME0004")
+
+    # check ignorePreflightErrors value and add mandatory errors from defaults.yaml if they're absent
+    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
+            as stream:
+        default_preflight_errors = yaml.safe_load(stream)["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
+    preflight_errors = inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
+
+    preflight_errors.extend(default_preflight_errors)
+    inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
     return inventory
 
@@ -397,9 +414,11 @@ def join_control_plane(group, node, join_dict):
 
     # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
     log.debug('Joining control-plane \'%s\'...' % node['name'])
+
     node['connection'].sudo("kubeadm join "
                             " --config=/etc/kubernetes/join-config.yaml"
-                            " --ignore-preflight-errors=Port-6443 --v=5",
+                            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+                            " --v=5",
                             is_async=False, hide=False)
 
     log.debug("Patching apiServer bind-address for control-plane %s" % node['name'])
@@ -442,11 +461,6 @@ def init_first_control_plane(group):
     first_control_plane = group.get_first_member(provide_node_configs=True)
     first_control_plane_group = first_control_plane["connection"]
 
-    # setting global apiServer bind-address to first control-plane internal address
-    # for other control-planes we override it during initialization
-    group.cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = \
-        first_control_plane['internal_address']
-
     init_config = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'InitConfiguration',
@@ -480,7 +494,7 @@ def init_first_control_plane(group):
     result = first_control_plane_group.sudo("kubeadm init"
                                      " --upload-certs"
                                      " --config=/etc/kubernetes/init-config.yaml"
-                                     " --ignore-preflight-errors=Port-6443"
+                                     " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
                                      " --v=5",
                                      hide=False)
 
@@ -609,9 +623,10 @@ def init_workers(group):
 
     group.cluster.log.debug('Joining workers...')
     return group.sudo(
-        "kubeadm join --config=/etc/kubernetes/join-config.yaml --ignore-preflight-errors=Port-6443 --v=5",
+        "kubeadm join --config=/etc/kubernetes/join-config.yaml"
+        " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+        " --v=5",
         is_async=False, hide=False)
-
 
 def apply_labels(group):
     log = group.cluster.log
@@ -680,7 +695,6 @@ def get_kubeadm_config(inventory):
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
-
 def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
@@ -690,7 +704,8 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=N
 
     cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
 
-    flags = "-f --certificate-renewal=true --ignore-preflight-errors=CoreDNSUnsupportedPlugins"
+    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
+
     if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"
 
@@ -865,15 +880,13 @@ def verify_target_version(target_version):
 
     pos = target_version.rfind(".")
     target_version = target_version[:pos]
-    with open(utils.get_resource_absolute_path('resources/configurations/globals.yaml',
-                                               script_relative=True), 'r') as stream:
-        globals_yml = yaml.safe_load(stream)
-        if target_version not in globals_yml["kubernetes_versions"]:
-            raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-        if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
-            message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
-            print(message)
-            return message
+    globals_yml = static.GLOBALS
+    if target_version not in globals_yml["kubernetes_versions"]:
+        raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
+    if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
+        message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
+        print(message)
+        return message
     return ""
 
 

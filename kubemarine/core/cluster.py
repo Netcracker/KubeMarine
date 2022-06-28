@@ -19,7 +19,7 @@ from typing import Dict, List, Union
 import fabric
 import yaml
 
-from kubemarine.core import log
+from kubemarine.core import log, defaults, utils
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup
@@ -31,8 +31,8 @@ _AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
 
 class KubernetesCluster(Environment):
 
-    def __init__(self, inventory, context, procedure_inventory=None,
-                 shallow_copy_env_from: 'KubernetesCluster' = None):
+    def __init__(self, inventory: dict, context: dict, procedure_inventory: dict = None,
+                 logger: log.EnhancedLogger = None):
 
         self.supported_roles = [
             "balancer",
@@ -47,37 +47,12 @@ class KubernetesCluster(Environment):
         }
         self.nodes: Dict[str, NodeGroup] = {}
 
+        self.raw_inventory = deepcopy(inventory)
         self.context = deepcopy(context)
-        self.context['runtime_vars'] = {}
+        self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
-        if isinstance(inventory, dict):
-            self.raw_inventory = deepcopy(inventory)
-        else:
-            with open(inventory, 'r') as stream:
-                self.raw_inventory = yaml.safe_load(stream)
-
-        if shallow_copy_env_from:
-            self._globals = shallow_copy_env_from._globals
-            self._defaults = shallow_copy_env_from._defaults
-            self._log = shallow_copy_env_from._log
-        else:
-            with open(utils.get_resource_absolute_path('resources/configurations/globals.yaml',
-                                                       script_relative=True), 'r') as stream:
-                self._globals = yaml.safe_load(stream)
-
-            with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
-                                                       script_relative=True), 'r') as stream:
-                self._defaults = yaml.safe_load(stream)
-
-            self._log = log.init_log_from_context_args(self)
-
-        self.procedure_inventory = {}
-        if procedure_inventory is not None:
-            if isinstance(procedure_inventory, dict):
-                self.procedure_inventory = deepcopy(procedure_inventory)
-            else:
-                with open(procedure_inventory, 'r') as stream:
-                    self.procedure_inventory = yaml.safe_load(stream)
+        self._logger = logger if logger is not None \
+            else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
 
         self._inventory = {}
         # connection pool should be created every time, because it is relied on partially enriched inventory
@@ -103,16 +78,8 @@ class KubernetesCluster(Environment):
         return self._inventory
 
     @property
-    def globals(self) -> dict:
-        return self._globals
-
-    @property
-    def defaults(self) -> dict:
-        return self._defaults
-
-    @property
     def log(self) -> log.EnhancedLogger:
-        return self._log.logger
+        return self._logger
 
     def make_group(self, ips: List[_AnyConnectionTypes]) -> NodeGroup:
         connections: Connections = {}
@@ -170,9 +137,11 @@ class KubernetesCluster(Environment):
         return common_group
 
     def schedule_cumulative_point(self, point_method):
+        from kubemarine.core import flow
         return flow.schedule_cumulative_point(self, point_method)
 
     def is_task_completed(self, task_path) -> bool:
+        from kubemarine.core import flow
         return flow.is_task_completed(self, task_path)
 
     def get_final_inventory(self):
@@ -199,6 +168,7 @@ class KubernetesCluster(Environment):
                 "roles": node['roles']
             }
 
+        from kubemarine import system
         system.whoami(self)
         self.log.verbose('Whoami check finished')
 
@@ -258,7 +228,7 @@ class KubernetesCluster(Environment):
 
     def get_associations_for_os(self, os_family):
         package_associations = self.inventory['services']['packages']['associations']
-        active_os_family = system.get_os_family(self)
+        active_os_family = self.context.get("os")
         if active_os_family != os_family:
             package_associations = package_associations[os_family]
 
@@ -328,6 +298,7 @@ class KubernetesCluster(Environment):
 
     def cache_package_versions(self):
         # todo consider nodes not having sudo privileges
+        from kubemarine import packages
         detected_packages = packages.detect_installed_packages_version_groups(
             self.nodes['all'].get_unchanged_nodes().get_online_nodes(True))
         for os_family in ['debian', 'rhel', 'rhel8']:
@@ -338,9 +309,12 @@ class KubernetesCluster(Environment):
             packages_list = []
             final_packages_list = []
             if isinstance(associated_packages, str):
-                packages_list.append(associated_packages)
+                packages_list.append(packages.get_package_name(os_family, associated_packages))
             elif isinstance(associated_packages, list):
-                packages_list = packages_list + associated_packages
+                associated_packages_clean = []
+                for package in associated_packages:
+                     associated_packages_clean.append(packages.get_package_name(os_family, package))
+                packages_list = packages_list + associated_packages_clean
             else:
                 raise Exception('Unsupported associated packages object type')
 
@@ -386,7 +360,7 @@ class KubernetesCluster(Environment):
             self.inventory['services']['packages']['install']['include'] = list(set(final_packages_list))
         return detected_packages
 
-    def finish(self):
+    def dump_finalized_inventory(self):
         self._gather_facts_after()
         # TODO: rewrite the following lines as deenrichment functions like common enrichment mechanism
         from kubemarine.procedures import remove_node
@@ -396,17 +370,17 @@ class KubernetesCluster(Environment):
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
         inventory_for_dump = controlplane.controlplane_finalize_inventory(self, prepared_inventory)
         utils.dump_file(self, yaml.dump(inventory_for_dump), "cluster_finalized.yaml")
-        cluster_storage = utils.ClusterStorage.get_instance(self)
-        if self.context["initial_procedure"] in ('paas', 'iaas'):
-            self.log.verbose(self.context["initial_procedure"] + ' procedure')
-        else:
-            cluster_storage.make_dir(self)
-            if self.context.get('initial_procedure') == 'add_node':
-                cluster_storage.collect_info_all_control_plane(self)
-                cluster_storage.upload_info_new_node(self)
-            cluster_storage.collect_procedure_info(self)
-            cluster_storage.compress_and_upload_archive(self)
-            cluster_storage.rotation_file(self)
+
+    def preserve_inventory(self):
+        self.log.debug("Start preserving of the information about the procedure.")
+        cluster_storage = utils.ClusterStorage(self)
+        cluster_storage.make_dir()
+        if self.context.get('initial_procedure') == 'add_node':
+            cluster_storage.collect_info_all_control_plane()
+            cluster_storage.upload_info_new_node()
+        cluster_storage.collect_procedure_info()
+        cluster_storage.compress_and_upload_archive()
+        cluster_storage.rotation_file()
 
     def escape_jinja_characters_for_inventory(self, obj):
         if isinstance(obj, dict):
@@ -433,6 +407,3 @@ class KubernetesCluster(Environment):
                 del inventory['services']['cri']['containerdConfig']
         elif inventory['services']['cri'].get('dockerConfig'):
             del inventory['services']['cri']['dockerConfig']
-
-from kubemarine import system, packages
-from kubemarine.core import defaults, flow, utils

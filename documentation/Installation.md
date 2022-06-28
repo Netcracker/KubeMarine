@@ -8,6 +8,7 @@ This section provides information about the inventory, features, and steps for i
     - [Disk Partitioning Recommendation](#disk-partitioning-recommendation)
     - [ETCD Recommendation](#etcd-recommendation)
     - [SSH key Recommendation](#ssh-key-recommendation)
+    - [Private Certificate Authority](#private-certificate-authority)
 - [Inventory Preparation](#inventory-preparation)
   - [Deployment Schemes](#deployment-schemes)
     - [Non-HA Deployment Schemes](#non-ha-deployment-schemes)
@@ -319,6 +320,26 @@ Before working with the cluster, you need to generate an ssh key. Kubemarine sup
 Example:
 ```
 ssh-keygen -t rsa -b 4096
+```
+
+### Private Certificate Authority
+
+In internal environments, certificates signed by the custom CA root certificate can be used, for example, in a private repository. 
+In this case, the custom CA root certificate should be added to all the cluster nodes.
+
+Examples:
+* CentOS/RHEL/Oracle
+```
+# yum install ca-certificates
+# curl -o /etc/pki/ca-trust/source/anchors/Custom_CA.crt http://example.com/misc/Custom_CA.crt
+# update-ca-trust extract
+```
+* Ubuntu/Debian:
+```
+# apt install ca-certificates
+# curl -o /usr/share/ca-certificates/Custom_CA.crt http://example.com/misc/Custom_CA.crt
+# echo "Custom_CA.crt" >> /etc/ca-certificates.conf
+# update-ca-certificates
 ```
 # Inventory Preparation
 
@@ -1000,6 +1021,29 @@ services:
 ```
 
 **Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
+
+During init, join, ugrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
+
+KubeMarine allows to configure kubeadm preflight errors to be ignored.
+
+Example:
+
+```yaml
+services:
+  kubeadm:
+  kubeadm_flags:
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins,DirAvailable--var-lib-etcd
+```
+
+**Note**: Default settings for `ignorePreflightErrors` are:
+
+```yaml
+services:
+  kubeadm:
+  kubeadm_flags:
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
+```
+
 
 #### Kubernetes version
 
@@ -3047,6 +3091,35 @@ In the `deploy.accounts` section, you can specify the account creation settings 
 
 In this section, you can describe any parameters that needs to be applied by default to each record in the [RBAC accounts](#rbac-accounts) section. It works the same way as [node_defaults](#node_defaults).
 
+The default settings for `account_defaults` are as follows:
+
+```yaml
+rbac:
+  account_defaults:
+    namespace: kube-system
+    configs:
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata: {}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata: {}
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+        subjects:
+          - kind: ServiceAccount
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          annotations: {}
+        type: kubernetes.io/service-account-token
+```
+
+The yaml file that is created from the above template is applied to the cluster during the installation procedure.
+
+**Note**: The `Secret` section works only for Kubernetes v1.24. It is excluded for Kubernetes v1.23 and lower versions.
+
 ### Plugins
 
 *Installation task*: `deploy.plugins`
@@ -3407,12 +3480,12 @@ If you enable the plugin, all other parameters are applied by default. The follo
   </tr>
   <tr>
     <td>dashboard.image</td>
-    <td><pre>kubernetesui/dashboard:v2.0.0-rc2</pre></td>
+    <td><pre>kubernetesui/dashboard:{{ plugins["kubernetes-dashboard"].version }}</pre></td>
     <td>Kubernetes Dashboard image.</td>
   </tr>
   <tr>
     <td>metrics-scraper.image</td>
-    <td><pre>kubernetesui/metrics-scraper:v1.0.2</pre></td>
+    <td><pre>kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion]["metrics-scraper-version"] }}</pre></td>
     <td>Kubernetes Dashboard Metrics Scraper image.</td>
   </tr>
   <tr>
@@ -3421,25 +3494,27 @@ If you enable the plugin, all other parameters are applied by default. The follo
 namespace: kubernetes-dashboard
 annotations:
   nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-  nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  nginx.ingress.kubernetes.io/rewrite-target: /
-  nginx.ingress.kubernetes.io/secure-backends: "true"
-  nginx.ingress.kubernetes.io/ssl-passthrough: "true"</pre></td>
+  </pre></td>
     <td>Ingress metadata, typically contains namespace and NGINX-specific parameters.</td>
   </tr>
   <tr>
     <td>ingress.spec</td>
-    <td><pre>tls:
-  - hosts:
-    - '{{ plugins["kubernetes-dashboard"].hostname }}'
-rules:
-  - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
-    http:
-      paths:
-        - path: /
-          backend:
-            serviceName: kubernetes-dashboard
-            servicePort: 443</pre></td>
+    <td><pre>
+        tls:
+          - hosts:
+            - '{{ plugins["kubernetes-dashboard"].hostname }}'
+        rules:
+          - host: '{{ plugins["kubernetes-dashboard"].hostname }}'
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
+    </pre></td>
     <td>Ingress specs, determining where and on which port the Kubernetes Dashboard UI is located.</td>
   </tr>
 </table>
@@ -3492,9 +3567,12 @@ plugins:
             http:
               paths:
                 - path: /
+                  pathType: Prefix
                   backend:
-                    serviceName: kubernetes-dashboard
-                    servicePort: 443
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
 ```
  
 **Warning**: Be very careful when overriding these parameters.

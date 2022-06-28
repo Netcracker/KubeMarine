@@ -40,6 +40,11 @@ procedures = OrderedDict({
         'description': "Install a cluster from scratch",
         'group': 'installation'
     },
+    'migrate_kubemarine': {
+        'description': "Automatically perform migration to update the environment for the "
+                       "current version of Kubemarine",
+        'group': 'maintenance'
+    },
     'upgrade': {
         'description': "Automatically upgrade the entire Kubernetes cluster to a new version",
         'group': 'maintenance'
@@ -178,7 +183,7 @@ def selftest():
 
         if "main" not in dir(module):
             raise Exception("No main method in %s" % procedure)
-        if procedure != "do":
+        if procedure not in ["do", "migrate_kubemarine"]:
             if "tasks" not in dir(module):
                 raise Exception("Tasks tree is not presented in %s" % procedure)
             if not isinstance(module.tasks, OrderedDict):
@@ -196,6 +201,16 @@ def selftest():
     from kubemarine import demo
 
     demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+
+    print('\nValidating patch duplicates ...')
+
+    from kubemarine import patches
+    patches = patches.patches
+    patch_ids = [patch.identifier for patch in patches]
+    unique = set()
+    duplicates = [p_id for p_id in patch_ids if p_id in unique or unique.add(p_id)]
+    if duplicates:
+        raise Exception(f'Patches identifiers {duplicates} are duplicated ')
 
     print("Finished")
 

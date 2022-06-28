@@ -27,6 +27,7 @@ ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, but VRRP I
 def enrich_inventory(inventory, cluster):
 
     for node in inventory["nodes"]:
+        # todo what if balancer is removed? It will have roles=['balancer', 'remove_node']
         if 'balancer' in node['roles'] and len(node['roles']) > 1:
 
             # ok, seems we have combination of balancer-control-plane / balancer-worker

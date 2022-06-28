@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-import argparse
 import sys
 import time
 from collections import OrderedDict
@@ -26,7 +25,9 @@ import ruamel.yaml
 import ipaddress
 
 from kubemarine import packages as pckgs, system, selinux, etcd
+from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -452,7 +453,7 @@ def kubernetes_nodes_condition(cluster, condition_type):
 
 def get_not_running_pods(cluster):
     # Completed pods should be excluded from the list as well
-    get_pods_cmd = 'kubectl get pods -A --field-selector status.phase!=Running | awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed'
+    get_pods_cmd = 'kubectl get pods -A --field-selector status.phase!=Running | awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed || true'
     result = cluster.nodes['control-plane'].get_any_member().sudo(get_pods_cmd)
     cluster.log.verbose(result)
     return list(result.values())[0].stdout.strip()
@@ -783,7 +784,8 @@ def control_plane_configuration_status(cluster):
                 result[static_pod['metadata']['name']] = dict()
                 if version in static_pod["spec"]["containers"][0].get("image", ""):
                     result[static_pod['metadata']['name']]['correct_version'] = True
-                result[static_pod['metadata']['name']]['correct_properties'] = check_extra_args(cluster, static_pod)
+                result[static_pod['metadata']['name']]['correct_properties'] = \
+                    check_extra_args(cluster, static_pod, control_plane)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
             results.append(result)
 
@@ -805,9 +807,12 @@ def control_plane_configuration_status(cluster):
             raise TestFailure('invalid', hint=message)
 
 
-def check_extra_args(cluster, static_pod):
+def check_extra_args(cluster, static_pod, node):
     static_pod_name = static_pod[static_pod['metadata']['name']]
     for arg, value in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraArgs", {}).items():
+        if arg == "bind-address":
+            # for "bind-address" we do not take default value into account, because its patched to node internal-address
+            value = node["internal_address"]
         correct_property = False
         original_property = arg + "=" + value
         properties = static_pod["spec"]["containers"][0].get("command", [])
@@ -1159,6 +1164,14 @@ tasks = OrderedDict({
 })
 
 
+class PaasAction(Action):
+    def __init__(self):
+        super().__init__('check paas')
+
+    def run(self, res: DynamicResources):
+        flow.run_tasks(res, tasks)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for checking Kubernetes cluster PAAS layer.
@@ -1167,15 +1180,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_parser(cli_help)
-
-    parser.add_argument('--tasks',
-                        default='',
-                        help='define comma-separated tasks to be executed')
-
-    parser.add_argument('--exclude',
-                        default='',
-                        help='exclude comma-separated tasks from execution')
+    parser = flow.new_tasks_flow_parser(cli_help)
 
     parser.add_argument('--csv-report',
                         default='report.csv',
@@ -1197,29 +1202,11 @@ def main(cli_arguments=None):
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    args = flow.parse_args(parser, cli_arguments)
-
-    defined_tasks = []
-    defined_excludes = []
-
-    if args.tasks != '':
-        defined_tasks = args.tasks.split(",")
-
-    if args.exclude != '':
-        defined_excludes = args.exclude.split(",")
-
-    context = flow.create_context(args, procedure='paas',
-                                  included_tasks=defined_tasks, excluded_tasks=defined_excludes)
+    context = flow.create_context(parser, cli_arguments, procedure='paas')
     context['testsuite'] = TestSuite()
+    context['preserve_inventory'] = False
 
-    cluster = flow.run(
-        tasks,
-        defined_tasks,
-        defined_excludes,
-        args.config,
-        context,
-        print_final_message=False
-    )
+    cluster = flow.run_actions(context, [PaasAction()], print_final_message=False)
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files

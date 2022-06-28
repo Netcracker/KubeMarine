@@ -14,6 +14,8 @@ services:
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
+  kubeadm_flags:
+    ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
     apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
@@ -654,6 +656,7 @@ rbac:
       - apiVersion: v1
         kind: ServiceAccount
         metadata: {}
+        secrets: []
       - apiVersion: rbac.authorization.k8s.io/v1
         kind: ClusterRoleBinding
         metadata: {}
@@ -662,6 +665,12 @@ rbac:
           kind: ClusterRole
         subjects:
           - kind: ServiceAccount
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          annotations: {}
+        type: kubernetes.io/service-account-token
+
   admission: psp
   psp:
     pod-security: enabled
