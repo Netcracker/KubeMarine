@@ -69,10 +69,29 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   fi
 
   if [ "$CONT_RUNTIME" == "podman" ]; then
-    podman pull ${ETCD_IMAGE} &> /dev/null
-    podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    # Login into registries if the authentication file exists
+    export REGISTRY_AUTH_FILE=${REGISTRY_AUTH_FILE:-/etc/containers/auth.json}
+    if [ -e ${REGISTRY_AUTH_FILE} ]; then
+      # Get the list of registries and try to pull the image if the registry matches with the image
+      REGISTRIES=$(cat /etc/containerd/config.toml | grep '\.auth\]' | sed 's/.\+configs\."\(.\+\)"\.auth\]/\1/')
+      for REGISTRY in ${REGISTRIES} 
+        do	
+	  IS_AUTH = $(echo "${ETCD_IMAGE}" | grep ${REGISTRY} | wc -l)
+	  if [ $IS_AUTH -eq 1 ]; then
+	    podman login ${REGISTRY} > /dev/null 2&>1
+	    podman pull ${ETCD_IMAGE} > /dev/null 2&>1
+	  fi
+        done
+      podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
+	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    else
+      podman pull ${ETCD_IMAGE} &> /dev/null
+      podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
+	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    fi
   else
-    docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
+	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   fi
   exit $?
 fi

@@ -16,6 +16,7 @@ from io import StringIO
 
 import toml
 import yaml
+import json
 
 from distutils.util import strtobool
 from kubemarine import system, packages
@@ -77,6 +78,19 @@ def configure(group):
                     break
             if is_insecure:
                 insecure_registries.append(mirror)
+    # save 'auth.json' if there are credentials for registry
+    auth_registries = {"auths": {}}
+    if config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {}).get('configs'):
+        #group.cluster.log.debug("TOML: %s" % config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['configs'])
+        registry_configs = config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['configs']
+        for auth_registry in registry_configs:
+            #group.cluster.log.debug("REG: %s; AUTH: %s" % (auth_registry, registry_configs[auth_registry]['auth']['auth']))
+            #auth_registries[auth_registry] = registry_configs[auth_registry]['auth']['auth']
+            auth_registries['auths'][auth_registry] = {}
+            auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
+        group.cluster.log.debug("AUTH_REG: %s;" % auth_registries)
+        auth_json = json.dumps(auth_registries)
+        group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
     if insecure_registries:
         log.debug("Uploading podman configuration...")
         podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"
@@ -86,6 +100,7 @@ def configure(group):
     else:
         log.debug("Removing old podman configuration...")
         group.sudo("rm -f /etc/containers/registries.conf")
+
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     with RemoteExecutor(group.cluster) as exe:
