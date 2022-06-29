@@ -1034,6 +1034,7 @@ def kubernetes_admission_status(cluster):
         api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
         ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
+        admission_path = "" 
         for item in ext_args:
             if item.startswith("--"):
                 key = re.split('=',item)[0]

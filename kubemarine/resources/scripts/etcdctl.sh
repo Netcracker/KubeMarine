@@ -76,7 +76,7 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
       REGISTRIES=$(cat /etc/containerd/config.toml | grep '\.auth\]' | sed 's/.\+configs\."\(.\+\)"\.auth\]/\1/')
       for REGISTRY in ${REGISTRIES} 
         do	
-	  IS_AUTH = $(echo "${ETCD_IMAGE}" | grep ${REGISTRY} | wc -l)
+	  IS_AUTH=$(echo "${ETCD_IMAGE}" | grep ${REGISTRY} | wc -l)
 	  if [ $IS_AUTH -eq 1 ]; then
 	    podman login ${REGISTRY} > /dev/null 2&>1
 	    podman pull ${ETCD_IMAGE} > /dev/null 2&>1
