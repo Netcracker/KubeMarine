@@ -270,6 +270,7 @@ services:
               file: /etc/coredns/Hosts
               data:
                 fallthrough: ''
+          rewrite: False  # Not used by default, but rather reserves a place for custom rewrite
           kubernetes:
             default:
               priority: 1
@@ -425,15 +426,6 @@ plugins:
       priority: 0
       procedures:
         - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
-        - expect:
-            daemonsets:
-              - calico-node
-            deployments:
-              - calico-kube-controllers
-            pods:
-              - coredns
-              - calico-kube-controllers
-              - calico-node
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico
@@ -454,11 +446,23 @@ plugins:
             apply_required: true
             apply_command: /bin/sh /tmp/calico_rr.sh
             sudo: true
+        - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
+            pods:
+              - coredns
+              - calico-kube-controllers
+              - calico-node
     mode: ipip
     crossSubnet: true
     natOutgoing: true
     mtu: 1440
     fullmesh: true
+    announceServices: false
+    defaultAsNumber: 64512
+    globalBgpPeers: []
     typha:
       enabled: false
       replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'
