@@ -318,8 +318,6 @@ class KubernetesCluster(Environment):
                 packages_list = packages_list + associated_packages_clean
             else:
                 raise Exception('Unsupported associated packages object type')
-            #self.log.debug("PAK: %s" % packages_list)
-            #self.log.debug("DETECT_PAK: %s" % detected_packages)
             for package in packages_list:
                 detected_package_versions = list(detected_packages[package].keys())
                 for version in detected_package_versions:
