@@ -141,10 +141,10 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     """
 
     cluster = group.cluster
+    excluded_dict = {}
 
     if not packages_list:
         packages_list = []
-        excluded_dict = {}
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
             associated_packages = associated_params.get('package_name', [])
