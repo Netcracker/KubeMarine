@@ -35,8 +35,8 @@ spec:
 apiVersion: crd.projectcalico.org/v1
 kind: BGPPeer
 metadata:
-  name: peer-with-route-reflectors
+  name: peer-with-route-reflectors-{{ peer['as'] }}-{{ peer['ip'] }}
 spec:
-    asNumber: {{ peer['as'] }}
-    peerIP: {{ peer['ip'] }}
+  asNumber: {{ peer['as'] }}
+  peerIP: {{ peer['ip'] }}
 {%- endfor %}
