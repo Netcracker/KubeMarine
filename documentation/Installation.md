@@ -3264,7 +3264,7 @@ The plugin configuration supports the following parameters:
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
 | fullmesh               | boolean | true                                | true/false                                       | Enable of disable full mesh BGP topology                           |
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
-| defaultAsNumber        | int     | 65200                               |                                                  | AS Number to be used by default for this cluster                   |
+| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
 | typha.enabled          | boolean | `false`                             | Enable if you have more than 50 nodes in cluster | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
 | typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 1) \                               | round(1) }}`                                                       |1 replica for every 50 cluster nodes|Number of Typha running replicas|
