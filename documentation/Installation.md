@@ -2527,6 +2527,17 @@ services:
       Corefile:
         '.:53':
           errors: True
+          rewrite: # Not used by default
+            default:
+              priority: 1
+              type: stop
+              data:
+                name:
+                - regex
+                - (.*)\.cluster-1\.local {1}.cluster.local
+                answer:
+                - name
+                - (.*)\.cluster\.local {1}.cluster-1.local
 ```
 
 The following settings are supported:
@@ -2588,6 +2599,12 @@ The following settings are supported:
     <td>boolean<br></td>
     <td>True</td>
     <td>The loadbalance acts as a round-robin DNS load balancer by randomizing the order of A, AAAA, and MX records in the answer.</td>
+  </tr>
+  <tr>
+    <td>rewrite</td>
+    <td>dict</td>
+    <td>False</td>
+    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. </td>
   </tr>
   <tr>
     <td>hosts</td>
