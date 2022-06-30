@@ -270,7 +270,6 @@ services:
               file: /etc/coredns/Hosts
               data:
                 fallthrough: ''
-          rewrite: False  # Not used by default, but rather reserves a place for custom rewrite
           kubernetes:
             default:
               priority: 1
