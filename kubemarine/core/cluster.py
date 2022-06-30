@@ -310,7 +310,6 @@ class KubernetesCluster(Environment):
             final_packages_list = []
             if isinstance(associated_packages, str):
                 packages_list.append(packages.get_package_name(self.nodes['all'].get_nodes_os(), associated_packages))
-                pack = packages.get_package_name(os_family, associated_packages)
             elif isinstance(associated_packages, list):
                 associated_packages_clean = []
                 for package in associated_packages:
