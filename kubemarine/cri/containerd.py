@@ -84,8 +84,8 @@ def configure(group):
         registry_configs = config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['configs']
         for auth_registry in registry_configs:
             auth_registries['auths'][auth_registry] = {}
-            auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
-        group.cluster.log.debug("AUTH_REG: %s;" % auth_registries)
+            if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
+                auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
         auth_json = json.dumps(auth_registries)
         group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
     if insecure_registries:

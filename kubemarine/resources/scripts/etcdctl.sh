@@ -69,21 +69,22 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   fi
 
   if [ "$CONT_RUNTIME" == "podman" ]; then
-    # Login into registries if the authentication file exists
-    export REGISTRY_AUTH_FILE=${REGISTRY_AUTH_FILE:-/etc/containers/auth.json}
-    if [ -e ${REGISTRY_AUTH_FILE} ]; then
-      # Get the list of registries and try to pull the image if the registry matches with the image
-      REGISTRIES=$(cat /etc/containerd/config.toml | grep '\.auth\]' | sed 's/.\+configs\."\(.\+\)"\.auth\]/\1/')
-      for REGISTRY in ${REGISTRIES} 
-        do	
-	  IS_AUTH=$(echo "${ETCD_IMAGE}" | grep ${REGISTRY} | wc -l)
-	  if [ $IS_AUTH -eq 1 ]; then
-	    podman login ${REGISTRY} > /dev/null 2&>1
-	    podman pull ${ETCD_IMAGE} > /dev/null 2&>1
-	  fi
-        done
-      podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
-	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+    # Check if the registry needs authentication:
+    # Match the registry from etcd image with the list of registries that assume an athentication
+    REGISTRIES=$(cat /etc/containerd/config.toml | grep '\.auth\]' | sed 's/.\+configs\."\(.\+\)"\.auth\]/\1/')
+    ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
+    IS_AUTH=$(echo "${REGISTRIES}" | grep ${ETCD_REGISTRY} | wc -l)
+    if [ $IS_AUTH -eq 1 ]; then
+      # Login into registries and pull image if the authentication file exists
+      export REGISTRY_AUTH_FILE=${REGISTRY_AUTH_FILE:-/etc/containers/auth.json}
+      if [ -e ${REGISTRY_AUTH_FILE} ]; then
+	podman login ${ETCD_REGISTRY} > /dev/null 2&>1
+	podman pull ${ETCD_IMAGE} > /dev/null 2&>1
+        podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
+		etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
+      else
+	exit 1
+      fi
     else
       podman pull ${ETCD_IMAGE} &> /dev/null
       podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
