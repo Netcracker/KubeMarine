@@ -98,7 +98,6 @@ def configure(group):
         log.debug("Removing old podman configuration...")
         group.sudo("rm -f /etc/containers/registries.conf")
 
-
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
