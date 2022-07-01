@@ -34,11 +34,19 @@ def enrich_inventory_associations(inventory, cluster):
         for association in os_specific_associations:
             if type(os_specific_associations[association]['package_name']) is list:
                 for item, package in enumerate(os_specific_associations[association]['package_name']):
-                    os_specific_associations[association]['package_name'][item] = \
-                            os_specific_associations[association]['package_name'][item].split('-{{')[0]
+                    if os_family in ["rhel", "rhel8"]:
+                        os_specific_associations[association]['package_name'][item] = \
+                                os_specific_associations[association]['package_name'][item].split('-{{')[0]
+                    else:
+                        os_specific_associations[association]['package_name'][item] = \
+                                os_specific_associations[association]['package_name'][item].split('={{')[0]
             elif type(os_specific_associations[association]['package_name']) is str:
-                    os_specific_associations[association]['package_name'] = \
+                    if os_family in ["rhel", "rhel8"]:
+                        os_specific_associations[association]['package_name'] = \
                             os_specific_associations[association]['package_name'].split('-{{')[0]
+                    else:
+                        os_specific_associations[association]['package_name'] = \
+                            os_specific_associations[association]['package_name'].split('={{')[0]
             else:
                 raise Exception('Unexpected value for association')
 
@@ -141,10 +149,10 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     """
 
     cluster = group.cluster
+    excluded_dict = {}
 
     if not packages_list:
         packages_list = []
-        excluded_dict = {}
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
             associated_packages = associated_params.get('package_name', [])

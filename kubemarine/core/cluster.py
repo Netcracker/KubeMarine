@@ -309,11 +309,11 @@ class KubernetesCluster(Environment):
             packages_list = []
             final_packages_list = []
             if isinstance(associated_packages, str):
-                packages_list.append(packages.get_package_name(os_family, associated_packages))
+                packages_list.append(packages.get_package_name(self.nodes['all'].get_nodes_os(), associated_packages))
             elif isinstance(associated_packages, list):
                 associated_packages_clean = []
                 for package in associated_packages:
-                     associated_packages_clean.append(packages.get_package_name(os_family, package))
+                     associated_packages_clean.append(packages.get_package_name(self.nodes['all'].get_nodes_os(), package))
                 packages_list = packages_list + associated_packages_clean
             else:
                 raise Exception('Unsupported associated packages object type')
