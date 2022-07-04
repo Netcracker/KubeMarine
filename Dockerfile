@@ -1,4 +1,4 @@
-FROM python:3.9-slim-buster
+FROM python:3.10.5-slim-buster
 # Warning! Python and Debian versions should be strict to avoid sudden components upgrade,
 # including unreasonable upgrade of GLIBC version. If the GLIBC version suddenly goes up, a large number of consumers
 # will suddenly be unable to use the compiled binary version on older systems.
