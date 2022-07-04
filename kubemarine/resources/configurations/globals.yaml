@@ -188,31 +188,31 @@ compatibility_map:
       v1.21.5:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.21.12:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.22.2:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.22.9:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.23.1:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.23.6:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
       v1.24.0:
         version_rhel: 1.6.4*
         version_rhel8: "*"
-        version_debian: "*"
+        version_debian: "100:3.4.*"
     haproxy:
       v1.21.5:
         version_rhel: 1.8*
