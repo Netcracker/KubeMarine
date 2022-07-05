@@ -230,7 +230,7 @@ curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://downlo
 dnf -y --refresh install containerd
 dnf -y --refresh install podman
 ```
-
+After the successful execution of the commands . It is necessary to complete the installation by excluding the **prepare.cri.install** task.
 **Preconfigured**
 * SSHD running on each VM via port 22.
 * User with sudo and no-require-tty parameter in sudoers file.
