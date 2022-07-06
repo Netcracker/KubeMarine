@@ -133,6 +133,10 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
+      v1.24.2:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
     containerd:
       v1.21.5:
         version_rhel8: 1.4*
@@ -153,6 +157,9 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.24.0:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.24.2:
         version_rhel8: 1.4*
         version_debian: 1.5.*
     containerdio:
@@ -181,6 +188,10 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.4.*
       v1.24.0:
+        version_rhel: 1.4*
+        version_rhel8: 1.4*
+        version_debian: 1.4.*
+      v1.24.2:
         version_rhel: 1.4*
         version_rhel8: 1.4*
         version_debian: 1.4.*
@@ -213,6 +224,10 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
+      v1.24.2:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
     haproxy:
       v1.21.5:
         version_rhel: 1.8*
@@ -239,6 +254,10 @@ compatibility_map:
         version_rhel8: 1.8*
         version_debian: 2.0.*
       v1.24.0:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.24.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
@@ -271,6 +290,10 @@ compatibility_map:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
+      v1.24.2:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
     crictl:
       v1.21.5:
         version: v1.23.0
@@ -293,6 +316,9 @@ compatibility_map:
       v1.24.0:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.24.2:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
     kubeadm:
       v1.21.5:
         sha1: 2ee056ac1d0b9c2289bdb03cb7bb0cd21ee29a8b
@@ -308,6 +334,8 @@ compatibility_map:
         sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
       v1.24.0:
         sha1: a60b0adcdc6f19e79bd98663914b694a325db819
+      v1.24.2:
+        sha1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726
     kubelet:
       v1.21.5:
         sha1: 61da22475b977cb678cca8cf7249bf727d72ee89
@@ -323,6 +351,8 @@ compatibility_map:
         sha1: 326110dcb62b66e69490d039b170682fb71c5560
       v1.24.0:
         sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
+      v1.24.2:
+        sha1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308
     kubectl:
       v1.21.5:
         sha1: c4648e31ca16fb00e3826f8ab7c653da81eff367
@@ -338,6 +368,8 @@ compatibility_map:
         sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
       v1.24.0:
         sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
+      v1.24.2:
+        sha1: d2a8e78bcdc992addd6faccb27b0af5d533443fa
     calico:
       v1.21:
         version: v3.22.2
