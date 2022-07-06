@@ -88,6 +88,7 @@ def configure(group):
                 auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
         auth_json = json.dumps(auth_registries)
         group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
+        group.sudo("chmod 600 /etc/containers/auth.json")
     if insecure_registries:
         log.debug("Uploading podman configuration...")
         podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"
