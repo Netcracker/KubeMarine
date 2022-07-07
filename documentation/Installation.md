@@ -2527,7 +2527,7 @@ services:
       Corefile:
         '.:53':
           errors: True
-          rewrite: # Not used by default
+          rewrite: # Not used by default, intended for GEO distributed scheme
             default:
               priority: 1
               type: stop
