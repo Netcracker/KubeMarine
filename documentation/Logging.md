@@ -5,6 +5,7 @@ This section provides information about configuring the logging of Kubemarine.
   - [Output to Stdout](#output-to-stdout)
   - [Output to File](#output-to-file)
   - [Output to Graylog](#output-to-graylog)
+  - [Output to Kubemarine](#output-to-kubemarine)
 
 # Default Behavior
 
@@ -80,3 +81,26 @@ Example:
 kubemarine install \
 --log="graylog;level=verbose;host=10.101.182.166;port=12201;type=tcp"
 ```
+## Output to Kubemarine
+
+Kubemarine collects information about the installation after each `successful` cluster installation.
+
+What to preserve:
+```yaml
+dir location:
+/etc/kubemarine/procedure  
+  data_time_initial_procedure
+    cluster.yaml
+    version
+    dump/
+      cluster.yaml
+      cluster_initial.yaml
+      procedure.yaml
+      cluster_finalized.yaml
+      cluster_precompiled.yaml
+      procedure_parameters
+```
+
+Target and then list the following files:
+* version - version Kubemarine.
+* procedure_parameters - cluster installation options.
