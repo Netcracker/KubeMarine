@@ -8,10 +8,15 @@ metadata:
   name: default
 spec:
   nodeToNodeMeshEnabled: {{ plugins['calico']['fullmesh'] }}
+  {%- if plugins['calico']['announceServices'] %}
+  serviceClusterIPs:
+  - cidr: {{ services['kubeadm']['networking']['serviceSubnet'] }}
+  {%- endif %}
+  asNumber: {{ plugins['calico']['defaultAsNumber'] }}
+
 
 {% if not plugins['calico']['fullmesh'] %}
 ---
-
 # This is for peering with route-reflectors
 
 apiVersion: crd.projectcalico.org/v1
@@ -25,4 +30,13 @@ spec:
 {% endif %}
 
 
-
+{%- for peer in plugins['calico']['globalBgpPeers'] -%}
+---
+apiVersion: crd.projectcalico.org/v1
+kind: BGPPeer
+metadata:
+  name: peer-with-route-reflectors-{{ peer['as'] }}-{{ peer['ip'] }}
+spec:
+  asNumber: {{ peer['as'] }}
+  peerIP: {{ peer['ip'] }}
+{%- endfor %}
