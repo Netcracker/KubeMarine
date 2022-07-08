@@ -5068,7 +5068,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>podman</td>
     <td>1.6.4</td>
     <td>latest</td>
-    <td>100:3.4.*</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5235,7 +5235,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>podman</td>
     <td>1.6.4</td>
     <td>latest</td>
-    <td>100:3.4.*</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5402,7 +5402,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>podman</td>
     <td>1.6.4</td>
     <td>latest</td>
-    <td>100:3.4.*</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5569,7 +5569,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>podman</td>
     <td>1.6.4</td>
     <td>latest</td>
-    <td>100:3.4.*</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
