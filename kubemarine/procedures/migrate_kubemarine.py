@@ -91,6 +91,9 @@ def main(cli_arguments=None):
         else:
             actions.append(patch.action)
 
+    if not actions:
+        print("No patches to apply")
+        exit(0)
     flow.run_actions(context, actions)
 
 

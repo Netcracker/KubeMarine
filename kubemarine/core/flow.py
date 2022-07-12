@@ -116,10 +116,9 @@ def _post_process_actions_group(last_cluster: c.KubernetesCluster, context: dict
             last_cluster.preserve_inventory()
 
 
-def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None):
+def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, tasks_filter: list = None):
     """
-    Filters and runs tasks and immediately exits in case any task fails.
-    It is preferable to use the method only in case the only action is executed.
+    Filters and runs tasks.
     """
 
     if cumulative_points is None:
@@ -127,8 +126,9 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None):
 
     args: dict = resources.context['execution_arguments']
 
-    tasks_filter = [] if not args['tasks'] else args['tasks'].split(",")
-    excluded_tasks = [] if not args['exclude'] else args['exclude'].split(",")
+    tasks_filter = tasks_filter if tasks_filter is not None \
+        else [] if not args.get('tasks') else args['tasks'].split(",")
+    excluded_tasks = [] if not args.get('exclude') else args['exclude'].split(",")
 
     print("Excluded tasks:")
     filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks)
@@ -235,9 +235,10 @@ def run_flow(tasks, cluster, cumulative_points, _task_path=''):
                 task(cluster)
                 add_task_to_proceeded_list(cluster, __task_path)
             except Exception as exc:
-                utils.do_fail("TASK FAILED %s" % __task_path, exc,
-                              hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_path),
-                              log=cluster.log)
+                raise errors.FailException(
+                    "TASK FAILED %s" % __task_path, exc,
+                    hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_path)
+                )
         else:
             run_flow(task, cluster, cumulative_points, __task_path)
 
@@ -387,8 +388,8 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
 
 
 def init_tasks_flow(cluster):
-    _check_within_flow(cluster, False)
-    cluster.context['proceeded_tasks'] = []
+    if 'proceeded_tasks' not in cluster.context:
+        cluster.context['proceeded_tasks'] = []
 
 
 def add_task_to_proceeded_list(cluster, task_path):

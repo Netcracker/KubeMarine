@@ -80,7 +80,7 @@ def prepare_backup_tmpdir(cluster):
 
 def verify_backup_location(cluster):
     target = utils.get_resource_absolute_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
-    if not os.path.isdir(target) and not os.path.isdir('/'.join(target.split('/')[:-1])):
+    if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         raise FileNotFoundError('Backup location directory not exists')
 
 
