@@ -225,11 +225,11 @@ installation on the same OS impossible. To avoid it one should implement those s
 ```
 dnf -y module disable container-tools
 dnf -y install 'dnf-command(copr)'
-dnf -y copr enable rhcontainerbot/container-selinux
 curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo
 dnf -y --refresh install containerd
 dnf -y --refresh install podman
 ```
+After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
 
 **Preconfigured**
 * SSHD running on each VM via port 22.
@@ -1030,7 +1030,6 @@ Example:
 
 ```yaml
 services:
-  kubeadm:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins,DirAvailable--var-lib-etcd
 ```
@@ -1039,7 +1038,6 @@ services:
 
 ```yaml
 services:
-  kubeadm:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
 ```
@@ -2037,6 +2035,24 @@ services:
         - https://artifactory.example.com:5443
 ```
 
+When the registry requires an authentication, `containerdConfig` should be similar to the following:
+
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".tls:
+        insecure_skip_verify: true
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".auth:
+        auth: "bmMtdXNlcjperfr="
+      plugins."io.containerd.grpc.v1.cri".registry.mirrors."private-registry:5000":
+        endpoint:
+        - https://private-registry:5000
+```
+
+Where, `auth: "bmMtdXNlcjperfr="` field is `username:password` string in base64 encoding.
+
 Note how `containerdConfig` section reflects the toml format structure.
 For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
 By default, the following parameters are used for `containerdConfig`:
@@ -2527,6 +2543,17 @@ services:
       Corefile:
         '.:53':
           errors: True
+          rewrite: # Not used by default, intended for GEO distributed scheme
+            default:
+              priority: 1
+              type: stop
+              data:
+                name:
+                - regex
+                - (.*)\.cluster-1\.local {1}.cluster.local
+                answer:
+                - name
+                - (.*)\.cluster\.local {1}.cluster-1.local
 ```
 
 The following settings are supported:
@@ -2588,6 +2615,12 @@ The following settings are supported:
     <td>boolean<br></td>
     <td>True</td>
     <td>The loadbalance acts as a round-robin DNS load balancer by randomizing the order of A, AAAA, and MX records in the answer.</td>
+  </tr>
+  <tr>
+    <td>rewrite</td>
+    <td>dict</td>
+    <td>False</td>
+    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. </td>
   </tr>
   <tr>
     <td>hosts</td>
@@ -3187,21 +3220,27 @@ plugins:
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
-###### Calico with Route Reflectors
+###### Calico BGP Configuration
 
-By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh. 
+By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh.
+You also have to change calico BGP configuration if you are using DR schema.
 
 **Note**: change BGP topology is possible for calico v3.20.1 or higher.
 
-To enable route reflector topology during installation the next steps are required:
+To enable route reflector and/or DR topology during installation the next steps are required:
 
 1. Choose the nodes to be route reflectors and add the label `route-reflector: True` to their description in the cluster.yaml. It is recommended to use control-plane nodes for route reflectors, but not necessarily.
 
-2. Add `fullmesh: false` parameter in the `calico` plugin section:
+2. Add required parameters in the `calico` plugin section:
 ```yaml
 plugins:
   calico:
-    fullmesh: false
+    fullmesh: false            # Full mesh will not be used, RRs will be used instead
+    announceServices: true     # ClusterIP services CIDR will be announced through BGP
+    defaultAsNumber: 65200     # AS Number will be 65200 for all nodes by default
+    globalBgpPeers:            # Additional global BGP Peer(s) will be configured with given IP and AS Number
+    - ip: 192.168.17.1
+      as: 65200
 ```
 
 It is also possible to change BGP topology at the running cluster. 
@@ -3234,19 +3273,22 @@ If necessary, remove `route-reflector` label from the cluster.yaml as well.
 
 The plugin configuration supports the following parameters:
 
-|Name|Type|Default Value|Value Rules|Description|
-|---|---|---|---|---|
-|mode|string|`ipip`|`ipip` / `vxlan`|Network protocol to be used in network plugin|
-|crossSubnet|boolean|`true`| |Enables crossing subnet boundaries to improve network performance|
-|mtu|int|`1440`|MTU size on interface - 50|MTU size for Calico interface|
-|fullmesh|boolean|true|true/false|Enable of disable full mesh BGP topology|
-|typha.enabled|boolean|`false`|Enable if you have more than 50 nodes in cluster|Enables the [Typha Daemon](https://github.com/projectcalico/typha)|
-|typha.replicas|int|`{{ (((nodes\|length)/50) + 1) \| round(1) }}`|1 replica for every 50 cluster nodes|Number of Typha running replicas|
-|typha.image|string|`calico/typha:v3.10.1`|Should contain both image name and version|Calico Typha image|
-|cni.image|string|`calico/cni:v3.10.1`|Should contain both image name and version|Calico CNI image|
-|node.image|string|`calico/node:v3.10.1`|Should contain both image name and version|Calico Node image|
-|kube-controllers.image|string|`calico/kube-controllers:v3.10.1`|Should contain both image name and version|Calico Kube Controllers image|
-|flexvol.image|string|`calico/pod2daemon-flexvol:v3.10.1`|Should contain both image name and version|Calico Flexvol image|
+| Name                   | Type    | Default Value                       | Value Rules                                      | Description                                                        |
+|------------------------|---------|-------------------------------------|--------------------------------------------------|--------------------------------------------------------------------|
+| mode                   | string  | `ipip`                              | `ipip` / `vxlan`                                 | Network protocol to be used in network plugin                      |
+| crossSubnet            | boolean | `true`                              |                                                  | Enables crossing subnet boundaries to improve network performance  |
+| mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
+| fullmesh               | boolean | true                                | true/false                                       | Enable of disable full mesh BGP topology                           |
+| announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
+| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
+| globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
+| typha.enabled          | boolean | `false`                             | Enable if you have more than 50 nodes in cluster | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
+| typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 1) \                               | round(1) }}`                                                       |1 replica for every 50 cluster nodes|Number of Typha running replicas|
+| typha.image            | string  | `calico/typha:v3.10.1`              | Should contain both image name and version       | Calico Typha image                                                 |
+| cni.image              | string  | `calico/cni:v3.10.1`                | Should contain both image name and version       | Calico CNI image                                                   |
+| node.image             | string  | `calico/node:v3.10.1`               | Should contain both image name and version       | Calico Node image                                                  |
+| kube-controllers.image | string  | `calico/kube-controllers:v3.10.1`   | Should contain both image name and version       | Calico Kube Controllers image                                      |
+| flexvol.image          | string  | `calico/pod2daemon-flexvol:v3.10.1` | Should contain both image name and version       | Calico Flexvol image                                               |
 
 ###### Calico Environment Properties
 
@@ -5559,10 +5601,10 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
     <td>1.5.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
     <td></td>
   </tr>
   <tr>

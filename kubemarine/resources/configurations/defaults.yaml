@@ -393,7 +393,7 @@ services:
         containerd:
           executable_name: 'containerd'
           package_name:
-            - 'containerd-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
             - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
@@ -425,15 +425,6 @@ plugins:
       priority: 0
       procedures:
         - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
-        - expect:
-            daemonsets:
-              - calico-node
-            deployments:
-              - calico-kube-controllers
-            pods:
-              - coredns
-              - calico-kube-controllers
-              - calico-node
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico
@@ -454,11 +445,23 @@ plugins:
             apply_required: true
             apply_command: /bin/sh /tmp/calico_rr.sh
             sudo: true
+        - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
+            pods:
+              - coredns
+              - calico-kube-controllers
+              - calico-node
     mode: ipip
     crossSubnet: true
     natOutgoing: true
     mtu: 1440
     fullmesh: true
+    announceServices: false
+    defaultAsNumber: 64512
+    globalBgpPeers: []
     typha:
       enabled: false
       replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'

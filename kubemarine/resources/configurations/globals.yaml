@@ -549,6 +549,5 @@ logging:
       correct_newlines: True
 
 prepull_group_size: 20
-
 accounts:
   retries: 10
