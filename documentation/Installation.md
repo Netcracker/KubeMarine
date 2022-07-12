@@ -1030,7 +1030,6 @@ Example:
 
 ```yaml
 services:
-  kubeadm:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins,DirAvailable--var-lib-etcd
 ```
@@ -1039,7 +1038,6 @@ services:
 
 ```yaml
 services:
-  kubeadm:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
 ```
