@@ -127,7 +127,7 @@ def recommended_system_packages_versions(cluster):
                 containerd_name: compatibility[containerd_name_last][k8s_version][version_key]
                 }
         elif "containerd" in cluster.inventory["services"]["cri"]["containerRuntime"]:
-            if version_key == "version_rhel":
+            if version_key in ["version_rhel", "version_rhel8"]:
                 containerd_name = "containerd.io"
                 containerd_name_last = "containerdio"
 

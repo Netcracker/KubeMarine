@@ -393,7 +393,7 @@ services:
         containerd:
           executable_name: 'containerd'
           package_name:
-            - 'containerd-{{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
             - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'

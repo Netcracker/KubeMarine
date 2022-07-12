@@ -5603,10 +5603,10 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
     <td>1.5.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
     <td></td>
   </tr>
   <tr>
