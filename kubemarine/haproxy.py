@@ -48,6 +48,16 @@ def enrich_inventory(inventory, cluster):
             if not found:
                 raise Exception('Balancer is combined with other role, but there is no any VRRP IP configured for '
                                 'node \'%s\'.' % node['name'])
+        elif 'balancer' in node['roles'] and len(node['roles']) == 1: 
+            is_maintenance_ip = False
+            if inventory["vrrp_ips"]:
+                for item in inventory["vrrp_ips"]:
+                    if isinstance(item, dict):
+                        if item.get('params', {}).get('maintenance-supported', False):
+                            is_maintenance_ip = True
+            # if 'maintenance_mode' is True then should be at least one IP with 'maintenance-supported: true'
+            if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False) and not is_maintenance_ip:
+                raise Exception("Balancer maintenance mode needes at least one VRRP IP with 'maintenance-supported: true'")
 
     return inventory
 
@@ -108,17 +118,27 @@ def enable(group):
                                   now=True)
 
 
-def get_config(cluster, node, future_nodes):
+def get_config(cluster, node, future_nodes, maintenance=False):
 
     bindings = []
-    if len(node['roles']) == 1 or not cluster.inventory['vrrp_ips']:
-        bindings.append("0.0.0.0")
-        bindings.append("::")
-    else:
+    # bindings list for common config and maintenance should be different
+    if maintenance:
         for item in cluster.inventory['vrrp_ips']:
-            for record in item['hosts']:
-                if record['name'] == node['name']:
+            if isinstance(item, dict):
+                if item.get('params', {}).get('maintenance-supported', False):
+                    # add only marked IPs
                     bindings.append(item['ip'])
+            else:
+                raise Exception("Error in VRRP IPs description") 
+    else:
+        if len(node['roles']) == 1 or not cluster.inventory['vrrp_ips']:
+            bindings.append("0.0.0.0")
+            bindings.append("::")
+        else:
+            for item in cluster.inventory['vrrp_ips']:
+                for record in item['hosts']:
+                    if record['name'] == node['name']:
+                        bindings.append(item['ip'])
 
     # remove duplicates
     bindings = list(set(bindings))
@@ -126,11 +146,14 @@ def get_config(cluster, node, future_nodes):
     if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
         return cluster.inventory['services']['loadbalancer']['haproxy']['config']
 
-    config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
-    if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
-        config_file = utils.get_resource_absolute_path(
-            cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
-            script_relative=False)
+    if maintenance:
+        config_file = utils.get_resource_absolute_path('templates/haproxy_mntc.cfg.j2', script_relative=True)
+    else:
+        config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
+        if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
+            config_file = utils.get_resource_absolute_path(
+                cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
+                script_relative=False)
 
     config_source = open(config_file).read()
 
@@ -154,6 +177,16 @@ def configure(group):
         node['connection'].sudo('mkdir -p %s' % configs_directory)
         node['connection'].put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
         node['connection'].sudo('ls -la %s' % package_associations['config_location'])
+
+        # add maintenance config to balancer if 'maintenance_mode' is True
+        if group.cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
+            group.cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node['name'])
+            mntc_config = get_config(group.cluster, node, all_nodes_configs, True)
+            utils.dump_file(group.cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node['name'])
+            node['connection'].sudo('mkdir -p %s' % configs_directory)
+            node['connection'].put(io.StringIO(mntc_config), '%s.mntc' % package_associations['config_location'], \
+                    backup=True, sudo=True)
+            node['connection'].sudo('ls -la %s.mntc' % package_associations['config_location'])
 
 
 def override_haproxy18(group):
