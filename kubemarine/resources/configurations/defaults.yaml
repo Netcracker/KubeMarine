@@ -425,6 +425,15 @@ plugins:
       priority: 0
       procedures:
         - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
+        - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
+            pods:
+              - coredns
+              - calico-kube-controllers
+              - calico-node
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico

@@ -341,7 +341,7 @@ class KubernetesCluster(Environment):
 
             associated_params['package_name'] = final_packages_list
         # packages from direct installation section
-        if self.inventory['services']['packages']['install']:
+        if self.inventory['services']['packages'].get('install', {}):
             final_packages_list = []
             for package in self.inventory['services']['packages']['install']['include']:
                 package_versions_list = []
