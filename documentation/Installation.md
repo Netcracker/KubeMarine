@@ -908,7 +908,7 @@ The following parameters are supported:
 |id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
-|params.maintenance-supported||Label for IPs that receive traffic in `maintenance` mode. See [maintenance mode](#maintenance-mode)and [maintenance support](#maintenance-support)|
+|params.maintenance-supported||Label for IPs that receive traffic in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance support](#maintenance-support)|
 
 There are several formats in which you can specify values.
 
@@ -2786,6 +2786,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td></td>
     <td>Path to the Jinja-template file with custom haproxy config to be used instead of the default one.</td>
   </tr>
+  <tr>
+    <td>maintenance_mode</td>
+    <td>boolean</td>
+    <td></td>
+    <td>Enable maintenance config for HAproxy</td>
+  </tr>
 </tbody>
 </table>
 
@@ -2828,7 +2834,7 @@ services:
       maintenance_mode: True
 ```
 
-**Note:** Maintenance mode requaires that at least one IP in `vrrp_ips` list should be labeled as `maintenance-supported`
+**Note:** Maintenance mode requaires that at least one IP in `vrrp_ips` list should be labeled as [maintenance support](#maintenance-support)
 
 ### RBAC Admission
 
