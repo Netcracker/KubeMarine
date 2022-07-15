@@ -2834,7 +2834,7 @@ services:
       maintenance_mode: True
 ```
 
-**Note:** Maintenance mode requaires that at least one IP in `vrrp_ips` list should be labeled as [maintenance support](#maintenance-support)
+**Note:** Maintenance mode requires at least one IP in `vrrp_ips` list should be labeled as [maintenance support](#maintenance-support)
 
 ### RBAC Admission
 
