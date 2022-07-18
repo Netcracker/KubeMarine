@@ -16,6 +16,7 @@ from io import StringIO
 
 import toml
 import yaml
+import json
 
 from distutils.util import strtobool
 from kubemarine import system, packages
@@ -77,6 +78,17 @@ def configure(group):
                     break
             if is_insecure:
                 insecure_registries.append(mirror)
+    # save 'auth.json' if there are credentials for registry
+    auth_registries = {"auths": {}}
+    if config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {}).get('configs'):
+        registry_configs = config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['configs']
+        for auth_registry in registry_configs:
+            auth_registries['auths'][auth_registry] = {}
+            if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
+                auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
+        auth_json = json.dumps(auth_registries)
+        group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
+        group.sudo("chmod 600 /etc/containers/auth.json")
     if insecure_registries:
         log.debug("Uploading podman configuration...")
         podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"

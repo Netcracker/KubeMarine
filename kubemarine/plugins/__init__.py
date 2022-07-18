@@ -410,9 +410,7 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
                     stdout_line_allowed = True
 
             if stdout_line_allowed:
-                if 'Running' in stdout_line:
-                    running_pods_stdout += stdout_line + '\n'
-                elif is_critical_state_in_stdout(cluster, stdout_line):
+                if is_critical_state_in_stdout(cluster, stdout_line):
                     cluster.log.verbose("Failed pod detected: %s\n" % stdout_line)
 
                     if not failure_found:
@@ -422,6 +420,9 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
                     # just in case, skip the error a couple of times, what if it comes out of the failure state?
                     if failures > cluster.globals['pods']['allowed_failures']:
                         raise Exception('Pod entered a state of error, further proceeding is impossible')
+                else:
+                # we have to take into account any pod in not a critical state
+                    running_pods_stdout += stdout_line + '\n'
 
         pods_ready = False
         if running_pods_stdout and running_pods_stdout != "" and "0/1" not in running_pods_stdout:
