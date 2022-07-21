@@ -48,6 +48,17 @@ def enrich_inventory(inventory, cluster):
             if not found:
                 raise Exception('Balancer is combined with other role, but there is no any VRRP IP configured for '
                                 'node \'%s\'.' % node['name'])
+        elif 'balancer' in node['roles'] and len(node['roles']) == 1:
+            not_bind = 0
+            if inventory["vrrp_ips"]:
+                for item in inventory["vrrp_ips"]:
+                    if isinstance(item, dict):
+                        if item.get('params', {}).get('maintenance-type', False):
+                            not_bind += 1
+            # if 'maintenance_mode' is True then should be at least one IP without 'maintenance-type: not bind'
+            if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False) and \
+                    not_bind == len(inventory["vrrp_ips"]):
+                raise Exception("Balancer maintenance mode needes at least one VRRP IP without 'maintenance-type: not bind'")
 
     return inventory
 
@@ -115,9 +126,12 @@ def get_config(cluster, node, future_nodes, maintenance=False):
     if maintenance:
         for item in cluster.inventory['vrrp_ips']:
             if isinstance(item, dict):
-                if item.get('params', {}).get('maintenance-supported', False):
-                    # add only marked IPs
+                if not item.get('params', {}).get('maintenance-type', False):
+                    # add only unmarked IPs
                     bindings.append(item['ip'])
+            elif isinstance(item, str):
+                    # add only unmarked IPs
+                    bindings.append(item)
             else:
                 raise Exception("Error in VRRP IPs description") 
     else:
