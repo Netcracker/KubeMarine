@@ -908,7 +908,7 @@ The following parameters are supported:
 |id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
-|params.maintenance-supported||Label for IPs that receive traffic in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
+|params.maintenance-type||Label for IPs that describes what type of traffic should be received in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
 
 There are several formats in which you can specify values.
 
@@ -955,7 +955,8 @@ vrrp_ips:
 
 #### maintenance type
 
-The following example discribes the type that applicable for particular IP in maintenance mode configuration (`not bind` means that IP will not recive neither TCP nor HTTP traffic):
+Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
+The following example discribes the type of traffic that applicable for particular IP in maintenance mode configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
 
 ```yaml
 vrrp_ips:
@@ -2833,8 +2834,6 @@ services:
       keep_configs_updated: True
       maintenance_mode: True
 ```
-
-**Note:** Maintenance configuration for HAproxy has the same IPs as it discribes in `vrrp_ips` list [maintenance type](#maintenance-type)
 
 ### RBAC Admission
 
