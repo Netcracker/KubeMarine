@@ -53,7 +53,7 @@ def enrich_inventory(inventory, cluster):
             if inventory["vrrp_ips"]:
                 for item in inventory["vrrp_ips"]:
                     if isinstance(item, dict):
-                        if item.get('params', {}).get('maintenance-type', False):
+                        if item.get('params', {}).get('maintenance-type', False) == 'not bind':
                             not_bind += 1
             # if 'maintenance_mode' is True then should be at least one IP without 'maintenance-type: not bind'
             if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False) and \
@@ -127,10 +127,14 @@ def get_config(cluster, node, future_nodes, maintenance=False):
         for item in cluster.inventory['vrrp_ips']:
             if isinstance(item, dict):
                 if not item.get('params', {}).get('maintenance-type', False):
-                    # add only unmarked IPs
+                    # add unmarked IPs
+                    bindings.append(item['ip'])
+                elif item.get('params', {}).get('maintenance-type', False) != 'not bind':
+                    # add IPs with type different from 'not bind'
+                    # that is the temporary solution
                     bindings.append(item['ip'])
             elif isinstance(item, str):
-                    # add only unmarked IPs
+                    # add unmarked IPs
                     bindings.append(item)
             else:
                 raise Exception("Error in VRRP IPs description") 
