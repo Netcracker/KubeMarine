@@ -908,6 +908,7 @@ The following parameters are supported:
 |id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
+|params.maintenance-type||Label for IPs that describes what type of traffic should be received in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
 
 There are several formats in which you can specify values.
 
@@ -950,6 +951,21 @@ vrrp_ips:
   floating_ip: 10.101.1.1
   password: 11a1aabe
   router_id: '1'
+```
+
+#### maintenance type
+
+Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
+The following example discribes the type of traffic that applicable for particular IP in maintenance mode configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
+
+```yaml
+vrrp_ips:
+- ip: 192.168.0.1
+  floating_ip: 10.101.1.1
+- ip: 192.168.0.2
+  floating_ip: 10.101.1.2
+  params:
+    maintenance-type: "not bind"
 ```
 
 ### Services
@@ -2771,6 +2787,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td></td>
     <td>Path to the Jinja-template file with custom haproxy config to be used instead of the default one.</td>
   </tr>
+  <tr>
+    <td>maintenance_mode</td>
+    <td>boolean</td>
+    <td></td>
+    <td>Enable maintenance config for HAproxy</td>
+  </tr>
 </tbody>
 </table>
 
@@ -2793,6 +2815,25 @@ This parameter use the following context options for template rendering:
 - config_options
 
 As an example of a template, you can look at [default template](kubemarine/templates/haproxy.cfg.j2).
+
+#### maintenance mode
+
+The `KubeMarine` supports maintenance mode for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
+
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
+      maintenance_mode: True
+```
 
 ### RBAC Admission
 
