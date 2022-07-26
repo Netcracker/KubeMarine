@@ -4836,9 +4836,11 @@ $ install --disable-dump-cleanup
 
 ### Finalized Dump
 
-After the procedure is completed, a final dump with all the missing variable values is needed, which is pulled from the finished cluster environment.
-This dump of the final inventory can be found in the `dump/cluster_finalized.yaml` file. In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
+After any procedure is completed, a final inventory with all the missing variable values is needed, which is pulled from the finished cluster environment.
+This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
+and can be passed as a source inventory in future runs of Kubemarine procedures.
 
+In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
 For example, consider the following package's origin configuration:
 
 ```yaml
@@ -4877,12 +4879,13 @@ services:
         service_name: 'docker'
         config_location: '/etc/docker/daemon.json'
     install:
-      - conntrack
-      - ethtool-4.8-10.el7.x86_64
-      - ebtables-2.0.10-16.el7.x86_64
-      - socat-1.7.3.2-2.el7.x86_64
-      - unzip-6.0-21.el7.x86_64
-      - policycoreutils-python-utils
+      include:
+        - conntrack
+        - ethtool-4.8-10.el7.x86_64
+        - ebtables-2.0.10-16.el7.x86_64
+        - socat-1.7.3.2-2.el7.x86_64
+        - unzip-6.0-21.el7.x86_64
+        - policycoreutils-python-utils
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.

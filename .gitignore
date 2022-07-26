@@ -6,6 +6,7 @@ config
 ansible-inventory.ini
 admin.conf
 account-tokens.yaml
+cluster_finalized.yaml
 ca.csr
 ca.pem
 ca-key.pem
