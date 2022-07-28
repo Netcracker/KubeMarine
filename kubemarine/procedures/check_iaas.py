@@ -337,7 +337,13 @@ def _get_not_balancers(cluster: KubernetesCluster) -> dict:
 def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
     inet = ipaddress.ip_network(subnet)
     net_mask = str(inet.netmask)
-    subnet_hosts = list(inet.hosts())
+    subnet_hosts = []
+    ip_numbers=0
+    for i in inet.hosts():
+        subnet_hosts.append(i)
+        ip_numbers +=1
+        if ip_numbers == 1000000:
+           break
     subnet_hosts_len = len(subnet_hosts)
 
     host_to_inf = {}
