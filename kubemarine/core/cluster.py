@@ -369,7 +369,11 @@ class KubernetesCluster(Environment):
         prepared_inventory = defaults.prepare_for_dump(prepared_inventory, copy=False)
         prepared_inventory = self.escape_jinja_characters_for_inventory(prepared_inventory)
         inventory_for_dump = controlplane.controlplane_finalize_inventory(self, prepared_inventory)
-        utils.dump_file(self, yaml.dump(inventory_for_dump), "cluster_finalized.yaml")
+        data = yaml.dump(inventory_for_dump)
+        finalized_filename = "cluster_finalized.yaml"
+        utils.dump_file(self, data, finalized_filename)
+        with open(finalized_filename, 'w') as f:
+            f.write(data)
 
     def preserve_inventory(self):
         self.log.debug("Start preserving of the information about the procedure.")
