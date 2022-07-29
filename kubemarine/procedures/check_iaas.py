@@ -337,6 +337,7 @@ def _get_not_balancers(cluster: KubernetesCluster) -> dict:
 def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
     inet = ipaddress.ip_network(subnet)
     net_mask = str(inet.netmask)
+    prefix = str(inet.prefixlen)
     subnet_hosts = []
     ip_numbers=0
     for i in inet.hosts():
@@ -380,7 +381,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
 
             # Create alias from the node network interface for the subnet on every node
             for host, node in nodes.items():
-                node['connection'].sudo(f"ip a add {host_to_ip[host]}/{net_mask} dev {host_to_inf[host]}")
+                node['connection'].sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
 
             exe.flush()
             try:
@@ -395,7 +396,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
         with RemoteExecutor(cluster):
             for node in nodes_to_rollback.get_ordered_members_list(provide_node_configs=True):
                 host = node["connect_to"]
-                node['connection'].sudo(f"ip a del {host_to_ip[host]}/{net_mask} dev {host_to_inf[host]}",
+                node['connection'].sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
                                         warn=True)
 
     if skipped_nodes:
