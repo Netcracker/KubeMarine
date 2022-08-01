@@ -167,6 +167,9 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
                 # replace packages with associated version that shoud be excluded from cache
                 for excluded_package in associated_params['package_name']:
                     excluded_dict[get_package_name(group.get_nodes_os(), excluded_package)] = excluded_package
+        # packages from direct installation section
+        if cluster.inventory['services']['packages'].get('install', {}):
+            packages_list = packages_list + cluster.inventory['services']['packages']['install']['include']
 
     # dedup
     packages_list = list(set(packages_list))
