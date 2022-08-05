@@ -137,11 +137,12 @@ def main():
                 previous_group = group
             for description in descriptions:
                 descriptions_print_list.append(' ' + description)
-        return print('''The following procedures available:
+        print('''The following procedures available:
 %s
 
 Usage: kubemarine <procedure> <arguments>
 ''' % '\n'.join(descriptions_print_list))
+        sys.exit(1)
 
     result = import_procedure(arguments[0]).main(arguments[1:])
     if result is not None:
