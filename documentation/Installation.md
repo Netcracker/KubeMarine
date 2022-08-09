@@ -908,6 +908,7 @@ The following parameters are supported:
 |id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
+|params.maintenance-type||Label for IPs that describes what type of traffic should be received in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
 
 There are several formats in which you can specify values.
 
@@ -950,6 +951,21 @@ vrrp_ips:
   floating_ip: 10.101.1.1
   password: 11a1aabe
   router_id: '1'
+```
+
+#### maintenance type
+
+Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
+The following example discribes the type of traffic that applicable for particular IP in maintenance mode configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
+
+```yaml
+vrrp_ips:
+- ip: 192.168.0.1
+  floating_ip: 10.101.1.1
+- ip: 192.168.0.2
+  floating_ip: 10.101.1.2
+  params:
+    maintenance-type: "not bind"
 ```
 
 ### Services
@@ -2771,6 +2787,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td></td>
     <td>Path to the Jinja-template file with custom haproxy config to be used instead of the default one.</td>
   </tr>
+  <tr>
+    <td>maintenance_mode</td>
+    <td>boolean</td>
+    <td></td>
+    <td>Enable maintenance config for HAproxy</td>
+  </tr>
 </tbody>
 </table>
 
@@ -2793,6 +2815,25 @@ This parameter use the following context options for template rendering:
 - config_options
 
 As an example of a template, you can look at [default template](kubemarine/templates/haproxy.cfg.j2).
+
+#### maintenance mode
+
+The `KubeMarine` supports maintenance mode for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
+
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+      defaults:
+        timeout_connect: '10s'
+        timeout_client: '1m'
+        timeout_server: '1m'
+        timeout_tunnel: '60m'
+        timeout_client_fin: '1m'
+        maxconn: 10000
+      keep_configs_updated: True
+      maintenance_mode: True
+```
 
 ### RBAC Admission
 
@@ -4795,9 +4836,11 @@ $ install --disable-dump-cleanup
 
 ### Finalized Dump
 
-After the procedure is completed, a final dump with all the missing variable values is needed, which is pulled from the finished cluster environment.
-This dump of the final inventory can be found in the `dump/cluster_finalized.yaml` file. In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
+After any procedure is completed, a final inventory with all the missing variable values is needed, which is pulled from the finished cluster environment.
+This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
+and can be passed as a source inventory in future runs of Kubemarine procedures.
 
+In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
 For example, consider the following package's origin configuration:
 
 ```yaml
@@ -4836,12 +4879,13 @@ services:
         service_name: 'docker'
         config_location: '/etc/docker/daemon.json'
     install:
-      - conntrack
-      - ethtool-4.8-10.el7.x86_64
-      - ebtables-2.0.10-16.el7.x86_64
-      - socat-1.7.3.2-2.el7.x86_64
-      - unzip-6.0-21.el7.x86_64
-      - policycoreutils-python-utils
+      include:
+        - conntrack
+        - ethtool-4.8-10.el7.x86_64
+        - ebtables-2.0.10-16.el7.x86_64
+        - socat-1.7.3.2-2.el7.x86_64
+        - unzip-6.0-21.el7.x86_64
+        - policycoreutils-python-utils
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.
