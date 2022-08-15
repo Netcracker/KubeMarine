@@ -18,7 +18,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kube-controller-manager` unable to sync caches for garbage collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
   - [etcdctl compaction and defragmentation](#etcdctl-compaction-and-defragmentation)
   - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
-  - [HTTPS Ingress doesn't work](#https:-ingress-doesn't-work)
+  - [HTTPS Ingress doesn't work](#https-ingress-doesnt-work)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
