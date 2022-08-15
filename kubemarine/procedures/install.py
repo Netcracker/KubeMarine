@@ -158,9 +158,6 @@ def system_prepare_policy(cluster):
                                              f"sudo sed -i 's/--bind-address=.*$/--bind-address="
                                              f"{control_plane['internal_address']}/' "
                                              f"/etc/kubernetes/manifests/kube-apiserver.yaml")
-            control_plane['connection'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-            control_plane['connection'].sudo("kubeadm init phase upload-config kubeadm "
-                                             "--config=/etc/kubernetes/audit-on-config.yaml")
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
                 control_plane['connection'].call(utils.wait_command_successful,
                                                  command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
@@ -169,6 +166,10 @@ def system_prepare_policy(cluster):
                                                  command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
                                                          " | awk '{print $1}')")
             cluster.nodes['control-plane'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            control_plane['connection'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            control_plane['connection'].sudo("kubeadm init phase upload-config kubeadm "
+                                             "--config=/etc/kubernetes/audit-on-config.yaml")
+
 
 
 def system_prepare_dns_hostname(cluster):
