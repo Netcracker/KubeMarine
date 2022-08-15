@@ -15,6 +15,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
   - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
   - [Long Recovery after a Node goes Offline](#long-recovery-after-a-node-goes-offline)
+  - [HTTPS Ingress doesn't work](#https:-ingress-doesn't-work)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -451,6 +452,24 @@ Failed to defragment etcd member
 ```
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
+
+## HTTPS Ingress doesn't work
+
+The `ingress-nginx-controller` doesn't support all ciphers from TLSv1.2 and TLSv1.3 by default. If secure connection isn't being established, check the ciphers that are applicable for the particural `ingress`. The following example of `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+...
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-ciphers: "AES128-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
+...
+
+```
+
+The default list of ciphers is embeded in `ingress-nginx-controller` image in `/etc/nginx/nginx.conf` file.
+
 
 # Troubleshooting Kubemarine
 
