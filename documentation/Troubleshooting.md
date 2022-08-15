@@ -15,6 +15,9 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
   - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
   - [Long Recovery after a Node goes Offline](#long-recovery-after-a-node-goes-offline)
+  - [`kube-controller-manager` unable to sync caches for garbage collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
+  - [etcdctl compaction and defragmentation](#etcdctl-compaction-and-defragmentation)
+  - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
   - [HTTPS Ingress doesn't work](#https:-ingress-doesn't-work)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
@@ -455,7 +458,9 @@ Failed to defragment etcd member
 
 ## HTTPS Ingress doesn't work
 
-The `ingress-nginx-controller` doesn't support all ciphers from TLSv1.2 and TLSv1.3 by default. If secure connection isn't being established, check the ciphers that are applicable for the particural `ingress`. The following example of `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
+**Symptoms**: The secure connection isn't being established, the ciphers is not supported by server.
+**Root cause**: The `ingress-nginx-controller` doesn't support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embeded in `ingress-nginx-controller` image in `/etc/nginx/nginx.conf` file.
+**Solution**: Change `ingress` annotation that manages the ciphers list. The following example of `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -467,9 +472,6 @@ metadata:
 ...
 
 ```
-
-The default list of ciphers is embeded in `ingress-nginx-controller` image in `/etc/nginx/nginx.conf` file.
-
 
 # Troubleshooting Kubemarine
 
