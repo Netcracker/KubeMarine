@@ -165,7 +165,6 @@ def system_prepare_policy(cluster):
                 control_plane['connection'].call(utils.wait_command_successful,
                                                  command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
                                                          " | awk '{print $1}')")
-            cluster.nodes['control-plane'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
             control_plane['connection'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
             control_plane['connection'].sudo("kubeadm init phase upload-config kubeadm "
                                              "--config=/etc/kubernetes/audit-on-config.yaml")
