@@ -17,9 +17,10 @@
 from collections import OrderedDict
 
 import io
+import uuid
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow
+from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
@@ -228,6 +229,27 @@ def _migrate_cri(cluster, node_group):
         node["connection"].sudo("rm -rf /var/run/docker.sock", hide=False)
 
 
+def release_calico_leaked_ips(cluster):
+    """
+    During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
+    For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
+    Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
+    This task releases problem ips with force.
+    """
+
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    cluster.log.debug("Getting leaked ips...")
+    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", is_async=False, hide=False)
+    leaked_ips = result.get_simple_out()
+    leaked_ips_count = leaked_ips.count('leaked')
+    cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
+    if leaked_ips_count != 0:
+        first_control_plane.sudo(f"calicoctl ipam release --from-report={random_report_name} --force", is_async=False, hide=False)
+        cluster.log.debug("Leaked ips was released")
+    first_control_plane.sudo(f"rm {random_report_name}", is_async=False, hide=False)
+    
+
 def edit_config(kubeadm_flags):
     kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")
     return _config_changer(kubeadm_flags,
@@ -266,6 +288,7 @@ def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
 tasks = OrderedDict({
     "add_repos": install.system_prepare_package_manager_configure,
     "apply_new_cri": migrate_cri,
+    "release_calico_ipam_leacked_ips": release_calico_leaked_ips
 })
 
 
