@@ -451,14 +451,14 @@ def tcp_connect(cluster, node_from, node_to, tcp_ports, host_to_ip, mtu):
     node_from['connection'].sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
-def get_start_tcp_listener_cmd(python_executable, tcp_listener):
+def get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version):
     # 1. Create anonymous pipe
     # 2. Create python tcp listener process in background and redirect output to pipe
     # 3. Wait till the listener successfully binds the port, or till it fails and exits.
     #    Read one line from pipe to check that.
     # 4. Exit with success or fail correspondingly.
     return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
-           f"sudo nohup {python_executable} {tcp_listener} $PORT >&3 2>&1 & " \
+           f"sudo nohup {python_executable} {tcp_listener} $PORT {ip_version} >&3 2>&1 & " \
            "PID=$(echo $!); " \
            "while read -t 0.1 -u 3 || sudo kill -0 $PID 2>/dev/null && [[ -z $REPLY ]]; do " \
                ":; " \
@@ -476,7 +476,7 @@ def get_start_tcp_listener_cmd(python_executable, tcp_listener):
 
 
 def get_stop_tcp_listener_cmd(tcp_listener):
-    identify_pid = "ps aux | grep \" %s ${port}$\" | grep -v grep | grep -v nohup | awk '{print $2}'" % tcp_listener
+    identify_pid = "ps aux | grep \" %s ${port} \" | grep -v grep | grep -v nohup | awk '{print $2}'" % tcp_listener
     return f"port=%s;pid=$({identify_pid}) " \
            "&& if [ ! -z $pid ]; then sudo kill -9 $pid; echo \"killed pid $pid for port $port\"; fi"
 
@@ -540,8 +540,10 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
         with RemoteExecutor(cluster) as exe:
             # Run process that LISTEN TCP port
             for host, node in nodes.items():
+                internal_ip = node.get('internal_address')
+                ip_version = ipaddress.ip_address(internal_ip).version 
                 python_executable = cluster.context['nodes'][host]['python']['executable']
-                tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener))
+                tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version))
                 node['connection'].sudo(tcp_listener_cmd, warn=True)
 
             exe.flush()
