@@ -55,10 +55,14 @@ def enrich_inventory(inventory, cluster):
                     if isinstance(item, dict):
                         if item.get('params', {}).get('maintenance-type', False) == 'not bind':
                             not_bind += 1
-            # if 'maintenance_mode' is True then should be at least one IP without 'maintenance-type: not bind'
-            if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False) and \
-                    not_bind == len(inventory["vrrp_ips"]):
-                raise Exception("Balancer maintenance mode needes at least one VRRP IP without 'maintenance-type: not bind'")
+            if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
+                # if 'maintenance_mode' is True then must be at least one IP without 'maintenance-type: not bind'
+                if not_bind == len(inventory["vrrp_ips"]):
+                    raise Exception("Balancer maintenance mode needes at least one VRRP IP without 'maintenance-type: not bind'")
+                # if 'maintenance_mode' is True then maintenance config and default config must be stored in different files'
+                if inventory['services']['loadbalancer']['haproxy']['maintenance_config'] == \
+                        inventory['services']['loadbalancer']['haproxy']['default_config']:
+                    raise Exception("Maintenance mode configuration file must be different with default configuration file")
 
     return inventory
 
@@ -188,13 +192,13 @@ def configure(group):
 
         # add maintenance config to balancer if 'maintenance_mode' is True
         if group.cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
+            mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_config']
             group.cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node['name'])
             mntc_config = get_config(group.cluster, node, all_nodes_configs, True)
             utils.dump_file(group.cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node['name'])
             node['connection'].sudo('mkdir -p %s' % configs_directory)
-            node['connection'].put(io.StringIO(mntc_config), '%s.mntc' % package_associations['config_location'], \
-                    backup=True, sudo=True)
-            node['connection'].sudo('ls -la %s.mntc' % package_associations['config_location'])
+            node['connection'].put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True)
+            node['connection'].sudo('ls -la %s' % mntc_config_location)
 
 
 def override_haproxy18(group):
