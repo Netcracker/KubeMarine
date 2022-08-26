@@ -458,11 +458,11 @@ Failed to defragment etcd member
 
 ## HTTPS Ingress doesn't work
 
-**Symptoms**: The secure connection isn't being established, the ciphers is not supported by server.
+**Symptoms**: The secure connection is not being established, the ciphers are not supported by server.
 
-**Root cause**: The `ingress-nginx-controller` doesn't support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in `ingress-nginx-controller` image in `/etc/nginx/nginx.conf` file.
+**Root cause**: `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file.
 
-**Solution**: Change `ingress` annotation that manages the ciphers list. The following example of `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
+**Solution**: Change the `ingress` annotation that manages the ciphers list. The following example of the `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -733,4 +733,4 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
       cluster.yaml
       procedure_parameters
   ```
-The user can analyze these files and try to find the reason for the failed installation of kubemarine
+The user can analyze these files and try to find the reason for the failed installation of Kubemarine.
