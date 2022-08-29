@@ -83,24 +83,24 @@ kubemarine install \
 ```
 ## Output to Kubemarine
 
-Kubemarine collects information about the installation after each `successful` cluster installation.
-
-What to preserve:
+Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes at the address:
+```
+/etc/kubemarine/procedure
+```
+What information is preserved under the `<timestamp_procedure-name>` directory:
 ```yaml
-dir location:
-/etc/kubemarine/procedure  
-  data_time_initial_procedure
-    cluster.yaml
-    version
-    dump/
-      cluster.yaml
-      cluster_initial.yaml
-      procedure.yaml
-      cluster_finalized.yaml
-      cluster_precompiled.yaml
-      procedure_parameters
+cluster.yaml
+version
+dump/
+  cluster.yaml
+  cluster_initial.yaml
+  procedure.yaml
+  cluster_finalized.yaml
+  cluster_precompiled.yaml
+  procedure_parameters
 ```
 
-Target and then list the following files:
-* version - version Kubemarine.
-* procedure_parameters - cluster installation options.
+Description of the following files:
+* cluster.yam - input cluster inventory
+* version - used Kubemarine version.
+* procedure_parameters - list of finished tasks.
