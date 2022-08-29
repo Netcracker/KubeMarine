@@ -15,12 +15,15 @@
 # Simple TCP socket listener that can be run on both python 2 and 3,
 # The listener accepts connections sequentially, and suppresses the received data.
 # The script is for testing purpose only.
-# The only argv parameter is a TCP port to listen.
+# The first argv parameter is the TCP port to listen. The second argv parameter is the ip protocol version.
 
 import socket
 import sys
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+if sys.argv[2] == '6' :
+  s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+else:
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 try:
     s.bind(('', int(sys.argv[1])))

@@ -15,6 +15,10 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
   - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
   - [Long Recovery after a Node goes Offline](#long-recovery-after-a-node-goes-offline)
+  - [`kube-controller-manager` unable to sync caches for garbage collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
+  - [etcdctl compaction and defragmentation](#etcdctl-compaction-and-defragmentation)
+  - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
+  - [HTTPS Ingress doesn't work](#https-ingress-doesnt-work)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -452,6 +456,25 @@ Failed to defragment etcd member
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
 
+## HTTPS Ingress doesn't work
+
+**Symptoms**: The secure connection is not being established, the ciphers are not supported by server.
+
+**Root cause**: `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file.
+
+**Solution**: Change the `ingress` annotation that manages the ciphers list. The following example of the `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+...
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-ciphers: "AES128-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
+...
+
+```
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
@@ -713,3 +736,4 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
       procedure_parameters
   ```
 The user can analyze these files and try to find the reason for the failed installation of kubemarine
+
