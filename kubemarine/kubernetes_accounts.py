@@ -46,8 +46,10 @@ def enrich_inventory(inventory, cluster):
         # It has only 'ServiceAccount' and 'ClusterRoleBinding'
         minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
         if minor_version < 24:
-            rbac["accounts"][i]['configs'].pop(2)
-            rbac["accounts"][i]['configs'][0].pop('secrets')
+            if len(rbac["accounts"][i]['configs']) > 2:
+                rbac["accounts"][i]['configs'].pop(2)
+            if rbac["accounts"][i]['configs'][0].get('secrets') is not None:
+                rbac["accounts"][i]['configs'][0].pop('secrets')
         else:
            # This part is applicable for Kubernetes v1.24 and higher
            # It has 'Secret' in addition 
