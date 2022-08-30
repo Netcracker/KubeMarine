@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import os
 import random
+import re
 import subprocess
 import time
 import uuid
@@ -660,11 +661,11 @@ class NodeGroup:
 
             self.cluster.log.verbose("Attempting to connect to nodes...")
             # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
-            results.update(self._do("sudo", left_nodes, True, "last reboot"))
+            results.update(self._do_nopasswd(left_nodes, "last reboot"))
             left_nodes = {host: left_nodes[host] for host, result in results.items()
                           if (isinstance(result, Exception)
                               # Something is wrong with sudo access. Node is active.
-                              and not isinstance(result, invoke.AuthFailure))
+                              and not NodeGroup.is_require_nopasswd_exception(result))
                           or (not isinstance(result, Exception)
                               and result == initial_boot_history.get(self.nodes[host]))}
 
@@ -691,6 +692,33 @@ class NodeGroup:
             self.cluster.log.verbose("All nodes are online now")
 
         return results
+
+    def _do_nopasswd(self, left_nodes: Connections, command: str):
+        prompt = '[sudo] password: '
+
+        class NoPasswdResponder(invoke.Responder):
+            def __init__(self):
+                super().__init__(re.escape(prompt), None)
+
+            def submit(self, stream):
+                if self.pattern_matches(stream, self.pattern, "index"):
+                    # If user appears to be not a NOPASSWD sudoer, "sudo" suggests to write password.
+                    # This is a W/A to handle the situation in a docker container without pseudo-TTY (no -t option)
+                    # As long as we require NOPASSWD, we can just fail immediately in such cases.
+                    raise invoke.exceptions.ResponseNotAccepted("The user should be a NOPASSWD sudoer")
+
+                # The only acceptable situation, responder does nothing.
+                return []
+
+        # Currently only NOPASSWD sudoers are supported.
+        # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
+        return self._do("run", left_nodes, True, f"sudo -S -p '{prompt}' {command}",
+                        watchers=[NoPasswdResponder()])
+
+    @staticmethod
+    def is_require_nopasswd_exception(exc: Exception):
+        return isinstance(exc, invoke.exceptions.Failure) \
+               and isinstance(exc.reason, invoke.exceptions.ResponseNotAccepted)
 
     def is_allowed_connection_exception(self, exception_message):
         exception_message = exception_message.partition('\n')[0]
