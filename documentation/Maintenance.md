@@ -166,6 +166,9 @@ etcd:
 ...
 ```
 
+**Note**: All the custom settings for the system services should be properly reflected in the cluster.yaml (see [services.kubeadm parameters](Installation.md#kubeadm)) to be kept after upgrade.
+
+
 #### Thirdparties Upgrade Section and Task
 
 If the cluster is located in an isolated environment, it is possible to specify the custom paths to new thirdparties with the same syntax as in the `cluster.yaml` as shown in the following script:
