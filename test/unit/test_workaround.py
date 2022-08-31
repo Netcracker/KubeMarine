@@ -62,7 +62,7 @@ class TestUnexpectedErrors(unittest.TestCase):
         cluster.fake_shell.add(bad_results, 'sudo', command, usage_limit=1)
         cluster.fake_shell.add(good_results, 'sudo', command)
         cluster.fake_shell.add(demo.create_nodegroup_result(cluster.nodes['all'], stdout='example result'),
-                               'sudo', ['last reboot'])
+                               'run', ["sudo -S -p '[sudo] password: ' last reboot"])
 
         results = cluster.nodes['master'].get_any_member().sudo('kubectl describe nodes')
 

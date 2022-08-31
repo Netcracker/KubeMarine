@@ -58,13 +58,17 @@ class TestFakeShell(unittest.TestCase):
         self.cluster.fake_shell.add(demo.create_nodegroup_result(self.cluster.nodes['all'], stdout='example result'),
                                     'sudo', ['last reboot'], usage_limit=1)
         self.cluster.fake_shell.add(demo.create_nodegroup_result(self.cluster.nodes['all'], stdout='example result 2'),
-                                    'sudo', ['last reboot'], usage_limit=1)
+                                    'run', ["sudo -S -p '[sudo] password: ' last reboot"], usage_limit=1)
 
         system.reboot_nodes(self.cluster.nodes['master'])
 
         for host in self.cluster.nodes['master'].get_hosts():
-            self.assertEqual(2,
+            self.assertEqual(1,
                              len(self.cluster.fake_shell.history_find(host, 'sudo', ['last reboot'])),
+                             msg="Wrong number of reboots in history")
+            self.assertEqual(1,
+                             len(self.cluster.fake_shell.history_find(
+                                 host, 'run', ["sudo -S -p '[sudo] password: ' last reboot"])),
                              msg="Wrong number of reboots in history")
 
 

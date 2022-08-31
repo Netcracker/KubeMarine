@@ -276,7 +276,8 @@ class FlowTest(unittest.TestCase):
     def _stub_detect_nodes_context(self, inventory: dict, online_nodes: list, sudoer_nodes: list):
         hosts = [node["address"] for node in inventory["nodes"]]
 
-        self._stub_result(hosts, sudoer_nodes, online_nodes, "sudo", ['last reboot'], 'some reboot info')
+        self._stub_result(hosts, sudoer_nodes, online_nodes, "run", ["sudo -S -p '[sudo] password: ' last reboot"],
+                          'some reboot info')
         self._stub_result(hosts, sudoer_nodes, online_nodes, "sudo", ['whoami'], 'root')
 
         for node in inventory["nodes"]:
@@ -298,6 +299,8 @@ class FlowTest(unittest.TestCase):
                 results[host] = socket.timeout()
             elif host not in sudoer_hosts and do_type == 'sudo':
                 results[host] = invoke.AuthFailure(None, None)
+            elif host not in sudoer_hosts and 'last reboot' in command[0]:
+                results[host] = invoke.Failure(None, invoke.exceptions.ResponseNotAccepted())
             else:
                 results[host] = demo.create_result(stdout=stdout)
         self.light_fake_shell.add(results, do_type, command, usage_limit=1)
