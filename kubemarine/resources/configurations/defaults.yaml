@@ -342,7 +342,6 @@ services:
           package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'haproxy'
           config_location: *haproxy_default_config
-          #config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
@@ -374,7 +373,6 @@ services:
           package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel }}'
           service_name: 'rh-haproxy18-haproxy'
           config_location: *haproxy_default_config
-          #config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
@@ -406,7 +404,6 @@ services:
           package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel8 }}'
           service_name: 'haproxy'
           config_location: *haproxy_default_config
-          #config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'
