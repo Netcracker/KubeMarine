@@ -36,6 +36,8 @@ from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff
 
+# Global variable for 'Maintenance mode'
+mntc_mode = False
 
 def services_status(cluster, service_type):
     global mntc_mode
@@ -65,6 +67,7 @@ def services_status(cluster, service_type):
 
         statuses = []
         failed = False
+        mntc_list = []
         for connection, node_result in result.items():
             if node_result.return_code == 4:
                 statuses.append('service is missing')
@@ -87,15 +90,26 @@ def services_status(cluster, service_type):
             else:
                 raise Exception('Failed to detect status for \"%s\"' % connection.host)
             # Check if HAproxy is running in Maintenance mode
-            if service_type == 'haproxy' and cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-                kuber_ip = cluster.inventory['public_cluster_ip']
-                for item in cluster.inventory['vrrp_ips']:
-                    if kuber_ip == item['ip'] and item.get('params', {}).get('maintenance-type', False):
-                        mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_config']
-                        is_mntc = re.findall(mntc_config_location, node_result.stdout)
-                        if is_mntc:
-                            mntc_mode = True
-                            raise TestWarn("Balancer is running in the maintenance mode")
+            if service_type == 'haproxy' and \
+                    cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
+                mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_config']
+                is_mntc = re.findall(mntc_config_location, node_result.stdout)
+                if is_mntc:
+                    cluster.log.warning("%s balancer is running in the maintenance mode" % connection.host)
+                    mntc_list.append(connection.host)
+
+        # Check if Kubernetes API is disable in maintenance mode
+        if service_type == 'haproxy' and \
+                    cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
+            kuber_ip_disable = False
+            kuber_ip = cluster.inventory['public_cluster_ip']
+            for item in cluster.inventory['vrrp_ips']:
+                if kuber_ip == item['ip'] and \
+                        item.get('params', {}).get('maintenance-type', '') == 'not bind':
+                    kuber_ip_disable = True
+            if kuber_ip_disable and len(group.get_nodes_names()) == len(mntc_list):
+                mntc_mode = True
+                raise TestWarn("Balancers are running in the maintenance mode")
 
         statuses = list(set(statuses))
 
@@ -1256,8 +1270,6 @@ def main(cli_arguments=None):
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    # Global variable for 'Maintenance mode'
-    mntc_mode = False
 
     context = flow.create_context(parser, cli_arguments, procedure='paas')
     context['testsuite'] = TestSuite()
