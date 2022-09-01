@@ -401,7 +401,7 @@ services:
         haproxy:
           executable_name: '/usr/sbin/haproxy'
           package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-          service_name: 'haproxy'          
+          service_name: 'haproxy'
           config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'

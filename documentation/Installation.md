@@ -2839,6 +2839,7 @@ services:
         maxconn: 10000
       keep_configs_updated: True
       maintenance_mode: True
+      mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
 
 ### RBAC Admission
