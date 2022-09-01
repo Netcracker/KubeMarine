@@ -460,7 +460,7 @@ Failed to defragment etcd member
 
 **Symptoms**: The secure connection is not being established, the ciphers are not supported by server.
 
-**Root cause**: `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. Those settings may be customized during the installation procedure. For more information see the `config_map` section the Installation documentation [nginx-ingress-controller plugin](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#nginx-ingress-controller).
+**Root cause**: `ingress-nginx-controller` does not support all ciphers from TLSv1.2 and TLSv1.3 by default. The default list of ciphers is embedded in the `ingress-nginx-controller` image in the `/etc/nginx/nginx.conf` file. Those settings may be customized during the installation procedure. For more information, see the `config_map` section in the Installation documentation, [nginx-ingress-controller plugin](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#nginx-ingress-controller).
 
 **Solution**: Change the `ingress` annotation that manages the ciphers list. The following example of the `ingress` annotation adds the `AES128-SHA256` cipher that is not supported by default:
 
