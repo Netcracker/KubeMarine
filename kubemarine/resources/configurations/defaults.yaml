@@ -313,8 +313,7 @@ services:
         timeout_client_fin: '1m'
         maxconn: 10000
       keep_configs_updated: True
-      default_config: &haproxy_default_config '/etc/haproxy/haproxy.cfg'
-      maintenance_config: '/etc/haproxy/haproxy_mntc.cfg'
+      mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
 
   packages:
     cache_versions: true
@@ -341,7 +340,7 @@ services:
           executable_name: '/usr/sbin/haproxy'
           package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'haproxy'
-          config_location: *haproxy_default_config
+          config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
@@ -372,7 +371,7 @@ services:
           executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
           package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel }}'
           service_name: 'rh-haproxy18-haproxy'
-          config_location: *haproxy_default_config
+          config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
@@ -402,8 +401,8 @@ services:
         haproxy:
           executable_name: '/usr/sbin/haproxy'
           package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-          service_name: 'haproxy'
-          config_location: *haproxy_default_config
+          service_name: 'haproxy'          
+          config_location: '/etc/haproxy/haproxy.cfg'
         keepalived:
           executable_name: 'keepalived'
           package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'

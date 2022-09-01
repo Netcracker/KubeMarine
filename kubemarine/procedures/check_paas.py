@@ -92,7 +92,7 @@ def services_status(cluster, service_type):
             # Check if HAproxy is running in Maintenance mode
             if service_type == 'haproxy' and \
                     cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-                mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_config']
+                mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
                 is_mntc = re.findall(mntc_config_location, node_result.stdout)
                 if is_mntc:
                     cluster.log.warning("%s balancer is running in the maintenance mode" % connection.host)
