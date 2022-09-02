@@ -182,7 +182,8 @@ def enrich_inventory(inventory, cluster):
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
                         node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
                     else:
-                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
+                        if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
+                            node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     # use first control plane internal address as a default bind-address
     # for other control-planes we override it during initialization
