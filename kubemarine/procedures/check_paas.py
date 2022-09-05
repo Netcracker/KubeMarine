@@ -109,7 +109,7 @@ def services_status(cluster, service_type):
                     kuber_ip_disable = True
             if kuber_ip_disable and len(group.get_nodes_names()) == len(mntc_list):
                 mntc_mode = True
-                raise TestWarn("Balancers are running in the maintenance mode")
+                raise TestWarn("Kubernetes API unavailable due to HAProxy maintenance mode")
 
         statuses = list(set(statuses))
 
