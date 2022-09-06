@@ -726,7 +726,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster):
         nodes_context[connection.host]['access'] = access_info
 
         if isinstance(result, Exception):
-            if isinstance(result, invoke.AuthFailure):
+            if NodeGroup.is_require_nopasswd_exception(result):
                 # The error is thrown only if connection is successful, but something is wrong with sudo access.
                 # In general, sudo password is incorrect. In our case, user is not a sudoer, or not a nopasswd sudoer.
                 access_info['online'] = True
