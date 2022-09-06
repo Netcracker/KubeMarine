@@ -868,10 +868,10 @@ def verify_upgrade_versions(cluster):
     k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['control-plane'])
     for node in k8s_nodes_group.get_ordered_members_list(provide_node_configs=True):
         cluster.log.debug(f"Verifying current k8s version for node {node['name']}")
-        result = first_control_plane['connection'].sudo("kubectl get nodes -o custom-columns="
-                                                 "'VERSION:.status.nodeInfo.kubeletVersion,NAME:.metadata.name' "
-                                                 f"| grep -w {node['name']} "
-                                                 "| awk '{ print $1 }'")
+        result = first_control_plane['connection'].sudo("kubectl get nodes "
+                                                 f"{node['name']}"
+                                                 " -o custom-columns='VERSION:.status.nodeInfo.kubeletVersion' "
+                                                 "| grep -vw ^VERSION ")
         curr_version = list(result.values())[0].stdout
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
