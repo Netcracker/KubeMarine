@@ -19,7 +19,7 @@ from collections import OrderedDict
 import io
 import uuid
 
-from kubemarine import kubernetes, etcd, thirdparties, cri
+from kubemarine import kubernetes, etcd, thirdparties, cri, plugins
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
 from kubemarine.core.resources import DynamicResources
@@ -236,6 +236,10 @@ def release_calico_leaked_ips(cluster):
     Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
     This task releases problem ips with force.
     """
+    cluster.log.debug("Waiting calico-node up")
+    plugins.expect_pods(cluster, pods=["calico-node"],
+                                timeout=cluster.globals['pods']['expect']['plugins']['timeout'],
+                                retries=cluster.globals['pods']['expect']['plugins']['retries'])
 
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
