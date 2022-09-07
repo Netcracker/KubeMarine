@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-import yaml
+import yaml, os
 import ruamel.yaml
 
 from kubemarine.core import utils, cluster as c, log, errors, static
@@ -74,6 +74,11 @@ class DynamicResources:
             else:
                 self._logger.info(msg)
         try:
+            with open(self.inventory_filepath) as f:
+                data = yaml.safe_load(f)
+            data['node_defaults']['keyfile'] = os.path.expanduser(data['node_defaults']['keyfile'])
+            with open(self.inventory_filepath, 'w') as f:
+                yaml.safe_dump(data, f, default_flow_style=False)
             with open(self.inventory_filepath, 'r') as stream:
                 data = stream.read()
                 self._raw_inventory = yaml.safe_load(data)
