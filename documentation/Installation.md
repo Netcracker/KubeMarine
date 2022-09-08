@@ -2793,6 +2793,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td></td>
     <td>Enable maintenance config for HAproxy</td>
   </tr>
+  <tr>
+    <td>mntc_config_location</td>
+    <td>string</td>
+    <td>/etc/haproxy/haproxy_mntc.cfg</td>
+    <td>Maintenance config flie location</td>
+  </tr>
 </tbody>
 </table>
 
@@ -2833,6 +2839,7 @@ services:
         maxconn: 10000
       keep_configs_updated: True
       maintenance_mode: True
+      mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
 
 ### RBAC Admission

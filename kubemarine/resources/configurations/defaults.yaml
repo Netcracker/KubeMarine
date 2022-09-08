@@ -313,6 +313,7 @@ services:
         timeout_client_fin: '1m'
         maxconn: 10000
       keep_configs_updated: True
+      mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
 
   packages:
     cache_versions: true
