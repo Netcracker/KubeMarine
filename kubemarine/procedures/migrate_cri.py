@@ -126,9 +126,9 @@ def _merge_containerd(cluster, inventory):
 
 
 def migrate_cri(cluster):
-    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
     _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"])
                  .get_ordered_members_list(provide_node_configs=True))
+    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
 
 
 def _migrate_cri(cluster, node_group):
@@ -236,11 +236,6 @@ def release_calico_leaked_ips(cluster):
     Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
     This task releases problem ips with force.
     """
-    cluster.log.debug("Waiting calico-node up")
-    plugins.expect_pods(cluster, pods=["calico-node"],
-                                timeout=cluster.globals['pods']['expect']['plugins']['timeout'],
-                                retries=cluster.globals['pods']['expect']['plugins']['retries'])
-
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
