@@ -39,7 +39,7 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   ETCD_CERT=$(echo "${ETCD_POD_CONFIG}" | grep '\- --cert-file' | sed s/=/\\n/g | sed -n 2p)
   ETCD_KEY=$(echo "${ETCD_POD_CONFIG}" | grep '\- --key-file' | sed s/=/\\n/g | sed -n 2p)
   ETCD_CA=$(echo "${ETCD_POD_CONFIG}" | grep '\- --trusted-ca-file' | sed s/=/\\n/g | sed -n 2p)
-  ETCD_ENDPOINTS=$(echo "${ETCD_POD_CONFIG}" | grep '\- --initial-cluster=' | sed -e 's/\s*- --initial-cluster=//g' -e "s/[a-zA-Z0-9-]*=//g" -e "s/2380/2379/g")
+  ETCD_ENDPOINTS=$(echo "${ETCD_POD_CONFIG}" | grep '\- --initial-cluster=' | sed -e 's/\s*- --initial-cluster=//g' -e "s/[a-zA-Z0-9\.-]*=//g" -e "s/2380/2379/g")
   while IFS= read -r line; do
       volume=$(echo "${line}" | awk '{print $3; exit}')
       ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
