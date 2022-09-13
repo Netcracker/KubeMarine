@@ -498,6 +498,7 @@ plugins:
       FELIX_DEFAULTENDPOINTTOHOSTACTION: ACCEPT
       FELIX_LOGSEVERITYSCREEN: info
       FELIX_HEALTHENABLED: true
+      FELIX_USAGEREPORTINGENABLED: false
     cni:
       image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
