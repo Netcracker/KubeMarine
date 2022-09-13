@@ -1038,6 +1038,9 @@ services:
 
 **Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
+**Warning**: These kubeadm parameters are configurable only during installation, currently. 
+KubeMarine currently do not provide special procedure to change these parameters after installation.
+
 During init, join, ugrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
 KubeMarine allows to configure kubeadm preflight errors to be ignored.
