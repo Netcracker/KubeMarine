@@ -48,7 +48,7 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   # User can override some of our "default" etcdctl args (see cases).
   # If user passed his own arg, then our "default" arg will be NULLed.
   USER_ARGS=("$@")
-  opts=$(getopt --quiet --longoptions "endpoints:," "$@")
+  opts=$(getopt --quiet --longoptions "endpoints:," -- "$@")
   eval set --$opts
   while [[ $# -gt 0 ]]; do
     case "$1" in
