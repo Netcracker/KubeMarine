@@ -103,8 +103,10 @@ def services_status(cluster, service_type):
                     cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
             kuber_ip_disable = False
             kuber_ip = cluster.inventory['public_cluster_ip']
+            cluster.log.warning("KUBER_IP: %s" % kuber_ip)
             for item in cluster.inventory['vrrp_ips']:
-                if kuber_ip == item['ip'] and \
+                cluster.log.warning("IP: %s; FLOATING_IP: %s" % (item['ip'], item.get('floating_ip', '')))
+                if (kuber_ip == item['ip'] or kuber_ip == item.get('floating_ip', '')) and \
                         item.get('params', {}).get('maintenance-type', '') == 'not bind':
                     kuber_ip_disable = True
             if kuber_ip_disable and len(group.get_nodes_names()) == len(mntc_list):
