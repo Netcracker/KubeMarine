@@ -18,6 +18,7 @@ This section describes the features and steps for performing maintenance procedu
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
+    - [Output to Kubemarine](#output-to-kubemarine)
     - [Additional Parameters](#additional-parameters)
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
@@ -1156,6 +1157,30 @@ kubemarine add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalanc
 
 Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
 For more information, refer to the [Configuring Kubemarine Logging](Logging.md) guide.
+
+## Output to Kubemarine
+
+Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes at the address:
+```
+/etc/kubemarine/procedure
+```
+What information is preserved under the `<timestamp_procedure-name>` directory:
+```yaml
+cluster.yaml
+version
+dump/
+  cluster.yaml
+  cluster_initial.yaml
+  procedure.yaml
+  cluster_finalized.yaml
+  cluster_precompiled.yaml
+  procedure_parameters
+```
+
+Description of the following files:
+* cluster.yam - input cluster inventory
+* version - used Kubemarine version.
+* procedure_parameters - list of finished tasks.
 
 
 ## Additional Parameters
