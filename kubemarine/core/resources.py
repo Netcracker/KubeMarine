@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-import yaml, os
+import yaml
 import ruamel.yaml
 
 from kubemarine.core import utils, cluster as c, log, errors, static
