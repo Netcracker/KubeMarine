@@ -14,7 +14,7 @@
 
 from typing import Dict
 
-import fabric
+import fabric, os
 
 from kubemarine.core.environment import Environment
 
