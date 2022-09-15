@@ -18,7 +18,7 @@ This section describes the features and steps for performing maintenance procedu
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
-    - [Output to Kubemarine](#output-to-kubemarine)
+    - [Inventory preservation](#inventory-preservation)
     - [Additional Parameters](#additional-parameters)
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
@@ -95,7 +95,7 @@ upgrade_plan:
 
 After starting the upgrade procedure, the script validates the correctness of the entered upgrade plan. If it contains issues, the update does not start, and a message with the problem description is displayed. If there are no errors, the following log with loaded update plan is displayed:
 
-```yaml
+```
 Loaded upgrade plan: current ⭢ v1.16.12
 Loading inventory file 'cluster.yaml'
 
@@ -1158,13 +1158,13 @@ kubemarine add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalanc
 Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
 For more information, refer to the [Configuring Kubemarine Logging](Logging.md) guide.
 
-## Output to Kubemarine
+## Inventory preservation
 
-Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes at the address:
+The Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes under the following path:
 ```
-/etc/kubemarine/procedure
+/etc/kubemarine/procedure/`<timestamp_procedure-name>`/
 ```
-What information is preserved under the `<timestamp_procedure-name>` directory:
+The list of preserved information:
 ```yaml
 cluster.yaml
 version
@@ -1178,8 +1178,8 @@ dump/
 ```
 
 Description of the following files:
-* cluster.yam - input cluster inventory
-* version - used Kubemarine version.
+* cluster.yaml - input cluster inventory
+* version -  Kubemarine version.
 * procedure_parameters - list of finished tasks.
 
 

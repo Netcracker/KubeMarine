@@ -6,7 +6,6 @@ This section provides information about configuring the logging of Kubemarine.
   - [Output to File](#output-to-file)
   - [Output to Graylog](#output-to-graylog)
 
-
 # Default Behavior
 
 By default, Kubemarine writes its logs into two locations with the following configurations:
@@ -81,4 +80,3 @@ Example:
 kubemarine install \
 --log="graylog;level=verbose;host=10.101.182.166;port=12201;type=tcp"
 ```
-
