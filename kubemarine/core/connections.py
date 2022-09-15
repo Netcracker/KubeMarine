@@ -14,7 +14,7 @@
 
 from typing import Dict
 
-import fabric
+import fabric, os
 
 from kubemarine.core.environment import Environment
 
@@ -51,7 +51,7 @@ class ConnectionPool:
             connect_timeout=conn_details.get('connection_timeout',
                                              self._env.globals['connection']['defaults']['timeout']),
             connect_kwargs={
-                "key_filename": conn_details['keyfile']
+                "key_filename": os.path.expanduser(conn_details['keyfile'])
             },
             inline_ssh_env=inline_ssh_env
         )
