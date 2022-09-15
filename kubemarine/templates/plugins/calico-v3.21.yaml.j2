@@ -4418,6 +4418,8 @@ spec:
 
             - name: FELIX_HEALTHENABLED
               value: "{{ plugins['calico']['env']['FELIX_HEALTHENABLED'] }}"
+            - name: FELIX_USAGEREPORTINGENABLED
+              value: "{{ plugins['calico']['env']['FELIX_USAGEREPORTINGENABLED'] }}"
           securityContext:
             privileged: true
           resources:
