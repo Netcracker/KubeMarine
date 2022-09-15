@@ -277,6 +277,7 @@ def new_common_parser(cli_help):
                         default='',
                         help='Custom path of the workdir')
 
+
     return parser
 
 
@@ -307,6 +308,10 @@ def new_tasks_flow_parser(cli_help):
     parser.add_argument('--exclude-cumulative-points-methods',
                         default='',
                         help='comma-separated cumulative points methods names to be excluded from execution')
+
+    parser.add_argument('--ignore-os-version',
+                        default='',
+                        help='ignore version os')
 
     return parser
 

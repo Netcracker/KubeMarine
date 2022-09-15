@@ -49,17 +49,28 @@ def system_prepare_check_system(cluster):
         if address not in group.nodes or not context.get('os'):
             continue
         if context["os"]["family"] == "unsupported":
-            raise Exception('%s host operating system is unsupported' % address)
+            if cluster.context['execution_arguments']['ignore_os_version']:
+                cluster.log.debug('%s host operating system is unsupported' % address)
+                cluster.log.debug('Please use recommended versions OS')
+            else:
+                raise Exception('%s host operating system is unsupported' % address)
         if context["os"]["family"] == "unknown":
             supported_os_versions = []
             os_family_list = cluster.globals["compatibility_map"]["distributives"][context["os"]["name"]]
-            for os_family_item in os_family_list:
-                supported_os_versions.extend(os_family_item["versions"])
-            raise Exception("%s running on unknown %s version. "
-                            "Expected %s, got '%s'" % (address,
-                                                       context["os"]["name"],
-                                                       supported_os_versions,
-                                                       context["os"]["version"]))
+            if cluster.context['execution_arguments']['ignore_os_version'] in ['True', 'true', 'Yes', 'yes']:
+                cluster.log.debug("%s running on unknown %s version." % (address, context["os"]["name"]))
+                if context["os"]["name"] == 'centos':
+                    context["os"]["family"] = 'rhel'
+                else:
+                    context["os"]["family"] = 'debian'
+            else:
+                for os_family_item in os_family_list:
+                    supported_os_versions.extend(os_family_item["versions"])
+                raise Exception("%s running on unknown %s version. "
+                                "Expected %s, got '%s'" % (address,
+                                                           context["os"]["name"],
+                                                           supported_os_versions,
+                                                           context["os"]["version"]))
 
 
 def system_prepare_check_cluster_installation(cluster):
