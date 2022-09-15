@@ -277,7 +277,6 @@ def new_common_parser(cli_help):
                         default='',
                         help='Custom path of the workdir')
 
-
     return parser
 
 
