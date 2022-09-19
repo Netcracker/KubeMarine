@@ -297,7 +297,7 @@ def thirdparties_hashes(cluster):
     If there is no thirdparties with hashes, then warning is shown.
     """
     with TestCase(cluster.context['testsuite'], '212', "Thirdparties", "Hashes") as tc:
-        successful = []
+        warning = []
         broken = []
 
         for path, config in cluster.inventory['services']['thirdparties'].items():
@@ -336,10 +336,9 @@ def thirdparties_hashes(cluster):
                 # was not able to find single actual SHA, errors already collected, nothing to do
                 continue
             if actual_sha != expected_sha:
-                broken.append(f'expected sha {expected_sha} is not equal to actual sha {actual_sha} for {path}')
+                warning.append(f'expected sha {expected_sha} is not equal to actual sha {actual_sha} for {path}')
                 continue
 
-            successful.append(path)
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
@@ -368,8 +367,8 @@ def thirdparties_hashes(cluster):
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
-        if not successful:
-            raise TestWarn('Did not found any hashes')
+        if warning:
+            raise TestWarn('Found warnings', hint=yaml.safe_dump(warning))
         tc.success('All found hashes are correct')
 
 
