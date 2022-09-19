@@ -499,6 +499,29 @@ plugins:
       FELIX_LOGSEVERITYSCREEN: info
       FELIX_HEALTHENABLED: true
       FELIX_USAGEREPORTINGENABLED: false
+      FELIX_TYPHAK8SSERVICENAME:
+          configMapKeyRef:
+            name: calico-config
+            key: typha_service_name
+      NODENAME:
+          fieldRef:
+            fieldPath: spec.nodeName
+      CALICO_NETWORKING_BACKEND:
+          configMapKeyRef:
+            name: calico-config
+            key: calico_backend
+      FELIX_IPINIPMTU:
+          configMapKeyRef:
+            name: calico-config
+            key: veth_mtu
+      FELIX_VXLANMTU:
+          configMapKeyRef:
+            name: calico-config
+            key: veth_mtu
+      FELIX_WIREGUARDMTU:
+          configMapKeyRef:
+            name: calico-config
+            key: veth_mtu
     cni:
       image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
