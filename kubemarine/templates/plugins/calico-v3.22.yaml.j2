@@ -4326,11 +4326,24 @@ spec:
               name: kubernetes-services-endpoint
               optional: true
           env:
-            # Use Kubernetes API as the backing datastore.
-            {%- for name_env, env in plugins.calico.env.items() %}
+     {%- set ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'] %}
+     {%- for name_env, env in plugins.calico.env.items() %}
+       {%- if (name_env not in ipv6_env) and (name_env != 'FELIX_TYPHAK8SSERVICENAME') %}
+            - name: {{ name_env }}
+              {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}{% else %}
+             {%- if name_env in ipv6_env and not services.kubeadm.networking.podSubnet|isipv4 %}
             - name: {{ name_env }}
               {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}
-            {%- endfor %}
+             {%- endif %}
+             {%- if (plugins.calico.typha.enabled | default(false) == true) and (name_env == 'FELIX_TYPHAK8SSERVICENAME') %}
+            - name: FELIX_TYPHAK8SSERVICENAME
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: typha_service_name
+             {%- endif %}
+       {%- endif %}
+     {%- endfor %}
           securityContext:
             privileged: true
           resources:
