@@ -3267,6 +3267,9 @@ plugins:
       enabled: true
     node:
       image: calico/node:v3.10.1
+    env:
+      FELIX_USAGEREPORTINGENABLED: true
+
 ```
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
