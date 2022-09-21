@@ -5305,8 +5305,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5386,7 +5386,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5429,7 +5429,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.23.6
+## Default Dependent Components Versions for Kubernetes Versions v1.23.11
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -5459,21 +5459,21 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.23.6</td>
-    <td>SHA1: 90386507b3214adb6b2d4ed05a07e80f11f674d6</td>
+    <td colspan="4" rowspan="3">v1.23.11</td>
+    <td>SHA1: b93ff384df125429dcbeb18c2ea648168ae10c56</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 326110dcb62b66e69490d039b170682fb71c5560</td>
+    <td>SHA1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152</td>
+    <td>SHA1: 81643da0b975102cede136d39767cdc54f2b0aef</td>
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5521,7 +5521,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.23.6</td>
+    <td colspan="4" rowspan="4">v1.23.11</td>
     <td></td>
   </tr>
   <tr>
@@ -5553,7 +5553,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5639,8 +5639,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5720,7 +5720,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
