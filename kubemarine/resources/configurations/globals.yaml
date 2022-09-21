@@ -408,7 +408,7 @@ compatibility_map:
       v1.23.6:
         sha1: 326110dcb62b66e69490d039b170682fb71c5560
       v1.23.11:
-        sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
+        sha1: 07769c846e4a83d59f9f34370c33be5cc163120b
       v1.24.0:
         sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
       v1.24.2:
