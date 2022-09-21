@@ -5464,7 +5464,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50</td>
+    <td>SHA1: 07769c846e4a83d59f9f34370c33be5cc163120b</td>
   </tr>
   <tr>
     <td>kubectl</td>
