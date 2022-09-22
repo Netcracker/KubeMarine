@@ -929,7 +929,7 @@ class NodeGroup:
             group = self.get_new_nodes_or_self()
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_family = self.cluster.context["nodes"][node['connect_to']]["os"]['family']
-            if os_family == 'unknown' and not suppress_exceptions and self.cluster.context['execution_arguments']['ignore_os_version'] in ['False', 'false', 'No', 'no']:
+            if os_family == 'unknown' and not suppress_exceptions:
                 raise Exception('OS family is unknown')
             if not detected_os_family:
                 detected_os_family = os_family

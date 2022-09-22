@@ -49,18 +49,22 @@ def system_prepare_check_system(cluster):
         if address not in group.nodes or not context.get('os'):
             continue
         if context["os"]["family"] == "unsupported":
-            if cluster.context['execution_arguments']['ignore_os_version']:
-                cluster.log.debug('%s host operating system is unsupported' % address)
-                cluster.log.debug('Please use recommended versions OS')
-            else:
-                raise Exception('%s host operating system is unsupported' % address)
+            raise Exception('%s host operating system is unsupported' % address)
         if context["os"]["family"] == "unknown":
             supported_os_versions = []
-            os_family_list = cluster.globals["compatibility_map"]["distributives"][context["os"]["name"]]
-            if cluster.context['execution_arguments']['ignore_os_version'] in ['True', 'true', 'Yes', 'yes']:
+            os_family_list = cluster.globals["compatibility_map"]["distributives"]
+            for os_family_item in os_family_list:
+                supported_os_versions.append(os_family_item)
+            if cluster.context['execution_arguments']['os_family'] in supported_os_versions:
                 cluster.log.debug("%s running on unknown %s version." % (address, context["os"]["name"]))
-                if context["os"]["name"] == 'centos':
+                if context["os"]["name"] == 'ubuntu':
+                    context["os"]["family"] = 'ubuntu'
+                elif context["os"]["name"] == 'centos':
+                    context["os"]["family"] = 'centos'
+                elif context["os"]["name"] == 'rhel':
                     context["os"]["family"] = 'rhel'
+                elif context["os"]["name"] == 'ol':
+                    context["os"]["family"] = 'ol'
                 else:
                     context["os"]["family"] = 'debian'
             else:
