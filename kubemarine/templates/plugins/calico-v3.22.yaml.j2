@@ -4326,100 +4326,24 @@ spec:
               name: kubernetes-services-endpoint
               optional: true
           env:
-            # Use Kubernetes API as the backing datastore.
-            - name: DATASTORE_TYPE
-              value: "{{ plugins['calico']['env']['DATASTORE_TYPE'] }}"
-{%- if plugins.calico.typha.enabled | default(false) == true %}
-            # Typha support: controlled by the ConfigMap.
+     {%- set ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'] %}
+     {%- for name_env, env in plugins.calico.env.items() %}
+       {%- if (name_env not in ipv6_env) and (name_env != 'FELIX_TYPHAK8SSERVICENAME') %}
+            - name: {{ name_env }}
+              {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}{% else %}
+             {%- if name_env in ipv6_env and not services.kubeadm.networking.podSubnet|isipv4 %}
+            - name: {{ name_env }}
+              {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}
+             {%- endif %}
+             {%- if (plugins.calico.typha.enabled | default(false) == true) and (name_env == 'FELIX_TYPHAK8SSERVICENAME') %}
             - name: FELIX_TYPHAK8SSERVICENAME
               valueFrom:
                 configMapKeyRef:
                   name: calico-config
                   key: typha_service_name
-{%- endif %}
-            # Wait for the datastore.
-            - name: WAIT_FOR_DATASTORE
-              value: "{{ plugins['calico']['env']['WAIT_FOR_DATASTORE'] }}"
-            # Set based on the k8s node name.
-            - name: NODENAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # Choose the backend to use.
-            - name: CALICO_NETWORKING_BACKEND
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: calico_backend
-            # Cluster type to identify the deployment type
-            - name: CLUSTER_TYPE
-              value: "{{ plugins['calico']['env']['CLUSTER_TYPE'] }}"
-            # Set MTU for tunnel device used if ipip is enabled
-            - name: FELIX_IPINIPMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # Set MTU for the VXLAN tunnel device.
-            - name: FELIX_VXLANMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # Set MTU for the Wireguard tunnel device.
-            - name: FELIX_WIREGUARDMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # The default IPv4 pool to create on startup if none exists. Pod IPs will be
-            # chosen from this range. Changing this value after installation will have
-            # no effect. This should fall within `--cluster-cidr`.
-            - name: CALICO_ROUTER_ID
-              value: "{{ plugins['calico']['env']['CALICO_ROUTER_ID'] }}"
-
-            # IPv4 OPTIONS
-            - name: IP
-              value: "{{ plugins['calico']['env']['IP'] }}"
-            - name: IP_AUTODETECTION_METHOD
-              value: "{{ plugins['calico']['env']['IP_AUTODETECTION_METHOD'] }}"
-            - name: CALICO_IPV4POOL_IPIP
-              value: "{{ plugins['calico']['env']['CALICO_IPV4POOL_IPIP'] }}"
-            - name: CALICO_IPV4POOL_VXLAN
-              value: "{{ plugins['calico']['env']['CALICO_IPV4POOL_VXLAN'] }}"
-            - name: CALICO_IPV4POOL_CIDR
-              value: "{{ plugins['calico']['env']['CALICO_IPV4POOL_CIDR'] }}"
-
-            - name: FELIX_IPV6SUPPORT
-              value: "{{ plugins['calico']['env']['FELIX_IPV6SUPPORT'] }}"
-{%- if not services.kubeadm.networking.podSubnet|isipv4 %}
-            # IPv6 OPTIONS
-            - name: CALICO_IPV6POOL_CIDR
-              value: "{{ plugins['calico']['env']['CALICO_IPV6POOL_CIDR'] }}"
-            - name: IP6
-              value: "{{ plugins['calico']['env']['IP6'] }}"
-            - name: IP6_AUTODETECTION_METHOD
-              value: "{{ plugins['calico']['env']['IP6_AUTODETECTION_METHOD'] }}"
-            - name: FELIX_IPV6SUPPORT
-              value: "{{ plugins['calico']['env']['FELIX_IPV6SUPPORT'] }}"
-            - name: CALICO_IPV6POOL_IPIP
-              value: "{{ plugins['calico']['env']['CALICO_IPV6POOL_IPIP'] }}"
-            - name: CALICO_IPV6POOL_VXLAN
-              value: "{{ plugins['calico']['env']['CALICO_IPV6POOL_VXLAN'] }}"
-{%- endif %}
-
-            # - name: CALICO_IPV4POOL_CIDR
-            #   value: "192.168.0.0/16"
-            # Disable file logging so `kubectl logs` works.
-            - name: CALICO_DISABLE_FILE_LOGGING
-              value: "{{ plugins['calico']['env']['CALICO_DISABLE_FILE_LOGGING'] }}"
-            # Set Felix endpoint to host default action to ACCEPT.
-            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
-              value: "{{ plugins['calico']['env']['FELIX_DEFAULTENDPOINTTOHOSTACTION'] }}"
-            - name: FELIX_HEALTHENABLED
-              value: "{{ plugins['calico']['env']['FELIX_HEALTHENABLED'] }}"
-            - name: FELIX_USAGEREPORTINGENABLED
-              value: "{{ plugins['calico']['env']['FELIX_USAGEREPORTINGENABLED'] }}"
+             {%- endif %}
+       {%- endif %}
+     {%- endfor %}
           securityContext:
             privileged: true
           resources:
