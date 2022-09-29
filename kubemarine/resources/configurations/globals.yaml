@@ -604,7 +604,6 @@ logging:
   default_targets:
     stdout:
       level: debug
-      colorize: True
       correct_newlines: True
     dump:
       level: verbose
