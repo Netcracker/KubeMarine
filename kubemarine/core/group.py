@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import random
@@ -379,34 +380,31 @@ class NodeGroup:
         self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s with options %s"
                                  % (local_file, remote_file, list(self.nodes.keys()), kwargs))
 
-        group_to_upload = self
         # Fabric opens file in 'rb' mode.
         open_mode = "b"
 
-        # hashes checking for text files is currently not supported when deploying from windows
-        # because we need to change CRLF -> LF when transferring file
         if not binary and self.cluster.is_deploying_from_windows():
             self.cluster.log.verbose("The file for transferring is marked as text. CRLF -> LF transformation is required")
             # Let's open file in 'rt' mode to automatically make CRLF -> LF transformation.
             open_mode = "t"
-        else:
-            self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
-            local_file_hash = self.get_local_file_sha1(local_file)
-            self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
-            remote_file_hashes = self.get_remote_file_sha1(remote_file)
-            self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
 
-            hosts_to_upload = []
-            for remote_ip, remote_file_hash in remote_file_hashes.items():
-                if remote_file_hash != local_file_hash:
-                    self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s' % (remote_ip,
-                                             local_file_hash, remote_file_hash))
-                    hosts_to_upload.append(remote_ip)
-            if not hosts_to_upload:
-                self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
-                return
+        self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
+        local_file_hash = self.get_local_file_sha1(local_file, open_mode)
+        self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
+        remote_file_hashes = self.get_remote_file_sha1(remote_file)
+        self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
 
-            group_to_upload = self.cluster.make_group(hosts_to_upload)
+        hosts_to_upload = []
+        for remote_ip, remote_file_hash in remote_file_hashes.items():
+            if remote_file_hash != local_file_hash:
+                self.cluster.log.verbose('Local and remote hashes does not match on node \'%s\' %s %s'
+                                         % (remote_ip, local_file_hash, remote_file_hash))
+                hosts_to_upload.append(remote_ip)
+        if not hosts_to_upload:
+            self.cluster.log.verbose('Local and remote hashes are equal on all nodes, no transmission required')
+            return
+
+        group_to_upload = self.cluster.make_group(hosts_to_upload)
 
         with open(local_file, "r" + open_mode) as local_stream:
             group_to_upload._put(local_stream, remote_file, **kwargs)
@@ -742,11 +740,22 @@ class NodeGroup:
 
         return False
 
-    def get_local_file_sha1(self, filename):
-        # TODO: Possibly use fabric instead of subprocess to avoid possible permissions conflicts
-        openssl_result = subprocess.check_output("openssl sha1 %s" % filename, shell=True)
-        # process output is bytes and we have to decode it to utf-8
-        return openssl_result.decode("utf-8").split("= ")[1].strip()
+    def get_local_file_sha1(self, filename, open_mode: str):
+        sha1 = hashlib.sha1()
+
+        # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
+        with open(filename, 'r' + open_mode) as f:
+            while True:
+                data = f.read(2 ** 16)
+                # If files is opened in text mode, then it is necessary to encode the content.
+                # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
+                if isinstance(data, str):
+                    data = data.encode("utf-8")
+                if not data:
+                    break
+                sha1.update(data)
+
+        return sha1.hexdigest()
 
     def get_remote_file_sha1(self, filename):
         results = self._do_with_wa("sudo", "openssl sha1 %s" % filename, warn=True)

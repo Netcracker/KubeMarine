@@ -695,11 +695,13 @@ def convert_ansible(cluster, config):
     return config
 
 
-def verify_ansible(cluster, config):
+def verify_ansible(cluster: KubernetesCluster, config):
     if config.get('playbook') is None or config['playbook'] == '':
         raise Exception('Playbook path is missing')
     if not os.path.isfile(config['playbook']):
-        raise Exception('Playbook file %s not exists' % config['location'])
+        raise Exception('Playbook file %s not exists' % config['playbook'])
+    if cluster.is_deploying_from_windows():
+        raise Exception("Executing of playbooks on Windows deployer is currently not supported")
     # TODO: verify fields types and contents
 
 
