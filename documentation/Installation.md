@@ -5652,9 +5652,6 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
-    <td>docker-ce</td>
-    <td colspan="4">19.03</td>
-    <td></td>
   </tr>
   <tr>
     <td>containerd.io</td>
