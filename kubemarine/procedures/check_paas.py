@@ -23,6 +23,7 @@ from typing import List
 import yaml
 import ruamel.yaml
 import ipaddress
+import uuid
 
 from kubemarine import packages as pckgs, system, selinux, etcd
 from kubemarine.core.action import Action
@@ -297,8 +298,11 @@ def thirdparties_hashes(cluster):
     If there is no thirdparties with hashes, then warning is shown.
     """
     with TestCase(cluster.context['testsuite'], '212', "Thirdparties", "Hashes") as tc:
-        warning = []
+        successful = []
         broken = []
+
+        #Create tmp dir for loading thirdparty without default sha
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
         for path, config in cluster.inventory['services']['thirdparties'].items():
             group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
@@ -309,9 +313,45 @@ def thirdparties_hashes(cluster):
                 continue
 
             if 'sha1' not in config:
-                # silently skip if SHA not defined
-                continue
+                is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
+                expected_sha = None
 
+                # Get sha from source, if it can be downloaded
+                if is_curl:
+                    cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
+                    #Create tmp dir for loading thirdparty without default sha
+                    random_dir = "/tmp/%s" % uuid.uuid4().hex
+                    final_commands = "rm -r -f %s" % random_dir
+                    random_path = "%s%s" % (random_dir, path)
+                    cluster.log.verbose('Temporary path: %s' % random_path)
+                    remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
+                    #Load thirdparty to temporary dir
+                    remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
+                    results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
+                    for host, result in results.items():
+                        if result.failed:
+                            broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                    if not results.is_any_failed():
+                        #Get temporary thirdparty sha
+                        cluster.log.verbose(f"Get temporary thirdparty sha...")
+                        results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
+                        for host, result in results.items():
+                            if result.failed:
+                                broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                            else:
+                                expected_sha = result.stdout.strip()
+                                cluster.log.verbose("Expected sha was got")
+                    # Remove temporary dir in any case
+                    cluster.log.verbose(f"Remove temporary dir {random_dir}...")
+                    first_control_plane.sudo(final_commands, hide=True, warn=True)
+
+                if expected_sha is None:
+                    cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
+                    #Skip checking sha if something went wrong or this sha can't be loaded
+                    continue
+            else:
+                expected_sha = config['sha1']
+        
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
@@ -331,14 +371,14 @@ def thirdparties_hashes(cluster):
                     actual_sha = None
                     break
 
-            expected_sha = config['sha1']  # expected SHA to compare with found actual SHA
             if actual_sha is None:
                 # was not able to find single actual SHA, errors already collected, nothing to do
                 continue
             if actual_sha != expected_sha:
-                warning.append(f'expected sha {expected_sha} is not equal to actual sha {actual_sha} for {path}')
+                broken.append(f'expected sha {expected_sha} is not equal to actual sha {actual_sha} for {path}')
                 continue
 
+            successful.append(path)
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
@@ -367,8 +407,8 @@ def thirdparties_hashes(cluster):
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
-        if warning:
-            raise TestWarn('Found warnings', hint=yaml.safe_dump(warning))
+        if not successful:
+            raise TestWarn('Did not found any hashes')
         tc.success('All found hashes are correct')
 
 

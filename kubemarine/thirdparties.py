@@ -79,6 +79,12 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                                     'Expected any of %s, but \'%s\' found.'
                                     % (destination, all_nodes_names, node_name))
 
+        # if source is re-defined by user, but "sha1" is not provided,
+        # then remove default "sha1", because it may be wrong
+        raw_config = raw_inventory.get('services', {}).get('thirdparties', {}).get(destination, {})
+        if 'source' in raw_config and 'sha1' not in raw_config and 'sha1' in config:
+            del config['sha1']
+
         inventory['services']['thirdparties'][destination] = config
 
     # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly specified in cluster.yaml
