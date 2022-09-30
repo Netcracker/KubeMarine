@@ -19,7 +19,6 @@ import io
 import os
 import random
 import re
-import subprocess
 import time
 import uuid
 from datetime import datetime
