@@ -51,4 +51,4 @@ class UpgrateCalicoVersion(Patch):
         return """\
 Upgrade calico plugin to v3.24.1 for kubernetes clusters on v1.22.X or v1.23.X or v1.24.X.
 Note that you may probably need to update plugins.calico section preliminarily.
-Equivalent to 'kubemarine install --tasks=deploy_plugins' for that clusters."""
+Equivalent to 'kubemarine install --tasks=deploy.plugins' for that clusters."""
