@@ -63,7 +63,7 @@ def services_status(cluster, service_type):
         result = group.sudo('systemctl status %s' % service_name, warn=True)
         cluster.log.verbose(result)
 
-        status_regexp = re.compile("Active:\s([a-z\s()]*)(\ssince|$)", re.M)
+        status_regexp = re.compile(r"Active:\s([a-z\s()]*)(\ssince|$)", re.M)
 
         statuses = []
         failed = False

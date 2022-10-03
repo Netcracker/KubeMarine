@@ -606,7 +606,7 @@ def verify_shell(cluster, config):
         raise Exception('Shell output variables could be used for single-node groups, but multi-node group was found')
 
     in_vars = config.get('in_vars', [])
-    words_splitter = re.compile('\W')
+    words_splitter = re.compile(r'\W')
     for var in chain(in_vars, out_vars):
         if not var.get('name'):
             raise Exception('All output and input shell variables should have "name" property specified')
