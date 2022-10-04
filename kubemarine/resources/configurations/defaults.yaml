@@ -482,7 +482,7 @@ plugins:
       DATASTORE_TYPE: kubernetes
       WAIT_FOR_DATASTORE: true
       CLUSTER_TYPE: k8s,bgp
-      CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% endif %}'
+      CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% else %}{% endif %}'
       IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
       IP_AUTODETECTION_METHOD: first-found
       CALICO_IPV4POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'

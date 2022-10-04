@@ -1054,7 +1054,7 @@ def calico_config_check(cluster):
         result = result.get_simple_out()
         result = yaml.safe_load(result)
         for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
-            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
+            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]) and ("value" in env.keys()):
                 if not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
                     correct_config = False
         if not correct_config:
