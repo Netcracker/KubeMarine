@@ -1054,8 +1054,10 @@ def calico_config_check(cluster):
         result = result.get_simple_out()
         result = yaml.safe_load(result)
         for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
-            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]) and ("value" in env.keys()):
-                if not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
+            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
+                if "value" in env.keys() and not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
+                    correct_config = False
+                if "valueFrom" in env.keys() and len(DeepDiff(cluster.inventory["plugins"]["calico"]["env"].get(env["name"]), env["valueFrom"], ignore_order=True)) != 0:
                     correct_config = False
         if not correct_config:
             message += "calico-node env configuration is outdated\n"
