@@ -505,6 +505,7 @@ plugins:
             key: typha_service_name
       NODENAME:
           fieldRef:
+            apiVersion: v1
             fieldPath: spec.nodeName
       CALICO_NETWORKING_BACKEND:
           configMapKeyRef:
