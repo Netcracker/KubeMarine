@@ -9,6 +9,11 @@ if not defined PYTHONUNBUFFERED (
     set PYTHONUNBUFFERED=TRUE
 )
 
+REM This env variable is used to ensure that possible redirect of stdout to files will use utf-8 encoding.
+if not defined PYTHONIOENCODING (
+    set PYTHONIOENCODING=utf-8
+)
+
 for /f "delims=" %%i in ('echo %cd%') do set WORKDIR=%%i
 
 set SCRIPT_DIR=%~dp0
