@@ -365,8 +365,6 @@ def recursive_apply_defaults(defaults, section):
                     default_value = deepcopy(section[key])
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
-            del section[key]
-
 
 def calculate_node_names(inventory, cluster):
     roles_iterators = {}
