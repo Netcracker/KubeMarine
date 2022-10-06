@@ -861,7 +861,23 @@ def get_local_chart_path(log, config):
         log.debug("Create copy of chart to work with")
         copy_tree(chart_path, local_chart_folder)
 
-    log.debug("Ready chart path = %s" % local_chart_folder)
+    # Find all Chart.yaml files in the chart.
+    glob_search = os.path.join(local_chart_folder, '**', 'Chart.yaml')
+    chart_metadata = glob.glob(glob_search, recursive=True)
+    if not chart_metadata:
+        raise Exception("Incorrect format of helm chart: Chart.yaml not found")
+
+    # Sort by number of parts in path to find outermost Chart.yaml
+    chart_metadata.sort(key=lambda path: len(path.split(os.sep)))
+    local_chart_folder = os.path.dirname(chart_metadata[0])
+    log.debug("Detected chart path = %s" % local_chart_folder)
+
+    # Check all nested Chart.yaml are inside chart path
+    for i in range(1, len(chart_metadata)):
+        if not os.path.commonpath([chart_metadata[i], local_chart_folder]) == local_chart_folder:
+            raise Exception(
+                f"Incorrect format of helm chart: inner {chart_metadata[i]} is not inside {local_chart_folder} directory.")
+
     return local_chart_folder
 
 
