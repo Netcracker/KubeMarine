@@ -322,7 +322,7 @@ class ClusterStorage:
         initial_procedure = self.cluster.context["initial_procedure"]
         self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
         self.dir_location = self.dir_path + self.dir_name
-        self.cluster.nodes['control-plane'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
+        self.cluster.nodes['control-plane'].get_final_nodes().sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                                  f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
     def rotation_file(self):
@@ -333,7 +333,7 @@ class ClusterStorage:
         delete_old = self.cluster.inventory['procedure_history']['delete_threshold']
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
-        node_group_results = self.cluster.nodes["control-plane"].sudo(command)
+        node_group_results = self.cluster.nodes["control-plane"].get_final_nodes().sudo(command)
         with RemoteExecutor(self.cluster):
             for cxn, result in node_group_results.items():
                 control_plane = self.cluster.make_group([cxn.host])
@@ -362,8 +362,8 @@ class ClusterStorage:
             tar.add(get_resource_absolute_path("version", script_relative=True), 'version')
 
         self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
-        self.cluster.nodes['control-plane'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
-        self.cluster.nodes['control-plane'].sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
+        self.cluster.nodes['control-plane'].get_final_nodes().put(archive, self.dir_location + 'local.tar.gz', sudo=True)
+        self.cluster.nodes['control-plane'].get_final_nodes().sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
                                                  f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self):
