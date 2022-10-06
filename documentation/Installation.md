@@ -123,23 +123,32 @@ Ensure the following requirements are met:
 **Operating System**
 * Linux
 * MacOS
-* Windows
+* Windows (See [Restrictions](#windows-deployer-restrictions))
 
 **Preinstalled Software**
-* OpenSSL library
 * python 3.7 (or higher version)
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-Install the required python modules using the following command:
+Install the required python modules.
 
+Linux / MacOS:
 ```bash
 pip3 install -r requirements.txt
+```
+Windows:
+```bash
+pip install -r requirements_nt.txt
 ```
 
 **System Clock**
 
 System clock should be synchronized the same way as for Cluster nodes system clock.  
+
+### Windows Deployer Restrictions
+
+There are the following restrictions when deploying from Windows:
+* [ansible](#ansible) plugin procedures are not supported.
 
 ## Prerequisites for Cluster Nodes
 
@@ -4306,9 +4315,12 @@ For this procedure you must specify the following parameters:
 
 **Note**: Ansible must be manually installed on the deploying node.
 
+**Note**: Executing of the playbooks is currently not supported on Windows deployers.
+
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with ansible-2.9.9.
+**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with `ansible-2.9.*`.
+Exact patch version is not fixed.
 
 For example:
 

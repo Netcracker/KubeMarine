@@ -31,9 +31,15 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 ## Kubemarine CLI Installation
 Proceed the following steps to install Kubemarine manually on your environment:
 1. Install latest [python3](https://www.python.org/downloads/)
-2. Upgrade pip:
+2. Upgrade pip.
+
+   Linux / MacOS:
    ```bash
    python3 -m pip install --upgrade pip
+   ```
+   Windows:
+   ```bash
+   python -m pip install --upgrade pip
    ```
 3. Ensure your environment meets [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node)
 4. [Download the latest release](https://github.com/netcracker/kubemarine/releases) or clone the repo:
@@ -48,26 +54,34 @@ Proceed the following steps to install Kubemarine manually on your environment:
    ```bash
    cd kubemarine
    ```
-7. Install Python dependencies:
+7. Install Python dependencies.
+
+   Linux / MacOS:
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-8. Optionally add Kubemarine to PATH.
-   You can do this by adding symlink to `/usr/local/bin`:
+   Windows:
+   ```bash
+   python -m pip install -r requirements_nt.txt
+   ```
+8. If you don't want to add something to PATH, you can execute the Kubemarine directly from `bin` location:
+   ```bash
+   cd bin
+   ```
+   Alternatively, add Kubemarine to PATH.
+   On Linux / MacOS, you can do this by adding symlink to `/usr/local/bin` being in the root directory of Kubemarine:
    ```bash
    sudo ln -s $(pwd)/bin/kubemarine /usr/local/bin/kubemarine
    sudo chmod +x /usr/local/bin/kubemarine
    ```
-   Alternatively, if you do not have root privileges, you can update your PATH in *rc file. Example:
+   If you do not have root privileges, you can update your PATH in *rc file. Example:
    ```bash
    echo "export PATH=\$PATH:$(pwd)/bin" >> ~/.bashrc
    source ~/.bashrc
    ```
-   If you don't want to add something to path, you can execute the Kubemarine directly from `bin` location:
-   ```bash
-   cd bin
-   ```
-10. Now you can proceed to run Kubemarine! Try the following:
+   On Windows, it is recommended to change PATH variable only through control panel.
+   To do that, type *Edit the system environment variables* in Search box.
+9. Now you can proceed to run Kubemarine! Try the following:
     ```bash
     kubemarine help
     ```
