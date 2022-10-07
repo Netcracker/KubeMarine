@@ -299,6 +299,7 @@ def thirdparties_hashes(cluster):
     """
     with TestCase(cluster.context['testsuite'], '212', "Thirdparties", "Hashes") as tc:
         successful = []
+        warnings = []
         broken = []
 
         #Create tmp dir for loading thirdparty without default sha
@@ -312,45 +313,49 @@ def thirdparties_hashes(cluster):
                 # if thirdparty is missing somewhere, do not check anything further for it
                 continue
 
-            if 'sha1' not in config:
-                is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
-                expected_sha = None
+            is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
+            expected_sha = None
 
-                # Get sha from source, if it can be downloaded
-                if is_curl:
-                    cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
-                    #Create tmp dir for loading thirdparty without default sha
-                    random_dir = "/tmp/%s" % uuid.uuid4().hex
-                    final_commands = "rm -r -f %s" % random_dir
-                    random_path = "%s%s" % (random_dir, path)
-                    cluster.log.verbose('Temporary path: %s' % random_path)
-                    remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
-                    #Load thirdparty to temporary dir
-                    remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
-                    results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
+            # Get sha from source, if it can be downloaded
+            if is_curl:
+                cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
+                #Create tmp dir for loading thirdparty without default sha
+                random_dir = "/tmp/%s" % uuid.uuid4().hex
+                final_commands = "rm -r -f %s" % random_dir
+                random_path = "%s%s" % (random_dir, path)
+                cluster.log.verbose('Temporary path: %s' % random_path)
+                remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
+                #Load thirdparty to temporary dir
+                remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
+                results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
+                for host, result in results.items():
+                    if result.failed:
+                        broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                        cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                if not results.is_any_failed():
+                    #Get temporary thirdparty sha
+                    cluster.log.verbose(f"Get temporary thirdparty sha for {path}...")
+                    results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
                     for host, result in results.items():
                         if result.failed:
-                            broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
-                    if not results.is_any_failed():
-                        #Get temporary thirdparty sha
-                        cluster.log.verbose(f"Get temporary thirdparty sha...")
-                        results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
-                        for host, result in results.items():
-                            if result.failed:
-                                broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
-                            else:
-                                expected_sha = result.stdout.strip()
-                                cluster.log.verbose("Expected sha was got")
-                    # Remove temporary dir in any case
-                    cluster.log.verbose(f"Remove temporary dir {random_dir}...")
-                    first_control_plane.sudo(final_commands, hide=True, warn=True)
+                            broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                            cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                        else:
+                            expected_sha = result.stdout.strip()
+                            cluster.log.verbose(f"Expected sha was got for {path}")
+                # Remove temporary dir in any case
+                cluster.log.verbose(f"Remove temporary dir {random_dir}...")
+                first_control_plane.sudo(final_commands, hide=True, warn=True)
 
-                if expected_sha is None:
-                    cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
-                    #Skip checking sha if something went wrong or this sha can't be loaded
-                    continue
-            else:
-                expected_sha = config['sha1']
+            if config.get("sha1", expected_sha) != expected_sha:
+                warnings.append("Given sha is not equal with actual sha from source for %s" % path)
+
+            expected_sha = config.get("sha1", expected_sha)
+
+            if expected_sha is None:
+                cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
+                # Skip checking sha if something went wrong or this sha can't be loaded
+                continue
         
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
@@ -407,8 +412,8 @@ def thirdparties_hashes(cluster):
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
-        if not successful:
-            raise TestWarn('Did not found any hashes')
+        if warnings:
+            raise TestWarn('Found warnings', hint=yaml.safe_dump(warnings))
         tc.success('All found hashes are correct')
 
 
