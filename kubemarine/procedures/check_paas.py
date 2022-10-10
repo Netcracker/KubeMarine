@@ -1148,10 +1148,11 @@ def geo_monitor(cluster):
     This test checks connectivity between clusters in geo schemas using paas-geo-monitor service.
     This test only work if "procedure.yaml" has "geo-monitor" section filled.
     """
-    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo connectivity") as tc:
-        if not cluster.procedure_inventory or not cluster.procedure_inventory.get("geo-monitor"):
-            raise TestWarn("Skipped", hint="no geo-monitor information is provided in procedure inventory")
+    if not cluster.procedure_inventory or not cluster.procedure_inventory.get("geo-monitor"):
+        # skip this check silently if configuration is not provided
+        return
 
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo connectivity") as tc:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
         if geo_monitor_inventory.get("namespace") is None or geo_monitor_inventory.get("service") is None:
             raise TestFailure("Configuration error",
