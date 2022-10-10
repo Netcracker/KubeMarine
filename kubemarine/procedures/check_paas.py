@@ -1149,7 +1149,7 @@ def geo_monitor(cluster):
     This test only work if "procedure.yaml" has "geo-monitor" section filled.
     """
     if not cluster.procedure_inventory or not cluster.procedure_inventory.get("geo-monitor"):
-        # skip this check silently if configuration is not provided
+        cluster.log.debug("Geo connectivity check is skipped, no configuration provided")
         return
 
     with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo connectivity") as tc:
