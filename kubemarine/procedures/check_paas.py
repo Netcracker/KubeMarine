@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import io
 import sys
 import time
 from collections import OrderedDict
@@ -1144,6 +1143,61 @@ def kubernetes_admission_status(cluster):
             tc.success(results='disabled')
 
 
+def geo_monitor(cluster):
+    """
+    This test checks connectivity between clusters in geo schemas using paas-geo-monitor service.
+    This test only work if "procedure.yaml" has "geo-monitor" section filled.
+    """
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo connectivity") as tc:
+        if not cluster.procedure_inventory or not cluster.procedure_inventory.get("geo-monitor"):
+            raise TestWarn("Skipped", hint="no geo-monitor information is provided in procedure inventory")
+
+        geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
+        if geo_monitor_inventory.get("namespace") is None or geo_monitor_inventory.get("service") is None:
+            raise TestFailure("Configuration error",
+                              hint="geo-monitor namespace and/or service name is not provided in procedure inventory")
+
+        namespace = geo_monitor_inventory["namespace"]
+        service = geo_monitor_inventory["service"]
+        control_plane_node = cluster.nodes['control-plane'].get_first_member()
+
+        svc_result = control_plane_node.sudo("kubectl get svc -n %s %s -o yaml" % (namespace, service)).get_simple_out()
+        svc = yaml.safe_load(io.StringIO(svc_result))
+        ip = svc["spec"]["clusterIP"]
+        port = svc["spec"]["ports"][0]["port"]
+
+        # todo: support https?
+        status_cmd = f'curl http://{ip}:{port}/neighbors/status'
+        if ipaddress.ip_address(ip).version == 6:
+            status_cmd += " -g"
+        neighbors_result = cluster.nodes['control-plane'].get_first_member().\
+            sudo(f'curl http://{ip}:{port}/neighbors/status').get_simple_out()
+
+        neighbors = yaml.safe_load(io.StringIO(neighbors_result))
+        if len(neighbors) == 0:
+            raise TestFailure("Configuration error", hint="geo-monitor instance has no neighbors")
+
+        failed = []
+        for neighbor in neighbors:
+            status = neighbor["clusterIpStatus"]
+            if not status["dnsStatus"]["resolved"]:
+                failed.append(f'Unable to resolve neighbor ({neighbor["name"]}) service '
+                              f'name: {status["clusterIp"]["name"]}')
+                continue
+            if not status["svcStatus"]["available"]:
+                failed.append(f'Neighbor ({neighbor["name"]}) service address '
+                              f'is not reachable: {status["svcStatus"]["address"]}')
+                continue
+            if not status["podStatus"]["available"]:
+                failed.append(f'Neighbor ({neighbor["name"]}) pod address '
+                              f'is not reachable: {status["podStatus"]["address"]}')
+                continue
+
+        if failed:
+            raise TestFailure("found failed statuses", hint=failed)
+        tc.success(results="all checks passed")
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -1231,7 +1285,8 @@ tasks = OrderedDict({
     },
     'calico': {
         "config_check": calico_config_check
-    }
+    },
+    'geo_monitor': geo_monitor,
 })
 
 
@@ -1251,7 +1306,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_tasks_flow_parser(cli_help)
+    parser = flow.new_procedure_parser(cli_help, optional_config=True)
 
     parser.add_argument('--csv-report',
                         default='report.csv',
