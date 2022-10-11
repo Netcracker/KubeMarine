@@ -1183,7 +1183,7 @@ def geo_monitor(cluster):
             status = neighbor["clusterIpStatus"]
             if not status["dnsStatus"]["resolved"]:
                 failed.append(f'Unable to resolve neighbor ({neighbor["name"]}) service '
-                              f'name: {status["clusterIp"]["name"]}')
+                              f'name: {status["name"]}')
                 continue
             if not status["svcStatus"]["available"]:
                 failed.append(f'Neighbor ({neighbor["name"]}) service address '
