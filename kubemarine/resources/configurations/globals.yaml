@@ -528,6 +528,7 @@ compatibility_map:
       - os_family: 'debian'
         versions:
           - '20.04'
+          - '22.04'
     debian:
       - os_family: 'debian'
         versions:
