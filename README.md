@@ -1,7 +1,7 @@
 ![Kubemarine_1280х640_3_JPEG](https://user-images.githubusercontent.com/5212888/162978291-63d55f19-7dc0-4126-ad39-cd69191e7e19.jpg)
 
 <div align="left" class="no-border">
-  <a href="https://github.com/FairwindsOps/pluto/releases">
+  <a href="https://github.com/Netcracker/Kubemarine/releases">
     <img src="https://img.shields.io/github/v/release/Netcracker/Kubemarine">
   </a>
 </dev>
