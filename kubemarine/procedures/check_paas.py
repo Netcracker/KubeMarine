@@ -1183,15 +1183,17 @@ def geo_monitor(cluster):
             status = neighbor["clusterIpStatus"]
             if not status["dnsStatus"]["resolved"]:
                 failed.append(f'Unable to resolve neighbor ({neighbor["name"]}) service '
-                              f'name: {status["name"]}')
+                              f'name: {status["name"]}, error: {status["dnsStatus"]["error"]}')
                 continue
             if not status["svcStatus"]["available"]:
                 failed.append(f'Neighbor ({neighbor["name"]}) service address '
-                              f'is not reachable: {status["svcStatus"]["address"]}')
+                              f'ping failed: {status["svcStatus"]["address"]}, '
+                              f'error: {status["svcStatus"]["error"]}')
                 continue
             if not status["podStatus"]["available"]:
                 failed.append(f'Neighbor ({neighbor["name"]}) pod address '
-                              f'is not reachable: {status["podStatus"]["address"]}')
+                              f'ping failed: {status["podStatus"]["address"]}, '
+                              f'error: {status["podStatus"]["error"]}')
                 continue
 
         if failed:
