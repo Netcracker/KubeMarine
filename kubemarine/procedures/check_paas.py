@@ -1143,7 +1143,7 @@ def kubernetes_admission_status(cluster):
             tc.success(results='disabled')
 
 
-def geo_monitor(cluster):
+def geo_check(cluster):
     """
     This test checks connectivity between clusters in geo schemas using paas-geo-monitor service.
     This test only work if "procedure.yaml" has "geo-monitor" section filled.
@@ -1168,30 +1168,30 @@ def geo_monitor(cluster):
         port = svc["spec"]["ports"][0]["port"]
 
         # todo: support https?
-        status_cmd = f'curl http://{ip}:{port}/neighbors/status'
+        status_cmd = f'curl http://{ip}:{port}/peers/status'
         if ipaddress.ip_address(ip).version == 6:
             status_cmd += " -g"
-        neighbors_result = cluster.nodes['control-plane'].get_first_member().\
-            sudo(f'curl http://{ip}:{port}/neighbors/status').get_simple_out()
+        peers_result = cluster.nodes['control-plane'].get_first_member().\
+            sudo(f'curl http://{ip}:{port}/peers/status').get_simple_out()
 
-        neighbors = yaml.safe_load(io.StringIO(neighbors_result))
-        if len(neighbors) == 0:
-            raise TestFailure("Configuration error", hint="geo-monitor instance has no neighbors")
+        peers = yaml.safe_load(io.StringIO(peers_result))
+        if len(peers) == 0:
+            raise TestFailure("Configuration error", hint="geo-monitor instance has no peers")
 
         failed = []
-        for neighbor in neighbors:
-            status = neighbor["clusterIpStatus"]
+        for peer in peers:
+            status = peer["clusterIpStatus"]
             if not status["dnsStatus"]["resolved"]:
-                failed.append(f'Unable to resolve neighbor ({neighbor["name"]}) service '
+                failed.append(f'Unable to resolve peer ({peer["name"]}) service '
                               f'name: {status["name"]}, error: {status["dnsStatus"]["error"]}')
                 continue
             if not status["svcStatus"]["available"]:
-                failed.append(f'Neighbor ({neighbor["name"]}) service address '
+                failed.append(f'peer ({peer["name"]}) service address '
                               f'ping failed: {status["svcStatus"]["address"]}, '
                               f'error: {status["svcStatus"]["error"]}')
                 continue
             if not status["podStatus"]["available"]:
-                failed.append(f'Neighbor ({neighbor["name"]}) pod address '
+                failed.append(f'peer ({peer["name"]}) pod address '
                               f'ping failed: {status["podStatus"]["address"]}, '
                               f'error: {status["podStatus"]["error"]}')
                 continue
@@ -1289,7 +1289,7 @@ tasks = OrderedDict({
     'calico': {
         "config_check": calico_config_check
     },
-    'geo_monitor': geo_monitor,
+    'geo_check': geo_check,
 })
 
 
