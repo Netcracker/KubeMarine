@@ -136,7 +136,7 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
             # if hash equal, then stop further actions immediately! unpack should not be performed too
             remote_commands += ' && FILE_HASH=$(sudo openssl sha1 %s | sed "s/^.* //"); ' \
                                '[ "%s" == "${FILE_HASH}" ] && exit 0 || true ' % (destination, config['sha1'])
-        remote_commands += ' && sudo rm -f %s && sudo curl --max-time 120 -f -g -L %s -o %s && ' % (destination, config['source'], destination)
+        remote_commands += ' && sudo rm -f %s && sudo curl -f -g -L %s -o %s && ' % (destination, config['source'], destination)
     else:
         cluster.log.verbose('Installation via sftp upload detected')
         cluster.log.debug(common_group.sudo(remote_commands))
