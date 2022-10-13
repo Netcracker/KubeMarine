@@ -4373,6 +4373,8 @@ The `values_file` parameter specifies the absolute path on local host to the fil
 
 The `namespace` parameter specifies the cloud namespace where chart should be installed. This parameter is optional.
 
+The `release` parameter specifies target Helm release. The parameter is optional and is equal to chart name by default.
+
 **Note**:
 
 * Helm 3 is only supported.
@@ -4393,6 +4395,7 @@ plugins:
               serviceAccount:
                 create: false
             namespace: elastic-search
+            release: elastic-search-1
             values_file: /tmp/custom_values.yaml
 ```
  
