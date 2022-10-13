@@ -30,9 +30,10 @@ def get_status(group):
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")
     parsed_result = {}
-    for connection, node_result in result.items():
-        log.verbose('Parsing status for %s...' % connection.host)
-        parsed_result[connection] = parse_status(node_result.stdout)
+    if result:
+        for connection, node_result in result.items():
+            log.verbose('Parsing status for %s...' % connection.host)
+            parsed_result[connection] = parse_status(node_result.stdout)
     print_status(log, parsed_result)
     return parsed_result
 
