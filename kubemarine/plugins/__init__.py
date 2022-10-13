@@ -18,9 +18,14 @@ import importlib.util
 import io
 import os
 import re
+import shutil
+import ssl
 import subprocess
 import sys
+import tarfile
 import time
+import urllib.request
+import zipfile
 from copy import deepcopy
 from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
@@ -695,11 +700,13 @@ def convert_ansible(cluster, config):
     return config
 
 
-def verify_ansible(cluster, config):
+def verify_ansible(cluster: KubernetesCluster, config):
     if config.get('playbook') is None or config['playbook'] == '':
         raise Exception('Playbook path is missing')
     if not os.path.isfile(config['playbook']):
-        raise Exception('Playbook file %s not exists' % config['location'])
+        raise Exception('Playbook file %s not exists' % config['playbook'])
+    if cluster.is_deploying_from_windows():
+        raise Exception("Executing of playbooks on Windows deployer is currently not supported")
     # TODO: verify fields types and contents
 
 
@@ -742,7 +749,7 @@ def verify_helm(cluster, config):
         raise Exception(f'public_cluster_ip is a mandatory parameter in the inventory in case of usage of helm plugin.')
 
 
-def apply_helm(cluster, config, plugin_name=None):
+def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
@@ -759,11 +766,11 @@ def apply_helm(cluster, config, plugin_name=None):
     kubeconfig_stdout = kubeconfig_stdout.replace(cluster_name, public_cluster_ip)
 
     cluster.log.debug("Writing config to file...")
-    local_config_path = os.getcwd() + "/config"
-    command = 'echo "%s" > %s' % (kubeconfig_stdout, local_config_path)
-    subprocess.check_output(command, shell=True)
+    local_config_path = "config"
+    with open(local_config_path, 'w') as f:
+        f.write(kubeconfig_stdout)
 
-    with open(chart_path + '/Chart.yaml', 'r') as stream:
+    with open(os.path.join(chart_path, 'Chart.yaml'), 'r') as stream:
         chart_metadata = yaml.safe_load(stream)
         chart_name = chart_metadata["name"]
 
@@ -774,22 +781,21 @@ def apply_helm(cluster, config, plugin_name=None):
         cluster.log.verbose('Namespace configuration is missing, "default" namespace will be used')
         namespace = "default"
 
-    prepare_for_helm_command = f'export KUBECONFIG="{local_config_path}"; cd "{chart_path}"; helm -n {namespace} '
+    prepare_for_helm_command = f'helm --kubeconfig {local_config_path} -n {namespace} '
 
     cluster.log.verbose("Check if chart already has been installed")
+    # todo probably use single command helm upgrade --install
     command = prepare_for_helm_command + 'list -q'
     helm_existed_releases = subprocess.check_output(command, shell=True).decode('utf-8')
 
-    command = f'echo "{helm_existed_releases}" | grep "^{chart_name}$" | cat'
-    deployed_release = subprocess.check_output(command, shell=True)
-    if deployed_release:
+    if chart_name in helm_existed_releases.splitlines():
         cluster.log.debug("Deployed release %s is found. Upgrading it..." % chart_name)
         deployment_mode = "upgrade"
     else:
         cluster.log.debug("Deployed release %s is not found. Installing it..." % chart_name)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {chart_name} . --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {chart_name} {chart_path} --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 
@@ -801,7 +807,7 @@ def process_chart_values(config, local_chart_path):
     config_values_file = config.get("values_file")
 
     if config_values is not None:
-        with open(local_chart_path + '/values.yaml', 'r+') as stream:
+        with open(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
             original_values = yaml.safe_load(stream)
             stream.seek(0)
             merged_values = default_merger.merge(original_values, config_values)
@@ -809,7 +815,7 @@ def process_chart_values(config, local_chart_path):
             stream.truncate()
     else:
         if config_values_file is not None:
-            with open(local_chart_path + '/values.yaml', 'r+') as stream:
+            with open(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
                 with open(config_values_file, 'r+') as additional_stream:
                     original_values = yaml.safe_load(stream)
                     additional_values = yaml.safe_load(additional_stream)
@@ -826,27 +832,52 @@ def get_local_chart_path(log, config):
 
     is_curl = chart_path[:4] == 'http' and '://' in chart_path[4:8]
 
-    local_chart_folder = os.getcwd() + "/local_chart_folder"
+    local_chart_folder = "local_chart_folder"
     if os.path.isdir(local_chart_folder):
         remove_tree(local_chart_folder)
     mkpath(local_chart_folder)
     if is_curl:
         log.verbose('Chart download via curl detected')
         destination = os.path.basename(chart_path)
-        commands = 'curl -g -k %s -o %s' % (chart_path, destination)
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        # todo probably add option which will manage if certificate should be verified?
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(chart_path, context=ctx) as u, \
+                open(destination, 'wb') as f:
+            shutil.copyfileobj(u, f)
+
         extension = destination.split('.')[-1]
         if extension == 'zip':
             log.verbose('Unzip will be used for unpacking')
-            commands += ' && unzip %s -d %s' % (destination, local_chart_folder)
+            with zipfile.ZipFile(destination, 'r') as zf:
+                zf.extractall(local_chart_folder)
         else:
             log.verbose('Tar will be used for unpacking')
-            commands += ' && tar -zxf %s -C %s' % (destination, local_chart_folder)
-        log.debug(subprocess.check_output(commands, shell=True))
+            with tarfile.open(destination, "r:gz") as tf:
+                tf.extractall(local_chart_folder)
     else:
         log.debug("Create copy of chart to work with")
         copy_tree(chart_path, local_chart_folder)
 
-    log.debug("Ready chart path = %s" % local_chart_folder)
+    # Find all Chart.yaml files in the chart.
+    glob_search = os.path.join(local_chart_folder, '**', 'Chart.yaml')
+    chart_metadata = glob.glob(glob_search, recursive=True)
+    if not chart_metadata:
+        raise Exception("Incorrect format of helm chart: Chart.yaml not found")
+
+    # Sort by number of parts in path to find outermost Chart.yaml
+    chart_metadata.sort(key=lambda path: len(path.split(os.sep)))
+    local_chart_folder = os.path.dirname(chart_metadata[0])
+    log.debug("Detected chart path = %s" % local_chart_folder)
+
+    # Check all nested Chart.yaml are inside chart path
+    for i in range(1, len(chart_metadata)):
+        if not os.path.commonpath([chart_metadata[i], local_chart_folder]) == local_chart_folder:
+            raise Exception(
+                f"Incorrect format of helm chart: inner {chart_metadata[i]} is not inside {local_chart_folder} directory.")
+
     return local_chart_folder
 
 

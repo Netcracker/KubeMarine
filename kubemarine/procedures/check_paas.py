@@ -104,7 +104,8 @@ def services_status(cluster, service_type):
             kuber_ip_disable = False
             kuber_ip = cluster.inventory['public_cluster_ip']
             for item in cluster.inventory['vrrp_ips']:
-                if kuber_ip == item['ip'] and \
+                # 'ip' and 'floating_ip' maight be different and 'floating_ip' might be omited
+                if (kuber_ip == item['ip'] or kuber_ip == item.get('floating_ip', '')) and \
                         item.get('params', {}).get('maintenance-type', '') == 'not bind':
                     kuber_ip_disable = True
             if kuber_ip_disable and len(group.get_nodes_names()) == len(mntc_list):
@@ -1054,7 +1055,9 @@ def calico_config_check(cluster):
         result = yaml.safe_load(result)
         for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
             if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
-                if not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
+                if "value" in env.keys() and not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
+                    correct_config = False
+                if "valueFrom" in env.keys() and len(DeepDiff(cluster.inventory["plugins"]["calico"]["env"].get(env["name"]), env["valueFrom"], ignore_order=True)) != 0:
                     correct_config = False
         if not correct_config:
             message += "calico-node env configuration is outdated\n"

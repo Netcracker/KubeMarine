@@ -133,6 +133,10 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:19.03.*
+      v1.23.11:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:19.03.*
       v1.24.0:
         version_rhel: 19.03*
         version_rhel8: 19.03*
@@ -161,6 +165,9 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.23.6:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.23.11:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.24.0:
@@ -195,6 +202,10 @@ compatibility_map:
         version_rhel8: 1.6*
         version_debian: 1.4.*
       v1.23.6:
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
+        version_debian: 1.4.*
+      v1.23.11:
         version_rhel: 1.6*
         version_rhel8: 1.6*
         version_debian: 1.4.*
@@ -235,6 +246,10 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
+      v1.23.11:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.24.0:
         version_rhel: 1.6.4*
         version_rhel8: "*"
@@ -269,6 +284,10 @@ compatibility_map:
         version_rhel8: 1.8*
         version_debian: 2.0.*
       v1.23.6:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.0.*
+      v1.23.11:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.0.*
@@ -309,6 +328,10 @@ compatibility_map:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.0.*
+      v1.23.11:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.0.*
       v1.24.0:
         version_rhel: 1.3*
         version_rhel8: 2.1*
@@ -339,6 +362,9 @@ compatibility_map:
       v1.23.6:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+      v1.23.11:
+        version: v1.23.0
+        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
       v1.24.0:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
@@ -360,6 +386,8 @@ compatibility_map:
         sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
       v1.23.6:
         sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
+      v1.23.11:
+        sha1: b93ff384df125429dcbeb18c2ea648168ae10c56
       v1.24.0:
         sha1: a60b0adcdc6f19e79bd98663914b694a325db819
       v1.24.2:
@@ -379,6 +407,8 @@ compatibility_map:
         sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
       v1.23.6:
         sha1: 326110dcb62b66e69490d039b170682fb71c5560
+      v1.23.11:
+        sha1: 07769c846e4a83d59f9f34370c33be5cc163120b
       v1.24.0:
         sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
       v1.24.2:
@@ -398,6 +428,8 @@ compatibility_map:
         sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
       v1.23.6:
         sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
+      v1.23.11:
+        sha1: 81643da0b975102cede136d39767cdc54f2b0aef
       v1.24.0:
         sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
       v1.24.2:
@@ -407,14 +439,14 @@ compatibility_map:
         version: v3.22.2
         sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
       v1.22:
-        version: v3.22.2
-        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+        version: v3.24.1
+        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
       v1.23:
-        version: v3.22.2
-        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+        version: v3.24.1
+        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
       v1.24:
-        version: v3.22.2
-        sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+        version: v3.24.1
+        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
     nginx-ingress-controller:
       v1.21:
         image-name: ingress-nginx/controller
@@ -573,7 +605,6 @@ logging:
   default_targets:
     stdout:
       level: debug
-      colorize: True
       correct_newlines: True
     dump:
       level: verbose

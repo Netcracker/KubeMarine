@@ -123,23 +123,32 @@ Ensure the following requirements are met:
 **Operating System**
 * Linux
 * MacOS
-* Windows
+* Windows (See [Restrictions](#windows-deployer-restrictions))
 
 **Preinstalled Software**
-* OpenSSL library
 * python 3.7 (or higher version)
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-Install the required python modules using the following command:
+Install the required python modules.
 
+Linux / MacOS:
 ```bash
 pip3 install -r requirements.txt
+```
+Windows:
+```bash
+pip install -r requirements_nt.txt
 ```
 
 **System Clock**
 
 System clock should be synchronized the same way as for Cluster nodes system clock.  
+
+### Windows Deployer Restrictions
+
+There are the following restrictions when deploying from Windows:
+* [ansible](#ansible) plugin procedures are not supported.
 
 ## Prerequisites for Cluster Nodes
 
@@ -3267,6 +3276,9 @@ plugins:
       enabled: true
     node:
       image: calico/node:v3.10.1
+    env:
+      FELIX_USAGEREPORTINGENABLED: true
+
 ```
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
@@ -4303,9 +4315,12 @@ For this procedure you must specify the following parameters:
 
 **Note**: Ansible must be manually installed on the deploying node.
 
+**Note**: Executing of the playbooks is currently not supported on Windows deployers.
+
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with ansible-2.9.9.
+**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with `ansible-2.9.*`.
+Exact patch version is not fixed.
 
 For example:
 
@@ -5305,8 +5320,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5386,7 +5401,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5429,7 +5444,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.23.6
+## Default Dependent Components Versions for Kubernetes Versions v1.23.11
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -5459,21 +5474,21 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.23.6</td>
-    <td>SHA1: 90386507b3214adb6b2d4ed05a07e80f11f674d6</td>
+    <td colspan="4" rowspan="3">v1.23.11</td>
+    <td>SHA1: b93ff384df125429dcbeb18c2ea648168ae10c56</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 326110dcb62b66e69490d039b170682fb71c5560</td>
+    <td>SHA1: 07769c846e4a83d59f9f34370c33be5cc163120b</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152</td>
+    <td>SHA1: 81643da0b975102cede136d39767cdc54f2b0aef</td>
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5521,7 +5536,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.23.6</td>
+    <td colspan="4" rowspan="4">v1.23.11</td>
     <td></td>
   </tr>
   <tr>
@@ -5553,7 +5568,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5639,8 +5654,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
-    <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
+    <td colspan="4">v3.24.1</td>
+    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5649,9 +5664,6 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
-    <td>docker-ce</td>
-    <td colspan="4">19.03</td>
-    <td></td>
   </tr>
   <tr>
     <td>containerd.io</td>
@@ -5720,7 +5732,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="4" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>

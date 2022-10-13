@@ -17,6 +17,7 @@ import os
 import sys
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler
 
+from copy import deepcopy
 from typing import List
 
 VERBOSE = 5
@@ -227,7 +228,9 @@ class LogHandler:
                 raise Exception(f'Unknown Graylog type "{kwargs["type"]}" for "{kwargs["host"]}:{kwargs["port"]}"')
         else:
             self._target = target
-            self.handler = FileHandlerWithHeader(self._target, mode=filemode, header=self._header)
+            # Output produced by remote commands might contain characters which cannot be encoded on Windows deployer.
+            # Specify explicitly utf-8 encoding which is native to the remote machines.
+            self.handler = FileHandlerWithHeader(self._target, mode=filemode, header=self._header, encoding='utf-8')
 
         self._level = LOGGING_LEVELS_BY_NAME.get(level)
         if self._level is None:
@@ -316,8 +319,12 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
                                    **globals['logging']['default_targets']['dump']))
 
     if not stdout_specified:
-        handlers.append(LogHandler(target='stdout',
-                                   **globals['logging']['default_targets']['stdout']))
+        stdout_settings = deepcopy(globals['logging']['default_targets']['stdout'])
+        # Globals lacks of colorize property, so calculated value for Windows is "false".
+        # But it is still convenient to specify the value explicitly even for Windows for debugging purpose.
+        if 'colorize' not in stdout_settings:
+            stdout_settings['colorize'] = (os.name != 'nt')
+        handlers.append(LogHandler(target='stdout', **stdout_settings))
 
     log = Log(raw_inventory, handlers)
 

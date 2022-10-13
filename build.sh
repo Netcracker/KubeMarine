@@ -8,7 +8,7 @@ if [[ -n "${LOCATION}" ]]; then
   sed -i "s|non-release version|version ${LOCATION} build $(date +"%D %T")|g" "kubemarine/__main__.py"
 fi
 
-rm -rf build.sh documentation examples CONTRIBUTING.md .git
+rm -rf build.sh documentation examples CONTRIBUTING.md .git bin/kubemarine.cmd requirements_nt.txt
 
 docker build -t "${NAME}" --no-cache .
 

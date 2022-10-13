@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
+          token: ${{ secrets.NCCLPLCI_PAT }}
           # By default, tag is checked out. It needs to check out branch to commit to.
           ref: ${{ github.event.release.target_commitish }}
       - run: |
