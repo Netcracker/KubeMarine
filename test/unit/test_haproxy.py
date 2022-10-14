@@ -50,7 +50,7 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate already installed haproxy package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='Haproxy v1.2.3')
-        cluster.fake_shell.add(expected_results_1, 'sudo', ['%s -v' % package_associations['executable_name']])
+        cluster.fake_shell.add(expected_results_1, 'sudo', ['bash %s -v' % package_associations['executable_name']])
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
