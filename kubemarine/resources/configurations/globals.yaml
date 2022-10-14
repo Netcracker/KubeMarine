@@ -262,27 +262,27 @@ compatibility_map:
       v1.21.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.21.5:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.21.12:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.22.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.22.9:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.23.1:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.23.6:
         version_rhel: 1.8*
         version_rhel8: 1.8*
@@ -290,40 +290,40 @@ compatibility_map:
       v1.23.11:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.24.0:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
       v1.24.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
-        version_debian: 2.0.*
+        version_debian: 2.*
     keepalived:
       v1.21.2:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.21.5:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.21.12:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.22.2:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.22.9:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.23.1:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.23.6:
         version_rhel: 1.3*
         version_rhel8: 2.1*
@@ -331,15 +331,15 @@ compatibility_map:
       v1.23.11:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.24.0:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
       v1.24.2:
         version_rhel: 1.3*
         version_rhel8: 2.1*
-        version_debian: 1:2.0.*
+        version_debian: 1:2.*
     crictl:
       v1.21.2:
         version: v1.23.0
