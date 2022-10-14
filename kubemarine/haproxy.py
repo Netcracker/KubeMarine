@@ -72,7 +72,7 @@ def install(group):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
-            group.sudo("%s -v" % package_associations['executable_name'], warn=True)
+            group.sudo("bash %s -v" % package_associations['executable_name'], warn=True)
 
     haproxy_installed = True
     for host, host_results in exe.get_last_results().items():
