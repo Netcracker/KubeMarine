@@ -104,7 +104,7 @@ Proceed the following steps to install Kubemarine manually on your environment:
    docker run -it --mount type=bind,source=/root/cluster.yaml,target=/opt/kubemarine/cluster.yaml --mount type=bind,source=/root/rsa_key,target=/opt/kubemarine/rsa_key kubemarine install -c /opt/kubemarine/cluster.yaml
    ```
    *Note:*: do not forget to pass inventory file and connection key inside container.
-For more execution details refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
+   For more execution details refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
 
 *Hint:* it is possible to pass building arguments (use `--build-arg`) to build using binary (argument `BUILD_TYPE=binary`) or build image with testing tools included (argument `BUILD_TYPE=test`).
 
