@@ -176,7 +176,7 @@ def enrich_inventory(inventory, cluster):
                     # Do not add taints for upgrade procedure
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                else:
+                elif minor_version == 24:
                     # For Kubernetes v1.24 taints for upgrade procedure and installation procedure should be different
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
@@ -184,6 +184,8 @@ def enrich_inventory(inventory, cluster):
                     else:
                         if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
                             node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
+                elif minor_version == 25:
+                    node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     # use first control plane internal address as a default bind-address
     # for other control-planes we override it during initialization
