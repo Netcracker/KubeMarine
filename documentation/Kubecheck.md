@@ -543,7 +543,7 @@ The test checks status of Pod Security Admissions, default PSS(Pod Security Stan
 *Task*: `geo_monitor`
 
 The task checks status of DNS resolving, pod-to-service and pod-to-pod connectivity between cluster in geographically
-distributed schemas. This task works only if `procedure_config` is provided with information about `paas-geo-monitor`,
+distributed schemas. This task works only if procedure config file is provided with information about `paas-geo-monitor`,
 at least service name and namespace. For example:
 ```yaml
 geo-monitor:
