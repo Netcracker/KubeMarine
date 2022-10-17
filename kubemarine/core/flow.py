@@ -252,10 +252,6 @@ def new_common_parser(cli_help):
                         default='cluster.yaml',
                         help='define main cluster configuration file')
 
-    parser.add_argument('--ansible-inventory-location',
-                        default='./ansible-inventory.ini',
-                        help='auto-generated ansible-compatible inventory file location')
-
     parser.add_argument('--dump-location',
                         default='./dump/',
                         help='dump directory for intermediate files')
