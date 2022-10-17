@@ -316,7 +316,7 @@ def new_procedure_parser(cli_help, optional_config=False):
 
     help_msg = 'config file for the procedure'
     if optional_config:
-        parser.add_argument('--procedure_config', type=str, help=help_msg)
+        parser.add_argument('procedure_config', metavar='procedure_config', type=str, help=help_msg, nargs='?')
     else:
         parser.add_argument('procedure_config', metavar='procedure_config', type=str, help=help_msg)
 

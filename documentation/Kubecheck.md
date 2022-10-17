@@ -112,11 +112,11 @@ kubemarine check_paas
 
 It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubemarine Installation Procedure_.
 
-**Note:** some `paas` checks work only if additional configuration is provided through `--procedure_config` yaml file.
+**Note:** some `paas` checks work only if additional configuration file is provided.
 Without additional configuration, such checks will be skipped without warning. 
-See particular check documentation for configuration format. Following is an example of passing procedure config:
+See particular check documentation for configuration format. Following is an example of passing procedure config file:
 ```bash
-kubemarine check_paas --procedure_config=procedure.yaml
+kubemarine check_paas procedure.yaml
 ```
 
 ### Check Procedures
