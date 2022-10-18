@@ -5644,7 +5644,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.24.0</td>
+    <td colspan="4" rowspan="3">v1.24.2</td>
     <td>SHA1: a60b0adcdc6f19e79bd98663914b694a325db819</td>
   </tr>
   <tr>
@@ -5703,7 +5703,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.24.0</td>
+    <td colspan="4" rowspan="4">v1.24.2</td>
     <td></td>
   </tr>
   <tr>
