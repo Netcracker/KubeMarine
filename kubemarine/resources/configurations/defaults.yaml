@@ -473,8 +473,8 @@ plugins:
     defaultAsNumber: 64512
     globalBgpPeers: []
     typha:
-      enabled: false
-      replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'
+      enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'
+      replicas: '{{ (((nodes|length)/50) + 2) | round(1) | int }}'
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
