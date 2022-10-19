@@ -284,7 +284,7 @@ def detect_preinstalled_python(cluster: KubernetesCluster):
     hosts_unknown_python = [host for host, node_context in nodes_context.items() if 'python' not in node_context]
     group_unknown_python = cluster.make_group(hosts_unknown_python)
     detected_python = group_unknown_python.run(
-        rf'for i in $(whereis -b python3); do '
+        rf'for i in $(whereis -b python && whereis -b python3 ); do '
         rf'if [[ -f "$i" ]] && [[ $($i --version 2>&1 | head -n 1) =~ {bash_version_pattern} ]]; then '
         rf'echo "$i"; $i --version 2>&1; break; '
         rf'fi; done')
