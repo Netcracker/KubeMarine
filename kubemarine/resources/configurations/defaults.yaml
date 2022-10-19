@@ -473,7 +473,9 @@ plugins:
     defaultAsNumber: 64512
     globalBgpPeers: []
     typha:
+      # enabled by default for envs with nodes > 3
       enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'
+      # let's start from 2 replicas and increment it every 50 nodes
       replicas: '{{ (((nodes|length)/50) + 2) | round(1) | int }}'
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
