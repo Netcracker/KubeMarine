@@ -108,43 +108,43 @@ compatibility_map:
       v1.21.2:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.21.5:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.21.12:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.22.2:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.22.9:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.23.1:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.23.6:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.23.11:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.24.0:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
       v1.24.2:
         version_rhel: 19.03*
         version_rhel8: 19.03*
-        version_debian: 5:19.03.*
+        version_debian: 5:20.10.*
     containerd:
       v1.21.2:
         version_rhel: 1.4*
