@@ -169,6 +169,7 @@ For cluster machines, ensure the following requirements are met:
   * RHEL 7.5+, 8.4
   * Oracle Linux 7.5+, 8.4
   * Ubuntu 20.04
+  * Ubuntu 22.04.1
 
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found at [global.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L335).
@@ -5164,7 +5165,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="4">20.10</td>
     <td></td>
   </tr>
   <tr>
@@ -5331,7 +5332,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="4">20.10</td>
     <td></td>
   </tr>
   <tr>
@@ -5498,7 +5499,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="4">20.10</td>
     <td></td>
   </tr>
   <tr>
@@ -5664,6 +5665,9 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
+    <td>docker-ce</td>
+    <td colspan="4">20.10</td>
+    <td></td>
   </tr>
   <tr>
     <td>containerd.io</td>
