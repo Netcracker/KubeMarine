@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import io
 import sys
 import time
 from collections import OrderedDict
@@ -1144,6 +1143,96 @@ def kubernetes_admission_status(cluster):
             tc.success(results='disabled')
 
 
+def geo_check(cluster):
+    """
+    This test checks connectivity between clusters in geo schemas using paas-geo-monitor service.
+    This test only work if "procedure.yaml" has "geo-monitor" section filled.
+    """
+    if not cluster.procedure_inventory or not cluster.procedure_inventory.get("geo-monitor"):
+        cluster.log.debug("Geo connectivity check is skipped, no configuration provided")
+        return
+
+    collected_results = {
+        "statusCollected": False,
+        "dnsStatus": {"failed": []},
+        "svcStatus": {"failed": [], "skipped": []},
+        "podStatus": {"failed": [], "skipped": []}
+    }
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Collect status") as tc_collect:
+        geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
+        if geo_monitor_inventory.get("namespace") is None or geo_monitor_inventory.get("service") is None:
+            raise TestFailure("configuration error",
+                              hint="geo-monitor namespace and/or service name is not provided in procedure inventory")
+
+        namespace = geo_monitor_inventory["namespace"]
+        service = geo_monitor_inventory["service"]
+        control_plane_node = cluster.nodes['control-plane'].get_first_member()
+
+        svc_result = control_plane_node.sudo("kubectl get svc -n %s %s -o yaml" % (namespace, service)).get_simple_out()
+        svc = yaml.safe_load(io.StringIO(svc_result))
+        ip = svc["spec"]["clusterIP"]
+        port = svc["spec"]["ports"][0]["port"]
+
+        # todo: support https?
+        status_cmd = f'curl http://{ip}:{port}/peers/status'
+        if ipaddress.ip_address(ip).version == 6:
+            status_cmd += " -g"
+        peers_result = cluster.nodes['control-plane'].get_first_member().\
+            sudo(f'curl http://{ip}:{port}/peers/status').get_simple_out()
+
+        peers = yaml.safe_load(io.StringIO(peers_result))
+        if len(peers) == 0:
+            raise TestFailure("configuration error", hint="geo-monitor instance has no peers")
+
+        for peer in peers:
+            status = peer["clusterIpStatus"]
+            if not status["dnsStatus"]["resolved"]:
+                error = f'FAILED DNS resolving for peer ({peer["name"]}) service ' \
+                        f'name: {status["name"]}, error: {status["dnsStatus"]["error"]}'
+                collected_results["dnsStatus"]["failed"].append(error)
+                collected_results["svcStatus"]["skipped"].append(error)
+                collected_results["podStatus"]["skipped"].append(error)
+                continue
+            if not status["svcStatus"]["available"]:
+                error = f'FAILED ping service for peer ({peer["name"]}), ' \
+                        f'address: {status["svcStatus"]["address"]}, error: {status["svcStatus"]["error"]}'
+                collected_results["svcStatus"]["failed"].append(error)
+                collected_results["podStatus"]["skipped"].append(error)
+                continue
+            if not status["podStatus"]["available"]:
+                error = f'FAILED ping pod for peer ({peer["name"]}), ' \
+                        f'address: {status["podStatus"]["address"]}, error: {status["podStatus"]["error"]}'
+                collected_results["podStatus"]["failed"].append(error)
+                continue
+
+        collected_results["statusCollected"] = True
+        tc_collect.success(results="peers data collected")
+
+    if not collected_results["statusCollected"]:
+        return
+
+    with TestCase(cluster.context['testsuite'], '226.1', "Geo Monitor", "DNS resolving") as tc_dns:
+        if collected_results["dnsStatus"]["failed"]:
+            raise TestFailure("found failed DNS statuses", hint=collected_results["dnsStatus"]["failed"])
+        tc_dns.success("all peer names resolved")
+
+    with TestCase(cluster.context['testsuite'], '226.2', "Geo Monitor", "Pod-to-service") as tc_svc:
+        if collected_results["svcStatus"]["failed"]:
+            raise TestFailure("found unavailable peer services",
+                              hint=collected_results["svcStatus"]["failed"]+collected_results["svcStatus"]["skipped"])
+        if collected_results["svcStatus"]["skipped"]:
+            raise TestWarn("found skipped peer services", hint=collected_results["svcStatus"]["skipped"])
+        tc_svc.success("all peer services available")
+
+    with TestCase(cluster.context['testsuite'], '226.3', "Geo Monitor", "Pod-to-pod") as tc_pod:
+        if collected_results["podStatus"]["failed"]:
+            raise TestFailure("found unavailable peer pod",
+                              hint=collected_results["podStatus"]["failed"]+collected_results["podStatus"]["skipped"])
+        if collected_results["podStatus"]["skipped"]:
+            raise TestWarn("found skipped peer pods", hint=collected_results["podStatus"]["skipped"])
+        tc_pod.success("all peer pods available")
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -1231,7 +1320,8 @@ tasks = OrderedDict({
     },
     'calico': {
         "config_check": calico_config_check
-    }
+    },
+    'geo_check': geo_check,
 })
 
 
@@ -1251,7 +1341,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_tasks_flow_parser(cli_help)
+    parser = flow.new_procedure_parser(cli_help, optional_config=True)
 
     parser.add_argument('--csv-report',
                         default='report.csv',
