@@ -493,14 +493,20 @@ compatibility_map:
         image-name: ingress-nginx/controller
         version: v1.4.0
         pod-name: ingress-nginx-controller
+        webhook-image-name: ingress-nginx/kube-webhook-certgen
+        webhook-version: v20220916-gd32f8c343
       v1.23:
         image-name: ingress-nginx/controller
         version: v1.4.0
         pod-name: ingress-nginx-controller
+        webhook-image-name: ingress-nginx/kube-webhook-certgen
+        webhook-version: v20220916-gd32f8c343
       v1.24:
         image-name: ingress-nginx/controller
         version: v1.4.0
         pod-name: ingress-nginx-controller
+        webhook-image-name: ingress-nginx/kube-webhook-certgen
+        webhook-version: v20220916-gd32f8c343
       v1.25:
         image-name: ingress-nginx/controller
         version: v1.4.0
