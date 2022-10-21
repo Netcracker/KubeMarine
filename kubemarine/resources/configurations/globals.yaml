@@ -473,17 +473,17 @@ compatibility_map:
         version: v3.22.2
         sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
       v1.22:
-        version: v3.24.1
+        version: v3.24.2
         sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
       v1.23:
-        version: v3.24.1
+        version: v3.24.2
         sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
       v1.24:
-        version: v3.24.1
+        version: v3.24.2
         sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
       v1.25:
-        version: v3.24.1
-        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
+        version: v3.24.2
+        sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 
     nginx-ingress-controller:
       v1.21:
         image-name: ingress-nginx/controller
@@ -491,20 +491,22 @@ compatibility_map:
         pod-name: ingress-nginx-controller
       v1.22:
         image-name: ingress-nginx/controller
-        version: v1.2.0
+        version: v1.4.0
         pod-name: ingress-nginx-controller
       v1.23:
         image-name: ingress-nginx/controller
-        version: v1.2.0
+        version: v1.4.0
         pod-name: ingress-nginx-controller
       v1.24:
         image-name: ingress-nginx/controller
-        version: v1.2.0
+        version: v1.4.0
         pod-name: ingress-nginx-controller
       v1.25:
         image-name: ingress-nginx/controller
-        version: v1.2.0
+        version: v1.4.0
         pod-name: ingress-nginx-controller
+        webhook-image-name: ingress-nginx/kube-webhook-certgen
+        webhook-version: v20220916-gd32f8c343
     kubernetes-dashboard:
       v1.21:
         version: v2.5.1
@@ -519,8 +521,8 @@ compatibility_map:
         version: v2.5.1
         metrics-scraper-version: v1.0.7
       v1.25:
-        version: v2.5.1
-        metrics-scraper-version: v1.0.7
+        version: v2.7.0
+        metrics-scraper-version: v1.0.8
     local-path-provisioner:
       v1.21:
         version: v0.0.22

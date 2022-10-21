@@ -118,6 +118,9 @@ def enrich_inventory(inventory, _):
 
 
 def manage_psp_enrichment(inventory, cluster):
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version >= 25:
+        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
     if "psp" not in cluster.procedure_inventory:
@@ -262,9 +265,6 @@ def merge_policy_lists(old_list, added_list, deleted_list):
 
 
 def install_psp_task(cluster):
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version >= 25:
-        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if not is_security_enabled(cluster.inventory):
         cluster.log.debug("Pod security disabled, skipping policies installation...")
         return
@@ -283,7 +283,7 @@ def install_psp_task(cluster):
 
 
 def delete_custom_task(cluster):
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
     if minor_version >= 25:
         raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if "delete-policies" not in cluster.procedure_inventory["psp"]:
@@ -298,7 +298,7 @@ def delete_custom_task(cluster):
 
 
 def add_custom_task(cluster):
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
     if minor_version >= 25:
         raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if "add-policies" not in cluster.procedure_inventory["psp"]:
@@ -610,9 +610,6 @@ def install(cluster):
 
 
 def manage_pss_enrichment(inventory, cluster):
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version >= 25:
-        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if cluster.context.get('initial_procedure') != 'manage_pss':
         return inventory
     if "pss" not in cluster.procedure_inventory:
