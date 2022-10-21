@@ -283,9 +283,6 @@ def install_psp_task(cluster):
 
 
 def delete_custom_task(cluster):
-    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version >= 25:
-        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if "delete-policies" not in cluster.procedure_inventory["psp"]:
         cluster.log.debug("No 'delete-policies' specified, skipping...")
         return
@@ -298,9 +295,6 @@ def delete_custom_task(cluster):
 
 
 def add_custom_task(cluster):
-    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version >= 25:
-        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if "add-policies" not in cluster.procedure_inventory["psp"]:
         cluster.log.debug("No 'add-policies' specified, skipping...")
         return
