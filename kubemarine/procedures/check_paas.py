@@ -1158,7 +1158,10 @@ def geo_check(cluster):
         "svcStatus": {"failed": [], "skipped": []},
         "podStatus": {"failed": [], "skipped": []}
     }
-    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Collect status") as tc_collect:
+
+    # Here we actually collect information about all statuses, but report information about DNS only.
+    # Other statuses are reported in other TestCases below. This is done for better UX.
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
         if geo_monitor_inventory.get("namespace") is None or geo_monitor_inventory.get("service") is None:
             raise TestFailure("configuration error",
@@ -1206,30 +1209,30 @@ def geo_check(cluster):
                 continue
 
         collected_results["statusCollected"] = True
-        tc_collect.success(results="peers data collected")
-
-    if not collected_results["statusCollected"]:
-        return
-
-    with TestCase(cluster.context['testsuite'], '226.1', "Geo Monitor", "DNS resolving") as tc_dns:
         if collected_results["dnsStatus"]["failed"]:
-            raise TestFailure("found failed DNS statuses", hint=collected_results["dnsStatus"]["failed"])
+            raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(collected_results["dnsStatus"]["failed"]))
         tc_dns.success("all peer names resolved")
 
-    with TestCase(cluster.context['testsuite'], '226.2', "Geo Monitor", "Pod-to-service") as tc_svc:
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
+        if not collected_results["statusCollected"]:
+            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
+
         if collected_results["svcStatus"]["failed"]:
             raise TestFailure("found unavailable peer services",
-                              hint=collected_results["svcStatus"]["failed"]+collected_results["svcStatus"]["skipped"])
+                              hint=yaml.safe_dump(collected_results["svcStatus"]["failed"]+collected_results["svcStatus"]["skipped"]))
         if collected_results["svcStatus"]["skipped"]:
-            raise TestWarn("found skipped peer services", hint=collected_results["svcStatus"]["skipped"])
+            raise TestWarn("found skipped peer services", hint=yaml.safe_dump(collected_results["svcStatus"]["skipped"]))
         tc_svc.success("all peer services available")
 
-    with TestCase(cluster.context['testsuite'], '226.3', "Geo Monitor", "Pod-to-pod") as tc_pod:
+    with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
+        if not collected_results["statusCollected"]:
+            raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
+
         if collected_results["podStatus"]["failed"]:
             raise TestFailure("found unavailable peer pod",
-                              hint=collected_results["podStatus"]["failed"]+collected_results["podStatus"]["skipped"])
+                              hint=yaml.safe_dump(collected_results["podStatus"]["failed"]+collected_results["podStatus"]["skipped"]))
         if collected_results["podStatus"]["skipped"]:
-            raise TestWarn("found skipped peer pods", hint=collected_results["podStatus"]["skipped"])
+            raise TestWarn("found skipped peer pods", hint=yaml.safe_dump(collected_results["podStatus"]["skipped"]))
         tc_pod.success("all peer pods available")
 
 
