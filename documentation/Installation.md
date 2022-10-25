@@ -635,6 +635,9 @@ Addresses are taken from the following groups in order:
 1. Balancer
 1. Control-plane
 
+**Note**: VRRP IPs with `maintenance-type: "not bind"` do not participate in control_plain calculation.
+See [maintenance type](#maintenance-type).
+
 **Note**: It is important to notice that addresses may not necessarily be taken from a single group. There may be situation that the internal address is taken from the VRRP, and the external one from the Balancer. This situation is not recommended, but it is possible. If the inventory is correctly filled in and all the addresses that are available are indicated, the algorithm automatically selects the best pair of addresses.
 
 After detecting addresses, the algorithm automatically displays the determined addresses and their sources as follows:
@@ -645,7 +648,10 @@ Control plains:
    External: 10.101.1.101 (balancer "balancer-1")
 ```
 
-The algorithm chooses the very first address if there are several elements in the group. If you are not satisfied with this principle, you can "help" the algorithm in choosing which address to take by specifying the parameter `control_endpoint` for the group element. 
+#### control_endpoint
+
+The algorithm of [control_plain](#control_plain) calculation chooses the very first address if there are several elements in the group.
+If you are not satisfied with this principle, you can "help" the algorithm in choosing which address to take by specifying the parameter `control_endpoint` for the group element.
 For example:
 
 ```yaml
@@ -691,6 +697,8 @@ Control plains:
    Internal: 192.168.0.2 (vrrp_ip[1])
    External: 10.101.0.4 (balancer "balancer-2")
 ```
+
+**Note**: `control_endpoint` is not taken into account for VRRP IPs with `maintenance-type: "not bind"`.
 
 ### public_cluster_ip
 
