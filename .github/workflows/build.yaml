@@ -23,6 +23,7 @@ jobs:
           docker cp "${CONTAINER_ID}:/opt/kubemarine/kubemarine" kubemarines
           chmod +x kubemarines
           docker rm -v "${CONTAINER_ID}"
+      - name: Copy artifact
         uses: actions/upload-artifact@v3
         with:
           name: kubemarines
