@@ -20,12 +20,17 @@ jobs:
       - name: Build Binary via Docker
         run: docker build -t ${GITHUB_RUN_ID}_binary --build-arg BUILD_TYPE=binary --no-cache .
       - name: Copy Kubemarine
+        uses: actions/upload-artifact@v3
         run: |
           pwd
           CONTAINER_ID=$(docker create "${GITHUB_RUN_ID}_binary")
           docker cp "${CONTAINER_ID}:/home/runner/work/KubeMarine kubemarines
           chmod +x kubemarines
           docker rm -v "${CONTAINER_ID}"
+        with:
+          name: kubemarines
+          path: kubemarines
+          retention-days: 1
 
   build-package:
     runs-on: ubuntu-latest
