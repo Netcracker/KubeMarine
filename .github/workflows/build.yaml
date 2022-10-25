@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - '**'
+
 jobs:
   build-image:
     runs-on: ubuntu-latest
