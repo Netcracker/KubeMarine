@@ -207,8 +207,8 @@ class FakeResources(DynamicResources):
         self._fake_shell = fake_shell if fake_shell else FakeShell()
         self._fake_fs = fake_fs if fake_fs else FakeFS()
 
-    def _create_cluster(self):
-        return FakeKubernetesCluster(self.raw_inventory(), self.context,
+    def _new_cluster_instance(self, context: dict):
+        return FakeKubernetesCluster(self.raw_inventory(), context,
                                      procedure_inventory=self.procedure_inventory(),
                                      logger=self.logger(),
                                      fake_shell=self._fake_shell, fake_fs=self._fake_fs)
@@ -387,10 +387,6 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     elif os_name in ['ubuntu', 'debian']:
         os_family = 'debian'
 
-    nodes_context = {
-        "nodes": {}
-    }
-
     for node in inventory['nodes']:
         node_context = {
             'name': node['name'],
@@ -409,9 +405,9 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
         connect_to = node['internal_address']
         if node.get('address'):
             connect_to = node['address']
-        nodes_context['nodes'][connect_to] = node_context
+        context['nodes'][connect_to] = node_context
 
-    nodes_context['os'] = os_family
+    context['os'] = os_family
 
     # It is possible to disable FakeCluster and create real cluster Object for some business case
     if fake:
@@ -419,7 +415,7 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     else:
         cluster = KubernetesCluster(inventory, context)
 
-    cluster.enrich(nodes_context=nodes_context)
+    cluster.enrich()
     return cluster
 
 

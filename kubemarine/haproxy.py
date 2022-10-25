@@ -19,9 +19,21 @@ from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, but VRRP IP is not configured."
+
+
+def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
+    return bool(cluster.raw_inventory.get('services', {}).get('loadbalancer', {})
+                .get('haproxy', {}).get('maintenance_mode', False))
+
+
+def get_associations_for_node(node: dict) -> dict:
+    conn: NodeGroup = node['connection']
+    return conn.cluster.get_associations_for_node(node['connect_to'])['haproxy']
 
 
 def enrich_inventory(inventory, cluster):
@@ -48,15 +60,17 @@ def enrich_inventory(inventory, cluster):
             if not found:
                 raise Exception('Balancer is combined with other role, but there is no any VRRP IP configured for '
                                 'node \'%s\'.' % node['name'])
-        elif 'balancer' in node['roles'] and len(node['roles']) == 1:
-            not_bind = 0
-            if inventory["vrrp_ips"]:
-                for item in inventory["vrrp_ips"]:
-                    if isinstance(item, dict):
-                        if item.get('params', {}).get('maintenance-type', False) == 'not bind':
-                            not_bind += 1
-            if inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-                config_location = inventory['services']['packages']['associations']['haproxy']['config_location']
+        if 'balancer' in node['roles']:
+            not_bind = sum(1 for item in inventory["vrrp_ips"]
+                           if isinstance(item, dict)
+                           and item.get('params', {}).get('maintenance-type', False) == 'not bind')
+            is_mntc_mode = is_maintenance_mode(cluster)
+            if bool(not_bind) != is_mntc_mode:
+                raise Exception("Haproxy maintenance mode should be used when and only when "
+                                "there is at least one VRRP IP with 'maintenance-type: not bind'")
+
+            if is_mntc_mode:
+                config_location = get_associations_for_node(node)['config_location']
                 mntc_config_location = inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
                 # if 'maintenance_mode' is True then must be at least one IP without 'maintenance-type: not bind'
                 if not_bind == len(inventory["vrrp_ips"]):
@@ -68,11 +82,24 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
+def get_config_path(group: NodeGroup) -> NodeGroupResult:
+    with RemoteExecutor(group.cluster) as exe:
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            package_associations = get_associations_for_node(node)
+            cmd = f"systemctl show -p MainPID {package_associations['service_name']} " \
+                  f"| cut -d '=' -f2 " \
+                  f"| xargs -I PID sudo cat /proc/PID/environ " \
+                  f"| tr '\\0' '\\n' | grep CONFIG | cut -d \"=\" -f2 | tr -d '\\n'"
+            node['connection'].sudo(cmd)
+
+    return exe.get_merged_result()
+
+
 def install(group):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
-            group.sudo("%s -v" % package_associations['executable_name'], warn=True)
+            package_associations = get_associations_for_node(node)
+            node['connection'].sudo("%s -v" % package_associations['executable_name'], warn=True)
 
     haproxy_installed = True
     for host, host_results in exe.get_last_results().items():
@@ -85,7 +112,7 @@ def install(group):
     else:
         with RemoteExecutor(group.cluster) as exe:
             for node in group.get_ordered_members_list(provide_node_configs=True):
-                package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
+                package_associations = get_associations_for_node(node)
                 packages.install(node["connection"], include=package_associations['package_name'])
 
     service_name = package_associations['service_name']
@@ -101,7 +128,7 @@ def uninstall(group):
 
 def restart(group):
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        service_name = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']['service_name']
+        service_name = get_associations_for_node(node)['service_name']
         system.restart_service(node['connection'], name=service_name)
     RemoteExecutor(group.cluster).flush()
     group.cluster.log.debug("Sleep while haproxy comes-up...")
@@ -112,15 +139,15 @@ def restart(group):
 def disable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.disable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'])
+            service_name = get_associations_for_node(node)['service_name']
+            system.disable_service(node['connection'], name=service_name)
 
 
 def enable(group):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.enable_service(node['connection'], name=os_specific_associations['haproxy']['service_name'],
+            service_name = get_associations_for_node(node)['service_name']
+            system.enable_service(node['connection'], name=service_name,
                                   now=True)
 
 
@@ -159,14 +186,12 @@ def get_config(cluster, node, future_nodes, maintenance=False):
     if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
         return cluster.inventory['services']['loadbalancer']['haproxy']['config']
 
-    if maintenance:
-        config_file = utils.get_resource_absolute_path('templates/haproxy_mntc.cfg.j2', script_relative=True)
-    else:
-        config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
-        if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
-            config_file = utils.get_resource_absolute_path(
-                cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
-                script_relative=False)
+    config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
+    # todo support custom template for maintenance mode
+    if not maintenance and cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
+        config_file = utils.get_resource_absolute_path(
+            cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
+            script_relative=False)
 
     config_source = open(config_file).read()
 
@@ -177,26 +202,27 @@ def get_config(cluster, node, future_nodes, maintenance=False):
                                           config_options=config_options)
 
 
-def configure(group):
-    all_nodes_configs = group.cluster.nodes['all'].get_final_nodes().get_ordered_members_list(provide_node_configs=True)
+def configure(group: NodeGroup):
+    cluster = group.cluster
+    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_list(provide_node_configs=True)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        package_associations = group.cluster.get_associations_for_node(node['connect_to'])['haproxy']
+        package_associations = get_associations_for_node(node)
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-        group.cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node['name'])
-        config = get_config(group.cluster, node, all_nodes_configs)
-        utils.dump_file(group.cluster, config, 'haproxy_%s.cfg' % node['name'])
+        cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node['name'])
+        config = get_config(cluster, node, all_nodes_configs)
+        utils.dump_file(cluster, config, 'haproxy_%s.cfg' % node['name'])
         node['connection'].sudo('mkdir -p %s' % configs_directory)
         node['connection'].put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
         node['connection'].sudo('ls -la %s' % package_associations['config_location'])
 
         # add maintenance config to balancer if 'maintenance_mode' is True
-        if group.cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-            mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
-            group.cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node['name'])
-            mntc_config = get_config(group.cluster, node, all_nodes_configs, True)
-            utils.dump_file(group.cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node['name'])
+        if is_maintenance_mode(cluster):
+            mntc_config_location = cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
+            cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node['name'])
+            mntc_config = get_config(cluster, node, all_nodes_configs, True)
+            utils.dump_file(cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node['name'])
             node['connection'].sudo('mkdir -p %s' % configs_directory)
             node['connection'].put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True)
             node['connection'].sudo('ls -la %s' % mntc_config_location)
