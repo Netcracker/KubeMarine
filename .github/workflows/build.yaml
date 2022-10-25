@@ -21,9 +21,10 @@ jobs:
         run: docker build -t ${GITHUB_RUN_ID}_binary --build-arg BUILD_TYPE=binary --no-cache .
       - name: Copy Kubemarine
         run: |
+          pwd
           CONTAINER_ID=$(docker create "${GITHUB_RUN_ID}_binary")
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine
-          chmod +x kubemarine
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/bin" kubemarines
+          chmod +x kubemarines
           docker rm -v "${CONTAINER_ID}"
 
   build-package:
