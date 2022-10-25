@@ -27,7 +27,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: kubemarine
-          path: /opt/kubemarine/kubemarine/kubemarine
+          path: /opt/kubemarine/kubemarine/
 
 
   build-package:
