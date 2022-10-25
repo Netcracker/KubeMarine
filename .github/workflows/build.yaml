@@ -23,7 +23,7 @@ jobs:
         run: |
           pwd
           CONTAINER_ID=$(docker create "${GITHUB_RUN_ID}_binary")
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/bin" kubemarines
+          docker cp "${CONTAINER_ID}:/home/runner/work/KubeMarine/KubeMarine" kubemarines
           chmod +x kubemarines
           docker rm -v "${CONTAINER_ID}"
 
