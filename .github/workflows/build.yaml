@@ -23,11 +23,16 @@ jobs:
           docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine
           chmod +x kubemarine
           docker rm -v "${CONTAINER_ID}"
-      - name: Copy artifact
+      - name: Tar files
+        run: |
+          pwd
+          ls -la
+          tar -cvf kubemarine.tar kubemarine
+      - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine
-          path: kubemarine
+          name: kubemarine.tar
+          path: kubemarine.tar
 
 
   build-package:
