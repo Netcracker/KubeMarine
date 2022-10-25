@@ -20,15 +20,15 @@ jobs:
         run: |
           docker build -t kubemarine_binary --build-arg BUILD_TYPE=binary --no-cache .
           CONTAINER_ID=$(docker create "kubemarine_binary")
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" ./kubemarine
-          chmod +x kubemarine
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine_linux
+          chmod +x kubemarine_linux
           docker rm -v "${CONTAINER_ID}"
           ls -la
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine
-          path: kubemarine
+          name: kubemarine_linux
+          path: kubemarine_linux
 
 
   build-package:
