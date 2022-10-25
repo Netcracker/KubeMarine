@@ -26,7 +26,7 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         print("Inventory: " + str(inventory))
         cluster = demo.new_cluster(inventory)
-        haproxy.enrich_inventory(cluster.inventory, None)
+        haproxy.enrich_inventory(cluster.inventory, cluster)
 
     def test_inventory_verify_multirole_balancer_without_keepalived(self):
         inventory = demo.generate_inventory(master=3, balancer=['master-1', 'master-2', 'master-3'],
