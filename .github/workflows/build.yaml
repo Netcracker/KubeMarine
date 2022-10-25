@@ -17,8 +17,9 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v2
       - name: Build Binary via Docker
-        run: |
-          docker build -t ${GITHUB_RUN_ID}_binary --build-arg BUILD_TYPE=binary --no-cache .
+        run: docker build -t ${GITHUB_RUN_ID}_binary --build-arg BUILD_TYPE=binary --no-cache .
+      - name: Copy Kubemaribe
+        rub: |
           CONTAINER_ID=$(docker create "${GITHUB_RUN_ID}_binary")
           docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine
           chmod +x kubemarine
