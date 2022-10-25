@@ -18,21 +18,17 @@ jobs:
         uses: actions/checkout@v2
       - name: Build Binary via Docker
         run: |
-          docker build -t ${GITHUB_RUN_ID}_binary --build-arg BUILD_TYPE=binary --no-cache .
-          CONTAINER_ID=$(docker create "${GITHUB_RUN_ID}_binary")
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine
+          docker build -t kubemarine_binary --build-arg BUILD_TYPE=binary --no-cache .
+          CONTAINER_ID=$(docker create "kubemarine_binary")
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" ./kubemarine
           chmod +x kubemarine
           docker rm -v "${CONTAINER_ID}"
-      - name: Tar files
-        run: |
-          pwd
           ls -la
-          tar -cvf kubemarine.tar kubemarine
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine.tar
-          path: kubemarine.tar
+          name: kubemarine
+          path: kubemarine
 
 
   build-package:
