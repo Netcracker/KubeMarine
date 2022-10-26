@@ -101,10 +101,13 @@ def cache_installed_packages(cluster):
 
     # avoid caching when unchanged nodes are not equal to GLOBAL os
     global_os = system.get_os_family(cluster)
-    for node in cluster.nodes['all'].get_unchanged_nodes().get_ordered_members_list(provide_node_configs=True):
-        if cluster.context["nodes"][node['connect_to']]["os"]['family'] != global_os:
+    for nodes in cluster.nodes['all'].get_first_member().get_ordered_members_list(provide_node_configs=True):
+        version_os = cluster.context["nodes"][nodes['connect_to']]["os"]['version']
+    for node in cluster.nodes['all'].get_changed_nodes().get_ordered_members_list(provide_node_configs=True):
+        if cluster.context["nodes"][node['connect_to']]["os"]['family'] != global_os \
+                or cluster.context["nodes"][node['connect_to']]["os"]['version'] != version_os:
             cluster.log.debug(f"New node has different OS ({global_os}) "
-                              f"than some other nodes ({cluster.context['nodes'][node['connect_to']]['os']['family']}), "
+                              f"than some other nodes ({cluster.context['nodes'][node['connect_to']]['os']['version']}), "
                               "packages will not be cached.")
             return
 
