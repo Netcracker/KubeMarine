@@ -28,7 +28,6 @@ jobs:
         with:
           name: kubemarine
           path: ./dist/linux
-
   build-package:
     runs-on: ubuntu-latest
     steps:
