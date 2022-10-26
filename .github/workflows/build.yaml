@@ -22,12 +22,12 @@ jobs:
       - name: PyInstaller Linux
         uses: JackMcKew/pyinstaller-action-linux@0.1.4
         with:
-          path: src
+          path: .
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: kubemarine
-          path: src/dist/linux
+          path: ./dist/linux
 
   build-package:
     runs-on: ubuntu-latest
