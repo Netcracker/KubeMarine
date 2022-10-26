@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install requirements
         run: |
+          echo ${GITHUB_ACTION_PATH}
           pwd
           ls -la
           pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt
