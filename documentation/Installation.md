@@ -2623,7 +2623,7 @@ The following settings are supported:
     <td>By enabling ready, an HTTP endpoint on port 8181 returns 200 OK when all plugins that are able to signal readiness have done so. If some are not ready, the endpoint still returns a 503 with the body containing the list of plugins that are not ready. Once a plugin has signaled that it is ready, it is not queried again.</td>
   </tr>
   <tr>
-    <td>Prometheus</td>
+    <td>prometheus</td>
     <td>string</td>
     <td>:9153</td>
     <td>With Prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics</td>
