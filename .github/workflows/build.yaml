@@ -20,16 +20,15 @@ jobs:
         run: |
           pip3 install --no-cache-dir -r ./requirements_nt.txt
       - name: PyInstaller win64
-        id: win64
-        uses: action-python/pyinstaller-py3.8@win64
+        uses: JackMcKew/pyinstaller-action-windows@main
         with:
           path: .
           requirements: "requirements_nt.txt"
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine.exe
-          path: ./dist/windows/win64/
+          name: kubemarine
+          path: ./dist/windows/
   build-package:
     runs-on: ubuntu-latest
     steps:
