@@ -1,0 +1,13 @@
+PyYAML==6.0
+deepmerge==1.0.*
+fabric==2.6.*
+jinja2==2.11.*
+MarkupSafe==2.0.*
+invoke==1.6.*
+ruamel.yaml==0.17.*
+pygelf==0.4.*
+toml==0.10.*
+python-dateutil==2.8.*
+deepdiff==5.7.*
+# Unix specific dependencies
+ansible==4.2.*
