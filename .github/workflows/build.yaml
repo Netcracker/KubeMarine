@@ -17,7 +17,10 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v2
       - name: Install requirements
-        run: pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt
+        run: |
+          pwd
+          ls -la
+          pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt
       - name: PyInstaller Linux
         uses: JackMcKew/pyinstaller-action-linux@0.1.4
         with:
