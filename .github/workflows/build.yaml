@@ -18,10 +18,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install requirements
         run: |
-          echo ${GITHUB_ACTION_PATH}
-          pwd
-          ls -la
-          pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt
+          pip3 install --no-cache-dir -r /{GITHUB_ACTION_PATH}/requirements.txt
       - name: PyInstaller Linux
         uses: JackMcKew/pyinstaller-action-linux@0.1.4
         with:
