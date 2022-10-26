@@ -23,7 +23,7 @@ jobs:
         id: win64
         uses: action-python/pyinstaller-py3.8@win64
         with:
-          path: .
+          path: ./requirements_nt.txt
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
