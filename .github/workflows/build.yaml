@@ -16,13 +16,10 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: Build Binary via Docker
-        run: |
-          docker build -t kubemarine_binary --build-arg BUILD_TYPE=binary --no-cache .
-          CONTAINER_ID=$(docker create "kubemarine_binary")
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine_linux
-          chmod +x kubemarine_linux
-          docker rm -v "${CONTAINER_ID}"
+      - name: PyInstaller Linux
+        uses: JackMcKew/pyinstaller-action-linux@0.1.4
+        with:
+          path: src
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
