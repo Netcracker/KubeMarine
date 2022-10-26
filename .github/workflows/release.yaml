@@ -14,8 +14,9 @@ jobs:
       - name: Install requirements
         run: |
           pip3 install --no-cache-dir -r /home/runner/work/KubeMarine/KubeMarine/requirements.txt
-      - name: PyInstaller Linux
-        uses: JackMcKew/pyinstaller-action-linux@0.1.4
+      - name: PyInstaller Linux amd64
+        id: amd64
+        uses: action-python/pyinstaller-py3.8@amd64
         with:
           path: .
       - name: Create Release
@@ -25,7 +26,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          release_name: ${{ github.ref }}
           draft: true
           prerelease: true
       - name: Upload Release Asset
@@ -34,7 +35,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/linux
-          asset_name: kubemarine
-          asset_content_type: application/bin
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            asset_path: ${{ steps.amd64.outputs.location }}
+            asset_name: ${{ steps.amd64.outputs.filename }}
+            asset_content_type: ${{ steps.amd64.outputs.content_type }}
