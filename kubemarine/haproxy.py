@@ -23,7 +23,8 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
-ERROR_VRRP_IS_NOT_CONFIGURED = "Balancer is combined with other role, but VRRP IP is not configured."
+ERROR_VRRP_IS_NOT_CONFIGURED = \
+    'Balancer is combined with other role, but there is no VRRP IP configured for node \'%s\'.'
 
 
 def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
@@ -36,48 +37,69 @@ def get_associations_for_node(node: dict) -> dict:
     return conn.cluster.get_associations_for_node(node['connect_to'])['haproxy']
 
 
+def _is_vrrp_not_bind(vrrp_item: dict):
+    return vrrp_item.get('params', {}).get('maintenance-type', '') == 'not bind'
+
+
+def _get_bindings(inventory: dict, node: dict, *, maintenance: bool):
+    # bindings list for common config and maintenance should be different
+    if not maintenance and len(node['roles']) == 1:
+        return ["0.0.0.0", '::']
+
+    # If we have combination of balancer-control-plane / balancer-worker or if haproxy is in maintenance mode,
+    # VRRP IP should be defined for the given balancer.
+    # In maintenance mode it should also be not "not bind".
+
+    bindings = []
+    for item in inventory['vrrp_ips']:
+        # skip IPs with type 'not bind' in maintenance mode
+        if maintenance and _is_vrrp_not_bind(item):
+            continue
+        for record in item['hosts']:
+            if record['name'] == node['name']:
+                bindings.append(item['ip'])
+
+    if len(node['roles']) == 1:
+        # In maintenance mode and if balancer is not combined with some other role,
+        # we can listen also own internal address of the balancer
+        bindings.append(node['internal_address'])
+
+    # remove duplicates
+    return list(set(bindings))
+
+
 def enrich_inventory(inventory, cluster):
 
     for node in inventory["nodes"]:
-        # todo what if balancer is removed? It will have roles=['balancer', 'remove_node']
-        if 'balancer' in node['roles'] and len(node['roles']) > 1:
+        if 'balancer' not in node['roles']:
+            continue
 
-            # ok, seems we have combination of balancer-control-plane / balancer-worker
-            # in that case VRRP IP should be defined
+        # todo what if balancer is removed? It will have roles=['balancer', 'remove_node'].
+        #  It should probably also not participate in other vrrp_ips validation.
 
-            # let's check vrrp ip section is defined
-            if not inventory["vrrp_ips"]:
-                raise Exception(ERROR_VRRP_IS_NOT_CONFIGURED)
+        regular_bindings = _get_bindings(inventory, node, maintenance=False)
+        if not regular_bindings:
+            raise Exception(ERROR_VRRP_IS_NOT_CONFIGURED % node['name'])
 
-            found = False
-            # let's check we have current balancer to be defined in vrrp ip hosts:
-            for item in inventory["vrrp_ips"]:
-                for record in item['hosts']:
-                    if record['name'] == node['name']:
-                        # seems there is at least 1 vrrp ip for current balancer
-                        found = True
+        is_mntc_mode = is_maintenance_mode(cluster)
+        mntc_bindings = _get_bindings(inventory, node, maintenance=True)
+        if is_mntc_mode and not mntc_bindings:
+            raise Exception(
+                f'No suitable bindings found for haproxy in maintenance mode for node \'{node["name"]}\'. '
+                f'Balancer is combined with other role and has no configured VRRP IP '
+                f'that is not marked with maintenance-type: "not bind"')
 
-            if not found:
-                raise Exception('Balancer is combined with other role, but there is no any VRRP IP configured for '
-                                'node \'%s\'.' % node['name'])
-        if 'balancer' in node['roles']:
-            not_bind = sum(1 for item in inventory["vrrp_ips"]
-                           if isinstance(item, dict)
-                           and item.get('params', {}).get('maintenance-type', False) == 'not bind')
-            is_mntc_mode = is_maintenance_mode(cluster)
-            if bool(not_bind) != is_mntc_mode:
-                raise Exception("Haproxy maintenance mode should be used when and only when "
-                                "there is at least one VRRP IP with 'maintenance-type: not bind'")
+        not_bind = sum(1 for item in inventory["vrrp_ips"] if _is_vrrp_not_bind(item))
+        if bool(not_bind) != is_mntc_mode:
+            raise Exception("Haproxy maintenance mode should be used when and only when "
+                            "there is at least one VRRP IP with 'maintenance-type: not bind'")
 
-            if is_mntc_mode:
-                config_location = get_associations_for_node(node)['config_location']
-                mntc_config_location = inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
-                # if 'maintenance_mode' is True then must be at least one IP without 'maintenance-type: not bind'
-                if not_bind == len(inventory["vrrp_ips"]):
-                    raise Exception("Balancer maintenance mode needes at least one VRRP IP without 'maintenance-type: not bind'")
-                # if 'maintenance_mode' is True then maintenance config and default config must be stored in different files'
-                if mntc_config_location == config_location:
-                    raise Exception("Maintenance mode configuration file must be different with default configuration file")
+        if is_mntc_mode:
+            config_location = get_associations_for_node(node)['config_location']
+            mntc_config_location = inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
+            # if 'maintenance_mode' is True then maintenance config and default config must be stored in different files'
+            if mntc_config_location == config_location:
+                raise Exception("Maintenance mode configuration file must be different with default configuration file")
 
     return inventory
 
@@ -107,19 +129,21 @@ def install(group):
             haproxy_installed = False
 
     if haproxy_installed:
-        # TODO: Add Haproxy version output from previous command to method results
         group.cluster.log.debug("HAProxy already installed, nothing to install")
+        installation_result = exe.get_last_results_str()
     else:
         with RemoteExecutor(group.cluster) as exe:
             for node in group.get_ordered_members_list(provide_node_configs=True):
                 package_associations = get_associations_for_node(node)
                 packages.install(node["connection"], include=package_associations['package_name'])
 
+        installation_result = exe.get_last_results_str()
+
     service_name = package_associations['service_name']
     patch_path = utils.get_resource_absolute_path("./resources/drop_ins/haproxy.conf", script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     enable(group)
-    return exe.get_last_results_str()
+    return installation_result
 
 
 def uninstall(group):
@@ -151,51 +175,24 @@ def enable(group):
                                   now=True)
 
 
-def get_config(cluster, node, future_nodes, maintenance=False):
+def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance=False):
 
-    bindings = []
-    # bindings list for common config and maintenance should be different
-    if maintenance:
-        for item in cluster.inventory['vrrp_ips']:
-            if isinstance(item, dict):
-                if not item.get('params', {}).get('maintenance-type', False):
-                    # add unmarked IPs
-                    bindings.append(item['ip'])
-                elif item.get('params', {}).get('maintenance-type', False) != 'not bind':
-                    # add IPs with type different from 'not bind'
-                    # that is the temporary solution
-                    bindings.append(item['ip'])
-            elif isinstance(item, str):
-                    # add unmarked IPs
-                    bindings.append(item)
-            else:
-                raise Exception("Error in VRRP IPs description") 
-    else:
-        if len(node['roles']) == 1 or not cluster.inventory['vrrp_ips']:
-            bindings.append("0.0.0.0")
-            bindings.append("::")
-        else:
-            for item in cluster.inventory['vrrp_ips']:
-                for record in item['hosts']:
-                    if record['name'] == node['name']:
-                        bindings.append(item['ip'])
+    inventory = cluster.inventory
+    bindings = _get_bindings(inventory, node, maintenance=maintenance)
 
-    # remove duplicates
-    bindings = list(set(bindings))
-
-    if cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
-        return cluster.inventory['services']['loadbalancer']['haproxy']['config']
+    if inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
+        return inventory['services']['loadbalancer']['haproxy']['config']
 
     config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
     # todo support custom template for maintenance mode
-    if not maintenance and cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
+    if not maintenance and inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
         config_file = utils.get_resource_absolute_path(
-            cluster.inventory['services']['loadbalancer']['haproxy']['config_file'],
+            inventory['services']['loadbalancer']['haproxy']['config_file'],
             script_relative=False)
 
     config_source = open(config_file).read()
 
-    config_options = cluster.inventory['services'].get('loadbalancer', {}).get('haproxy', {})
+    config_options = inventory['services'].get('loadbalancer', {}).get('haproxy', {})
 
     return Template(config_source).render(nodes=future_nodes,
                                           bindings=bindings,

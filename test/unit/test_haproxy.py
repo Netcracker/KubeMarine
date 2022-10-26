@@ -37,7 +37,7 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             demo.new_cluster(inventory)
 
-        self.assertIn(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED, str(cm.exception), "Invalid exception message")
+        self.assertEqual(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED % 'master-1', str(cm.exception), "Invalid exception message")
 
 
 class TestHaproxyInstallation(unittest.TestCase):
@@ -68,10 +68,9 @@ class TestHaproxyInstallation(unittest.TestCase):
         actual_result = haproxy.install(cluster.nodes['balancer'])
 
         # verify installation result should be the same as simulated and contain version print stdout
-        expected_results_1 = cluster.nodes["all"]._make_result(expected_results_1)
+        expected_results_1 = get_result_str(expected_results_1)
 
-        # TODO: this section is not compatible with RemoteExecutor yet
-        # self.assertEqual(expected_results, actual_result)
+        self.assertEqual(expected_results_1, actual_result)
 
     def test_haproxy_installation_when_not_installed(self):
         inventory = demo.generate_inventory(**demo.FULLHA)
