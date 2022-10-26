@@ -26,8 +26,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine_linux
-          path: kubemarine_linux
+          name: kubemarine
+          path: src/dist/linux
 
   build-package:
     runs-on: ubuntu-latest
