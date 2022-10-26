@@ -28,8 +28,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine
-          path: ./dist/linux/win64/
+          name: kubemarine.exe
+          path: ./dist/windows/win64/
   build-package:
     runs-on: ubuntu-latest
     steps:
