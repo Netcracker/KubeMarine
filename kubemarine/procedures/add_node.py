@@ -99,18 +99,35 @@ def cache_installed_packages(cluster):
     so that new nodes install exactly the same packages as on other already existing nodes.
     """
 
-    # avoid caching when unchanged nodes are not equal to GLOBAL os
-    global_os = system.get_os_family(cluster)
-    for nodes in cluster.nodes['all'].get_first_member().get_ordered_members_list(provide_node_configs=True):
-        version_os = cluster.context["nodes"][nodes['connect_to']]["os"]['version']
+    version_os = []
+    family_os = []
+    for nodes in cluster.nodes['all'].get_unchanged_nodes().get_ordered_members_list(provide_node_configs=True):
+        version_os.append(cluster.context["nodes"][nodes['connect_to']]["os"]['version'])
+        family_os.append(cluster.context["nodes"][nodes['connect_to']]["os"]['family'])
     for node in cluster.nodes['all'].get_changed_nodes().get_ordered_members_list(provide_node_configs=True):
-        if cluster.context["nodes"][node['connect_to']]["os"]['family'] != global_os \
-                or cluster.context["nodes"][node['connect_to']]["os"]['version'] != version_os:
-            cluster.log.debug(f"New node has different OS ({global_os}) "
-                              f"than some other nodes ({cluster.context['nodes'][node['connect_to']]['os']['version']}), "
-                              "packages will not be cached.")
+        if cluster.context["nodes"][node['connect_to']]["os"]['family'] not in family_os:
+            cluster.log.debug(f"New node has different OS ({cluster.context['nodes'][node['connect_to']]['os']['family']}) "
+                              f"than some other nodes, "
+                             "packages will not be cached.")
             return
-
+        elif cluster.context["nodes"][node['connect_to']]["os"]['family'] in family_os \
+            and cluster.context["nodes"][node['connect_to']]["os"]['version'] not in version_os:
+            cluster.log.debug(
+                f"New node has different OS Version ({cluster.context['nodes'][node['connect_to']]['os']['family']},"
+                f"{cluster.context['nodes'][node['connect_to']]['os']['version']}) "
+                f"than some other nodes, "
+                "packages will not be cached.")
+            return
+        elif cluster.context["nodes"][node['connect_to']]["os"]['family'] in family_os \
+             and cluster.context["nodes"][node['connect_to']]["os"]['version'] in version_os:
+            for old_version_os in version_os:
+                if cluster.context["nodes"][node['connect_to']]["os"]['version'] != old_version_os:
+                    cluster.log.debug(
+                        f"New node has different OS Version ({cluster.context['nodes'][node['connect_to']]['os']['family']},"
+                        f"{cluster.context['nodes'][node['connect_to']]['os']['version']}) "
+                        f"than some other nodes, "
+                        "packages will not be cached.")
+                    return
     # Cache packages only if it's set in configuration
     if cluster.inventory['services']['packages']['cache_versions']:
         cluster.cache_package_versions()
