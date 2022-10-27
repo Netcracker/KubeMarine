@@ -28,8 +28,8 @@ def new(log, root=None):
     env.filters['majorversion'] = lambda version: precompile(log, version, root).split('.')[0]
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'
-    env.filters['is_true'] = lambda v: True if (v in ['true','True','TRUE'] or v == True) else False
-    env.filters['is_false'] = lambda v: True if (v in ['false','False','FALSE'] or v == False) else False
+    env.filters['is_true'] = lambda v: v in ['true', 'True', 'TRUE', True]
+    env.filters['is_false'] = lambda v: v in ['false', 'False', 'FALSE', False]
     return env
 
 
