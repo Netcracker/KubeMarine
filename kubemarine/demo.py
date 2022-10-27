@@ -419,8 +419,8 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     return cluster
 
 
-def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
-    inventory = {
+def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mntc=0):
+    inventory: dict = {
         'node_defaults': {
             'keyfile': '/dev/null',
             'username': 'anonymous'
@@ -466,14 +466,38 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
             'roles': roles
         })
 
-    if isinstance(keepalived, int):
-        ips = []
-        if keepalived > 0:
-            for i in range(0, keepalived):
-                ips.append('10.101.2.%s' % (i + 1))
-        keepalived = ips
+    ip_i = 0
+    vrrp_ips = []
 
-    inventory['vrrp_ips'] = keepalived
+    if isinstance(keepalived, list):
+        vrrp_ips.append(deepcopy(keepalived))
+    elif isinstance(keepalived, int) and keepalived > 0:
+        for _ in range(keepalived):
+            ip_i = ip_i + 1
+            vrrp_ips.append('10.101.2.%s' % ip_i)
+
+    if isinstance(haproxy_mntc, list):
+        vrrp_ips.append(deepcopy(haproxy_mntc))
+    elif isinstance(haproxy_mntc, int) and haproxy_mntc > 0:
+        for _ in range(haproxy_mntc):
+            ip_i = ip_i + 1
+            vrrp_ips.append({
+                'ip': '10.101.2.%s' % ip_i,
+                'params': {
+                    'maintenance-type': 'not bind'
+                }
+            })
+
+    if haproxy_mntc:
+        inventory['services'] = {
+            'loadbalancer' : {
+                'haproxy': {
+                    'maintenance_mode': True
+                }
+            }
+        }
+
+    inventory['vrrp_ips'] = vrrp_ips
 
     return inventory
 
@@ -508,10 +532,17 @@ def empty_action(*args, **kwargs) -> None:
     pass
 
 
+def new_scheme(scheme: dict, role: str, number: int):
+    scheme = deepcopy(scheme)
+    scheme[role] = number
+    return scheme
+
+
 FULLHA = {'balancer': 1, 'master': 3, 'worker': 3}
 FULLHA_KEEPALIVED = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
 FULLHA_NOBALANCERS = {'balancer': 0, 'master': 3, 'worker': 3}
-ALLINONE = {'master': 1}
+ALLINONE = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
 MINIHA = {'master': 3}
 MINIHA_KEEPALIVED = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
                      'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
+NON_HA_BALANCER = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}

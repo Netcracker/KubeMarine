@@ -22,22 +22,44 @@ from kubemarine import demo
 
 class HAProxyDefaultsEnrichment(unittest.TestCase):
 
-    def test_correct_inventory(self):
-        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        print("Inventory: " + str(inventory))
-        cluster = demo.new_cluster(inventory)
-        haproxy.enrich_inventory(cluster.inventory, cluster)
+    def test_correct_inventories(self):
+        correct_schemes = [
+            demo.MINIHA_KEEPALIVED,
+            demo.FULLHA_KEEPALIVED,
+            demo.ALLINONE,
+            demo.NON_HA_BALANCER,
+        ]
+        for schema in correct_schemes:
+            for try_mntc in (False, True):
+                if try_mntc:
+                    schema = demo.new_scheme(schema, 'haproxy_mntc', 1)
 
-    def test_inventory_verify_multirole_balancer_without_keepalived(self):
-        inventory = demo.generate_inventory(master=3, balancer=['master-1', 'master-2', 'master-3'],
-                                            worker=['master-1', 'master-2', 'master-3'], keepalived=0)
+                inventory = demo.generate_inventory(**schema)
+                print("Inventory: " + str(inventory))
+                # enrichment should not fail
+                demo.new_cluster(inventory)
 
-        print("Inventory: " + str(inventory))
+    def test_incorrect_inventory_without_keepalived(self):
+        incorrect_schemes = [
+            demo.new_scheme(demo.MINIHA_KEEPALIVED, 'keepalived', 0),
+            demo.new_scheme(demo.ALLINONE, 'keepalived', 0),
+        ]
+        for schema in incorrect_schemes:
+            for try_mntc in (False, True):
+                if try_mntc:
+                    schema = demo.new_scheme(schema, 'haproxy_mntc', 1)
+                inventory = demo.generate_inventory(**schema)
+                print("Inventory: " + str(inventory))
 
-        with self.assertRaises(Exception) as cm:
-            demo.new_cluster(inventory)
+                with self.assertRaises(Exception) as cm:
+                    demo.new_cluster(inventory)
 
-        self.assertEqual(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED % 'master-1', str(cm.exception), "Invalid exception message")
+                if try_mntc:
+                    self.assertEqual(haproxy.ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC % 'master-1', str(cm.exception),
+                                     "Invalid exception message")
+                else:
+                    self.assertEqual(haproxy.ERROR_VRRP_IS_NOT_CONFIGURED % 'master-1', str(cm.exception),
+                                     "Invalid exception message")
 
 
 class TestHaproxyInstallation(unittest.TestCase):

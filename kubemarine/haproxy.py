@@ -26,6 +26,11 @@ from kubemarine.core.group import NodeGroupResult, NodeGroup
 ERROR_VRRP_IS_NOT_CONFIGURED = \
     'Balancer is combined with other role, but there is no VRRP IP configured for node \'%s\'.'
 
+ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC = \
+    'No suitable bindings found for haproxy in maintenance mode for node \'%s\'. ' \
+    'Balancer is combined with other role and has no configured VRRP IP ' \
+    'that is not marked with maintenance-type: "not bind"'
+
 
 def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
     return bool(cluster.raw_inventory.get('services', {}).get('loadbalancer', {})
@@ -84,10 +89,7 @@ def enrich_inventory(inventory, cluster):
         is_mntc_mode = is_maintenance_mode(cluster)
         mntc_bindings = _get_bindings(inventory, node, maintenance=True)
         if is_mntc_mode and not mntc_bindings:
-            raise Exception(
-                f'No suitable bindings found for haproxy in maintenance mode for node \'{node["name"]}\'. '
-                f'Balancer is combined with other role and has no configured VRRP IP '
-                f'that is not marked with maintenance-type: "not bind"')
+            raise Exception(ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC % node["name"])
 
         not_bind = sum(1 for item in inventory["vrrp_ips"] if _is_vrrp_not_bind(item))
         if bool(not_bind) != is_mntc_mode:
