@@ -50,7 +50,7 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate already installed haproxy package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='Haproxy v1.2.3')
-        cluster.fake_shell.add(expected_results_1, 'sudo', [' %s -v' % package_associations['executable_name']])
+        cluster.fake_shell.add(expected_results_1, 'run', ['%s -v' % package_associations['executable_name']])
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
@@ -83,7 +83,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         missing_package_command = ['%s -v' % package_associations['executable_name']]
         missing_package_result = demo.create_nodegroup_result(cluster.nodes['balancer'],
                                                               code=127, stderr='Command haproxy not found')
-        cluster.fake_shell.add(missing_package_result, 'sudo', missing_package_command)
+        cluster.fake_shell.add(missing_package_result, 'run', missing_package_command)
 
         # simulate package installation
         installation_command = ['yum install -y %s; rpm -q %s; if [ $? != 0 ]; then echo '
