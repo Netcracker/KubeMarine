@@ -50,7 +50,7 @@ class TestHaproxyInstallation(unittest.TestCase):
 
         # simulate already installed haproxy package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='Haproxy v1.2.3')
-        cluster.fake_shell.add(expected_results_1, 'run', ['%s -v' % package_associations['executable_name']])
+        cluster.fake_shell.add(expected_results_1, 'sudo', [' %s -v' % package_associations['executable_name']])
 
         # simulate mkdir command
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
@@ -80,7 +80,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         package_associations = cluster.inventory['services']['packages']['associations']['haproxy']
 
         # simulate haproxy package missing
-        missing_package_command = ['bash %s -v' % package_associations['executable_name']]
+        missing_package_command = ['%s -v' % package_associations['executable_name']]
         missing_package_result = demo.create_nodegroup_result(cluster.nodes['balancer'],
                                                               code=127, stderr='Command haproxy not found')
         cluster.fake_shell.add(missing_package_result, 'sudo', missing_package_command)
