@@ -98,12 +98,13 @@ def cache_installed_packages(cluster):
     It is called first during "add_node" procedure,
     so that new nodes install exactly the same packages as on other already existing nodes.
     """
-
-    if len(set(((cluster.context["nodes"][node['connect_to']]["os"]['family']), (cluster.context["nodes"][node['connect_to']]["os"]['version']))
-               for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True))) > 1:
+    different_os = len(set(((cluster.context["nodes"][node['connect_to']]["os"]['family']), (cluster.context["nodes"][node['connect_to']]["os"]['version']))
+               for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)))
+    if different_os > 1:
         cluster.log.debug(f"New node has different OS"
                           f"than some other nodes, "
                           "packages will not be cached.")
+        cluster.log.debug("Count different OS %d ", different_os)
         return
     # Cache packages only if it's set in configuration
     if cluster.inventory['services']['packages']['cache_versions']:
