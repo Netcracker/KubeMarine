@@ -19,7 +19,7 @@ from typing import Dict, List, Union
 import fabric
 import yaml
 
-from kubemarine.core import log, defaults, utils
+from kubemarine.core import log, utils
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup
@@ -58,20 +58,12 @@ class KubernetesCluster(Environment):
         # connection pool should be created every time, because it is relied on partially enriched inventory
         self._connection_pool = ConnectionPool(self)
 
-    def enrich(self, nodes_context: dict = None, custom_enrichment_fns: List[str] = None):
-        # if nodes context is explicitly supplied, let's copy it first.
-        if nodes_context is not None:
-            self.context['nodes'] = deepcopy(nodes_context['nodes'])
-            self.context['os'] = deepcopy(nodes_context['os'])
-
+    def enrich(self, custom_enrichment_fns: List[str] = None):
         # do not make dumps for custom enrichment functions, because result is generally undefined
         make_dumps = custom_enrichment_fns is None
-        self._inventory = defaults.enrich_inventory(self, self.raw_inventory,
-                                                    make_dumps=make_dumps, custom_fns=custom_enrichment_fns)
-
-        # detect nodes context automatically, after enrichment is done to ensure that node groups are initialized
-        if nodes_context is None:
-            self._detect_nodes_context()
+        from kubemarine.core import defaults
+        self._inventory = defaults.enrich_inventory(
+            self, self.raw_inventory, make_dumps=make_dumps, custom_fns=custom_enrichment_fns)
 
     @property
     def inventory(self) -> dict:
@@ -108,6 +100,9 @@ class KubernetesCluster(Environment):
                         'connect_to': node.get('connect_to')
                     }
         return result
+
+    def get_node(self, host: Union[str, fabric.connection.Connection]) -> dict:
+        return self.make_group([host]).get_first_member(provide_node_configs=True)
 
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         addresses = self.get_addresses_from_node_names(node_names)
@@ -159,7 +154,8 @@ class KubernetesCluster(Environment):
             "kubemarine.core.defaults.calculate_nodegroups"
         ]
 
-    def _detect_nodes_context(self) -> None:
+    def detect_nodes_context(self) -> dict:
+        """The method should fetch only node specific information that is not changed during Kubemarine run"""
         self.log.debug('Start detecting nodes context...')
 
         for node in self.nodes['all'].get_ordered_members_list(provide_node_configs=True):
@@ -181,6 +177,7 @@ class KubernetesCluster(Environment):
         self.log.verbose('OS family check finished')
 
         self.log.debug('Detecting nodes context finished!')
+        return {k: deepcopy(self.context[k]) for k in ('nodes', 'os')}
 
     def _gather_facts_after(self):
         self.log.debug('Gathering facts after tasks execution started...')
@@ -363,6 +360,7 @@ class KubernetesCluster(Environment):
     def dump_finalized_inventory(self):
         self._gather_facts_after()
         # TODO: rewrite the following lines as deenrichment functions like common enrichment mechanism
+        from kubemarine.core import defaults
         from kubemarine.procedures import remove_node
         from kubemarine import controlplane
         prepared_inventory = remove_node.remove_node_finalize_inventory(self, self.inventory)
