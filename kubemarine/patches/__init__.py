@@ -22,7 +22,11 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_migrate_not_bind_vrrp import MigrateNotBindVRRP
+from kubemarine.patches.p2_haproxy_maintenance_listen_internal import HaproxyMaintenanceListenInternal
 
 patches: List[Patch] = [
+    MigrateNotBindVRRP(),
+    HaproxyMaintenanceListenInternal(),
 ]
 """List of patches which can be executed strictly in the declared order"""

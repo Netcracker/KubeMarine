@@ -57,6 +57,7 @@ This section provides information about the Kubecheck functionality.
     - [223 Default services health status](#223-default-services-health-status)
     - [224 Calico configuration check](#224-calico-configuration-check)
     - [225 Pod security admission status](#225-pod-security-admission-status)
+    - [226 Geo connectivity status](#226-geo-connectivity-status)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -105,12 +106,18 @@ The final report is generated in a file. For more information, see [Report File 
 Check procedure execution form CLI can be started with the following command:
 
 ```bash
-kubemarine check %{CHECK_TYPE}
-kubemarine check iaas
-kubemarine check paas
+kubemarine check_iaas
+kubemarine check_paas
 ```
 
 It begins the execution of all tasks available in the procedure in accordance with the procedure type. For more information about how a tasks list can be redefined, see [Tasks List Redefinition](Installation.md#tasks-list-redefinition) in _Kubemarine Installation Procedure_.
+
+**Note:** some `paas` checks work only if additional configuration file is provided.
+Without additional configuration, such checks will be skipped without warning. 
+See particular check documentation for configuration format. Following is an example of passing procedure config file:
+```bash
+kubemarine check_paas procedure.yaml
+```
 
 ### Check Procedures
 
@@ -530,6 +537,21 @@ This test checks the configuration of the `calico-node` envs, Calico's ConfigMap
 *Task*: `kubernetes.admission`
 
 The test checks status of Pod Security Admissions, default PSS(Pod Security Standards) profile and match consistance between 'cluster.yaml' and current Kubernetes configuration. Also it check consistancy between 'kube-apiserver.yaml' and 'kubeadm-config'.
+
+###### 226 Geo connectivity status
+
+*Task*: `geo_monitor`
+
+The task checks status of DNS resolving, pod-to-service and pod-to-pod connectivity between cluster in geographically
+distributed schemas. This task works only if procedure config file is provided with information about `paas-geo-monitor`,
+at least service name and namespace. For example:
+```yaml
+geo-monitor:
+  namespace: site-manager
+  service: paas-geo-monitor
+```
+
+For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
 
 ### Report File Generation
 

@@ -776,6 +776,9 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
 
     cluster.log.debug("Running helm chart %s" % chart_name)
 
+    release = config.get('release', chart_name)
+    cluster.log.debug("Deploying release %s" % release)
+
     namespace = config.get('namespace')
     if not namespace:
         cluster.log.verbose('Namespace configuration is missing, "default" namespace will be used')
@@ -788,14 +791,14 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
     command = prepare_for_helm_command + 'list -q'
     helm_existed_releases = subprocess.check_output(command, shell=True).decode('utf-8')
 
-    if chart_name in helm_existed_releases.splitlines():
-        cluster.log.debug("Deployed release %s is found. Upgrading it..." % chart_name)
+    if release in helm_existed_releases.splitlines():
+        cluster.log.debug("Deployed release %s is found. Upgrading it..." % release)
         deployment_mode = "upgrade"
     else:
-        cluster.log.debug("Deployed release %s is not found. Installing it..." % chart_name)
+        cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {chart_name} {chart_path} --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 

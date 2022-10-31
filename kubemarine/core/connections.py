@@ -26,7 +26,6 @@ class ConnectionPool:
     def __init__(self, env: Environment):
         self._env = env
         self._connections: Connections = {}
-        self._gateways: Connections = {}
 
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
@@ -72,24 +71,23 @@ class ConnectionPool:
         return self._create_connection_from_details(ip, node, gateway=gateway)
 
     def _get_gateway_node_connection(self, name: str) -> fabric.connection.Connection:
-        gateway_conn = self._gateways.get(name)
+        # Create new connection instance each time even if it is the same gateway node.
+        # This is necessary to not share the same gateway connection instance in multiple threads
+        gateway_conn = None
+
+        for gateway in self._env.inventory.get('gateway_nodes', []):
+            if gateway.get('name') == name:
+                if gateway.get('address') is None:
+                    raise Exception('There is no address specified in configfile for gateway \'%s\'' % name)
+                if gateway.get('keyfile') is None:
+                    raise Exception('There is no keyfile specified in configfile for gateway \'%s\'' % name)
+
+                # todo since we have no workaround for gateway connections currently,
+                #  probably we need different default connection timeout
+                gateway_conn = self._create_connection_from_details(
+                    gateway["address"], gateway, inline_ssh_env=False)
 
         if gateway_conn is None:
-            for gateway in self._env.inventory.get('gateway_nodes', []):
-                if gateway.get('name') == name:
-                    if gateway.get('address') is None:
-                        raise Exception('There is no address specified in configfile for gateway \'%s\'' % name)
-                    if gateway.get('keyfile') is None:
-                        raise Exception('There is no keyfile specified in configfile for gateway \'%s\'' % name)
-
-                    # todo since we have no workaround for gateway connections currently,
-                    #  probably we need different default connection timeout
-                    gateway_conn = self._create_connection_from_details(gateway["address"], gateway,
-                                                                        inline_ssh_env=False)
-
-            if gateway_conn is None:
-                raise Exception('Requested gateway \'%s\' is not found in configfile' % name)
-
-            self._gateways[name] = gateway_conn
+            raise Exception('Requested gateway \'%s\' is not found in configfile' % name)
 
         return gateway_conn
