@@ -5627,7 +5627,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.24.0
+## Default Dependent Components Versions for Kubernetes Versions v1.24.2
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -5658,16 +5658,16 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="5" rowspan="3">v1.24.0</td>
-    <td>SHA1: a60b0adcdc6f19e79bd98663914b694a325db819</td>
+    <td colspan="5" rowspan="3">v1.24.2</td>
+    <td>SHA1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3</td>
+    <td>SHA1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab</td>
+    <td>SHA1: d2a8e78bcdc992addd6faccb27b0af5d533443fa</td>
   </tr>
   <tr>
     <td>calicoctl</td>
@@ -5724,7 +5724,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="5" rowspan="4">v1.24.0</td>
+    <td colspan="5" rowspan="4">v1.24.2</td>
     <td></td>
   </tr>
   <tr>
