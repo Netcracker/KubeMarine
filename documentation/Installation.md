@@ -5134,6 +5134,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5301,6 +5302,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5468,6 +5470,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5635,6 +5638,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
