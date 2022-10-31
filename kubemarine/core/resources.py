@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from copy import deepcopy
 from typing import Optional
 
 import yaml
 import ruamel.yaml
 
 from kubemarine.core import utils, cluster as c, log, errors, static
+from kubemarine.core.yaml_merger import default_merger
 
 
 class DynamicResources:
@@ -34,6 +35,13 @@ class DynamicResources:
         self._raw_inventory = None
         self._formatted_inventory = None
         self._procedure_inventory = None
+
+        self._nodes_context = None
+        """
+        The nodes_context variable should hold node specific information that is not changed during Kubemarine run.
+        The variable should be initialized on demand and only once.
+        """
+
         self._cluster = None
 
         args: dict = context['execution_arguments']
@@ -101,43 +109,74 @@ class DynamicResources:
 
         self._raw_inventory = None
         self._formatted_inventory = None
+        # no need to clear _nodes_context as it should not change after cluster is reinitialized.
         self._cluster = None
 
     def cluster_if_initialized(self) -> Optional[c.KubernetesCluster]:
         return self._cluster
 
     def cluster(self) -> c.KubernetesCluster:
-        """Returns already initialized cluster object or initializes new cluster object."""
+        """Returns already initialized cluster object or initializes new real cluster object."""
         if self._cluster is None:
-            log = self.logger()
-            try:
-                # temporary cluster instance to detect initial nodes context.
-                light_cluster = self._create_cluster()
-                light_cluster.enrich(custom_enrichment_fns=light_cluster.get_facts_enrichment_fns())
-
-                # main cluster instance to be used in flow
-                cluster = self._create_cluster()
-                cluster.enrich(nodes_context=light_cluster.context)
-
-                self._cluster = cluster
-            except Exception as exc:
-                raise errors.FailException("Failed to proceed inventory file", exc)
-
-            if not self._silent:
-                log.debug("Inventory file loaded:")
-                for role in self._cluster.roles:
-                    log.debug("  %s %i" % (role, len(self._cluster.ips[role])))
-                    for ip in self._cluster.ips[role]:
-                        log.debug("    %s" % ip)
-
-            args = self.context['execution_arguments']
-            if 'ansible_inventory_location' in args:
-                utils.make_ansible_inventory(args['ansible_inventory_location'], self._cluster)
+            self._cluster = self._create_cluster(self.context)
 
         return self._cluster
 
-    def _create_cluster(self):
-        return _provide_cluster(self.raw_inventory(), self.context,
+    def create_deviated_cluster(self, deviated_context: dict):
+        """
+        Create new cluster instance with specified deviation of context params.
+        The method work should minimize work with network and avoid RW work with filesystem.
+        The cluster instance should be useful to develop a patch in case enrichment procedure is changed
+        and it is necessary to compare the result of old and new algorithm of enrichment.
+        It should not be used in tasks.
+
+        :param deviated_context dictionary to override context params.
+        """
+        sample_context = deepcopy(self.context)
+        default_merger.merge(sample_context, deviated_context)
+        sample_context['preserve_inventory'] = False
+        args = sample_context['execution_arguments']
+        args['disable_dump'] = True
+        del args['ansible_inventory_location']
+        return self._create_cluster(sample_context)
+
+    def _create_cluster(self, context):
+        log = self.logger()
+        context = deepcopy(context)
+        default_merger.merge(context, self._get_nodes_context())
+        try:
+            cluster = self._new_cluster_instance(context)
+            cluster.enrich()
+        except Exception as exc:
+            raise errors.FailException("Failed to proceed inventory file", exc)
+
+        if not self._silent:
+            log.debug("Inventory file loaded:")
+            for role in cluster.roles:
+                log.debug("  %s %i" % (role, len(cluster.ips[role])))
+                for ip in cluster.ips[role]:
+                    log.debug("    %s" % ip)
+
+        args = context['execution_arguments']
+        if 'ansible_inventory_location' in args:
+            utils.make_ansible_inventory(args['ansible_inventory_location'], cluster)
+
+        return cluster
+
+    def _get_nodes_context(self):
+        if self._nodes_context is None:
+            try:
+                # temporary cluster instance to detect initial nodes context.
+                light_cluster = self._new_cluster_instance(self.context)
+                light_cluster.enrich(custom_enrichment_fns=light_cluster.get_facts_enrichment_fns())
+                self._nodes_context = light_cluster.detect_nodes_context()
+            except Exception as exc:
+                raise errors.FailException("Failed to proceed inventory file", exc)
+
+        return self._nodes_context
+
+    def _new_cluster_instance(self, context: dict):
+        return _provide_cluster(self.raw_inventory(), context,
                                 procedure_inventory=self.procedure_inventory(),
                                 logger=self.logger())
 
