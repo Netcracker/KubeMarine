@@ -184,7 +184,7 @@ def enrich_inventory(inventory, cluster):
                     else:
                         if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
                             node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                elif minor_version == 25:
+                elif minor_version > 24:
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
