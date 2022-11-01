@@ -27,3 +27,22 @@ def enrich_inventory(inventory, cluster):
             inventory["plugins"]["calico"]["install"] = True
 
     return inventory
+
+def enrich_original_yaml(inventory, cluster, original_yaml):
+    for key in obj_list:
+        if key == "ConfigMap_calico-config":
+            ls['ConfigMap_calico-config']['data']['veth_mtu'] = str(cluster['plugins']['calico']['mtu'])
+            if cluster['plugins']['calico']['typha']['enabled'] == True:
+                ls['ConfigMap_calico-config']['data']['typha_service_name'] = 'calico-typha'
+            else:
+                ls['ConfigMap_calico-config']['data']['typha_service_name'] = 'none'
+            string_part = ls['ConfigMap_calico-config']['data']['cni_network_config']
+            yaml_part = yaml.safe_load(string_part.replace('\n', '').replace('\\', ''))
+            ip = cluster['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+            if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+                yaml_part['plugins'][0]['ipam'] = cluster['plugins']['calico']['cni']['ipam']['ipv4']
+            else:
+                yaml_part['plugins'][0]['ipam'] = cluster['plugins']['calico']['cni']['ipam']['ipv6']
+            ls['ConfigMap_calico-config']['data']['cni_network_config'] = str(yaml_part).replace("'__CNI_MTU__'", "__CNI_MTU__").replace("'","\"")
+
+    return patched_yaml

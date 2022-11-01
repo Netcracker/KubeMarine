@@ -425,7 +425,9 @@ plugins:
     installation:
       priority: 0
       procedures:
-        - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
+        - config:
+            source: 'plugins/yaml/calico-{{ plugins.calico.version|minorversion }}.yaml'
+            do_render: False
         - expect:
             daemonsets:
               - calico-node
