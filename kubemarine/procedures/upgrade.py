@@ -22,6 +22,7 @@ import toml
 from distutils.util import strtobool
 
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core import flow
@@ -106,7 +107,7 @@ def upgrade_plugins(cluster):
     plugins.install(cluster, upgrade_candidates)
 
 
-def upgrade_containerd(cluster):
+def upgrade_containerd(cluster: KubernetesCluster):
     """
         This function fixes the incorrect version of pause during the cluster update procedure
     """
@@ -145,7 +146,7 @@ def upgrade_containerd(cluster):
             with RemoteExecutor(cluster) as exe:
                 for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
                         provide_node_configs=True):
-                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
+                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
                                            backup=True,
                                            sudo=True, mkdir=True)

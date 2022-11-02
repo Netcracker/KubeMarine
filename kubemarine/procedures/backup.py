@@ -91,9 +91,9 @@ def export_ansible_inventory(cluster):
     cluster.log.verbose('ansible-inventory.ini exported to backup')
 
 
-def export_packages_list(cluster):
+def export_packages_list(cluster: KubernetesCluster):
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8']:
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"

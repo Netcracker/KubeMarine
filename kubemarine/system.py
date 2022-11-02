@@ -101,14 +101,19 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory, cluster):
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get("initial_procedure") != "upgrade":
         return inventory
+
+    os_family = cluster.get_os_family()
+    if os_family in ('unknown', 'unsupported', 'multiple'):
+        raise Exception("Upgrade is possible only for cluster "
+                        "with all nodes having the same and supported OS family")
 
     # validate all packages sections in procedure inventory
     with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
             as stream:
-        base_associations = yaml.safe_load(stream)["services"]["packages"]["associations"][get_os_family(cluster)]
+        base_associations = yaml.safe_load(stream)["services"]["packages"]["associations"][os_family]
 
     cluster_associations = deepcopy(cluster.inventory["services"]["packages"]["associations"])
     previous_ver = cluster.context["initial_kubernetes_version"]
@@ -183,7 +188,6 @@ def detect_os_family(cluster):
         stdout = result.stdout.lower()
 
         version = None
-        versions = []
         lines = ''
 
         version_regex = re.compile("\\s\\d*\\.\\d*", re.M)
@@ -208,18 +212,14 @@ def detect_os_family(cluster):
 
         cluster.log.debug("Distribution: %s; Version: %s" % (name, version))
 
+        os_family = 'unsupported'
         if name in cluster.globals["compatibility_map"]["distributives"]:
+            os_family = 'unknown'
             os_family_list = cluster.globals["compatibility_map"]["distributives"][name]
             for os_family_item in os_family_list:
-                versions.extend(os_family_item["versions"])
-                if version in versions:
+                if version in os_family_item["versions"]:
                     os_family = os_family_item["os_family"]
-                    versions = []
                     break
-                else:
-                    os_family = 'unknown'
-        else:
-            os_family = 'unsupported'
 
         cluster.log.debug("OS family: %s" % os_family)
 
@@ -228,19 +228,6 @@ def detect_os_family(cluster):
             'version': version,
             'family': os_family
         }
-
-    cluster.context["os"] = cluster.nodes["all"].get_accessible_nodes().get_nodes_os(suppress_exceptions=True)
-
-
-def get_os_family(cluster: KubernetesCluster) -> str:
-    """
-    Returns common OS family name from remote hosts.
-    :param cluster: Cluster object where OS family is detected.
-    :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
-    """
-    # OS family is always not None,
-    # because it is either detected during cluster initialization, or there are no accessible nodes to detect it.
-    return cluster.context.get("os")
 
 
 def get_compatibility_version_key(cluster: KubernetesCluster) -> str or None:
@@ -253,7 +240,7 @@ def get_compatibility_version_key(cluster: KubernetesCluster) -> str or None:
     Return os-specific version compatibility key.
     If OS is unknown or multiple OS, then returns None.
     """
-    os = get_os_family(cluster)
+    os = cluster.get_os_family()
     if os == "rhel":
         return "version_rhel"
     elif os == "rhel8":
@@ -262,10 +249,6 @@ def get_compatibility_version_key(cluster: KubernetesCluster) -> str or None:
         return "version_debian"
     else:
         return None
-
-
-def is_multiple_os_detected(cluster):
-    return get_os_family(cluster) == 'multiple'
 
 
 def update_resolv_conf(group, config=None):
@@ -631,7 +614,7 @@ def is_modprobe_valid(group):
 def verify_system(group):
     log = group.cluster.log
     # this method handles clusters with multiple is, suppress exceptions enabled
-    os_family = group.get_nodes_os(suppress_exceptions=True)
+    os_family = group.get_nodes_os()
 
     if os_family in ['rhel', 'rhel8'] and group.cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")

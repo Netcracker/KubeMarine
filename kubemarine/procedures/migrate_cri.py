@@ -22,6 +22,7 @@ import uuid
 from kubemarine import kubernetes, etcd, thirdparties, cri, plugins
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
@@ -131,7 +132,7 @@ def migrate_cri(cluster):
     _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
 
 
-def _migrate_cri(cluster, node_group):
+def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
     """
     Migrate CRI from docker to already installed containerd.
     This method works node-by-node, configuring kubelet to use containerd.
@@ -179,7 +180,7 @@ def _migrate_cri(cluster, node_group):
         node["connection"].sudo("systemctl stop kubelet")
         docker.prune(node["connection"])
 
-        docker_associations = cluster.get_associations_for_node(node['connect_to'])['docker']
+        docker_associations = cluster.get_associations_for_node(node['connect_to'], 'docker')
         node["connection"].sudo(f"systemctl disable {docker_associations['service_name']} --now; "
                                  "sudo sh -c 'rm -rf /var/lib/docker/*'")
 

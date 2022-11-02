@@ -163,6 +163,7 @@ def install(group):
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
+        # todo why check and try to install all keepalives but finally filter out only new nodes?
         installation_result = packages.install(group.get_new_nodes_or_self(), include=package_associations['package_name'])
 
     service_name = group.cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
@@ -184,30 +185,31 @@ def uninstall(group):
     return packages.remove(group, include='keepalived')
 
 
-def restart(group):
+def restart(group: NodeGroup):
     results = NodeGroupResult(group.cluster)
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-        package_associations = os_specific_associations['keepalived']
-        results.update(system.restart_service(node['connection'], name=package_associations['service_name']))
+        service_name = group.cluster.get_package_association_for_node(
+            node['connect_to'], 'keepalived', 'service_name')
+        results.update(system.restart_service(node['connection'], name=service_name))
         group.cluster.log.debug("Sleep while keepalived comes-up...")
         time.sleep(group.cluster.globals['keepalived']['restart_wait'])
     return results
 
 
-def enable(group):
+def enable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.enable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'],
-                                  now=True)
+            service_name = group.cluster.get_package_association_for_node(
+                node['connect_to'], 'keepalived', 'service_name')
+            system.enable_service(node['connection'], name=service_name, now=True)
 
 
-def disable(group):
+def disable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.disable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'])
+            service_name = group.cluster.get_package_association_for_node(
+                node['connect_to'], 'keepalived', 'service_name')
+            system.disable_service(node['connection'], name=service_name)
 
 
 def generate_config(inventory, node):
@@ -253,7 +255,7 @@ def configure(group: NodeGroup) -> NodeGroupResult:
 
             log.debug("Configuring keepalived on '%s'..." % node['name'])
 
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'])['keepalived']
+            package_associations = group.cluster.get_associations_for_node(node['connect_to'], 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
             group.sudo('mkdir -p %s' % configs_directory, hide=True)

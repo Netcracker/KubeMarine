@@ -112,7 +112,7 @@ def configure_apparmor(group, expected_profiles):
 def setup_apparmor(group):
     log = group.cluster.log
 
-    if group.get_nodes_os(suppress_exceptions=True) != 'debian':
+    if group.get_nodes_os() != 'debian':
         log.debug("Skipped - Apparmor is supported only on Ubuntu/Debian")
         return
 

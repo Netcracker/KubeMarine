@@ -22,12 +22,13 @@ from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.group import NodeGroup
 
 
-def install(group):
+def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
+            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
 
             group.cluster.log.debug("Installing latest containerd and podman on %s node" % node['name'])
             # always install latest available containerd and podman
@@ -42,7 +43,7 @@ def install(group):
     return exe.get_last_results_str()
 
 
-def configure(group):
+def configure(group: NodeGroup):
     log = group.cluster.log
 
     log.debug("Uploading crictl configuration for containerd...")
@@ -102,7 +103,7 @@ def configure(group):
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['containerd']
+            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
             log.debug("Uploading containerd configuration to %s node..." % node['name'])
             node['connection'].put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
                                    sudo=True, mkdir=True)

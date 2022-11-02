@@ -213,7 +213,7 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.context["os"])
+        self.assertEqual("rhel", cluster.get_os_family())
         for host, node_context in cluster.context["nodes"].items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
@@ -230,7 +230,7 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"],
                          "Here should be all 4 calls of test_func")
 
-        self.assertEqual("rhel", cluster.context["os"])
+        self.assertEqual("rhel", cluster.get_os_family())
         for host, node_context in cluster.context["nodes"].items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info

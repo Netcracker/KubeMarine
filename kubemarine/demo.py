@@ -407,8 +407,6 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
             connect_to = node['address']
         context['nodes'][connect_to] = node_context
 
-    context['os'] = os_family
-
     # It is possible to disable FakeCluster and create real cluster Object for some business case
     if fake:
         cluster = FakeKubernetesCluster(inventory, context)

@@ -78,9 +78,10 @@ supported_defaults = {
 
 invalid_node_name_regex = re.compile("[^a-z-.\\d]", re.M)
 escaped_expression_regex = re.compile('({%[\\s*|]raw[\\s*|]%}.*?{%[\\s*|]endraw[\\s*|]%})', re.M)
+jinja_query_regex = re.compile("{{ .* }}", re.M)
 
 
-def apply_defaults(inventory, cluster):
+def apply_defaults(inventory, cluster: KubernetesCluster):
     recursive_apply_defaults(supported_defaults, inventory)
 
     for i, node in enumerate(inventory["nodes"]):
@@ -93,11 +94,7 @@ def apply_defaults(inventory, cluster):
             raise Exception('Node name \"%s\" contains invalid characters. A DNS-1123 subdomain must consist of lower '
                             'case alphanumeric characters, \'-\' or \'.\'' % node_name)
 
-        address = node.get('connect_to')
-        if address is None:
-            address = node.get('address')
-        if address is None:
-            address = node.get('internal_address')
+        address = cluster.get_access_address_from_node(node)
         if address is None:
             raise Exception('Node %s do not have any address' % node_name)
 
@@ -415,7 +412,7 @@ def calculate_nodegroups(inventory, cluster):
     return inventory
 
 
-def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True, custom_fns=None):
+def enrich_inventory(cluster, custom_inventory, make_dumps=True, custom_fns=None):
     with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
@@ -424,23 +421,22 @@ def enrich_inventory(cluster, custom_inventory, apply_fns=True, make_dumps=True,
 
         # it is necessary to temporary put half-compiled inventory to cluster inventory field
         cluster._inventory = inventory
-        if apply_fns:
-            if custom_fns:
-                enrichment_functions = custom_fns
-            else:
-                enrichment_functions = DEFAULT_ENRICHMENT_FNS
+        if custom_fns:
+            enrichment_functions = custom_fns
+        else:
+            enrichment_functions = DEFAULT_ENRICHMENT_FNS
 
-            # run required fields calculation
-            for enrichment_fn in enrichment_functions:
-                fn_package_name, fn_method_name = enrichment_fn.rsplit('.', 1)
-                mod = import_module(fn_package_name)
-                cluster.log.verbose('Calling fn "%s"' % enrichment_fn)
-                inventory = getattr(mod, fn_method_name)(inventory, cluster)
+        # run required fields calculation
+        for enrichment_fn in enrichment_functions:
+            fn_package_name, fn_method_name = enrichment_fn.rsplit('.', 1)
+            mod = import_module(fn_package_name)
+            cluster.log.verbose('Calling fn "%s"' % enrichment_fn)
+            inventory = getattr(mod, fn_method_name)(inventory, cluster)
 
         cluster.log.verbose('Enrichment finished!')
 
         if make_dumps:
-            inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump((inventory)))
+            inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
             utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
 
         return inventory
@@ -512,6 +508,27 @@ def compile_string(log, struct, root, ignore_jinja_escapes=True):
 
     log.verbose("\tRendered as \"%s\"" % struct)
     return struct
+
+
+def escape_jinja_characters_for_inventory(cluster: KubernetesCluster, obj):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            obj[key] = escape_jinja_characters_for_inventory(cluster, value)
+    elif isinstance(obj, list):
+        for key, value in enumerate(obj):
+            obj[key] = escape_jinja_characters_for_inventory(cluster, value)
+    elif isinstance(obj, str):
+        obj = _escape_jinja_character(obj)
+    return obj
+
+
+def _escape_jinja_character(value):
+    if '{{' in value and '}}' in value and re.search(jinja_query_regex, value):
+        matches = re.findall(jinja_query_regex, value)
+        for match in matches:
+            # TODO: rewrite to correct way of match replacement: now it can cause "{raw}{raw}xxx.." circular bug
+            value = value.replace(match, '{% raw %}'+match+'{% endraw %}')
+    return value
 
 
 def prepare_for_dump(inventory, copy=True):

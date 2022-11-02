@@ -15,22 +15,28 @@
 from copy import deepcopy
 from typing import List, Dict
 
-from kubemarine import yum, system, apt
+from kubemarine import yum, apt, system
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.yaml_merger import default_merger
 
 
-def enrich_inventory_associations(inventory, cluster):
-    os_family = system.get_os_family(cluster)
-
-    associations = inventory['services']['packages']['associations']
-    if not associations.get(os_family):
-        # already enriched
+def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
+    os_family = cluster.get_os_family_from_new_nodes_or_final()
+    # todo what if new and existing nodes have different OS family but new nodes have the same os family?
+    if os_family in ('unknown', 'unsupported', 'multiple'):
+        cluster.log.debug("Skip enrichment of associations as the nodes do not have single OS family")
+        # Skip enrichment. Some features might not work.
         return inventory
 
+    associations: dict = inventory['services']['packages']['associations']
+
+    # copy associations for OS family to one level higher
     os_specific_associations = deepcopy(associations[os_family])
     # Cache packages versions only if the option is set in configuration, so we cut the version from 'package_name'
     if not cluster.inventory['services']['packages']['cache_versions']:
+        # todo remove this section, and write patch if necessary to move package_name without versions.
         for association in os_specific_associations:
             if type(os_specific_associations[association]['package_name']) is list:
                 for item, package in enumerate(os_specific_associations[association]['package_name']):
@@ -51,23 +57,59 @@ def enrich_inventory_associations(inventory, cluster):
                 raise Exception('Unexpected value for association')
 
     else:
+        # todo switch to explicit cache_versions=false for specific packages and optionally write patch
         # set 'skip_caching' for customer association
         if cluster.raw_inventory.get('services', {}).get('packages', {}).get('associations', {}):
             for package in cluster.raw_inventory['services']['packages']['associations']:
                 os_specific_associations[package]['skip_caching'] = "true"
 
-    os_specific_associations['debian'] = deepcopy(associations['debian'])
-    os_specific_associations['rhel'] = deepcopy(associations['rhel'])
-    os_specific_associations['rhel8'] = deepcopy(associations['rhel8'])
+    # move associations for OS families as-is
+    for association_name in get_associations_os_family_keys():
+        os_specific_associations[association_name] = associations.pop(association_name)
 
-    for association_name, properties in associations.items():
-        if association_name in os_specific_associations.keys():
-            for key, value in properties.items():
-                os_specific_associations[association_name][key] = value
+    # merge remained explicitly defined package properties with priority
+    default_merger.merge(os_specific_associations, associations)
 
     inventory['services']['packages']['associations'] = os_specific_associations
 
     return inventory
+
+
+def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict):
+    final_nodes = cluster.nodes['all'].get_final_nodes()
+    for os_family in get_associations_os_family_keys():
+        # Do not remove OS family associations section in finalized inventory if any node has this OS family, because
+        # 1) the user might modified it directly and we not always enrich common associations section.
+        # 2) in add_node procedure we enrich associations by new nodes only while initial nodes might have different OS.
+        if final_nodes.get_subgroup_with_os(os_family).is_empty():
+            del inventory['services']['packages']['associations'][os_family]
+
+    return inventory
+
+
+def get_associations_os_family_keys():
+    return ['debian', 'rhel', 'rhel8']
+
+
+def get_indexed_by_pure_packages_for_association(group: NodeGroup, association_name: str) -> dict:
+    os_family = group.get_nodes_os()
+    if os_family not in get_associations_os_family_keys():
+        raise Exception('Failed to get package names for ambiguous OS family')
+
+    if association_name in get_associations_os_family_keys():
+        return {}
+
+    associated_params = group.cluster.inventory['services']['packages']['associations'].get(association_name)
+    if associated_params is None:
+        raise Exception('Unsupported associated package')
+
+    associated_packages = associated_params.get('package_name')
+    if isinstance(associated_packages, str):
+        associated_packages = [associated_packages]
+    elif not isinstance(associated_packages, list):
+        raise Exception('Unsupported associated packages object type')
+
+    return {get_package_name(os_family, package): package for package in associated_packages}
 
 
 def get_package_manager(group: NodeGroup) -> apt or yum:
@@ -113,7 +155,7 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
-    :param package: package name, which version should be detected (eg. 'podman' and 'containerd' without any version suggestion)
+    :param package: package name, which version should be detected (eg. 'podman' and 'containerd')
     :param warn: Suppress exception for non-found packages
     :return: NodeGroupResults with package version on each host
 
@@ -151,30 +193,23 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     cluster = group.cluster
     excluded_dict = {}
 
-    if not packages_list:
+    if packages_list is None:
         packages_list = []
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
-            associated_packages = associated_params.get('package_name', [])
-            if isinstance(associated_packages, str):
-                packages_list.append(get_package_name(group.get_nodes_os(), associated_packages))
-            else:
-                associated_packages_clean = []
-                for package in associated_packages:
-                     associated_packages_clean.append(get_package_name(group.get_nodes_os(), package))
-                packages_list = packages_list + associated_packages_clean
+            packages_list.extend(get_indexed_by_pure_packages_for_association(group, association_name).keys())
+            # todo check cache_versions=true instead
             if associated_params.get('skip_caching', False):
-                # replace packages with associated version that shoud be excluded from cache
+                # replace packages with associated version that should be excluded from cache
                 for excluded_package in associated_params['package_name']:
                     excluded_dict[get_package_name(group.get_nodes_os(), excluded_package)] = excluded_package
 
-    # dedup
+    # deduplicate
     packages_list = list(set(packages_list))
 
     with RemoteExecutor(cluster) as exe:
         for package in packages_list:
-            package_name = get_package_name(group.get_nodes_os(), package)
-            detect_installed_package_version(group, package_name, warn=True)
+            detect_installed_package_version(group, package, warn=True)
 
     raw_result = exe.get_last_results()
     results: dict[str, NodeGroupResult] = {}
@@ -183,11 +218,14 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
         results[package] = NodeGroupResult(cluster)
         for host, multiple_results in raw_result.items():
             node_detected_package = multiple_results[i].stdout.strip() + multiple_results[i].stderr.strip()
-            if "not installed" in node_detected_package or "no packages found" in node_detected_package:
+            # consider version, which ended with special symbol = or - as not installed
+            # (it is possible in some cases to receive "containerd=" version)
+            if "not installed" in node_detected_package or "no packages found" in node_detected_package \
+                    or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
                 node_detected_package = f"not installed {package}"
             else:
                 if package in excluded_dict.keys():
-                    node_detected_package = excluded_dict[package] 
+                    node_detected_package = excluded_dict[package]
             results[package][host] = node_detected_package
 
     return results
@@ -208,19 +246,8 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
     grouped_packages: Dict[str, Dict[str, List]] = {}
     for queried_package, detected_packages_results in detected_packages.items():
         detected_grouped_packages = {}
-        for host, packages in detected_packages_results.items():
-            if '\n' in packages:
-                # this is the test, when package name contains multiple names,
-                # e.g. docker-ce and docker-cli for "docker-ce-*" query
-                packages = packages.split('\n')
-            else:
-                packages = [packages]
-
-            for pckg in packages:
-                if pckg not in detected_grouped_packages:
-                    detected_grouped_packages[pckg] = [host]
-                else:
-                    detected_grouped_packages[pckg].append(host)
+        for host, pckg in detected_packages_results.items():
+            detected_grouped_packages.setdefault(pckg, []).append(host)
 
         grouped_packages[queried_package] = detected_grouped_packages
 
