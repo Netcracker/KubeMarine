@@ -92,18 +92,7 @@ Proceed the following steps to install Kubemarine manually on your environment:
 
 **Note:** Kubemarine debugging available via `kubemarine/__main__.py`.
 
-#### Kubemarine Docker installation
-To start download Kubmarine image ```docker pull ghcr.io/netcracker/kubemarine:main```
-
-Now you can proceed to run Kubemarine from container, for example:
-   ```
-   docker run -it --mount type=bind,source=/root/cluster.yaml,target=/opt/kubemarine/cluster.yaml --mount type=bind,source=/root/rsa_key,target=/opt/kubemarine/rsa_key kubemarine install -c /opt/kubemarine/cluster.yaml
-   ```
-   *Note:*: do not forget to pass inventory file and connection key inside container.
-   For more execution details refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
-
-
-## Running Cluster Installation
+### Running Cluster Installation
 Proceed the following steps to install Kubernetes cluster using Kubemarine:
 1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes)
 2. Create inventory file `cluster.yaml` and describe your env and everything should be configured. See [inventory configs available](documentation/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to fill in all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
@@ -138,6 +127,16 @@ Proceed the following steps to install Kubernetes cluster using Kubemarine:
    ```
 
 See [other guides](#documentation) for more info.
+
+## Kubemarine Docker installation
+To start download Kubmarine image ```docker pull ghcr.io/netcracker/kubemarine:main```
+
+Now you can proceed to run Kubemarine from container, for example:
+   ```
+   docker run -it --mount type=bind,source=/root/cluster.yaml,target=/opt/kubemarine/cluster.yaml --mount type=bind,source=/root/rsa_key,target=/opt/kubemarine/rsa_key kubemarine install -c /opt/kubemarine/cluster.yaml
+   ```
+   *Note:*: do not forget to pass inventory file and connection key inside container.
+   For more execution details refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
 
 ## Documentation
 The following documents and tutorials are available:
