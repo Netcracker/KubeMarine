@@ -80,7 +80,7 @@ where, `<patches>` are the patch identifiers separated by comma.
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
-* Since Kubernetes v1.25 doesn't support PSP any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If solution doesn't have appropriate description what `PSS` profile should be used for every namespace, it's better not to migrate from PSP for a while.  
+* Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If solution doesn't have appropriate description what `PSS` profile should be used for every namespace, it's better not to migrate from PSP for a while.  
 
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
@@ -1101,7 +1101,7 @@ for namespace. For proper matching see the following articles:
 **Notes**: 
 * KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
 * Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
-[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
+[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#application-prerequisites)
 
 ### Procedure Execution Steps
 
