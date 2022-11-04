@@ -298,8 +298,8 @@ def load_yaml(filepath) -> dict:
 def load_multiple_yaml(filepath) -> dict:
     yaml_dict = {}
     try:
-        with open(filepath, 'r') as file:
-            source_yamls = yaml.safe_load_all(file)
+        with open(filepath, 'r') as stream:
+            source_yamls = yaml.safe_load_all(stream)
             for source_yaml in source_yamls:
                 if source_yaml:
                     yaml_key = f"{source_yaml['kind']}_{source_yaml['metadata']['name']}"
@@ -312,10 +312,10 @@ def load_multiple_yaml(filepath) -> dict:
 def save_multiple_yaml(filepath, multi_yaml):
     source_yamls = []
     try:
-        with open(filepath, 'w') as file:
+        with open(filepath, 'w') as stream:
             for item in multi_yaml:
                 source_yamls.append(deepcopy(multi_yaml[item]))
-            yaml.dump_all(source_yamls, file, default_flow_style=False, explicit_start=True)
+            yaml.dump_all(source_yamls, stream, default_flow_style=False, explicit_start=True)
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
 

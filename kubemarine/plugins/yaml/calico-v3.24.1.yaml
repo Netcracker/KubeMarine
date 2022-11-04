@@ -1,89 +1,46 @@
 ---
-# Source: calico/templates/calico-kube-controllers.yaml
-# This manifest creates a Pod Disruption Budget for Controller to allow K8s Cluster Autoscaler to evict
-
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: calico-kube-controllers
-  namespace: kube-system
   labels:
     k8s-app: calico-kube-controllers
+  name: calico-kube-controllers
+  namespace: kube-system
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
       k8s-app: calico-kube-controllers
 ---
-# Source: calico/templates/calico-kube-controllers.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-kube-controllers
   namespace: kube-system
 ---
-# Source: calico/templates/calico-node.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
 ---
-# Source: calico/templates/calico-config.yaml
-# This ConfigMap is used to configure a self-hosted Calico installation.
-kind: ConfigMap
 apiVersion: v1
+data:
+  calico_backend: bird
+  cni_network_config: '{"name": "k8s-pod-network", "cniVersion": "0.3.1", "plugins":
+    [{"type": "calico", "log_level": "info", "log_file_path": "/var/log/calico/cni/cni.log",
+    "datastore_type": "kubernetes", "nodename": "__KUBERNETES_NODE_NAME__", "mtu":
+    __CNI_MTU__, "ipam": {"assign_ipv4": "true", "ipv4_pools": ["10.128.0.0/14", "default-ipv4-ippool"],
+    "type": "calico-ipam"}, "policy": {"type": "k8s"}, "kubernetes": {"kubeconfig":
+    "__KUBECONFIG_FILEPATH__"}}, {"type": "portmap", "snat": True, "capabilities":
+    {"portMappings": True}}, {"type": "bandwidth", "capabilities": {"bandwidth": True}}]}'
+  typha_service_name: none
+  veth_mtu: '1440'
+kind: ConfigMap
 metadata:
   name: calico-config
   namespace: kube-system
-data:
-  # Typha is disabled.
-  typha_service_name: "none"
-  # Configure the backend to use.
-  calico_backend: "bird"
-
-  # Configure the MTU to use for workload interfaces and tunnels.
-  # By default, MTU is auto-detected, and explicitly setting this field should not be required.
-  # You can override auto-detection by providing a non-zero value.
-  veth_mtu: "0"
-
-  # The CNI network configuration to install on each node. The special
-  # values in this config will be automatically populated.
-  cni_network_config: |-
-    {
-      "name": "k8s-pod-network",
-      "cniVersion": "0.3.1",
-      "plugins": [
-        {
-          "type": "calico",
-          "log_level": "info",
-          "log_file_path": "/var/log/calico/cni/cni.log",
-          "datastore_type": "kubernetes",
-          "nodename": "__KUBERNETES_NODE_NAME__",
-          "mtu": __CNI_MTU__,
-          "ipam": {
-              "type": "calico-ipam"
-          },
-          "policy": {
-              "type": "k8s"
-          },
-          "kubernetes": {
-              "kubeconfig": "__KUBECONFIG_FILEPATH__"
-          }
-        },
-        {
-          "type": "portmap",
-          "snat": true,
-          "capabilities": {"portMappings": true}
-        },
-        {
-          "type": "bandwidth",
-          "capabilities": {"bandwidth": true}
-        }
-      ]
-    }
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -259,12 +216,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -379,12 +335,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -441,12 +396,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -705,12 +659,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -770,12 +723,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -945,14 +897,14 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
-                description: 'BPFPSNATPorts sets the range from which we randomly
-                  pick a port if there is a source port collision. This should be
-                  within the ephemeral range as defined by RFC 6056 (1024–65535) and
-                  preferably outside the  ephemeral ranges used by common operating
-                  systems. Linux uses 32768–60999, while others mostly use the IANA
-                  defined range 49152–65535. It is not necessarily a problem if this
-                  range overlaps with the operating systems. Both ends of the range
-                  are inclusive. [Default: 20000:29999]'
+                description: "BPFPSNATPorts sets the range from which we randomly\
+                  \ pick a port if there is a source port collision. This should be\
+                  \ within the ephemeral range as defined by RFC 6056 (1024\u2013\
+                  65535) and preferably outside the  ephemeral ranges used by common\
+                  \ operating systems. Linux uses 32768\u201360999, while others mostly\
+                  \ use the IANA defined range 49152\u201365535. It is not necessarily\
+                  \ a problem if this range overlaps with the operating systems. Both\
+                  \ ends of the range are inclusive. [Default: 20000:29999]"
                 pattern: ^.*
                 x-kubernetes-int-or-string: true
               bpfPolicyDebugEnabled:
@@ -1498,12 +1450,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -1551,14 +1502,14 @@ spec:
                 description: The ordered set of egress rules.  Each rule contains
                   a set of packet match criteria and a corresponding action to apply.
                 items:
-                  description: "A Rule encapsulates a set of match criteria and an
-                    action.  Both selector-based security Policy and security Profiles
-                    reference rules - separated out as a list of rules for both ingress
-                    and egress packet matching. \n Each positive match criteria has
-                    a negated version, prefixed with \"Not\". All the match criteria
-                    within a rule must be satisfied for a packet to match. A single
-                    rule can contain the positive and negative version of a match
-                    and both must be satisfied for the rule to match."
+                  description: "A Rule encapsulates a set of match criteria and an\
+                    \ action.  Both selector-based security Policy and security Profiles\
+                    \ reference rules - separated out as a list of rules for both\
+                    \ ingress and egress packet matching. \n Each positive match criteria\
+                    \ has a negated version, prefixed with \"Not\". All the match\
+                    \ criteria within a rule must be satisfied for a packet to match.\
+                    \ A single rule can contain the positive and negative version\
+                    \ of a match and both must be satisfied for the rule to match."
                   properties:
                     action:
                       type: string
@@ -1567,21 +1518,21 @@ spec:
                         to destination entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -1614,13 +1565,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -1629,22 +1580,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -1670,14 +1622,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -1780,12 +1733,12 @@ spec:
                       anyOf:
                       - type: integer
                       - type: string
-                      description: "Protocol is an optional field that restricts the
-                        rule to only apply to traffic of a specific IP protocol. Required
-                        if any of the EntityRules contain Ports (because ports only
-                        apply to certain protocols). \n Must be one of these string
-                        values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\", \"SCTP\",
-                        \"UDPLite\" or an integer in the range 1-255."
+                      description: "Protocol is an optional field that restricts the\
+                        \ rule to only apply to traffic of a specific IP protocol.\
+                        \ Required if any of the EntityRules contain Ports (because\
+                        \ ports only apply to certain protocols). \n Must be one of\
+                        \ these string values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\"\
+                        , \"SCTP\", \"UDPLite\" or an integer in the range 1-255."
                       pattern: ^.*
                       x-kubernetes-int-or-string: true
                     source:
@@ -1793,21 +1746,21 @@ spec:
                         source entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -1840,13 +1793,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -1855,22 +1808,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -1896,14 +1850,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -1924,14 +1879,14 @@ spec:
                 description: The ordered set of ingress rules.  Each rule contains
                   a set of packet match criteria and a corresponding action to apply.
                 items:
-                  description: "A Rule encapsulates a set of match criteria and an
-                    action.  Both selector-based security Policy and security Profiles
-                    reference rules - separated out as a list of rules for both ingress
-                    and egress packet matching. \n Each positive match criteria has
-                    a negated version, prefixed with \"Not\". All the match criteria
-                    within a rule must be satisfied for a packet to match. A single
-                    rule can contain the positive and negative version of a match
-                    and both must be satisfied for the rule to match."
+                  description: "A Rule encapsulates a set of match criteria and an\
+                    \ action.  Both selector-based security Policy and security Profiles\
+                    \ reference rules - separated out as a list of rules for both\
+                    \ ingress and egress packet matching. \n Each positive match criteria\
+                    \ has a negated version, prefixed with \"Not\". All the match\
+                    \ criteria within a rule must be satisfied for a packet to match.\
+                    \ A single rule can contain the positive and negative version\
+                    \ of a match and both must be satisfied for the rule to match."
                   properties:
                     action:
                       type: string
@@ -1940,21 +1895,21 @@ spec:
                         to destination entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -1987,13 +1942,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -2002,22 +1957,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -2043,14 +1999,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -2153,12 +2110,12 @@ spec:
                       anyOf:
                       - type: integer
                       - type: string
-                      description: "Protocol is an optional field that restricts the
-                        rule to only apply to traffic of a specific IP protocol. Required
-                        if any of the EntityRules contain Ports (because ports only
-                        apply to certain protocols). \n Must be one of these string
-                        values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\", \"SCTP\",
-                        \"UDPLite\" or an integer in the range 1-255."
+                      description: "Protocol is an optional field that restricts the\
+                        \ rule to only apply to traffic of a specific IP protocol.\
+                        \ Required if any of the EntityRules contain Ports (because\
+                        \ ports only apply to certain protocols). \n Must be one of\
+                        \ these string values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\"\
+                        , \"SCTP\", \"UDPLite\" or an integer in the range 1-255."
                       pattern: ^.*
                       x-kubernetes-int-or-string: true
                     source:
@@ -2166,21 +2123,21 @@ spec:
                         source entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -2213,13 +2170,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -2228,22 +2185,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -2269,14 +2227,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -2310,39 +2269,40 @@ spec:
                   any DNAT.
                 type: boolean
               selector:
-                description: "The selector is an expression used to pick pick out
-                  the endpoints that the policy should be applied to. \n Selector
-                  expressions follow this syntax: \n \tlabel == \"string_literal\"
-                  \ ->  comparison, e.g. my_label == \"foo bar\" \tlabel != \"string_literal\"
-                  \  ->  not equal; also matches if label is not present \tlabel in
-                  { \"a\", \"b\", \"c\", ... }  ->  true if the value of label X is
-                  one of \"a\", \"b\", \"c\" \tlabel not in { \"a\", \"b\", \"c\",
-                  ... }  ->  true if the value of label X is not one of \"a\", \"b\",
-                  \"c\" \thas(label_name)  -> True if that label is present \t! expr
-                  -> negation of expr \texpr && expr  -> Short-circuit and \texpr
-                  || expr  -> Short-circuit or \t( expr ) -> parens for grouping \tall()
-                  or the empty selector -> matches all endpoints. \n Label names are
-                  allowed to contain alphanumerics, -, _ and /. String literals are
-                  more permissive but they do not support escape characters. \n Examples
-                  (with made-up labels): \n \ttype == \"webserver\" && deployment
-                  == \"prod\" \ttype in {\"frontend\", \"backend\"} \tdeployment !=
-                  \"dev\" \t! has(label_name)"
+                description: "The selector is an expression used to pick pick out\
+                  \ the endpoints that the policy should be applied to. \n Selector\
+                  \ expressions follow this syntax: \n \tlabel == \"string_literal\"\
+                  \  ->  comparison, e.g. my_label == \"foo bar\" \tlabel != \"string_literal\"\
+                  \   ->  not equal; also matches if label is not present \tlabel\
+                  \ in { \"a\", \"b\", \"c\", ... }  ->  true if the value of label\
+                  \ X is one of \"a\", \"b\", \"c\" \tlabel not in { \"a\", \"b\"\
+                  , \"c\", ... }  ->  true if the value of label X is not one of \"\
+                  a\", \"b\", \"c\" \thas(label_name)  -> True if that label is present\
+                  \ \t! expr -> negation of expr \texpr && expr  -> Short-circuit\
+                  \ and \texpr || expr  -> Short-circuit or \t( expr ) -> parens for\
+                  \ grouping \tall() or the empty selector -> matches all endpoints.\
+                  \ \n Label names are allowed to contain alphanumerics, -, _ and\
+                  \ /. String literals are more permissive but they do not support\
+                  \ escape characters. \n Examples (with made-up labels): \n \ttype\
+                  \ == \"webserver\" && deployment == \"prod\" \ttype in {\"frontend\"\
+                  , \"backend\"} \tdeployment != \"dev\" \t! has(label_name)"
                 type: string
               serviceAccountSelector:
                 description: ServiceAccountSelector is an optional field for an expression
                   used to select a pod based on service accounts.
                 type: string
               types:
-                description: "Types indicates whether this policy applies to ingress,
-                  or to egress, or to both.  When not explicitly specified (and so
-                  the value on creation is empty or nil), Calico defaults Types according
-                  to what Ingress and Egress rules are present in the policy.  The
-                  default is: \n - [ PolicyTypeIngress ], if there are no Egress rules
-                  (including the case where there are   also no Ingress rules) \n
-                  - [ PolicyTypeEgress ], if there are Egress rules but no Ingress
-                  rules \n - [ PolicyTypeIngress, PolicyTypeEgress ], if there are
-                  both Ingress and Egress rules. \n When the policy is read back again,
-                  Types will always be one of these values, never empty or nil."
+                description: "Types indicates whether this policy applies to ingress,\
+                  \ or to egress, or to both.  When not explicitly specified (and\
+                  \ so the value on creation is empty or nil), Calico defaults Types\
+                  \ according to what Ingress and Egress rules are present in the\
+                  \ policy.  The default is: \n - [ PolicyTypeIngress ], if there\
+                  \ are no Egress rules (including the case where there are   also\
+                  \ no Ingress rules) \n - [ PolicyTypeEgress ], if there are Egress\
+                  \ rules but no Ingress rules \n - [ PolicyTypeIngress, PolicyTypeEgress\
+                  \ ], if there are both Ingress and Egress rules. \n When the policy\
+                  \ is read back again, Types will always be one of these values,\
+                  \ never empty or nil."
                 items:
                   description: PolicyType enumerates the possible values of the PolicySpec
                     Types field.
@@ -2354,12 +2314,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2408,12 +2367,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2449,35 +2407,35 @@ spec:
               resource.
             properties:
               expectedIPs:
-                description: "The expected IP addresses (IPv4 and IPv6) of the endpoint.
-                  If \"InterfaceName\" is not present, Calico will look for an interface
-                  matching any of the IPs in the list and apply policy to that. Note:
-                  \tWhen using the selector match criteria in an ingress or egress
-                  security Policy \tor Profile, Calico converts the selector into
-                  a set of IP addresses. For host \tendpoints, the ExpectedIPs field
-                  is used for that purpose. (If only the interface \tname is specified,
-                  Calico does not learn the IPs of the interface for use in match
-                  \tcriteria.)"
+                description: "The expected IP addresses (IPv4 and IPv6) of the endpoint.\
+                  \ If \"InterfaceName\" is not present, Calico will look for an interface\
+                  \ matching any of the IPs in the list and apply policy to that.\
+                  \ Note: \tWhen using the selector match criteria in an ingress or\
+                  \ egress security Policy \tor Profile, Calico converts the selector\
+                  \ into a set of IP addresses. For host \tendpoints, the ExpectedIPs\
+                  \ field is used for that purpose. (If only the interface \tname\
+                  \ is specified, Calico does not learn the IPs of the interface for\
+                  \ use in match \tcriteria.)"
                 items:
                   type: string
                 type: array
               interfaceName:
-                description: "Either \"*\", or the name of a specific Linux interface
-                  to apply policy to; or empty.  \"*\" indicates that this HostEndpoint
-                  governs all traffic to, from or through the default network namespace
-                  of the host named by the \"Node\" field; entering and leaving that
-                  namespace via any interface, including those from/to non-host-networked
-                  local workloads. \n If InterfaceName is not \"*\", this HostEndpoint
-                  only governs traffic that enters or leaves the host through the
-                  specific interface named by InterfaceName, or - when InterfaceName
-                  is empty - through the specific interface that has one of the IPs
-                  in ExpectedIPs. Therefore, when InterfaceName is empty, at least
-                  one expected IP must be specified.  Only external interfaces (such
-                  as \"eth0\") are supported here; it isn't possible for a HostEndpoint
-                  to protect traffic through a specific local workload interface.
-                  \n Note: Only some kinds of policy are implemented for \"*\" HostEndpoints;
-                  initially just pre-DNAT policy.  Please check Calico documentation
-                  for the latest position."
+                description: "Either \"*\", or the name of a specific Linux interface\
+                  \ to apply policy to; or empty.  \"*\" indicates that this HostEndpoint\
+                  \ governs all traffic to, from or through the default network namespace\
+                  \ of the host named by the \"Node\" field; entering and leaving\
+                  \ that namespace via any interface, including those from/to non-host-networked\
+                  \ local workloads. \n If InterfaceName is not \"*\", this HostEndpoint\
+                  \ only governs traffic that enters or leaves the host through the\
+                  \ specific interface named by InterfaceName, or - when InterfaceName\
+                  \ is empty - through the specific interface that has one of the\
+                  \ IPs in ExpectedIPs. Therefore, when InterfaceName is empty, at\
+                  \ least one expected IP must be specified.  Only external interfaces\
+                  \ (such as \"eth0\") are supported here; it isn't possible for a\
+                  \ HostEndpoint to protect traffic through a specific local workload\
+                  \ interface. \n Note: Only some kinds of policy are implemented\
+                  \ for \"*\" HostEndpoints; initially just pre-DNAT policy.  Please\
+                  \ check Calico documentation for the latest position."
                 type: string
               node:
                 description: The node name identifying the Calico node instance.
@@ -2517,12 +2475,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2569,10 +2526,8 @@ spec:
                   value is the index of the associated attributes in the Attributes
                   array.
                 items:
-                  type: integer
-                  # TODO: This nullable is manually added in. We should update controller-gen
-                  # to handle []*int properly itself.
                   nullable: true
+                  type: integer
                 type: array
               attributes:
                 description: Attributes is an array of arbitrary metadata associated
@@ -2637,12 +2592,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2696,12 +2650,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2753,12 +2706,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2842,7 +2794,7 @@ spec:
                   for internal use only.'
                 type: boolean
               natOutgoing:
-                description: When natOutgoing is true, packets sent from Calico networked
+                description: When nat-outgoing is true, packets sent from Calico networked
                   containers in this pool to destinations outside of this pool will
                   be masqueraded.
                 type: boolean
@@ -2863,12 +2815,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2918,12 +2869,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -3172,12 +3122,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -3214,14 +3163,14 @@ spec:
                 description: The ordered set of egress rules.  Each rule contains
                   a set of packet match criteria and a corresponding action to apply.
                 items:
-                  description: "A Rule encapsulates a set of match criteria and an
-                    action.  Both selector-based security Policy and security Profiles
-                    reference rules - separated out as a list of rules for both ingress
-                    and egress packet matching. \n Each positive match criteria has
-                    a negated version, prefixed with \"Not\". All the match criteria
-                    within a rule must be satisfied for a packet to match. A single
-                    rule can contain the positive and negative version of a match
-                    and both must be satisfied for the rule to match."
+                  description: "A Rule encapsulates a set of match criteria and an\
+                    \ action.  Both selector-based security Policy and security Profiles\
+                    \ reference rules - separated out as a list of rules for both\
+                    \ ingress and egress packet matching. \n Each positive match criteria\
+                    \ has a negated version, prefixed with \"Not\". All the match\
+                    \ criteria within a rule must be satisfied for a packet to match.\
+                    \ A single rule can contain the positive and negative version\
+                    \ of a match and both must be satisfied for the rule to match."
                   properties:
                     action:
                       type: string
@@ -3230,21 +3179,21 @@ spec:
                         to destination entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -3277,13 +3226,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -3292,22 +3241,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -3333,14 +3283,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -3443,12 +3394,12 @@ spec:
                       anyOf:
                       - type: integer
                       - type: string
-                      description: "Protocol is an optional field that restricts the
-                        rule to only apply to traffic of a specific IP protocol. Required
-                        if any of the EntityRules contain Ports (because ports only
-                        apply to certain protocols). \n Must be one of these string
-                        values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\", \"SCTP\",
-                        \"UDPLite\" or an integer in the range 1-255."
+                      description: "Protocol is an optional field that restricts the\
+                        \ rule to only apply to traffic of a specific IP protocol.\
+                        \ Required if any of the EntityRules contain Ports (because\
+                        \ ports only apply to certain protocols). \n Must be one of\
+                        \ these string values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\"\
+                        , \"SCTP\", \"UDPLite\" or an integer in the range 1-255."
                       pattern: ^.*
                       x-kubernetes-int-or-string: true
                     source:
@@ -3456,21 +3407,21 @@ spec:
                         source entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -3503,13 +3454,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -3518,22 +3469,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -3559,14 +3511,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -3587,14 +3540,14 @@ spec:
                 description: The ordered set of ingress rules.  Each rule contains
                   a set of packet match criteria and a corresponding action to apply.
                 items:
-                  description: "A Rule encapsulates a set of match criteria and an
-                    action.  Both selector-based security Policy and security Profiles
-                    reference rules - separated out as a list of rules for both ingress
-                    and egress packet matching. \n Each positive match criteria has
-                    a negated version, prefixed with \"Not\". All the match criteria
-                    within a rule must be satisfied for a packet to match. A single
-                    rule can contain the positive and negative version of a match
-                    and both must be satisfied for the rule to match."
+                  description: "A Rule encapsulates a set of match criteria and an\
+                    \ action.  Both selector-based security Policy and security Profiles\
+                    \ reference rules - separated out as a list of rules for both\
+                    \ ingress and egress packet matching. \n Each positive match criteria\
+                    \ has a negated version, prefixed with \"Not\". All the match\
+                    \ criteria within a rule must be satisfied for a packet to match.\
+                    \ A single rule can contain the positive and negative version\
+                    \ of a match and both must be satisfied for the rule to match."
                   properties:
                     action:
                       type: string
@@ -3603,21 +3556,21 @@ spec:
                         to destination entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -3650,13 +3603,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -3665,22 +3618,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -3706,14 +3660,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -3816,12 +3771,12 @@ spec:
                       anyOf:
                       - type: integer
                       - type: string
-                      description: "Protocol is an optional field that restricts the
-                        rule to only apply to traffic of a specific IP protocol. Required
-                        if any of the EntityRules contain Ports (because ports only
-                        apply to certain protocols). \n Must be one of these string
-                        values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\", \"SCTP\",
-                        \"UDPLite\" or an integer in the range 1-255."
+                      description: "Protocol is an optional field that restricts the\
+                        \ rule to only apply to traffic of a specific IP protocol.\
+                        \ Required if any of the EntityRules contain Ports (because\
+                        \ ports only apply to certain protocols). \n Must be one of\
+                        \ these string values: \"TCP\", \"UDP\", \"ICMP\", \"ICMPv6\"\
+                        , \"SCTP\", \"UDPLite\" or an integer in the range 1-255."
                       pattern: ^.*
                       x-kubernetes-int-or-string: true
                     source:
@@ -3829,21 +3784,21 @@ spec:
                         source entity.
                       properties:
                         namespaceSelector:
-                          description: "NamespaceSelector is an optional field that
-                            contains a selector expression. Only traffic that originates
-                            from (or terminates at) endpoints within the selected
-                            namespaces will be matched. When both NamespaceSelector
-                            and another selector are defined on the same rule, then
-                            only workload endpoints that are matched by both selectors
-                            will be selected by the rule. \n For NetworkPolicy, an
-                            empty NamespaceSelector implies that the Selector is limited
-                            to selecting only workload endpoints in the same namespace
-                            as the NetworkPolicy. \n For NetworkPolicy, `global()`
-                            NamespaceSelector implies that the Selector is limited
-                            to selecting only GlobalNetworkSet or HostEndpoint. \n
-                            For GlobalNetworkPolicy, an empty NamespaceSelector implies
-                            the Selector applies to workload endpoints across all
-                            namespaces."
+                          description: "NamespaceSelector is an optional field that\
+                            \ contains a selector expression. Only traffic that originates\
+                            \ from (or terminates at) endpoints within the selected\
+                            \ namespaces will be matched. When both NamespaceSelector\
+                            \ and another selector are defined on the same rule, then\
+                            \ only workload endpoints that are matched by both selectors\
+                            \ will be selected by the rule. \n For NetworkPolicy,\
+                            \ an empty NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only workload endpoints in the\
+                            \ same namespace as the NetworkPolicy. \n For NetworkPolicy,\
+                            \ `global()` NamespaceSelector implies that the Selector\
+                            \ is limited to selecting only GlobalNetworkSet or HostEndpoint.\
+                            \ \n For GlobalNetworkPolicy, an empty NamespaceSelector\
+                            \ implies the Selector applies to workload endpoints across\
+                            \ all namespaces."
                           type: string
                         nets:
                           description: Nets is an optional field that restricts the
@@ -3876,13 +3831,13 @@ spec:
                             selectors.
                           type: string
                         ports:
-                          description: "Ports is an optional field that restricts
-                            the rule to only apply to traffic that has a source (destination)
-                            port that matches one of these ranges/values. This value
-                            is a list of integers or strings that represent ranges
-                            of ports. \n Since only some protocols have ports, if
-                            any ports are specified it requires the Protocol match
-                            in the Rule to be set to \"TCP\" or \"UDP\"."
+                          description: "Ports is an optional field that restricts\
+                            \ the rule to only apply to traffic that has a source\
+                            \ (destination) port that matches one of these ranges/values.\
+                            \ This value is a list of integers or strings that represent\
+                            \ ranges of ports. \n Since only some protocols have ports,\
+                            \ if any ports are specified it requires the Protocol\
+                            \ match in the Rule to be set to \"TCP\" or \"UDP\"."
                           items:
                             anyOf:
                             - type: integer
@@ -3891,22 +3846,23 @@ spec:
                             x-kubernetes-int-or-string: true
                           type: array
                         selector:
-                          description: "Selector is an optional field that contains
-                            a selector expression (see Policy for sample syntax).
-                            \ Only traffic that originates from (terminates at) endpoints
-                            matching the selector will be matched. \n Note that: in
-                            addition to the negated version of the Selector (see NotSelector
-                            below), the selector expression syntax itself supports
-                            negation.  The two types of negation are subtly different.
-                            One negates the set of matched endpoints, the other negates
-                            the whole match: \n \tSelector = \"!has(my_label)\" matches
-                            packets that are from other Calico-controlled \tendpoints
-                            that do not have the label \"my_label\". \n \tNotSelector
-                            = \"has(my_label)\" matches packets that are not from
-                            Calico-controlled \tendpoints that do have the label \"my_label\".
-                            \n The effect is that the latter will accept packets from
-                            non-Calico sources whereas the former is limited to packets
-                            from Calico-controlled endpoints."
+                          description: "Selector is an optional field that contains\
+                            \ a selector expression (see Policy for sample syntax).\
+                            \  Only traffic that originates from (terminates at) endpoints\
+                            \ matching the selector will be matched. \n Note that:\
+                            \ in addition to the negated version of the Selector (see\
+                            \ NotSelector below), the selector expression syntax itself\
+                            \ supports negation.  The two types of negation are subtly\
+                            \ different. One negates the set of matched endpoints,\
+                            \ the other negates the whole match: \n \tSelector = \"\
+                            !has(my_label)\" matches packets that are from other Calico-controlled\
+                            \ \tendpoints that do not have the label \"my_label\"\
+                            . \n \tNotSelector = \"has(my_label)\" matches packets\
+                            \ that are not from Calico-controlled \tendpoints that\
+                            \ do have the label \"my_label\". \n The effect is that\
+                            \ the latter will accept packets from non-Calico sources\
+                            \ whereas the former is limited to packets from Calico-controlled\
+                            \ endpoints."
                           type: string
                         serviceAccounts:
                           description: ServiceAccounts is an optional field that restricts
@@ -3932,14 +3888,15 @@ spec:
                               type: string
                           type: object
                         services:
-                          description: "Services is an optional field that contains
-                            options for matching Kubernetes Services. If specified,
-                            only traffic that originates from or terminates at endpoints
-                            within the selected service(s) will be matched, and only
-                            to/from each endpoint's port. \n Services cannot be specified
-                            on the same rule as Selector, NotSelector, NamespaceSelector,
-                            Nets, NotNets or ServiceAccounts. \n Ports and NotPorts
-                            can only be specified with Services on ingress rules."
+                          description: "Services is an optional field that contains\
+                            \ options for matching Kubernetes Services. If specified,\
+                            \ only traffic that originates from or terminates at endpoints\
+                            \ within the selected service(s) will be matched, and\
+                            \ only to/from each endpoint's port. \n Services cannot\
+                            \ be specified on the same rule as Selector, NotSelector,\
+                            \ NamespaceSelector, Nets, NotNets or ServiceAccounts.\
+                            \ \n Ports and NotPorts can only be specified with Services\
+                            \ on ingress rules."
                           properties:
                             name:
                               description: Name specifies the name of a Kubernetes
@@ -3965,39 +3922,40 @@ spec:
                   on the Policy "Name".
                 type: number
               selector:
-                description: "The selector is an expression used to pick pick out
-                  the endpoints that the policy should be applied to. \n Selector
-                  expressions follow this syntax: \n \tlabel == \"string_literal\"
-                  \ ->  comparison, e.g. my_label == \"foo bar\" \tlabel != \"string_literal\"
-                  \  ->  not equal; also matches if label is not present \tlabel in
-                  { \"a\", \"b\", \"c\", ... }  ->  true if the value of label X is
-                  one of \"a\", \"b\", \"c\" \tlabel not in { \"a\", \"b\", \"c\",
-                  ... }  ->  true if the value of label X is not one of \"a\", \"b\",
-                  \"c\" \thas(label_name)  -> True if that label is present \t! expr
-                  -> negation of expr \texpr && expr  -> Short-circuit and \texpr
-                  || expr  -> Short-circuit or \t( expr ) -> parens for grouping \tall()
-                  or the empty selector -> matches all endpoints. \n Label names are
-                  allowed to contain alphanumerics, -, _ and /. String literals are
-                  more permissive but they do not support escape characters. \n Examples
-                  (with made-up labels): \n \ttype == \"webserver\" && deployment
-                  == \"prod\" \ttype in {\"frontend\", \"backend\"} \tdeployment !=
-                  \"dev\" \t! has(label_name)"
+                description: "The selector is an expression used to pick pick out\
+                  \ the endpoints that the policy should be applied to. \n Selector\
+                  \ expressions follow this syntax: \n \tlabel == \"string_literal\"\
+                  \  ->  comparison, e.g. my_label == \"foo bar\" \tlabel != \"string_literal\"\
+                  \   ->  not equal; also matches if label is not present \tlabel\
+                  \ in { \"a\", \"b\", \"c\", ... }  ->  true if the value of label\
+                  \ X is one of \"a\", \"b\", \"c\" \tlabel not in { \"a\", \"b\"\
+                  , \"c\", ... }  ->  true if the value of label X is not one of \"\
+                  a\", \"b\", \"c\" \thas(label_name)  -> True if that label is present\
+                  \ \t! expr -> negation of expr \texpr && expr  -> Short-circuit\
+                  \ and \texpr || expr  -> Short-circuit or \t( expr ) -> parens for\
+                  \ grouping \tall() or the empty selector -> matches all endpoints.\
+                  \ \n Label names are allowed to contain alphanumerics, -, _ and\
+                  \ /. String literals are more permissive but they do not support\
+                  \ escape characters. \n Examples (with made-up labels): \n \ttype\
+                  \ == \"webserver\" && deployment == \"prod\" \ttype in {\"frontend\"\
+                  , \"backend\"} \tdeployment != \"dev\" \t! has(label_name)"
                 type: string
               serviceAccountSelector:
                 description: ServiceAccountSelector is an optional field for an expression
                   used to select a pod based on service accounts.
                 type: string
               types:
-                description: "Types indicates whether this policy applies to ingress,
-                  or to egress, or to both.  When not explicitly specified (and so
-                  the value on creation is empty or nil), Calico defaults Types according
-                  to what Ingress and Egress are present in the policy.  The default
-                  is: \n - [ PolicyTypeIngress ], if there are no Egress rules (including
-                  the case where there are   also no Ingress rules) \n - [ PolicyTypeEgress
-                  ], if there are Egress rules but no Ingress rules \n - [ PolicyTypeIngress,
-                  PolicyTypeEgress ], if there are both Ingress and Egress rules.
-                  \n When the policy is read back again, Types will always be one
-                  of these values, never empty or nil."
+                description: "Types indicates whether this policy applies to ingress,\
+                  \ or to egress, or to both.  When not explicitly specified (and\
+                  \ so the value on creation is empty or nil), Calico defaults Types\
+                  \ according to what Ingress and Egress are present in the policy.\
+                  \  The default is: \n - [ PolicyTypeIngress ], if there are no Egress\
+                  \ rules (including the case where there are   also no Ingress rules)\
+                  \ \n - [ PolicyTypeEgress ], if there are Egress rules but no Ingress\
+                  \ rules \n - [ PolicyTypeIngress, PolicyTypeEgress ], if there are\
+                  \ both Ingress and Egress rules. \n When the policy is read back\
+                  \ again, Types will always be one of these values, never empty or\
+                  \ nil."
                 items:
                   description: PolicyType enumerates the possible values of the PolicySpec
                     Types field.
@@ -4009,12 +3967,11 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -4061,264 +4018,248 @@ spec:
     storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 ---
-# Source: calico/templates/calico-kube-controllers-rbac.yaml
-# Include a clusterrole for the kube-controllers component,
-# and bind it to the calico-kube-controllers serviceaccount.
-kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
   name: calico-kube-controllers
 rules:
-  # Nodes are watched to monitor for deletions.
-  - apiGroups: [""]
-    resources:
-      - nodes
-    verbs:
-      - watch
-      - list
-      - get
-  # Pods are watched to check for existence as part of IPAM controller.
-  - apiGroups: [""]
-    resources:
-      - pods
-    verbs:
-      - get
-      - list
-      - watch
-  # IPAM resources are manipulated in response to node and block updates, as well as periodic triggers.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - ipreservations
-    verbs:
-      - list
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - blockaffinities
-      - ipamblocks
-      - ipamhandles
-    verbs:
-      - get
-      - list
-      - create
-      - update
-      - delete
-      - watch
-  # Pools are watched to maintain a mapping of blocks to IP pools.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - ippools
-    verbs:
-      - list
-      - watch
-  # kube-controllers manages hostendpoints.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - hostendpoints
-    verbs:
-      - get
-      - list
-      - create
-      - update
-      - delete
-  # Needs access to update clusterinformations.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - clusterinformations
-    verbs:
-      - get
-      - list
-      - create
-      - update
-      - watch
-  # KubeControllersConfiguration is where it gets its config
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - kubecontrollersconfigurations
-    verbs:
-      # read its own config
-      - get
-      # create a default if none exists
-      - create
-      # update status
-      - update
-      # watch for changes
-      - watch
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - watch
+  - list
+  - get
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - ipreservations
+  verbs:
+  - list
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - blockaffinities
+  - ipamblocks
+  - ipamhandles
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - ippools
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - hostendpoints
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - clusterinformations
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - kubecontrollersconfigurations
+  verbs:
+  - get
+  - create
+  - update
+  - watch
 ---
-# Source: calico/templates/calico-node-rbac.yaml
-# Include a clusterrole for the calico-node DaemonSet,
-# and bind it to the calico-node serviceaccount.
-kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
   name: calico-node
 rules:
-  # Used for creating service account tokens to be used by the CNI plugin
-  - apiGroups: [""]
-    resources:
-      - serviceaccounts/token
-    resourceNames:
-      - calico-node
-    verbs:
-      - create
-  # The CNI plugin needs to get pods, nodes, and namespaces.
-  - apiGroups: [""]
-    resources:
-      - pods
-      - nodes
-      - namespaces
-    verbs:
-      - get
-  # EndpointSlices are used for Service-based network policy rule
-  # enforcement.
-  - apiGroups: ["discovery.k8s.io"]
-    resources:
-      - endpointslices
-    verbs:
-      - watch 
-      - list
-  - apiGroups: [""]
-    resources:
-      - endpoints
-      - services
-    verbs:
-      # Used to discover service IPs for advertisement.
-      - watch
-      - list
-      # Used to discover Typhas.
-      - get
-  # Pod CIDR auto-detection on kubeadm needs access to config maps.
-  - apiGroups: [""]
-    resources:
-      - configmaps
-    verbs:
-      - get
-  - apiGroups: [""]
-    resources:
-      - nodes/status
-    verbs:
-      # Needed for clearing NodeNetworkUnavailable flag.
-      - patch
-      # Calico stores some configuration information in node annotations.
-      - update
-  # Watch for changes to Kubernetes NetworkPolicies.
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - networkpolicies
-    verbs:
-      - watch
-      - list
-  # Used by Calico for policy information.
-  - apiGroups: [""]
-    resources:
-      - pods
-      - namespaces
-      - serviceaccounts
-    verbs:
-      - list
-      - watch
-  # The CNI plugin patches pods/status.
-  - apiGroups: [""]
-    resources:
-      - pods/status
-    verbs:
-      - patch
-  # Calico monitors various CRDs for config.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - globalfelixconfigs
-      - felixconfigurations
-      - bgppeers
-      - globalbgpconfigs
-      - bgpconfigurations
-      - ippools
-      - ipreservations
-      - ipamblocks
-      - globalnetworkpolicies
-      - globalnetworksets
-      - networkpolicies
-      - networksets
-      - clusterinformations
-      - hostendpoints
-      - blockaffinities
-      - caliconodestatuses
-    verbs:
-      - get
-      - list
-      - watch
-  # Calico must create and update some CRDs on startup.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - ippools
-      - felixconfigurations
-      - clusterinformations
-    verbs:
-      - create
-      - update
-  # Calico must update some CRDs.
-  - apiGroups: [ "crd.projectcalico.org" ]
-    resources:
-      - caliconodestatuses
-    verbs:
-      - update
-  # Calico stores some configuration information on the node.
-  - apiGroups: [""]
-    resources:
-      - nodes
-    verbs:
-      - get
-      - list
-      - watch
-  # These permissions are only required for upgrade from v2.6, and can
-  # be removed after upgrade or on fresh installations.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - bgpconfigurations
-      - bgppeers
-    verbs:
-      - create
-      - update
-  # These permissions are required for Calico CNI to perform IPAM allocations.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - blockaffinities
-      - ipamblocks
-      - ipamhandles
-    verbs:
-      - get
-      - list
-      - create
-      - update
-      - delete
-  # The CNI plugin and calico/node need to be able to create a default
-  # IPAMConfiguration
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - ipamconfigs
-    verbs:
-      - get
-      - create
-  # Block affinities must also be watchable by confd for route aggregation.
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - blockaffinities
-    verbs:
-      - watch
-  # The Calico IPAM migration needs to get daemonsets. These permissions can be
-  # removed if not upgrading from an installation using host-local IPAM.
-  - apiGroups: ["apps"]
-    resources:
-      - daemonsets
-    verbs:
-      - get
+- apiGroups:
+  - ''
+  resourceNames:
+  - calico-node
+  resources:
+  - serviceaccounts/token
+  verbs:
+  - create
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  - nodes
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - watch
+  - list
+- apiGroups:
+  - ''
+  resources:
+  - endpoints
+  - services
+  verbs:
+  - watch
+  - list
+  - get
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  verbs:
+  - get
+- apiGroups:
+  - ''
+  resources:
+  - nodes/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - watch
+  - list
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  - namespaces
+  - serviceaccounts
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/status
+  verbs:
+  - patch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - globalfelixconfigs
+  - felixconfigurations
+  - bgppeers
+  - globalbgpconfigs
+  - bgpconfigurations
+  - ippools
+  - ipreservations
+  - ipamblocks
+  - globalnetworkpolicies
+  - globalnetworksets
+  - networkpolicies
+  - networksets
+  - clusterinformations
+  - hostendpoints
+  - blockaffinities
+  - caliconodestatuses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - ippools
+  - felixconfigurations
+  - clusterinformations
+  verbs:
+  - create
+  - update
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - caliconodestatuses
+  verbs:
+  - update
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - bgpconfigurations
+  - bgppeers
+  verbs:
+  - create
+  - update
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - blockaffinities
+  - ipamblocks
+  - ipamhandles
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - ipamconfigs
+  verbs:
+  - get
+  - create
+- apiGroups:
+  - crd.projectcalico.org
+  resources:
+  - blockaffinities
+  verbs:
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
 ---
-# Source: calico/templates/calico-kube-controllers-rbac.yaml
-kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
   name: calico-kube-controllers
 roleRef:
@@ -4330,7 +4271,6 @@ subjects:
   name: calico-kube-controllers
   namespace: kube-system
 ---
-# Source: calico/templates/calico-node-rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -4344,339 +4284,277 @@ subjects:
   name: calico-node
   namespace: kube-system
 ---
-# Source: calico/templates/calico-node.yaml
-# This manifest installs the calico-node container, as well
-# as the CNI plugins and network config on
-# each master and worker node in a Kubernetes cluster.
-kind: DaemonSet
 apiVersion: apps/v1
+kind: DaemonSet
 metadata:
-  name: calico-node
-  namespace: kube-system
   labels:
     k8s-app: calico-node
+  name: calico-node
+  namespace: kube-system
 spec:
   selector:
     matchLabels:
       k8s-app: calico-node
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
   template:
     metadata:
       labels:
         k8s-app: calico-node
     spec:
+      containers:
+      - env:
+        - name: DATASTORE_TYPE
+          value: kubernetes
+        - name: CLUSTER_TYPE
+          value: k8s,bgp
+        - name: CALICO_ROUTER_ID
+          value: ''
+        - name: IP
+          value: autodetect
+        - name: IP_AUTODETECTION_METHOD
+          value: first-found
+        - name: CALICO_IPV4POOL_IPIP
+          value: Always
+        - name: CALICO_IPV4POOL_VXLAN
+          value: Never
+        - name: CALICO_IPV4POOL_CIDR
+          value: 10.128.0.0/14
+        - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+          value: ACCEPT
+        - name: FELIX_LOGSEVERITYSCREEN
+          value: info
+        - name: NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: CALICO_NETWORKING_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              key: calico_backend
+              name: calico-config
+        - name: FELIX_IPINIPMTU
+          valueFrom:
+            configMapKeyRef:
+              key: veth_mtu
+              name: calico-config
+        - name: FELIX_VXLANMTU
+          valueFrom:
+            configMapKeyRef:
+              key: veth_mtu
+              name: calico-config
+        - name: FELIX_WIREGUARDMTU
+          valueFrom:
+            configMapKeyRef:
+              key: veth_mtu
+              name: calico-config
+        envFrom:
+        - configMapRef:
+            name: kubernetes-services-endpoint
+            optional: true
+        image: calico/node:v3.24.1
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/calico-node
+              - -shutdown
+        livenessProbe:
+          exec:
+            command:
+            - /bin/calico-node
+            - -felix-live
+            - -bird-live
+          failureThreshold: 6
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        name: calico-node
+        readinessProbe:
+          exec:
+            command:
+            - /bin/calico-node
+            - -felix-ready
+            - -bird-ready
+          periodSeconds: 10
+          timeoutSeconds: 10
+        resources:
+          requests:
+            cpu: 250m
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host/etc/cni/net.d
+          name: cni-net-dir
+          readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+          readOnly: false
+        - mountPath: /var/run/calico
+          name: var-run-calico
+          readOnly: false
+        - mountPath: /var/lib/calico
+          name: var-lib-calico
+          readOnly: false
+        - mountPath: /var/run/nodeagent
+          name: policysync
+        - mountPath: /sys/fs/bpf
+          name: bpffs
+        - mountPath: /var/log/calico/cni
+          name: cni-log-dir
+          readOnly: true
+      hostNetwork: true
+      initContainers:
+      - command:
+        - /opt/cni/bin/calico-ipam
+        - -upgrade
+        env:
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CALICO_NETWORKING_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              key: calico_backend
+              name: calico-config
+        envFrom:
+        - configMapRef:
+            name: kubernetes-services-endpoint
+            optional: true
+        image: calico/cni:v3.24.1
+        imagePullPolicy: IfNotPresent
+        name: upgrade-ipam
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/lib/cni/networks
+          name: host-local-net-dir
+        - mountPath: /host/opt/cni/bin
+          name: cni-bin-dir
+      - command:
+        - /opt/cni/bin/install
+        env:
+        - name: CNI_CONF_NAME
+          value: 10-calico.conflist
+        - name: CNI_NETWORK_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              key: cni_network_config
+              name: calico-config
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CNI_MTU
+          valueFrom:
+            configMapKeyRef:
+              key: veth_mtu
+              name: calico-config
+        - name: SLEEP
+          value: 'false'
+        envFrom:
+        - configMapRef:
+            name: kubernetes-services-endpoint
+            optional: true
+        image: calico/cni:v3.24.1
+        imagePullPolicy: IfNotPresent
+        name: install-cni
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: cni-bin-dir
+        - mountPath: /host/etc/cni/net.d
+          name: cni-net-dir
+      - command:
+        - calico-node
+        - -init
+        - -best-effort
+        image: calico/node:v3.24.1
+        imagePullPolicy: IfNotPresent
+        name: mount-bpffs
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /sys/fs
+          mountPropagation: Bidirectional
+          name: sys-fs
+        - mountPath: /var/run/calico
+          mountPropagation: Bidirectional
+          name: var-run-calico
+        - mountPath: /nodeproc
+          name: nodeproc
+          readOnly: true
       nodeSelector:
         kubernetes.io/os: linux
-      hostNetwork: true
-      tolerations:
-        # Make sure calico-node gets scheduled on all nodes.
-        - effect: NoSchedule
-          operator: Exists
-        # Mark the pod as a critical add-on for rescheduling.
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
-      serviceAccountName: calico-node
-      # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
-      # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
-      terminationGracePeriodSeconds: 0
       priorityClassName: system-node-critical
-      initContainers:
-        # This container performs upgrade from host-local IPAM to calico-ipam.
-        # It can be deleted if this is a fresh installation, or if you have already
-        # upgraded to use calico-ipam.
-        - name: upgrade-ipam
-          image: docker.io/calico/cni:v3.24.2
-          imagePullPolicy: IfNotPresent
-          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-          envFrom:
-          - configMapRef:
-              # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
-              name: kubernetes-services-endpoint
-              optional: true
-          env:
-            - name: KUBERNETES_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: CALICO_NETWORKING_BACKEND
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: calico_backend
-          volumeMounts:
-            - mountPath: /var/lib/cni/networks
-              name: host-local-net-dir
-            - mountPath: /host/opt/cni/bin
-              name: cni-bin-dir
-          securityContext:
-            privileged: true
-        # This container installs the CNI binaries
-        # and CNI network config file on each node.
-        - name: install-cni
-          image: docker.io/calico/cni:v3.24.2
-          imagePullPolicy: IfNotPresent
-          command: ["/opt/cni/bin/install"]
-          envFrom:
-          - configMapRef:
-              # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
-              name: kubernetes-services-endpoint
-              optional: true
-          env:
-            # Name of the CNI config file to create.
-            - name: CNI_CONF_NAME
-              value: "10-calico.conflist"
-            # The CNI network config to install on each node.
-            - name: CNI_NETWORK_CONFIG
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: cni_network_config
-            # Set the hostname based on the k8s node name.
-            - name: KUBERNETES_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # CNI MTU Config variable
-            - name: CNI_MTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # Prevents the container from sleeping forever.
-            - name: SLEEP
-              value: "false"
-          volumeMounts:
-            - mountPath: /host/opt/cni/bin
-              name: cni-bin-dir
-            - mountPath: /host/etc/cni/net.d
-              name: cni-net-dir
-          securityContext:
-            privileged: true
-        # This init container mounts the necessary filesystems needed by the BPF data plane
-        # i.e. bpf at /sys/fs/bpf and cgroup2 at /run/calico/cgroup. Calico-node initialisation is executed
-        # in best effort fashion, i.e. no failure for errors, to not disrupt pod creation in iptable mode.
-        - name: "mount-bpffs"
-          image: docker.io/calico/node:v3.24.2
-          imagePullPolicy: IfNotPresent
-          command: ["calico-node", "-init", "-best-effort"]
-          volumeMounts:
-            - mountPath: /sys/fs
-              name: sys-fs
-              # Bidirectional is required to ensure that the new mount we make at /sys/fs/bpf propagates to the host
-              # so that it outlives the init container.
-              mountPropagation: Bidirectional
-            - mountPath: /var/run/calico
-              name: var-run-calico
-              # Bidirectional is required to ensure that the new mount we make at /run/calico/cgroup propagates to the host
-              # so that it outlives the init container.
-              mountPropagation: Bidirectional
-            # Mount /proc/ from host which usually is an init program at /nodeproc. It's needed by mountns binary,
-            # executed by calico-node, to mount root cgroup2 fs at /run/calico/cgroup to attach CTLB programs correctly.
-            - mountPath: /nodeproc
-              name: nodeproc
-              readOnly: true
-          securityContext:
-            privileged: true
-      containers:
-        # Runs calico-node container on each Kubernetes node. This
-        # container programs network policy and routes on each
-        # host.
-        - name: calico-node
-          image: docker.io/calico/node:v3.24.2
-          imagePullPolicy: IfNotPresent
-          envFrom:
-          - configMapRef:
-              # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
-              name: kubernetes-services-endpoint
-              optional: true
-          env:
-            # Use Kubernetes API as the backing datastore.
-            - name: DATASTORE_TYPE
-              value: "kubernetes"
-            # Wait for the datastore.
-            - name: WAIT_FOR_DATASTORE
-              value: "true"
-            # Set based on the k8s node name.
-            - name: NODENAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # Choose the backend to use.
-            - name: CALICO_NETWORKING_BACKEND
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: calico_backend
-            # Cluster type to identify the deployment type
-            - name: CLUSTER_TYPE
-              value: "k8s,bgp"
-            # Auto-detect the BGP IP address.
-            - name: IP
-              value: "autodetect"
-            # Enable IPIP
-            - name: CALICO_IPV4POOL_IPIP
-              value: "Always"
-            # Enable or Disable VXLAN on the default IP pool.
-            - name: CALICO_IPV4POOL_VXLAN
-              value: "Never"
-            # Enable or Disable VXLAN on the default IPv6 IP pool.
-            - name: CALICO_IPV6POOL_VXLAN
-              value: "Never"
-            # Set MTU for tunnel device used if ipip is enabled
-            - name: FELIX_IPINIPMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # Set MTU for the VXLAN tunnel device.
-            - name: FELIX_VXLANMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # Set MTU for the Wireguard tunnel device.
-            - name: FELIX_WIREGUARDMTU
-              valueFrom:
-                configMapKeyRef:
-                  name: calico-config
-                  key: veth_mtu
-            # The default IPv4 pool to create on startup if none exists. Pod IPs will be
-            # chosen from this range. Changing this value after installation will have
-            # no effect. This should fall within `--cluster-cidr`.
-            # - name: CALICO_IPV4POOL_CIDR
-            #   value: "192.168.0.0/16"
-            # Disable file logging so `kubectl logs` works.
-            - name: CALICO_DISABLE_FILE_LOGGING
-              value: "true"
-            # Set Felix endpoint to host default action to ACCEPT.
-            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
-              value: "ACCEPT"
-            # Disable IPv6 on Kubernetes.
-            - name: FELIX_IPV6SUPPORT
-              value: "false"
-            - name: FELIX_HEALTHENABLED
-              value: "true"
-          securityContext:
-            privileged: true
-          resources:
-            requests:
-              cpu: 250m
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - /bin/calico-node
-                - -shutdown
-          livenessProbe:
-            exec:
-              command:
-              - /bin/calico-node
-              - -felix-live
-              - -bird-live
-            periodSeconds: 10
-            initialDelaySeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-              - /bin/calico-node
-              - -felix-ready
-              - -bird-ready
-            periodSeconds: 10
-            timeoutSeconds: 10
-          volumeMounts:
-            # For maintaining CNI plugin API credentials.
-            - mountPath: /host/etc/cni/net.d
-              name: cni-net-dir
-              readOnly: false
-            - mountPath: /lib/modules
-              name: lib-modules
-              readOnly: true
-            - mountPath: /run/xtables.lock
-              name: xtables-lock
-              readOnly: false
-            - mountPath: /var/run/calico
-              name: var-run-calico
-              readOnly: false
-            - mountPath: /var/lib/calico
-              name: var-lib-calico
-              readOnly: false
-            - name: policysync
-              mountPath: /var/run/nodeagent
-            # For eBPF mode, we need to be able to mount the BPF filesystem at /sys/fs/bpf so we mount in the
-            # parent directory.
-            - name: bpffs
-              mountPath: /sys/fs/bpf
-            - name: cni-log-dir
-              mountPath: /var/log/calico/cni
-              readOnly: true
+      serviceAccountName: calico-node
+      terminationGracePeriodSeconds: 0
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
       volumes:
-        # Used by calico-node.
-        - name: lib-modules
-          hostPath:
-            path: /lib/modules
-        - name: var-run-calico
-          hostPath:
-            path: /var/run/calico
-        - name: var-lib-calico
-          hostPath:
-            path: /var/lib/calico
-        - name: xtables-lock
-          hostPath:
-            path: /run/xtables.lock
-            type: FileOrCreate
-        - name: sys-fs
-          hostPath:
-            path: /sys/fs/
-            type: DirectoryOrCreate
-        - name: bpffs
-          hostPath:
-            path: /sys/fs/bpf
-            type: Directory
-        # mount /proc at /nodeproc to be used by mount-bpffs initContainer to mount root cgroup2 fs.
-        - name: nodeproc
-          hostPath:
-            path: /proc
-        # Used to install CNI.
-        - name: cni-bin-dir
-          hostPath:
-            path: /opt/cni/bin
-        - name: cni-net-dir
-          hostPath:
-            path: /etc/cni/net.d
-        # Used to access CNI logs.
-        - name: cni-log-dir
-          hostPath:
-            path: /var/log/calico/cni
-        # Mount in the directory for host-local IPAM allocations. This is
-        # used when upgrading from host-local to calico-ipam, and can be removed
-        # if not using the upgrade-ipam init container.
-        - name: host-local-net-dir
-          hostPath:
-            path: /var/lib/cni/networks
-        # Used to create per-pod Unix Domain Sockets
-        - name: policysync
-          hostPath:
-            type: DirectoryOrCreate
-            path: /var/run/nodeagent
+      - hostPath:
+          path: /lib/modules
+        name: lib-modules
+      - hostPath:
+          path: /var/run/calico
+        name: var-run-calico
+      - hostPath:
+          path: /var/lib/calico
+        name: var-lib-calico
+      - hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+        name: xtables-lock
+      - hostPath:
+          path: /sys/fs/
+          type: DirectoryOrCreate
+        name: sys-fs
+      - hostPath:
+          path: /sys/fs/bpf
+          type: Directory
+        name: bpffs
+      - hostPath:
+          path: /proc
+        name: nodeproc
+      - hostPath:
+          path: /opt/cni/bin
+        name: cni-bin-dir
+      - hostPath:
+          path: /etc/cni/net.d
+        name: cni-net-dir
+      - hostPath:
+          path: /var/log/calico/cni
+        name: cni-log-dir
+      - hostPath:
+          path: /var/lib/cni/networks
+        name: host-local-net-dir
+      - hostPath:
+          path: /var/run/nodeagent
+          type: DirectoryOrCreate
+        name: policysync
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
 ---
-# Source: calico/templates/calico-kube-controllers.yaml
-# See https://github.com/projectcalico/kube-controllers
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: calico-kube-controllers
-  namespace: kube-system
   labels:
     k8s-app: calico-kube-controllers
+  name: calico-kube-controllers
+  namespace: kube-system
 spec:
-  # The controllers can only have a single active instance.
   replicas: 1
   selector:
     matchLabels:
@@ -4685,45 +4563,43 @@ spec:
     type: Recreate
   template:
     metadata:
-      name: calico-kube-controllers
-      namespace: kube-system
       labels:
         k8s-app: calico-kube-controllers
+      name: calico-kube-controllers
+      namespace: kube-system
     spec:
+      containers:
+      - env:
+        - name: ENABLED_CONTROLLERS
+          value: node
+        - name: DATASTORE_TYPE
+          value: kubernetes
+        image: calico/kube-controllers:v3.24.1
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - /usr/bin/check-status
+            - -l
+          failureThreshold: 6
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        name: calico-kube-controllers
+        readinessProbe:
+          exec:
+            command:
+            - /usr/bin/check-status
+            - -r
+          periodSeconds: 10
       nodeSelector:
         kubernetes.io/os: linux
-      tolerations:
-        # Mark the pod as a critical add-on for rescheduling.
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          effect: NoSchedule
-      serviceAccountName: calico-kube-controllers
       priorityClassName: system-cluster-critical
-      containers:
-        - name: calico-kube-controllers
-          image: docker.io/calico/kube-controllers:v3.24.2
-          imagePullPolicy: IfNotPresent
-          env:
-            # Choose which controllers to run.
-            - name: ENABLED_CONTROLLERS
-              value: node
-            - name: DATASTORE_TYPE
-              value: kubernetes
-          livenessProbe:
-            exec:
-              command:
-              - /usr/bin/check-status
-              - -l
-            periodSeconds: 10
-            initialDelaySeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-              - /usr/bin/check-status
-              - -r
-            periodSeconds: 10
+      serviceAccountName: calico-kube-controllers
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
