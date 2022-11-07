@@ -205,8 +205,8 @@ def _migrate_cri(cluster, node_group):
                                 "sudo iptables -t raw -F && "
                                 "sudo iptables -t filter -F && "
                                 # hotfix for Ubuntu 22.04
-                                "sudo systemctl stop kubepods-burstable.slice || true"
-                                "sudo systemctl restart containerd"
+                                "sudo systemctl stop kubepods-burstable.slice || true && "
+                                "sudo systemctl restart containerd && "
                                 # start kubelet
                                 "sudo systemctl restart kubelet")
         control_plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
