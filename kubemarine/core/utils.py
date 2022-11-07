@@ -295,31 +295,6 @@ def load_yaml(filepath) -> dict:
         do_fail(f"Failed to load {filepath}", exc)
 
 
-def load_multiple_yaml(filepath) -> dict:
-    yaml_dict = {}
-    try:
-        with open(filepath, 'r') as stream:
-            source_yamls = yaml.safe_load_all(stream)
-            for source_yaml in source_yamls:
-                if source_yaml:
-                    yaml_key = f"{source_yaml['kind']}_{source_yaml['metadata']['name']}"
-                    yaml_dict[yaml_key] = source_yaml
-        return yaml_dict
-    except yaml.YAMLError as exc:
-        print(f"Failed to load {filepath}", exc)
-
-
-def save_multiple_yaml(filepath, multi_yaml):
-    source_yamls = []
-    try:
-        with open(filepath, 'w') as stream:
-            for item in multi_yaml:
-                source_yamls.append(deepcopy(multi_yaml[item]))
-            yaml.dump_all(source_yamls, stream, default_flow_style=False, explicit_start=True)
-    except Exception as exc:
-        print(f"Failed to save {filepath}", exc)
-
-
 class ClusterStorage:
     """
     File preservation:
