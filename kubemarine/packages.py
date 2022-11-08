@@ -34,34 +34,6 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
 
     # copy associations for OS family to one level higher
     os_specific_associations = deepcopy(associations[os_family])
-    # Cache packages versions only if the option is set in configuration, so we cut the version from 'package_name'
-    if not cluster.inventory['services']['packages']['cache_versions']:
-        # todo remove this section, and write patch if necessary to move package_name without versions.
-        for association in os_specific_associations:
-            if type(os_specific_associations[association]['package_name']) is list:
-                for item, package in enumerate(os_specific_associations[association]['package_name']):
-                    if os_family in ["rhel", "rhel8"]:
-                        os_specific_associations[association]['package_name'][item] = \
-                                os_specific_associations[association]['package_name'][item].split('-{{')[0]
-                    else:
-                        os_specific_associations[association]['package_name'][item] = \
-                                os_specific_associations[association]['package_name'][item].split('={{')[0]
-            elif type(os_specific_associations[association]['package_name']) is str:
-                    if os_family in ["rhel", "rhel8"]:
-                        os_specific_associations[association]['package_name'] = \
-                            os_specific_associations[association]['package_name'].split('-{{')[0]
-                    else:
-                        os_specific_associations[association]['package_name'] = \
-                            os_specific_associations[association]['package_name'].split('={{')[0]
-            else:
-                raise Exception('Unexpected value for association')
-
-    else:
-        # todo switch to explicit cache_versions=false for specific packages and optionally write patch
-        # set 'skip_caching' for customer association
-        if cluster.raw_inventory.get('services', {}).get('packages', {}).get('associations', {}):
-            for package in cluster.raw_inventory['services']['packages']['associations']:
-                os_specific_associations[package]['skip_caching'] = "true"
 
     # move associations for OS families as-is
     for association_name in get_associations_os_family_keys():
@@ -191,18 +163,20 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
     """
 
     cluster = group.cluster
+    # todo skip detection of cache_versions=false packages from outside
     excluded_dict = {}
 
     if packages_list is None:
         packages_list = []
         # packages from associations
         for association_name, associated_params in cluster.inventory['services']['packages']['associations'].items():
-            packages_list.extend(get_indexed_by_pure_packages_for_association(group, association_name).keys())
-            # todo check cache_versions=true instead
-            if associated_params.get('skip_caching', False):
+            indexed_by_pure_packages = get_indexed_by_pure_packages_for_association(group, association_name)
+            if not indexed_by_pure_packages:
+                continue
+            packages_list.extend(indexed_by_pure_packages.keys())
+            if not associated_params.get('cache_versions', True):
                 # replace packages with associated version that should be excluded from cache
-                for excluded_package in associated_params['package_name']:
-                    excluded_dict[get_package_name(group.get_nodes_os(), excluded_package)] = excluded_package
+                excluded_dict.update(indexed_by_pure_packages)
 
     # deduplicate
     packages_list = list(set(packages_list))
@@ -223,9 +197,8 @@ def detect_installed_packages_versions(group: NodeGroup, packages_list: List or 
             if "not installed" in node_detected_package or "no packages found" in node_detected_package \
                     or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
                 node_detected_package = f"not installed {package}"
-            else:
-                if package in excluded_dict.keys():
-                    node_detected_package = excluded_dict[package]
+            elif package in excluded_dict.keys():
+                node_detected_package = excluded_dict[package]
             results[package][host] = node_detected_package
 
     return results
