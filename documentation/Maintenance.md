@@ -1132,7 +1132,7 @@ psp:
 rbac:
   admission: pss
   pss:
-    pod-security: enabled
+    pod-security: disabled
 ...
 ```
 
