@@ -1130,8 +1130,8 @@ psp:
 ```yaml
 ...
 rbac:
-  admission: psp
-  psp:
+  admission: pss
+  pss:
     pod-security: enabled
 ...
 ```
