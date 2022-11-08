@@ -1108,10 +1108,50 @@ for namespace. For proper matching see the following articles:
 
 1. Verify that Kubernetes cluster has version v1.23+
 2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
-3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary.
+3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary. The example of `cluster.yaml` part is the following:
+```yaml
+...
+rbac:
+  admission: psp
+  psp:
+    pod-security: enabled
+...
+```
+
+The example of `procedure.yaml` is the following:
+```yaml
+psp:
+  pod-security: disabled
+```
+
 4. Verify if the apllications in cluster work properly
-5. Set the `admission: pss` options in `cluster.yaml`
-6. Create the `procedure.yaml` for `migrate_pss` and fill in `namespaces` subsection in `pss` section in procedure file
+5. Set the `admission: pss` options in `cluster.yaml`. The example of `cluster.yaml` part is the following:
+
+```yaml
+...
+rbac:
+  admission: psp
+  psp:
+    pod-security: enabled
+...
+```
+
+6. Create the `procedure.yaml` for `migrate_pss` and fill in `namespaces` subsection in `pss` section in procedure file. The example of `procedure.yaml` is the following:
+
+```yaml
+pss:
+  pod-security: enabled
+  namespaces:
+    - namespace_1
+    - namespace_2:
+      enforce: "baseline"
+    - namespace_3
+  namespaces_defaults:
+    enforce: "privileged"
+    enforce-version: latest
+restart-pods: false
+```
+
 7. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution
 8. Restart pods in all namespaces if `restart-pods: false` option was used on previous step
 9. Verify if the applications in cluster work properly
