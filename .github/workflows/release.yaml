@@ -5,6 +5,7 @@ on:
     types:
       - published
 
+
 jobs:
   build-binary:
     runs-on: ubuntu-latest
