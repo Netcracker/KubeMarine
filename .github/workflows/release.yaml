@@ -1,9 +1,9 @@
 name: Make release with Build binaries
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  release:
+    types:
+      - published
 
 jobs:
   build-binary:
@@ -23,23 +23,13 @@ jobs:
         with:
           path: ./
           requirements: "./requirements.txt"
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: true
-          prerelease: true
       - name: Upload Release Asset amd64
         id: upload-release-asset-amd64
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            upload_url: ${{ github.event.release.upload_url }}
             asset_path: ${{ steps.amd64.outputs.location }}
             asset_name: ${{ steps.amd64.outputs.filename }}
             asset_content_type: ${{ steps.amd64.outputs.content_type }}
@@ -49,7 +39,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ steps.win64.outputs.location }}
           asset_name: ${{ steps.win64.outputs.filename }}
           asset_content_type: ${{ steps.win64.outputs.content_type }}
