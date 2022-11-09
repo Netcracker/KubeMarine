@@ -135,3 +135,40 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         inventory = defaults.append_controlplain(inventory, None)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][1]['address'])
+
+    def test_controlplain_skip_not_bind(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['vrrp_ips'] = [
+            {
+                'ip': '192.168.2.0',
+                'floating_ip': '1.1.1.1',
+                'params': {
+                    'maintenance-type': 'not bind'
+                }
+            },
+            {
+                'ip': '192.168.2.1',
+                'floating_ip': '2.2.2.2',
+            }
+        ]
+        inventory = defaults.append_controlplain(inventory, None)
+        self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
+        self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
+
+    def test_controlplain_skip_not_bind_half_vrrp_half_master(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['vrrp_ips'] = [
+            {
+                'ip': '192.168.2.0',
+                'floating_ip': '1.1.1.1',
+                'params': {
+                    'maintenance-type': 'not bind'
+                }
+            },
+            {
+                'ip': '192.168.2.1',
+            }
+        ]
+        inventory = defaults.append_controlplain(inventory, None)
+        self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
+        self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
