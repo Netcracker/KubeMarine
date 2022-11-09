@@ -327,100 +327,13 @@ class KubernetesCluster(Environment):
             return results_values[0]
         raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
-    def cache_package_versions(self):
-        # todo not cache twice for add_node procedure
-        # Cache packages only if it's set in configuration
-        if not self.inventory['services']['packages']['cache_versions']:
-            self.log.debug("Skip caching of package versions as it is manually disabled")
-            return
-
-        os_ids = self.get_os_identifiers()
-        different_os = list(set(os_ids.values()))
-        if len(different_os) > 1:
-            self.log.debug(f"Final nodes have different OS families or versions, packages will not be cached. "
-                           f"List of (OS family, version): {different_os}")
-            return
-
-        os_family = different_os[0][0]
-        if os_family in ('unknown', 'unsupported'):
-            # For add_node/install procedures we check that OS is supported in prepare.check.system task.
-            # For check_iaas procedure it is allowed to have unsupported OS, so skip caching.
-            self.log.debug("Skip caching of packages for unsupported OS.")
-            return
-
-        nodes_cache_versions = self.nodes['all'].get_final_nodes().get_sudo_nodes()
-        if nodes_cache_versions.is_empty():
-            # For add_node/install procedures we check that all nodes are sudoers in prepare.check.sudoer task.
-            # For check_iaas procedure the nodes might still be not sudoers, so skip caching.
-            self.log.debug(f"There are no nodes with sudo privileges, packages will not be cached.")
-            return
-
-        self._detect_and_cache_package_versions_by_group(nodes_cache_versions)
-        self.log.debug('Package versions detection finished')
-
-    def _detect_and_cache_package_versions_by_group(self, group: NodeGroup):
-        from kubemarine import packages
-        detected_packages = packages.detect_installed_packages_version_groups(group)
-
-        for association_name, associated_params in self.inventory['services']['packages']['associations'].items():
-            indexed_by_pure_packages = packages.get_indexed_by_pure_packages_for_association(group, association_name)
-            if not indexed_by_pure_packages:
-                continue
-
-            final_packages_list = []
-
-            for package in indexed_by_pure_packages.keys():
-                detected_package_versions = list(detected_packages[package].keys())
-                installed_packages = []
-                for version in detected_package_versions:
-                    # add package version to list only if it was found as installed
-                    if "not installed" not in version:
-                        installed_packages.append(version)
-
-                # if there no versions detected, then set package version to default
-                if not installed_packages:
-                    final_packages_list.append(indexed_by_pure_packages[package])
-                else:
-                    # todo what if installed with different versions?
-                    final_packages_list.extend(installed_packages)
-
-            # if non-multiple value, then convert to simple string
-            # packages can contain multiple package values, like docker package
-            # (it has docker-ce, docker-cli and containerd.io packages for installation)
-            if len(final_packages_list) == 1:
-                final_packages_list = final_packages_list[0]
-            else:
-                final_packages_list = list(set(final_packages_list))
-
-            associated_params['package_name'] = final_packages_list
-        # packages from direct installation section
-        if self.inventory['services']['packages'].get('install', {}):
-            final_packages_list = []
-            for package in self.inventory['services']['packages']['install']['include']:
-                package_versions_list = []
-                if package in self.globals['compatibility_map']['software']:
-                    detected_package_versions = list(detected_packages[package].keys())
-                    for version in detected_package_versions:
-                        # skip version, which ended with special symbol = or -
-                        # (it is possible in some cases)
-                        if "not installed" not in version and version[-1] != '=' and version[-1] != '-':
-                            # add package version to list only if it was found as installed
-                            package_versions_list.append(version)
-                # if there no versions detected, then set package version to default
-                if not package_versions_list:
-                    package_versions_list = [package]
-                final_packages_list = final_packages_list + package_versions_list
-            self.inventory['services']['packages']['install']['include'] = list(set(final_packages_list))
-        return detected_packages
-
     def dump_finalized_inventory(self):
-        self.cache_package_versions()
-
         from kubemarine.core import defaults
         from kubemarine.procedures import remove_node
         from kubemarine import controlplane, cri, packages
 
         cluster_finalized_functions = {
+            packages.cache_package_versions,
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
             remove_node.remove_node_finalize_inventory,

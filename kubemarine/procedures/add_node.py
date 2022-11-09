@@ -17,9 +17,10 @@
 import copy
 
 from collections import OrderedDict
-from kubemarine import kubernetes, system
+from kubemarine import kubernetes, packages
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
@@ -92,13 +93,13 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
     return inventory_to_finalize
 
 
-def cache_installed_packages(cluster):
+def cache_installed_packages(cluster: KubernetesCluster):
     """
     Task which is used to collect already installed packages versions on already existing nodes.
     It is called first during "add_node" procedure,
     so that new nodes install exactly the same packages as on other already existing nodes.
     """
-    cluster.cache_package_versions()
+    packages.cache_package_versions(cluster, cluster.inventory, ensured_associations_only=True)
 
 
 tasks = OrderedDict(copy.deepcopy(install.tasks))
