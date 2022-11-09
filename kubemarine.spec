@@ -27,7 +27,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 'kubemarine.plugins.nginx_ingress.verify_inventory',
                 'kubemarine.plugins.nginx_ingress.enrich_inventory',
                 'kubemarine.plugins.enrich_inventory',
-                'kubemarine.plugins.verify_inventory',
+                'kubemarine.plugins.verify_inventory'
              ],
              pathex=['./'],
              binaries=[],
