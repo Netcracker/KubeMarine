@@ -1,14 +1,20 @@
-name: Make release with Build binaries
+name: Make release with Build binaries and Publish Artifacts
 
 on:
   release:
     types:
       - published
+  push:
+    branches:
+      - 'main'
 
+env:
+  TAG_NAME: ${{ github.event.release.tag_name || (github.ref == 'refs/heads/main' && 'main') || 'unknown' }}
 
 jobs:
   build-binary:
     runs-on: ubuntu-latest
+    if: github.event.release
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
@@ -44,3 +50,13 @@ jobs:
           asset_path: ${{ steps.win64.outputs.location }}
           asset_name: ${{ steps.win64.outputs.filename }}
           asset_content_type: ${{ steps.win64.outputs.content_type }}
+
+  publish-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build . -t ghcr.io/dmyar21/kubemarine:${{ env.TAG_NAME }}
+      - run: docker build . -t ghcr.io/dmyar21/kubemarine:latest
+      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+      - run: docker push ghcr.io/dmyar21/kubemarine:${{ env.TAG_NAME }}
+      - run: docker push ghcr.io/dmyar21/kubemarine:latest
