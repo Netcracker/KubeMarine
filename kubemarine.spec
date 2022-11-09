@@ -32,7 +32,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 ('./kubemarine/templates/*',                './kubemarine/templates'),
                 ('./kubemarine/templates/plugins/*',        './kubemarine/templates/plugins'),
                 ('./kubemarine/plugins/*',                  './kubemarine/plugins'),
-                ('./kubemarine/*',                           'version')
+                ('./kubemarine/version',                    './kubemarine/')
              ],
              runtime_hooks=[],
              excludes=[],
