@@ -118,6 +118,8 @@ def enrich_original_yaml(cluster):
                 ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
                             'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
                 env_list = []
+                ###DEBUG
+                cluster.log.debug(f"ORIGINAL_LIST: {obj_list[key]['spec']['template']['spec']['containers'][num]['env']}")
                 for name, value in cluster.inventory['plugins']['calico']['env'].items():
                     ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
                     if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
@@ -139,7 +141,16 @@ def enrich_original_yaml(cluster):
                         env_list.append({'name': name, 'valueFrom': value})
                         cluster.log.verbose(f"The {key} has been patched in "
                                             f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                obj_list[key]['spec']['template']['spec']['containers'][num]['env'] = env_list
+                ###DEBUG
+                cluster.log.debug(f"LIST: {env_list}")
+                i = 0
+                for env in obj_list[key]['spec']['template']['spec']['containers'][num]['env']:
+                    for item in env_list:
+                        if env['name'] == item['name']:
+                            obj_list[key]['spec']['template']['spec']['containers'][num]['env'][i] = item
+                    i += 1
+                ###DEBUG
+                cluster.log.debug(f"RESULT_LIST: {obj_list[key]['spec']['template']['spec']['containers'][num]['env']}")
 
     for key in ["Service_calico-typha", "PodDisruptionBudget_calico-typha"]:
         if obj_list.get(key, ''):
