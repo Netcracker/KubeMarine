@@ -15,3 +15,4 @@ jobs:
       - run: docker build . -t ghcr.io/dmyar21/kubemarine:${{ env.TAG_NAME }}
       - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - run: docker push ghcr.io/dmyar21/kubemarine:${{ env.TAG_NAME }}
+      - run: docker push ghcr.io/dmyar21/kubemarine:latest
