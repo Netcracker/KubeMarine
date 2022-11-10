@@ -15,17 +15,19 @@
 import re
 from importlib import import_module
 from copy import deepcopy
+from typing import Optional
 
 import yaml
 
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine import controlplane 
+from kubemarine import controlplane
 
 # All enrichment procedures should not connect to any node.
-# The information about nodes should be collected within KubernetesCluster#_detect_nodes_context().
+# The information about nodes should be collected within KubernetesCluster#detect_nodes_context().
 DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
@@ -266,7 +268,7 @@ def apply_registry_endpoints(inventory, cluster):
     return registry_mirror_address, containerd_endpoints, thirdparties_address
 
 
-def append_controlplain(inventory, cluster):
+def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
 
     if inventory.get('control_plain', {}).get('internal') and inventory.get('control_plain', {}).get('external'):
         if cluster:
@@ -290,7 +292,9 @@ def append_controlplain(inventory, cluster):
                 if internal_address is None:
                     internal_address = item
                     internal_address_source = 'vrrp_ip[%s]' % i
-            else:
+            # todo remove p1_migrate_not_bind_vrrp_fix after next release
+            elif item.get('params', {}).get('maintenance-type', False) != 'not bind' \
+                    or (cluster and not cluster.context.get('p1_migrate_not_bind_vrrp_fix', True)):
                 if internal_address is None or item.get('control_endpoint', False):
                     internal_address = item['ip']
                     internal_address_source = 'vrrp_ip[%s]' % i

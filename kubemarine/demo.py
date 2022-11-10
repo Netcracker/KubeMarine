@@ -207,8 +207,8 @@ class FakeResources(DynamicResources):
         self._fake_shell = fake_shell if fake_shell else FakeShell()
         self._fake_fs = fake_fs if fake_fs else FakeFS()
 
-    def _create_cluster(self):
-        return FakeKubernetesCluster(self.raw_inventory(), self.context,
+    def _new_cluster_instance(self, context: dict):
+        return FakeKubernetesCluster(self.raw_inventory(), context,
                                      procedure_inventory=self.procedure_inventory(),
                                      logger=self.logger(),
                                      fake_shell=self._fake_shell, fake_fs=self._fake_fs)
@@ -387,10 +387,6 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     elif os_name in ['ubuntu', 'debian']:
         os_family = 'debian'
 
-    nodes_context = {
-        "nodes": {}
-    }
-
     for node in inventory['nodes']:
         node_context = {
             'name': node['name'],
@@ -409,9 +405,9 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
         connect_to = node['internal_address']
         if node.get('address'):
             connect_to = node['address']
-        nodes_context['nodes'][connect_to] = node_context
+        context['nodes'][connect_to] = node_context
 
-    nodes_context['os'] = os_family
+    context['os'] = os_family
 
     # It is possible to disable FakeCluster and create real cluster Object for some business case
     if fake:
@@ -419,12 +415,12 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     else:
         cluster = KubernetesCluster(inventory, context)
 
-    cluster.enrich(nodes_context=nodes_context)
+    cluster.enrich()
     return cluster
 
 
-def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
-    inventory = {
+def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mntc=0):
+    inventory: dict = {
         'node_defaults': {
             'keyfile': '/dev/null',
             'username': 'anonymous'
@@ -470,14 +466,38 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0):
             'roles': roles
         })
 
-    if isinstance(keepalived, int):
-        ips = []
-        if keepalived > 0:
-            for i in range(0, keepalived):
-                ips.append('10.101.2.%s' % (i + 1))
-        keepalived = ips
+    ip_i = 0
+    vrrp_ips = []
 
-    inventory['vrrp_ips'] = keepalived
+    if isinstance(keepalived, list):
+        vrrp_ips.append(deepcopy(keepalived))
+    elif isinstance(keepalived, int) and keepalived > 0:
+        for _ in range(keepalived):
+            ip_i = ip_i + 1
+            vrrp_ips.append('10.101.2.%s' % ip_i)
+
+    if isinstance(haproxy_mntc, list):
+        vrrp_ips.append(deepcopy(haproxy_mntc))
+    elif isinstance(haproxy_mntc, int) and haproxy_mntc > 0:
+        for _ in range(haproxy_mntc):
+            ip_i = ip_i + 1
+            vrrp_ips.append({
+                'ip': '10.101.2.%s' % ip_i,
+                'params': {
+                    'maintenance-type': 'not bind'
+                }
+            })
+
+    if haproxy_mntc:
+        inventory['services'] = {
+            'loadbalancer' : {
+                'haproxy': {
+                    'maintenance_mode': True
+                }
+            }
+        }
+
+    inventory['vrrp_ips'] = vrrp_ips
 
     return inventory
 
@@ -512,10 +532,17 @@ def empty_action(*args, **kwargs) -> None:
     pass
 
 
+def new_scheme(scheme: dict, role: str, number: int):
+    scheme = deepcopy(scheme)
+    scheme[role] = number
+    return scheme
+
+
 FULLHA = {'balancer': 1, 'master': 3, 'worker': 3}
 FULLHA_KEEPALIVED = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
 FULLHA_NOBALANCERS = {'balancer': 0, 'master': 3, 'worker': 3}
-ALLINONE = {'master': 1}
+ALLINONE = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
 MINIHA = {'master': 3}
 MINIHA_KEEPALIVED = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
                      'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
+NON_HA_BALANCER = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}

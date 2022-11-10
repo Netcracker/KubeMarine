@@ -58,6 +58,7 @@ Remember the following when upgrading Kubemarine:
   For more information, refer to the [Patch Identifiers](#patch-identifiers) section.
 
 **Note**: As much as any other maintenance procedure, `migrate_kubemarine` can make the cluster temporarily unavailable.
+**Note**: Rollback is not supported. To revert to previous Kubemarine version need to reinstall it.
 
 #### Patch Identifiers
 

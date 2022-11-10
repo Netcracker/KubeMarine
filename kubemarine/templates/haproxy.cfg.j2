@@ -67,3 +67,4 @@ backend kubernetes_control_plane_nodes
     server {{ node['name'] }} {{ node['internal_address'] }}:6443 check port 6443
 {%- endif %}
 {%- endfor %}
+
