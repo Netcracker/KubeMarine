@@ -95,7 +95,6 @@ def enrich_original_yaml(cluster):
                 obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
                 cluster.log.verbose(f"The {key} has been patched in "
                                     f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-            # 'mount-bpffs' and 'flexvol-driver' must not be at the same result YAML, result validation should cover this case
             if container['name'] == "mount-bpffs":
                 num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
                 val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
@@ -118,8 +117,6 @@ def enrich_original_yaml(cluster):
                 ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
                             'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
                 env_list = []
-                ###DEBUG
-                cluster.log.debug(f"ORIGINAL_LIST: {obj_list[key]['spec']['template']['spec']['containers'][num]['env']}")
                 for name, value in cluster.inventory['plugins']['calico']['env'].items():
                     ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
                     if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
@@ -141,16 +138,12 @@ def enrich_original_yaml(cluster):
                         env_list.append({'name': name, 'valueFrom': value})
                         cluster.log.verbose(f"The {key} has been patched in "
                                             f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                ###DEBUG
-                cluster.log.debug(f"LIST: {env_list}")
                 i = 0
                 for env in obj_list[key]['spec']['template']['spec']['containers'][num]['env']:
                     for item in env_list:
                         if env['name'] == item['name']:
                             obj_list[key]['spec']['template']['spec']['containers'][num]['env'][i] = item
                     i += 1
-                ###DEBUG
-                cluster.log.debug(f"RESULT_LIST: {obj_list[key]['spec']['template']['spec']['containers'][num]['env']}")
 
     for key in ["Service_calico-typha", "PodDisruptionBudget_calico-typha"]:
         if obj_list.get(key, ''):
@@ -187,6 +180,7 @@ def enrich_original_yaml(cluster):
     cluster.log.verbose(f"The total number of exclued objects is {len(excluded_list)} "
                         f"the objects are the following: {excluded_list}")
 
+    # TODO: check results 
     #validate_result()
     save_multiple_yaml(calico_yaml, obj_list)
 
@@ -234,9 +228,10 @@ def validate_original(cluster, obj_list):
             cluster.log.verbose(f"The current version of original yaml does not include"
                                 f"the following object: {key}")
 
-
-def validate_result(cluster, obj_list):
-    return True
+# TODO: implement method for results validation
+# 'mount-bpffs' and 'flexvol-driver' initContainers must not be at the same result YAML, result validation should cover this case
+# Some validation inside the objects
+#def validate_result(cluster, obj_list):
 
 
 def load_multiple_yaml(filepath) -> dict:
