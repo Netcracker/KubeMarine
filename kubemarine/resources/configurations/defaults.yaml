@@ -431,7 +431,6 @@ plugins:
         - config:
             source: 'kubemarine/plugins/yaml/calico-{{ plugins.calico.version }}.yaml'
             do_render: False
-#        - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
         - expect:
             daemonsets:
               - calico-node

@@ -945,9 +945,6 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     destination_nodes = config.get('destination_nodes', [])
     apply_groups = config.get('apply_groups', [])
     apply_nodes = config.get('apply_nodes', [])
-    ###########################################
-    cluster.log.debug(f"CONFIG: {config}")
-    ###########################################
     do_render = config.get('do_render', True)
 
     # Determite absolute path to templates
