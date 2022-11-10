@@ -343,6 +343,7 @@ def install(group):
                     hostname=node["name"])
                 log.debug("Uploading to '%s'..." % node["connect_to"])
                 node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
+                node["connection"].sudo("chmod 644 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(group)
