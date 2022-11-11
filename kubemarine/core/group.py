@@ -881,7 +881,7 @@ class NodeGroup:
 
     def get_host(self):
         if len(self.nodes) != 1:
-            raise Exception("Cannot get the only host from group of few nodes")
+            raise Exception("Cannot get the only host from not a single node")
 
         return list(self.nodes.keys())[0]
 

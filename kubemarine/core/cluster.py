@@ -276,6 +276,8 @@ class KubernetesCluster(Environment):
             raise Exception(f'Unsupported association "{association_key}" value type for package "{package}", '
                             f'got: {str(association_value)}')
 
+        return association_value
+
     def get_package_association(self, package: str, association_key: str) -> str or list:
         """
         Returns the specified association for the specified package from inventory for the cluster.

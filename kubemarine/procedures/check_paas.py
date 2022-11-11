@@ -110,7 +110,6 @@ def recommended_system_packages_versions(cluster: KubernetesCluster):
         version_key = system.get_compatibility_version_key(cluster)
         if not version_key:
             raise TestFailure("OS is unknown or multiple OS present")
-        version_key = system.get_compatibility_version_key(cluster)
         k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
         compatibility = cluster.globals["compatibility_map"]["software"]
         if k8s_version not in compatibility["kubeadm"]:

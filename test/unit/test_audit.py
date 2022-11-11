@@ -34,7 +34,7 @@ class NodeGroupResultsTest(unittest.TestCase):
 
     def test_audit_installation_for_debian(self):
         cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
@@ -61,7 +61,7 @@ class NodeGroupResultsTest(unittest.TestCase):
 
     def test_audit_installation_when_already_installed_for_debian(self):
         cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
 
@@ -76,7 +76,7 @@ class NodeGroupResultsTest(unittest.TestCase):
     def test_audit_installation_when_partly_installed_for_debian(self):
         cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
         all_nodes_group = cluster.nodes['all'].nodes
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
@@ -119,7 +119,7 @@ class NodeGroupResultsTest(unittest.TestCase):
 
     def test_audit_configuring(self):
         cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
         package_name = package_associations['package_name']
         config_location = package_associations['config_location']
 
