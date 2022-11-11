@@ -36,13 +36,13 @@ from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff
 
 
-def services_status(cluster, service_type):
+def services_status(cluster: KubernetesCluster, service_type: str):
     with TestCase(cluster.context['testsuite'], '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
         service_name = service_type
 
-        if cluster.inventory['services']['packages']['associations'].get(service_type):
-            service_name = cluster.inventory['services']['packages']['associations'][service_type]['service_name']
+        if cluster.get_os_family() != 'multiple':
+            service_name = cluster.get_package_association(service_type, 'service_name')
 
         group = cluster.nodes['all']
         if service_type == 'haproxy':
@@ -147,7 +147,7 @@ def recommended_system_packages_versions(cluster: KubernetesCluster):
         good_results = set()
         bad_results = []
         for package_alias, expected_packages in expected_system_packages.items():
-            actual_packages = cluster.inventory["services"]["packages"]["associations"][package_alias]["package_name"]
+            actual_packages = cluster.get_package_association(package_alias, "package_name")
             if not isinstance(actual_packages, list):
                 actual_packages = [actual_packages]
             for expected_pckg, version in expected_packages.items():
@@ -192,7 +192,7 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
         else:
             raise Exception(f"Unknown system package alias: {pckg_alias}")
 
-        packages = cluster.inventory['services']['packages']['associations'][pckg_alias]['package_name']
+        packages = cluster.get_package_association(pckg_alias, 'package_name')
         if not isinstance(packages, list):
             packages = [packages]
         return check_packages_versions(cluster, tc, group, packages)

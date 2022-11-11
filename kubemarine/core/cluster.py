@@ -227,21 +227,13 @@ class KubernetesCluster(Environment):
     def get_os_family(self) -> str:
         """
         Returns common OS family name from all final remote hosts.
+        The method can be used during enrichment when NodeGroups are not yet calculated.
         :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
         """
-        return self.nodes['all'].get_final_nodes().get_nodes_os()
-
-    def get_os_family_from_new_nodes_or_final(self) -> str:
-        """
-        The method can be used during enrichment when NodeGroups are not yet calculated.
-        """
-        procedure = self.context['initial_procedure']
-
-        # For add_node procedure, check only new nodes. Otherwise, use final (except removed) nodes.
         hosts_detect_os_family = []
         for node in self.inventory['nodes']:
             host = self.get_access_address_from_node(node)
-            if 'remove_node' not in node['roles'] and (procedure != 'add_node' or 'add_node' in node['roles']):
+            if 'remove_node' not in node['roles']:
                 hosts_detect_os_family.append(host)
 
         return self.get_os_family_for_nodes(hosts_detect_os_family)
@@ -255,13 +247,15 @@ class KubernetesCluster(Environment):
 
         return os_ids
 
-    def _get_associations_for_os(self, os_family) -> dict:
-        package_associations = self.inventory['services']['packages']['associations']
-        active_os_family = self.get_os_family_from_new_nodes_or_final()
-        if active_os_family != os_family:
-            package_associations = package_associations[os_family]
+    def _get_associations_for_os(self, os_family: str, package: str) -> dict:
+        if os_family in ('unknown', 'unsupported', 'multiple'):
+            raise Exception("Failed to get associations for unsupported or multiple OS families")
 
-        return package_associations
+        associations = self.inventory['services']['packages']['associations'][os_family].get(package)
+        if associations is None:
+            raise Exception(f'Failed to get associations for package "{package}"')
+
+        return associations
 
     def get_associations_for_node(self, host: str, package: str) -> dict:
         """
@@ -270,15 +264,28 @@ class KubernetesCluster(Environment):
         :param package: The package name to get the associations for
         :return: Dict with packages and their associations
         """
-        if package in ('debian', 'rhel', 'rhel8'):
-            raise Exception(f'Failed to get associations for package "{package}"')
-
         node_os_family = self.get_os_family_for_node(host)
-        associations = self._get_associations_for_os(node_os_family).get(package)
-        if associations is None:
-            raise Exception(f'Failed to get associations for package "{package}"')
+        return self._get_associations_for_os(node_os_family, package)
 
-        return associations
+    def _get_package_associations_for_os(self, os_family: str, package: str, association_key: str) -> str or list:
+        associations = self._get_associations_for_os(os_family, package)
+        association_value = associations.get(association_key)
+        if association_value is None:
+            raise Exception(f'Failed to get association "{association_key}" for package "{package}"')
+        if not isinstance(association_value, str) and not isinstance(association_value, list):
+            raise Exception(f'Unsupported association "{association_key}" value type for package "{package}", '
+                            f'got: {str(association_value)}')
+
+    def get_package_association(self, package: str, association_key: str) -> str or list:
+        """
+        Returns the specified association for the specified package from inventory for the cluster.
+        The method can be used only if cluster has nodes with the same and supported OS family.
+        :param package: The package name to get the association for
+        :param association_key: Association key to get
+        :return: Association string or list value
+        """
+        os_family = self.get_os_family()
+        return self._get_package_associations_for_os(os_family, package, association_key)
 
     def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str or list:
         """
@@ -288,14 +295,8 @@ class KubernetesCluster(Environment):
         :param association_key: Association key to get
         :return: Association string or list value
         """
-        associations = self.get_associations_for_node(host, package)
-        association_value = associations.get(association_key)
-        if association_value is None:
-            raise Exception(f'Failed to get association "{association_key}" for package "{package}"')
-        if not isinstance(association_value, str) and not isinstance(association_value, list):
-            raise Exception(f'Unsupported association "{association_key}" value type for package "{package}", '
-                            f'got: {str(association_value)}')
-        return association_value
+        os_family = self.get_os_family_for_node(host)
+        return self._get_package_associations_for_os(os_family, package, association_key)
 
     def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
         """

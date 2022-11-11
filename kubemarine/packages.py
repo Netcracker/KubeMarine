@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
 from typing import List, Dict
 
-from kubemarine import yum, apt, system
+from kubemarine import yum, apt
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
@@ -23,26 +22,26 @@ from kubemarine.core.yaml_merger import default_merger
 
 
 def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
-    os_family = cluster.get_os_family_from_new_nodes_or_final()
-    # todo what if new and existing nodes have different OS family but new nodes have the same os family?
-    if os_family in ('unknown', 'unsupported', 'multiple'):
-        cluster.log.debug("Skip enrichment of associations as the nodes do not have single OS family")
-        # Skip enrichment. Some features might not work.
-        return inventory
-
     associations: dict = inventory['services']['packages']['associations']
-
-    # copy associations for OS family to one level higher
-    os_specific_associations = deepcopy(associations[os_family])
+    os_propagated_associations = {}
 
     # move associations for OS families as-is
     for association_name in get_associations_os_family_keys():
-        os_specific_associations[association_name] = associations.pop(association_name)
+        os_propagated_associations[association_name] = associations.pop(association_name)
 
-    # merge remained explicitly defined package properties with priority
-    default_merger.merge(os_specific_associations, associations)
+    inventory['services']['packages']['associations'] = os_propagated_associations
 
-    inventory['services']['packages']['associations'] = os_specific_associations
+    # Check remained associations section if they are customized at global level.
+    if associations:
+        os_family = cluster.get_os_family()
+        if os_family == 'multiple':
+            raise Exception(
+                "It is not supported to customize services.packages.associations section "
+                "if nodes have different OS families. "
+                "Please move the section to corresponding services.packages.associations.<os_family> section.")
+        elif os_family not in ('unknown', 'unsupported'):
+            # move remained associations properties to the specific OS family section and merge with priority
+            default_merger.merge(os_propagated_associations[os_family], associations)
 
     return inventory
 
@@ -52,7 +51,7 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_
     different_os = list(set(os_ids.values()))
     if len(different_os) > 1:
         cluster.log.debug(f"Final nodes have different OS families or versions, packages will not be cached. "
-                       f"List of (OS family, version): {different_os}")
+                          f"List of (OS family, version): {different_os}")
         return inventory
 
     os_family = different_os[0][0]
@@ -69,7 +68,7 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_
         cluster.log.debug(f"There are no nodes with sudo privileges, packages will not be cached.")
         return inventory
 
-    packages_list = _get_packages_to_detect_versions(inventory, ensured_associations_only)
+    packages_list = _get_packages_to_detect_versions(cluster, inventory, ensured_associations_only)
     detected_packages = detect_installed_packages_version_groups(nodes_cache_versions, packages_list)
 
     _cache_package_associations(cluster, inventory, detected_packages, ensured_associations_only)
@@ -79,11 +78,15 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_
     return inventory
 
 
-def _get_package_names_for_association(inventory: dict, association_name: str) -> list:
+def _get_associations(cluster: KubernetesCluster, inventory: dict):
+    return inventory['services']['packages']['associations'][cluster.get_os_family()]
+
+
+def _get_package_names_for_association(cluster: KubernetesCluster, inventory: dict, association_name: str) -> list:
     if association_name in get_associations_os_family_keys():
         return []
 
-    associated_packages = inventory['services']['packages']['associations'][association_name].get('package_name')
+    associated_packages = _get_associations(cluster, inventory)[association_name].get('package_name')
     if isinstance(associated_packages, str):
         associated_packages = [associated_packages]
     elif not isinstance(associated_packages, list):
@@ -92,24 +95,25 @@ def _get_package_names_for_association(inventory: dict, association_name: str) -
     return associated_packages
 
 
-def _get_packages_for_associations_to_detect(inventory: dict, association_name: str,
+def _get_packages_for_associations_to_detect(cluster: KubernetesCluster, inventory: dict, association_name: str,
                                              ensured_association_only: bool) -> list:
-    packages_list = _get_package_names_for_association(inventory, association_name)
+    packages_list = _get_package_names_for_association(cluster, inventory, association_name)
     if not packages_list:
         return []
 
     global_cache_versions = inventory['services']['packages']['cache_versions']
-    associated_params = inventory['services']['packages']['associations'][association_name]
+    associated_params = _get_associations(cluster, inventory)[association_name]
     if not ensured_association_only or (global_cache_versions and associated_params.get('cache_versions', True)):
         return packages_list
 
     return []
 
 
-def _get_packages_to_detect_versions(inventory: dict, ensured_association_only: bool) -> list:
+def _get_packages_to_detect_versions(cluster: KubernetesCluster, inventory: dict, ensured_association_only: bool) -> list:
     packages_list = []
-    for association_name in inventory['services']['packages']['associations'].keys():
-        packages_list.extend(_get_packages_for_associations_to_detect(inventory, association_name, ensured_association_only))
+    for association_name in _get_associations(cluster, inventory).keys():
+        packages_list.extend(_get_packages_for_associations_to_detect(
+            cluster, inventory, association_name, ensured_association_only))
 
     if not ensured_association_only and inventory['services']['packages'].get('install', {}):
         packages_list.extend(inventory['services']['packages']['install']['include'])
@@ -119,8 +123,9 @@ def _get_packages_to_detect_versions(inventory: dict, ensured_association_only: 
 
 def _cache_package_associations(cluster: KubernetesCluster, inventory: dict,
                                 detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
-    for association_name, associated_params in inventory['services']['packages']['associations'].items():
-        packages_list = _get_packages_for_associations_to_detect(inventory, association_name, ensured_association_only)
+    for association_name, associated_params in _get_associations(cluster, inventory).items():
+        packages_list = _get_packages_for_associations_to_detect(
+            cluster, inventory, association_name, ensured_association_only)
         if not packages_list:
             continue
 
@@ -181,9 +186,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
 def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict):
     final_nodes = cluster.nodes['all'].get_final_nodes()
     for os_family in get_associations_os_family_keys():
-        # Do not remove OS family associations section in finalized inventory if any node has this OS family, because
-        # 1) the user might modified it directly and we not always enrich common associations section.
-        # 2) in add_node procedure we enrich associations by new nodes only while initial nodes might have different OS.
+        # Do not remove OS family associations section in finalized inventory if any node has this OS family.
         if final_nodes.get_subgroup_with_os(os_family).is_empty():
             del inventory['services']['packages']['associations'][os_family]
 

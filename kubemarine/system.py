@@ -115,7 +115,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
             as stream:
         base_associations = yaml.safe_load(stream)["services"]["packages"]["associations"][os_family]
 
-    cluster_associations = deepcopy(cluster.inventory["services"]["packages"]["associations"])
+    cluster_associations = deepcopy(inventory["services"]["packages"]["associations"][os_family])
     previous_ver = cluster.context["initial_kubernetes_version"]
     upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
     for version in upgrade_plan:
@@ -135,9 +135,13 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
     cluster.context["packages"] = {"upgrade_required": upgrade_required}
 
     upgrade_ver = cluster.context["upgrade_version"]
-    packages_section = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages")
-    if packages_section:
-        default_merger.merge(inventory["services"]["packages"], packages_section)
+    packages_section = deepcopy(cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}))
+    # move associations to the OS family specific section, and then merge with associations from procedure
+    associations = packages_section.pop("associations", {})
+    default_merger.merge(inventory["services"]["packages"]["associations"][os_family], associations)
+
+    # merge remained packages section
+    default_merger.merge(inventory["services"]["packages"], packages_section)
 
     return inventory
 
@@ -148,7 +152,7 @@ def get_system_packages_for_upgrade(cluster):
     compatibility = cluster.globals["compatibility_map"]["software"]
 
     # handle special cases in which upgrade is not required for particular package
-    cluster_associations = cluster.inventory["services"]["packages"]["associations"]
+    cluster_associations = cluster.inventory["services"]["packages"]["associations"][cluster.get_os_family()]
     upgrade_associations = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}).get("associations", {})
     system_packages = get_system_packages(cluster)
     upgrade_required = list(system_packages)

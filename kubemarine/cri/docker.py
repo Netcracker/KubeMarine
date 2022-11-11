@@ -40,16 +40,15 @@ def uninstall(group):
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
 
-def enable(group):
-    system.enable_service(
-        group,
-        name=group.cluster.inventory['services']['packages']['associations']['docker']['service_name'], now=True)
+def enable(group: NodeGroup):
+    # currently it is invoked only for single node
+    service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
+    system.enable_service(group, name=service_name, now=True)
 
 
-def disable(group):
-    system.disable_service(
-        group,
-        name=group.cluster.inventory['services']['packages']['associations']['docker']['service_name'], now=True)
+def disable(group: NodeGroup):
+    service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
+    system.disable_service(group, name=service_name, now=True)
 
 
 def configure(group: NodeGroup):

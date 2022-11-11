@@ -147,10 +147,15 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
     return inventory
 
 
-def install(group):
-    log = group.cluster.log
+def install(group: NodeGroup):
+    cluster = group.cluster
+    log = cluster.log
 
-    package_associations = group.cluster.inventory['services']['packages']['associations']['keepalived']
+    # todo why check and try to install all keepalives but finally filter out only new nodes?
+    group = group.get_new_nodes_or_self()
+    # todo consider probably different associations for nodes with different OS families
+    any_host = group.get_first_member().get_host()
+    package_associations = cluster.get_associations_for_node(any_host, 'keepalived')
 
     keepalived_version = group.sudo("%s -v" % package_associations['executable_name'], warn=True)
     keepalived_installed = True
@@ -163,10 +168,9 @@ def install(group):
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
-        # todo why check and try to install all keepalives but finally filter out only new nodes?
-        installation_result = packages.install(group.get_new_nodes_or_self(), include=package_associations['package_name'])
+        installation_result = packages.install(group, include=package_associations['package_name'])
 
-    service_name = group.cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
+    service_name = package_associations['service_name']
     patch_path = utils.get_resource_absolute_path("./resources/drop_ins/keepalived.conf", script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     group.call(install_haproxy_check_script)

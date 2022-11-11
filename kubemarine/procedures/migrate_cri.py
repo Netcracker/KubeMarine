@@ -33,6 +33,12 @@ from kubemarine import packages
 def enrich_inventory(inventory, cluster):
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
+
+    os_family = cluster.get_os_family()
+    if os_family in ('unknown', 'unsupported', 'multiple'):
+        raise Exception("Migration of CRI is possible only for cluster "
+                        "with all nodes having the same and supported OS family")
+
     enrichment_functions = [
         _prepare_yum_repos,
         _prepare_packages,
@@ -45,7 +51,7 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def _prepare_yum_repos(cluster, inventory):
+def _prepare_yum_repos(cluster: KubernetesCluster, inventory: dict, finalization=False):
     if not cluster.procedure_inventory.get("yum", {}):
         cluster.log.debug("Skipped - no yum section defined in procedure config file")
         return inventory
@@ -66,7 +72,7 @@ def _prepare_yum_repos(cluster, inventory):
     return inventory
 
 
-def _prepare_packages(cluster, inventory):
+def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization=False):
     if not cluster.procedure_inventory.get("packages", {}):
         cluster.log.debug("Skipped - no packages defined in procedure config file")
         return inventory
@@ -75,18 +81,20 @@ def _prepare_packages(cluster, inventory):
         cluster.log.debug("Skipped - no associations defined in procedure config file")
         return inventory
 
-    if not inventory["services"].get("packages", {}):
-        inventory["services"]["packages"] = {}
-
-    if inventory["services"]["packages"].get("associations", {}):
+    if finalization:
+        # Merge global associations section as it has priority.
+        inventory["services"].setdefault("packages", {}).setdefault("associations", {})
         default_merger.merge(inventory["services"]["packages"]["associations"],
                              cluster.procedure_inventory["packages"]["associations"])
     else:
-        inventory["services"]["packages"]["associations"] = cluster.procedure_inventory["packages"]["associations"]
+        # Merge OS family specific section. It is already enriched in packages.enrich_inventory_associations
+        default_merger.merge(inventory["services"]["packages"]["associations"][cluster.get_os_family()],
+                             cluster.procedure_inventory["packages"]["associations"])
+
     return inventory
 
 
-def _prepare_crictl(cluster, inventory):
+def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization=False):
     if cluster.procedure_inventory.get("thirdparties", {}) \
             and cluster.procedure_inventory["thirdparties"].get("/usr/bin/crictl.tar.gz", {}):
 
@@ -101,7 +109,7 @@ def _prepare_crictl(cluster, inventory):
         return inventory
 
 
-def _configure_containerd_on_nodes(cluster, inventory):
+def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
     if "cri" not in cluster.procedure_inventory or "containerRuntime" not in cluster.procedure_inventory["cri"]:
         raise Exception("Please specify mandatory parameter cri.containerRuntime in procedure.yaml")
 
@@ -115,7 +123,7 @@ def _configure_containerd_on_nodes(cluster, inventory):
     return inventory
 
 
-def _merge_containerd(cluster, inventory):
+def _merge_containerd(cluster, inventory, finalization=False):
     if not inventory["services"].get("cri", {}):
         inventory["services"]["cri"] = {}
 
@@ -289,7 +297,7 @@ def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
     ]
     for finalize_fn in finalize_functions:
         cluster.log.verbose('Calling fn "%s"' % finalize_fn.__qualname__)
-        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize)
+        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, finalization=True)
 
     return inventory_to_finalize
 

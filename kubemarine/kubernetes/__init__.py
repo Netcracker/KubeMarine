@@ -848,11 +848,13 @@ def prepare_drain_command(node, version: str, globals, disable_eviction: bool, n
 
 
 def upgrade_cri_if_required(group):
-    log = group.cluster.log
-    cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
+    # currently it is invoked only for single node
+    cluster = group.cluster
+    log = cluster.log
+    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
 
-    if cri_impl in group.cluster.context["packages"]["upgrade_required"]:
-        cri_packages = group.cluster.inventory['services']['packages']['associations'][cri_impl]['package_name']
+    if cri_impl in cluster.context["packages"]["upgrade_required"]:
+        cri_packages = cluster.get_package_association_for_node(group.get_host(), cri_impl, 'package_name')
 
         log.debug(f"Installing {cri_packages}")
         packages.install(group, include=cri_packages)
