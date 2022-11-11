@@ -69,38 +69,47 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_
         cluster.log.debug(f"There are no nodes with sudo privileges, packages will not be cached.")
         return inventory
 
-    associations_packages = _get_associations_packages_to_cache(inventory, nodes_cache_versions, ensured_associations_only)
-    packages_list = _get_packages_to_detect_versions(inventory, associations_packages, ensured_associations_only)
-
+    packages_list = _get_packages_to_detect_versions(inventory, ensured_associations_only)
     detected_packages = detect_installed_packages_version_groups(nodes_cache_versions, packages_list)
 
-    _cache_package_associations(cluster, inventory, associations_packages, detected_packages, ensured_associations_only)
+    _cache_package_associations(cluster, inventory, detected_packages, ensured_associations_only)
     _cache_custom_packages(cluster, inventory, detected_packages, ensured_associations_only)
 
     cluster.log.debug('Package versions detection finished')
     return inventory
 
 
-def _get_associations_packages_to_cache(inventory: dict, group: NodeGroup, ensured_association_only: bool) \
-        -> Dict[str, Dict[str, str]]:
+def _get_package_names_for_association(inventory: dict, association_name: str) -> list:
+    if association_name in get_associations_os_family_keys():
+        return []
 
-    associations_packages: Dict[str, Dict[str, str]] = {}
+    associated_packages = inventory['services']['packages']['associations'][association_name].get('package_name')
+    if isinstance(associated_packages, str):
+        associated_packages = [associated_packages]
+    elif not isinstance(associated_packages, list):
+        raise Exception('Unsupported associated packages object type')
+
+    return associated_packages
+
+
+def _get_packages_for_associations_to_detect(inventory: dict, association_name: str,
+                                             ensured_association_only: bool) -> list:
+    packages_list = _get_package_names_for_association(inventory, association_name)
+    if not packages_list:
+        return []
+
     global_cache_versions = inventory['services']['packages']['cache_versions']
-    for association_name, associated_params in inventory['services']['packages']['associations'].items():
-        pkgs = get_indexed_by_pure_packages_for_association(group, association_name)
-        if not pkgs:
-            continue
-        if not ensured_association_only or (global_cache_versions and associated_params.get('cache_versions', True)):
-            associations_packages[association_name] = pkgs
+    associated_params = inventory['services']['packages']['associations'][association_name]
+    if not ensured_association_only or (global_cache_versions and associated_params.get('cache_versions', True)):
+        return packages_list
 
-    return associations_packages
+    return []
 
 
-def _get_packages_to_detect_versions(inventory: dict, associations_packages: Dict[str, Dict[str, str]],
-                                     ensured_association_only: bool) -> list:
+def _get_packages_to_detect_versions(inventory: dict, ensured_association_only: bool) -> list:
     packages_list = []
-    for pure_packages in associations_packages.values():
-        packages_list.extend(pure_packages.keys())
+    for association_name in inventory['services']['packages']['associations'].keys():
+        packages_list.extend(_get_packages_for_associations_to_detect(inventory, association_name, ensured_association_only))
 
     if not ensured_association_only and inventory['services']['packages'].get('install', {}):
         packages_list.extend(inventory['services']['packages']['install']['include'])
@@ -108,18 +117,16 @@ def _get_packages_to_detect_versions(inventory: dict, associations_packages: Dic
     return packages_list
 
 
-def _cache_package_associations(cluster: KubernetesCluster, inventory: dict, associations_packages: Dict[str, Dict[str, str]],
+def _cache_package_associations(cluster: KubernetesCluster, inventory: dict,
                                 detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
     for association_name, associated_params in inventory['services']['packages']['associations'].items():
-        if association_name not in associations_packages:
+        packages_list = _get_packages_for_associations_to_detect(inventory, association_name, ensured_association_only)
+        if not packages_list:
             continue
 
-        pure_packages = associations_packages[association_name]
         final_packages_list = []
-
-        for package in pure_packages.keys():
-            final_package = _detect_final_package(cluster,
-                detected_packages, package, pure_packages[package], ensured_association_only)
+        for package in packages_list:
+            final_package = _detect_final_package(cluster, detected_packages, package, ensured_association_only)
             final_packages_list.append(final_package)
 
         # if non-multiple value, then convert to simple string
@@ -140,21 +147,21 @@ def _cache_custom_packages(cluster: KubernetesCluster, inventory: dict,
     if custom_install_packages:
         final_packages_list = []
         for package in custom_install_packages['include']:
-            final_package = _detect_final_package(cluster, detected_packages, package, package, False)
+            final_package = _detect_final_package(cluster, detected_packages, package, False)
             final_packages_list.append(final_package)
         custom_install_packages['include'] = final_packages_list
     return detected_packages
 
 
 def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[str, Dict[str, List]],
-                          package, default_package, ensured_association_only: bool):
+                          package, ensured_association_only: bool):
     # add package version to list only if it was found as installed
     detected_package_versions = list(filter(lambda version: "not installed" not in version,
                                             detected_packages[package].keys()))
 
     # if there no versions detected, then return default package from inventory
     if not detected_package_versions:
-        return default_package
+        return package
     elif len(detected_package_versions) > 1:
         if ensured_association_only:
             raise Exception(
@@ -164,9 +171,9 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
         else:
             cluster.log.warning(
                 f"Multiple package versions detected {detected_packages[package]} for package '{package}'. "
-                f"Use default package '{default_package}' from inventory.")
+                f"Use default package '{package}' from inventory.")
             # return default package from inventory if multiple versions detected
-            return default_package
+            return package
     else:
         return detected_package_versions[0]
 
@@ -185,27 +192,6 @@ def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: 
 
 def get_associations_os_family_keys():
     return ['debian', 'rhel', 'rhel8']
-
-
-def get_indexed_by_pure_packages_for_association(group: NodeGroup, association_name: str) -> dict:
-    os_family = group.get_nodes_os()
-    if os_family not in get_associations_os_family_keys():
-        raise Exception('Failed to get package names for ambiguous OS family')
-
-    if association_name in get_associations_os_family_keys():
-        return {}
-
-    associated_params = group.cluster.inventory['services']['packages']['associations'].get(association_name)
-    if associated_params is None:
-        raise Exception('Unsupported associated package')
-
-    associated_packages = associated_params.get('package_name')
-    if isinstance(associated_packages, str):
-        associated_packages = [associated_packages]
-    elif not isinstance(associated_packages, list):
-        raise Exception('Unsupported associated packages object type')
-
-    return {get_package_name(os_family, package): package for package in associated_packages}
 
 
 def get_package_manager(group: NodeGroup) -> apt or yum:
