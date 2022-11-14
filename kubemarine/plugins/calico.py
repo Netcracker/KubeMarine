@@ -35,6 +35,7 @@ def enrich_inventory(inventory, cluster):
 
 
 def enrich_original_yaml(cluster):
+
     # get original YAML and parse it into dict of objects
     items = cluster.inventory['plugins']['calico']['installation']['procedures']
     for item in items:
@@ -48,132 +49,33 @@ def enrich_original_yaml(cluster):
     patched_list = []
     excluded_list = []
 
-    # patch the objects one by one
-    key = "ConfigMap_calico-config"
-    if obj_list.get(key, ''):
-        patched_list.append(key)
-        val = cluster.inventory['plugins']['calico']['mtu']
-        obj_list[key]['data']['veth_mtu'] = str(val)
-        cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
-        if cluster.inventory['plugins']['calico']['typha']['enabled'] == True:
-            val = "calico-typha"
-        else:
-            val = "none"
-        obj_list[key]['data']['typha_service_name'] = val
-        cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
-        string_part = obj_list[key]['data']['cni_network_config']
-        ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
-            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
-        else:
-            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
-        new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
-        obj_list[key]['data']['cni_network_config'] = new_string_part
-        log_str = new_string_part.replace("\n", "")
-        cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
+    # list of objects for enrichment
+    objects_for_enrichment = [
+            "ConfigMap_calico-config",
+            "Deployment_calico-kube-controllers",
+            "DaemonSet_calico-node",
+            "Deployment_calico-typha",
+            "Service_calico-typha", 
+            "PodDisruptionBudget_calico-typha"
+           ]
 
-    key = "Deployment_calico-kube-controllers"
-    if obj_list.get(key, ''):
-        patched_list.append(key)
-        obj_list[key]['spec']['template']['spec']['nodeSelector'] = \
-                cluster.inventory['plugins']['calico']['kube-controllers']['nodeSelector']
-        for container in obj_list[key]['spec']['template']['spec']['containers']:
-            if container['name'] == "calico-kube-controllers":
-                num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['kube-controllers']['image']}"
-                obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].image with '{val}'")
-
-    key = "DaemonSet_calico-node"
-    if obj_list.get(key, ''):
-        patched_list.append(key)
-        for container in obj_list[key]['spec']['template']['spec']['initContainers']:
-            if container['name'] in ['upgrade-ipam', 'install-cni']: 
-                num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['cni']['image']}"
-                obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-            if container['name'] == "mount-bpffs":
-                num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
-                obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-            if container['name'] == "flexvol-driver":
-                num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['flexvol']['image']}"
-                obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-        for container in obj_list[key]['spec']['template']['spec']['containers']:
-            if container['name'] == "calico-node":
-                num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
-                obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val 
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].image' with '{val}'")
-                ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
-                            'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
-                env_list = []
-                for name, value in cluster.inventory['plugins']['calico']['env'].items():
-                    ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-                    if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
-                        if type(value) is str:
-                            env_list.append({'name': name, 'value': value})
-                        elif type(value) is dict:
-                            env_list.append({'name': name, 'valueFrom': value})
-                        cluster.log.verbose(f"The {key} has been patched in "
-                                            f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                    elif name in ipv6_env and type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
-                        if type(value) is str:
-                            env_list.append({'name': name, 'value': value})
-                        elif type(value) is dict:
-                            env_list.append({'name': name, 'valueFrom': value})
-                        cluster.log.verbose(f"The {key} has been patched in "
-                                            f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                    if cluster.inventory['plugins']['calico']['typha']['enabled'] and \
-                            name == 'FELIX_TYPHAK8SSERVICENAME':
-                        env_list.append({'name': name, 'valueFrom': value})
-                        cluster.log.verbose(f"The {key} has been patched in "
-                                            f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                i = 0
-                for env in obj_list[key]['spec']['template']['spec']['containers'][num]['env']:
-                    for item in env_list:
-                        if env['name'] == item['name']:
-                            obj_list[key]['spec']['template']['spec']['containers'][num]['env'][i] = item
-                    i += 1
-
-    for key in ["Service_calico-typha", "PodDisruptionBudget_calico-typha"]:
-        if obj_list.get(key, ''):
-            if not cluster.inventory['plugins']['calico']['typha']['enabled']:
-                obj_list.pop(key)
-                excluded_list.append(key)
-                cluster.log.verbose(f"The {key} has been excluded")
-            else:
+    # enrich objects one by one
+    for key in objects_for_enrichment:
+        # enrich common Calico objects
+        if key not in ["Service_calico-typha", "PodDisruptionBudget_calico-typha", "Deployment_calico-typha"]:
+            if obj_list.get(key, ''):
                 patched_list.append(key)
-
-    key = "Deployment_calico-typha"
-    if obj_list.get(key, ''):
-        if not cluster.inventory['plugins']['calico']['typha']['enabled']:
-            obj_list.pop(key)
-            excluded_list.append(key)
-            cluster.log.verbose(f"The {key} has been excluded")
-        else:
-            patched_list.append(key)
-            val = cluster.inventory['plugins']['calico']['typha']['replicas']
-            obj_list[key]['spec']['replicas'] = val
-            cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
-            val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
-            obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
-            cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
-            if container['name'] == "calico-typha":
-                num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-                val = f"{cluster.inventory['plugins']['calico']['typha']['image']}"
-                obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].image with '{val}'")
+                enrich_objects_fns[key](cluster, obj_list)
+            else:
+                # enrich 'calico-typha' objects only if it enabled in 'cluster.yaml'
+                # in other case those objects must be excluded
+                if not cluster.inventory['plugins']['calico']['typha']['enabled']:
+                    obj_list.pop(key)
+                    excluded_list.append(key)
+                    cluster.log.verbose(f"The {key} has been excluded")
+                else:
+                    patched_list.append(key)
+                    enrich_objects_fns[key](cluster, obj_list)
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -183,6 +85,128 @@ def enrich_original_yaml(cluster):
     # TODO: check results 
     #validate_result()
     save_multiple_yaml(calico_yaml, obj_list)
+
+
+def enrich_configmap_calico_config(cluster, obj_list):
+
+    key = "ConfigMap_calico-config"
+    val = cluster.inventory['plugins']['calico']['mtu']
+    obj_list[key]['data']['veth_mtu'] = str(val)
+    cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
+    if cluster.inventory['plugins']['calico']['typha']['enabled'] == True:
+        val = "calico-typha"
+    else:
+        val = "none"
+    obj_list[key]['data']['typha_service_name'] = val
+    cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
+    string_part = obj_list[key]['data']['cni_network_config']
+    ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+    if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
+    else:
+        val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
+    new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
+    obj_list[key]['data']['cni_network_config'] = new_string_part
+    log_str = new_string_part.replace("\n", "")
+    cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
+    
+    return obj_list
+
+def enrich_deployment_calico_kube_controllers(cluster, obj_list):
+
+    key = "Deployment_calico-kube-controllers"
+    obj_list[key]['spec']['template']['spec']['nodeSelector'] = \
+            cluster.inventory['plugins']['calico']['kube-controllers']['nodeSelector']
+    for container in obj_list[key]['spec']['template']['spec']['containers']:
+        if container['name'] == "calico-kube-controllers":
+            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['kube-controllers']['image']}"
+            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.containers.[{num}].image with '{val}'")
+
+    return obj_list
+
+def enrich_daemonset_calico_node(cluster, obj_yaml):
+
+    key = "DaemonSet_calico-node"
+    for container in obj_list[key]['spec']['template']['spec']['initContainers']:
+        if container['name'] in ['upgrade-ipam', 'install-cni']: 
+            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['cni']['image']}"
+            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
+        if container['name'] == "mount-bpffs":
+            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
+            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
+        if container['name'] == "flexvol-driver":
+            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['flexvol']['image']}"
+            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
+    for container in obj_list[key]['spec']['template']['spec']['containers']:
+        if container['name'] == "calico-node":
+            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
+            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val 
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.containers.[{num}].image' with '{val}'")
+            ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
+                        'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
+            env_list = []
+            for name, value in cluster.inventory['plugins']['calico']['env'].items():
+                ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+                if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
+                    if type(value) is str:
+                        env_list.append({'name': name, 'value': value})
+                    elif type(value) is dict:
+                        env_list.append({'name': name, 'valueFrom': value})
+                    cluster.log.verbose(f"The {key} has been patched in "
+                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+                elif name in ipv6_env and type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
+                    if type(value) is str:
+                        env_list.append({'name': name, 'value': value})
+                    elif type(value) is dict:
+                        env_list.append({'name': name, 'valueFrom': value})
+                    cluster.log.verbose(f"The {key} has been patched in "
+                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+                if cluster.inventory['plugins']['calico']['typha']['enabled'] and \
+                        name == 'FELIX_TYPHAK8SSERVICENAME':
+                    env_list.append({'name': name, 'valueFrom': value})
+                    cluster.log.verbose(f"The {key} has been patched in "
+                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+            i = 0
+            for env in obj_list[key]['spec']['template']['spec']['containers'][num]['env']:
+                for item in env_list:
+                    if env['name'] == item['name']:
+                        obj_list[key]['spec']['template']['spec']['containers'][num]['env'][i] = item
+                i += 1
+
+    return obj_list
+
+
+def enrich_deployment_calico_typha(cluster, obj_yaml):
+
+    key = "Deployment_calico-typha"
+    val = cluster.inventory['plugins']['calico']['typha']['replicas']
+    obj_list[key]['spec']['replicas'] = val
+    cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
+    val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
+    obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
+    cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
+    if container['name'] == "calico-typha":
+        num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+        val = f"{cluster.inventory['plugins']['calico']['typha']['image']}"
+        obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
+        cluster.log.verbose(f"The {key} has been patched in "
+                            f"'spec.template.spec.containers.[{num}].image with '{val}'")
+
+    return obj_list
 
 
 def validate_original(cluster, obj_list):
@@ -263,3 +287,14 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
             yaml.dump_all(source_yamls, stream)
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
+
+
+enrich_objects_fns = {
+        "ConfigMap_calico-config": enrich_configmap_calico_config,
+        "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
+        "DaemonSet_calico-node": enrich_daemonset_calico_node,
+        "Deployment_calico-typha": enrich_deployment_calico_typha(cluster, obj_yaml),
+        "Service_calico-typha": None, 
+        "PodDisruptionBudget_calico-typha": None
+
+}
