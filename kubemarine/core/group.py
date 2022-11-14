@@ -931,6 +931,7 @@ class NodeGroup:
     def get_nodes_os(self) -> str:
         """
         Returns the detected operating system family for group.
+
         :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
         """
         return self.cluster.get_os_family_for_nodes(self.nodes.keys())

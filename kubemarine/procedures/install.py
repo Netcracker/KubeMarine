@@ -34,6 +34,17 @@ from kubemarine.core.resources import DynamicResources
 
 
 def _applicable_for_new_nodes_with_roles(*roles):
+    """
+    Decorator to annotate installation methods.
+    If there are no new nodes with the specified roles to be added / installed to the cluster,
+    the decorator skips execution of the method.
+    Otherwise, it runs the annotated method with the calculated group of nodes with the specified roles.
+    Note that the signature of annotated method should be f(NodeGroup),
+    but the resulting wrapping method will be f(KubernetesCluster).
+
+    :param roles: roles of nodes for which the annotated method is applicable.
+    :return: new wrapping method.
+    """
     if not roles:
         raise Exception(f'Roles are not defined')
 

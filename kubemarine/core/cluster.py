@@ -90,6 +90,10 @@ class KubernetesCluster(Environment):
         return NodeGroup(connections, self)
 
     def get_access_address_from_node(self, node: dict):
+        """
+        Returns address which should be used to connect to the node via Fabric.
+        The address also can be used as unique identifier of the node.
+        """
         address = node.get('connect_to')
         if address is None:
             address = node.get('address')
@@ -216,6 +220,11 @@ class KubernetesCluster(Environment):
         return node_context['os']['family']
 
     def get_os_family_for_nodes(self, hosts: Iterable[str]) -> str:
+        """
+        Returns the detected operating system family for hosts.
+
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
+        """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
         if len(os_families) > 1:
             return 'multiple'
@@ -228,6 +237,7 @@ class KubernetesCluster(Environment):
         """
         Returns common OS family name from all final remote hosts.
         The method can be used during enrichment when NodeGroups are not yet calculated.
+
         :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
         """
         hosts_detect_os_family = []
@@ -239,6 +249,9 @@ class KubernetesCluster(Environment):
         return self.get_os_family_for_nodes(hosts_detect_os_family)
 
     def get_os_identifiers(self) -> Dict[str, Tuple[str, str]]:
+        """
+        For each final node of the cluster, returns a tuple of OS (family, version).
+        """
         nodes_check_os = self.nodes['all'].get_final_nodes()
         os_ids = {}
         for host in nodes_check_os.get_hosts():
@@ -259,7 +272,8 @@ class KubernetesCluster(Environment):
 
     def get_associations_for_node(self, host: str, package: str) -> dict:
         """
-        Returns all packages associations for specific node
+        Returns all packages associations for specific node.
+
         :param host: The address of the node for which required to find the associations
         :param package: The package name to get the associations for
         :return: Dict with packages and their associations
@@ -282,6 +296,7 @@ class KubernetesCluster(Environment):
         """
         Returns the specified association for the specified package from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.
+
         :param package: The package name to get the association for
         :param association_key: Association key to get
         :return: Association string or list value
@@ -291,7 +306,8 @@ class KubernetesCluster(Environment):
 
     def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str or list:
         """
-        Returns the specified association for the specified package from inventory for specific node
+        Returns the specified association for the specified package from inventory for specific node.
+
         :param host: The address of the node for which required to find the association
         :param package: The package name to get the association for
         :param association_key: Association key to get
@@ -302,7 +318,8 @@ class KubernetesCluster(Environment):
 
     def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
         """
-        Returns the specified association dict for the specified package from inventory for entire NodeGroup
+        Returns the specified association dict for the specified package from inventory for entire NodeGroup.
+
         :param group: NodeGroup for which required to find the association
         :param package: The package name to get the association for
         :param association_key: Association key to get
@@ -319,6 +336,7 @@ class KubernetesCluster(Environment):
         """
         Returns the specified association string or list for the specified package from inventory for entire NodeGroup.
         If association value is different between some nodes, an exception will be thrown.
+
         :param group: NodeGroup for which required to find the association
         :param package: The package name to get the association for
         :param association_key: Association key to get
