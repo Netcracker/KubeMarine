@@ -211,6 +211,12 @@ def _migrate_cri(cluster, node_group):
                                 "sudo systemctl restart kubelet")
         control_plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
         if "control-plane" in node["roles"]:
+            # hotfix for Ubuntu 22.04 and Kubernetes v1.21.2
+            if version == "v1.21.2":
+                node['connection'].sudo("sleep 30 && "
+                                        "sudo kubectl -n kube-system  delete pod "
+                                        "$(sudo kubectl -n kube-system get pod --field-selector='status.phase=Pending' | "
+                                        "grep 'kube-proxy' | awk '{ print $1 }')")
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
             # check ETCD health
             etcd.wait_for_health(cluster, node["connection"])
