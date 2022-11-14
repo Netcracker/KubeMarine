@@ -82,12 +82,16 @@ def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization=
         return inventory
 
     if finalization:
-        # Merge global associations section as it has priority.
+        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
+        # we still merge global associations section because it has priority during enrichment.
         inventory["services"].setdefault("packages", {}).setdefault("associations", {})
         default_merger.merge(inventory["services"]["packages"]["associations"],
                              cluster.procedure_inventory["packages"]["associations"])
     else:
         # Merge OS family specific section. It is already enriched in packages.enrich_inventory_associations
+        # This effectively allows to specify only global section but not for specific OS family.
+        # This restriction is because system.enrich_upgrade_inventory goes after packages.enrich_inventory_associations,
+        # but in future the restriction can be eliminated.
         default_merger.merge(inventory["services"]["packages"]["associations"][cluster.get_os_family()],
                              cluster.procedure_inventory["packages"]["associations"])
 

@@ -22,7 +22,7 @@ import yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import jinja
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine import controlplane
 
@@ -447,7 +447,7 @@ def compile_inventory(inventory, cluster):
     # convert references in yaml to normal values
     iterations = 100
     root = deepcopy(inventory)
-    root['globals'] = cluster.globals
+    root['globals'] = static.GLOBALS
 
     while iterations > 0:
 

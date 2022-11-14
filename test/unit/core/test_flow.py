@@ -193,8 +193,8 @@ class FlowTest(unittest.TestCase):
          deploy.loadbalancer.haproxy, deploy.loadbalancer.keepalived, deploy.accounts, overview.")
 
     def test_run_tasks(self):
-        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"),
-                                             ['--tasks', 'deploy.loadbalancer.haproxy'])
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory, context=context)
         flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks)
@@ -205,7 +205,7 @@ class FlowTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, hosts)
-        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
         # not throws any exception during cluster initialization
         flow.run_tasks(res, tasks)
@@ -223,7 +223,7 @@ class FlowTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, [])
-        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
         flow.run_tasks(res, tasks)
         cluster = res.cluster()
@@ -242,7 +242,7 @@ class FlowTest(unittest.TestCase):
         online_hosts = [node["address"] for node in inventory["nodes"]]
         offline = online_hosts.pop(random.randrange(len(online_hosts)))
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        context = demo.create_silent_context(flow.new_tasks_flow_parser("Help text"), [])
+        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
         exc = None
@@ -265,8 +265,8 @@ class FlowTest(unittest.TestCase):
         procedure_inventory = {"nodes": [{"name": inventory["nodes"][masters[i]]["name"]}]}
 
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        context = demo.create_silent_context(flow.new_procedure_parser("Help text"), ['fake_path.yaml'],
-                                             procedure='remove_node')
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node',
+                                             parser=flow.new_procedure_parser("Help text"))
         res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
                                  fake_shell=self.light_fake_shell)
 

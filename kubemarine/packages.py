@@ -21,6 +21,17 @@ from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
 
+ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS = \
+    "It is not supported to customize services.packages.associations section " \
+    "if nodes have different OS families. " \
+    "Please move the section to corresponding services.packages.associations.<os_family> section."
+
+ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED = \
+    "Multiple package versions detected %s for package '%s'. " \
+    "Align them to the single version manually or using corresponding task of install procedure. " \
+    "Alternatively, specify cache_versions=false for corresponding association."
+
+
 def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     associations: dict = inventory['services']['packages']['associations']
     os_propagated_associations = {}
@@ -35,10 +46,7 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     if associations:
         os_family = cluster.get_os_family()
         if os_family == 'multiple':
-            raise Exception(
-                "It is not supported to customize services.packages.associations section "
-                "if nodes have different OS families. "
-                "Please move the section to corresponding services.packages.associations.<os_family> section.")
+            raise Exception(ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS)
         elif os_family not in ('unknown', 'unsupported'):
             # move remained associations properties to the specific OS family section and merge with priority
             default_merger.merge(os_propagated_associations[os_family], associations)
@@ -159,7 +167,7 @@ def _cache_custom_packages(cluster: KubernetesCluster, inventory: dict,
 
 
 def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[str, Dict[str, List]],
-                          package, ensured_association_only: bool):
+                          package: str, ensured_association_only: bool) -> str:
     # add package version to list only if it was found as installed
     detected_package_versions = list(filter(lambda version: "not installed" not in version,
                                             detected_packages[package].keys()))
@@ -169,10 +177,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
         return package
     elif len(detected_package_versions) > 1:
         if ensured_association_only:
-            raise Exception(
-                f"Multiple package versions detected {detected_packages[package]} for package '{package}'. "
-                f"Align them to the single version manually or using corresponding task of install procedure. "
-                f"Alternatively, specify cache_versions=false in corresponding association.")
+            raise Exception(ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED % (str(detected_packages[package]), package))
         else:
             cluster.log.warning(
                 f"Multiple package versions detected {detected_packages[package]} for package '{package}'. "
@@ -194,7 +199,7 @@ def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: 
 
 
 def get_associations_os_family_keys():
-    return ['debian', 'rhel', 'rhel8']
+    return {'debian', 'rhel', 'rhel8'}
 
 
 def get_package_manager(group: NodeGroup) -> apt or yum:
@@ -236,12 +241,23 @@ def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroup
     return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
 
 
-def detect_installed_package_version(group: NodeGroup, package: str, warn=True) -> NodeGroupResult:
+def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
+    if os_family in ["rhel", "rhel8"]:
+        cmd = r"rpm -q %s" % package_name
+    else:
+        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
+
+    # This is WA for RemoteExecutor, since any package failed others are not checked
+    # TODO: get rid of this WA and use warn=True in sudo
+    cmd += ' || true'
+    return cmd
+
+
+def detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
     :param package: package name, which version should be detected (eg. 'podman' and 'containerd')
-    :param warn: Suppress exception for non-found packages
     :return: NodeGroupResults with package version on each host
 
     Method generates different package query for different OS.
@@ -253,16 +269,7 @@ def detect_installed_package_version(group: NodeGroup, package: str, warn=True) 
     os_family = group.get_nodes_os()
     package_name = get_package_name(os_family, package)
 
-    if os_family in ["rhel", "rhel8"]:
-        cmd = r"rpm -q %s" % package_name
-    else:
-        cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
-
-    # This is WA for RemoteExecutor, since any package failed others are not checked
-    # TODO: get rid of this WA and use warn=True in sudo
-    if warn:
-        cmd += ' || true'
-
+    cmd = get_detect_package_version_cmd(os_family, package_name)
     return group.sudo(cmd)
 
 
@@ -286,7 +293,7 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
 
     with RemoteExecutor(cluster) as exe:
         for package in packages_list:
-            detect_installed_package_version(group, package, warn=True)
+            detect_installed_package_version(group, package)
 
     raw_result = exe.get_last_results()
     results: Dict[str, Dict[str, List]] = {}
@@ -309,7 +316,7 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
 
 def get_package_name(os_family: str, package: str) -> str:
     """
-    Return the pure package name, whithout any part of version
+    Return the pure package name, without any part of version
     """
 
     import re

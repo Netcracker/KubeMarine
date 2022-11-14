@@ -175,9 +175,7 @@ def upgrade_finalize_inventory(cluster, inventory):
         return inventory
     upgrade_version = cluster.context.get("upgrade_version")
 
-    if not inventory['services'].get('kubeadm'):
-        inventory['services']['kubeadm'] = {}
-    inventory['services']['kubeadm']['kubernetesVersion'] = upgrade_version
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
 
     # if thirdparties was not defined in procedure.yaml,
     # then no need to forcibly place them: user may want to use default
@@ -185,16 +183,14 @@ def upgrade_finalize_inventory(cluster, inventory):
         inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
 
     if cluster.procedure_inventory.get(upgrade_version, {}).get("plugins"):
-        if not inventory.get("plugins"):
-            inventory["plugins"] = {}
+        inventory.setdefault("plugins", {})
         default_merger.merge(inventory["plugins"], cluster.procedure_inventory[upgrade_version]["plugins"])
 
     if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
-        if not inventory.get("services"):
-            inventory["services"] = {}
-        if not inventory["services"].get("packages"):
-            inventory["services"]["packages"] = {}
+        inventory['services'].setdefault("packages", {})
         packages = cluster.procedure_inventory[upgrade_version]["packages"]
+        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
+        # we still merge global associations section because it has priority during enrichment.
         default_merger.merge(inventory["services"]["packages"], packages)
 
     return inventory

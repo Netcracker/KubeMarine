@@ -362,12 +362,14 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def create_silent_context(parser: argparse.ArgumentParser, args: list, procedure: str = None):
-    args = list(args)
+def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure: str = None):
+    args = list(args) if args else []
     # todo probably increase logging level to get rid of spam in logs.
     if '--disable-dump' not in args:
         args.append('--disable-dump')
 
+    if parser is None:
+        parser = flow.new_common_parser("Help text")
     context = flow.create_context(parser, args, procedure=procedure)
     del context['execution_arguments']['ansible_inventory_location']
     context['preserve_inventory'] = False
@@ -375,11 +377,26 @@ def create_silent_context(parser: argparse.ArgumentParser, args: list, procedure
     return context
 
 
-def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
-                os_name='centos', os_version='7.9', net_interface='eth0'):
+def new_cluster(inventory, procedure_inventory=None, context: dict = None,
+                fake=True) -> Union[KubernetesCluster, FakeKubernetesCluster]:
     if context is None:
-        context = create_silent_context(flow.new_common_parser("Help text"), [], procedure=procedure)
+        context = create_silent_context()
 
+    nodes_context = generate_nodes_context(inventory)
+    nodes_context.update(context['nodes'])
+    context['nodes'] = nodes_context
+
+    # It is possible to disable FakeCluster and create real cluster Object for some business case
+    if fake:
+        cluster = FakeKubernetesCluster(inventory, context, procedure_inventory=procedure_inventory)
+    else:
+        cluster = KubernetesCluster(inventory, context, procedure_inventory=procedure_inventory)
+
+    cluster.enrich()
+    return cluster
+
+
+def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', net_interface='eth0') -> dict:
     os_family = None
 
     if os_name in ['centos', 'rhel']:
@@ -387,6 +404,7 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
     elif os_name in ['ubuntu', 'debian']:
         os_family = 'debian'
 
+    context = {}
     for node in inventory['nodes']:
         node_context = {
             'name': node['name'],
@@ -405,16 +423,9 @@ def new_cluster(inventory, procedure=None, fake=True, context: dict = None,
         connect_to = node['internal_address']
         if node.get('address'):
             connect_to = node['address']
-        context['nodes'][connect_to] = node_context
+        context[connect_to] = node_context
 
-    # It is possible to disable FakeCluster and create real cluster Object for some business case
-    if fake:
-        cluster = FakeKubernetesCluster(inventory, context)
-    else:
-        cluster = KubernetesCluster(inventory, context)
-
-    cluster.enrich()
-    return cluster
+    return context
 
 
 def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mntc=0):

@@ -136,7 +136,10 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
 
     upgrade_ver = cluster.context["upgrade_version"]
     packages_section = deepcopy(cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}))
-    # move associations to the OS family specific section, and then merge with associations from procedure
+    # Move associations to the OS family specific section, and then merge with associations from procedure.
+    # This effectively allows to specify only global section but not for specific OS family.
+    # This restriction is because system.enrich_upgrade_inventory goes after packages.enrich_inventory_associations,
+    # but in future the restriction can be eliminated.
     associations = packages_section.pop("associations", {})
     default_merger.merge(inventory["services"]["packages"]["associations"][os_family], associations)
 

@@ -17,6 +17,11 @@
 import unittest
 
 from kubemarine import demo
+from kubemarine.demo import FakeKubernetesCluster
+
+
+def get_os_family(cluster: FakeKubernetesCluster):
+    return cluster.get_os_family()
 
 
 class KubernetesClusterTest(unittest.TestCase):
@@ -60,3 +65,46 @@ class KubernetesClusterTest(unittest.TestCase):
         ])
         self.assertEqual(self.cluster.nodes['all'], actual_group,
                          msg="Created group is not equivalent to all nodes group")
+
+    def test_get_os_family(self):
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.MINIHA_KEEPALIVED))
+        self.assertEqual('rhel', get_os_family(cluster),
+                         msg="Demo cluster should be created with 'rhel' OS family by default")
+
+    def test_get_os_family_multiple(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context()
+        host_different_os = inventory['nodes'][0]['address']
+        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
+        cluster = demo.new_cluster(inventory, context=context)
+        self.assertEqual('multiple', get_os_family(cluster),
+                         msg="One node has different OS family and thus global OS family should be 'multiple'")
+
+    def test_add_node_different_os_get_os_family_multiple(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context(procedure='add_node')
+        host_different_os = inventory['nodes'][0]['address']
+        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
+        add_node = {'nodes': [inventory['nodes'].pop(0)]}
+        cluster = demo.new_cluster(inventory, procedure_inventory=add_node, context=context)
+        self.assertEqual('multiple', get_os_family(cluster),
+                         msg="One node has different OS family and thus global OS family should be 'multiple'")
+
+    def test_remove_node_different_os_get_os_family_single(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context(procedure='remove_node')
+        host_different_os = inventory['nodes'][0]['address']
+        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
+        remove_node = {"nodes": [{"name": inventory["nodes"][0]["name"]}]}
+        cluster = demo.new_cluster(inventory, procedure_inventory=remove_node, context=context)
+        self.assertEqual('debian', get_os_family(cluster),
+                         msg="One node has different OS family and thus global OS family should be 'multiple'")
+
+    def _nodes_context_one_different_os(self, inventory, host_different_os):
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context[host_different_os]['os'] = {
+            'name': 'centos',
+            'family': 'rhel',
+            'version': '7.9'
+        }
+        return nodes_context

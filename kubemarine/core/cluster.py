@@ -145,9 +145,6 @@ class KubernetesCluster(Environment):
         from kubemarine.core import flow
         return flow.is_task_completed(self, task_path)
 
-    def get_final_inventory(self):
-        return utils.get_final_inventory(self)
-
     def get_facts_enrichment_fns(self):
         return [
             "kubemarine.kubernetes.add_node_enrichment",
@@ -348,7 +345,7 @@ class KubernetesCluster(Environment):
             return results_values[0]
         raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
-    def dump_finalized_inventory(self):
+    def make_finalized_inventory(self):
         from kubemarine.core import defaults
         from kubemarine.procedures import remove_node
         from kubemarine import controlplane, cri, packages
@@ -367,7 +364,10 @@ class KubernetesCluster(Environment):
         for finalize_fn in cluster_finalized_functions:
             prepared_inventory = finalize_fn(self, prepared_inventory)
 
-        inventory_for_dump = defaults.prepare_for_dump(prepared_inventory, copy=False)
+        return defaults.prepare_for_dump(prepared_inventory, copy=False)
+
+    def dump_finalized_inventory(self):
+        inventory_for_dump = self.make_finalized_inventory()
         data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
