@@ -65,17 +65,17 @@ def enrich_original_yaml(cluster):
         if key not in ["Service_calico-typha", "PodDisruptionBudget_calico-typha", "Deployment_calico-typha"]:
             if obj_list.get(key, ''):
                 patched_list.append(key)
-                enrich_objects_fns[key](cluster, obj_list)
+                obj_list = enrich_objects_fns[key](cluster, obj_list)
+        else:
+            # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+            # in other case those objects must be excluded
+            if not cluster.inventory['plugins']['calico']['typha']['enabled']:
+                obj_list.pop(key)
+                excluded_list.append(key)
+                cluster.log.verbose(f"The {key} has been excluded")
             else:
-                # enrich 'calico-typha' objects only if it enabled in 'cluster.yaml'
-                # in other case those objects must be excluded
-                if not cluster.inventory['plugins']['calico']['typha']['enabled']:
-                    obj_list.pop(key)
-                    excluded_list.append(key)
-                    cluster.log.verbose(f"The {key} has been excluded")
-                else:
-                    patched_list.append(key)
-                    enrich_objects_fns[key](cluster, obj_list)
+                patched_list.append(key)
+                obj_list = enrich_objects_fns[key](cluster, obj_list)
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -127,7 +127,7 @@ def enrich_deployment_calico_kube_controllers(cluster, obj_list):
 
     return obj_list
 
-def enrich_daemonset_calico_node(cluster, obj_yaml):
+def enrich_daemonset_calico_node(cluster, obj_list):
 
     key = "DaemonSet_calico-node"
     for container in obj_list[key]['spec']['template']['spec']['initContainers']:
@@ -190,7 +190,7 @@ def enrich_daemonset_calico_node(cluster, obj_yaml):
     return obj_list
 
 
-def enrich_deployment_calico_typha(cluster, obj_yaml):
+def enrich_deployment_calico_typha(cluster, obj_list):
 
     key = "Deployment_calico-typha"
     val = cluster.inventory['plugins']['calico']['typha']['replicas']
@@ -293,7 +293,7 @@ enrich_objects_fns = {
         "ConfigMap_calico-config": enrich_configmap_calico_config,
         "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
         "DaemonSet_calico-node": enrich_daemonset_calico_node,
-        "Deployment_calico-typha": enrich_deployment_calico_typha(cluster, obj_yaml),
+        "Deployment_calico-typha": enrich_deployment_calico_typha,
         "Service_calico-typha": None, 
         "PodDisruptionBudget_calico-typha": None
 
