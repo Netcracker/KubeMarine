@@ -578,6 +578,8 @@ plugins:
                 namespace: ingress-nginx
             pods:
               - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
+    webhook:
+      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-image-name"] }}:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-version"] }}'
     controller:
       image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["image-name"] }}:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
@@ -595,6 +597,9 @@ plugins:
         protocol: TCP
       - name: prometheus
         containerPort: 10254
+        protocol: TCP
+      - name: webhook
+        containerPort: 8443
         protocol: TCP
 
   # TODO: support hostPort for haproxy-ingress
@@ -686,7 +691,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: rancher/local-path-provisioner:v0.0.22
+    image: rancher/local-path-provisioner:v0.0.23
     helper-pod-image: library/busybox:1.35.0
 
 rbac:
