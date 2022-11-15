@@ -38,6 +38,29 @@ def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
     return inventory
 
 
+def get_thirdparty_recommended_sha(destination, cluster):
+    cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
+    # Get kubeadm version
+    kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    effective_kubernetes_version = ".".join(kubernetes_version.split('.')[0:2])
+
+    # Get software versions map
+    software_name = cluster.globals['thirdparties'].get(destination, {}).get('software_name', None)
+    software_versions = cluster.globals['compatibility_map']['software'].get(software_name, {})
+
+    # Return sha1 related to used kubernetes version
+    recommended_sha = software_versions[kubernetes_version].get('sha1', None) \
+        if kubernetes_version in software_versions else \
+        software_versions.get(effective_kubernetes_version, {}).get('sha1', None)
+
+    if recommended_sha is not None:
+        cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
+    else:
+        cluster.log.verbose(f"Recommended sha for thirdparty {destination} doesn't exist")
+
+    return recommended_sha
+
+
 def enrich_inventory_apply_defaults(inventory, cluster):
     # if thirdparties is empty, then nothing to do
     if not inventory['services'].get('thirdparties', {}):

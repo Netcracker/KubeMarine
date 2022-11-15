@@ -102,6 +102,18 @@ workaround:
   retries: 10
   delay_period: 5
 
+thirdparties:
+  /usr/bin/kubeadm:
+    software_name: kubeadm
+  /usr/bin/kubelet:
+    software_name: kubelet
+  /usr/bin/kubectl:
+    software_name: kubectl
+  /usr/bin/calicoctl:
+    software_name: calico
+  /usr/bin/crictl.tar.gz:
+    software_name: crictl
+
 compatibility_map:
   software:
     docker:

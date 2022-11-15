@@ -25,7 +25,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -346,6 +346,10 @@ def thirdparties_hashes(cluster):
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
                 first_control_plane.sudo(final_commands, hide=True, warn=True)
+
+            recommended_sha = thirdparties.get_thirdparty_recommended_sha(path, cluster)
+            if recommended_sha is not None and recommended_sha != expected_sha:
+                warnings.append(f"{path} source contains not recommended thirdparty version for used kubernetes version")
 
             if config.get("sha1", expected_sha) != expected_sha:
                 warnings.append("Given sha is not equal with actual sha from source for %s" % path)
