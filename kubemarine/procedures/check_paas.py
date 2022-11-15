@@ -41,7 +41,7 @@ def services_status(cluster: KubernetesCluster, service_type: str):
                   default_results='active (running)'):
         service_name = service_type
 
-        if cluster.get_os_family() != 'multiple':
+        if cluster.get_os_family() != 'multiple' and service_type != 'kubelet':
             service_name = cluster.get_package_association(service_type, 'service_name')
 
         group = cluster.nodes['all']
