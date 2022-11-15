@@ -96,8 +96,10 @@ def _check_same_os(cluster: KubernetesCluster):
     os_ids = cluster.get_os_identifiers()
     different_os = set(os_ids.values())
     if len(different_os) > 1:
-        raise TestFailure(f"Nodes have different OS families or versions, packages versions cannot be checked. "
-                          f"List of (OS family, version): {list(different_os)}")
+        cluster.log.warning(
+            f"Nodes have different OS families or versions, packages versions cannot be checked. "
+            f"List of (OS family, version): {list(different_os)}")
+        raise TestFailure(f"Nodes have different OS families or versions")
 
 
 def recommended_system_packages_versions(cluster: KubernetesCluster):
