@@ -3356,7 +3356,7 @@ The plugin configuration supports the following parameters:
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
 | defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
-| typha.enabled          | boolean | `true` or `false`                   | if nodes < 4 then `true` else `false`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
+| typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
 | typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 2) \                               | round(1) }}`                                                       |Starts from 2 replicas amd increments for every 50  nodes|Number of Typha running replicas|
 | typha.image            | string  | `calico/typha:v3.10.1`              | Should contain both image name and version       | Calico Typha image                                                 |
 | typha.tolerations      | list    |                                     |                                                  | Custom toleration for calico-typha pods                            |
