@@ -41,8 +41,15 @@ def get_status(group):
 def parse_status(result_stdout):
     result = {}
     parsed_data = json.loads(result_stdout)
-    for profile_name, profile_state in parsed_data['profiles'].items():
-        result[profile_state] = profile_name
+    modes_set = set()
+    for mode in parsed_data['profiles'].values():
+        modes_set.add(mode)
+    for mode in modes_set:
+        profile_list = []
+        for profile_name, profile_state in parsed_data['profiles'].items():
+            if profile_state == mode:
+                profile_list.append(profile_name)
+        result[profile_state] = profile_list
     return result
 
 
@@ -79,15 +86,23 @@ def is_state_valid(group, expected_profiles):
                     valid = False
                     log.verbose('Mode %s is not presented on remote host %s' % (state, connection.host))
                     break
+                # check if all 'cluster.yaml' settings reflect on particular node
                 for profile in profiles:
-                    if convert_profile(profile) not in status[state]:
+                    if profile not in status[state]:
                         valid = False
                         log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, connection.host))
+                        break
+                # check if some settings on particular node do not match with 'cluster.yaml'
+                for profile in status[state]:
+                    if profile not in profiles:
+                        valid = False
+                        log.verbose("Profile %s is enabled in %s mode on remote host %s but doesn't in 'cluster.yaml'"
+                                 % (profile, state, connection.host))
                         break
 
     return valid, parsed_result
 
-
+# TODO: describe what the purpose of that method is
 def convert_profile(profile):
     profile = profile.replace('/', '.')
     if profile[0] == '.':
