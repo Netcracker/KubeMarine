@@ -380,12 +380,12 @@ def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
 
 def is_firewalld_disabled(group):
     result = fetch_firewalld_status(group)
-    disabled_status = True
+    disabled_status = False
 
     for node_result in list(result.values()):
-        if node_result.return_code != 4 and "disabled" not in node_result.stdout:
-            disabled_status = False
-
+        if node_result.return_code == 4 and "inactive" not in node_result.stdout or \
+                node_result.return_code == 3 and "inactive" in node_result.stdout:
+            disabled_status = True
     return disabled_status, result
 
 
@@ -660,6 +660,8 @@ def verify_system(group):
         log.debug(firewalld_result)
         if not firewalld_disabled:
             raise Exception("FirewallD is still enabled")
+        else:
+            log.debug("FirewallD disabled")
     else:
         log.debug('FirewallD verification skipped - origin disable task was not completed')
 
