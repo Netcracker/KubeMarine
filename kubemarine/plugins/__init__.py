@@ -922,9 +922,7 @@ def _verify_file(config, file_type):
 
     files = glob.glob(source)
 
-    # do not check source file for predifined plugins because files create on the further steps
-    check_source = config.get('check_source', True)
-    if len(files) == 0 and check_source:
+    if len(files) == 0:
         raise Exception('Cannot find any %s files matching this '
                         'source value: %s' % (file_type, source))
 

@@ -427,11 +427,10 @@ plugins:
       procedures:
         - python:
             module: plugins/calico.py
-            method: enrich_original_yaml
-        - config:
-            source: 'kubemarine/plugins/yaml/calico-{{ plugins.calico.version }}.yaml'
-            do_render: False
-            check_source: False
+            method: apply_calico_yaml
+            arguments:
+              calico_original_yaml: 'kubemarine/plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
+              calico_yaml: 'dump/calico-{{ plugins.calico.version }}.yaml'
         - expect:
             daemonsets:
               - calico-node

@@ -17,6 +17,10 @@ import ruamel.yaml
 
 from copy import deepcopy
 
+from kubemarine import plugins
+
+
+
 def enrich_inventory(inventory, cluster):
 
     # By default we use calico, but have to find it out
@@ -31,17 +35,25 @@ def enrich_inventory(inventory, cluster):
         if not flannel_required and not canal_required:
             inventory["plugins"]["calico"]["install"] = True
 
+    if inventory["plugins"]["calico"]["install"] == True:
+        # Check if original YAML and final YAML have different paths (applicable for non Jinja2 template)
+        items = inventory['plugins']['calico']['installation']['procedures']
+        for item in items:
+            if item.get('python', ''):
+                if item['python']["arguments"]["calico_yaml"] == item['python']["arguments"]["calico_original_yaml"]:
+                    raise Exception("'Calico' plugin error: 'calico_yaml' and 'calico_original_yaml' arguments must be different")
+
     return inventory
 
 
-def enrich_original_yaml(cluster):
+def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
 
     # get original YAML and parse it into dict of objects
-    items = cluster.inventory['plugins']['calico']['installation']['procedures']
-    for item in items:
-        if item.get('config', ''):
-            calico_original_yaml = f"{item['config']['source']}.original"
-            calico_yaml = item['config']['source']
+    #calico_original_yaml = "kubemarine/plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml.original"
+    #calico_original_yaml = "plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml.original"
+    #calico_yaml = "kubemarine/plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml"
+    #calico_yaml = "plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml"
+
     obj_list = load_multiple_yaml(calico_original_yaml)
 
     validate_original(cluster, obj_list)
@@ -79,13 +91,20 @@ def enrich_original_yaml(cluster):
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
-    cluster.log.verbose(f"The total number of exclued objects is {len(excluded_list)} "
+    cluster.log.verbose(f"The total number of excluded objects is {len(excluded_list)} "
                         f"the objects are the following: {excluded_list}")
 
     # TODO: check results 
     #validate_result()
     save_multiple_yaml(calico_yaml, obj_list)
 
+    # create config for plugin module
+    config = {
+            "source": calico_yaml,
+            "do_render": False
+            }
+
+    plugins.apply_config(cluster, config)
 
 def enrich_configmap_calico_config(cluster, obj_list):
 
@@ -242,7 +261,7 @@ def validate_original(cluster, obj_list):
     ]
 
     # check if there are new objects
-    for key, _ in obj_list.items():
+    for key in obj_list.keys():
         if key not in known_objects:
             cluster.log.verbose(f"The current version of original yaml has a new object: {key}")
 
