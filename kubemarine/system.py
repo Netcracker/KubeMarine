@@ -659,11 +659,12 @@ def verify_system(group):
         firewalld_disabled, firewalld_result = is_firewalld_disabled(group)
         log.debug(firewalld_result)
         if not firewalld_disabled:
-            raise Exception("FirewallD is still enabled")
+            log.debug("FirewallD is still enabled")
+            disable_service(group, name='firewalld', now=True)
+            reboot_nodes(group)
+            verify_system(group)
         else:
             log.debug("FirewallD disabled")
-    else:
-        log.debug('FirewallD verification skipped - origin disable task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_swap'):
         log.debug("Verifying swap...")
