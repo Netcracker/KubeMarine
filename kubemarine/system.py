@@ -383,9 +383,14 @@ def is_firewalld_disabled(group):
     disabled_status = False
 
     for node_result in list(result.values()):
-        if node_result.return_code == 4 and "inactive" not in node_result.stdout or \
-                node_result.return_code == 3 and "inactive" in node_result.stdout:
+        if node_result.return_code == 4:
             disabled_status = True
+        elif node_result.return_code == 3 and "disabled" not in node_result.stdout:
+            return disabled_status, result
+        elif node_result.return_code == 3 and "disabled" in node_result.stdout:
+            disabled_status = True
+        else:
+            disabled_status = False
     return disabled_status, result
 
 
@@ -659,12 +664,12 @@ def verify_system(group):
         firewalld_disabled, firewalld_result = is_firewalld_disabled(group)
         log.debug(firewalld_result)
         if not firewalld_disabled:
-            log.debug("FirewallD is still enabled")
-            disable_service(group, name='firewalld', now=True)
-            reboot_nodes(group)
-            verify_system(group)
+            raise Exception("FirewallD is still enabled")
+
         else:
             log.debug("FirewallD disabled")
+    else:
+        log.debug('FirewallD verification skipped - origin disable task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_swap'):
         log.debug("Verifying swap...")
