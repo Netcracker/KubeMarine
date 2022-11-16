@@ -35,11 +35,8 @@ from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff
 
-# Global variable for 'Maintenance mode'
-mntc_mode = False
 
 def services_status(cluster, service_type):
-    global mntc_mode
     with TestCase(cluster.context['testsuite'], '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
         service_name = service_type
@@ -66,7 +63,6 @@ def services_status(cluster, service_type):
 
         statuses = []
         failed = False
-        mntc_list = []
         for connection, node_result in result.items():
             if node_result.return_code == 4:
                 statuses.append('service is missing')
@@ -88,28 +84,6 @@ def services_status(cluster, service_type):
                                   % (service_type.capitalize(), node_result.return_code, connection.host))
             else:
                 raise Exception('Failed to detect status for \"%s\"' % connection.host)
-            # Check if HAproxy is running in Maintenance mode
-            if service_type == 'haproxy' and \
-                    cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-                mntc_config_location = group.cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
-                is_mntc = re.findall(mntc_config_location, node_result.stdout)
-                if is_mntc:
-                    cluster.log.warning("%s balancer is running in the maintenance mode" % connection.host)
-                    mntc_list.append(connection.host)
-
-        # Check if Kubernetes API is disable in maintenance mode
-        if service_type == 'haproxy' and \
-                    cluster.inventory['services']['loadbalancer']['haproxy'].get('maintenance_mode', False):
-            kuber_ip_disable = False
-            kuber_ip = cluster.inventory['public_cluster_ip']
-            for item in cluster.inventory['vrrp_ips']:
-                # 'ip' and 'floating_ip' maight be different and 'floating_ip' might be omited
-                if (kuber_ip == item['ip'] or kuber_ip == item.get('floating_ip', '')) and \
-                        item.get('params', {}).get('maintenance-type', '') == 'not bind':
-                    kuber_ip_disable = True
-            if kuber_ip_disable and len(group.get_nodes_names()) == len(mntc_list):
-                mntc_mode = True
-                raise TestWarn("Kubernetes API unavailable due to HAProxy maintenance mode")
 
         statuses = list(set(statuses))
 
@@ -270,9 +244,6 @@ def get_nodes_description(cluster):
 def kubelet_version(cluster):
     with TestCase(cluster.context['testsuite'], '203', "Services", "Kubelet Version",
                   default_results=cluster.inventory['services']['kubeadm']['kubernetesVersion']):
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         nodes_description = get_nodes_description(cluster)
         bad_versions = []
         for node_description in nodes_description['items']:
@@ -391,9 +362,6 @@ def find_hosts_missing_thirdparty(group, path) -> List[str]:
 def kubernetes_nodes_existence(cluster):
     with TestCase(cluster.context['testsuite'], '209', "Kubernetes", "Nodes Existence",
                   default_results="All nodes presented"):
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         nodes_description = get_nodes_description(cluster)
         not_found = []
         for node in cluster.inventory['nodes']:
@@ -419,9 +387,6 @@ def kubernetes_nodes_existence(cluster):
 def kubernetes_nodes_roles(cluster):
     with TestCase(cluster.context['testsuite'], '210', "Kubernetes", "Nodes Roles",
                   default_results="All nodes have the correct roles"):
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         nodes_description = get_nodes_description(cluster)
         nodes_with_bad_roles = []
         for node in cluster.inventory['nodes']:
@@ -452,9 +417,6 @@ def kubernetes_nodes_roles(cluster):
 
 def kubernetes_nodes_condition(cluster, condition_type):
     with TestCase(cluster.context['testsuite'], '211', "Kubernetes", "Nodes Condition - %s" % condition_type) as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         nodes_description = get_nodes_description(cluster)
         expected_status = 'False'
         if condition_type == 'Ready':
@@ -500,9 +462,6 @@ def kubernetes_pods_condition(cluster):
     system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default"]
     critical_states = cluster.globals['pods']['critical_states']
     with TestCase(cluster.context['testsuite'], '207', "Kubernetes", "Pods Condition") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         pods_description = get_not_running_pods(cluster)
         total_failed_amount = len(pods_description.split('\n')[1:])
         critical_system_failed_amount = 0
@@ -533,9 +492,6 @@ def kubernetes_pods_condition(cluster):
 
 def kubernetes_dashboard_status(cluster):
     with TestCase(cluster.context['testsuite'], '208', "Plugins", "Dashboard Availability") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         retries = 10
         test_succeeded = False
         i = 0
@@ -570,9 +526,6 @@ def kubernetes_dashboard_status(cluster):
 
 def nodes_pid_max(cluster):
     with TestCase(cluster.context['testsuite'], '202', "Nodes", "Nodes pid_max correctly installed") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
@@ -805,9 +758,6 @@ def control_plane_configuration_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '220', "Control plane", "configuration status") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         results = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
@@ -913,9 +863,6 @@ def control_plane_health_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '221', "Control plane", "health status") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
@@ -948,9 +895,6 @@ def default_services_configuration_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '222', "Default services", "configuration status") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         original_coredns_cm = generate_configmap(cluster.inventory)
         original_coredns_cm = yaml.safe_load(original_coredns_cm)
@@ -1003,9 +947,6 @@ def default_services_health_status(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '223', "Default services", "health status") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
@@ -1043,9 +984,6 @@ def calico_config_check(cluster):
     :return: None
     '''
     with TestCase(cluster.context['testsuite'], '224', "Calico", "configuration check") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         message = ""
         correct_config = True
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -1088,9 +1026,6 @@ def kubernetes_admission_status(cluster):
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
     with TestCase(cluster.context['testsuite'], '225', "Kubernetes", "Pod Security Admissions") as tc:
-        if mntc_mode:
-            raise TestWarn("Current check is skipped due to Kubernetes API is unreachable in maintenance mode")
-            return
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         profile_inv = ""
         if cluster.inventory["rbac"]["admission"] == "pss" and \

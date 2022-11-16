@@ -337,7 +337,7 @@ services:
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
         haproxy:
-          executable_name: '/usr/sbin/haproxy'
+          executable_name: 'haproxy'
           package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'haproxy'
           config_location: '/etc/haproxy/haproxy.cfg'
@@ -739,3 +739,6 @@ rbac:
 procedure_history:
   archive_threshold: 5
   delete_threshold: 10
+
+timeout_download:
+  60

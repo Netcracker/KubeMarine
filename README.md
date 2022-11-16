@@ -106,7 +106,7 @@ Proceed the following steps to install Kubemarine  on your environment:
    ```bash
    kubemarine.exe help
    ```
-
+   
 ## Running Cluster Installation
 Proceed the following steps to install Kubernetes cluster using Kubemarine:
 1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes)
