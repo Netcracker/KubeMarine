@@ -47,13 +47,14 @@ def enrich_inventory(inventory, cluster):
 
 
 def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
+    """
+    The method implements full proccessing for Calico plugin
+    :param calico_original_yaml: path to original Calico manifest
+    :param calico_yaml: path to result of Calico manifest
+    :param cluster: Cluster object
+    """
 
     # get original YAML and parse it into dict of objects
-    #calico_original_yaml = "kubemarine/plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml.original"
-    #calico_original_yaml = "plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml.original"
-    #calico_yaml = "kubemarine/plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml"
-    #calico_yaml = "plugins/yaml/calico-{cluster.inventory['plugins']['calico']['version'].yaml"
-
     obj_list = load_multiple_yaml(calico_original_yaml)
 
     validate_original(cluster, obj_list)
@@ -107,6 +108,11 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     plugins.apply_config(cluster, config)
 
 def enrich_configmap_calico_config(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Calico ConfigMap
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
 
     key = "ConfigMap_calico-config"
     val = cluster.inventory['plugins']['calico']['mtu']
@@ -132,6 +138,11 @@ def enrich_configmap_calico_config(cluster, obj_list):
     return obj_list
 
 def enrich_deployment_calico_kube_controllers(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Calico controller Deployment
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
 
     key = "Deployment_calico-kube-controllers"
     obj_list[key]['spec']['template']['spec']['nodeSelector'] = \
@@ -147,6 +158,11 @@ def enrich_deployment_calico_kube_controllers(cluster, obj_list):
     return obj_list
 
 def enrich_daemonset_calico_node(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Calico node DaemonSet
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
 
     key = "DaemonSet_calico-node"
     for container in obj_list[key]['spec']['template']['spec']['initContainers']:
@@ -210,6 +226,11 @@ def enrich_daemonset_calico_node(cluster, obj_list):
 
 
 def enrich_deployment_calico_typha(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Typha Deployment
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
 
     key = "Deployment_calico-typha"
     val = cluster.inventory['plugins']['calico']['typha']['replicas']
@@ -229,6 +250,11 @@ def enrich_deployment_calico_typha(cluster, obj_list):
 
 
 def validate_original(cluster, obj_list):
+    """
+    The method implements some validations for Calico objects
+    :param cluster: Cluster object
+    :param obj_list: list of objects for validation
+    """
 
     known_objects = [
         "ConfigMap_calico-config",
@@ -271,13 +297,17 @@ def validate_original(cluster, obj_list):
             cluster.log.verbose(f"The current version of original yaml does not include"
                                 f"the following object: {key}")
 
-# TODO: implement method for results validation
-# 'mount-bpffs' and 'flexvol-driver' initContainers must not be at the same result YAML, result validation should cover this case
+# TODO: implement method for validation after enrichment
 # Some validation inside the objects
 #def validate_result(cluster, obj_list):
 
 
 def load_multiple_yaml(filepath) -> dict:
+    """
+    The method implements the parse YAML file that includes several YAMLs inside
+    :param filepath: Path to file that should be parsed
+    :return: dictionary with the 'kind' and 'name' of object as 'key' and whole YAML structure as 'value'
+    """
     yaml = ruamel.yaml.YAML()
     yaml_dict = {}
     try:
@@ -297,6 +327,11 @@ def load_multiple_yaml(filepath) -> dict:
 
 
 def save_multiple_yaml(filepath, multi_yaml) -> None:
+    """
+    The method implements the dumping some dictionary as the file that includes several YAMLs inside
+    :param filepath: Path to file that should be created as the result
+    :param multi_yaml: dictionary with the 'kind' and 'name' of object as 'key' and whole YAML structure as 'value'
+    """
     yaml = ruamel.yaml.YAML()
     source_yamls = []
     try:
@@ -307,7 +342,7 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
 
-
+# name of objects and enrichment methods mapping
 enrich_objects_fns = {
         "ConfigMap_calico-config": enrich_configmap_calico_config,
         "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
@@ -315,5 +350,4 @@ enrich_objects_fns = {
         "Deployment_calico-typha": enrich_deployment_calico_typha,
         "Service_calico-typha": None, 
         "PodDisruptionBudget_calico-typha": None
-
 }
