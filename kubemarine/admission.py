@@ -118,6 +118,9 @@ def enrich_inventory(inventory, _):
 
 
 def manage_psp_enrichment(inventory, cluster):
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version >= 25:
+        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
     if "psp" not in cluster.procedure_inventory:
@@ -652,6 +655,12 @@ def manage_pss_enrichment(inventory, cluster):
 
 
 def manage_enrichment(inventory, cluster):
+    # workaround for easy install Kubernetes v1.25 that doesn't have PSP at all:
+    # if the 'admission' parameter is empty in 'cluster.yaml', then set it to 'pss' instead of 'psp'
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version >= 25:
+        if cluster.context.get('initial_procedure') == 'install' and not cluster.raw_inventory['rbac'].get('admission', ''):
+            inventory['rbac']['admission'] = "pss"
     admission_impl = inventory['rbac']['admission']
     if admission_impl == "psp":
         return manage_psp_enrichment(inventory, cluster)

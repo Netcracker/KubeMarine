@@ -337,7 +337,7 @@ services:
           service_name: 'containerd'
           config_location: '/etc/containerd/config.toml'
         haproxy:
-          executable_name: '/usr/sbin/haproxy'
+          executable_name: 'haproxy'
           package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
           service_name: 'haproxy'
           config_location: '/etc/haproxy/haproxy.cfg'
@@ -478,8 +478,10 @@ plugins:
     defaultAsNumber: 64512
     globalBgpPeers: []
     typha:
-      enabled: false
-      replicas: '{{ (((nodes|length)/50) + 1) | round(1) | int }}'
+      # enabled by default for envs with nodes > 3
+      enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'
+      # let's start from 2 replicas and increment it every 50 nodes
+      replicas: '{{ (((nodes|length)/50) + 2) | round(1) | int }}'
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
@@ -581,6 +583,8 @@ plugins:
                 namespace: ingress-nginx
             pods:
               - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
+    webhook:
+      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-image-name"] }}:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-version"] }}'
     controller:
       image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["image-name"] }}:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
@@ -598,6 +602,9 @@ plugins:
         protocol: TCP
       - name: prometheus
         containerPort: 10254
+        protocol: TCP
+      - name: webhook
+        containerPort: 8443
         protocol: TCP
 
   # TODO: support hostPort for haproxy-ingress
@@ -689,7 +696,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: rancher/local-path-provisioner:v0.0.22
+    image: rancher/local-path-provisioner:v0.0.23
     helper-pod-image: library/busybox:1.35.0
 
 rbac:
@@ -742,3 +749,6 @@ rbac:
 procedure_history:
   archive_threshold: 5
   delete_threshold: 10
+
+timeout_download:
+  60

@@ -26,7 +26,10 @@ def new(log, root=None):
     env.filters['isipv4'] = lambda ip: ":" not in precompile(log, ip, root)
     env.filters['minorversion'] = lambda version: ".".join(precompile(log, version, root).split('.')[0:2])
     env.filters['majorversion'] = lambda version: precompile(log, version, root).split('.')[0]
-
+    # we need these filters because rendered cluster.yaml can contain variables like 
+    # enable: 'true'
+    env.filters['is_true'] = lambda v: v in ['true', 'True', 'TRUE', True]
+    env.filters['is_false'] = lambda v: v in ['false', 'False', 'FALSE', False]
     return env
 
 

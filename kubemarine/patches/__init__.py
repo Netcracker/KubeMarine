@@ -22,7 +22,11 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_upgrade_crictl_version import UpgrateCrictlVersion
+from kubemarine.patches.p2_upgrade_calico_version import UpgrateCalicoVersion
 
 patches: List[Patch] = [
+        UpgrateCrictlVersion(),
+        UpgrateCalicoVersion()
 ]
 """List of patches which can be executed strictly in the declared order"""

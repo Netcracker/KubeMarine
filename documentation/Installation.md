@@ -58,7 +58,7 @@ This section provides information about the inventory, features, and steps for i
       - [Configuring Custom Policies](#configuring-custom-policies)
     - [Admission pss](#admission-pss)
       - [Configuring Default Profiles](#configuring-default-profiles)
-      - [Configuring Exemption](#configuring-exemptions)
+      - [Configuring Exemptions](#configuring-exemptions)
     - [RBAC Accounts](#rbac-accounts)
       - [RBAC account_defaults](#rbac-account_defaults)
     - [Plugins](#plugins)
@@ -110,7 +110,7 @@ This section provides information about the inventory, features, and steps for i
 
 # Prerequisites
 
-The technical requirements for all types of host VMs for Kubemarine installation are specified in this section.
+The technical requirements for all types of host VMs for KubeMarine installation are specified in this section.
 
 ## Prerequisites for Deployment Node
 
@@ -169,6 +169,7 @@ For cluster machines, ensure the following requirements are met:
   * RHEL 7.5+, 8.4
   * Oracle Linux 7.5+, 8.4
   * Ubuntu 20.04
+  * Ubuntu 22.04.1
 
 <!-- #GFCFilterMarkerStart# -->
 The actual information about the supported versions can be found at [global.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L335).
@@ -195,7 +196,7 @@ The actual information about the supported versions can be found at [global.yaml
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
+**Warning**: `KubeMarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
@@ -216,7 +217,7 @@ If you have other solution, remove or switch off the IP firewall before the inst
   * policycoreutils-python
 
 **Warning**: You have to specify packages names in "RPM format" if it is possible for you OS,
-e.g.: specify `conntrack-tools` instead of `conntrack`.
+For example, specify `conntrack-tools` instead of `conntrack`.
 
 **Note**: For an automated installation, you can use [Packages](#packages) during installation.
 
@@ -324,7 +325,7 @@ Mount point:
 
 ### SSH key Recommendation 
 
-Before working with the cluster, you need to generate an ssh key. Kubemarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
+Before working with the cluster, you need to generate an ssh key. KubeMarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
 Example:
 ```
@@ -364,7 +365,7 @@ There are two major deployment schemes as follows:
 
 ### Non-HA Deployment Schemes
 
-This deployment provides a single Kubemarine control-plane.
+This deployment provides a single KubeMarine control-plane.
 
 #### All-in-one Scheme
 
@@ -635,6 +636,9 @@ Addresses are taken from the following groups in order:
 1. Balancer
 1. Control-plane
 
+**Note**: VRRP IPs with `maintenance-type: "not bind"` do not participate in the control_plain calculation.
+For more information, see [maintenance type](#maintenance-type).
+
 **Note**: It is important to notice that addresses may not necessarily be taken from a single group. There may be situation that the internal address is taken from the VRRP, and the external one from the Balancer. This situation is not recommended, but it is possible. If the inventory is correctly filled in and all the addresses that are available are indicated, the algorithm automatically selects the best pair of addresses.
 
 After detecting addresses, the algorithm automatically displays the determined addresses and their sources as follows:
@@ -645,7 +649,10 @@ Control plains:
    External: 10.101.1.101 (balancer "balancer-1")
 ```
 
-The algorithm chooses the very first address if there are several elements in the group. If you are not satisfied with this principle, you can "help" the algorithm in choosing which address to take by specifying the parameter `control_endpoint` for the group element. 
+#### control_endpoint
+
+The algorithm of [control_plain](#control_plain) calculation chooses the very first address if there are several elements in the group.
+If you are not satisfied with this principle, you can "help" the algorithm in choosing which address to take by specifying the `control_endpoint` parameter for the group element.
 For example:
 
 ```yaml
@@ -691,6 +698,8 @@ Control plains:
    Internal: 192.168.0.2 (vrrp_ip[1])
    External: 10.101.0.4 (balancer "balancer-2")
 ```
+
+**Note**: `control_endpoint` is not taken into account for VRRP IPs with `maintenance-type: "not bind"`.
 
 ### public_cluster_ip
 
@@ -743,7 +752,7 @@ The following parameters are supported:
 
 | Parameter       | Type   | Default value            | Description                                                                                   |
 |-----------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
-| endpoints       | list   |                          | Address list of registry endponites                                                           |
+| endpoints       | list   |                          | Address list of registry endpoints                                                           |
 | mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
 | thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
 
@@ -1050,7 +1059,7 @@ services:
 **Warning**: These kubeadm parameters are configurable only during installation, currently. 
 KubeMarine currently do not provide special procedure to change these parameters after installation.
 
-During init, join, ugrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
+During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
 KubeMarine allows to configure kubeadm preflight errors to be ignored.
 
@@ -1085,7 +1094,7 @@ services:
 
 Before proceeding further, it is recommended to read the official Kubernetes Guide about the CPP deployment in the cluster at [https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/](https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/).
 
-**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubemarine procedures for adding and removing nodes.
+**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break KubeMarine procedures for adding and removing nodes.
 
 It is possible to specify a plugin at the installation stage, if it is required. To enable the CPP support, just specify the `external-cloud-volume-plugin` parameter of `controllerManager` in the `kubeadm` cluster configuration. For example:
 
@@ -1103,7 +1112,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, KubeMarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -1123,7 +1132,7 @@ In this case, Kubemarine automatically initializes and joins new cluster nodes w
    /etc/kubernetes/cloud-config
    ```
 
-   It is recommended to use Kubemarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
+   It is recommended to use KubeMarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
 
    ```yaml
    services:
@@ -1132,7 +1141,7 @@ In this case, Kubemarine automatically initializes and joins new cluster nodes w
          source: ./example/cloud-config.txt
    ```
 
-1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubemarine plugin, for example:
+1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first KubeMarine plugin, for example:
 
    Create a file `./openstack-cloud-controller-manager-ds.yaml` on deploy node with the following content:
 
@@ -1219,7 +1228,7 @@ In this case, Kubemarine automatically initializes and joins new cluster nodes w
   ```
    **Warning:** Pay attention on external resources links. 
    For restricted environments links should be changed to local registry.
-   e.g. image: `docker.io/k8scloudprovider/openstack-cloud-controller-manager:v1.15.0` should be changed to
+   For example, image: `docker.io/k8scloudprovider/openstack-cloud-controller-manager:v1.15.0` should be changed to
    `registry:17001/k8scloudprovider/openstack-cloud-controller-manager:v1.15.0`
   
   **Warning**: Pay attention to pod security policies for cloud controller manager. You can create new ClusterRole or disable PSP.
@@ -1527,7 +1536,7 @@ The profiles should be specified in a standard way using a path or name. It is p
 * `complain` - does not prohibit, but only displays violation warnings in the logs.
 * `disable` - disables and unloads security profile.
 
-**Note**: The necessary profiles are installed and configured by themselves during the installation of packages and their activation manually is not required by default. However, if some profiles are missing for you, you need to preload them on all nodes yourself and launch the apparmor task after that.
+**Note**: The necessary profiles are installed and configured by themselves during the installation of packages and their activation manually is not required by default. However, if some profiles are missing for you, you need to preload them on all nodes yourself and launch the AppArmor task after that.
 
 Example:
 
@@ -1548,7 +1557,7 @@ services:
         - man_groff 
 ```
 
-If you need to disable AppArmor, you cannot do this using Kubemarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
+If you need to disable AppArmor, you cannot do this using KubeMarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
 
 **Note**: After the installation of new repositories, the repodata is reloaded.
 
@@ -1738,8 +1747,8 @@ The following associations are used by default:
 <table>
   <tr>
     <th>Subject</th>
-    <th>Assosiation key</th>
-    <th>Assosiation value</th>
+    <th>Association key</th>
+    <th>Association value</th>
   </tr>
   <tr>
     <td rowspan="4">docker</td>
@@ -1817,8 +1826,8 @@ The following associations are used by default:
 <table>
   <tr>
     <th>Subject</th>
-    <th>Assosiation key</th>
-    <th>Assosiation value</th>
+    <th>Association key</th>
+    <th>Association value</th>
   </tr>
   <tr>
     <td rowspan="4">docker</td>
@@ -2194,7 +2203,7 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
 
-**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
+**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by KubeMarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
 You can specify your own parameters instead of the standard parameters. You need to specify the parameter key and its value. If the value is empty, the key is ignored. For example:
 
@@ -2358,7 +2367,7 @@ The following parameters are supported:
 |---|---|---|---|---|
 |servers|**yes**|list| |NTP servers addresses with additional configurations.|
 |makestep|no|string|`5 10`|Step the system clock if large correction is needed.|
-|rtcsync|no|boolean|`True`|Specify that RTC should be automatically synchronised by kernel.|
+|rtcsync|no|boolean|`True`|Specify that RTC should be automatically synchronized by kernel.|
 
 For more information about Chrony configuration, refer to the official documentation at [https://chrony.tuxfamily.org/documentation.html](https://chrony.tuxfamily.org/documentation.html).
 
@@ -2618,7 +2627,7 @@ The following settings are supported:
     <td>prometheus</td>
     <td>string</td>
     <td>:9153</td>
-    <td>With prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics</td>
+    <td>With Prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics</td>
   </tr>
   <tr>
     <td>cache</td>
@@ -3111,7 +3120,7 @@ There are three parts of PSS configuration.
 * default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
 * `exemptions` describes exemptions from default rules
 
-The PSS enabling requires spacial labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
+The PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
 
 ```yaml
 apiVersion: v1
@@ -3133,7 +3142,7 @@ Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS
 `kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
 Therefor PSS labels on namespaces shouldn't be set even if you Kubernetes cluster is deployed without PSS enabled.
 
-#### Configuring Exemption
+#### Configuring Exemptions
 
 The `exemption` section describes objects that are not enforced by the policy. It is possible to define `User` or `ServiceAccount` in 
 the `username` section. For example, ("system:serviceaccount:my-ns:myadmin" - it is a serviceAccount, "myuser" - it is a user):
@@ -3159,7 +3168,7 @@ Do not change the namespaces exemption list without strong necessary. In any cas
 #### Application prerequisites
 
 In case of using PSS the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
-`baseline`, `restricted`). Those profiles may be set by labling the namespace so as it described above for predifined plugins. 
+`baseline`, `restricted`). Those profiles may be set by labeling the namespace so as it described above for predefined plugins. 
 Moreover the application should be compatible with PSS. The `restricted` profile requires the following section in pod description:
 
 ```yaml
@@ -3274,6 +3283,8 @@ plugins:
     mtu: 1400
     typha:
       enabled: true
+      nodeSelector:
+        region: infra
     node:
       image: calico/node:v3.10.1
     env:
@@ -3285,7 +3296,7 @@ An example is also available in [Full Inventory Example](../examples/cluster.yam
 
 ###### Calico BGP Configuration
 
-By default, calico is installed with "full mesh" BGP topology, that is every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh.
+By default, calico is installed with "full mesh" BGP topology, that is, every node has BGP peering with all other nodes in the cluster. If the cluster size is more than 50 nodes it is recommended to use the BGP configuration with route reflectors instead of full mesh.
 You also have to change calico BGP configuration if you are using DR schema.
 
 **Note**: change BGP topology is possible for calico v3.20.1 or higher.
@@ -3330,9 +3341,9 @@ $ kubectl label node <NODENAME> route-reflector-
 If necessary, remove `route-reflector` label from the cluster.yaml as well.
 
 
-**Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see mor details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
+**Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see more details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
 
-**Note**: If the cluster size is more than 50 nodes, it is recommended to enable the Calico Typha daemon and adjust the size of its replicas.
+**Note**: If the cluster size is more than 3 nodes, Calico Typha daemon is enabled by default and number of its replicas is incremented with every 50 nodes. This behavior can be overridden with cluster.yaml.
 
 The plugin configuration supports the following parameters:
 
@@ -3345,9 +3356,10 @@ The plugin configuration supports the following parameters:
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
 | defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
-| typha.enabled          | boolean | `false`                             | Enable if you have more than 50 nodes in cluster | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
-| typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 1) \                               | round(1) }}`                                                       |1 replica for every 50 cluster nodes|Number of Typha running replicas|
+| typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
+| typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 2) \                               | round(1) }}`                                                       |Starts from 2 replicas amd increments for every 50  nodes|Number of Typha running replicas|
 | typha.image            | string  | `calico/typha:v3.10.1`              | Should contain both image name and version       | Calico Typha image                                                 |
+| typha.tolerations      | list    |                                     |                                                  | Custom toleration for calico-typha pods                            |
 | cni.image              | string  | `calico/cni:v3.10.1`                | Should contain both image name and version       | Calico CNI image                                                   |
 | node.image             | string  | `calico/node:v3.10.1`               | Should contain both image name and version       | Calico Node image                                                  |
 | kube-controllers.image | string  | `calico/kube-controllers:v3.10.1`   | Should contain both image name and version       | Calico Kube Controllers image                                      |
@@ -3762,7 +3774,7 @@ To do this, you need to start the execution of the plugin task `deploy.plugins` 
 
 Starting the task leads to re-application of the plugin configurations in the Kubernetes, which allows you to reinstall, reset, reconfigure the plugin to the desired parameters without stopping the Kubernetes cluster and other plugins.
 
-The following is an example in which Calico and NGINX Ingress Controller not assigned for reinstal, and the Kubernetes Dashboard is assigned for reinstall:
+The following is an example in which Calico and NGINX Ingress Controller not assigned for reinstall, and the Kubernetes Dashboard is assigned for reinstall:
 
 ```yaml
 plugins:
@@ -4319,7 +4331,7 @@ For this procedure you must specify the following parameters:
 
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from kubemarine container, note that kubemarine container is shiped with `ansible-2.9.*`.
+**Note**: When calling ansible plugin from KubeMarine container, note that KubeMarine container is shipped with `ansible-2.9.*`.
 Exact patch version is not fixed.
 
 For example:
@@ -4669,7 +4681,7 @@ Be careful with the following parameters:
 
 # Installation Procedure
 
-The installation information for Kubemarine is specified below.
+The installation information for KubeMarine is specified below.
 
 **Warning**: Running the installation on an already running cluster redeploys the cluster from scratch.
 
@@ -4832,8 +4844,8 @@ not need to consider the sequence for listing the tasks. You can do it in any se
 
 ## Logging
 
-Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring Kubemarine Logging](Logging.md) section.
+KubeMarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
+For more information, refer to the [Configuring KubeMarine Logging](Logging.md) section.
 
 ## Dump Files
 
@@ -4866,7 +4878,7 @@ $ install --disable-dump-cleanup
 
 After any procedure is completed, a final inventory with all the missing variable values is needed, which is pulled from the finished cluster environment.
 This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
-and can be passed as a source inventory in future runs of Kubemarine procedures.
+and can be passed as a source inventory in future runs of KubeMarine procedures.
 
 In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
 For example, consider the following package's origin configuration:
@@ -4944,7 +4956,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of Kubemarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
+During perform of KubeMarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*
@@ -5129,13 +5141,14 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <th rowspan="2">Type</th>
     <th rowspan="2">Name</th>
-    <th colspan="4">Versions</th>
+    <th colspan="5">Versions</th>
     <th rowspan="2">Note</th>
   </tr>
   <tr>
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5143,7 +5156,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.21.12</td>
+    <td colspan="5" rowspan="3">v1.21.12</td>
     <td>SHA1: b566840ac2bd50d9c83165ac61331ba7998bf7ce</td>
   </tr>
   <tr>
@@ -5156,24 +5169,25 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.22.2</td>
+    <td colspan="5">v3.22.2</td>
     <td>SHA1: b1e2c550480afe4250a34b0e4529eb38ae06973f<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td colspan="4">v1.23.0</td>
+    <td colspan="5">v1.23.0</td>
     <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="5">20.10</td>
     <td></td>
   </tr>
   <tr>
     <td>containerd.io</td>
     <td>1.4.*</td>
     <td>1.4.*</td>
+    <td>1.5.*</td>
     <td>1.5.*</td>
     <td>1.4.*</td>
     <td></td>
@@ -5183,6 +5197,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.6.4</td>
     <td>latest</td>
     <td>latest</td>
+    <td>latest</td>
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5190,7 +5205,8 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>haproxy/rh-haproxy</td>
     <td>1.8</td>
     <td>1.8</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.8</td>
     <td>Required only if balancers are presented in the deployment scheme.</td>
   </tr>
@@ -5198,14 +5214,15 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>keepalived</td>
     <td>1.3</td>
     <td>2.1</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.3</td>
     <td>Required only if VRRP is presented in the deployment scheme.</td>
   </tr>
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.21.12</td>
+    <td colspan="5" rowspan="4">v1.21.12</td>
     <td></td>
   </tr>
   <tr>
@@ -5222,22 +5239,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/coredns</td>
-    <td colspan="4">1.8.0</td>
+    <td colspan="5">1.8.0</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.4.1</td>
+    <td colspan="5">3.4.1</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="4">3.4.13-0</td>
+    <td colspan="5">3.4.13-0</td>
     <td></td>
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.22.2</td>
+    <td colspan="5" rowspan="5">v3.22.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5258,22 +5275,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.2.0</td>
+    <td colspan="5">v1.2.0</td>
     <td></td>
   </tr>
   <tr>
     <td>kubernetesui/dashboard</td>
-    <td colspan="4">v2.5.1</td>
+    <td colspan="5">v2.5.1</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>kubernetesui/metrics-scraper</td>
-    <td colspan="4">v1.0.7</td>
+    <td colspan="5">v1.0.7</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.22</td>
+    <td colspan="5">v0.0.22</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -5296,13 +5313,14 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <th rowspan="2">Type</th>
     <th rowspan="2">Name</th>
-    <th colspan="4">Versions</th>
+    <th colspan="5">Versions</th>
     <th rowspan="2">Note</th>
   </tr>
   <tr>
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5310,7 +5328,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.22.9</td>
+    <td colspan="5" rowspan="3">v1.22.9</td>
     <td>SHA1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d</td>
   </tr>
   <tr>
@@ -5323,18 +5341,18 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.24.1</td>
+    <td colspan="5">v3.24.1</td>
     <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td colspan="4">v1.23.0</td>
+    <td colspan="5">v1.23.0</td>
     <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="5">20.10</td>
     <td></td>
   </tr>
   <tr>
@@ -5342,6 +5360,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.4.*</td>
     <td>1.4.*</td>
     <td>1.5.*</td>
+    <td>1.5.*</td>				  
     <td>1.4.*</td>
     <td></td>
   </tr>
@@ -5350,6 +5369,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.6.4</td>
     <td>latest</td>
     <td>latest</td>
+    <td>latest</td>				   
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5357,7 +5377,8 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>haproxy/rh-haproxy</td>
     <td>1.8</td>
     <td>1.8</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.8</td>
     <td>Required only if balancers are presented in the deployment scheme.</td>
   </tr>
@@ -5365,14 +5386,15 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>keepalived</td>
     <td>1.3</td>
     <td>2.1</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.3</td>
     <td>Required only if VRRP is presented in the deployment scheme.</td>
   </tr>
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.22.9</td>
+    <td colspan="5" rowspan="4">v1.22.9</td>
     <td></td>
   </tr>
   <tr>
@@ -5389,22 +5411,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/coredns</td>
-    <td colspan="4">1.8.4</td>
+    <td colspan="5">1.8.4</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.5</td>
+    <td colspan="5">3.5</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="4">3.5.0-0</td>
+    <td colspan="5">3.5.0-0</td>
     <td></td>
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5425,22 +5447,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.2.0</td>
+    <td colspan="5">v1.2.0</td>
     <td></td>
   </tr>
   <tr>
     <td>kubernetesui/dashboard</td>
-    <td colspan="4">v2.5.1</td>
+    <td colspan="5">v2.5.1</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>kubernetesui/metrics-scraper</td>
-    <td colspan="4">v1.0.7</td>
+    <td colspan="5">v1.0.7</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.22</td>
+    <td colspan="5">v0.0.22</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
@@ -5463,13 +5485,14 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <th rowspan="2">Type</th>
     <th rowspan="2">Name</th>
-    <th colspan="4">Versions</th>
+    <th colspan="5">Versions</th>
     <th rowspan="2">Note</th>
   </tr>
   <tr>
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5477,7 +5500,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.23.11</td>
+    <td colspan="5" rowspan="3">v1.23.11</td>
     <td>SHA1: b93ff384df125429dcbeb18c2ea648168ae10c56</td>
   </tr>
   <tr>
@@ -5490,18 +5513,18 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.24.1</td>
+    <td colspan="5">v3.24.1</td>
     <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td colspan="4">v1.23.0</td>
+    <td colspan="5">v1.23.0</td>
     <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
     <td>docker-ce</td>
-    <td colspan="4">19.03</td>
+    <td colspan="5">20.10</td>
     <td></td>
   </tr>
   <tr>
@@ -5509,6 +5532,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.4.*</td>
     <td>1.4.*</td>
     <td>1.5.*</td>
+    <td>1.5.*</td>				  
     <td>1.4.*</td>
     <td></td>
   </tr>
@@ -5517,6 +5541,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.6.4</td>
     <td>latest</td>
     <td>latest</td>
+    <td>latest</td>				   
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5524,7 +5549,8 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>haproxy/rh-haproxy</td>
     <td>1.8</td>
     <td>1.8</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.8</td>
     <td>Required only if balancers are presented in the deployment scheme.</td>
   </tr>
@@ -5532,14 +5558,15 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>keepalived</td>
     <td>1.3</td>
     <td>2.1</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.3</td>
     <td>Required only if VRRP is presented in the deployment scheme.</td>
   </tr>
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.23.11</td>
+    <td colspan="5" rowspan="4">v1.23.11</td>
     <td></td>
   </tr>
   <tr>
@@ -5556,22 +5583,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/coredns</td>
-    <td colspan="4">1.8.6</td>
+    <td colspan="5">1.8.6</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.6</td>
+    <td colspan="5">3.6</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="4">3.5.1-0</td>
+    <td colspan="5">3.5.1-0</td>
     <td></td>
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5592,29 +5619,29 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.2.0</td>
+    <td colspan="5">v1.2.0</td>
     <td></td>
   </tr>
   <tr>
     <td>kubernetesui/dashboard</td>
-    <td colspan="4">v2.5.1</td>
+    <td colspan="5">v2.5.1</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>kubernetesui/metrics-scraper</td>
-    <td colspan="4">v1.0.7</td>
+    <td colspan="5">v1.0.7</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.22</td>
+    <td colspan="5">v0.0.22</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.24.0
+## Default Dependent Components Versions for Kubernetes Versions v1.24.2
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -5630,13 +5657,14 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <th rowspan="2">Type</th>
     <th rowspan="2">Name</th>
-    <th colspan="4">Versions</th>
+    <th colspan="5">Versions</th>
     <th rowspan="2">Note</th>
   </tr>
   <tr>
     <th>CentOS RHEL<br>7.5+</th>
     <th>CentOS RHEL<br>Oracle Linux 8.4</th>
     <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
     <th>Oracle Linux 7.5+</th>
   </tr>
 </thead>
@@ -5644,35 +5672,39 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="4" rowspan="3">v1.24.2</td>
-    <td>SHA1: a60b0adcdc6f19e79bd98663914b694a325db819</td>
+    <td colspan="5" rowspan="3">v1.24.2</td>
+    <td>SHA1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3</td>
+    <td>SHA1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab</td>
+    <td>SHA1: d2a8e78bcdc992addd6faccb27b0af5d533443fa</td>
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="4">v3.24.1</td>
+    <td colspan="5">v3.24.1</td>
     <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td colspan="4">v1.23.0</td>
+    <td colspan="5">v1.23.0</td>
     <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
+    <td>docker-ce</td>
+    <td colspan="5">20.10</td>
+    <td></td>
   </tr>
   <tr>
     <td>containerd.io</td>
     <td>1.6.*</td>
     <td>1.6.*</td>
     <td>1.5.*</td>
+    <td>1.5.*</td>				  
     <td>1.6.*</td>
     <td></td>
   </tr>
@@ -5681,6 +5713,7 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>1.6.4</td>
     <td>latest</td>
     <td>latest</td>
+    <td>latest</td>				   
     <td>1.4.4</td>
     <td>Required only if containerd is used as a container runtime.</td>
   </tr>
@@ -5688,7 +5721,8 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>haproxy/rh-haproxy</td>
     <td>1.8</td>
     <td>1.8</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.8</td>
     <td>Required only if balancers are presented in the deployment scheme.</td>
   </tr>
@@ -5696,14 +5730,15 @@ The tables below shows the correspondence of versions that are supported and is 
     <td>keepalived</td>
     <td>1.3</td>
     <td>2.1</td>
-    <td>2.0</td>
+    <td>2.*</td>
+    <td>2.*</td>
     <td>1.3</td>
     <td>Required only if VRRP is presented in the deployment scheme.</td>
   </tr>
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="4" rowspan="4">v1.24.2</td>
+    <td colspan="5" rowspan="4">v1.24.2</td>
     <td></td>
   </tr>
   <tr>
@@ -5720,22 +5755,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/coredns</td>
-    <td colspan="4">1.8.6</td>
+    <td colspan="5">1.8.6</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/pause</td>
-    <td colspan="4">3.7</td>
+    <td colspan="5">3.7</td>
     <td></td>
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="4">3.5.3-0</td>
+    <td colspan="5">3.5.3-0</td>
     <td></td>
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="4" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.1</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5756,22 +5791,22 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="4">v1.2.0</td>
+    <td colspan="5">v1.2.0</td>
     <td></td>
   </tr>
   <tr>
     <td>kubernetesui/dashboard</td>
-    <td colspan="4">v2.5.1</td>
+    <td colspan="5">v2.5.1</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>kubernetesui/metrics-scraper</td>
-    <td colspan="4">v1.0.7</td>
+    <td colspan="5">v1.0.7</td>
     <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
   </tr>
   <tr>
     <td>rancher/local-path-provisioner</td>
-    <td colspan="4">v0.0.22</td>
+    <td colspan="5">v0.0.22</td>
     <td>Required only if local-path provisioner plugin is set to be installed.</td>
   </tr>
 </tbody>
