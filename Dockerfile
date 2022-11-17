@@ -5,8 +5,6 @@ FROM python:3-slim-buster
 
 ARG BUILD_TYPE
 
-USER root
-
 ENV PYTHONUNBUFFERED 1
 
 # Used in Ansible plugin. See Ansible documentation for more details

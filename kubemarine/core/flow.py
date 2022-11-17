@@ -311,11 +311,14 @@ def new_tasks_flow_parser(cli_help):
     return parser
 
 
-def new_procedure_parser(cli_help):
+def new_procedure_parser(cli_help, optional_config=False):
     parser = new_tasks_flow_parser(cli_help)
 
-    parser.add_argument('procedure_config', metavar='procedure_config', type=str,
-                        help='config file for the procedure')
+    help_msg = 'config file for the procedure'
+    if optional_config:
+        parser.add_argument('procedure_config', metavar='procedure_config', type=str, help=help_msg, nargs='?')
+    else:
+        parser.add_argument('procedure_config', metavar='procedure_config', type=str, help=help_msg)
 
     return parser
 

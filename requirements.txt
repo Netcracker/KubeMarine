@@ -10,4 +10,4 @@ toml==0.10.*
 python-dateutil==2.8.*
 deepdiff==5.7.*
 # Unix specific dependencies
-ansible==2.9.*
+ansible==4.2.*

@@ -58,6 +58,7 @@ Remember the following when upgrading Kubemarine:
   For more information, refer to the [Patch Identifiers](#patch-identifiers) section.
 
 **Note**: As much as any other maintenance procedure, `migrate_kubemarine` can make the cluster temporarily unavailable.
+**Note**: Rollback is not supported. To revert to previous Kubemarine version need to reinstall it.
 
 #### Patch Identifiers
 
@@ -80,6 +81,7 @@ where, `<patches>` are the patch identifiers separated by comma.
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
+* Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If solution doesn't have appropriate description what `PSS` profile should be used for every namespace, it's better not to migrate from PSP for a while.  
 
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
@@ -1100,20 +1102,62 @@ for namespace. For proper matching see the following articles:
 **Notes**: 
 * KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
 * Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
-[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/pss_documentaion/documentation/Installation.md#application-prerequisites)
+[Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#application-prerequisites)
 
 ### Procedure Execution Steps
 
+
 1. Verify that Kubernetes cluster has version v1.23+
 2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
-3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary.
+3. Run the `manage_psp` procedure with `pod-security: disabled` option, ensure `admission: psp` is set in `cluster.yaml` preliminary. The example of `cluster.yaml` part is the following:
+```yaml
+...
+rbac:
+  admission: psp
+  psp:
+    pod-security: enabled
+...
+```
+
+The example of `procedure.yaml` is the following:
+```yaml
+psp:
+  pod-security: disabled
+```
+
 4. Verify if the apllications in cluster work properly
-5. Set the `admission: pss` options in `cluster.yaml`
-6. Fill in `namespaces` subsection in `pss` section in procedure file
-7. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution 
-8. Restart pods in all namespaces if `restart-pods: false` option was used on previous step 
+5. Set the `admission: pss` options in `cluster.yaml`. The example of `cluster.yaml` part is the following:
+
+```yaml
+...
+rbac:
+  admission: pss
+  pss:
+    pod-security: disabled
+...
+```
+
+6. Create the `procedure.yaml` for `migrate_pss` and fill in `namespaces` subsection in `pss` section in procedure file. The example of `procedure.yaml` is the following:
+
+```yaml
+pss:
+  pod-security: enabled
+  namespaces:
+    - namespace_1
+    - namespace_2:
+      enforce: "baseline"
+    - namespace_3
+  namespaces_defaults:
+    enforce: "privileged"
+    enforce-version: latest
+restart-pods: false
+```
+
+7. Run the `manage_pss` procedure with `restart-pods: true` option if it is applicable for solution
+8. Restart pods in all namespaces if `restart-pods: false` option was used on previous step
 9. Verify if the applications in cluster work properly
 
+It's possible to switch off `PSS` on dev environment for some reason. In this case migration procedure become shorter and steps #6,7,8 should be skipped.
 
 # Procedure Execution
 
