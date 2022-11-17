@@ -385,12 +385,11 @@ def is_firewalld_disabled(group):
     for node_result in list(result.values()):
         if node_result.return_code == 4:
             disabled_status = True
-        elif node_result.return_code == 3 and "disabled" not in node_result.stdout:
-            return disabled_status, result
         elif node_result.return_code == 3 and "disabled" in node_result.stdout:
             disabled_status = True
         else:
-            disabled_status = False
+            disable_service(node_result.connection, name='firewalld', now=True)
+            disabled_status = True
     return disabled_status, result
 
 
@@ -402,16 +401,6 @@ def disable_firewalld(group):
     if already_disabled:
         log.debug("Skipped - FirewallD already disabled or not installed")
         return result
-
-    log.verbose("Trying to stop and disable FirewallD...")
-
-    result = disable_service(group, name='firewalld', now=True)
-
-    group.cluster.schedule_cumulative_point(reboot_nodes)
-    group.cluster.schedule_cumulative_point(verify_system)
-
-    return result
-
 
 def is_swap_disabled(group):
     result = group.sudo("cat /proc/swaps", warn=True)
