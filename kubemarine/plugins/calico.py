@@ -85,7 +85,7 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
             if not cluster.inventory['plugins']['calico']['typha']['enabled']:
                 obj_list.pop(key)
                 excluded_list.append(key)
-                cluster.log.verbose(f"The {key} has been excluded")
+                cluster.log.verbose(f"The {key} has been excluded from result")
             else:
                 patched_list.append(key)
                 obj_list = enrich_objects_fns[key](cluster, obj_list)
@@ -283,7 +283,10 @@ def validate_original(cluster, obj_list):
         "ServiceAccount_calico-node",
         "Deployment_calico-kube-controllers",
         "ServiceAccount_calico-kube-controllers",
-        "PodDisruptionBudget_calico-kube-controllers"        
+        "PodDisruptionBudget_calico-kube-controllers",
+        "Deployment_calico-typha",
+        "Service_calico-typha", 
+        "PodDisruptionBudget_calico-typha"
     ]
 
     # check if there are new objects
