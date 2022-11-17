@@ -3283,6 +3283,8 @@ plugins:
     mtu: 1400
     typha:
       enabled: true
+      nodeSelector:
+        region: infra
     node:
       image: calico/node:v3.10.1
     env:
@@ -3341,7 +3343,7 @@ If necessary, remove `route-reflector` label from the cluster.yaml as well.
 
 **Warning**: For correct network communication, it is important to set the correct MTU value (For example in case `ipip` mode it should be 20 bytes less than MTU NIC size), see more details in [Troubleshooting Guide](Troubleshooting.md#packets-between-nodes-in-different-networks-are-lost).
 
-**Note**: If the cluster size is more than 50 nodes, it is recommended to enable the Calico Typha daemon and adjust the size of its replicas.
+**Note**: If the cluster size is more than 3 nodes, Calico Typha daemon is enabled by default and number of its replicas is incremented with every 50 nodes. This behavior can be overridden with cluster.yaml.
 
 The plugin configuration supports the following parameters:
 
@@ -3354,9 +3356,10 @@ The plugin configuration supports the following parameters:
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
 | defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
-| typha.enabled          | boolean | `false`                             | Enable if you have more than 50 nodes in cluster | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
-| typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 1) \                               | round(1) }}`                                                       |1 replica for every 50 cluster nodes|Number of Typha running replicas|
+| typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
+| typha.replicas         | int     | `{{ (((nodes\                       | length)/50) + 2) \                               | round(1) }}`                                                       |Starts from 2 replicas amd increments for every 50  nodes|Number of Typha running replicas|
 | typha.image            | string  | `calico/typha:v3.10.1`              | Should contain both image name and version       | Calico Typha image                                                 |
+| typha.tolerations      | list    |                                     |                                                  | Custom toleration for calico-typha pods                            |
 | cni.image              | string  | `calico/cni:v3.10.1`                | Should contain both image name and version       | Calico CNI image                                                   |
 | node.image             | string  | `calico/node:v3.10.1`               | Should contain both image name and version       | Calico Node image                                                  |
 | kube-controllers.image | string  | `calico/kube-controllers:v3.10.1`   | Should contain both image name and version       | Calico Kube Controllers image                                      |
