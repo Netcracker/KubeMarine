@@ -438,17 +438,15 @@ compatibility_map:
       v1.21:
         version: v3.22.2
         sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
-      v1.22:
-        version: v3.24.1
-        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
-      v1.23:
-        version: v3.24.1
-        sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
-      v1.24:
-        #version: v3.24.1
-        #sha1: 5a2e2a391ec76fe0cf144854056b809113cb1432
+       v1.22:
         version: v3.24.2
-        sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+        sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 
+      v1.23:
+        version: v3.24.2
+        sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 
+      v1.24:
+        version: v3.24.2
+        sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 
     nginx-ingress-controller:
       v1.21:
         image-name: ingress-nginx/controller
