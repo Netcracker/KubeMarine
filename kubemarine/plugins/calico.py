@@ -88,7 +88,8 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
                 cluster.log.verbose(f"The {key} has been excluded from result")
             else:
                 patched_list.append(key)
-                obj_list = enrich_objects_fns[key](cluster, obj_list)
+                if enrich_objects_fns[key]:
+                    obj_list = enrich_objects_fns[key](cluster, obj_list)
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -234,17 +235,18 @@ def enrich_deployment_calico_typha(cluster, obj_list):
 
     key = "Deployment_calico-typha"
     val = cluster.inventory['plugins']['calico']['typha']['replicas']
-    obj_list[key]['spec']['replicas'] = val
+    obj_list[key]['spec']['replicas'] = int(val)
     cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
     val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
     obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
     cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
-    if container['name'] == "calico-typha":
-        num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-        val = f"{cluster.inventory['plugins']['calico']['typha']['image']}"
-        obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
-        cluster.log.verbose(f"The {key} has been patched in "
-                            f"'spec.template.spec.containers.[{num}].image with '{val}'")
+    for container in obj_list[key]['spec']['template']['spec']['containers']:
+        if container['name'] == "calico-typha":
+            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            val = f"{cluster.inventory['plugins']['calico']['typha']['image']}"
+            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
+            cluster.log.verbose(f"The {key} has been patched in "
+                                f"'spec.template.spec.containers.[{num}].image with '{val}'")
 
     return obj_list
 
