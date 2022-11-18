@@ -341,8 +341,9 @@ def thirdparties_hashes(cluster):
                             broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
                             cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
                         else:
-                            expected_sha = result.stdout.strip()
-                            cluster.log.verbose(f"Expected sha was got for {path}")
+                            result_str = result.stdout.strip()
+                            expected_sha = result_str if len(result_str) > 0 else expected_sha
+                            cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
                 first_control_plane.sudo(final_commands, hide=True, warn=True)
@@ -352,7 +353,7 @@ def thirdparties_hashes(cluster):
                 warnings.append(f"{path} source contains not recommended thirdparty version for used kubernetes version")
 
             if config.get("sha1", expected_sha) != expected_sha:
-                warnings.append("Given sha is not equal with actual sha from source for %s" % path)
+                broken .append("Given sha is not equal with actual sha from source for %s" % path)
 
             expected_sha = config.get("sha1", expected_sha)
 
