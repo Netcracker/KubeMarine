@@ -216,7 +216,7 @@ def _migrate_cri(cluster, node_group):
                 node['connection'].sudo("sleep 30 && "
                                         "sudo kubectl -n kube-system  delete pod "
                                         "$(sudo kubectl -n kube-system get pod --field-selector='status.phase=Pending' | "
-                                        "grep 'kube-proxy' | awk '{ print $1 }')")
+                                        "grep 'kube-proxy' | awk '{ print $1 }') || true")
             kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
             # check ETCD health
             etcd.wait_for_health(cluster, node["connection"])
