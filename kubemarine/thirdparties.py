@@ -102,11 +102,10 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                                     'Expected any of %s, but \'%s\' found.'
                                     % (destination, all_nodes_names, node_name))
 
-        # if source is re-defined by user, but "sha1" is not provided,
-        # then remove default "sha1", because it may be wrong
         raw_config = raw_inventory.get('services', {}).get('thirdparties', {}).get(destination, {})
-        if 'source' in raw_config and 'sha1' not in raw_config and 'sha1' in config:
-            del config['sha1']
+        recommended_sha = get_thirdparty_recommended_sha(destination, cluster)
+        if 'source' not in raw_config and 'sha1' not in raw_config and recommended_sha is not None:
+            config['sha1'] = get_thirdparty_recommended_sha(destination, cluster)
 
         inventory['services']['thirdparties'][destination] = config
 
