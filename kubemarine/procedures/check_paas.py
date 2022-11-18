@@ -319,31 +319,30 @@ def thirdparties_hashes(cluster):
             # Get sha from source, if it can be downloaded
             if is_curl:
                 cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
-                #Create tmp dir for loading thirdparty without default sha
+                # Create tmp dir for loading thirdparty without default sha
                 random_dir = "/tmp/%s" % uuid.uuid4().hex
                 final_commands = "rm -r -f %s" % random_dir
                 random_path = "%s%s" % (random_dir, path)
                 cluster.log.verbose('Temporary path: %s' % random_path)
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
-                #Load thirdparty to temporary dir
+                # Load thirdparty to temporary dir
                 remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
                 results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
-                for host, result in results.items():
-                    if result.failed:
-                        broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
-                        cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
-                if not results.is_any_failed():
-                    #Get temporary thirdparty sha
+                host, result = list(results.items())[0]
+                if result.failed:
+                    broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                    cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                else:
+                    # Get temporary thirdparty sha
                     cluster.log.verbose(f"Get temporary thirdparty sha for {path}...")
                     results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
-                    for host, result in results.items():
-                        if result.failed:
-                            broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
-                            cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
-                        else:
-                            result_str = result.stdout.strip()
-                            expected_sha = result_str if len(result_str) > 0 else expected_sha
-                            cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
+                    host, result = list(results.items())[0]
+                    if result.failed:
+                        broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                        cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                    else:
+                        expected_sha = result.stdout.strip()
+                        cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
                 first_control_plane.sudo(final_commands, hide=True, warn=True)
@@ -352,7 +351,7 @@ def thirdparties_hashes(cluster):
             if recommended_sha is not None and recommended_sha != expected_sha:
                 warnings.append(f"{path} source contains not recommended thirdparty version for used kubernetes version")
 
-            if config.get("sha1", expected_sha) != expected_sha:
+            if config.get("sha1", expected_sha) != expected_sha and expected_sha is not None:
                 broken .append("Given sha is not equal with actual sha from source for %s" % path)
 
             expected_sha = config.get("sha1", expected_sha)
