@@ -30,19 +30,13 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: PyInstaller win64
-        id: win64
-        uses: action-python/pyinstaller-py3.8@win64
-        with:
-          path: ./
-          requirements: "./requirements_nt.txt"
       - name: PyInstaller amd64
         id: amd64
         uses: action-python/pyinstaller-py3.8@amd64
         with:
           path: ./
           requirements: "./requirements.txt"
-      - run: ./ kubemarine selftest
+      - run: ./kubemarine selftest
   unit-tests:
     needs: license
     runs-on: ubuntu-latest
