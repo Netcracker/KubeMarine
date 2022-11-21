@@ -426,7 +426,12 @@ plugins:
     installation:
       priority: 0
       procedures:
-        - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/calico.py
+            method: apply_calico_yaml
+            arguments:
+              calico_original_yaml: 'kubemarine/plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
+              calico_yaml: 'dump/calico-{{ plugins.calico.version }}.yaml'
         - expect:
             daemonsets:
               - calico-node
@@ -527,7 +532,7 @@ plugins:
             name: calico-config
             key: veth_mtu
     cni:
-      image: 'calico/cni:{{ plugins.calico.version }}'
+      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/cni:{{ plugins.calico.version }}'
       ipam:
         ipv4:
           assign_ipv4: 'true'
@@ -543,13 +548,13 @@ plugins:
             - default-ipv6-ippool
           type: calico-ipam
     node:
-      image: 'calico/node:{{ plugins.calico.version }}'
+      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/node:{{ plugins.calico.version }}'
     kube-controllers:
-      image: 'calico/kube-controllers:{{ plugins.calico.version }}'
+      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/kube-controllers:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
     flexvol:
-      image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
+      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
   flannel:
     installation:
