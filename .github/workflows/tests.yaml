@@ -36,7 +36,7 @@ jobs:
         with:
           path: ./
           requirements: "./requirements.txt"
-      - run: ./kubemarine selftest
+      - run: kubemarine selftest
   unit-tests:
     needs: license
     runs-on: ubuntu-latest
