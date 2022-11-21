@@ -258,6 +258,12 @@ def system_distributive(cluster):
             else:
                 detected_supported_os.append(detected_os)
                 cluster.log.debug('Host %s running \"%s\"' % (address, detected_os))
+                result = all(versions == detected_os[0] for versions in detected_os)
+                if (result):
+                    print ("Detected versions are similar")
+                else:
+                    raise TestWarn ("Detected OS versions are not similar",
+                    hint="Install similar verions of OS on all nodes")
 
         detected_supported_os = list(set(detected_supported_os))
         detected_unsupported_os = list(set(detected_unsupported_os))
