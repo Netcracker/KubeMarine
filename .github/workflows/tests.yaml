@@ -36,7 +36,7 @@ jobs:
         with:
           path: ./
           requirements: "./requirements.txt"
-      - run: ls -la
+      - run: ls -la ./dist/linux/amd64/
   unit-tests:
     needs: license
     runs-on: ubuntu-latest
