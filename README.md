@@ -17,7 +17,11 @@ Kubemarine is an open source, lightweight and powerful management tool built for
   - [restore](documentation/Maintenance.md#restore-procedure)
   - [check_iaas](documentation/Kubecheck.md#iaas-procedure)
   - [check_paas](documentation/Kubecheck.md#paas-procedure)
+  - [migrate_kubemarine](documentation/Maintenance.md#kubemarine-migration-procedure)
   - [manage_psp](documentation/Maintenance.md#manage-psp-procedure)
+  - [manage_pss](documentation/Maintenance.md#manage-pss-procedure)
+  - [cert_renew](documentation/Maintenance.md#certificate-renew-procedure)
+  - [migrate_cri](documentation/Maintenance.md#migration-cri-procedure)
 - [Single cluster inventory](documentation/Installation.md#configuration) for all operations, highly customizable
 - Default values of all parameters in configurations with a minimum of required parameters
 - [Control planes balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP
@@ -94,7 +98,7 @@ Proceed the following steps to install Kubemarine manually on your environment:
 ## Running Cluster Installation
 Proceed the following steps to install Kubernetes cluster using Kubemarine:
 1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes)
-2. Create inventory file `cluster.yaml` and describe your env and everything should be configured. See [inventory configs available](documentation/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to fill in all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
+1. Create inventory file `cluster.yaml` and describe your env and everything should be configured. See [inventory configs available](documentation/Installation.md#configuration) and [examples](examples/cluster.yaml). No need to fill in all the parameters that are available, it is enough to specify the minimal identification data about the nodes where you want to install the cluster, for example:
    ```yaml
    node_defaults:
      keyfile: "/home/username/.ssh/id_rsa"
@@ -119,10 +123,18 @@ Proceed the following steps to install Kubernetes cluster using Kubemarine:
 
    cluster_name: "k8s.example.com"
    ```
-5. Move `cluster.yaml` to the directory, where Kubemarine installed
-6. Start installation:
+1. Move `cluster.yaml` to the directory, where Kubemarine installed.
+1. Verify infrastructure:
+   ```bash
+   kubemarine check_iaas
+   ```
+1. Start installation:
    ```bash
    kubemarine install
+   ```
+1. Check the health of a newly installed cluster:
+   ```bash
+   kubemarine check_paas
    ```
 
 See [other guides](#documentation) for more info.
