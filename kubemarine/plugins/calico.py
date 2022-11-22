@@ -69,7 +69,9 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
             "DaemonSet_calico-node",
             "Deployment_calico-typha",
             "Service_calico-typha", 
-            "PodDisruptionBudget_calico-typha"
+            "PodDisruptionBudget_calico-typha",
+            "ClusterRole_calico-kube-controllers",
+            "ClusterRole_calico-node"
            ]
 
     # enrich objects one by one
@@ -82,14 +84,19 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
         else:
             # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
             # in other case those objects must be excluded
-            if not cluster.inventory['plugins']['calico']['typha']['enabled']:
+            str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+            if str_value == 'false':
                 obj_list.pop(key)
                 excluded_list.append(key)
                 cluster.log.verbose(f"The {key} has been excluded from result")
-            else:
+            elif str_value == 'true':
                 patched_list.append(key)
                 if enrich_objects_fns[key]:
                     obj_list = enrich_objects_fns[key](cluster, obj_list)
+            else:
+                raise Exception(f"The {key} can't be patched correctly "
+                                f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                                f"as string or boolean value")
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -118,10 +125,11 @@ def enrich_configmap_calico_config(cluster, obj_list):
     key = "ConfigMap_calico-config"
     val = cluster.inventory['plugins']['calico']['mtu']
     obj_list[key]['data']['veth_mtu'] = str(val)
-    cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
-    if cluster.inventory['plugins']['calico']['typha']['enabled'] == True:
+    cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
+    str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+    if str_value == "true":
         val = "calico-typha"
-    else:
+    elif str_value == "false":
         val = "none"
     obj_list[key]['data']['typha_service_name'] = val
     cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
@@ -251,6 +259,42 @@ def enrich_deployment_calico_typha(cluster, obj_list):
     return obj_list
 
 
+def enrich_clusterRole_calico_kube_controllers(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Calico controller ClusterRole
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
+
+    key = "ClusterRole_calico-kube-controllers"
+    if cluster.inventory['rbac']['admission'] == "psp" and \
+            cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+        api_list = obj_list[key]['rules']
+        api_list.append(psp_calico_kube_controllers)
+        obj_list[key]['rules'] = api_list
+        cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
+
+    return obj_list
+
+
+def enrich_clusterrole_calico_node(cluster, obj_list):
+    """
+    The method implements the enrichment procedure for Calico node ClusterRole
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
+
+    key = "ClusterRole_calico-node"
+    if cluster.inventory['rbac']['admission'] == "psp" and \
+            cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+        api_list = obj_list[key]['rules']
+        api_list.append(psp_calico_node)
+        obj_list[key]['rules'] = api_list
+        cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
+
+    return obj_list
+
+
 def validate_original(cluster, obj_list):
     """
     The method implements some validations for Calico objects
@@ -347,12 +391,43 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
 
+
+def true_or_false(input_string):
+    """
+    The method check string and boolean value
+    :param input_string: String that should be checked
+    """
+    if input_string in ['true', 'True', 'TRUE']:
+        result = "true"
+    elif input_string in ['false', 'False', 'FALSE']:
+        result = "false"
+    else:
+        result = "undefined"
+
+    return result
+
 # name of objects and enrichment methods mapping
 enrich_objects_fns = {
         "ConfigMap_calico-config": enrich_configmap_calico_config,
         "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
         "DaemonSet_calico-node": enrich_daemonset_calico_node,
         "Deployment_calico-typha": enrich_deployment_calico_typha,
+        "ClusterRole_calico-kube-controllers": enrich_clusterRole_calico_kube_controllers,
+        "ClusterRole_calico-node": enrich_clusterrole_calico_node,
         "Service_calico-typha": None, 
         "PodDisruptionBudget_calico-typha": None
+}
+
+psp_calico_kube_controllers = {
+        "apiGroups": ["policy"],
+        "resources": ["podsecuritypolicies"],
+        "verbs":     ["use"],
+        "resourceNames": ["oob-anyuid-psp"]
+}
+
+psp_calico_node = {
+        "apiGroups": ["policy"],
+        "resources": ["podsecuritypolicies"],
+        "verbs":     ["use"],
+        "resourceNames": ["oob-privileged-psp"]
 }
