@@ -242,11 +242,12 @@ def system_distributive(cluster):
         detected_supported_os = []
         detected_unsupported_version = []
         supported_versions = []
+        detected_versions_compatability = []
         for address, context_data in cluster.context["nodes"].items():
             detected_os = '%s %s' % (context_data['os']['name'], context_data['os']['version'])
             if context_data['os']['family'] == 'unsupported': 
                 detected_unsupported_os.append(detected_os)
-                cluster.log.error('Host %s running unsupported OS \"%s\"' % (address, detected_os))
+                cluster.log.error('Host %s running unsupported OS \"%s\"' % (address, detected_os))             
             elif context_data['os']['family'] == 'unknown':
                 detected_unsupported_version.append(detected_os)
                 os_family_list = cluster.globals["compatibility_map"]["distributives"][context_data['os']['name']]
@@ -257,13 +258,10 @@ def system_distributive(cluster):
                 cluster.log.error('Host %s running unknown OS family \"%s\"' % (address, detected_os))
             else:
                 detected_supported_os.append(detected_os)
-                cluster.log.debug('Host %s running \"%s\"' % (address, detected_os))
-                result = all(versions == detected_os[0] for versions in detected_os)
-                if (result):
-                    print ("Detected versions are similar")
-                else:
-                    raise TestWarn ("Detected OS versions are not similar",
-                    hint="Install similar verions of OS on all nodes")
+                cluster.log.debug('Host %s running \"%s\"' % (address, detected_os)) 
+                detected_versions_compatability.append(detected_os)
+                result = all(element == detected_versions_compatability[0] for element in detected_versions_compatability)
+
 
         detected_supported_os = list(set(detected_supported_os))
         detected_unsupported_os = list(set(detected_unsupported_os))
@@ -278,6 +276,11 @@ def system_distributive(cluster):
             raise TestFailure("Unsupported version: %s" % ", ".join(detected_unsupported_version),
                               hint="Reinstall the OS on the host to one of the supported versions: %s" % \
                                       ", ".join(supported_versions))
+        if (result):
+            print ("Detected versions are similar")
+        else:
+            raise TestWarn ("Detected OS versions are not similar",
+            hint="Install similar verions of OS on all nodes")                                      
 
         tc.success(results=", ".join(detected_supported_os))
 
