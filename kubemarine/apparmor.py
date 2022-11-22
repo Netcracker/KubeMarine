@@ -92,13 +92,6 @@ def is_state_valid(group, expected_profiles):
                         valid = False
                         log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, connection.host))
                         break
-                # check if some settings on particular node do not match with 'cluster.yaml'
-                for profile in status[state]:
-                    if profile not in profiles:
-                        valid = False
-                        log.verbose("Profile %s is enabled in %s mode on remote host %s but doesn't in 'cluster.yaml'"
-                                 % (profile, state, connection.host))
-                        break
 
     return valid, parsed_result
 

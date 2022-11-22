@@ -1241,7 +1241,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     if system.get_os_family(cluster) in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster.context['testsuite'], '226', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster.context['testsuite'], '227', "Security", "Apparmor security policy") as tc:
         group = cluster.nodes['all'].get_accessible_nodes()
         results = group.sudo("aa-enabled")
         enabled_nodes = []
@@ -1269,7 +1269,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     if system.get_os_family(cluster) in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster.context['testsuite'], '227', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster.context['testsuite'], '228', "Security", "Apparmor security policy") as tc:
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:
