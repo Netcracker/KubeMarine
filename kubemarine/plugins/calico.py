@@ -159,7 +159,7 @@ def enrich_deployment_calico_kube_controllers(cluster, obj_list):
     for container in obj_list[key]['spec']['template']['spec']['containers']:
         if container['name'] == "calico-kube-controllers":
             num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['kube-controllers']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['kube-controllers']['image'])
             obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
@@ -177,26 +177,26 @@ def enrich_daemonset_calico_node(cluster, obj_list):
     for container in obj_list[key]['spec']['template']['spec']['initContainers']:
         if container['name'] in ['upgrade-ipam', 'install-cni']: 
             num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['cni']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['cni']['image'])
             obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
         if container['name'] == "mount-bpffs":
             num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
             obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
         if container['name'] == "flexvol-driver":
             num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['flexvol']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['flexvol']['image'])
             obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
     for container in obj_list[key]['spec']['template']['spec']['containers']:
         if container['name'] == "calico-node":
             num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['node']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
             obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val 
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image' with '{val}'")
@@ -251,7 +251,7 @@ def enrich_deployment_calico_typha(cluster, obj_list):
     for container in obj_list[key]['spec']['template']['spec']['containers']:
         if container['name'] == "calico-typha":
             num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
-            val = f"{cluster.inventory['plugins']['calico']['typha']['image']}"
+            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['typha']['image'])
             obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
@@ -405,6 +405,19 @@ def true_or_false(input_string):
         result = "undefined"
 
     return result
+
+def enrich_image(cluster, image):
+    """
+    The method implements some validations for Calico objects
+    :param cluster: Cluster object
+    :param image: particular image
+    """
+    if cluster.inventory['plugins']['calico']['installation'].get('registry', ''):
+        if len(cluster.inventory['plugins']['calico']['installation']['registry']):
+            return f"{cluster.inventory['plugins']['calico']['installation']['registry']}/{image}"
+
+    return image
+
 
 # name of objects and enrichment methods mapping
 enrich_objects_fns = {

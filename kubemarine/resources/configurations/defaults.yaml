@@ -532,7 +532,7 @@ plugins:
             name: calico-config
             key: veth_mtu
     cni:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/cni:{{ plugins.calico.version }}'
+      image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
         ipv4:
           assign_ipv4: 'true'
@@ -548,13 +548,13 @@ plugins:
             - default-ipv6-ippool
           type: calico-ipam
     node:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/node:{{ plugins.calico.version }}'
+      image: 'calico/node:{{ plugins.calico.version }}'
     kube-controllers:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/kube-controllers:{{ plugins.calico.version }}'
+      image: 'calico/kube-controllers:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
     flexvol:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
+      image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
   flannel:
     installation:
