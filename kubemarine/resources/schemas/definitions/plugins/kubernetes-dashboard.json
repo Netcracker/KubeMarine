@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "hostname": {
+      "type": "string",
+      "default": "'dashboard.{{ cluster_name }}'"
+    },
+    "dashboard": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics-scraper": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "default": "kubernetes-dashboard"},
+            "namespace": {"type": "string", "default": "kubernetes-dashboard"},
+            "annotations": {
+              "type": "object",
+              "properties": {
+                "nginx.ingress.kubernetes.io/backend-protocol": {"type": "string", "default": "HTTPS"}
+              }
+            }
+          }
+        },
+        "spec": {
+          "type": "object",
+          "properties": {
+            "tls": {"$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"},
+            "rules": {"$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"}
+          }
+        }
+      }
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "hostname", "dashboard", "metrics-scraper", "ingress"]}
+    ]
+  }
+}

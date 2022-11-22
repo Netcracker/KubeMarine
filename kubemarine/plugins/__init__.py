@@ -37,7 +37,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -46,28 +46,15 @@ from kubemarine.kubernetes.replicaset import ReplicaSet
 from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
-
-oob_plugins = [
-    "calico",
-    "flannel",
-    "nginx-ingress-controller",
-    "haproxy-ingress-controller",
-    "kubernetes-dashboard",
-    "local-path-provisioner",
-]
+oob_plugins = list(static.DEFAULTS["plugins"].keys())
 
 
 def verify_inventory(inventory, cluster):
-    supported_procedure_types = list(procedure_types.keys())
-
     for plugin_name, plugin_item in inventory["plugins"].items():
         for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
-                if procedure_type not in supported_procedure_types:
-                    raise Exception('Unknown installation procedure type found in a plugin \'%s\'. '
-                                    'Expected any of %s, but found \'%s\'.'
-                                    % (plugin_name, supported_procedure_types, procedure_type))
-                procedure_types[procedure_type]['verify'](cluster, configs)
+                if procedure_types[procedure_type].get('verify') is not None:
+                    procedure_types[procedure_type]['verify'](cluster, configs)
 
     return inventory
 
@@ -77,8 +64,7 @@ def enrich_inventory(inventory, cluster):
         for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
             for procedure_type, configs in step.items():
                 if procedure_types[procedure_type].get('convert') is not None:
-                    inventory["plugins"][plugin_name]['installation']['procedures'][i][procedure_type] = \
-                        procedure_types[procedure_type]['convert'](cluster, configs)
+                    step[procedure_type] = procedure_types[procedure_type]['convert'](cluster, configs)
     return inventory
 
 
@@ -132,29 +118,28 @@ def verify_image_redefined(plugin_name, previous_version, base_plugin, cluster_p
 def install(cluster, plugins=None):
     if not plugins:
         plugins = cluster.inventory["plugins"]
-    plugins_queue = []
+    plugins_queue: List[str] = []
     max_priority = 0
     for plugin_name, plugin_item in plugins.items():
         if plugin_item.get("install", False) and plugin_item.get("installation", {}).get('procedures') is not None:
-            plugin_item['plugin_name'] = plugin_name
-            plugins_queue.append(plugin_item)
+            plugins_queue.append(plugin_name)
             if plugin_item.get("installation", {}).get('priority') is not None \
                     and plugin_item['installation']['priority'] > max_priority:
                 max_priority = plugin_item['installation']['priority']
 
-    plugins_queue.sort(key=lambda item: item.get("installation", {}).get('priority', max_priority + 1))
+    plugins_queue.sort(key=lambda name: plugins[name].get("installation", {}).get('priority', max_priority + 1))
 
     cluster.log.debug('The following plugins will be installed:')
-    for plugin_item in plugins_queue:
+    for plugin_name in plugins_queue:
         cluster.log.debug('%i. %s' % (
-            plugin_item.get("installation", {}).get('priority', max_priority + 1),
-            plugin_item['plugin_name']
+            plugins[plugin_name].get("installation", {}).get('priority', max_priority + 1),
+            plugin_name
         ))
 
     cluster.log.debug('Starting plugins installation:')
 
-    for plugin_item in plugins_queue:
-        install_plugin(cluster, plugin_item['plugin_name'], plugin_item["installation"]['procedures'])
+    for plugin_name in plugins_queue:
+        install_plugin(cluster, plugin_name, plugins[plugin_name]["installation"]['procedures'])
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
@@ -498,26 +483,6 @@ def convert_expect(cluster, config):
     return config
 
 
-def verify_expect(cluster, config):
-    if not config:
-        raise Exception('Expect procedure is empty, but it should not be')
-
-    if config.get('daemonsets') is not None and config['daemonsets'].get('list') is None:
-        raise Exception('DaemonSet expectation defined, but DaemonSets list is missing')
-
-    if config.get('replicasets') is not None and config['replicasets'].get('list') is None:
-        raise Exception('ReplicaSet expectation defined, but replicasets list is missing')
-
-    if config.get('statefulsets') is not None and config['statefulsets'].get('list') is None:
-        raise Exception('StatefulSet expectation defined, but statefulsets list is missing')
-
-    if config.get('deployments') is not None and config['deployments'].get('list') is None:
-        raise Exception('Deployment expectation defined, but Deployments list is missing')
-
-    if config.get('pods') is not None and config['pods'].get('list') is None:
-        raise Exception('Pod expectation defined, but Pods list is missing')
-
-
 def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
 
@@ -551,18 +516,12 @@ def apply_expect(cluster, config, plugin_name=None):
                         timeout=config['pods'].get('timeout', plugins_timeout),
                         retries=config['pods'].get('retries', plugins_retries))
 
-        else:
-            raise Exception(f'Unknown expectation type "{expect_type}"')
-
 
 # **** PYTHON ****
 
 def verify_python(cluster, step):
-    if step.get('module') is None:
-        raise Exception('Module path is missing for python in plugin steps, but should be defined. Step:\n%s' % step)
-    if step.get('method') is None:
-        raise Exception('Method name is missing for python in plugin steps, but should be defined. Step:\n%s' % step)
     # TODO: verify fields types and contents
+    return
 
 
 def apply_python(cluster, step, plugin_name=None):
@@ -602,9 +561,6 @@ def convert_shell(cluster, config):
 
 
 def verify_shell(cluster, config):
-    if config.get('command') is None or config['command'] == '':
-        raise Exception('Shell command is missing')
-
     out_vars = config.get('out_vars', [])
     explicit_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
     if out_vars and explicit_group and explicit_group.nodes_amount() != 1:
@@ -613,8 +569,6 @@ def verify_shell(cluster, config):
     in_vars = config.get('in_vars', [])
     words_splitter = re.compile('\W')
     for var in chain(in_vars, out_vars):
-        if not var.get('name'):
-            raise Exception('All output and input shell variables should have "name" property specified')
         var_name = var['name']
         if len(words_splitter.split(var_name)) > 1:
             raise Exception(f"'{var_name}' is not a valid shell variable name")
@@ -695,15 +649,16 @@ def convert_ansible(cluster, config):
         config = {
             'playbook': config
         }
-    # if config['playbook'][0] != '/':
-    #     config['playbook'] = os.path.abspath(os.path.dirname(__file__) + '../../../' + config['playbook'])
     return config
 
 
+def _get_absolute_playbook(config):
+    return utils.determine_resource_absolute_path(config['playbook'])
+
+
 def verify_ansible(cluster: KubernetesCluster, config):
-    if config.get('playbook') is None or config['playbook'] == '':
-        raise Exception('Playbook path is missing')
-    if not os.path.isfile(config['playbook']):
+    playbook_path = _get_absolute_playbook(config)
+    if not os.path.isfile(playbook_path):
         raise Exception('Playbook file %s not exists' % config['playbook'])
     if cluster.is_deploying_from_windows():
         raise Exception("Executing of playbooks on Windows deployer is currently not supported")
@@ -711,7 +666,7 @@ def verify_ansible(cluster: KubernetesCluster, config):
 
 
 def apply_ansible(cluster, step, plugin_name=None):
-    playbook_path = utils.determine_resource_absolute_path(step.get('playbook'))
+    playbook_path = _get_absolute_playbook(step)
     external_vars = step.get('vars', {})
     become = step.get('become', False)
     groups = step.get('groups', [])
@@ -739,14 +694,6 @@ def apply_ansible(cluster, step, plugin_name=None):
         raise Exception("Failed to apply ansible plugin, see error above")
 
     return result
-
-
-def verify_helm(cluster, config):
-    if config.get('chart_path') is None or config['chart_path'] == '':
-        raise Exception('Chart path is missing')
-
-    if cluster.inventory.get('public_cluster_ip') is None:
-        raise Exception(f'public_cluster_ip is a mandatory parameter in the inventory in case of usage of helm plugin.')
 
 
 def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
@@ -901,25 +848,24 @@ def _convert_file(config):
         config = {
             'source': config
         }
-    # if config['source'][0] != '/':
-    #     config['source'] = os.path.abspath(os.path.dirname(__file__) + '../../../' + config['source'])
     return config
+
+
+def _get_absolute_pattern(config):
+    return os.path.join(
+        utils.determine_resource_absolute_dir(config['source']),
+        os.path.basename(config['source'])
+    )
 
 
 def _verify_file(config, file_type):
     """
         Verifies if the path matching the config 'source' key exists and points to
         existing files.
-        """
-    if config.get('source') is None or config['source'] == '':
-        raise Exception('%s file source is missing' % file_type)
+    """
 
     # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
+    source = _get_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
@@ -947,17 +893,7 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     apply_nodes = config.get('apply_nodes', [])
     do_render = config.get('do_render', True)
 
-    # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
-    files = glob.glob(source)
-
-    if len(files) == 0:
-        raise ValueError('Cannot find any %s files matching this '
-                         'source value: %s' % (source, file_type))
+    files = glob.glob(_get_absolute_pattern(config))
 
     for file in files:
         source_filename = os.path.basename(file)
@@ -1014,7 +950,6 @@ procedure_types = {
     },
     'expect': {
         'convert': convert_expect,
-        'verify': verify_expect,
         'apply': apply_expect
     },
     'python': {
@@ -1036,7 +971,6 @@ procedure_types = {
         'apply': apply_ansible
     },
     'helm': {
-        'verify': verify_helm,
         'apply': apply_helm
     },
     'config': {

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "haproxy": {
+      "type": "object",
+      "properties": {
+        "keep_configs_updated": {
+          "type": "boolean",
+          "default": true
+        },
+        "config": {
+          "type": "string"
+        },
+        "config_file": {
+          "type": "string"
+        },
+        "maintenance_mode": {
+          "type": "boolean",
+          "default": false
+        },
+        "mntc_config_location": {
+          "type": "string",
+          "default": "/etc/haproxy/haproxy_mntc.cfg"
+        },
+        "defaults": {
+          "type": "object",
+          "properties": {
+            "timeout_connect": {
+              "type": "string",
+              "default": "10s"
+            },
+            "timeout_client": {
+              "type": "string",
+              "default": "1m"
+            },
+            "timeout_server": {
+              "type": "string",
+              "default": "1m"
+            },
+            "timeout_tunnel": {
+              "type": "string",
+              "default": "60m"
+            },
+            "timeout_client_fin": {
+              "type": "string",
+              "default": "1m"
+            },
+            "maxconn": {
+              "type": "integer",
+              "default": 10000
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

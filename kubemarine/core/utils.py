@@ -310,6 +310,10 @@ def true_or_false(value):
     return result
 
 
+def get_version_filepath():
+    return get_resource_absolute_path("version", script_relative=True)
+
+
 class ClusterStorage:
     """
     File preservation:
@@ -374,7 +378,7 @@ class ClusterStorage:
                 if os.path.exists(source):
                     tar.add(source, 'dump/' + name)
             tar.add(context['execution_arguments']['config'], 'cluster.yaml')
-            tar.add(get_resource_absolute_path("version", script_relative=True), 'version')
+            tar.add(get_version_filepath(), 'version')
 
         self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
         self.cluster.nodes['control-plane'].get_final_nodes().put(archive, self.dir_location + 'local.tar.gz', sudo=True)

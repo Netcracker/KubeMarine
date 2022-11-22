@@ -65,10 +65,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_tasks_flow_parser(cli_help)
-
-    parser.add_argument('procedure_config', nargs='?', metavar='procedure_config', type=str,
-                        help='config file for reboot procedure')
+    parser = flow.new_procedure_parser(cli_help, optional_config=True)
 
     context = flow.create_context(parser, cli_arguments, procedure='reboot')
 

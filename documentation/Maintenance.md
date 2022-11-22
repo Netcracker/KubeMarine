@@ -131,6 +131,14 @@ upgrade_nodes:
     roles: [worker]
 ```
 
+There is support for a shortened format.
+
+```yaml
+upgrade_nodes:
+  - worker-10
+  - worker-11
+```
+
 Based on the example above, only the nodes `worker-10` and `worker-11` are updated, the rest are skipped.
 
 **Note**: The nodes are excluded only from the Kubernetes upgrade. All other upgrade tasks like thirdparties, coredns, and so on are performed for all the nodes as they are. 
@@ -374,7 +382,6 @@ You can specify two types of path in it:
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
 
 * `source_node` - the name of the node to create snapshot from. The node must be a control-plane and have a ETCD data located on it.
-* `certificates` - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. You must specify the paths of certificates on the node from which the copy is made.
 
 Parameters example:
 
@@ -382,10 +389,6 @@ Parameters example:
 backup_plan:
   etcd:
     source_node: control-plane-1
-    certificates:
-      cert: /etc/kubernetes/pki/etcd/server.crt
-      key: /etc/kubernetes/pki/etcd/server.key
-      cacert: /etc/kubernetes/pki/etcd/ca.crt
 ```
 
 #### Nodes Parameter

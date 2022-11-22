@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "backup_location": {
+      "type": "string"
+    },
+    "restore_plan": {
+      "type": "object",
+      "properties": {
+        "etcd": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string"
+            },
+            "certificates": {
+              "type": "object",
+              "properties": {
+                "cert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/server.crt"
+                },
+                "key": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/server.key"
+                },
+                "cacert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/ca.crt"
+                },
+                "peer_cert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/peer.crt"
+                },
+                "peer_key": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/peer.key"
+                },
+                "peer_cacert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/ca.crt"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "thirdparties": {
+          "type": "object",
+          "properties": {
+            "/usr/bin/etcdctl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubeadm": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubelet": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubectl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/calicoctl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/crictl.tar.gz": {"$ref": "#/definitions/ThirdParty"}
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/ThirdParty"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["backup_location"],
+  "additionalProperties": false,
+  "definitions": {
+    "ThirdParty": {
+      "type": "object",
+      "allOf": [{"$ref": "definitions/services/thirdparties.json#/definitions/MinimalThirdPartyProperties"}],
+      "required": ["source"],
+      "propertyNames": {
+        "$ref": "definitions/services/thirdparties.json#/definitions/MinimalThirdPartyPropertyNames"
+      }
+    }
+  }
+}

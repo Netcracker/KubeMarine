@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "kubernetesVersion": {
+      "type":  "string",
+      "default": "v1.24.0"
+    },
+    "imageRepository": {
+      "type": "string"
+    },
+    "controlPlaneEndpoint": {
+      "type":  "string",
+      "default": "'{{ cluster_name }}:6443'"
+    },
+    "networking": {
+      "type": "object",
+      "properties": {
+        "podSubnet": {
+          "type": "string"
+        },
+        "serviceSubnet": {
+          "type": "string"
+        }
+      }
+    },
+    "dns": {
+      "type": "object",
+      "properties": {
+        "imageRepository": {
+          "type": "string"
+        }
+      }
+    },
+    "apiServer": {
+      "$ref": "#/definitions/ApiServer"
+    },
+    "scheduler": {
+      "$ref": "#/definitions/Scheduler"
+    },
+    "controllerManager": {
+      "$ref": "#/definitions/ControllerManager"
+    },
+    "etcd": {
+      "$ref": "#/definitions/ETCD"
+    },
+    "apiVersion": {"type": ["string"], "default": "kubeadm.k8s.io/v1beta2"},
+    "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"}
+  },
+  "definitions": {
+    "ApiServer": {
+      "type": "object",
+      "properties": {
+        "certSANs": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings"
+        },
+        "extraArgs": {
+          "type": "object",
+          "properties": {
+            "enable-admission-plugins": {"type": "string", "default": "NodeRestriction"},
+            "profiling": {"type": "string", "default": "'false'"},
+            "audit-log-path": {"type": "string", "default": "/var/log/kubernetes/audit/audit.log"},
+            "audit-policy-file": {"type": "string", "default": "/etc/kubernetes/audit-policy.yaml"},
+            "audit-log-maxage": {"type": "string", "default": "'30'"},
+            "audit-log-maxbackup": {"type": "string", "default": "'10'"},
+            "audit-log-maxsize": {"type": "string", "default": "'100'"},
+            "kubelet-certificate-authority": {"type": "string", "default": "/etc/kubernetes/pki/ca.crt"},
+            "feature-gates": {"type": "string"},
+            "service-account-issuer": {"type": "string"},
+            "service-account-jwks-uri": {"type": "string"},
+            "service-account-signing-key-file": {"type": "string"},
+            "service-account-key-file": {"type": "string"}
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extraVolumes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"$ref": "#/definitions/HostPathMount"},
+              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+            ]
+          }
+        }
+      }
+    },
+    "Scheduler": {
+      "type": "object",
+      "properties": {
+        "extraArgs": {
+          "type": "object",
+          "properties": {
+            "profiling": {"type": "string", "default": "'false'"},
+            "feature-gates": {"type": "string"}
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ControllerManager": {
+      "type": "object",
+      "properties": {
+        "extraArgs": {
+          "type": "object",
+          "properties": {
+            "profiling": {"type": "string", "default": "'false'"},
+            "terminated-pod-gc-threshold": {"type": "string", "default": "'1000'"},
+            "external-cloud-volume-plugin": {"type": "string"},
+            "feature-gates": {"type": "string"}
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extraVolumes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HostPathMount"
+          }
+        }
+      }
+    },
+    "ETCD": {
+      "type": "object",
+      "properties": {
+        "local": {
+          "type": "object",
+          "properties": {
+            "extraArgs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "HostPathMount": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "hostPath": {"type": "string"},
+        "mountPath": {"type": "string"},
+        "readOnly": {"type": "boolean"},
+        "pathType": {"type": "string"}
+      },
+      "required": ["name", "hostPath", "mountPath"],
+      "additionalProperties": false
+    }
+  }
+}

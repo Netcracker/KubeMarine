@@ -63,7 +63,7 @@ class KubernetesCluster(Environment):
         make_dumps = custom_enrichment_fns is None
         from kubemarine.core import defaults
         self._inventory = defaults.enrich_inventory(
-            self, self.raw_inventory, make_dumps=make_dumps, custom_fns=custom_enrichment_fns)
+            self, self.raw_inventory, make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
 
     @property
     def inventory(self) -> dict:
@@ -147,6 +147,8 @@ class KubernetesCluster(Environment):
 
     def get_facts_enrichment_fns(self):
         return [
+            "kubemarine.core.schema.verify_inventory",
+            "kubemarine.core.defaults.merge_defaults",
             "kubemarine.kubernetes.add_node_enrichment",
             "kubemarine.kubernetes.remove_node_enrichment",
             "kubemarine.controlplane.controlplane_node_enrichment",

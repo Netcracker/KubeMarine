@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "install": {
+      "type": ["string", "boolean"],
+      "default": "true"
+    },
+    "version": {
+      "type": "string"
+    },
+    "webhook": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "controller": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "object",
+          "properties": {
+            "enableSslPassthrough": {
+              "type": "boolean",
+              "default": false
+            },
+            "default-certificate": {
+              "$ref": "#/definitions/DefaultCertificate"
+            }
+          },
+          "additionalProperties": false
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ports": {
+      "$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"
+    },
+    "config_map": {
+      "type": "object"
+    },
+    "custom_headers": {
+      "type": "object"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "webhook", "controller", "ports", "config_map", "custom_headers"]}
+    ]
+  },
+  "definitions": {
+    "DefaultCertificate": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/CertAndKey"
+        },
+        "paths": {
+          "$ref": "#/definitions/CertAndKey"
+        }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    },
+    "CertAndKey": {
+      "type": "object",
+      "properties": {
+        "cert": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": ["cert", "key"],
+      "additionalProperties": false
+    }
+  }
+}

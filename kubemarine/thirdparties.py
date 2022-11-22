@@ -74,9 +74,6 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                 'source': config
             }
 
-        if config.get('source') is None:
-            raise Exception('Source not found for thirparty \'%s\'' % destination)
-
         if config.get('mode') is None:
             config['mode'] = 700
 

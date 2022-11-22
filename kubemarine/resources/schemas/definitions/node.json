@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "required": ["internal_address", "roles"],
+  "propertyNames": {
+    "$ref": "#/definitions/PropertyNames"
+  },
+  "definitions": {
+    "Properties": {
+      "allOf": [{"$ref": "node_defaults.json#/definitions/CommonNodeProperties"}],
+      "properties": {
+        "name": {
+          "$ref": "common/node_ref.json#/definitions/Name"
+        },
+        "address": {
+          "type": "string"
+        },
+        "internal_address": {
+          "type": "string"
+        },
+        "control_endpoint": {
+          "type": "boolean",
+          "default": false
+        },
+        "connect_to": {"type": "string"}
+      }
+    },
+    "PropertyNames": {
+      "anyOf": [
+        {"$ref": "node_defaults.json#/definitions/CommonNodePropertyNames"},
+        {"enum": ["name", "address", "internal_address", "control_endpoint", "connect_to"]}
+      ]
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
+        "required": ["name"],
+        "propertyNames": {
+          "$ref": "definitions/node.json#/definitions/PropertyNames"
+        }
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": ["nodes"],
+  "additionalProperties": false
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/CommonNodeProperties"}],
+  "propertyNames": {
+    "$ref": "#/definitions/CommonNodePropertyNames"
+  },
+  "definitions": {
+    "SSHAccessCommonProperties": {
+      "properties": {
+        "keyfile": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string",
+          "default": "root"
+        },
+        "connection_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 22
+        },
+        "connection_timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        }
+      }
+    },
+    "SSHAccessCommonPropertyNames": {
+      "enum": ["keyfile", "username", "connection_port", "connection_timeout"]
+    },
+    "CommonNodeProperties": {
+      "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],
+      "properties": {
+        "roles": {
+          "$ref": "common/node_ref.json#/definitions/Roles"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "boolean", "integer"]
+          }
+        },
+        "taints": {
+          "$ref": "common/utils.json#/definitions/ArrayOfStrings"
+        },
+        "gateway": {
+          "type": "string"
+        }
+      }
+    },
+    "CommonNodePropertyNames": {
+      "anyOf": [
+        {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
+        {"enum": ["roles", "labels", "taints", "gateway"]}
+      ]
+    }
+  }
+}

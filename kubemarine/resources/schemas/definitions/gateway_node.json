@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "node_defaults.json#/definitions/SSHAccessCommonProperties"}],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    }
+  },
+  "required": ["name", "address", "username", "keyfile"],
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "node_defaults.json#/definitions/SSHAccessCommonPropertyNames"},
+      {"enum": ["name", "address"]}
+    ]
+  }
+}

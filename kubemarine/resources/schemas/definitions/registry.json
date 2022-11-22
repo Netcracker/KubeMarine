@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "oneOf": [
+    {"$ref": "#/definitions/NewEndpointsFormat"},
+    {"$ref": "#/definitions/OldAddressPortFormat"}
+  ],
+  "definitions": {
+    "NewEndpointsFormat": {
+      "type": "object",
+      "properties": {
+        "endpoints": {
+          "$ref": "common/utils.json#/definitions/NonEmptySetOfStrings"
+        },
+        "mirror_registry": {
+          "type": "string",
+          "default": "registry.cluster.local"
+        },
+        "thirdparties": {
+          "type": "string"
+        }
+      },
+      "required": ["endpoints"],
+      "additionalProperties": false
+    },
+    "OldAddressPortFormat": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "docker_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "webserver": {
+          "type": "boolean",
+          "default": false
+        },
+        "ssl": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": ["address"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -17,15 +17,6 @@ import json
 from kubemarine import system
 
 
-def verify_inventory(inventory, cluster):
-    expected_states = ['enforce', 'complain', 'disable']
-    for state in inventory['services']['kernel_security'].get('apparmor', {}).keys():
-        if state not in expected_states:
-            raise Exception('Unknown apparmor mode found in configfile. Expected %s, but \'%s\' found.'
-                            % (expected_states, state))
-    return inventory
-
-
 def get_status(group):
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")

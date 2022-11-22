@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "controller": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string",
+          "default": "haproxytech/kubernetes-ingress:1.2.7"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string",
+          "default": "k8s.gcr.io/defaultbackend:1.0"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["controller", "backend"]}
+    ]
+  }
+}

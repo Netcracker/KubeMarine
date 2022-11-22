@@ -29,7 +29,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
-from kubemarine.core import flow, utils
+from kubemarine.core import flow
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
@@ -1158,10 +1158,6 @@ def geo_check(cluster):
     # Other statuses are reported in other TestCases below. This is done for better UX.
     with TestCase(cluster.context['testsuite'], '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
-        if geo_monitor_inventory.get("namespace") is None or geo_monitor_inventory.get("service") is None:
-            raise TestFailure("configuration error",
-                              hint="geo-monitor namespace and/or service name is not provided in procedure inventory")
-
         namespace = geo_monitor_inventory["namespace"]
         service = geo_monitor_inventory["service"]
         control_plane_node = cluster.nodes['control-plane'].get_first_member()

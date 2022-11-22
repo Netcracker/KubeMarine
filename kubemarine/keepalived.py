@@ -232,6 +232,8 @@ def generate_config(inventory, node):
 
         priority = 100
         interface = 'eth0'
+        # todo Probably skip the VRRP if it not defined for this node?
+        #  Currently behaviour does not correspond to documentation.
         for record in item['hosts']:
             if record['name'] == node['name']:
                 priority = record['priority']

@@ -23,8 +23,8 @@ from typing import Dict
 
 from dateutil.parser import parse
 import fabric
-import invoke
 import yaml
+from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils
@@ -42,8 +42,6 @@ def verify_inventory(inventory, cluster):
              cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP')):
         raise Exception('chrony and timesyncd configured both at the same time')
 
-    # TODO: Add validation that selinux and apparmor are not enabled at the same time
-
     return inventory
 
 
@@ -55,20 +53,8 @@ def enrich_inventory(inventory, cluster):
                     inventory['services']['packages'][_type] = {
                         'include': inventory['services']['packages'][_type]
                     }
-                for __type in ['include', 'exclude']:
-                    if inventory['services']['packages'][_type].get(__type) is not None:
-                        if not isinstance(inventory['services']['packages'][_type][__type], list):
-                            raise Exception('Packages %s section in configfile has invalid type. '
-                                            'Expected \'list\', but found \'%s\''
-                                            % (__type, type(inventory['services']['packages'][_type][__type])))
-                        if not inventory['services']['packages'][_type][__type]:
-                            raise Exception('Packages %s section contains empty \'%s\' definition. ' % (__type, __type))
-                    elif __type == 'include':
-                        if _type != 'install':
-                            inventory['services']['packages'][_type]['include'] = ['*']
-                        else:
-                            raise Exception('Definition \'include\' is missing in \'install\' packages section, '
-                                            'but should be specified.')
+                if _type != 'install' and inventory['services']['packages'][_type].get('include') is None:
+                    inventory['services']['packages'][_type]['include'] = ['*']
 
     if inventory['services'].get('etc_hosts'):
 
@@ -86,17 +72,15 @@ def enrich_inventory(inventory, cluster):
             internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
             internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
             internal_node_ip_names.append(node['name'])
+            internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
             inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
 
             if node.get('address'):
                 external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
                 external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
                 external_node_ip_names.append(node['name'] + "-external")
+                external_node_ip_names = list(OrderedSet(external_node_ip_names))
                 inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
-
-            uniq_node_hostnames = list(set(inventory['services']['etc_hosts'][node['address']]))
-            inventory['services']['etc_hosts'][node['address']] = uniq_node_hostnames
-
 
     return inventory
 
@@ -283,12 +267,7 @@ def generate_etc_hosts_config(inventory, cluster=None):
     ignore_ips = []
     if cluster and cluster.context['initial_procedure'] == 'remove_node':
         for removal_node in cluster.procedure_inventory.get("nodes"):
-            if isinstance(removal_node, str):
-                removal_node_name = removal_node
-            elif isinstance(removal_node, dict) and removal_node.get('name'):
-                removal_node_name = removal_node['name']
-            else:
-                raise Exception('Invalid node specification in procedure.yaml')
+            removal_node_name = removal_node['name']
             for node in inventory['nodes']:
                 if node['name'] == removal_node_name:
                     if node.get('address'):

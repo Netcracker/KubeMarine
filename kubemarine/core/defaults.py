@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import re
 from importlib import import_module
 from copy import deepcopy
@@ -24,11 +23,12 @@ from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils, static
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine import controlplane
 
 # All enrichment procedures should not connect to any node.
 # The information about nodes should be collected within KubernetesCluster#detect_nodes_context().
 DEFAULT_ENRICHMENT_FNS = [
+    "kubemarine.core.schema.verify_inventory",
+    "kubemarine.core.defaults.merge_defaults",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.controlplane.controlplane_node_enrichment",
@@ -53,15 +53,12 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes_accounts.enrich_inventory",
     "kubemarine.plugins.calico.enrich_inventory",
     "kubemarine.plugins.nginx_ingress.cert_renew_enrichment",
-    "kubemarine.plugins.nginx_ingress.verify_inventory",
     "kubemarine.plugins.nginx_ingress.enrich_inventory",
     "kubemarine.core.defaults.calculate_nodegroups",
     "kubemarine.keepalived.enrich_inventory_calculate_nodegroup",
     "kubemarine.thirdparties.enrich_inventory_apply_defaults",
     "kubemarine.system.verify_inventory",
     "kubemarine.system.enrich_inventory",
-    "kubemarine.selinux.verify_inventory",
-    "kubemarine.apparmor.verify_inventory",
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
@@ -106,9 +103,6 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
         if not cluster.context["nodes"].get(address):
             cluster.context["nodes"][address] = {}
 
-        if not node.get("roles"):
-            raise Exception('There are no roles defined for the node %s' % node_name)
-
         if address not in cluster.ips["all"]:
             cluster.ips['all'].append(address)
 
@@ -130,13 +124,11 @@ def apply_registry(inventory, cluster):
         cluster.log.verbose('Unified registry is not used')
         return inventory
 
-    if inventory['registry'].get('endpoints') and inventory['registry'].get('docker_port'):
-        raise KME('KME0006')
-
     thirdparties_address = None
     containerd_endpoints = None
     protocol = None
 
+    # registry contains either 'endpoints' or 'address' that is validated by JSON schema.
     if inventory['registry'].get('endpoints'):
         registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory, cluster)
     else:
@@ -256,10 +248,8 @@ def apply_registry_endpoints(inventory, cluster):
 
     registry_mirror_address = inventory['registry']['mirror_registry']
 
-    for i, endpoint_address in enumerate(inventory['registry']['endpoints']):
-        if not isinstance(endpoint_address, str):
-            raise KME('KME0008')
-
+    # todo Currently registry.endpoints is used only for containerd registry mirrors, but it can be provided explicitly.
+    #  Probably we could make endpoints optional in this case.
     containerd_endpoints = inventory['registry']['endpoints']
     thirdparties_address = inventory['registry'].get('thirdparties')
 
@@ -368,11 +358,11 @@ def recursive_apply_defaults(defaults, section):
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
 
-def calculate_node_names(inventory, cluster):
+def calculate_node_names(inventory: dict, cluster):
     roles_iterators = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
-            if role_name in node.get('roles', []):
+            if role_name in node['roles']:
                 # The idea is this:
                 # If the name is already specified, we must skip this node,
                 # however, we must consider that we already have a node of this type
@@ -399,8 +389,6 @@ def calculate_node_names(inventory, cluster):
 def verify_node_names(inventory, cluster):
     known_names = []
     for i, node in enumerate(inventory['nodes']):
-        if node.get('name') is None:
-            raise Exception('Node item %s in nodes section do not contain name' % i)
         if node['name'] in known_names:
             raise Exception('Node name %s is duplicated in configfile' % node['name'])
         known_names.append(node['name'])
@@ -413,34 +401,36 @@ def calculate_nodegroups(inventory, cluster):
     return inventory
 
 
-def enrich_inventory(cluster, custom_inventory, make_dumps=True, custom_fns=None):
+def merge_defaults(inventory: dict, cluster: KubernetesCluster):
     with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
                                                script_relative=True), 'r') as stream:
         base_inventory = yaml.safe_load(stream)
 
-        inventory = default_merger.merge(base_inventory, custom_inventory)
+    inventory = default_merger.merge(base_inventory, inventory)
+    # it is necessary to temporary put half-compiled inventory to cluster inventory field
+    cluster._inventory = inventory
+    return inventory
 
-        # it is necessary to temporary put half-compiled inventory to cluster inventory field
-        cluster._inventory = inventory
-        if custom_fns:
-            enrichment_functions = custom_fns
-        else:
-            enrichment_functions = DEFAULT_ENRICHMENT_FNS
 
-        # run required fields calculation
-        for enrichment_fn in enrichment_functions:
-            fn_package_name, fn_method_name = enrichment_fn.rsplit('.', 1)
-            mod = import_module(fn_package_name)
-            cluster.log.verbose('Calling fn "%s"' % enrichment_fn)
-            inventory = getattr(mod, fn_method_name)(inventory, cluster)
+def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=True, enrichment_functions=None):
+    if not enrichment_functions:
+        enrichment_functions = DEFAULT_ENRICHMENT_FNS
 
-        cluster.log.verbose('Enrichment finished!')
+    # run required fields calculation
+    for enrichment_fn in enrichment_functions:
+        fn_package_name, fn_method_name = enrichment_fn.rsplit('.', 1)
+        mod = import_module(fn_package_name)
+        cluster.log.verbose('Calling fn "%s"' % enrichment_fn)
+        inventory = getattr(mod, fn_method_name)(inventory, cluster)
 
-        if make_dumps:
-            inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
-            utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
+    cluster.log.verbose('Enrichment finished!')
 
-        return inventory
+    if make_dumps:
+        from kubemarine import controlplane
+        inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
+        utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
+
+    return inventory
 
 
 def compile_inventory(inventory, cluster):
@@ -469,6 +459,7 @@ def compile_inventory(inventory, cluster):
 
     inventory = compile_object(cluster.log, inventory, root, ignore_jinja_escapes=False)
 
+    from kubemarine import controlplane
     inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
     merged_inventory = yaml.dump(inventory_for_dump)
     utils.dump_file(cluster, merged_inventory, "cluster_precompiled.yaml")
