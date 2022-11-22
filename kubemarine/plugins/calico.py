@@ -84,14 +84,19 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
         else:
             # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
             # in other case those objects must be excluded
-            if cluster.inventory['plugins']['calico']['typha']['enabled'] == 'false':
+            str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+            if str_value == 'false':
                 obj_list.pop(key)
                 excluded_list.append(key)
                 cluster.log.verbose(f"The {key} has been excluded from result")
-            else:
+            elif str_value == 'true':
                 patched_list.append(key)
                 if enrich_objects_fns[key]:
                     obj_list = enrich_objects_fns[key](cluster, obj_list)
+            else:
+                raise Exception(f"The {key} can't be patched correctly "
+                                f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                                f"as string or boolean value")
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -121,10 +126,10 @@ def enrich_configmap_calico_config(cluster, obj_list):
     val = cluster.inventory['plugins']['calico']['mtu']
     obj_list[key]['data']['veth_mtu'] = str(val)
     cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-    cluster.log.verbose(f"ENABLE: {cluster.inventory['plugins']['calico']['typha']['enabled']}")
-    if cluster.inventory['plugins']['calico']['typha']['enabled'] == 'true':
+    str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+    if str_value == "true":
         val = "calico-typha"
-    else:
+    elif str_value == "false":
         val = "none"
     obj_list[key]['data']['typha_service_name'] = val
     cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
@@ -385,6 +390,21 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
             yaml.dump_all(source_yamls, stream)
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
+
+
+def true_or_false(input_string):
+    """
+    The method check string and boolean value
+    :param input_string: String that should be checked
+    """
+    if input_string in ['true', 'True', 'TRUE']:
+        result = "true"
+    elif input_string in ['false', 'False', 'FALSE']:
+        result = "false"
+    else:
+        result = "undefined"
+
+    return result
 
 # name of objects and enrichment methods mapping
 enrich_objects_fns = {
