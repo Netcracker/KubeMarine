@@ -488,7 +488,7 @@ plugins:
         kubernetes.io/os: linux
     env:
       DATASTORE_TYPE: kubernetes
-      WAIT_FOR_DATASTORE: true
+      WAIT_FOR_DATASTORE: 'true'
       CLUSTER_TYPE: k8s,bgp
       CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% endif %}'
       IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
@@ -502,11 +502,11 @@ plugins:
       FELIX_IPV6SUPPORT: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
       CALICO_IPV6POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
       CALICO_IPV6POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
-      CALICO_DISABLE_FILE_LOGGING: true
+      CALICO_DISABLE_FILE_LOGGING: 'true'
       FELIX_DEFAULTENDPOINTTOHOSTACTION: ACCEPT
       FELIX_LOGSEVERITYSCREEN: info
-      FELIX_HEALTHENABLED: true
-      FELIX_USAGEREPORTINGENABLED: false
+      FELIX_HEALTHENABLED: 'true'
+      FELIX_USAGEREPORTINGENABLED: 'false'
       FELIX_TYPHAK8SSERVICENAME:
           configMapKeyRef:
             name: calico-config
