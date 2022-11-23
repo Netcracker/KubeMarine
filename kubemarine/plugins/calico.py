@@ -409,7 +409,7 @@ def true_or_false(input_string):
 
 def enrich_image(cluster, image):
     """
-    The method add registry to image if it's necessary
+    The method adds registry to image if it's necessary
     :param cluster: Cluster object
     :param image: particular image
     """
