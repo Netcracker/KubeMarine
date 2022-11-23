@@ -58,6 +58,8 @@ This section provides information about the Kubecheck functionality.
     - [224 Calico configuration check](#224-calico-configuration-check)
     - [225 Pod security admission status](#225-pod-security-admission-status)
     - [226 Geo connectivity status](#226-geo-connectivity-status)
+    - [227 Apparmor status](#227-apparmor-status)
+    - [228 Apparmor configuration](#228-apparmor-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -552,6 +554,18 @@ geo-monitor:
 ```
 
 For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
+
+###### 227 AppArmor status
+
+*Task*: `services.security.apparmor.status`
+
+The test checks the status of AppArmor. It should be `enabled` by default.
+
+###### 228 AppArmor configuration
+
+*Task*: `services.security.apparmor.config`
+
+The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may incude only part of the profiles.
 
 ### Report File Generation
 
