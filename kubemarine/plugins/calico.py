@@ -18,6 +18,7 @@ import ruamel.yaml
 from copy import deepcopy
 
 from kubemarine import plugins
+from kubemarine.core import utils
 
 
 
@@ -55,7 +56,8 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     """
 
     # get original YAML and parse it into dict of objects
-    obj_list = load_multiple_yaml(calico_original_yaml)
+    calico_original_yaml_path = utils.determine_resource_absolute_path(calico_original_yaml)
+    obj_list = load_multiple_yaml(calico_original_yaml_path)
 
     validate_original(cluster, obj_list)
 
