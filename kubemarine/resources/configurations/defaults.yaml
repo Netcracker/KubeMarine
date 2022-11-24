@@ -488,7 +488,7 @@ plugins:
         kubernetes.io/os: linux
     env:
       DATASTORE_TYPE: kubernetes
-      WAIT_FOR_DATASTORE: true
+      WAIT_FOR_DATASTORE: 'true'
       CLUSTER_TYPE: k8s,bgp
       CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% endif %}'
       IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
@@ -502,11 +502,11 @@ plugins:
       FELIX_IPV6SUPPORT: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
       CALICO_IPV6POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
       CALICO_IPV6POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
-      CALICO_DISABLE_FILE_LOGGING: true
+      CALICO_DISABLE_FILE_LOGGING: 'true'
       FELIX_DEFAULTENDPOINTTOHOSTACTION: ACCEPT
       FELIX_LOGSEVERITYSCREEN: info
-      FELIX_HEALTHENABLED: true
-      FELIX_USAGEREPORTINGENABLED: false
+      FELIX_HEALTHENABLED: 'true'
+      FELIX_USAGEREPORTINGENABLED: 'false'
       FELIX_TYPHAK8SSERVICENAME:
           configMapKeyRef:
             name: calico-config
@@ -532,7 +532,7 @@ plugins:
             name: calico-config
             key: veth_mtu
     cni:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/cni:{{ plugins.calico.version }}'
+      image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
         ipv4:
           assign_ipv4: 'true'
@@ -548,13 +548,13 @@ plugins:
             - default-ipv6-ippool
           type: calico-ipam
     node:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/node:{{ plugins.calico.version }}'
+      image: 'calico/node:{{ plugins.calico.version }}'
     kube-controllers:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/kube-controllers:{{ plugins.calico.version }}'
+      image: 'calico/kube-controllers:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
     flexvol:
-      image: '{% if plugins.calico.installation.registry is defined and plugins.calico.installation.registry|length %}{{ plugins.calico.installation.registry }}/{% endif %}calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
+      image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
   flannel:
     installation:
