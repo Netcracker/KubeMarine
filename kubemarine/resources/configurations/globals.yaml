@@ -544,7 +544,7 @@ compatibility_map:
       v1.24:
         version: 3.7
       v1.25:
-        version: 3.7
+        version: 3.8
 
   hardware:
     minimal:
