@@ -46,13 +46,13 @@ metadata:
   name: custom-headers
   namespace: ingress-nginx
 data:
-{{ plugins['nginx-ingress-controller']['custom_headers'] | toyaml | indent(width=2, indentfirst=True) -}}
+{{ plugins['nginx-ingress-controller']['custom_headers'] | toyaml | indent(width=2, first=True) -}}
 {%- endif %}
 ---
 apiVersion: v1
 data:
 {% if plugins['nginx-ingress-controller']['config_map'] is defined -%}
-  {{ plugins['nginx-ingress-controller']['config_map'] | toyaml | indent(width=2, indentfirst=True) -}}
+  {{ plugins['nginx-ingress-controller']['config_map'] | toyaml | indent(width=2, first=True) -}}
 {%- endif %}
 kind: ConfigMap
 metadata:
@@ -511,7 +511,7 @@ spec:
           timeoutSeconds: 1
         name: controller
         ports:
-            {{ plugins['nginx-ingress-controller']['ports'] | toyaml | indent(width=12, indentfirst=False) }}
+            {{ plugins['nginx-ingress-controller']['ports'] | toyaml | indent(width=12, first=False) }}
         readinessProbe:
           failureThreshold: 3
           httpGet:
@@ -540,10 +540,10 @@ spec:
           readOnly: true
       dnsPolicy: ClusterFirst
       nodeSelector:
-        {{ plugins['nginx-ingress-controller']['controller']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['nginx-ingress-controller']['controller']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       {% if plugins['nginx-ingress-controller']['controller']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['nginx-ingress-controller']['controller']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['nginx-ingress-controller']['controller']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       serviceAccountName: ingress-nginx
       terminationGracePeriodSeconds: 300

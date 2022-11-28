@@ -66,11 +66,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
   selector:
     matchLabels:
@@ -138,11 +138,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -192,11 +192,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -249,11 +249,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -308,11 +308,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -374,11 +374,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -443,11 +443,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -500,11 +500,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -548,11 +548,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -608,11 +608,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -677,11 +677,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -742,11 +742,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1
@@ -802,11 +802,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {% if plugins['sock-shop']['nodeSelector'] is defined -%}
-          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['sock-shop']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       {% if plugins['sock-shop']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['sock-shop']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: v1

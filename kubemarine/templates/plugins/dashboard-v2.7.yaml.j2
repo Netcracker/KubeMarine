@@ -239,10 +239,10 @@ spec:
           emptyDir: {}
       serviceAccountName: kubernetes-dashboard
       nodeSelector:
-        {{ plugins['kubernetes-dashboard']['dashboard']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['kubernetes-dashboard']['dashboard']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       {% if plugins['kubernetes-dashboard']['dashboard']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['kubernetes-dashboard']['dashboard']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['kubernetes-dashboard']['dashboard']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 
 ---
@@ -307,10 +307,10 @@ spec:
             runAsGroup: 2001
       serviceAccountName: kubernetes-dashboard
       nodeSelector:
-        {{ plugins['kubernetes-dashboard']['metrics-scraper']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['kubernetes-dashboard']['metrics-scraper']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       {% if plugins['kubernetes-dashboard']['metrics-scraper']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['kubernetes-dashboard']['metrics-scraper']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['kubernetes-dashboard']['metrics-scraper']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       volumes:
         - name: tmp-volume
