@@ -93,6 +93,10 @@ def apply_defaults(inventory, cluster):
             raise Exception('Node name \"%s\" contains invalid characters. A DNS-1123 subdomain must consist of lower '
                             'case alphanumeric characters, \'-\' or \'.\'' % node_name)
 
+        # Use internal address if address is not defined
+        if node.get('address') is None and node.get("internal_address") is not None:
+            cluster.inventory["nodes"][i]["address"] = node.get("internal_address")
+
         address = node.get('connect_to')
         if address is None:
             address = node.get('address')
