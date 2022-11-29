@@ -60,3 +60,8 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           console=True)
+
+app = BUNDLE(coll,
+             name='kubemarine',
+             icon='kubemarine.ico',
+             bundle_identifier=None)
