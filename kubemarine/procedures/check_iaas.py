@@ -272,7 +272,15 @@ def system_distributive(cluster):
             raise TestFailure("Unsupported version: %s" % ", ".join(detected_unsupported_version),
                               hint="Reinstall the OS on the host to one of the supported versions: %s" % \
                                       ", ".join(supported_versions))
-
+        
+        os_ids = cluster.get_os_identifiers()
+        different_os = set(os_ids.values())
+        if len(different_os) > 1:
+            cluster.log.warning(
+                f"Nodes have different OS families or versions. "
+                f"List of (OS family, version): {list(different_os)}")
+            raise TestWarn(f"Nodes have different OS families or versions")
+        
         tc.success(results=", ".join(detected_supported_os))
 
 
