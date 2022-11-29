@@ -737,3 +737,13 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
   ```
 The user can analyze these files and try to find the reason for the failed installation of kubemarine
 
+
+## Kubelet has conflict with kubepods-burstable.slice and kube-proxy pods stick in ContainerCreating status.
+
+* Sometimes the `migrate_cri` procedure fails because of kubelet has conflict with kubepods-burstable.slice and `kube-proxy` pods stuck in ContainerCreating status.
+
+**Solution**: 
+```
+sudo systemctl stop kubepods-burstable.slice
+sudo systemctl restart containerd
+```
