@@ -24,6 +24,7 @@ import time
 from contextlib import contextmanager
 
 import fabric
+import yaml
 
 from kubemarine.core import flow, utils
 from kubemarine import system
@@ -274,6 +275,34 @@ def system_distributive(cluster):
                                       ", ".join(supported_versions))
 
         tc.success(results=", ".join(detected_supported_os))
+
+
+def check_access_to_thirdparties(cluster: KubernetesCluster):
+    uninstalled_curl_hosts = set()
+    broken = []
+
+    for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
+        # Check if curl
+        if config['source'][:4] != 'http' or '://' not in config['source'][4:8]:
+            continue
+        # Try to connect
+        common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
+        res = common_group.sudo('curl -o /dev/null --max-time %d -f -g -L -s -S %s' %
+                                (cluster.inventory['timeout_download'], config['source']), warn=True)
+        for host, result in res.items():
+            if result.failed:
+                if "command not found" in result.stderr:
+                    uninstalled_curl_hosts.add(host.host)
+                else:
+                    broken.append(f"{host.host}, {destination}: {result.stderr}")
+
+    with TestCase(cluster.context['testsuite'], '009', 'System', 'Access to trirdparties') as tc:
+        if broken:
+            raise TestFailure('Some thirdparties are unavailable', hint=yaml.safe_dump(broken))
+        if uninstalled_curl_hosts:
+            raise TestWarn('Curl is not installed on some nodes, can`t check access',
+                           hint=yaml.safe_dump(list(uninstalled_curl_hosts)))
+        tc.success('All thirdparties are available')
 
 
 def detect_preinstalled_python(cluster: KubernetesCluster):
@@ -638,7 +667,8 @@ tasks = OrderedDict({
         }
     },
     'system': {
-        'distributive': system_distributive
+        'distributive': system_distributive,
+        'thirdparties_available': check_access_to_thirdparties
     }
 })
 
