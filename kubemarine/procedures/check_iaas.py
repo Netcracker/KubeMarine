@@ -277,9 +277,9 @@ def system_distributive(cluster):
         different_os = set(os_ids.values())
         if len(different_os) > 1:
             cluster.log.warning(
-                f"Nodes have different OS families or versions, packages versions cannot be checked. "
+                f"Nodes have different OS families or versions. "
                 f"List of (OS family, version): {list(different_os)}")
-            raise TestFailure(f"Nodes have different OS families or versions")
+            raise TestWarn(f"Nodes have different OS families or versions")
         
         tc.success(results=", ".join(detected_supported_os))
 
