@@ -549,21 +549,21 @@ compatibility_map:
   hardware:
     minimal:
       balancer:
-        amount: 1
+        amount: 0
         vcpu: 1
         ram: 1
       control-plane:
-        amount: 3
+        amount: 1
         vcpu: 2
         ram: 2
       worker:
-        amount: 3
+        amount: 1
         vcpu: 4
         ram: 4
       vip:
         amount: 0
       all:
-        amount: 3
+        amount: 1
     recommended:
       balancer:
         amount: 2
