@@ -296,7 +296,7 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
                 else:
                     broken.append(f"{host.host}, {destination}: {result.stderr}")
 
-    with TestCase(cluster.context['testsuite'], '009', 'System', 'Access to trirdparties') as tc:
+    with TestCase(cluster.context['testsuite'], '012', 'Network', 'Access to trirdparties') as tc:
         if broken:
             raise TestFailure('Some thirdparties are unavailable', hint=yaml.safe_dump(broken))
         if uninstalled_curl_hosts:
@@ -645,7 +645,8 @@ tasks = OrderedDict({
     'network': {
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
-        'check_tcp_ports': check_tcp_ports
+        'check_tcp_ports': check_tcp_ports,
+        'thirdparties_available': check_access_to_thirdparties
     },
     'hardware': {
         'members_amount': {
@@ -667,8 +668,7 @@ tasks = OrderedDict({
         }
     },
     'system': {
-        'distributive': system_distributive,
-        'thirdparties_available': check_access_to_thirdparties
+        'distributive': system_distributive
     }
 })
 
