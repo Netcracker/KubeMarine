@@ -18,12 +18,13 @@ from io import StringIO
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.group import NodeGroup
 
 
-def install(group):
+def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['docker']
+            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'docker')
             packages.install(node['connection'], include=os_specific_associations['package_name'])
             enable(node['connection'])
 
@@ -39,19 +40,18 @@ def uninstall(group):
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
 
-def enable(group):
-    system.enable_service(
-        group,
-        name=group.cluster.inventory['services']['packages']['associations']['docker']['service_name'], now=True)
+def enable(group: NodeGroup):
+    # currently it is invoked only for single node
+    service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
+    system.enable_service(group, name=service_name, now=True)
 
 
-def disable(group):
-    system.disable_service(
-        group,
-        name=group.cluster.inventory['services']['packages']['associations']['docker']['service_name'], now=True)
+def disable(group: NodeGroup):
+    service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
+    system.disable_service(group, name=service_name, now=True)
 
 
-def configure(group):
+def configure(group: NodeGroup):
     log = group.cluster.log
 
     settings_json = json.dumps(group.cluster.inventory["services"]['cri']['dockerConfig'], sort_keys=True, indent=4)
@@ -59,7 +59,7 @@ def configure(group):
 
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])['docker']
+            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'docker')
             log.debug("Uploading docker configuration to %s node..." % node['name'])
             node['connection'].put(StringIO(settings_json), os_specific_associations['config_location'], backup=True,
                                    sudo=True)

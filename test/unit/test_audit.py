@@ -20,6 +20,7 @@ import fabric
 
 from kubemarine import demo, audit
 from kubemarine.core.group import NodeGroupResult
+from kubemarine.demo import FakeKubernetesCluster
 
 
 class NodeGroupResultsTest(unittest.TestCase):
@@ -28,13 +29,20 @@ class NodeGroupResultsTest(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.inventory = demo.generate_inventory(**demo.FULLHA)
 
+    def new_debian_cluster(self) -> FakeKubernetesCluster:
+        context = demo.create_silent_context()
+        context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        return demo.new_cluster(self.inventory, context=context)
+
     def test_audit_installation_for_centos(self):
-        cluster = demo.new_cluster(self.inventory, os_name='centos', os_version='7.9')
+        context = demo.create_silent_context()
+        context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
+        cluster = demo.new_cluster(self.inventory, context=context)
         audit.install(cluster.nodes['master'])
 
     def test_audit_installation_for_debian(self):
-        cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        cluster = self.new_debian_cluster()
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
@@ -60,8 +68,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         audit.install(cluster.nodes['master'])
 
     def test_audit_installation_when_already_installed_for_debian(self):
-        cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        cluster = self.new_debian_cluster()
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
 
@@ -74,9 +82,9 @@ class NodeGroupResultsTest(unittest.TestCase):
         audit.install(cluster.nodes['master'])
 
     def test_audit_installation_when_partly_installed_for_debian(self):
-        cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
+        cluster = self.new_debian_cluster()
         all_nodes_group = cluster.nodes['all'].nodes
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
         service_name = package_associations['service_name']
@@ -118,8 +126,8 @@ class NodeGroupResultsTest(unittest.TestCase):
                               msg="Installation task did not finished with audit enable command")
 
     def test_audit_configuring(self):
-        cluster = demo.new_cluster(self.inventory, os_name='ubuntu', os_version='20.04')
-        package_associations = cluster.inventory['services']['packages']['associations']['audit']
+        cluster = self.new_debian_cluster()
+        package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
         package_name = package_associations['package_name']
         config_location = package_associations['config_location']
 

@@ -36,13 +36,13 @@ from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff
 
 
-def services_status(cluster, service_type):
+def services_status(cluster: KubernetesCluster, service_type: str):
     with TestCase(cluster.context['testsuite'], '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
         service_name = service_type
 
-        if cluster.inventory['services']['packages']['associations'].get(service_type):
-            service_name = cluster.inventory['services']['packages']['associations'][service_type]['service_name']
+        if cluster.get_os_family() != 'multiple' and service_type != 'kubelet':
+            service_name = cluster.get_package_association(service_type, 'service_name')
 
         group = cluster.nodes['all']
         if service_type == 'haproxy':
@@ -92,7 +92,17 @@ def services_status(cluster, service_type):
                               hint="Fix the service to be enabled and has running status.")
 
 
-def recommended_system_packages_versions(cluster):
+def _check_same_os(cluster: KubernetesCluster):
+    os_ids = cluster.get_os_identifiers()
+    different_os = set(os_ids.values())
+    if len(different_os) > 1:
+        cluster.log.warning(
+            f"Nodes have different OS families or versions, packages versions cannot be checked. "
+            f"List of (OS family, version): {list(different_os)}")
+        raise TestFailure(f"Nodes have different OS families or versions")
+
+
+def recommended_system_packages_versions(cluster: KubernetesCluster):
     """
     Task that checks if configured "system" packages versions are compatible with the configured k8s version and OS.
     Fails if unable to detect the OS family.
@@ -138,7 +148,7 @@ def recommended_system_packages_versions(cluster):
         good_results = set()
         bad_results = []
         for package_alias, expected_packages in expected_system_packages.items():
-            actual_packages = cluster.inventory["services"]["packages"]["associations"][package_alias]["package_name"]
+            actual_packages = cluster.get_package_association(package_alias, "package_name")
             if not isinstance(actual_packages, list):
                 actual_packages = [actual_packages]
             for expected_pckg, version in expected_packages.items():
@@ -164,7 +174,7 @@ def recommended_system_packages_versions(cluster):
         tc.success("all packages have recommended versions")
 
 
-def system_packages_versions(cluster, pckg_alias):
+def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
     """
     Verifies that system packages are installed on required nodes and have equal versions.
     Failure is shown if check is not successful.
@@ -172,6 +182,7 @@ def system_packages_versions(cluster, pckg_alias):
     :param pckg_alias: system package alias to retrieve "package_name" association.
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
+        _check_same_os(cluster)
         if pckg_alias == "docker" or pckg_alias == "containerd":
             group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
         elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
@@ -182,18 +193,19 @@ def system_packages_versions(cluster, pckg_alias):
         else:
             raise Exception(f"Unknown system package alias: {pckg_alias}")
 
-        packages = cluster.inventory['services']['packages']['associations'][pckg_alias]['package_name']
+        packages = cluster.get_package_association(pckg_alias, 'package_name')
         if not isinstance(packages, list):
             packages = [packages]
         return check_packages_versions(cluster, tc, group, packages)
 
 
-def generic_packages_versions(cluster):
+def generic_packages_versions(cluster: KubernetesCluster):
     """
     Verifies that user-provided packages are installed on required nodes and have equal versions.
     Warning is shown if check is not successful.
     """
     with TestCase(cluster.context['testsuite'], '206', "Services", f"Generic packages version") as tc:
+        _check_same_os(cluster)
         packages = cluster.inventory['services']['packages']['install']['include']
         return check_packages_versions(cluster, tc, cluster.nodes['all'], packages, warn_on_bad_result=True)
 
@@ -571,7 +583,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) == 'debian':
+    if cluster.get_os_family() == 'debian':
         return
 
     with TestCase(cluster.context['testsuite'], '213', "Security", "Selinux security policy") as tc:
@@ -630,7 +642,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) == 'debian':
+    if cluster.get_os_family() == 'debian':
         return
 
     with TestCase(cluster.context['testsuite'], '214', "Security", "Selinux configuration") as tc:

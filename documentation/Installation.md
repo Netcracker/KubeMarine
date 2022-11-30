@@ -1901,7 +1901,11 @@ The following associations are used by default:
 
 **Notes**: 
 * By default, the packages' versions are installed according to the Kubernetes version specified in the [Supported versions](#supported-versions) section.
-* In the procedure for adding nodes, the package versions are taken from the current nodes in order to match the nodes in the cluster. For example, if `containerd.io-1.6.4-1` is installed on the nodes of the cluster, this version is installed on the new node. This behavior can be changed by setting the `cache_versions` option to `false`. The package versions are then used only with the template from the `associations` section.
+* In the procedure for adding nodes, the package versions are taken from the current nodes to match the nodes in the cluster.
+  For example, if `containerd.io-1.6.4-1` is installed on the nodes of the cluster, this version is installed on the new node.
+  This behavior can be changed by setting the `cache_versions` option to "false".
+  The package versions are then used only with the template from the `associations` section.
+  The option can be used both in global `services.packages` and in specific associations sections.
 
 The following is an example of overriding docker associations:
 
@@ -1911,6 +1915,7 @@ services:
     cache_versions: true
     associations:
       docker:
+        cache_versions: false
         executable_name: 'docker'
         package_name:
           - docker-ce-19*
@@ -4880,6 +4885,10 @@ After any procedure is completed, a final inventory with all the missing variabl
 This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
 and can be passed as a source inventory in future runs of KubeMarine procedures.
 
+**Note**: The `cluster_finalized.yaml` inventory file is aimed to reflect the current cluster state together with the KubeMarine version using which it is created.
+This in particular means that the file cannot be directly used with a different KubeMarine version.
+Though, it still can be migrated together with the managed cluster using the [Kubemarine Migration Procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
+
 In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
 For example, consider the following package's origin configuration:
 
@@ -4904,20 +4913,21 @@ services:
       - policycoreutils-python-utils
 ```
 
-The above configuration is converted to the following finalized configuration:
+The above configuration is converted to the following finalized configuration, provided that the cluster is based on RHEL nodes:
 
 ```yaml
 services:
   packages:
     associations:
-      docker:
-        executable_name: 'docker'
-        package_name:
-          - docker-ce-19.03.15-3.el7.x86_64
-          - docker-ce-cli-19.03.15-3.el7.x86_64
-          - containerd.io-1.4.6-3.1.el7.x86_64
-        service_name: 'docker'
-        config_location: '/etc/docker/daemon.json'
+      rhel:
+        docker:
+          executable_name: 'docker'
+          package_name:
+            - docker-ce-19.03.15-3.el7.x86_64
+            - docker-ce-cli-19.03.15-3.el7.x86_64
+            - containerd.io-1.4.6-3.1.el7.x86_64
+          service_name: 'docker'
+          config_location: '/etc/docker/daemon.json'
     install:
       include:
         - conntrack
@@ -4929,6 +4939,11 @@ services:
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.
+The same rule is applied if two different package versions are detected on different nodes.
+Also, see the `cache_versions` option in the [associations](#associations) section.
+
+**Note**: After some time is passed, the detected package versions might disappear from the repository.
+Direct using of the `cluster_finalized.yaml` file in procedures like `install` or `add_node` might be impossible due to this reason, and would require a manual intervention.
 
 The same applies to the VRRP interfaces. For example, the following origin configuration without interfaces:
 

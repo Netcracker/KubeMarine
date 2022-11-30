@@ -31,7 +31,7 @@ class FakeResources(demo.FakeResources):
 
 class RunActionsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.context = demo.create_silent_context(flow.new_common_parser("Help text"), [])
+        self.context = demo.create_silent_context()
         self.context['preserve_inventory'] = True
         self.inventory = demo.generate_inventory(**demo.FULLHA)
         self.cluster: demo.FakeKubernetesCluster = demo.new_cluster(self.inventory, context=self.context)
