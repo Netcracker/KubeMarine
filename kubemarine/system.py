@@ -378,30 +378,34 @@ def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
     return group.sudo("systemctl status firewalld", warn=True)
 
 
-def is_firewalld_disabled(group):
+def disable_firewalld(group, check_post=None):
+    log = group.cluster.log
+
     result = fetch_firewalld_status(group)
+
     disabled_status = False
+    restart_node = False
 
     for node_result in list(result.values()):
         if node_result.return_code == 4:
             disabled_status = True
         elif node_result.return_code == 3 and "disabled" in node_result.stdout:
             disabled_status = True
-        else:
+        elif node_result.return_code not in [3,4] or "disabled" not in node_result.stdout and check_post != True:
             disable_service(node_result.connection, name='firewalld', now=True)
+            restart_node = True
             disabled_status = True
-    return disabled_status, result
+        else:
+            disabled_status = False
+            return result, disabled_status
 
-
-def disable_firewalld(group):
-    log = group.cluster.log
-
-    already_disabled, result = is_firewalld_disabled(group)
-
-    if already_disabled:
+    if disabled_status and restart_node != True:
         log.debug("Skipped - FirewallD already disabled or not installed")
         return result
-
+    if restart_node == True:
+        group.cluster.schedule_cumulative_point(reboot_nodes)
+        group.cluster.schedule_cumulative_point(verify_system)
+    return result
 def is_swap_disabled(group):
     result = group.sudo("cat /proc/swaps", warn=True)
     disabled_status = True
@@ -650,7 +654,7 @@ def verify_system(group):
 
     if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
-        firewalld_disabled, firewalld_result = is_firewalld_disabled(group)
+        firewalld_result,firewalld_disabled = disable_firewalld(group,check_post=True)
         log.debug(firewalld_result)
         if not firewalld_disabled:
             raise Exception("FirewallD is still enabled")
