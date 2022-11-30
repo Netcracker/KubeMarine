@@ -401,7 +401,7 @@ def disable_firewalld(group, check_post=None):
 
     if disabled_status and restart_node != True:
         log.debug("Skipped - FirewallD already disabled or not installed")
-        return result
+        return result, disabled_status
     if restart_node == True:
         group.cluster.schedule_cumulative_point(reboot_nodes)
         group.cluster.schedule_cumulative_point(verify_system)
