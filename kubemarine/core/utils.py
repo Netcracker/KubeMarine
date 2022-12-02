@@ -295,6 +295,21 @@ def load_yaml(filepath) -> dict:
         do_fail(f"Failed to load {filepath}", exc)
 
 
+def true_or_false(value):
+    """
+    The method check string and boolean value
+    :param value: Value that should be checked
+    """
+    input_string = str(value)
+    if input_string in ['true', 'True', 'TRUE']:
+        result = "true"
+    elif input_string in ['false', 'False', 'FALSE']:
+        result = "false"
+    else:
+        result = "undefined"
+    return result
+
+
 class ClusterStorage:
     """
     File preservation:
