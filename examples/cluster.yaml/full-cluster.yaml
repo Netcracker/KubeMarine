@@ -439,27 +439,6 @@ plugins:
                       port:
                         number: 443
 
-  sock-shop:
-    install: true
-    installation:
-      procedures:
-        - template: templates/plugins/sock-shop.yaml.j2
-          expect:
-            pods:
-              - carts
-              - carts-db
-              - catalogue
-              - catalogue-db
-              - front-end
-              - orders
-              - orders-db
-              - payment
-              - queue-master
-              - rabbitmq
-              - shipping
-              - user
-              - user-db
-        - template: templates/plugins/sock-shop-ingress.yaml.j2
     carts-db:
       image: mongo
     carts:
