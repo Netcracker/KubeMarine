@@ -381,27 +381,25 @@ class ClusterStorage:
         output = yaml.dump(out)
         dump_file(context, output, "procedure_parameters")
 
-    def collect_info_all_control_plane(self):
+    def upload_info_new_control_planes(self):
         """
-        This method is used to transfer backup logs from the main control-plane to the new control-plane.
+        This method is used to transfer backup logs from the initial control-plane to the new control-planes.
         """
+        new_control_planes = self.cluster.nodes['control-plane'].get_new_nodes()
+        if new_control_planes.is_empty():
+            return
 
         node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member(provide_node_configs=True)
         control_plane = self.cluster.make_group([node['connect_to']])
         data_copy_res = control_plane.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
-        self.cluster.log.debug('Backup created:\n%s' % data_copy_res)
+        self.cluster.log.verbose('Backup created:\n%s' % data_copy_res)
         control_plane.get('/tmp/kubemarine-backup.tar.gz',
                           get_dump_filepath(self.cluster.context, "dump_log_cluster.tar.gz"), 'dump_log_cluster.tar.gz')
 
         self.cluster.log.debug('Backup downloaded')
 
-    def upload_info_new_node(self):
-
-        new_nodes = self.cluster.nodes['all'].get_new_nodes()
-
-        for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
+        for new_node in new_control_planes.get_ordered_members_list(provide_node_configs=True):
             group = self.cluster.make_group([new_node['connect_to']])
-            if 'control-plane' in new_node['roles']:
-                group.put(get_dump_filepath(self.cluster.context, "dump_log_cluster.tar.gz"),
-                    "/tmp/dump_log_cluster.tar.gz", sudo=True)
-                group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
+            group.put(get_dump_filepath(self.cluster.context, "dump_log_cluster.tar.gz"),
+                      "/tmp/dump_log_cluster.tar.gz", sudo=True)
+            group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')

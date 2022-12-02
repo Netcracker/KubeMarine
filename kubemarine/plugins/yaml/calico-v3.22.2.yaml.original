@@ -7,16 +7,15 @@ metadata:
   name: calico-config
   namespace: kube-system
 data:
-  # Typha is disabled.
-  typha_service_name: "{% if plugins.calico.typha.enabled | default(false) | is_true == true %}calico-typha{% else %}none{% endif %}"
-
+  # You must set a non-zero value for Typha replicas below.
+  typha_service_name: "calico-typha"
   # Configure the backend to use.
   calico_backend: "bird"
 
   # Configure the MTU to use for workload interfaces and tunnels.
   # By default, MTU is auto-detected, and explicitly setting this field should not be required.
   # You can override auto-detection by providing a non-zero value.
-  veth_mtu: "{{ plugins['calico']['mtu'] }}"
+  veth_mtu: "0"
 
   # The CNI network configuration to install on each node. The special
   # values in this config will be automatically populated.
@@ -32,9 +31,9 @@ data:
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
-          "ipam": {% if services.kubeadm.networking.podSubnet|isipv4 %}{{ plugins['calico']['cni']['ipam']['ipv4']|tojson|safe }},{% else %}{{ plugins['calico']['cni']['ipam']['ipv6']|tojson|safe }},{% endif %}
-
-
+          "ipam": {
+              "type": "calico-ipam"
+          },
           "policy": {
               "type": "k8s"
           },
@@ -881,7 +880,6 @@ spec:
                   and CIDRs that Felix will allow incoming traffic to host endpoints
                   on irrespective of the security policy. This is useful to avoid
                   accidentally cutting off a host with incorrect configuration. For
-
                   back-compatibility, if the protocol is not specified, it defaults
                   to "tcp". If a CIDR is not specified, it will allow traffic from
                   all addresses. To disable all inbound host ports, use the value
@@ -907,7 +905,6 @@ spec:
                   and CIDRs that Felix will allow outgoing traffic from host endpoints
                   to irrespective of the security policy. This is useful to avoid
                   accidentally cutting off a host with incorrect configuration. For
-
                   back-compatibility, if the protocol is not specified, it defaults
                   to "tcp". If a CIDR is not specified, it will allow traffic from
                   all addresses. To disable all outbound host ports, use the value
@@ -3853,12 +3850,6 @@ rules:
       - update
       # watch for changes
       - watch
-  # calico-kube-controllers requires root privileges
-  - apiGroups: ['policy']
-    resources: ['podsecuritypolicies']
-    verbs:     ['use']
-    resourceNames:
-      - oob-anyuid-psp
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -3897,7 +3888,7 @@ rules:
     resources:
       - endpointslices
     verbs:
-      - watch
+      - watch 
       - list
   - apiGroups: [""]
     resources:
@@ -4030,12 +4021,6 @@ rules:
       - daemonsets
     verbs:
       - get
-  # calico-node requires full privileges
-  - apiGroups: ['policy']
-    resources: ['podsecuritypolicies']
-    verbs:     ['use']
-    resourceNames:
-      - oob-privileged-psp
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -4051,7 +4036,6 @@ subjects:
   name: calico-node
   namespace: kube-system
 
-{% if plugins.calico.typha.enabled | default(false) | is_true == true -%}
 ---
 # Source: calico/templates/calico-typha.yaml
 # This manifest creates a Service, which will be backed by Calico's Typha daemon.
@@ -4091,7 +4075,7 @@ spec:
   # We recommend using Typha if you have more than 50 nodes. Above 100 nodes it is essential
   # (when using the Kubernetes datastore). Use one replica for every 100-200 nodes. In
   # production, we recommend running at least 3 replicas to reduce the impact of rolling upgrade.
-  replicas: {{ plugins['calico']['typha']['replicas'] }}
+  replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -4104,19 +4088,12 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
     spec:
       nodeSelector:
-        {{ plugins['calico']['typha']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        kubernetes.io/os: linux
       hostNetwork: true
       tolerations:
         # Mark the pod as a critical add-on for rescheduling.
         - key: CriticalAddonsOnly
           operator: Exists
-        - key: node.kubernetes.io/network-unavailable
-          effect: NoSchedule
-        - key: node.kubernetes.io/network-unavailable
-          effect: NoExecute
-        {% if plugins['calico']['typha']['tolerations'] is defined -%}
-          {{ plugins['calico']['typha']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
-        {%- endif %}
       # Since Calico can't network a pod until Typha is up, we need to run Typha itself
       # as a host-networked pod.
       serviceAccountName: calico-node
@@ -4125,7 +4102,7 @@ spec:
       securityContext:
         fsGroup: 65534
       containers:
-      - image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['typha']['image'] }}
+      - image: docker.io/calico/typha:v3.22.2
         name: calico-typha
         ports:
         - containerPort: 5473
@@ -4166,6 +4143,7 @@ spec:
             host: localhost
           periodSeconds: 30
           initialDelaySeconds: 30
+          timeoutSeconds: 10
         securityContext:
           runAsNonRoot: true
           allowPrivilegeEscalation: false
@@ -4175,6 +4153,7 @@ spec:
             port: 9098
             host: localhost
           periodSeconds: 10
+          timeoutSeconds: 10
 
 ---
 
@@ -4192,8 +4171,6 @@ spec:
   selector:
     matchLabels:
       k8s-app: calico-typha
-{%- endif %}
-
 ---
 # Source: calico/templates/calico-node.yaml
 # This manifest installs the calico-node container, as well
@@ -4218,12 +4195,6 @@ spec:
     metadata:
       labels:
         k8s-app: calico-node
-      annotations:
-        # This, along with the CriticalAddonsOnly toleration below,
-        # marks the pod as a critical add-on, ensuring it gets
-        # priority scheduling and that its resources are reserved
-        # if it ever gets evicted.
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       nodeSelector:
         kubernetes.io/os: linux
@@ -4247,7 +4218,7 @@ spec:
         # It can be deleted if this is a fresh installation, or if you have already
         # upgraded to use calico-ipam.
         - name: upgrade-ipam
-          image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['cni']['image'] }}
+          image: docker.io/calico/cni:v3.22.2
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
           - configMapRef:
@@ -4274,7 +4245,7 @@ spec:
         # This container installs the CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['cni']['image'] }}
+          image: docker.io/calico/cni:v3.22.2
           command: ["/opt/cni/bin/install"]
           envFrom:
           - configMapRef:
@@ -4315,7 +4286,7 @@ spec:
         # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
         # to communicate with Felix over the Policy Sync API.
         - name: flexvol-driver
-          image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['flexvol']['image'] }}
+          image: docker.io/calico/pod2daemon-flexvol:v3.22.2
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -4326,31 +4297,82 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['node']['image'] }}
+          image: docker.io/calico/node:v3.22.2
           envFrom:
           - configMapRef:
               # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
               name: kubernetes-services-endpoint
               optional: true
           env:
-     {%- set ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'] %}
-     {%- for name_env, env in plugins.calico.env.items() %}
-       {%- if (name_env not in ipv6_env) and (name_env != 'FELIX_TYPHAK8SSERVICENAME') %}
-            - name: {{ name_env }}
-              {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}{% else %}
-             {%- if name_env in ipv6_env and not services.kubeadm.networking.podSubnet|isipv4 %}
-            - name: {{ name_env }}
-              {% if env is not mapping %}value: "{{ env }}" {% else %}valueFrom: {{ env }}{% endif %}
-             {%- endif %}
-             {%- if (plugins.calico.typha.enabled | default(false) | is_true == true) and (name_env == 'FELIX_TYPHAK8SSERVICENAME') %}
+            # Use Kubernetes API as the backing datastore.
+            - name: DATASTORE_TYPE
+              value: "kubernetes"
+            # Typha support: controlled by the ConfigMap.
             - name: FELIX_TYPHAK8SSERVICENAME
               valueFrom:
                 configMapKeyRef:
                   name: calico-config
                   key: typha_service_name
-             {%- endif %}
-       {%- endif %}
-     {%- endfor %}
+            # Wait for the datastore.
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
+            # Set based on the k8s node name.
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # Choose the backend to use.
+            - name: CALICO_NETWORKING_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: calico_backend
+            # Cluster type to identify the deployment type
+            - name: CLUSTER_TYPE
+              value: "k8s,bgp"
+            # Auto-detect the BGP IP address.
+            - name: IP
+              value: "autodetect"
+            # Enable IPIP
+            - name: CALICO_IPV4POOL_IPIP
+              value: "Always"
+            # Enable or Disable VXLAN on the default IP pool.
+            - name: CALICO_IPV4POOL_VXLAN
+              value: "Never"
+            # Set MTU for tunnel device used if ipip is enabled
+            - name: FELIX_IPINIPMTU
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: veth_mtu
+            # Set MTU for the VXLAN tunnel device.
+            - name: FELIX_VXLANMTU
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: veth_mtu
+            # Set MTU for the Wireguard tunnel device.
+            - name: FELIX_WIREGUARDMTU
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: veth_mtu
+            # The default IPv4 pool to create on startup if none exists. Pod IPs will be
+            # chosen from this range. Changing this value after installation will have
+            # no effect. This should fall within `--cluster-cidr`.
+            # - name: CALICO_IPV4POOL_CIDR
+            #   value: "192.168.0.0/16"
+            # Disable file logging so `kubectl logs` works.
+            - name: CALICO_DISABLE_FILE_LOGGING
+              value: "true"
+            # Set Felix endpoint to host default action to ACCEPT.
+            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+              value: "ACCEPT"
+            # Disable IPv6 on Kubernetes.
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
+            - name: FELIX_HEALTHENABLED
+              value: "true"
           securityContext:
             privileged: true
           resources:
@@ -4487,11 +4509,9 @@ spec:
       namespace: kube-system
       labels:
         k8s-app: calico-kube-controllers
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       nodeSelector:
-        {{ plugins['calico']['kube-controllers']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        kubernetes.io/os: linux
       tolerations:
         # Mark the pod as a critical add-on for rescheduling.
         - key: CriticalAddonsOnly
@@ -4502,7 +4522,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {% if plugins['calico']['installation']['registry'] is defined and plugins['calico']['installation']['registry']|length %}{{ plugins['calico']['installation']['registry'] }}/{% endif %}{{ plugins['calico']['kube-controllers']['image'] }}
+          image: docker.io/calico/kube-controllers:v3.22.2
           env:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS
@@ -4552,9 +4572,6 @@ spec:
 
 ---
 # Source: calico/templates/calico-etcd-secrets.yaml
-
----
-# Source: calico/templates/calico-typha.yaml
 
 ---
 # Source: calico/templates/configure-canal.yaml

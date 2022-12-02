@@ -16,7 +16,7 @@ import io
 import math
 import time
 from copy import deepcopy
-from typing import List
+from typing import List, Dict, Union
 
 import ruamel.yaml
 import yaml
@@ -29,6 +29,11 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
 
 version_coredns_path_breakage = "v1.21.2"
+
+ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
+ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
+ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
+ERROR_MINOR_RANGE_EXCEEDED='Minor version \"%s\" rises to new \"%s\" more than one'
 
 
 def add_node_enrichment(inventory, cluster):
@@ -176,7 +181,7 @@ def enrich_inventory(inventory, cluster):
                     # Do not add taints for upgrade procedure
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                else:
+                elif minor_version == 24:
                     # For Kubernetes v1.24 taints for upgrade procedure and installation procedure should be different
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
@@ -184,6 +189,9 @@ def enrich_inventory(inventory, cluster):
                     else:
                         if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
                             node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
+                elif minor_version > 24:
+                    if cluster.context.get('initial_procedure') != 'upgrade':
+                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
     # use first control plane internal address as a default bind-address
     # for other control-planes we override it during initialization
@@ -343,6 +351,7 @@ def install(group):
                     hostname=node["name"])
                 log.debug("Uploading to '%s'..." % node["connect_to"])
                 node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
+                node["connection"].sudo("chmod 644 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(group)
@@ -844,11 +853,13 @@ def prepare_drain_command(node, version: str, globals, disable_eviction: bool, n
 
 
 def upgrade_cri_if_required(group):
-    log = group.cluster.log
-    cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
+    # currently it is invoked only for single node
+    cluster = group.cluster
+    log = cluster.log
+    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
 
-    if cri_impl in group.cluster.context["packages"]["upgrade_required"]:
-        cri_packages = group.cluster.inventory['services']['packages']['associations'][cri_impl]['package_name']
+    if cri_impl in cluster.context["packages"]["upgrade_required"]:
+        cri_packages = cluster.get_package_association_for_node(group.get_host(), cri_impl, 'package_name')
 
         log.debug(f"Installing {cri_packages}")
         packages.install(group, include=cri_packages)
@@ -931,7 +942,8 @@ def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node
     raise Exception('In the expected time, the nodes did not receive correct Kubernetes version')
 
 
-def test_version(version):
+def test_version(version: Union[list, str]):
+    version_list: list = version
     # catch version without "v" at the first symbol
     if isinstance(version, str):
         if not version.startswith('v'):
@@ -955,34 +967,30 @@ def test_version(version):
 
 
 def test_version_upgrade_possible(old, new, skip_equal=False):
-    versions = {
+    versions_unchanged = {
         'old': old.strip(),
         'new': new.strip()
     }
-    versions_unchanged = versions.copy()
+    versions: Dict[str, List[int]] = {}
 
-    for v_type, version in versions.items():
+    for v_type, version in versions_unchanged.items():
         versions[v_type] = test_version(version)
 
     # test new is greater than old
     if tuple(versions['old']) > tuple(versions['new']):
-        raise Exception('Kubernetes old version \"%s\" is greater than new one \"%s\"'
-                        % (versions_unchanged['old'], versions_unchanged['new']))
+        raise Exception(ERROR_DOWNGRADE % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test new is the same as old
     if tuple(versions['old']) == tuple(versions['new']) and not skip_equal:
-        raise Exception('Kubernetes old version \"%s\" is the same as new one \"%s\"'
-                        % (versions_unchanged['old'], versions_unchanged['new']))
+        raise Exception(ERROR_SAME % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test major step is not greater than 1
     if versions['new'][0] - versions['old'][0] > 1:
-        raise Exception('Major version \"%s\" rises to new \"%s\" more than one'
-                        % (versions_unchanged['old'], versions_unchanged['new']))
+        raise Exception(ERROR_MAJOR_RANGE_EXCEEDED % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test minor step is not greater than 1
     if versions['new'][1] - versions['old'][1] > 1:
-        raise Exception('Minor version \"%s\" rises to new \"%s\" more than one'
-                        % (versions_unchanged['old'], versions_unchanged['new']))
+        raise Exception(ERROR_MINOR_RANGE_EXCEEDED % (versions_unchanged['old'], versions_unchanged['new']))
 
 
 def recalculate_proper_timeout(nodes, timeout):

@@ -22,8 +22,9 @@ from typing import List
 import yaml
 import ruamel.yaml
 import ipaddress
+import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -36,13 +37,13 @@ from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff
 
 
-def services_status(cluster, service_type):
+def services_status(cluster: KubernetesCluster, service_type: str):
     with TestCase(cluster.context['testsuite'], '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
         service_name = service_type
 
-        if cluster.inventory['services']['packages']['associations'].get(service_type):
-            service_name = cluster.inventory['services']['packages']['associations'][service_type]['service_name']
+        if cluster.get_os_family() != 'multiple' and service_type != 'kubelet':
+            service_name = cluster.get_package_association(service_type, 'service_name')
 
         group = cluster.nodes['all']
         if service_type == 'haproxy':
@@ -92,7 +93,17 @@ def services_status(cluster, service_type):
                               hint="Fix the service to be enabled and has running status.")
 
 
-def recommended_system_packages_versions(cluster):
+def _check_same_os(cluster: KubernetesCluster):
+    os_ids = cluster.get_os_identifiers()
+    different_os = set(os_ids.values())
+    if len(different_os) > 1:
+        cluster.log.warning(
+            f"Nodes have different OS families or versions, packages versions cannot be checked. "
+            f"List of (OS family, version): {list(different_os)}")
+        raise TestFailure(f"Nodes have different OS families or versions")
+
+
+def recommended_system_packages_versions(cluster: KubernetesCluster):
     """
     Task that checks if configured "system" packages versions are compatible with the configured k8s version and OS.
     Fails if unable to detect the OS family.
@@ -138,7 +149,7 @@ def recommended_system_packages_versions(cluster):
         good_results = set()
         bad_results = []
         for package_alias, expected_packages in expected_system_packages.items():
-            actual_packages = cluster.inventory["services"]["packages"]["associations"][package_alias]["package_name"]
+            actual_packages = cluster.get_package_association(package_alias, "package_name")
             if not isinstance(actual_packages, list):
                 actual_packages = [actual_packages]
             for expected_pckg, version in expected_packages.items():
@@ -164,7 +175,7 @@ def recommended_system_packages_versions(cluster):
         tc.success("all packages have recommended versions")
 
 
-def system_packages_versions(cluster, pckg_alias):
+def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
     """
     Verifies that system packages are installed on required nodes and have equal versions.
     Failure is shown if check is not successful.
@@ -172,6 +183,7 @@ def system_packages_versions(cluster, pckg_alias):
     :param pckg_alias: system package alias to retrieve "package_name" association.
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
+        _check_same_os(cluster)
         if pckg_alias == "docker" or pckg_alias == "containerd":
             group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
         elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
@@ -182,18 +194,19 @@ def system_packages_versions(cluster, pckg_alias):
         else:
             raise Exception(f"Unknown system package alias: {pckg_alias}")
 
-        packages = cluster.inventory['services']['packages']['associations'][pckg_alias]['package_name']
+        packages = cluster.get_package_association(pckg_alias, 'package_name')
         if not isinstance(packages, list):
             packages = [packages]
         return check_packages_versions(cluster, tc, group, packages)
 
 
-def generic_packages_versions(cluster):
+def generic_packages_versions(cluster: KubernetesCluster):
     """
     Verifies that user-provided packages are installed on required nodes and have equal versions.
     Warning is shown if check is not successful.
     """
     with TestCase(cluster.context['testsuite'], '206', "Services", f"Generic packages version") as tc:
+        _check_same_os(cluster)
         packages = cluster.inventory['services']['packages']['install']['include']
         return check_packages_versions(cluster, tc, cluster.nodes['all'], packages, warn_on_bad_result=True)
 
@@ -269,7 +282,11 @@ def thirdparties_hashes(cluster):
     """
     with TestCase(cluster.context['testsuite'], '212', "Thirdparties", "Hashes") as tc:
         successful = []
+        warnings = []
         broken = []
+
+        #Create tmp dir for loading thirdparty without default sha
+        first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
         for path, config in cluster.inventory['services']['thirdparties'].items():
             group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
@@ -279,10 +296,54 @@ def thirdparties_hashes(cluster):
                 # if thirdparty is missing somewhere, do not check anything further for it
                 continue
 
-            if 'sha1' not in config:
-                # silently skip if SHA not defined
-                continue
+            is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
+            expected_sha = None
 
+            # Get sha from source, if it can be downloaded
+            if is_curl:
+                cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
+                # Create tmp dir for loading thirdparty without default sha
+                random_dir = "/tmp/%s" % uuid.uuid4().hex
+                final_commands = "rm -r -f %s" % random_dir
+                random_path = "%s%s" % (random_dir, path)
+                cluster.log.verbose('Temporary path: %s' % random_path)
+                remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
+                # Load thirdparty to temporary dir
+                remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
+                results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
+                host, result = list(results.items())[0]
+                if result.failed:
+                    broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                    cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                else:
+                    # Get temporary thirdparty sha
+                    cluster.log.verbose(f"Get temporary thirdparty sha for {path}...")
+                    results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
+                    host, result = list(results.items())[0]
+                    if result.failed:
+                        broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                        cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                    else:
+                        expected_sha = result.stdout.strip()
+                        cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
+                # Remove temporary dir in any case
+                cluster.log.verbose(f"Remove temporary dir {random_dir}...")
+                first_control_plane.sudo(final_commands, hide=True, warn=True)
+
+            recommended_sha = thirdparties.get_thirdparty_recommended_sha(path, cluster)
+            if recommended_sha is not None and recommended_sha != expected_sha:
+                warnings.append(f"{path} source contains not recommended thirdparty version for used kubernetes version")
+
+            if config.get("sha1", expected_sha) != expected_sha and expected_sha is not None:
+                broken .append("Given sha is not equal with actual sha from source for %s" % path)
+
+            expected_sha = config.get("sha1", expected_sha)
+
+            if expected_sha is None:
+                cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
+                # Skip checking sha if something went wrong or this sha can't be loaded
+                continue
+        
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
@@ -302,7 +363,6 @@ def thirdparties_hashes(cluster):
                     actual_sha = None
                     break
 
-            expected_sha = config['sha1']  # expected SHA to compare with found actual SHA
             if actual_sha is None:
                 # was not able to find single actual SHA, errors already collected, nothing to do
                 continue
@@ -339,8 +399,8 @@ def thirdparties_hashes(cluster):
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
-        if not successful:
-            raise TestWarn('Did not found any hashes')
+        if warnings:
+            raise TestWarn('Found warnings', hint=yaml.safe_dump(warnings))
         tc.success('All found hashes are correct')
 
 
@@ -571,7 +631,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) == 'debian':
+    if cluster.get_os_family() == 'debian':
         return
 
     with TestCase(cluster.context['testsuite'], '213', "Security", "Selinux security policy") as tc:
@@ -630,7 +690,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) == 'debian':
+    if cluster.get_os_family() == 'debian':
         return
 
     with TestCase(cluster.context['testsuite'], '214', "Security", "Selinux configuration") as tc:

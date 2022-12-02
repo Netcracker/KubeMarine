@@ -22,6 +22,7 @@ import toml
 from distutils.util import strtobool
 
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core import flow
@@ -106,7 +107,7 @@ def upgrade_plugins(cluster):
     plugins.install(cluster, upgrade_candidates)
 
 
-def upgrade_containerd(cluster):
+def upgrade_containerd(cluster: KubernetesCluster):
     """
         This function fixes the incorrect version of pause during the cluster update procedure
     """
@@ -145,7 +146,7 @@ def upgrade_containerd(cluster):
             with RemoteExecutor(cluster) as exe:
                 for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
                         provide_node_configs=True):
-                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'])['containerd']
+                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
                                            backup=True,
                                            sudo=True, mkdir=True)
@@ -174,9 +175,7 @@ def upgrade_finalize_inventory(cluster, inventory):
         return inventory
     upgrade_version = cluster.context.get("upgrade_version")
 
-    if not inventory['services'].get('kubeadm'):
-        inventory['services']['kubeadm'] = {}
-    inventory['services']['kubeadm']['kubernetesVersion'] = upgrade_version
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
 
     # if thirdparties was not defined in procedure.yaml,
     # then no need to forcibly place them: user may want to use default
@@ -184,16 +183,14 @@ def upgrade_finalize_inventory(cluster, inventory):
         inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
 
     if cluster.procedure_inventory.get(upgrade_version, {}).get("plugins"):
-        if not inventory.get("plugins"):
-            inventory["plugins"] = {}
+        inventory.setdefault("plugins", {})
         default_merger.merge(inventory["plugins"], cluster.procedure_inventory[upgrade_version]["plugins"])
 
     if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
-        if not inventory.get("services"):
-            inventory["services"] = {}
-        if not inventory["services"].get("packages"):
-            inventory["services"]["packages"] = {}
+        inventory['services'].setdefault("packages", {})
         packages = cluster.procedure_inventory[upgrade_version]["packages"]
+        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
+        # we still merge global associations section because it has priority during enrichment.
         default_merger.merge(inventory["services"]["packages"], packages)
 
     return inventory

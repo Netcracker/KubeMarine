@@ -54,7 +54,7 @@ def install(group: NodeGroup, enable_service: bool = True, force: bool = False) 
         return
 
     # This method handles cluster with multiple os, exceptions should be suppressed
-    if not force and group.get_nodes_os(suppress_exceptions=True) in ['rhel', 'rhel8']:
+    if not force and group.get_nodes_os() in ['rhel', 'rhel8']:
         log.debug('Auditd installation is not required on RHEL nodes')
         return
 

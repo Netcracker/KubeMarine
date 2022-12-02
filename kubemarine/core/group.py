@@ -879,6 +879,12 @@ class NodeGroup:
         members = self.get_ordered_members_list(provide_node_configs=True)
         return [node['connect_to'] for node in members]
 
+    def get_host(self):
+        if len(self.nodes) != 1:
+            raise Exception("Cannot get the only host from not a single node")
+
+        return list(self.nodes.keys())[0]
+
     def is_empty(self) -> bool:
         return not self.nodes
 
@@ -922,38 +928,20 @@ class NodeGroup:
         """
         return len(self.nodes.keys())
 
-    def get_nodes_os(self, suppress_exceptions: bool = False, force_all_nodes: bool = False) -> str:
+    def get_nodes_os(self) -> str:
         """
-        Returns the detected operating system family for group. If the families are different within the same group, or
-        the family is unknown, the exception will be thrown or a string result will be returned.
-        :param suppress_exceptions: Flag, deactivating exception. A string value "unknown" or "multiple" will be
-        returned instead.
-        :param force_all_nodes: A flag that forces OS detection from all nodes, not just new ones.
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown".
+        Returns the detected operating system family for group.
+
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
         """
-        detected_os_family = None
-        group = self
-        if not force_all_nodes:
-            group = self.get_new_nodes_or_self()
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_family = self.cluster.context["nodes"][node['connect_to']]["os"]['family']
-            if os_family == 'unknown' and not suppress_exceptions:
-                raise Exception('OS family is unknown')
-            if not detected_os_family:
-                detected_os_family = os_family
-            elif detected_os_family != os_family:
-                detected_os_family = 'multiple'
-                if not suppress_exceptions:
-                    raise Exception('OS families differ: detected "%s" and "%s" in same cluster'
-                                    % (detected_os_family, os_family))
-        return detected_os_family
+        return self.cluster.get_os_family_for_nodes(self.nodes.keys())
 
     def is_multi_os(self) -> bool:
         """
         Returns true if same group contains nodes with multiple OS families
         :return: Boolean
         """
-        return self.get_nodes_os(suppress_exceptions=True) == 'multiple'
+        return self.get_nodes_os() == 'multiple'
 
     def get_subgroup_with_os(self, os_family: str) -> NodeGroup:
         """

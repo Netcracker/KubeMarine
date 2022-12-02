@@ -118,6 +118,9 @@ def enrich_inventory(inventory, _):
 
 
 def manage_psp_enrichment(inventory, cluster):
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version >= 25:
+        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
     if "psp" not in cluster.procedure_inventory:

@@ -68,7 +68,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['haproxy']
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['haproxy']
 
         # simulate already installed haproxy package
         expected_results_1 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='Haproxy v1.2.3')
@@ -98,7 +98,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory)
 
-        package_associations = cluster.inventory['services']['packages']['associations']['haproxy']
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['haproxy']
 
         # simulate haproxy package missing
         missing_package_command = ['%s -v' % package_associations['executable_name']]

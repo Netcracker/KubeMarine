@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroupResult
 from kubemarine.cri import docker, containerd
 
@@ -35,6 +35,16 @@ def enrich_inventory(inventory, cluster):
     for key, value in forbidden_cri_sections.items():
         if value in cluster.raw_inventory.get('services', {}).get('cri', {}):
             raise Exception(f"{key} is not used, please remove {value} config from `services.cri` section")
+
+    return inventory
+
+
+def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
+    if inventory['services']['cri']['containerRuntime'] == 'docker':
+        if inventory['services']['cri'].get('containerdConfig'):
+            del inventory['services']['cri']['containerdConfig']
+    elif inventory['services']['cri'].get('dockerConfig'):
+        del inventory['services']['cri']['dockerConfig']
 
     return inventory
 

@@ -32,8 +32,9 @@ services:
         audit-log-path: /var/log/kubernetes/audit/audit.log
         audit-policy-file: /etc/kubernetes/audit-policy.yaml
         audit-log-maxage: "30"
-        audit-log-maxbackup: "5"
-        audit-log-maxsize: "20"
+        audit-log-maxbackup: "10"
+        audit-log-maxsize: "100"
+        kubelet-certificate-authority: /etc/kubernetes/pki/ca.crt
       extraVolumes:
         - name: audit
           hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
@@ -79,22 +80,17 @@ services:
       binary: false
     /usr/bin/kubeadm:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
-      sha1: '{{ globals.compatibility_map.software.kubeadm[services.kubeadm.kubernetesVersion].sha1 }}'
     /usr/bin/kubelet:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
-      sha1: '{{ globals.compatibility_map.software.kubelet[services.kubeadm.kubernetesVersion].sha1 }}'
     /usr/bin/kubectl:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
-      sha1: '{{ globals.compatibility_map.software.kubectl[services.kubeadm.kubernetesVersion].sha1 }}'
       group: control-plane
     /usr/bin/calicoctl:
       source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
-      sha1: '{{ globals.compatibility_map.software.calico[services.kubeadm.kubernetesVersion|minorversion].sha1 }}'
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
-      sha1: '{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].sha1 }}'
       unpack: /usr/bin/
 
   cri:
@@ -425,7 +421,12 @@ plugins:
     installation:
       priority: 0
       procedures:
-        - template: 'templates/plugins/calico-{{ plugins.calico.version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/calico.py
+            method: apply_calico_yaml
+            arguments:
+              calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
+              calico_yaml: './dump/calico-{{ plugins.calico.version }}.yaml'
         - expect:
             daemonsets:
               - calico-node
@@ -482,7 +483,7 @@ plugins:
         kubernetes.io/os: linux
     env:
       DATASTORE_TYPE: kubernetes
-      WAIT_FOR_DATASTORE: true
+      WAIT_FOR_DATASTORE: 'true'
       CLUSTER_TYPE: k8s,bgp
       CALICO_ROUTER_ID: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}hash{% endif %}'
       IP: '{% if services.kubeadm.networking.podSubnet|isipv4 %}autodetect{% else %}none{% endif %}'
@@ -496,11 +497,11 @@ plugins:
       FELIX_IPV6SUPPORT: '{% if not services.kubeadm.networking.podSubnet|isipv4 %}true{% else %}false{% endif %}'
       CALICO_IPV6POOL_IPIP: '{% if plugins.calico.mode | default("vxlan") == "ipip" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
       CALICO_IPV6POOL_VXLAN: '{% if plugins.calico.mode | default("vxlan") == "vxlan" and not services.kubeadm.networking.podSubnet|isipv4 %}Always{% else %}Never{% endif %}'
-      CALICO_DISABLE_FILE_LOGGING: true
+      CALICO_DISABLE_FILE_LOGGING: 'true'
       FELIX_DEFAULTENDPOINTTOHOSTACTION: ACCEPT
       FELIX_LOGSEVERITYSCREEN: info
-      FELIX_HEALTHENABLED: true
-      FELIX_USAGEREPORTINGENABLED: false
+      FELIX_HEALTHENABLED: 'true'
+      FELIX_USAGEREPORTINGENABLED: 'false'
       FELIX_TYPHAK8SSERVICENAME:
           configMapKeyRef:
             name: calico-config
@@ -578,6 +579,8 @@ plugins:
                 namespace: ingress-nginx
             pods:
               - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
+    webhook:
+      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-image-name"] }}:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-version"] }}'
     controller:
       image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["image-name"] }}:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
@@ -595,6 +598,9 @@ plugins:
         protocol: TCP
       - name: prometheus
         containerPort: 10254
+        protocol: TCP
+      - name: webhook
+        containerPort: 8443
         protocol: TCP
 
   # TODO: support hostPort for haproxy-ingress
@@ -686,7 +692,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: rancher/local-path-provisioner:v0.0.22
+    image: rancher/local-path-provisioner:v0.0.23
     helper-pod-image: library/busybox:1.35.0
 
 rbac:

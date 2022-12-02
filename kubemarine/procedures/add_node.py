@@ -17,9 +17,10 @@
 import copy
 
 from collections import OrderedDict
-from kubemarine import kubernetes, system
+from kubemarine import kubernetes, packages
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
@@ -92,27 +93,13 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
     return inventory_to_finalize
 
 
-def cache_installed_packages(cluster):
+def cache_installed_packages(cluster: KubernetesCluster):
     """
     Task which is used to collect already installed packages versions on already existing nodes.
     It is called first during "add_node" procedure,
     so that new nodes install exactly the same packages as on other already existing nodes.
     """
-    unique_os = set(((cluster.context['nodes'][node['connect_to']]['os']['family']), (cluster.context['nodes'][node['connect_to']]['os']['version']))
-               for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True))
-    different_os = len(unique_os)
-
-    if different_os > 1:
-        cluster.log.debug(f"New node has different OS"
-                          f" than some other nodes, "
-                          "packages will not be cached.")
-        cluster.log.debug("Count different OS %d ", different_os)
-        cluster.log.debug("Unique OS %s ", unique_os)
-
-        return
-    # Cache packages only if it's set in configuration
-    if cluster.inventory['services']['packages']['cache_versions']:
-        cluster.cache_package_versions()
+    packages.cache_package_versions(cluster, cluster.inventory, ensured_associations_only=True)
 
 
 tasks = OrderedDict(copy.deepcopy(install.tasks))

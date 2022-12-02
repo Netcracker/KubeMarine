@@ -24,6 +24,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
   - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
   - [Troubleshooting an installation that ended incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
+  - [Kubelet has conflict with kubepods-burstable.slice and kube-proxy pods stick in ContainerCreating status](#kubelet-has-conflict-with-kubepods-burstable.-slice-and-kube-proxy-pods-stick-in-containerCreating-status)
 
 # KubeMarine Errors
 
@@ -737,3 +738,13 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
   ```
 The user can analyze these files and try to find the reason for the failed installation of kubemarine
 
+
+## Kubelet has conflict with kubepods-burstable.slice and kube-proxy pods stick in ContainerCreating status
+
+* Sometimes the `migrate_cri` procedure fails because of kubelet has conflict with kubepods-burstable.slice and `kube-proxy` pods stuck in ContainerCreating status.
+
+**Solution**: 
+```
+sudo systemctl stop kubepods-burstable.slice
+sudo systemctl restart containerd
+```
