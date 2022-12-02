@@ -80,22 +80,17 @@ services:
       binary: false
     /usr/bin/kubeadm:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
-      sha1: '{{ globals.compatibility_map.software.kubeadm[services.kubeadm.kubernetesVersion].sha1 }}'
     /usr/bin/kubelet:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
-      sha1: '{{ globals.compatibility_map.software.kubelet[services.kubeadm.kubernetesVersion].sha1 }}'
     /usr/bin/kubectl:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
-      sha1: '{{ globals.compatibility_map.software.kubectl[services.kubeadm.kubernetesVersion].sha1 }}'
       group: control-plane
     /usr/bin/calicoctl:
       source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
-      sha1: '{{ globals.compatibility_map.software.calico[services.kubeadm.kubernetesVersion|minorversion].sha1 }}'
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
       source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
-      sha1: '{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].sha1 }}'
       unpack: /usr/bin/
 
   cri:
