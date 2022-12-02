@@ -434,13 +434,13 @@ def update_kubeapi_config_psp(control_planes, plugins_list):
 
     # force kube-apiserver pod restart, then wait for api to become available
     if control_planes.cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-        control_planes.get_first_member().call(utils.wait_command_successful,
+        control_plane.call(utils.wait_command_successful,
                                                command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
     else:
-        control_planes.get_first_member().call(utils.wait_command_successful,
+        control_plane.call(utils.wait_command_successful,
                                                command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
                                                        " | awk '{print $1}')")
-    control_planes.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+    control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def update_kubeapi_config(control_planes, options_list):
