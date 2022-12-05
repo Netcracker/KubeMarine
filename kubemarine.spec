@@ -35,6 +35,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 ('./kubemarine/resources/drop_ins/*',       './kubemarine/resources/drop_ins'),
                 ('./kubemarine/templates/*',                './kubemarine/templates'),
                 ('./kubemarine/plugins/*',                  './kubemarine/plugins'),
+                ('./kubemarine/plugins/yaml/*',             './kubemarine/plugins/yaml'),
                 ('./kubemarine/templates/plugins/*',        './kubemarine/templates/plugins'),
                 ('./kubemarine/version',                    './kubemarine/')
              ],
