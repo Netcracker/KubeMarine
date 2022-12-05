@@ -481,6 +481,11 @@ plugins:
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
+      tolerations:
+        - key: node.kubernetes.io/network-unavailable
+          effect: NoSchedule
+        - key: node.kubernetes.io/network-unavailable
+          effect: NoExecute
     env:
       DATASTORE_TYPE: kubernetes
       WAIT_FOR_DATASTORE: 'true'
