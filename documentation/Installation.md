@@ -3369,14 +3369,13 @@ The plugin configuration supports the following parameters:
 | typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
 | typha.replicas         | int     | `((nodes length)/50) + 2)` | Starts from 2 replicas amd increments for every 50  nodes | Number of Typha running replicas|
 | typha.image            | string  | `calico/typha:{calico.version}` | Should contain both image name and version | Calico Typha image |
-|                        |         | `- key: node.kubernetes.io/network-unavailable` |  |                                            |
-| typha.tolerations      | list    | `  effect: NoSchedule                           |  | Custom toleration for calico-typha pods    |
-|                        |         | `- key: node.kubernetes.io/network-unavailable` |  |                                            |
-|                        |         | `  effect: NoExecute`                           |  |                                            |
+| typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of tolerations | Custom toleration for calico-typha pods |
 | cni.image              | string  | `calico/cni:{calico.version}`                | Should contain both image name and version       | Calico CNI image                                                   |
 | node.image             | string  | `calico/node:{calico.version}`               | Should contain both image name and version       | Calico Node image                                                  |
 | kube-controllers.image | string  | `calico/kube-controllers:{calico.version}`   | Should contain both image name and version       | Calico Kube Controllers image                                      |
 | flexvol.image          | string  | `calico/pod2daemon-flexvol:{calico.version}` | Should contain both image name and version       | Calico Flexvol image                                               |
+
+###### Default Typha Tolerations
 
 ```yaml
 - key: node.kubernetes.io/network-unavailable
