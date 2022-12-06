@@ -278,30 +278,36 @@ def system_distributive(cluster):
 
 
 def check_access_to_thirdparties(cluster: KubernetesCluster):
-    uninstalled_curl_hosts = set()
+    detect_preinstalled_python(cluster)
     broken = []
+
+    # Load script for checking sources
+    all_group = cluster.nodes['all']
+    local_path = utils.get_resource_absolute_path("resources/scripts/check_thirdparty_avaliability.py",
+                                                  script_relative=True)
+    random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+    all_group.put(local_path, random_temp_path, sudo=True, binary=False)
 
     for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
         # Check if curl
         if config['source'][:4] != 'http' or '://' not in config['source'][4:8]:
             continue
-        # Try to connect
+        # Check with script
         common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
-        res = common_group.sudo('curl -o /dev/null --max-time %d -f -g -L -s -S %s' %
-                                (cluster.inventory['timeout_download'], config['source']), warn=True)
-        for host, result in res.items():
+        for node in common_group.get_ordered_members_list(provide_node_configs=True):
+            python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+            res = node['connection'].sudo("%s %s %s" % (python_executable, random_temp_path, config['source']), warn=True)
+            _, result = list(res.items())[0]
             if result.failed:
-                if "command not found" in result.stderr:
-                    uninstalled_curl_hosts.add(host.host)
-                else:
-                    broken.append(f"{host.host}, {destination}: {result.stderr}")
+                broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")
 
-    with TestCase(cluster.context['testsuite'], '012', 'Network', 'Access to trirdparties') as tc:
+    # Remove file
+    rm_command = "rm %s" % random_temp_path
+    all_group.sudo(rm_command)
+
+    with TestCase(cluster.context['testsuite'], '012', 'Thirdparties', 'Availability') as tc:
         if broken:
             raise TestFailure('Some thirdparties are unavailable', hint=yaml.safe_dump(broken))
-        if uninstalled_curl_hosts:
-            raise TestWarn('Curl is not installed on some nodes, can`t check access',
-                           hint=yaml.safe_dump(list(uninstalled_curl_hosts)))
         tc.success('All thirdparties are available')
 
 
@@ -645,8 +651,7 @@ tasks = OrderedDict({
     'network': {
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
-        'check_tcp_ports': check_tcp_ports,
-        'thirdparties_available': check_access_to_thirdparties
+        'check_tcp_ports': check_tcp_ports
     },
     'hardware': {
         'members_amount': {
@@ -669,6 +674,9 @@ tasks = OrderedDict({
     },
     'system': {
         'distributive': system_distributive
+    },
+    'thirdparties': {
+        'availability': check_access_to_thirdparties
     }
 })
 

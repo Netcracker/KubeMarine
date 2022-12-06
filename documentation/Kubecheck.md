@@ -25,7 +25,7 @@ This section provides information about the Kubecheck functionality.
     - [009 PodSubnet](#009-podsubnet)
     - [010 ServiceSubnet](#010-servicesubnet)
     - [011 TCPPorts](#011-tcpports)
-    - [012 Access To Thirdparties](#012-access-to-thirdparties)
+    - [012 Thirdparties Availability](#012-thirdparties availability)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -161,6 +161,8 @@ The task tree is as follows:
     * workers
 * system
   * distributive
+* thirdparties
+  * availability
 
 ##### 001 Connectivity
 
@@ -293,9 +295,9 @@ This test checks the connectivity between nodes inside the service's subnetwork.
 
 This test checks if necessary ports are opened on the nodes.
 
-##### 012 Access To Thirdparties
+##### 012 Thirdparties Availability
 
-*Task*: `network.thirdparties_available`
+*Task*: `thirdparties.availability`
 
 This test checks if thirdparties are available from sources on needed nodes.
 
