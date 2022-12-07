@@ -1,0 +1,60 @@
+name: Make release with Build binaries and Publish Artifacts
+
+on:
+  release:
+    types:
+      - published
+  push:
+    branches:
+      - 'main'
+
+env:
+  TAG_NAME: ${{ github.event.release.tag_name || (github.ref == 'refs/heads/main' && 'main') || 'unknown' }}
+
+jobs:
+  build-binary:
+    runs-on: ubuntu-latest
+    if: github.event.release
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: PyInstaller win64
+        id: win64
+        uses: action-python/pyinstaller-py3.8@win64
+        with:
+          path: ./
+          requirements: "./requirements_nt.txt"
+      - name: PyInstaller amd64
+        id: amd64
+        uses: action-python/pyinstaller-py3.8@amd64
+        with:
+          path: ./
+          requirements: "./requirements.txt"
+      - name: Upload Release Asset amd64
+        id: upload-release-asset-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            upload_url: ${{ github.event.release.upload_url }}
+            asset_path: ${{ steps.amd64.outputs.location }}
+            asset_name: ${{ steps.amd64.outputs.filename }}
+            asset_content_type: ${{ steps.amd64.outputs.content_type }}
+      - name: Upload Release Asset win64
+        id: upload-release-asset-win64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ steps.win64.outputs.location }}
+          asset_name: ${{ steps.win64.outputs.filename }}
+          asset_content_type: ${{ steps.win64.outputs.content_type }}
+
+  publish-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build . -t ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}
+      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+      - run: docker push ghcr.io/netcracker/kubemarine:${{ env.TAG_NAME }}

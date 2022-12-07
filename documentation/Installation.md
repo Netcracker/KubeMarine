@@ -140,6 +140,11 @@ Windows:
 ```bash
 pip install -r requirements_nt.txt
 ```
+or 
+
+Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
+
+Move binary kubemarine to a separate folder 
 
 **System Clock**
 

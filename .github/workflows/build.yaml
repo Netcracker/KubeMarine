@@ -16,8 +16,12 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: Build Binary via Docker
-        run: docker build -t kubemarine --build-arg BUILD_TYPE=binary --no-cache .
+      - name: PyInstaller amd64
+        id: amd64
+        uses: action-python/pyinstaller-py3.8@amd64
+        with:
+          path: ./
+          requirements: "./requirements.txt"
   build-package:
     runs-on: ubuntu-latest
     steps:

@@ -17,13 +17,26 @@ jobs:
        - uses: stefanzweifel/git-auto-commit-action@v4
          with:
            commit_message: Auto-update license header
-  selftest:
+  selftest-docker:
     needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - run: docker build -t kubemarine --no-cache .
       - run: docker run kubemarine selftest
+  selftest-binary:
+    needs: license
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: PyInstaller amd64
+        id: amd64
+        uses: action-python/pyinstaller-py3.8@amd64
+        with:
+          path: ./
+          requirements: "./requirements.txt"
+      - run: ./dist/linux/amd64/kubemarine selftest
   unit-tests:
     needs: license
     runs-on: ubuntu-latest
