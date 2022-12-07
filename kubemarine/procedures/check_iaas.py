@@ -296,7 +296,8 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
         common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
         for node in common_group.get_ordered_members_list(provide_node_configs=True):
             python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
-            res = node['connection'].sudo("%s %s %s" % (python_executable, random_temp_path, config['source']), warn=True)
+            res = node['connection'].sudo("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
+                                                           cluster.inventory['timeout_download']), warn=True)
             _, result = list(res.items())[0]
             if result.failed:
                 broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")

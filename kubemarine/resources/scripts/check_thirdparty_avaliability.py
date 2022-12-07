@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Simple TCP socket listener that can be run on both python 2 and 3,
-# The listener accepts connections sequentially, and suppresses the received data.
+# Check thirdparty availability script.
 # The script is for testing purpose only.
-# The first argv parameter is the TCP port to listen. The second argv parameter is the ip protocol version.
+# The first argv parameter is thirdparty source. The second argv parameter is the timeout.
 
 import sys
 
@@ -23,11 +22,12 @@ major_version = sys.version_info.major
 if major_version == 3:
     import urllib.request as urllib
 else:
-    import urllib
+    import urllib2 as urllib
 
 try:
     source = sys.argv[1]
-    status_code = urllib.urlopen(source).getcode()
+    timeout = int(sys.argv[2])
+    status_code = urllib.urlopen(source, timeout=timeout).getcode()
     if status_code != 200:
         sys.stderr.write("Error status code: %s" % status_code)
         exit(1)
