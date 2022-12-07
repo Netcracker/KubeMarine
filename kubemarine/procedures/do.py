@@ -59,24 +59,12 @@ def main(cli_arguments=None):
     if not cli_arguments:
         cli_arguments = sys.argv
 
-    configfile_path = 'cluster.yaml'
-    arguments = vars()
-
-    kubemarine_args = []
-    remote_args = []
-
-    if '--' not in cli_arguments:
-        kubemarine_args = cli_arguments
+    if '--' in cli_arguments:
+        kubemarine_args = cli_arguments[:cli_arguments.index('--')]
+        remote_args = cli_arguments[cli_arguments.index('--') + 1:]
     else:
-        split = False
-        for argument in cli_arguments:
-            if argument == '--':
-                split = True
-                continue
-            if not split:
-                kubemarine_args.append(argument)
-            else:
-                remote_args.append(argument)
+        kubemarine_args = cli_arguments
+        remote_args = []
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      prog='do',
@@ -110,7 +98,7 @@ def main(cli_arguments=None):
     context['preserve_inventory'] = False
 
     def node_group_provider(cluster: KubernetesCluster):
-        if kubemarine_args:
+        if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
             executor_lists = {
                     'node': [],
                     'group': []
