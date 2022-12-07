@@ -418,6 +418,7 @@ plugins:
 
   calico:
     version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    source: 'https://raw.githubusercontent.com/projectcalico/calico/{{ plugins.calico.version }}/manifests/calico-typha.yaml'
     installation:
       priority: 0
       procedures:

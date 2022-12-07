@@ -1,0 +1,19 @@
+kubemarine: 
+  dir: "../kubemarine"
+  globals: "resources/configurations/globals.yaml"
+
+default:
+  dest: "../dump"
+
+kubernetesVersion: "v1.25.4"
+
+thirdparties:
+  - /usr/bin/calicoctl:
+    source:
+    version:
+  - /usr/bin/crictl.tar.gz
+
+plugins:
+  calico:
+    version: "v3.24.5"
+    compatible_versions: ['v1.23', 'v1.24', 'v1.25']

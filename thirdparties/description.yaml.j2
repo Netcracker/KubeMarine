@@ -1,0 +1,84 @@
+build:
+  integration:
+    applicationName: 'k8s-sources'
+    releaseOnly: false
+    buildMode: 'CHANGED'
+
+integration:
+
+ - type: image
+   service-name: 'kube-apiserver'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["kube-apiserver"]}}'
+ - type: image
+   service-name: 'kube-controller-manager'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["kube-controller-manager"]}}'
+ - type: image
+   service-name: 'kube-proxy'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["kube-proxy"]}}'
+ - type: image
+   service-name: 'kube-scheduler'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["kube-scheduler"]}}'
+ - type: image
+   service-name: 'coredns'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["coredns"]}}'
+ - type: image
+   service-name: 'pause'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["pause"]}}'
+ - type: image
+   service-name: 'etcd'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{images["etcd"]}}'
+
+ - type: image
+   service-name: 'calico-typha'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["calico"]["typha"]["image"]}}'
+ - type: image
+   service-name: 'calico-cni'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["calico"]["cni"]["image"]}}'
+ - type: image
+   service-name: 'calico-node'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["calico"]["node"]["image"]}}'
+ - type: image
+   service-name: 'calico-kube-controllers'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["calico"]["kube-controllers"]["image"]}}'
+ - type: image
+   service-name: 'calico-pod2daemon-flexvol'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["calico"]["flexvol"]["image"]}}'
+
+ - type: image
+   service-name: 'nginx-ingress-controller'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{inventory["plugins"]["nginx-ingress-controller"]["controller"]["image"]}}'
+ - type: image
+   service-name: 'kube-webhook-certgen'
+   docker-image: 'artifactorycn.netcracker.com:17115/{{inventory["plugins"]["nginx-ingress-controller"]["webhook"]["image"]}}'
+
+ - type: image
+   service-name: 'kubernetes-dashboard'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["kubernetes-dashboard"]["dashboard"]["image"]}}'
+ - type: image
+   service-name: 'kubernetes-metrics-scraper'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["kubernetes-dashboard"]["metrics-scraper"]["image"]}}'
+ - type: image
+   service-name: 'local-path-provisioner'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["local-path-provisioner"]["image"]}}'
+ - type: image
+   service-name: 'local-path-provisioner-helper'
+   docker-image: 'artifactorycn.netcracker.com:17064/{{inventory["plugins"]["local-path-provisioner"]["helper-pod-image"]}}'
+
+ - type: artifacts
+   artifacts:
+
+   - type: raw
+     url: https://artifactorycn.netcracker.com/nc.thirdparty.files/kubernetes/kubeadm/{{raw["kubeadm"]}}/bin/linux/amd64/kubeadm
+     service-name: kubernetes-kubeadm
+   - type: raw
+     url: https://artifactorycn.netcracker.com/nc.thirdparty.files/kubernetes/kubectl/{{raw["kubectl"]}}/bin/linux/amd64/kubectl
+     service-name: kubernetes-kubectl
+   - type: raw
+     url: https://artifactorycn.netcracker.com/nc.thirdparty.files/kubernetes/kubelet/{{raw["kubelet"]}}/bin/linux/amd64/kubelet
+     service-name: kubernetes-kubelet
+   - type: raw
+     url: https://artifactorycn.netcracker.com/nc.thirdparty.files/projectcalico/calico/{{raw["calicoctl"]}}/calicoctl-linux-amd64
+     service-name: calico-calicoctl
+   - type: raw
+     url: https://artifactorycn.netcracker.com/nc.thirdparty.files/kubernetes-sigs/cri-tools/{{raw["crictl"]}}/crictl-v1.25.0-linux-amd64.tar.gz
+     service-name: cri-tools-crictl
