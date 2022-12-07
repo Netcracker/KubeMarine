@@ -104,7 +104,7 @@ spec:
             name: local-path-config
       {% if plugins['local-path-provisioner']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['local-path-provisioner']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['local-path-provisioner']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
 ---
 apiVersion: storage.k8s.io/v1

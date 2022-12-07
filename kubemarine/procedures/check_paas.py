@@ -24,7 +24,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -1231,6 +1231,59 @@ def geo_check(cluster):
         tc_pod.success("all peer pods available")
 
 
+def verify_apparmor_status(cluster: KubernetesCluster) -> None:
+    """
+    This method is a test, which checks the status of Apparmor.
+    This test is applicable only for systems of the Debian family.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+        return
+
+    with TestCase(cluster.context['testsuite'], '227', "Security", "Apparmor security policy") as tc:
+        group = cluster.nodes['all'].get_accessible_nodes()
+        results = group.sudo("aa-enabled")
+        enabled_nodes = []
+        invalid_nodes = []
+        for connection, item in results.items():
+            apparmor_status = item.stdout
+            cluster.log.warning(f"Apparmor on node: {connection.host} enabled: {apparmor_status}")
+            if apparmor_status ==  "Yes":
+                enabled_nodes.append(connection.host)
+            else:
+                enabled_nodes.append(connection.host)
+        if group.nodes_amount() == len(enabled_nodes):
+            tc.success(results='enabled')
+        else:
+            raise TestFailure(f"Apparmor does not properly configured on the following nodes: {invalid_nodes}")
+
+
+def verify_apparmor_config(cluster: KubernetesCluster) -> None:
+    """
+    This method tests if the Apparmor configuration matches to 'cluster.yaml' spec.
+    This test is applicable only for systems of the Debian family.
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+        return
+
+    with TestCase(cluster.context['testsuite'], '228', "Security", "Apparmor security policy") as tc:
+        expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
+        group = cluster.nodes['all'].get_accessible_nodes()
+        if expected_profiles:
+            apparmor_configured, result = apparmor.is_state_valid(group, expected_profiles)
+            if apparmor_configured:
+                cluster.log.verbose(f"Apparmor is configured properly on cluster")
+                tc.success(results='valid')
+            else:
+                raise TestFailure('invalid',
+                        hint=f"Some nodes do not have properly configured Apparmor service")
+        else:
+            tc.success(results='skipped')
+
+
 tasks = OrderedDict({
     'services': {
         'security': {
@@ -1238,11 +1291,10 @@ tasks = OrderedDict({
                 'status': verify_selinux_status,
                 'config': verify_selinux_config
             },
-            # TODO: support apparmor validation
-            # 'apparmor': {
-            #     'status': None,
-            #     'config': None
-            # },
+            'apparmor': {
+                'status': verify_apparmor_status,
+                'config': verify_apparmor_config
+            },
             'firewalld': {
                 'status': verify_firewalld_status
             }

@@ -26,7 +26,7 @@ import fabric
 import invoke
 import yaml
 
-from kubemarine import selinux, kubernetes
+from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
@@ -636,13 +636,14 @@ def verify_system(group):
     else:
         log.debug('Selinux verification skipped - origin task was not completed')
 
-    # TODO: support apparmor validation
-    # if group.cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
-    #     log.debug("Verifying Apparmor...")
-    #     if not apparmor_configured:
-    #         raise Exception("Selinux is still not configured")
-    # else:
-    #     log.debug('Apparmor verification skipped - origin task was not completed')
+    if group.cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
+        log.debug("Verifying Apparmor...")
+        expected_profiles = group.cluster.inventory['services']['kernel_security'].get('apparmor', {})
+        apparmor_configured, result = apparmor.is_state_valid(group, expected_profiles)
+        if not apparmor_configured:
+            raise Exception("Apparmor is still not configured")
+    else:
+        log.debug('Apparmor verification skipped - origin task was not completed')
 
     if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
