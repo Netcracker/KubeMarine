@@ -57,7 +57,7 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
 
     # get original YAML and parse it into dict of objects
     calico_original_yaml_path = utils.determine_resource_absolute_path(calico_original_yaml)
-    obj_list = load_multiple_yaml(calico_original_yaml_path)
+    obj_list = load_multiple_yaml(calico_original_yaml_path, cluster)
 
     validate_original(cluster, obj_list)
 
@@ -107,7 +107,7 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
 
     # TODO: check results 
     #validate_result()
-    save_multiple_yaml(calico_yaml, obj_list)
+    save_multiple_yaml(calico_yaml, obj_list, cluster)
 
     # create config for plugin module
     config = {
@@ -358,7 +358,7 @@ def validate_original(cluster, obj_list):
 #def validate_result(cluster, obj_list):
 
 
-def load_multiple_yaml(filepath) -> dict:
+def load_multiple_yaml(filepath, cluster) -> dict:
     """
     The method implements the parse YAML file that includes several YAMLs inside
     :param filepath: Path to file that should be parsed
@@ -379,10 +379,10 @@ def load_multiple_yaml(filepath) -> dict:
                         raise Exception("ERROR: the {yaml_key} object is duplicated, please verify the original yaml")
         return yaml_dict
     except Exception as exc:
-        print(f"Failed to load {filepath}", exc)
+        cluster.log.error(f"Failed to load {filepath}", exc)
 
 
-def save_multiple_yaml(filepath, multi_yaml) -> None:
+def save_multiple_yaml(filepath, multi_yaml, cluster) -> None:
     """
     The method implements the dumping some dictionary as the file that includes several YAMLs inside
     :param filepath: Path to file that should be created as the result
@@ -396,7 +396,7 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
                 source_yamls.append(deepcopy(multi_yaml[item]))
             yaml.dump_all(source_yamls, stream)
     except Exception as exc:
-        print(f"Failed to save {filepath}", exc)
+        cluster.log.error(f"Failed to save {filepath}", exc)
 
 
 def enrich_image(cluster, image):
