@@ -373,19 +373,17 @@ def patch_systemd_service(group: NodeGroup, service_name, patch_source):
               sudo=True, binary=False)
     group.sudo("systemctl daemon-reload")
 
-
 def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
     return group.sudo("systemctl status firewalld", warn=True)
 
-
-def disable_firewalld(group, check_post=None):
-    log = group.cluster.log
+def is_firewalld_disabled(group, check_post=None):
 
     result = fetch_firewalld_status(group)
 
     disabled_status = False
     restart_node = False
     nodes = {}
+
     for node_result in list(result.values()):
         if node_result.return_code == 4:
             disabled_status = True
@@ -393,13 +391,22 @@ def disable_firewalld(group, check_post=None):
             disabled_status = True
         elif node_result.return_code not in [3,4] or "disabled" not in node_result.stdout and check_post != True:
             nodes[node_result.connection.host] = node_result.connection
-            restart_node = True
-        else:
             disabled_status = False
-            return result, disabled_status
-    if disabled_status and restart_node != True:
+            restart_node = True
+
+    if check_post == True:
+        return disabled_status, result
+
+    return disabled_status, result, nodes, restart_node
+
+def disable_firewalld(group):
+    log = group.cluster.log
+
+    already_disabled, result, nodes, restart_node = is_firewalld_disabled(group)
+
+    if already_disabled and restart_node != True:
         log.debug("Skipped - FirewallD already disabled or not installed")
-        return result, disabled_status
+        return result
     if restart_node:
         disable_nodes = NodeGroup(nodes, group.cluster)
         result = disable_service(disable_nodes, name='firewalld', now=True)
@@ -656,7 +663,7 @@ def verify_system(group):
 
     if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
-        firewalld_result,firewalld_disabled = disable_firewalld(group,check_post=True)
+        firewalld_disabled, firewalld_result = is_firewalld_disabled(group,check_post=True)
         log.debug(firewalld_result)
         if not firewalld_disabled:
             raise Exception("FirewallD is still enabled")
