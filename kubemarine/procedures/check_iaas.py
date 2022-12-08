@@ -286,7 +286,7 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
     local_path = utils.get_resource_absolute_path("resources/scripts/check_thirdparty_avaliability.py",
                                                   script_relative=True)
     random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
-    all_group.put(local_path, random_temp_path, sudo=True, binary=False)
+    all_group.put(local_path, random_temp_path, binary=False)
 
     for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
         # Check if curl
@@ -304,7 +304,7 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
 
     # Remove file
     rm_command = "rm %s" % random_temp_path
-    all_group.sudo(rm_command)
+    all_group.run(rm_command)
 
     with TestCase(cluster.context['testsuite'], '012', 'Thirdparties', 'Availability') as tc:
         if broken:
