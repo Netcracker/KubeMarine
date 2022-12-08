@@ -29,14 +29,14 @@ def enrich_inventory(inventory, cluster):
     # By default installation parameter is unset, means user did not made any decision
     if inventory["plugins"]["calico"].get("install") is None:
         # Is user defined Flannel plugin and set it to install?
-        flannel_required = inventory["plugins"].get("flannel", {}).get("install", False)
+        flannel_required = utils.true_or_false(inventory["plugins"].get("flannel", {}).get("install", False)) == 'true'
         # Is user defined Canal plugin and set it to install?
-        canal_required = inventory["plugins"].get("canal", {}).get("install", False)
+        canal_required = utils.true_or_false(inventory["plugins"].get("canal", {}).get("install", False)) == 'true'
         # If Flannel and Canal is unset or not required to install, then install Calico
         if not flannel_required and not canal_required:
             inventory["plugins"]["calico"]["install"] = True
 
-    if inventory["plugins"]["calico"]["install"] == True:
+    if utils.true_or_false(inventory["plugins"]["calico"]["install"]) == 'true':
         # Check if original YAML and final YAML have different paths (applicable for non Jinja2 template)
         items = inventory['plugins']['calico']['installation']['procedures']
         for item in items:

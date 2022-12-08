@@ -116,7 +116,7 @@ def make_ansible_inventory(location, cluster):
         if inventory.get(group) is not None:
             for service_name, service_configs in inventory[group].items():
                 # write to inventory only plugins, which will be installed
-                if group != 'plugins' or service_configs.get('install', False) is True:
+                if group != 'plugins' or true_or_false(service_configs.get('install', False)) == 'true':
 
                     config['cluster:vars'].append('\n# %s.%s' % (group, service_name))
 
