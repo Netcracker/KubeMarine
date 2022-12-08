@@ -3378,6 +3378,8 @@ The plugin configuration supports the following parameters:
 ###### Default Typha Tolerations
 
 ```yaml
+- key: CriticalAddonsOnly
+  operator: Exists
 - key: node.kubernetes.io/network-unavailable
   effect: NoSchedule
 - key: node.kubernetes.io/network-unavailable
