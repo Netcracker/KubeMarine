@@ -24,6 +24,12 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 
+HELP_DESCRIPTION = """
+Script for executing shell command
+    
+additional arguments:
+    shell_command       command to execute on nodes
+"""
 
 class CLIAction(Action):
     def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup], remote_args, no_stream):
@@ -53,44 +59,34 @@ def main(cli_arguments=None):
     if not cli_arguments:
         cli_arguments = sys.argv
 
-    configfile_path = 'cluster.yaml'
-    arguments = vars()
-
-    kubemarine_args = []
-    remote_args = []
-
-    if '--' not in cli_arguments:
-        remote_args = cli_arguments
+    if '--' in cli_arguments:
+        kubemarine_args = cli_arguments[:cli_arguments.index('--')]
+        remote_args = cli_arguments[cli_arguments.index('--') + 1:]
     else:
-        split = False
-        for argument in cli_arguments:
-            if argument == '--':
-                split = True
-                continue
-            if not split:
-                kubemarine_args.append(argument)
-            else:
-                remote_args.append(argument)
+        kubemarine_args = cli_arguments
+        remote_args = []
 
-    if kubemarine_args:
-        parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     prog='do',
+                                     description=HELP_DESCRIPTION,
+                                     usage='%(prog)s [-h] [-c CONFIG] [-n NODE] [-g GROUP] [--no_stream] -- shell_command')
 
-        parser.add_argument('-c', '--config',
+    parser.add_argument('-c', '--config',
                             default='cluster.yaml',
                             help='define main cluster configuration file')
 
-        parser.add_argument('-n', '--node',
+    parser.add_argument('-n', '--node',
                             help='node(s) name to execute on, can be combined with groups')
 
-        parser.add_argument('-g', '--group',
+    parser.add_argument('-g', '--group',
                             help='group(s) name to execute on, can be combined with nodes')
 
-        parser.add_argument('--no_stream',
+    parser.add_argument('--no_stream',
                             action='store_true',
                             help='do not stream all remote results in real-time, show node names')
 
-        arguments = vars(parser.parse_args(kubemarine_args))
-        configfile_path = arguments.get('config')
+    arguments = vars(parser.parse_args(kubemarine_args))
+    configfile_path = arguments.get('config')
 
     context = flow.create_empty_context({
         'disable_dump': True,
@@ -102,7 +98,7 @@ def main(cli_arguments=None):
     context['preserve_inventory'] = False
 
     def node_group_provider(cluster: KubernetesCluster):
-        if kubemarine_args:
+        if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
             executor_lists = {
                     'node': [],
                     'group': []

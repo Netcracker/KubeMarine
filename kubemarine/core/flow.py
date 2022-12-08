@@ -159,6 +159,7 @@ def create_empty_context(args: dict = None, procedure: str = None):
 
 
 def create_context(parser: argparse.ArgumentParser, cli_arguments: list, procedure: str = None):
+    parser.prog = procedure
     args = vars(parse_args(parser, cli_arguments))
 
     if args.get('exclude_cumulative_points_methods', '').strip() != '':
