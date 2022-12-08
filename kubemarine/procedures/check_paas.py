@@ -1240,7 +1240,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
     with TestCase(cluster.context['testsuite'], '227', "Security", "Apparmor security policy") as tc:
@@ -1268,7 +1268,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
     with TestCase(cluster.context['testsuite'], '228', "Security", "Apparmor security policy") as tc:
