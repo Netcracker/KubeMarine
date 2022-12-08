@@ -15,13 +15,9 @@ WORKDIR /opt/kubemarine/
 
 RUN apt update && apt install -y wget && \
     pip3 install --no-cache-dir -r /opt/kubemarine/requirements.txt && \
-    if [ "$BUILD_TYPE" = "binary" ]; then \
-      apt install -y zlib1g-dev upx-ucl binutils; \
-      pip3 install --no-cache-dir pyinstaller;  \
-      pyinstaller kubemarine.spec --noconfirm;  \
-    else \
-      wget -O - https://get.helm.sh/helm-v3.10.0-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1 && \
-      [ "$BUILD_TYPE" = "test" ] && pip3 install  --no-cache-dir pytest pylint coverage || true; fi && \
+    wget -O - https://get.helm.sh/helm-v3.10.0-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1 && \
+    if [ "$BUILD_TYPE" = "test" ]; then \
+      pip3 install  --no-cache-dir pytest pylint coverage || true; fi && \
     apt autoremove -y wget zlib1g-dev upx-ucl && \
     apt clean autoclean && \
     rm -f /etc/apt/sources.list && \
