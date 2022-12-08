@@ -116,7 +116,7 @@ def make_ansible_inventory(location, cluster):
         if inventory.get(group) is not None:
             for service_name, service_configs in inventory[group].items():
                 # write to inventory only plugins, which will be installed
-                if group != 'plugins' or service_configs.get('install', False) is True:
+                if group != 'plugins' or true_or_false(service_configs.get('install', False)) == 'true':
 
                     config['cluster:vars'].append('\n# %s.%s' % (group, service_name))
 
@@ -293,6 +293,21 @@ def load_yaml(filepath) -> dict:
             return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
+
+
+def true_or_false(value):
+    """
+    The method check string and boolean value
+    :param value: Value that should be checked
+    """
+    input_string = str(value)
+    if input_string in ['true', 'True', 'TRUE']:
+        result = "true"
+    elif input_string in ['false', 'False', 'FALSE']:
+        result = "false"
+    else:
+        result = "undefined"
+    return result
 
 
 class ClusterStorage:

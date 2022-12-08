@@ -135,7 +135,8 @@ def install(cluster, plugins=None):
     plugins_queue = []
     max_priority = 0
     for plugin_name, plugin_item in plugins.items():
-        if plugin_item.get("install", False) and plugin_item.get("installation", {}).get('procedures') is not None:
+        if utils.true_or_false(plugin_item.get("install", False)) == 'true' and \
+                plugin_item.get("installation", {}).get('procedures') is not None:
             plugin_item['plugin_name'] = plugin_name
             plugins_queue.append(plugin_item)
             if plugin_item.get("installation", {}).get('priority') is not None \
