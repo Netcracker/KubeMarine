@@ -38,6 +38,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.packages.enrich_inventory_associations",
     "kubemarine.system.enrich_upgrade_inventory",
     "kubemarine.core.defaults.compile_inventory",
+    "kubemarine.core.defaults.manage_true_false_values",
     "kubemarine.admission.manage_enrichment",
     "kubemarine.thirdparties.enrich_inventory_apply_upgrade_defaults",
     "kubemarine.procedures.migrate_cri.enrich_inventory",
@@ -545,3 +546,12 @@ def prepare_for_dump(inventory, copy=True):
 
     return dump_inventory
 
+
+def manage_true_false_values(inventory, cluster):
+    # Check undefined values for plugin.name.install
+    for plugin_name, plugin_item in inventory["plugins"].items():
+        # Check install value
+        if utils.true_or_false(plugin_item.get('install', False)) == 'undefined':
+            raise ValueError(f"Found unsupported value for plugin.{plugin_name}.install: {plugin_item['install']}")
+
+    return inventory
