@@ -36,6 +36,7 @@ jobs:
         with:
           path: ./
           requirements: "./requirements.txt"
+      - run: ls -la ./dist/linux/amd64
       - run: ./dist/linux/amd64/kubemarine selftest
   unit-tests:
     needs: license
