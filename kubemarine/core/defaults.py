@@ -551,6 +551,8 @@ def manage_true_false_values(inventory, cluster):
     # Check undefined values for plugin.name.install and convert it to bool
     for plugin_name, plugin_item in inventory["plugins"].items():
         # Check install value
+        if 'install' not in plugin_item:
+            continue
         value = utils.true_or_false(plugin_item.get('install', False))
         if value == 'undefined':
             raise ValueError(f"Found unsupported value for plugin.{plugin_name}.install: {plugin_item['install']}")
