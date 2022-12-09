@@ -557,7 +557,7 @@ def kubernetes_dashboard_status(cluster):
         i = 0
         while not test_succeeded and i < retries:
             i += 1
-            if utils.true_or_false(cluster.inventory['plugins']['kubernetes-dashboard']['install']) == 'true':
+            if cluster.inventory['plugins']['kubernetes-dashboard']['install']:
                 results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl get svc -n kubernetes-dashboard kubernetes-dashboard -o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
                 for control_plane, result in results.items():
                     if result.failed:
@@ -982,8 +982,7 @@ def default_services_configuration_status(cluster):
                     for service in services:
                         for service_name, properties in service.items():
                             if service_name == "ingress-nginx-controller":
-                                if utils.true_or_false(
-                                        cluster.inventory['plugins']['nginx-ingress-controller']['install']) != 'true':
+                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
                             content = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
                             content = yaml.safe_load(content)
@@ -1020,8 +1019,7 @@ def default_services_health_status(cluster):
                     if type == 'DaemonSet':
                         for service in services:
                             if service == "ingress-nginx-controller":
-                                if utils.true_or_false(
-                                        cluster.inventory['plugins']['nginx-ingress-controller']['install']) != 'true':
+                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
                             daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
                             ready = daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()

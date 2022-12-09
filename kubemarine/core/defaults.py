@@ -548,10 +548,11 @@ def prepare_for_dump(inventory, copy=True):
 
 
 def manage_true_false_values(inventory, cluster):
-    # Check undefined values for plugin.name.install
+    # Check undefined values for plugin.name.install and convert it to bool
     for plugin_name, plugin_item in inventory["plugins"].items():
         # Check install value
-        if utils.true_or_false(plugin_item.get('install', False)) == 'undefined':
+        value = utils.true_or_false(plugin_item.get('install', False))
+        if value == 'undefined':
             raise ValueError(f"Found unsupported value for plugin.{plugin_name}.install: {plugin_item['install']}")
-
+        plugin_item['install'] = value == 'true'
     return inventory
