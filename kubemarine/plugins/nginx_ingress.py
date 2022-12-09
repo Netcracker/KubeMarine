@@ -19,7 +19,7 @@ from kubemarine.core.group import NodeGroup
 
 
 def verify_inventory(inventory, _):
-    if utils.true_or_false(inventory["plugins"]["nginx-ingress-controller"]["install"]) != "true":
+    if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
     nginx_plugin = inventory["plugins"]["nginx-ingress-controller"]
@@ -43,7 +43,7 @@ def verify_inventory(inventory, _):
 
 
 def enrich_inventory(inventory, _):
-    if utils.true_or_false(inventory["plugins"]["nginx-ingress-controller"]["install"]) != "true":
+    if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
     if inventory["plugins"]["nginx-ingress-controller"].get('custom_headers'):
@@ -63,7 +63,7 @@ def cert_renew_enrichment(inventory, cluster):
     nginx_plugin = inventory["plugins"]["nginx-ingress-controller"]
 
     # check that renewal is possible
-    if utils.true_or_false(nginx_plugin["install"]) != 'true':
+    if not nginx_plugin["install"]:
         raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
 
     # update certificates in inventory, other check will be performed in "verify_inventory" function
