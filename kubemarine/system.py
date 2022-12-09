@@ -380,34 +380,32 @@ def is_firewalld_disabled(group, check_post=None):
 
     result = fetch_firewalld_status(group)
 
-    disabled_status = False
-    restart_node = False
+    disabled_status = []
     nodes = {}
 
     for node_result in list(result.values()):
         if node_result.return_code == 4:
-            disabled_status = True
+            disabled_status.append(True)
         elif node_result.return_code == 3 and "disabled" in node_result.stdout:
-            disabled_status = True
-        elif node_result.return_code not in [3,4] or "disabled" not in node_result.stdout and check_post != True:
+            disabled_status.append(True)
+        elif node_result.return_code not in (3,4) or "disabled" not in node_result.stdout and check_post != True:
             nodes[node_result.connection.host] = node_result.connection
-            disabled_status = False
-            restart_node = True
+            disabled_status.append(False)
 
     if check_post == True:
         return disabled_status, result
 
-    return disabled_status, result, nodes, restart_node
+    return disabled_status, result, nodes
 
 def disable_firewalld(group):
     log = group.cluster.log
 
-    already_disabled, result, nodes, restart_node = is_firewalld_disabled(group)
+    already_disabled, result, nodes = is_firewalld_disabled(group)
 
-    if already_disabled and restart_node != True:
+    if False not in already_disabled:
         log.debug("Skipped - FirewallD already disabled or not installed")
         return result
-    if restart_node:
+    else:
         disable_nodes = NodeGroup(nodes, group.cluster)
         result = disable_service(disable_nodes, name='firewalld', now=True)
         group.cluster.schedule_cumulative_point(reboot_nodes)
@@ -665,7 +663,7 @@ def verify_system(group):
         log.debug("Verifying FirewallD...")
         firewalld_disabled, firewalld_result = is_firewalld_disabled(group,check_post=True)
         log.debug(firewalld_result)
-        if not firewalld_disabled:
+        if False in firewalld_disabled:
             raise Exception("FirewallD is still enabled")
 
         else:
