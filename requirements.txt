@@ -9,6 +9,6 @@ pygelf==0.4.*
 toml==0.10.*
 python-dateutil==2.8.*
 deepdiff==5.7.*
-jsonschema==4.0.*
+jsonschema==4.5.*
 # Unix specific dependencies
 ansible==6.7.*
