@@ -243,6 +243,9 @@ def enrich_deployment_calico_typha(cluster, obj_list):
     :param obj_list: list of objects for enrichment
     """
 
+    default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
+                           {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
+
     key = "Deployment_calico-typha"
     val = cluster.inventory['plugins']['calico']['typha']['replicas']
     obj_list[key]['spec']['replicas'] = int(val)
@@ -251,6 +254,9 @@ def enrich_deployment_calico_typha(cluster, obj_list):
     obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
     cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
     if cluster.inventory['plugins']['calico']['typha']['tolerations']:
+        for val in default_tolerations:
+            obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
+            cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
         vals = cluster.inventory['plugins']['calico']['typha']['tolerations']
         for val in vals:
             obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
