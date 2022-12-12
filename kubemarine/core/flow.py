@@ -25,7 +25,10 @@ import importlib
 from kubemarine.core import utils, cluster as c, action, resources as res, errors
 
 DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
-
+TASK_DESCRIPTION_TEMPLATE = """
+tasks list:
+    %s
+"""
 
 def run_actions(context: dict, actions: List[action.Action],
                 resources: res.DynamicResources = None,
@@ -158,6 +161,14 @@ def create_empty_context(args: dict = None, procedure: str = None):
     }
 
 
+def get_task_list(tasks, _task_path=''):
+    result = []
+    for task_name, task in tasks.items():
+        __task_path = _task_path + "." + task_name if _task_path != '' else task_name
+        result.extend(get_task_list(task, __task_path) if not callable(task) else [__task_path])
+    return result
+
+
 def create_context(parser: argparse.ArgumentParser, cli_arguments: list, procedure: str = None):
     parser.prog = procedure
     args = vars(parse_args(parser, cli_arguments))
@@ -281,7 +292,7 @@ def new_common_parser(cli_help):
     return parser
 
 
-def new_tasks_flow_parser(cli_help):
+def new_tasks_flow_parser(cli_help, tasks=None):
     parser = new_common_parser(cli_help)
 
     parser.add_argument('--without-act',
@@ -309,11 +320,15 @@ def new_tasks_flow_parser(cli_help):
                         default='',
                         help='comma-separated cumulative points methods names to be excluded from execution')
 
+    # Add tasks list to help section
+    if tasks is not None:
+        parser.epilog = TASK_DESCRIPTION_TEMPLATE % ('\n    '.join(get_task_list(tasks)))
+
     return parser
 
 
-def new_procedure_parser(cli_help, optional_config=False):
-    parser = new_tasks_flow_parser(cli_help)
+def new_procedure_parser(cli_help, optional_config=False, tasks=None):
+    parser = new_tasks_flow_parser(cli_help, tasks)
 
     help_msg = 'config file for the procedure'
     if optional_config:

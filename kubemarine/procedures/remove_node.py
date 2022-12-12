@@ -154,7 +154,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_procedure_parser(cli_help)
+    parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='remove_node')
 
     flow.run_actions(context, [RemoveNodeAction()])

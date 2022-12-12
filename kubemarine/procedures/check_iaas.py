@@ -706,7 +706,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_tasks_flow_parser(cli_help)
+    parser = flow.new_tasks_flow_parser(cli_help, tasks=tasks)
 
     parser.add_argument('--csv-report',
                         default='report.csv',

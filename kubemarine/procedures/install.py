@@ -617,7 +617,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_tasks_flow_parser(cli_help)
+    parser = flow.new_tasks_flow_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='install')
 
     install = InstallAction()
