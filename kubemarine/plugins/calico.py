@@ -253,14 +253,12 @@ def enrich_deployment_calico_typha(cluster, obj_list):
     val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
     obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
     cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
-    if cluster.inventory['plugins']['calico']['typha']['tolerations']:
-        for val in default_tolerations:
-            obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
-            cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
-        vals = cluster.inventory['plugins']['calico']['typha']['tolerations']
-        for val in vals:
-            obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
-            cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
+    for val in default_tolerations:
+        obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
+        cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
+    for val in cluster.inventory['plugins']['calico']['typha'].get('tolerations', ''):
+        obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
+        cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
     for container in obj_list[key]['spec']['template']['spec']['containers']:
         if container['name'] == "calico-typha":
             num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
