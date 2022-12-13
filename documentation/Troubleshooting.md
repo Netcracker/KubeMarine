@@ -479,7 +479,7 @@ metadata:
 
 ## Garbage Collector does not initialize if convert webhook is broken
 
-**Symptoms**: If the deletion process is in the background (which is the default setting), the namespace quota is not updated. If deletion is in the foreground, the pod freezes in `Terminating` state. If create new quota then the REQUEST and LIMIT fields are empty:
+**Symptoms**: If the pod deletion process is in the background (which is the default setting), the namespace quota is not updated. If pod deletion is in the foreground, the pod freezes in `Terminating` state. If you create new quota then the REQUEST and LIMIT fields are empty:
 ```
 # kubectl get quota -n test
 NAME            AGE    REQUEST   LIMIT
