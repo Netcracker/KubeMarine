@@ -18,12 +18,6 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: PyInstaller win64
-        id: win64
-        uses: action-python/pyinstaller-py3.8@win64
-        with:
-          path: ./
-          requirements: "./requirements_nt.txt"
       - name: PyInstaller amd64
         id: amd64
         uses: action-python/pyinstaller-py3.8@amd64
@@ -40,16 +34,6 @@ jobs:
             asset_path: ${{ steps.amd64.outputs.location }}
             asset_name: ${{ steps.amd64.outputs.filename }}
             asset_content_type: ${{ steps.amd64.outputs.content_type }}
-      - name: Upload Release Asset win64
-        id: upload-release-asset-win64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ steps.win64.outputs.location }}
-          asset_name: ${{ steps.win64.outputs.filename }}
-          asset_content_type: ${{ steps.win64.outputs.content_type }}
 
   publish-docker:
     runs-on: ubuntu-latest

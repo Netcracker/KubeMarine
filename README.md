@@ -33,6 +33,17 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 - Package extension with [open extension API](documentation/PackageExtension.md)
 - Support different deployment schemes (all-in-one, mini-HA, HA, and so on)
 
+## Kubemarine Binary Installation
+Proceed the following steps to install Kubemarine  on your environment:
+1. Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
+2. Move binary kubemarine to a separate folder 
+3. Now you can proceed to run Kubemarine! Try the following:
+   
+   Linux:
+   ```bash
+   kubemarine help
+   ```
+
 
 ## Kubemarine CLI Installation
 To install Kubemarine manually on your environment:
@@ -97,21 +108,7 @@ To install Kubemarine manually on your environment:
 
 **Note:** Kubemarine debugging available via `kubemarine/__main__.py`.
 
-## Kubemarine Binary Installation
-Proceed the following steps to install Kubemarine  on your environment:
-1. Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
-2. Move binary kubemarine to a separate folder 
-3. Now you can proceed to run Kubemarine! Try the following:
-   
-   Linux / MacOS:
-   ```bash
-   kubemarine help
-   ```
-   Windows:
-   ```bash
-   kubemarine.exe help
-   ```
-   
+
 ## Running Cluster Installation
 To install a Kubernetes cluster using Kubemarine:
 1. Prepare your VMs or bare-metal machines according to [Recommended Hardware Requirements](documentation/Installation.md#recommended-hardware-requirements) and the selected [Deployment Scheme](documentation/Installation.md#deployment-schemes). Make sure the nodes meet [Cluster Nodes Prerequisites](documentation/Installation.md#prerequisites-for-cluster-nodes).
