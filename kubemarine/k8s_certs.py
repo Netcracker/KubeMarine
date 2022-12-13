@@ -14,11 +14,6 @@
 
 from kubemarine import kubernetes
 
-supported_k8s_certs = ["all",
-                       "apiserver", "apiserver-etcd-client", "apiserver-kubelet-client",
-                       "etcd-healthcheck-client", "etcd-peer", "etcd-server",
-                       "admin.conf", "controller-manager.conf", "scheduler.conf",
-                       "front-proxy-client"]
 version_kubectl_alpha_removed = "v1.21.0"
 
 
@@ -39,8 +34,6 @@ def renew_verify(inventory, cluster):
         return inventory
 
     cert_list = cluster.procedure_inventory["kubernetes"].get("cert-list")
-    verify_cert_list_format(cert_list)
-    verify_certs_supported(cert_list)
     verify_all_is_absent_or_single(cert_list)
 
     return inventory
@@ -50,7 +43,7 @@ def renew_apply(control_planes):
     log = control_planes.cluster.log
 
     procedure = control_planes.cluster.procedure_inventory["kubernetes"]
-    cert_list = remove_certs_duplicates(procedure["cert-list"])
+    cert_list = procedure["cert-list"]
 
     if kubernetes.version_higher_or_equal(control_planes.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
                                           version_kubectl_alpha_removed):
@@ -92,24 +85,7 @@ def force_renew_kubelet_serving_certs(control_planes):
     control_planes.sudo("systemctl restart kubelet")
 
 
-def verify_cert_list_format(cert_list):
-    if cert_list is None or not isinstance(cert_list, list) or len(cert_list) == 0:
-        raise Exception("Incorrect k8s certs renew configuration, 'cert_list' list should be present and non-empty")
-    return True
-
-
-def verify_certs_supported(cert_list):
-    for line in cert_list:
-        if line not in supported_k8s_certs:
-            raise Exception(f"Found unsupported cert: {line}, list of supported certs: {supported_k8s_certs}")
-    return True
-
-
 def verify_all_is_absent_or_single(cert_list):
     if "all" in cert_list and len(cert_list) > 1:
         raise Exception(f"Found 'all' in certs list, but it is not single: {cert_list}")
     return True
-
-
-def remove_certs_duplicates(cert_list):
-    return set(cert_list)

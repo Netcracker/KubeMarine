@@ -74,23 +74,6 @@ def get_expected_permissive(inventory):
     return inventory['services']['kernel_security'].get('selinux', {}).get('permissive', [])
 
 
-def verify_inventory(inventory, cluster):
-
-    expected_selinux_states = ['enforcing', 'permissive', 'disabled']
-    if inventory['services']['kernel_security'].get('selinux', {}).get('state') and \
-            inventory['services']['kernel_security']['selinux']['state'] not in expected_selinux_states:
-        raise Exception('Unknown selinux state found in configfile. Expected %s, but \'%s\' found.'
-                        % (expected_selinux_states, inventory['services']['kernel_security']['selinux']['state']))
-
-    expected_selinux_policies = ['targeted', 'strict']
-    if inventory['services']['kernel_security'].get('selinux', {}).get('policy') and \
-            inventory['services']['kernel_security']['selinux']['policy'] not in expected_selinux_policies:
-        raise Exception('Unknown selinux policy found in configfile. Expected %s, but \'%s\' found.'
-                        % (expected_selinux_policies, inventory['services']['kernel_security']['selinux']['policy']))
-
-    return inventory
-
-
 def parse_selinux_status(log, stdout):
     result = {}
     if stdout is not None and stdout.strip() != '':

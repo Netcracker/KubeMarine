@@ -50,16 +50,11 @@ oob_plugins = list(static.DEFAULTS["plugins"].keys())
 
 
 def verify_inventory(inventory, cluster):
-    supported_procedure_types = list(procedure_types.keys())
-
     for plugin_name, plugin_item in inventory["plugins"].items():
         for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
-                if procedure_type not in supported_procedure_types:
-                    raise Exception('Unknown installation procedure type found in a plugin \'%s\'. '
-                                    'Expected any of %s, but found \'%s\'.'
-                                    % (plugin_name, supported_procedure_types, procedure_type))
-                procedure_types[procedure_type]['verify'](cluster, configs)
+                if procedure_types[procedure_type].get('verify') is not None:
+                    procedure_types[procedure_type]['verify'](cluster, configs)
 
     return inventory
 
@@ -488,26 +483,6 @@ def convert_expect(cluster, config):
     return config
 
 
-def verify_expect(cluster, config):
-    if not config:
-        raise Exception('Expect procedure is empty, but it should not be')
-
-    if config.get('daemonsets') is not None and config['daemonsets'].get('list') is None:
-        raise Exception('DaemonSet expectation defined, but DaemonSets list is missing')
-
-    if config.get('replicasets') is not None and config['replicasets'].get('list') is None:
-        raise Exception('ReplicaSet expectation defined, but replicasets list is missing')
-
-    if config.get('statefulsets') is not None and config['statefulsets'].get('list') is None:
-        raise Exception('StatefulSet expectation defined, but statefulsets list is missing')
-
-    if config.get('deployments') is not None and config['deployments'].get('list') is None:
-        raise Exception('Deployment expectation defined, but Deployments list is missing')
-
-    if config.get('pods') is not None and config['pods'].get('list') is None:
-        raise Exception('Pod expectation defined, but Pods list is missing')
-
-
 def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
 
@@ -541,18 +516,12 @@ def apply_expect(cluster, config, plugin_name=None):
                         timeout=config['pods'].get('timeout', plugins_timeout),
                         retries=config['pods'].get('retries', plugins_retries))
 
-        else:
-            raise Exception(f'Unknown expectation type "{expect_type}"')
-
 
 # **** PYTHON ****
 
 def verify_python(cluster, step):
-    if step.get('module') is None:
-        raise Exception('Module path is missing for python in plugin steps, but should be defined. Step:\n%s' % step)
-    if step.get('method') is None:
-        raise Exception('Method name is missing for python in plugin steps, but should be defined. Step:\n%s' % step)
     # TODO: verify fields types and contents
+    return
 
 
 def apply_python(cluster, step, plugin_name=None):
@@ -592,9 +561,6 @@ def convert_shell(cluster, config):
 
 
 def verify_shell(cluster, config):
-    if config.get('command') is None or config['command'] == '':
-        raise Exception('Shell command is missing')
-
     out_vars = config.get('out_vars', [])
     explicit_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
     if out_vars and explicit_group and explicit_group.nodes_amount() != 1:
@@ -603,8 +569,6 @@ def verify_shell(cluster, config):
     in_vars = config.get('in_vars', [])
     words_splitter = re.compile('\W')
     for var in chain(in_vars, out_vars):
-        if not var.get('name'):
-            raise Exception('All output and input shell variables should have "name" property specified')
         var_name = var['name']
         if len(words_splitter.split(var_name)) > 1:
             raise Exception(f"'{var_name}' is not a valid shell variable name")
@@ -693,8 +657,6 @@ def _get_absolute_playbook(config):
 
 
 def verify_ansible(cluster: KubernetesCluster, config):
-    if config.get('playbook') is None or config['playbook'] == '':
-        raise Exception('Playbook path is missing')
     playbook_path = _get_absolute_playbook(config)
     if not os.path.isfile(playbook_path):
         raise Exception('Playbook file %s not exists' % config['playbook'])
@@ -732,14 +694,6 @@ def apply_ansible(cluster, step, plugin_name=None):
         raise Exception("Failed to apply ansible plugin, see error above")
 
     return result
-
-
-def verify_helm(cluster, config):
-    if config.get('chart_path') is None or config['chart_path'] == '':
-        raise Exception('Chart path is missing')
-
-    if cluster.inventory.get('public_cluster_ip') is None:
-        raise Exception(f'public_cluster_ip is a mandatory parameter in the inventory in case of usage of helm plugin.')
 
 
 def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
@@ -909,8 +863,6 @@ def _verify_file(config, file_type):
         Verifies if the path matching the config 'source' key exists and points to
         existing files.
     """
-    if config.get('source') is None or config['source'] == '':
-        raise Exception('%s file source is missing' % file_type)
 
     # Determite absolute path to templates
     source = _get_absolute_pattern(config)
@@ -941,12 +893,7 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     apply_nodes = config.get('apply_nodes', [])
     do_render = config.get('do_render', True)
 
-    source = _get_absolute_pattern(config)
-    files = glob.glob(source)
-
-    if len(files) == 0:
-        raise ValueError('Cannot find any %s files matching this '
-                         'source value: %s' % (source, file_type))
+    files = glob.glob(_get_absolute_pattern(config))
 
     for file in files:
         source_filename = os.path.basename(file)
@@ -1003,7 +950,6 @@ procedure_types = {
     },
     'expect': {
         'convert': convert_expect,
-        'verify': verify_expect,
         'apply': apply_expect
     },
     'python': {
@@ -1025,7 +971,6 @@ procedure_types = {
         'apply': apply_ansible
     },
     'helm': {
-        'verify': verify_helm,
         'apply': apply_helm
     },
     'config': {

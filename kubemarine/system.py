@@ -42,8 +42,6 @@ def verify_inventory(inventory, cluster):
              cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP')):
         raise Exception('chrony and timesyncd configured both at the same time')
 
-    # TODO: Add validation that selinux and apparmor are not enabled at the same time
-
     return inventory
 
 
@@ -269,12 +267,7 @@ def generate_etc_hosts_config(inventory, cluster=None):
     ignore_ips = []
     if cluster and cluster.context['initial_procedure'] == 'remove_node':
         for removal_node in cluster.procedure_inventory.get("nodes"):
-            if isinstance(removal_node, str):
-                removal_node_name = removal_node
-            elif isinstance(removal_node, dict) and removal_node.get('name'):
-                removal_node_name = removal_node['name']
-            else:
-                raise Exception('Invalid node specification in procedure.yaml')
+            removal_node_name = removal_node['name']
             for node in inventory['nodes']:
                 if node['name'] == removal_node_name:
                     if node.get('address'):
