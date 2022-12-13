@@ -34,7 +34,6 @@ services:
         audit-log-maxage: "30"
         audit-log-maxbackup: "10"
         audit-log-maxsize: "100"
-        kubelet-certificate-authority: /etc/kubernetes/pki/ca.crt
       extraVolumes:
         - name: audit
           hostPath: '{{ services["kubeadm"]["apiServer"]["extraArgs"]["audit-policy-file"] }}'
