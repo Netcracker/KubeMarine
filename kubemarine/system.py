@@ -92,11 +92,8 @@ def enrich_inventory(inventory, cluster):
                 external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
                 external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
                 external_node_ip_names.append(node['name'] + "-external")
+                external_node_ip_names = list(set(external_node_ip_names))
                 inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
-
-            uniq_node_hostnames = list(set(inventory['services']['etc_hosts'][node['address']]))
-            inventory['services']['etc_hosts'][node['address']] = uniq_node_hostnames
-
 
     return inventory
 

@@ -99,7 +99,9 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
 
     if inventory_to_finalize['services'].get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
         for node in nodes_for_removal.get_ordered_members_list(provide_node_configs=True):
-            hostnames = [node['name'], node['address'], node['internal_address']]
+            hostnames = [node['name'], node['internal_address']]
+            if node.get('address') is not None:
+                hostnames.append(node['address'])
             for name in hostnames:
                 if name in inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs']:
                     inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs'].remove(name)
@@ -108,7 +110,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
         for node in nodes_for_removal.get_ordered_members_list(provide_node_configs=True):
             if inventory_to_finalize['services']['etc_hosts'].get(node['internal_address']):
                 del inventory_to_finalize['services']['etc_hosts'][node['internal_address']]
-            if inventory_to_finalize['services']['etc_hosts'].get(node['address']):
+            if node.get('address') is not None and inventory_to_finalize['services']['etc_hosts'].get(node['address']):
                 del inventory_to_finalize['services']['etc_hosts'][node['address']]
 
         coredns.enrich_add_hosts_config(inventory_to_finalize, cluster)
