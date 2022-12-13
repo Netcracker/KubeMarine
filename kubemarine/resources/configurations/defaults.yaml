@@ -17,7 +17,7 @@ services:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
-    apiVersion: kubeadm.k8s.io/v1beta2
+    apiVersion: kubeadm.k8s.io/v1beta3
     kind: ClusterConfiguration
     kubernetesVersion: v1.24.0
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
