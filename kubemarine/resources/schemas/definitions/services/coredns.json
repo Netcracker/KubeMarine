@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "configmap": {
+      "type": "object",
+      "properties": {
+        "Corefile": {
+          "type": "object",
+          "properties": {
+            ".:53": {
+              "$ref": "#/definitions/DefaultSettings"
+            }
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "properties": {
+            "template": {
+              "type": "object",
+              "properties": {
+                "spec": {
+                  "type": "object",
+                  "properties": {
+                    "volumes": {"$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"},
+                    "nodeSelector": {"type": "object"},
+                    "affinity": {"type": "object"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "DefaultSettings": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "boolean",
+          "default": true
+        },
+        "health": {
+          "type": "boolean",
+          "default": true
+        },
+        "ready": {
+          "type": "boolean",
+          "default": true
+        },
+        "prometheus": {
+          "type": "string",
+          "default": ":9153"
+        },
+        "cache": {
+          "type": "integer",
+          "default": 30
+        },
+        "loop": {
+          "type": "boolean",
+          "default": true
+        },
+        "reload": {
+          "type": "boolean",
+          "default": true
+        },
+        "loadbalance": {
+          "type": "boolean",
+          "default": true
+        },
+        "forward": {
+          "$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings"
+        },
+        "rewrite": {
+          "$ref": "#/definitions/CustomPlugin"
+        },
+        "hosts": {
+          "type": "object",
+          "properties": {
+            "default": {"$ref": "#/definitions/HostsPluginSection"}
+          },
+          "additionalProperties": {"$ref": "#/definitions/HostsPluginSection"}
+        },
+        "kubernetes": {
+          "type": "object",
+          "properties": {
+            "default": {"$ref": "#/definitions/KubernetesPluginSection"}
+          },
+          "additionalProperties": {"$ref": "#/definitions/KubernetesPluginSection"}
+        },
+        "template": {
+          "type": "object",
+          "properties": {
+            "default": {"$ref": "#/definitions/TemplatePluginSection"},
+            "reject-aaaa": {"$ref": "#/definitions/TemplatePluginSection"}
+          },
+          "additionalProperties": {"$ref": "#/definitions/TemplatePluginSection"}
+        }
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {"type": ["string", "integer", "boolean"]},
+          {"$ref": "#/definitions/CustomPlugin"}
+        ]
+      }
+    },
+    "CustomPlugin": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "allOf": [{"$ref": "#/definitions/GenericPluginSection"}],
+        "required": ["data"],
+        "propertyNames": {
+          "$ref": "#/definitions/GenericPluginSectionPropertyNames"
+        }
+      }
+    },
+    "HostsPluginSection": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/GenericPluginSection"}],
+      "properties": {
+        "file": {"type": "string", "default": "/etc/coredns/Hosts"}
+      },
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "#/definitions/GenericPluginSectionPropertyNames"},
+          {"enum": ["file"]}
+        ]
+      }
+    },
+    "KubernetesPluginSection": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/GenericPluginSection"}],
+      "properties": {
+        "zone": {
+          "oneOf": [
+            {"type": "string"},
+            {"$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings"}
+          ]
+        }
+      },
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "#/definitions/GenericPluginSectionPropertyNames"},
+          {"enum": ["zone"]}
+        ]
+      }
+    },
+    "TemplatePluginSection": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/GenericPluginSection"}],
+      "properties": {
+        "zone": {
+          "oneOf": [
+            {"type": "string"},
+            {"$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings"}
+          ]
+        },
+        "class": {"type": "string"},
+        "type": {"type": "string"}
+      },
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "#/definitions/GenericPluginSectionPropertyNames"},
+          {"enum": ["zone", "class", "type"]}
+        ]
+      }
+    },
+    "GenericPluginSection": {
+      "properties": {
+        "priority": {
+          "type": "integer"
+        },
+        "enabled": {
+          "type": ["string", "boolean"],
+          "default": true
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "GenericPluginSectionPropertyNames": {
+      "enum": ["priority", "enabled", "data"]
+    }
+  }
+}

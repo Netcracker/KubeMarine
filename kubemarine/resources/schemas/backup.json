@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "backup_location": {
+      "type": "string",
+      "default": "backup.tar.gz"
+    },
+    "backup_plan": {
+      "type": "object",
+      "properties": {
+        "etcd": {
+          "type": "object",
+          "properties": {
+            "source_node": {
+              "$ref": "definitions/common/node_ref.json#/definitions/Name"
+            }
+          },
+          "additionalProperties": false
+        },
+        "nodes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "kubernetes": {
+          "type": "object",
+          "properties": {
+            "namespaced_resources": {
+              "type": "object",
+              "properties": {
+                "namespaces": {
+                  "$ref": "#/definitions/ListOrEverything"
+                },
+                "resources": {
+                  "$ref": "#/definitions/ListOrEverything"
+                }
+              },
+              "additionalProperties": false
+            },
+            "nonnamespaced_resources": {
+              "$ref": "#/definitions/ListOrEverything"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ListOrEverything": {
+      "oneOf": [
+        {"type": "string", "enum": ["all"], "default": "all"},
+        {"$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings"}
+      ]
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "upgrade_plan": {
+      "$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings"
+    },
+    "upgrade_nodes": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"$ref": "definitions/common/node_ref.json#/definitions/Name"},
+          {
+            "type": "object",
+            "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
+            "required": ["name"],
+            "propertyNames": {
+              "$ref": "definitions/node.json#/definitions/PropertyNames"
+            }
+          }
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "disable-eviction": {
+      "type": "boolean",
+      "default": true
+    },
+    "prepull_group_size": {"$ref": "definitions/procedures.json#/definitions/PrepullGroupSize"},
+    "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
+    "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
+  },
+  "required": ["upgrade_plan"],
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "thirdparties": {
+        "$ref": "definitions/services/thirdparties.json"
+      },
+      "packages": {
+        "type": "object",
+        "allOf": [{"$ref": "definitions/services/packages.json#/definitions/Properties"}],
+        "properties": {
+          "associations": {
+            "type": "object",
+            "allOf": [{"$ref": "definitions/services/packages/associations.json#/definitions/Associations"}],
+            "propertyNames": {
+              "$ref": "definitions/services/packages/associations.json#/definitions/AssociationsNames"
+            }
+          }
+        },
+        "propertyNames": {
+          "anyOf": [
+            {"$ref": "definitions/services/packages.json#/definitions/PropertyNames"},
+            {"enum": ["associations"]}
+          ]
+        }
+      },
+      "plugins": {
+        "$ref": "definitions/plugins.json"
+      }
+    },
+    "additionalProperties": false
+  }
+}

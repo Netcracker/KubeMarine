@@ -57,7 +57,8 @@ def enrich_inventory(inventory, _):
 
 def cert_renew_enrichment(inventory, cluster):
     # check that renewal is required for nginx
-    if not cluster.procedure_inventory.get("nginx-ingress-controller"):
+    if cluster.context.get('initial_procedure') != 'cert_renew' \
+            or not cluster.procedure_inventory.get("nginx-ingress-controller"):
         return inventory
 
     nginx_plugin = inventory["plugins"]["nginx-ingress-controller"]
@@ -74,7 +75,8 @@ def cert_renew_enrichment(inventory, cluster):
 
 def finalize_inventory(cluster, inventory_to_finalize):
     # check that renewal is required for nginx
-    if not cluster.procedure_inventory.get("nginx-ingress-controller"):
+    if cluster.context.get('initial_procedure') != 'cert_renew' \
+            or not cluster.procedure_inventory.get("nginx-ingress-controller"):
         return inventory_to_finalize
 
     if not inventory_to_finalize["plugins"].get("nginx-ingress-controller"):

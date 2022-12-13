@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "installation": {
+      "type": "object",
+      "allOf": [{"$ref": "plugins/installation.json#/definitions/DefaultProperties"}],
+      "propertyNames": {
+        "$ref": "plugins/installation.json#/definitions/DefaultPropertyNames"
+      }
+    }
+  },
+  "additionalProperties": false
+}

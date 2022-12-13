@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "account_defaults.json#/definitions/CommonAccountProperties"}],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    }
+  },
+  "required": ["name", "role"],
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "account_defaults.json#/definitions/CommonAccountPropertyNames"},
+      {"enum": ["name", "role"]}
+    ]
+  }
+}

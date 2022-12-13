@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "definitions": {
+    "PrepullGroupSize": {
+      "type": "integer",
+      "default": 20
+    },
+    "GracePeriod": {
+      "type": "integer",
+      "default": 60
+    },
+    "DrainTimeout": {
+      "type": "integer"
+    }
+  }
+}

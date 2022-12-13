@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/DefaultProperties"}],
+  "properties": {
+    "priority": {
+      "type": "integer"
+    },
+    "procedures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "template": {"$ref": "installation/template.json"},
+          "config": {"$ref": "installation/config.json"},
+          "expect": {"$ref": "installation/expect.json"},
+          "python": {"$ref": "installation/python.json"},
+          "shell": {"$ref": "installation/shell.json"},
+          "ansible": {"$ref": "installation/ansible.json"},
+          "helm": {"$ref": "installation/helm.json"},
+          "thirdparty": {"type": "string"},
+          "<<": {"$ref": "../common/utils.json#/definitions/ListMergingDefinition"}
+        },
+        "minProperties": 1,
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "#/definitions/DefaultPropertyNames"},
+      {"enum": ["priority", "procedures"]}
+    ]
+  },
+  "definitions": {
+    "DefaultProperties": {
+      "properties": {
+        "registry": {
+          "type": "string"
+        }
+      }
+    },
+    "DefaultPropertyNames": {
+      "enum": ["registry"]
+    }
+  }
+}

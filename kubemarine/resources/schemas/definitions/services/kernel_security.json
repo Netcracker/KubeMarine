@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "apparmor": {
+      "$ref": "#/definitions/AppArmor"
+    },
+    "selinux": {
+      "$ref": "#/definitions/SELinux"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AppArmor": {
+      "type": "object",
+      "properties": {
+        "enforce": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings"
+        },
+        "complain": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings"
+        },
+        "disable": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SELinux": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": ["enforcing", "permissive", "disabled"],
+          "default": "enforcing"
+        },
+        "policy": {
+          "enum": ["targeted", "strict"],
+          "default": "targeted"
+        },
+        "permissive": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

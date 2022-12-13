@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "install": {
+      "type": ["string", "boolean"],
+      "default": "true"
+    },
+    "version": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": ["ipip", "vxlan"],
+      "default": "ipip"
+    },
+    "crossSubnet": {
+      "type": "boolean",
+      "default": true
+    },
+    "natOutgoing": {
+      "type": "boolean",
+      "default": true
+    },
+    "mtu": {
+      "type": "integer",
+      "default": 1440
+    },
+    "fullmesh": {
+      "type": "boolean",
+      "default": true
+    },
+    "announceServices": {
+      "type": "boolean",
+      "default": false
+    },
+    "defaultAsNumber": {
+      "type": "integer",
+      "default": 64512
+    },
+    "globalBgpPeers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ip": {"type": "string"},
+          "as": {"type": "string"}
+        },
+        "required": ["ip", "as"],
+        "additionalProperties": false
+      }
+    },
+    "typha": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": ["string", "boolean"]
+        },
+        "replicas": {
+          "type": ["string", "integer"]
+        },
+        "image": {
+          "type": "string"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        }
+      },
+      "additionalProperties": false
+    },
+    "env": {
+      "type": "object",
+      "properties": {
+        "FELIX_USAGEREPORTINGENABLED": {"type": ["string", "boolean"], "default": "'false'"},
+        "WAIT_FOR_DATASTORE": {"type": ["string", "boolean"], "default": "'true'"},
+        "FELIX_DEFAULTENDPOINTTOHOSTACTION": {"type": "string", "default": "ACCEPT"},
+        "CALICO_ROUTER_ID": {"type": "string"}
+      }
+    },
+    "cni": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "ipam": {
+          "type": "object",
+          "properties": {
+            "ipv4": {
+              "type": "object"
+            },
+            "ipv6": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kube-controllers": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        }
+      },
+      "additionalProperties": false
+    },
+    "flexvol": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": [
+        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "announceServices", "defaultAsNumber",
+        "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol"
+      ]}
+    ]
+  }
+}

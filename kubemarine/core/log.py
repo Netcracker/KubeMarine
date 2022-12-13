@@ -18,7 +18,7 @@ import sys
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler
 
 from copy import deepcopy
-from typing import List
+from typing import List, Optional
 
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
@@ -291,6 +291,14 @@ def parse_log_argument(argument: str) -> LogHandler:
     return LogHandler(**parameters)
 
 
+def get_dump_debug_filepath(context: dict) -> Optional[str]:
+    args = context['execution_arguments']
+    if args.get('disable_dump', True):
+        return None
+
+    return os.path.join(args['dump_location'], 'debug.log')
+
+
 def init_log_from_context_args(globals, context, raw_inventory) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
@@ -314,8 +322,9 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
                     stdout_specified = True
             handlers.append(handler)
 
-    if not args.get('disable_dump', True):
-        handlers.append(LogHandler(target=os.path.join(args['dump_location'], 'debug.log'),
+    debug_filepath = get_dump_debug_filepath(context)
+    if debug_filepath:
+        handlers.append(LogHandler(target=debug_filepath,
                                    **globals['logging']['default_targets']['dump']))
 
     if not stdout_specified:

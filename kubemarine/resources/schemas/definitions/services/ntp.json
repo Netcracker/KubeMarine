@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "chrony": {
+      "$ref": "#/definitions/Chrony"
+    },
+    "timesyncd": {
+      "$ref": "#/definitions/Timesyncd"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Chrony": {
+      "type": "object",
+      "properties": {
+        "servers": {
+          "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings"
+        },
+        "makestep": {
+          "type": "string",
+          "default": "5 -1"
+        },
+        "rtcsync": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "Timesyncd": {
+      "type": "object",
+      "properties": {
+        "Time": {
+          "type": "object",
+          "properties": {
+            "NTP": {
+              "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings"
+            },
+            "FallbackNTP": {
+              "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings"
+            },
+            "RootDistanceMaxSec": {
+              "type": "integer",
+              "default": 5
+            },
+            "PollIntervalMinSec": {
+              "type": "integer",
+              "default": 32
+            },
+            "PollIntervalMaxSec": {
+              "type": "integer",
+              "default": 2048
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "/usr/bin/etcdctl": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/kubeadm": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/kubelet": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/kubectl": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/calicoctl": {"$ref": "#/definitions/ThirdParty"},
+    "/usr/bin/crictl.tar.gz": {"$ref": "#/definitions/ThirdParty"}
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/ThirdParty"
+  },
+  "definitions": {
+    "MinimalThirdPartyProperties": {
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "sha1": {
+          "type": "string"
+        }
+      }
+    },
+    "MinimalThirdPartyPropertyNames": {
+      "enum": ["source", "sha1"]
+    },
+    "ThirdParty": {
+      "oneOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "allOf": [{"$ref": "#/definitions/MinimalThirdPartyProperties"}],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "default": "root"
+            },
+            "mode": {
+              "type": ["string", "integer"],
+              "default": "700"
+            },
+            "unpack": {
+              "type": "string"
+            },
+            "group": {
+              "$ref": "../common/node_ref.json#/definitions/Role"
+            },
+            "groups": {
+              "$ref": "../common/node_ref.json#/definitions/Roles"
+            },
+            "node": {
+              "$ref": "../common/node_ref.json#/definitions/Name"
+            },
+            "nodes": {
+              "$ref": "../common/node_ref.json#/definitions/Names"
+            },
+            "binary": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": ["source"],
+          "propertyNames": {
+            "anyOf": [
+              {"$ref": "#/definitions/MinimalThirdPartyPropertyNames"},
+              {"enum": ["owner", "mode", "unpack", "group", "groups", "node", "nodes", "binary"]}
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -19,24 +19,25 @@ def list_merger(config, path, base, nxt):
     strategy = None
     strategy_definition_position = 0
     for i, v in enumerate(nxt):
-        if isinstance(v, dict) and v.get('<<') is not None:
+        if isinstance(v, dict) and '<<' in v:
+            if strategy is not None:
+                raise Exception(f"Found more than one merge strategy definitions at path {path}.")
             strategy = v.get('<<')
             strategy_definition_position = i
+            if v.keys() != {'<<'} or strategy not in ('replace', 'merge'):
+                raise Exception(f"Unexpected merge strategy definition {v} at path {path}.")
 
     if strategy is None:
-        strategy = 'replace'
-    else:
-        # delete << key-value from array elements
-        del nxt[strategy_definition_position]
+        return nxt
 
+    elements_after = nxt[(strategy_definition_position + 1):]
+    elements_before = nxt[:strategy_definition_position]
+    # do not modify source list
+    nxt = []
+    nxt.extend(elements_before)
     if strategy == 'merge':
-        elements_after = nxt[strategy_definition_position:]
-        elements_before = nxt[:strategy_definition_position]
-
-        nxt = []
-        nxt.extend(elements_before)
         nxt.extend(base)
-        nxt.extend(elements_after)
+    nxt.extend(elements_after)
 
     return nxt
 

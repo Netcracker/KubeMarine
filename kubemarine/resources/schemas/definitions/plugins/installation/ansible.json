@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "oneOf": [
+    {"type": "string", "minLength": 1},
+    {
+      "type": "object",
+      "properties": {
+        "playbook": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vars": {
+          "type": "object"
+        },
+        "become": {
+          "type": "boolean",
+          "default": false
+        },
+        "groups": {
+          "$ref": "../../common/node_ref.json#/definitions/Roles"
+        },
+        "nodes": {
+          "$ref": "../../common/node_ref.json#/definitions/Names"
+        }
+      },
+      "required": ["playbook"],
+      "additionalProperties": false
+    }
+  ]
+}

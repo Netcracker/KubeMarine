@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "definitions": {
+    "Properties": {
+      "properties": {
+        "install": {
+          "type": ["string", "boolean"],
+          "default": false
+        },
+        "installation": {
+          "$ref": "installation.json"
+        }
+      }
+    },
+    "PropertyNames": {
+      "enum": ["install", "installation"]
+    },
+    "CustomTolerations": {
+      "$ref": "../common/utils.json#/definitions/NonEmptyArrayOfObjects"
+    },
+    "CommonNodeSelector": {
+      "type": "object",
+      "properties": {
+        "kubernetes.io/os": {"type": "string", "default": "linux"}
+      }
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "properties": {
+    "associations": {
+      "$ref": "packages/associations.json"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "#/definitions/PropertyNames"},
+      {"enum": ["associations"]}
+    ]
+  },
+  "definitions": {
+    "Properties": {
+      "properties": {
+        "package_manager": {
+          "type": "object",
+          "properties": {
+            "replace-repositories": {
+              "type": "boolean",
+              "default": false
+            },
+            "repositories": {
+              "oneOf": [
+                {"type": "string"},
+                {"$ref": "#/definitions/YumRepositories"},
+                {"$ref": "#/definitions/AptRepositories"}
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "install": {
+          "oneOf": [
+            {
+              "type": "object",
+              "allOf": [{"$ref": "#/definitions/IncludeExcludeProperties"}],
+              "required": ["include"],
+              "propertyNames": {
+                "$ref": "#/definitions/IncludeExcludePropertyNames"
+              }
+            },
+            {
+              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+            }
+          ]
+        },
+        "upgrade": {
+          "oneOf": [
+            {"$ref": "#/definitions/IncludeExcludePermissive"},
+            {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
+          ]
+        },
+        "remove": {
+          "oneOf": [
+            {"$ref": "#/definitions/IncludeExcludePermissive"},
+            {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
+          ]
+        },
+        "cache_versions": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "PropertyNames": {
+      "enum": ["package_manager", "install", "upgrade", "remove", "cache_versions"]
+    },
+    "YumRepositories": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "enabled": {"type": "integer"},
+          "gpgcheck": {"type": "integer"},
+          "baseurl": {"type": "string"}
+        }
+      }
+    },
+    "AptRepositories": {
+      "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+    },
+    "IncludeExcludePermissive": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/IncludeExcludeProperties"}],
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/definitions/IncludeExcludePropertyNames"
+      }
+    },
+    "IncludeExcludeProperties": {
+      "properties": {
+        "include": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+        },
+        "exclude": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+        }
+      }
+    },
+    "IncludeExcludePropertyNames": {
+      "enum": ["include", "exclude"]
+    }
+  }
+}

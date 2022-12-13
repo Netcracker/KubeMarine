@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "image": {
+      "type": "string",
+      "default": "quay.io/coreos/flannel:v0.11.0-amd64"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["image"]}
+    ]
+  }
+}

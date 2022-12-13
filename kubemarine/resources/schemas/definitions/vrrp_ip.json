@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "oneOf": [
+    {"type": "string"},
+    {"$ref": "#/definitions/ExtendedVRRP"}
+  ],
+  "definitions": {
+    "ExtendedVRRP": {
+      "type": "object",
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "floating_ip": {
+          "type": "string"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HostToApplyVRRP"
+          }
+        },
+        "interface": {
+          "type": "string",
+          "default": "auto"
+        },
+        "id": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "router_id": {
+          "type": "string"
+        },
+        "control_endpoint": {
+          "type": "boolean",
+          "default": false
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "maintenance-type": {
+              "enum": ["not bind"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["ip"],
+      "additionalProperties": false
+    },
+    "HostToApplyVRRP": {
+      "oneOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "interface": {
+              "type": "string",
+              "default": "auto"
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

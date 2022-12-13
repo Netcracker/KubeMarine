@@ -97,12 +97,12 @@ def generate_nested_sections(type, data, tabsize):
             config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
 
         elif type == 'template':
+            zones = [None]
             if data[section['name']].get('zone'):
-                if isinstance(data[section['name']]['zone'], str):
-                    data[section['name']]['zone'] = [data[section['name']]['zone']]
-            else:
-                data[section['name']]['zone'] = [None]
-            for zone in data[section['name']]['zone']:
+                zones = data[section['name']]['zone']
+                if isinstance(zones, str):
+                    zones = [zones]
+            for zone in zones:
                 config += '\n' + tab + type
                 if data[section['name']].get('class'):
                     config += ' ' + data[section['name']]['class']

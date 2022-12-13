@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "account_defaults": {
+      "$ref": "rbac/account_defaults.json"
+    },
+    "accounts": {
+      "type": "array",
+      "items": {
+        "$ref": "rbac/account.json"
+      },
+      "minItems": 1
+    },
+    "admission": {
+      "enum": ["psp", "pss"],
+      "default": "psp"
+    },
+    "psp": {
+      "$ref": "rbac/psp.json"
+    },
+    "pss": {
+      "$ref": "rbac/pss.json"
+    }
+  },
+  "additionalProperties": false
+}

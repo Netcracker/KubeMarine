@@ -132,7 +132,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
 
 class UpgradePackagesEnrichment(unittest.TestCase):
-    def prepare_procedure_inventory(self, new):
+    def prepare_procedure_inventory(self, new) -> dict:
         return {
             'upgrade_plan': [new],
             new: {
@@ -165,7 +165,9 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         upgrade = self.prepare_procedure_inventory(new)
         cluster = demo.new_cluster(deepcopy(inventory), procedure_inventory=deepcopy(upgrade), context=context)
         final_inventory = utils.get_final_inventory(cluster, inventory)
-        self.assertEqual(upgrade[new]['packages'], final_inventory['services']['packages'],
+        expected_final_packages = deepcopy(upgrade[new]['packages'])
+        expected_final_packages['install'] = {'include': expected_final_packages['install']}
+        self.assertEqual(expected_final_packages, final_inventory['services']['packages'],
                          "Final inventory is recreated incorrectly")
 
 

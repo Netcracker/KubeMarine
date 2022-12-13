@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "arguments": {
+      "type": "object"
+    }
+  },
+  "required": ["module", "method"],
+  "additionalProperties": false
+}

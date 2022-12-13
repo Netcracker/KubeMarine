@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "daemonsets": {"$ref": "#/definitions/GenericResource"},
+    "replicasets": {"$ref": "#/definitions/GenericResource"},
+    "statefulsets": {"$ref": "#/definitions/GenericResource"},
+    "deployments": {"$ref": "#/definitions/GenericResource"},
+    "pods": {"$ref": "#/definitions/Pods"}
+  },
+  "minProperties": 1,
+  "additionalProperties": false,
+  "definitions": {
+    "GenericResource": {
+      "oneOf": [
+        {"$ref": "#/definitions/ResourcesList"},
+        {
+          "type": "object",
+          "allOf": [{"$ref": "#/definitions/CommonResourceProperties"}],
+          "properties": {
+            "list": {"$ref": "#/definitions/ResourcesList"}
+          },
+          "required": ["list"],
+          "propertyNames": {
+            "anyOf": [
+              {"$ref": "#/definitions/CommonResourcePropertyNames"},
+              {"enum": ["list"]}
+            ]
+          }
+        }
+      ]
+    },
+    "ResourcesList": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string",
+                "default": "kube-system"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "Pods": {
+      "oneOf": [
+        {"$ref": "#/definitions/PodsList"},
+        {
+          "type": "object",
+          "allOf": [{"$ref": "#/definitions/CommonResourceProperties"}],
+          "properties": {
+            "list": {"$ref": "#/definitions/PodsList"},
+            "namespace": {
+              "type": "string"
+            }
+          },
+          "required": ["list"],
+          "propertyNames": {
+            "anyOf": [
+              {"$ref": "#/definitions/CommonResourcePropertyNames"},
+              {"enum": ["list", "namespace"]}
+            ]
+          }
+        }
+      ]
+    },
+    "PodsList": {
+      "$ref": "../../common/utils.json#/definitions/SetOfStrings"
+    },
+    "CommonResourceProperties": {
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "default": 5
+        },
+        "retries": {
+          "type": "integer",
+          "default": 30
+        }
+      }
+    },
+    "CommonResourcePropertyNames": {
+      "enum": ["timeout", "retries"]
+    }
+  }
+}
