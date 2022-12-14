@@ -14,7 +14,9 @@
       },
       "minItems": 1,
       "uniqueItems": true
-    }
+    },
+    "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
+    "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
   },
   "required": ["nodes"],
   "additionalProperties": false
