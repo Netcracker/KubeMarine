@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Deliver files from third party sources and install them in the system",
   "properties": {
     "/usr/bin/etcdctl": {"$ref": "#/definitions/ThirdParty"},
     "/usr/bin/kubeadm": {"$ref": "#/definitions/ThirdParty"},
@@ -16,10 +17,12 @@
     "MinimalThirdPartyProperties": {
       "properties": {
         "source": {
-          "type": "string"
+          "type": "string",
+          "description": "Source from where to upload the file to hosts. It can be an URL or an absolute path on the deployment node."
         },
         "sha1": {
-          "type": "string"
+          "type": "string",
+          "description": "SHA1 hash of the file. It is necessary in order to check with an existing file on the hosts and decide whether to download the file or not."
         }
       }
     },
@@ -27,6 +30,7 @@
       "enum": ["source", "sha1"]
     },
     "ThirdParty": {
+      "description": "The absolute destination path of the 3rd-party on the host system of the cluster",
       "oneOf": [
         {"type": "string"},
         {
@@ -35,30 +39,38 @@
           "properties": {
             "owner": {
               "type": "string",
-              "default": "root"
+              "default": "root",
+              "description": "The owner who needs to be assigned to the file after downloading it"
             },
             "mode": {
               "type": ["string", "integer"],
-              "default": "700"
+              "default": "700",
+              "description": "The mode which needs to be assigned to the file after downloading it"
             },
             "unpack": {
-              "type": "string"
+              "type": "string",
+              "description": "Absolute path on hosts where to unpack the downloaded file. Unpacking is supported only for the following file extensions: .tar, .gz and .zip."
             },
             "group": {
-              "$ref": "../common/node_ref.json#/definitions/Role"
+              "$ref": "../common/node_ref.json#/definitions/Role",
+              "description": "The name of the group to whose hosts the file should be uploaded"
             },
             "groups": {
-              "$ref": "../common/node_ref.json#/definitions/Roles"
+              "$ref": "../common/node_ref.json#/definitions/Roles",
+              "description": "The list of group names to whose hosts the file should be uploaded"
             },
             "node": {
-              "$ref": "../common/node_ref.json#/definitions/Name"
+              "$ref": "../common/node_ref.json#/definitions/Name",
+              "description": "The name of node where the file should be uploaded"
             },
             "nodes": {
-              "$ref": "../common/node_ref.json#/definitions/Names"
+              "$ref": "../common/node_ref.json#/definitions/Names",
+              "description": "The list of node names where the file should be uploaded"
             },
             "binary": {
               "type": "boolean",
-              "default": true
+              "default": true,
+              "description": "Specifies whether to treat the file as binary or as text"
             }
           },
           "required": ["source"],

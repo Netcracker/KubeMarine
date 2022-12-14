@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "array",
+  "description": "Manage Linux Kernel modules to be loaded in the host operating system",
   "items": {
     "anyOf": [
       {

@@ -7,9 +7,11 @@
     },
     "kubernetes": {
       "type": "object",
+      "description": "Update internal kubernetes certificates",
       "properties": {
         "cert-list": {
           "type": "array",
+          "description": "List with the particular certificates or 'all' if all possible certificates should be updated",
           "items": {
             "enum": [
               "all",

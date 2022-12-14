@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Override the original settings for the kubelet",
   "properties": {
     "readOnlyPort": {"type": "integer", "default": 0},
     "protectKernelDefaults": {"type": "boolean", "default": true},

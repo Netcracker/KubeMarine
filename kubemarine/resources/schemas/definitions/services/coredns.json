@@ -1,12 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Configure the Coredns service and its DNS rules in the Kubernetes cluster",
   "properties": {
     "configmap": {
       "type": "object",
+      "description": "Configmap parameters that are applied to the Coredns service",
       "properties": {
         "Corefile": {
           "type": "object",
+          "description": "The main Coredns config, which is converted into a template in accordance with the specified parameters",
           "properties": {
             ".:53": {
               "$ref": "#/definitions/DefaultSettings"
@@ -15,6 +18,10 @@
           "additionalProperties": {
             "type": "object"
           }
+        },
+        "Hosts": {
+          "type": "string",
+          "description": "Hosts file obtained in accordance with etc_hosts inventory parameter. The contents of this file are automatically added to the inventory, if not specified manually"
         }
       },
       "additionalProperties": {
@@ -23,6 +30,7 @@
     },
     "deployment": {
       "type": "object",
+      "description": "YAML settings that are applied to Coredns service via a patch",
       "properties": {
         "spec": {
           "type": "object",
@@ -49,47 +57,59 @@
   "definitions": {
     "DefaultSettings": {
       "type": "object",
+      "description": "Default destination",
       "properties": {
         "errors": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Any errors encountered during the query processing are printed to standard output. The errors of a particular type can be consolidated and printed once per a period of time."
         },
         "health": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Enabled process wide health endpoint. When CoreDNS is up and running, this returns a 200 OK HTTP status code. The health is exported, by default, on port 8080/health"
         },
         "ready": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "By enabling ready, an HTTP endpoint on port 8181 returns 200 OK when all plugins that are able to signal readiness have done so. If some are not ready, the endpoint still returns a 503 with the body containing the list of plugins that are not ready. Once a plugin has signaled that it is ready, it is not queried again."
         },
         "prometheus": {
           "type": "string",
-          "default": ":9153"
+          "default": ":9153",
+          "description": "With Prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics"
         },
         "cache": {
           "type": "integer",
-          "default": 30
+          "default": 30,
+          "description": "With cache enabled, all records except zone transfers and metadata records are cached according to the ttl value set"
         },
         "loop": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "The loop plugin sends a random probe query and keeps a track of how many it is viewed. If it is viewed more than twice, assume that CoreDNS has seen a forwarding loop and halt the process."
         },
         "reload": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "This plugin allows automatic reload of a changed Corefile"
         },
         "loadbalance": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "The loadbalance acts as a round-robin DNS load balancer by randomizing the order of A, AAAA, and MX records in the answer"
         },
         "forward": {
-          "$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings"
+          "$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings",
+          "description": "The forward plugin re-uses already opened sockets to the upstreams. It supports UDP, TCP, and DNS-over-TLS. It is used in band health checking."
         },
         "rewrite": {
-          "$ref": "#/definitions/CustomPlugin"
+          "$ref": "#/definitions/CustomPlugin",
+          "description": "The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema."
         },
         "hosts": {
           "type": "object",
+          "description": "The hosts plugin is useful for serving zones from a /etc/hosts like file. It serves from a preloaded file, which is applied from ConfigMap during the installation.",
           "properties": {
             "default": {"$ref": "#/definitions/HostsPluginSection"}
           },
@@ -97,6 +117,7 @@
         },
         "kubernetes": {
           "type": "object",
+          "description": "This plugin implements the Kubernetes DNS-Based Service Discovery Specification",
           "properties": {
             "default": {"$ref": "#/definitions/KubernetesPluginSection"}
           },
@@ -104,6 +125,7 @@
         },
         "template": {
           "type": "object",
+          "description": "The template plugin allows you to dynamically respond to queries by just writing a template",
           "properties": {
             "default": {"$ref": "#/definitions/TemplatePluginSection"},
             "reject-aaaa": {"$ref": "#/definitions/TemplatePluginSection"}

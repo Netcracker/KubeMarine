@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Enable and/or change default settings for 'local-path-provisioner' plugin",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "image": {
@@ -9,21 +10,25 @@
     },
     "storage-class": {
       "type": "object",
+      "description": "Configuration of StorageClass resource for Local Path Provisioner",
       "properties": {
         "name": {
           "type": "string",
-          "default": "local-path"
+          "default": "local-path",
+          "description": "Name of the storage class resource, which describes the class of the local volumes created by the provisioner"
         },
         "is-default": {
           "type": ["string", "boolean"],
-          "default": "'false'"
+          "default": "'false'",
+          "description": "If 'true', the created storage class is the default one"
         }
       },
       "additionalProperties": false
     },
     "volume-dir": {
       "type": "string",
-      "default": "/opt/local-path-provisioner"
+      "default": "/opt/local-path-provisioner",
+      "description": "The directory on each node, where the provisioner stores the PV data. For each requested PV, the provisioner creates the subdirectory in the volume-dir."
     },
     "tolerations": {
       "$ref": "generic_plugin.json#/definitions/CustomTolerations"

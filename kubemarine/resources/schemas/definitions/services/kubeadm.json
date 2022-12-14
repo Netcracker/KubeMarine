@@ -1,13 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Override the original settings for the kubeadm",
   "properties": {
     "kubernetesVersion": {
       "type":  "string",
-      "default": "v1.24.0"
+      "default": "v1.24.0",
+      "description": "Specify the version to install and maintain. This version applies into all the dependent parameters - images, binaries, rpms, configurations."
     },
     "imageRepository": {
-      "type": "string"
+      "type": "string",
+      "description": "Kubernetes Image Repository. The system container's images such as kubeapi or etcd is loaded from this registry."
     },
     "controlPlaneEndpoint": {
       "type":  "string",
@@ -108,7 +111,10 @@
           "properties": {
             "profiling": {"type": "string", "default": "'false'"},
             "terminated-pod-gc-threshold": {"type": "string", "default": "'1000'"},
-            "external-cloud-volume-plugin": {"type": "string"},
+            "external-cloud-volume-plugin": {
+              "type": "string",
+              "description": "Plugin to enable the CPP support"
+            },
             "feature-gates": {"type": "string"}
           },
           "additionalProperties": {

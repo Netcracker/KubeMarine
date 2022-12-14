@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Change the default settings for the by-default installed 'nginx-ingress-controller' plugin",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "install": {
@@ -21,16 +22,20 @@
     },
     "controller": {
       "type": "object",
+      "description": "NGINX Ingress Controller configuration",
       "properties": {
         "image": {
-          "type": "string"
+          "type": "string",
+          "description": "Specifies the string for the NGINX Ingress Controller image"
         },
         "ssl": {
           "type": "object",
+          "description": "SSL configuration",
           "properties": {
             "enableSslPassthrough": {
               "type": "boolean",
-              "default": false
+              "default": false,
+              "description": "Enable the ssl-passthrough feature. The feature introduces a small performance penalty."
             },
             "default-certificate": {
               "$ref": "#/definitions/DefaultCertificate"
@@ -51,10 +56,12 @@
       "$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"
     },
     "config_map": {
-      "type": "object"
+      "type": "object",
+      "description": "Customize or fine tune NGINX behavior"
     },
     "custom_headers": {
-      "type": "object"
+      "type": "object",
+      "description": "The parameter sets specified custom headers before sending the traffic to backends"
     }
   },
   "propertyNames": {
@@ -66,12 +73,15 @@
   "definitions": {
     "DefaultCertificate": {
       "type": "object",
+      "description": "Configure a custom default certificate for ingress resources",
       "properties": {
         "data": {
-          "$ref": "#/definitions/CertAndKey"
+          "$ref": "#/definitions/CertAndKey",
+          "description": "Provide a certificate and a key inplace in the pem format"
         },
         "paths": {
-          "$ref": "#/definitions/CertAndKey"
+          "$ref": "#/definitions/CertAndKey",
+          "description": "Provide a certificate and a key as paths to the pem files"
         }
       },
       "minProperties": 1,

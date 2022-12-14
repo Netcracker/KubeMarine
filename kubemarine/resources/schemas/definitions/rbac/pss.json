@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "PSS configuration section",
   "allOf": [{"$ref": "#/definitions/Properties"}],
   "propertyNames": {
     "$ref": "#/definitions/PropertyNames"
@@ -10,22 +11,27 @@
       "properties": {
         "pod-security": {
           "enum": ["enabled", "disabled"],
-          "default": "enabled"
+          "default": "enabled",
+          "description": "Specify if PSS should be enabled/disabled"
         },
         "defaults": {
-          "$ref": "#/definitions/Profiles"
+          "$ref": "#/definitions/Profiles",
+          "description": "Default profiles that are passed to 'defaults' section of PodSecurityConfiguration"
         },
         "exemptions": {
           "type": "object",
+          "description": "The section describes objects that are not enforced by the policy",
           "properties": {
             "usernames": {
-              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+              "description": "List of User or ServiceAccount names"
             },
             "runtimeClasses": {
               "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
             },
             "namespaces": {
               "type": "array",
+              "description": "List of namespaces to not enforce the policy",
               "items": {
                 "anyOf": [
                   {"type": "string", "enum": ["kube-system"]},

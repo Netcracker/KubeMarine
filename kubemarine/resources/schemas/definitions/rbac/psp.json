@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "PSP configuration section",
   "properties": {
     "pod-security": {
-      "enum": ["enabled", "disabled"],
-      "default": "enabled"
+      "$ref": "#/definitions/PodSecurity"
     },
     "oob-policies": {
       "$ref": "#/definitions/OOBPolicies"
@@ -15,41 +15,54 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "PodSecurity": {
+      "enum": ["enabled", "disabled"],
+      "default": "enabled",
+      "description": "Specify if PSP should be enabled/disabled"
+    },
     "OOBPolicies": {
       "type": "object",
+      "description": "Policies that are configured out of the box",
       "properties": {
         "default": {
           "enum": ["enabled", "disabled"],
-          "default": "enabled"
+          "default": "enabled",
+          "description": "Used for 'authenticated' group, enforces unauthorized users to deploy pods with severe restrictions"
         },
         "host-network": {
           "enum": ["enabled", "disabled"],
-          "default": "enabled"
+          "default": "enabled",
+          "description": "Used for pods which require host network access"
         },
         "anyuid": {
           "enum": ["enabled", "disabled"],
-          "default": "enabled"
+          "default": "enabled",
+          "description": "Used for pods which require root privileges"
         }
       },
       "additionalProperties": false
     },
     "CustomPolicies": {
       "type": "object",
+      "description": "Custom policies section",
       "properties": {
         "psp-list": {
           "type": "array",
+          "description": "List of PodSecurityPolicy resources",
           "items": {
             "$ref": "#/definitions/PodSecurityPolicy"
           }
         },
         "roles-list": {
           "type": "array",
+          "description": "List of Role/ClusterRole resources",
           "items": {
             "$ref": "#/definitions/Roles"
           }
         },
         "bindings-list": {
           "type": "array",
+          "description": "List of RoleBinding/ClusterRoleBinding resources",
           "items": {
             "$ref": "#/definitions/RoleBindings"
           }

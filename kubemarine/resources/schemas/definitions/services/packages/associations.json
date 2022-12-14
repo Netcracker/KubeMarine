@@ -16,11 +16,14 @@
   "definitions": {
     "PackageAssociations": {
       "type": "object",
+      "description": "Associations related to specific package",
       "properties": {
         "executable_name": {
-          "type": "string"
+          "type": "string",
+          "description": "Path to or name of the associated binary executable"
         },
         "package_name": {
+          "description": "Packages with versions to install if the associated service is required for the cluster",
           "oneOf": [
             {"type": "string"},
             {
@@ -37,20 +40,24 @@
           ]
         },
         "service_name": {
-          "type": "string"
+          "type": "string",
+          "description": "Name of systemd service"
         },
         "config_location": {
-          "type": "string"
+          "type": "string",
+          "description": "Path to the configuration file of the associated service"
         },
         "cache_versions": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure"
         }
       },
       "additionalProperties": false
     },
     "OSFamilyAssociations": {
       "type": "object",
+      "description": "Associations related to specific OS family. Specifying in this section is not required in common case, but can be necessary during operating system migration.",
       "allOf": [{"$ref": "#/definitions/Associations"}],
       "propertyNames": {
         "$ref": "#/definitions/AssociationsNames"

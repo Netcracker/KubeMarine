@@ -4,10 +4,12 @@
   "allOf": [{"$ref": "#/definitions/DefaultProperties"}],
   "properties": {
     "priority": {
-      "type": "integer"
+      "type": "integer",
+      "description": "Parameter that defines the installation order of the plugin relative to the other plugins"
     },
     "procedures": {
       "type": "array",
+      "description": "Installation procedures to perform during the installation of the plugin",
       "items": {
         "type": "object",
         "properties": {
@@ -37,7 +39,8 @@
     "DefaultProperties": {
       "properties": {
         "registry": {
-          "type": "string"
+          "type": "string",
+          "description": "The plugin(s) container's images are loaded from this registry"
         }
       }
     },

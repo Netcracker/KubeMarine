@@ -4,10 +4,12 @@
   "allOf": [{"$ref": "node_defaults.json#/definitions/SSHAccessCommonProperties"}],
   "properties": {
     "name": {
-      "type": "string"
+      "type": "string",
+      "description": "Gateway node name"
     },
     "address": {
-      "type": "string"
+      "type": "string",
+      "description": "Gateway node's IP or hostname address for connection"
     }
   },
   "required": ["name", "address", "username", "keyfile"],

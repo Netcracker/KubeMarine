@@ -3,10 +3,12 @@
   "type": "object",
   "properties": {
     "upgrade_plan": {
-      "$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings"
+      "$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings",
+      "description": "List of new versions through which to upgrade the cluster to the last specified version"
     },
     "upgrade_nodes": {
       "type": "array",
+      "description": "Manually specify certain nodes that need to be upgraded. Each item can be either a node name referring to the cluster.yaml, or full node specification.",
       "items": {
         "oneOf": [
           {"$ref": "definitions/common/node_ref.json#/definitions/Name"},
@@ -25,7 +27,8 @@
     },
     "disable-eviction": {
       "type": "boolean",
-      "default": true
+      "default": true,
+      "description": "If specified to false, enforces PDB rules during the upgrade"
     },
     "prepull_group_size": {"$ref": "definitions/procedures.json#/definitions/PrepullGroupSize"},
     "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
@@ -34,16 +37,19 @@
   "required": ["upgrade_plan"],
   "additionalProperties": {
     "type": "object",
+    "description": "Configuration for the upgrade to the particular version from the 'upgrade_plan'",
     "properties": {
       "thirdparties": {
         "$ref": "definitions/services/thirdparties.json"
       },
       "packages": {
         "type": "object",
+        "description": "Section for packages and their management during upgrade",
         "allOf": [{"$ref": "definitions/services/packages.json#/definitions/Properties"}],
         "properties": {
           "associations": {
             "type": "object",
+            "description": "Configure associations of package objects to be used during upgrade",
             "allOf": [{"$ref": "definitions/services/packages/associations.json#/definitions/Associations"}],
             "propertyNames": {
               "$ref": "definitions/services/packages/associations.json#/definitions/AssociationsNames"

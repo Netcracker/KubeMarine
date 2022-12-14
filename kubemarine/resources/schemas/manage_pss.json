@@ -4,10 +4,12 @@
   "properties": {
     "pss": {
       "type": "object",
+      "description": "PSS configuration section",
       "allOf": [{"$ref": "definitions/rbac/pss.json#/definitions/Properties"}],
       "properties": {
         "namespaces": {
           "type": "array",
+          "description": "List of namespaces that will be labeled during the maintenance procedure. Each item can be either a namespace name, or dictionary where key is a namespace name and values are profile labels.",
           "items": {
             "oneOf": [
               {"type": "string"},
@@ -23,7 +25,8 @@
           }
         },
         "namespaces_defaults": {
-          "$ref": "definitions/rbac/pss.json#/definitions/Profiles"
+          "$ref": "definitions/rbac/pss.json#/definitions/Profiles",
+          "description": "Labels to be applied on namespaces list from 'namespaces' section"
         }
       },
       "required": ["pod-security"],
@@ -36,7 +39,8 @@
     },
     "restart-pods": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Enforce restart all pods in cluster. It drains nodes one by one and may cause cluster instability."
     }
   },
   "required": ["pss"],

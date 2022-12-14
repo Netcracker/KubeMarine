@@ -800,7 +800,7 @@ The following parameters are supported:
 |-------------|---------|---------------|--------------------------------------------------------------|
 | address     | string  |               | Full address to the registry, without protocol and port.     |
 | docker_port | number  |               | Custom port for connecting to the image registry.               |
-| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
+| webserver   | boolean | `False`       | A special parameter indicating whether registry has ability to serve http files. When enabled, the `thirdparties` are patched with the `address` provided. | 
 | ssl         | boolean | `False`       | Registry SSL support switch.                                 |
 
 Example:
@@ -1543,7 +1543,7 @@ The procedure for applying SELinux settings is as follows:
 
 *OS specific*: Yes, performs only on Ubuntu OS family.
 
-All the Ubuntu settings are specified in the `services.kernel_security.ubuntu` section of the inventory.
+All the AppArmor settings are specified in the `services.kernel_security.apparmor` section of the inventory.
 
 **Note**: AppArmor configuration is possible only on nodes running Ubuntu or Debian operating system.
 
@@ -2784,7 +2784,8 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 ##### haproxy
 
-This section contains the configuration parameters that are applied to the **haproxy.cfg** config file. By default, the following configuration is used:
+This section contains the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
+By default, the following configuration is used:
 
 ```yaml
 services:
@@ -3276,7 +3277,7 @@ The yaml file that is created from the above template is applied to the cluster 
 
 *Installation task*: `deploy.plugins`
 
-In the `deploy.plugins` section, you can configure the parameters of the plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
+In the `plugins` section, you can configure the parameters of the plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
 If you skip the plugin installation task, no plugins are installed.
 
 #### Predefined Plugins

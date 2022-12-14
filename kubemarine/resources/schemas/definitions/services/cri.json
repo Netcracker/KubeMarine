@@ -1,10 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Configure container runtime used for Kubernetes",
   "properties": {
     "containerRuntime": {
       "enum": ["containerd", "docker"],
-      "default": "containerd"
+      "default": "containerd",
+      "description": "A particular container runtime implementation used for Kubernetes"
     },
     "containerdConfig": {
       "$ref": "#/definitions/ContainerdConfig"
@@ -17,6 +19,7 @@
   "definitions": {
     "ContainerdConfig": {
       "type": "object",
+      "description": "Parameters for containerd passed to config.toml",
       "properties": {
         "version": {"type": "integer", "default": 2},
         "plugins.\"io.containerd.grpc.v1.cri\"": {
@@ -41,9 +44,16 @@
     },
     "DockerConfig": {
       "type": "object",
+      "description": "Parameters for docker passed to daemon.json",
       "properties": {
-        "insecure-registries": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
-        "registry-mirrors": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
+        "insecure-registries": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it."
+        },
+        "registry-mirrors": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Docker Registry Mirrors. Additional image sources for the container's images pull."
+        },
         "ipv6": {"type": "boolean", "default": false},
         "log-driver": {"type": "string", "default": "json-file"},
         "log-opts": {

@@ -11,17 +11,21 @@
       "allOf": [{"$ref": "node_defaults.json#/definitions/CommonNodeProperties"}],
       "properties": {
         "name": {
-          "$ref": "common/node_ref.json#/definitions/Name"
+          "$ref": "common/node_ref.json#/definitions/Name",
+          "description": "Cluster member name. If omitted, KubeMarine will calculate the name by the member role and position in the inventory."
         },
         "address": {
-          "type": "string"
+          "type": "string",
+          "description": "External node's IP-address"
         },
         "internal_address": {
-          "type": "string"
+          "type": "string",
+          "description": "Internal node's IP-address"
         },
         "control_endpoint": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "Parameter to help the algorithm in choosing which address to take as the control_plain"
         },
         "connect_to": {"type": "string"}
       }

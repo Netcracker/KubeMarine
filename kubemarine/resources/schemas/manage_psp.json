@@ -4,10 +4,10 @@
   "properties": {
     "psp": {
       "type": "object",
+      "description": "PSP configuration section",
       "properties": {
         "pod-security": {
-          "enum": ["enabled", "disabled"],
-          "default": "enabled"
+          "$ref": "definitions/rbac/psp.json#/definitions/PodSecurity"
         },
         "oob-policies": {
           "$ref": "definitions/rbac/psp.json#/definitions/OOBPolicies"

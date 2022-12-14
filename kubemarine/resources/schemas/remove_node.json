@@ -4,6 +4,7 @@
   "properties": {
     "nodes": {
       "type": "array",
+      "description": "Nodes to remove. Each item can be specified in the same format as that of the installation procedure, or in short format where only the node name is present.",
       "items": {
         "type": "object",
         "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
