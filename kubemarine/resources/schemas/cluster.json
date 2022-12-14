@@ -75,6 +75,10 @@
         }
       },
       "additionalProperties": false
+    },
+    "values": {
+      "type": "object",
+      "description": "Section to hold custom variables to be used in Jinja2 templates."
     }
   },
   "required": ["nodes", "cluster_name"],

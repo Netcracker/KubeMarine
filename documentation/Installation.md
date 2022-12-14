@@ -4726,6 +4726,14 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
+* All variables should be either valid variables that KubeMarine understands,
+  or custom variables defined in the dedicated `values` section.
+  ```yaml
+  values:
+    custom_variable: value
+  kubemarine_section:
+    kubemarine_variable: '{{ values.custom_variable }}'
+  ```
 * The start pointer of the Jinja2 template must be inside a pair of single or double quotes. The `{{` or `{%` out of quotes leads to a parsing error of the yaml file.
 * The variable cannot refer to itself. It does not lead to any result, but it slows down the compilation process.
 * The variables cannot mutually refer to each other. For example, the following configuration:

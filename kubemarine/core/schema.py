@@ -56,14 +56,20 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     if not errs:
         return
 
-    cluster.log.error(f"Inventory file{for_procedure} is failed to be validated against the schema.")
+    context = cluster.context
+    logger = cluster.log
+    # TODO remove in next release
+    ignore_schema_errors = context['execution_arguments']['ignore_schema_errors']
+
+    log_method = logger.warning if ignore_schema_errors else logger.error
+    log_method(f"Inventory file{for_procedure} is failed to be validated against the schema.")
 
     errs = _resolve_errors(errs)
     for err in errs:
-        cluster.log.verbose("------------------------------------------")
-        cluster.log.verbose(err)
+        logger.verbose("------------------------------------------")
+        logger.verbose(err)
 
-    debug_filepath = log.get_dump_debug_filepath(cluster.context)
+    debug_filepath = log.get_dump_debug_filepath(context)
     if debug_filepath:
         detailed_msg = f"See detailed message in {debug_filepath}."
     else:
@@ -74,8 +80,18 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     public_schema = f"https://raw.githubusercontent.com/Netcracker/KubeMarine/{version}/kubemarine/{root_schema_resource}"
     hint = f"Inventory file{for_procedure} has incorrect format. {detailed_msg}\n" \
            f"To validate the file manually, you can use JSON schema {root_schema_uri}\n" \
-           f"or its public alternative {public_schema}"
-    raise errors.FailException(errs[0].message, hint=hint)
+           f"or its public alternative {public_schema}\n"
+
+    msg = errs[0].message
+    if ignore_schema_errors:
+        context['schema_errors_ignored'] = True
+        logger.warning(msg + "\n\n" + hint)
+        return
+    else:
+        hint += f"If you are sure that the file is correct, please contact support,\n" \
+                f"and use --ignore-schema-errors to proceed (option will be removed in next release).\n"
+
+    raise errors.FailException(msg, hint=hint)
 
 
 def _resolve_errors(errs: List[jsonschema.ValidationError]):
