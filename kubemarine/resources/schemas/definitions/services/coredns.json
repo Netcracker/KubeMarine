@@ -237,11 +237,13 @@
     "GenericPluginSection": {
       "properties": {
         "priority": {
-          "type": "integer"
+          "type": "integer",
+          "description": "Defines an order in which the section will appear in the generated ConfigMap. If omitted, the section will be placed after all other sections with the defined priority"
         },
         "enabled": {
-          "type": ["string", "boolean"],
-          "default": true
+          "type": ["string", "boolean", "integer"],
+          "default": true,
+          "description": "The section is added to the generated ConfigMap only if it has positive 'enabled' value"
         },
         "data": {
           "type": "object"
