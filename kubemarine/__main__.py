@@ -114,9 +114,7 @@ def main():
         if arguments[0] == 'selftest':
             return selftest()
         elif arguments[0] == 'version':
-            with open('version', 'r') as f:
-                print('Kubemarine %s' % f.read())
-            return
+            return version()
 
     if len(arguments) < 1 or arguments[0] not in procedures.keys():
         descriptions_print_list = []
@@ -154,6 +152,11 @@ def import_procedure(name):
     module_name = 'kubemarine.procedures.%s' % name
     return __import__(module_name, fromlist=['object'])
 
+def version():
+
+    from kubemarine.core import utils
+    with open((utils.get_resource_absolute_path("version", script_relative=True), 'version')[0], 'r') as f:
+        print('Kubemarine %s' % f.read())
 
 def selftest():
 
