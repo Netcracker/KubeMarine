@@ -105,7 +105,6 @@ procedures = OrderedDict({
     },
 })
 
-
 def main():
     arguments = sys.argv[1:]
 
@@ -124,8 +123,7 @@ def main():
         for module_name, module in procedures.items():
             if items_description_by_groups.get(module['group']) is None:
                 items_description_by_groups[module['group']] = []
-            items_description_by_groups[module['group']].append(
-                '  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
+            items_description_by_groups[module['group']].append('  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
 
         previous_group = None
         for group, descriptions in items_description_by_groups.items():
