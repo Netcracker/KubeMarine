@@ -107,7 +107,6 @@ procedures = OrderedDict({
 
 
 def main():
-
     arguments = sys.argv[1:]
 
     if len(arguments) > 0:
@@ -125,7 +124,8 @@ def main():
         for module_name, module in procedures.items():
             if items_description_by_groups.get(module['group']) is None:
                 items_description_by_groups[module['group']] = []
-            items_description_by_groups[module['group']].append('  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
+            items_description_by_groups[module['group']].append(
+                '  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
 
         previous_group = None
         for group, descriptions in items_description_by_groups.items():
@@ -152,14 +152,15 @@ def import_procedure(name):
     module_name = 'kubemarine.procedures.%s' % name
     return __import__(module_name, fromlist=['object'])
 
-def version():
 
+def version():
     from kubemarine.core import utils
-    with open((utils.get_resource_absolute_path("version", script_relative=True), 'version')[0], 'r') as f:
+
+    with open(utils.get_resource_absolute_path("version", script_relative=True), 'r') as f:
         print('Kubemarine %s' % f.read())
 
-def selftest():
 
+def selftest():
     print("Running selftest")
 
     import time
@@ -218,7 +219,7 @@ def selftest():
     print("Finished")
 
     time_end = int(round(time.time() * 1000))
-    print("\nElapsed: %sms\n" % (time_end-time_start))
+    print("\nElapsed: %sms\n" % (time_end - time_start))
 
 
 if __name__ == '__main__':
