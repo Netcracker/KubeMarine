@@ -33,8 +33,6 @@ u''.encode('idna')
 # but Fabric2 writes to stderr if hide=false used and remote console has stderr messages.
 sys.stderr = sys.stdout
 
-release_version = 'non-release version'
-
 procedures = OrderedDict({
     'install': {
         'description': "Install a cluster from scratch",
@@ -116,7 +114,8 @@ def main():
         if arguments[0] == 'selftest':
             return selftest()
         elif arguments[0] == 'version':
-            print('Kubemarine %s' % release_version)
+            with open('version', 'r') as f:
+                print('Kubemarine %s' % f.read())
             return
 
     if len(arguments) < 1 or arguments[0] not in procedures.keys():
