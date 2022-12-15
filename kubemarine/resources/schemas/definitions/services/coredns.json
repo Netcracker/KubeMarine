@@ -75,14 +75,24 @@
           "description": "By enabling ready, an HTTP endpoint on port 8181 returns 200 OK when all plugins that are able to signal readiness have done so. If some are not ready, the endpoint still returns a 503 with the body containing the list of plugins that are not ready. Once a plugin has signaled that it is ready, it is not queried again."
         },
         "prometheus": {
-          "type": "string",
-          "default": ":9153",
-          "description": "With Prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics"
+          "description": "With Prometheus, you export metrics from the CoreDNS and any plugin that has them. The metrics path is fixed to /metrics",
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {
+              "type": "string",
+              "default": ":9153"
+            }
+          ]
         },
         "cache": {
-          "type": "integer",
-          "default": 30,
-          "description": "With cache enabled, all records except zone transfers and metadata records are cached according to the ttl value set"
+          "description": "With cache enabled, all records except zone transfers and metadata records are cached according to the ttl value set",
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {
+              "type": "integer",
+              "default": 30
+            }
+          ]
         },
         "loop": {
           "type": "boolean",
@@ -100,37 +110,55 @@
           "description": "The loadbalance acts as a round-robin DNS load balancer by randomizing the order of A, AAAA, and MX records in the answer"
         },
         "forward": {
-          "$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings",
-          "description": "The forward plugin re-uses already opened sockets to the upstreams. It supports UDP, TCP, and DNS-over-TLS. It is used in band health checking."
+          "description": "The forward plugin re-uses already opened sockets to the upstreams. It supports UDP, TCP, and DNS-over-TLS. It is used in band health checking.",
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {"$ref": "../common/utils.json#/definitions/NonEmptyArrayOfStrings"}
+          ]
         },
         "rewrite": {
           "$ref": "#/definitions/CustomPlugin",
           "description": "The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema."
         },
         "hosts": {
-          "type": "object",
           "description": "The hosts plugin is useful for serving zones from a /etc/hosts like file. It serves from a preloaded file, which is applied from ConfigMap during the installation.",
-          "properties": {
-            "default": {"$ref": "#/definitions/HostsPluginSection"}
-          },
-          "additionalProperties": {"$ref": "#/definitions/HostsPluginSection"}
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {
+              "type": "object",
+              "properties": {
+                "default": {"$ref": "#/definitions/HostsPluginSection"}
+              },
+              "additionalProperties": {"$ref": "#/definitions/HostsPluginSection"}
+            }
+          ]
         },
         "kubernetes": {
-          "type": "object",
           "description": "This plugin implements the Kubernetes DNS-Based Service Discovery Specification",
-          "properties": {
-            "default": {"$ref": "#/definitions/KubernetesPluginSection"}
-          },
-          "additionalProperties": {"$ref": "#/definitions/KubernetesPluginSection"}
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {
+              "type": "object",
+              "properties": {
+                "default": {"$ref": "#/definitions/KubernetesPluginSection"}
+              },
+              "additionalProperties": {"$ref": "#/definitions/KubernetesPluginSection"}
+            }
+          ]
         },
         "template": {
-          "type": "object",
           "description": "The template plugin allows you to dynamically respond to queries by just writing a template",
-          "properties": {
-            "default": {"$ref": "#/definitions/TemplatePluginSection"},
-            "reject-aaaa": {"$ref": "#/definitions/TemplatePluginSection"}
-          },
-          "additionalProperties": {"$ref": "#/definitions/TemplatePluginSection"}
+          "oneOf": [
+            {"$ref": "#/definitions/DisableSetting"},
+            {
+              "type": "object",
+              "properties": {
+                "default": {"$ref": "#/definitions/TemplatePluginSection"},
+                "reject-aaaa": {"$ref": "#/definitions/TemplatePluginSection"}
+              },
+              "additionalProperties": {"$ref": "#/definitions/TemplatePluginSection"}
+            }
+          ]
         }
       },
       "additionalProperties": {
@@ -139,6 +167,10 @@
           {"$ref": "#/definitions/CustomPlugin"}
         ]
       }
+    },
+    "DisableSetting": {
+      "type": "boolean",
+      "enum": [false, "False"]
     },
     "CustomPlugin": {
       "type": "object",
