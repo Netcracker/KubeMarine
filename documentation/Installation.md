@@ -2135,9 +2135,11 @@ services:
 For detailed description of the parameters, see [Installation without Internet Resources](#installation-without-internet-resources).
 For more information about Docker daemon parameters, refer to the official docker configuration file documentation at [https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file).
 
-**Note**: After applying the parameters, the docker is restarted on all nodes in the cluster.
+**Notes**: 
+* After applying the parameters, the docker is restarted on all nodes in the cluster.
+* Do not omit the `containerRuntime` parameter in cluster.yaml if you include `dockerConfig` or `containerdConfig` in `cri` section
 
-**Note**: Do not omit the `containerRuntime` parameter in cluster.yaml if you include `dockerConfig` or `containerdConfig` in `cri` section
+**Warning:** Kubernetes v1.24 and higher do not work with `docker` as a `cri`
 
 #### modprobe
 
