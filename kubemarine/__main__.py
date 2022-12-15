@@ -219,7 +219,7 @@ def selftest():
     print("Finished")
 
     time_end = int(round(time.time() * 1000))
-    print("\nElapsed: %sms\n" % (time_end - time_start))
+    print("\nElapsed: %sms\n" % (time_end-time_start))
 
 
 if __name__ == '__main__':
