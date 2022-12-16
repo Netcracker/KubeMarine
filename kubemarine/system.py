@@ -53,6 +53,7 @@ def enrich_etc_hosts(inventory, cluster):
     control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
     control_plain_names.append(cluster.inventory['cluster_name'])
     control_plain_names.append('control-plain')
+    control_plain_names = list(OrderedSet(control_plain_names))
     inventory['services']['etc_hosts'][control_plain] = control_plain_names
 
     for node in cluster.inventory['nodes']:

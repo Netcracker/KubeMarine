@@ -18,9 +18,9 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import kubernetes
-from kubemarine.core import utils
 from kubemarine.procedures import upgrade
 from kubemarine import demo
+from test.unit import utils
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
@@ -132,43 +132,69 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
 
 class UpgradePackagesEnrichment(unittest.TestCase):
-    def prepare_procedure_inventory(self, new) -> dict:
-        return {
-            'upgrade_plan': [new],
-            new: {
+    def setUp(self):
+        self.old = 'v1.24.0'
+        self.new = 'v1.24.2'
+        self.inventory, self.context = generate_upgrade_environment(self.old, self.new)
+        self.inventory['services']['packages'] = {}
+        self.upgrade: dict = {
+            'upgrade_plan': [self.new],
+            self.new: {
                 'packages': {
                     'associations': {
-                        'docker': {
-                            'package_name': 'docker-ce'
-                        }
-                    },
-                    'install': ['curl']
+                        'docker': {}
+                    }
                 }
             }
         }
 
+    def _new_cluster(self):
+        return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
+                                context=self.context)
+
     def test_enrich_packages_propagate_associations(self):
-        old = 'v1.24.0'
-        new = 'v1.24.2'
-        inventory, context = generate_upgrade_environment(old, new)
-        upgrade = self.prepare_procedure_inventory(new)
-        cluster = demo.new_cluster(inventory, procedure_inventory=upgrade, context=context)
+        self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
+        self.upgrade[self.new]['packages']['install'] = ['curl']
+        cluster = self._new_cluster()
         self.assertEqual(['curl'], cluster.inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
         self.assertEqual('docker-ce', cluster.inventory['services']['packages']['associations']['rhel']['docker']['package_name'],
                          "Associations packages are enriched incorrectly")
 
     def test_final_inventory_enrich_global(self):
-        old = 'v1.24.0'
-        new = 'v1.24.2'
-        inventory, context = generate_upgrade_environment(old, new)
-        upgrade = self.prepare_procedure_inventory(new)
-        cluster = demo.new_cluster(deepcopy(inventory), procedure_inventory=deepcopy(upgrade), context=context)
-        final_inventory = utils.get_final_inventory(cluster, inventory)
-        expected_final_packages = deepcopy(upgrade[new]['packages'])
+        self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
+        self.upgrade[self.new]['packages']['install'] = ['curl']
+        cluster = self._new_cluster()
+        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        expected_final_packages = deepcopy(self.upgrade[self.new]['packages'])
         expected_final_packages['install'] = {'include': expected_final_packages['install']}
         self.assertEqual(expected_final_packages, final_inventory['services']['packages'],
                          "Final inventory is recreated incorrectly")
+
+    def test_final_inventory_merge_packages(self):
+        self.inventory['services']['packages'].setdefault('install', {})['include'] = ['curl']
+        self.upgrade[self.new]['packages']['install'] = ['unzip', {'<<': 'merge'}]
+
+        self.inventory['services']['packages'].setdefault('upgrade', {})['exclude'] = ['conntrack']
+        self.upgrade[self.new]['packages'].setdefault('upgrade', {})['exclude'] = [{'<<': 'merge'}, 'socat']
+        cluster = self._new_cluster()
+
+        self.assertEqual(['unzip', 'curl'], cluster.inventory['services']['packages']['install']['include'])
+        self.assertEqual(['conntrack', 'socat'], cluster.inventory['services']['packages']['upgrade']['exclude'])
+        self.assertEqual(['*'], cluster.inventory['services']['packages']['upgrade']['include'])
+
+        utils.stub_associations_packages(cluster, {})
+        utils.stub_detect_packages(cluster, {"unzip": {}, "curl": {}})
+
+        finalized_inventory = utils.make_finalized_inventory(cluster)
+        self.assertEqual(['unzip', 'curl'], finalized_inventory['services']['packages']['install']['include'])
+        self.assertEqual(['conntrack', 'socat'], finalized_inventory['services']['packages']['upgrade']['exclude'])
+        self.assertEqual(['*'], finalized_inventory['services']['packages']['upgrade']['include'])
+
+        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        self.assertEqual(['unzip', 'curl'], final_inventory['services']['packages']['install']['include'])
+        self.assertEqual(['conntrack', 'socat'], final_inventory['services']['packages']['upgrade']['exclude'])
+        self.assertIsNone(final_inventory['services']['packages']['upgrade'].get('include'))
 
 
 if __name__ == '__main__':

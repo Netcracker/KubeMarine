@@ -63,7 +63,7 @@ public_cluster_ip: "10.101.0.1"
 services:
 
   kubeadm:
-    kubernetesVersion: v1.16.3
+    kubernetesVersion: v1.24.0
     controlPlaneEndpoint: 'k8s.example.com:6443'
     imageRepository: artifactory.example.com:5443/k8s.gcr.io
     networking:
@@ -99,6 +99,7 @@ services:
         enable-admission-plugins: NodeRestriction,PodNodeSelector
 
   cri:
+    containerRuntime: docker
     dockerConfig:
       ipv6: True
       log-driver: json-file
@@ -132,22 +133,23 @@ services:
         - 1.de.pool.ntp.org iburst
       makestep: 5 10
       rtcsync: True
-    # For Debian OS use timesyncd:
-    timesyncd:
-      Time:
-        NTP:
-          - 0.de.pool.ntp.org
-          - 1.de.pool.ntp.org
-        FallbackNTP:
-          - 2.de.pool.ntp.org
-          - 3.de.pool.ntp.org
-        RootDistanceMaxSec: 10
-        PollIntervalMinSec: 64
-        PollIntervalMaxSec: 1024
+
+    # For Debian OS use timesyncd. Uncomment and customize the following section:
+    # timesyncd:
+    #   Time:
+    #     NTP:
+    #       - 0.de.pool.ntp.org
+    #       - 1.de.pool.ntp.org
+    #     FallbackNTP:
+    #       - 2.de.pool.ntp.org
+    #       - 3.de.pool.ntp.org
+    #     RootDistanceMaxSec: 10
+    #     PollIntervalMinSec: 64
+    #     PollIntervalMaxSec: 1024
 
   thirdparties:
     /usr/bin/kubeadm:
-      source: 'https://example.com/kubernetes/v1.16.3/bin/linux/amd64/kubeadm'
+      source: 'https://example.com/kubernetes/v1.24.0/bin/linux/amd64/kubeadm'
       sha1: e5cdfcda337a5c8d59035da9db0c2b02913271d1
       groups:
         - control-plane
@@ -247,6 +249,20 @@ rbac:
       - apiVersion: v1
         kind: ServiceAccount
         metadata: {}
+        secrets: []
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata: {}
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+        subjects:
+          - kind: ServiceAccount
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          annotations: {}
+        type: kubernetes.io/service-account-token
 
   accounts:
     - name: superadmin
@@ -438,30 +454,3 @@ plugins:
                       name: kubernetes-dashboard
                       port:
                         number: 443
-
-    carts-db:
-      image: mongo
-    carts:
-      image: weaveworksdemos/carts:0.4.8
-    catalogue-db:
-      image: weaveworksdemos/catalogue-db:0.3.0
-    catalogue:
-      image: weaveworksdemos/catalogue:0.3.5
-    front-end:
-      image: weaveworksdemos/front-end:0.3.12
-    orders-db:
-      image: mongo
-    orders:
-      image: weaveworksdemos/orders:0.4.7
-    payment:
-      image: weaveworksdemos/payment:0.4.3
-    queue-master:
-      image: weaveworksdemos/queue-master:0.3.1
-    rabbitmq:
-      image: rabbitmq:3.6.8
-    shipping:
-      image: weaveworksdemos/shipping:0.4.8
-    user-db:
-      image: weaveworksdemos/user-db:0.4.0
-    user:
-      image: weaveworksdemos/user:0.4.7

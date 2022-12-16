@@ -163,12 +163,6 @@ class KubernetesCluster(Environment):
         """The method should fetch only node specific information that is not changed during Kubemarine run"""
         self.log.debug('Start detecting nodes context...')
 
-        for node in self.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-            self.context['nodes'][node['connect_to']] = {
-                "name": node['name'],
-                "roles": node['roles']
-            }
-
         from kubemarine import system
         system.whoami(self)
         self.log.verbose('Whoami check finished')
@@ -258,6 +252,13 @@ class KubernetesCluster(Environment):
             os_ids[host] = (os_details['family'], os_details['version'])
 
         return os_ids
+
+    def get_associations(self):
+        """
+        Returns association for all packages from inventory for the cluster.
+        The method can be used only if cluster has nodes with the same and supported OS family.
+        """
+        return self.inventory['services']['packages']['associations'][self.get_os_family()]
 
     def _get_associations_for_os(self, os_family: str, package: str) -> dict:
         if os_family in ('unknown', 'unsupported', 'multiple'):

@@ -62,7 +62,7 @@ class KME(RuntimeError):
 
 class FailException(Exception):
     def __init__(self, message='', reason: Union[str, Exception] = '', hint=''):
-        super().__init__()
+        super().__init__(message)
         self.message = message
         self.reason = reason
         self.hint = hint
