@@ -15,6 +15,8 @@
 import configparser
 import io
 
+from kubemarine.core.group import NodeGroupResult, NodeGroup
+
 
 def ls_repofiles(group, **kwargs):
     return group.sudo('ls -la /etc/yum.repos.d', **kwargs)
@@ -31,6 +33,15 @@ def backup_repo(group, repo_filename="*", **kwargs):
 
 
 def add_repo(group, repo_data="", repo_filename="predefined", **kwargs):
+    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
+    return group.sudo('yum clean all && sudo yum updateinfo', **kwargs)
+
+
+def get_repo_file_name(repo_filename="predefined"):
+    return '/etc/yum.repos.d/%s.repo' % repo_filename
+
+
+def create_repo_file(group, repo_data, repo_file):
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
@@ -38,8 +49,7 @@ def add_repo(group, repo_data="", repo_filename="predefined", **kwargs):
             config[repo_id] = data
         repo_data = io.StringIO()
         config.write(repo_data)
-    group.put(repo_data, '/etc/yum.repos.d/%s.repo' % repo_filename, sudo=True)
-    return group.sudo('yum clean all && sudo yum updateinfo', **kwargs)
+    group.put(repo_data, repo_file, sudo=True)
 
 
 def clean(group, mode="all", **kwargs):
@@ -95,4 +105,11 @@ def upgrade(group, include=None, exclude=None, **kwargs):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
+    return group.sudo(command, **kwargs)
+
+
+def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
+    if package is None:
+        raise Exception('You must specify package to search')
+    command = 'yum list %s' % package
     return group.sudo(command, **kwargs)

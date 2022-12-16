@@ -14,7 +14,7 @@
 
 import io
 
-from kubemarine.core.group import NodeGroupResult
+from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
 
@@ -34,13 +34,21 @@ def backup_repo(group, repo_filename="*", **kwargs) -> NodeGroupResult or None:
 
 
 def add_repo(group, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
+    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
+    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update', **kwargs)
+
+
+def get_repo_file_name(repo_filename="predefined"):
+    return '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename)
+
+
+def create_repo_file(group, repo_data, repo_file):
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
         repo_data_str = str(repo_data)
-    group.put(io.StringIO(repo_data_str), '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename), sudo=True)
-    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update', **kwargs)
+    group.put(io.StringIO(repo_data_str), repo_file, sudo=True)
 
 
 def clean(group, **kwargs) -> NodeGroupResult:
@@ -96,4 +104,12 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
+    return group.sudo(command, **kwargs)
+
+
+def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
+    if package is None:
+        raise Exception('You must specify package to search')
+    command = DEBIAN_HEADERS + 'apt update && ' + \
+              DEBIAN_HEADERS + 'apt show %s' % package
     return group.sudo(command, **kwargs)
