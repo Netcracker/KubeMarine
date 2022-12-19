@@ -436,11 +436,14 @@ def update_kubeapi_config_psp(control_planes, plugins_list):
         control_plane.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
     # force kube-apiserver pod restart, then wait for api to become available
-    control_planes.get_first_member().call(utils.wait_command_successful,
-                                    command="kubectl delete pod -n kube-system "
-                                            "$(sudo kubectl get pod -n kube-system "
-                                            "| grep 'kube-apiserver' | awk '{ print $1 }')")
-    control_planes.get_first_member().call(utils.wait_command_successful, command="kubectl get pod -A")
+        if control_planes.cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+            control_plane.call(utils.wait_command_successful,
+                                                   command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
+        else:
+            control_plane.call(utils.wait_command_successful,
+                                                   command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
+                                                           " | awk '{print $1}')")
+        control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def update_kubeapi_config(control_planes, options_list):
