@@ -12,7 +12,7 @@
     },
     "vrrp_ips": {
       "type": "array",
-      "description": "List of VRRP IPs to assign to balancers that redefine the vrrp_ips section of cluster.yaml. Each item can be either a simple address string or a dictionary with the address and additional parameters.",
+      "description": "List of VRRP IPs to be assigned to balancers. The VRRP IPs redefine the vrrp_ips section of cluster.yaml. Each item can be either a simple address string or a dictionary with the address and additional parameters.",
       "items": {
         "$ref": "definitions/vrrp_ip.json"
       }
