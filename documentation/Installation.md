@@ -536,11 +536,11 @@ node:
     roles: ["control-plane"]
 ```
 
-Allowed parameters to specify in the `node_defaults` section:
-* keyfile, username, connection_port, connection_timeout.
-* roles, labels, taints - make sense to specify at global level only if [Mini-HA Scheme](#mini-ha-scheme) is used.
+Following are the parameters allowed to be specified in the `node_defaults` section:
+* keyfile, username, connection_port, and connection_timeout.
+* roles, labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 
-For more information about the listed parameters, refer to the next section.
+For more information about the listed parameters, refer to the following section.
 
 ### nodes
 
@@ -552,7 +552,7 @@ The following options are supported:
 |---|---|---|---|---|---|
 |keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
-|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, KubeMarine will calculate the name by the member role and position in the inventory. Note that this will lead to undefined behaviour when adding / removing of the nodes.|
+|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, KubeMarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
 |address|ip address|no| |`10.101.0.1`|External node's IP-address|
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
@@ -924,8 +924,8 @@ nodes:
 *Can restart service*: Always yes, `keepalived`
 
 *OS specific*: Yes, different OS may have different default network interfaces.
-For interfaces with autodetection mode selected, it is automatically detected by the `internal_address` property of the node on which the particular VRRP IP should be set.
-By default, the autodetection is enabled.
+For interfaces with the autodetection mode selected, it is automatically detected by the `internal_address` property of the node on which the particular VRRP IP should be set.
+By default, autodetection is enabled.
 
 In order to assign VRRP IP you need to create a `vrrp_ips` section in the inventory and specify the appropriate configuration.
 You can specify several VRRP IP addresses.
@@ -2025,7 +2025,7 @@ This is configured in the `services.thirdparties` section. The contents of this 
 |**groups**|no|`None`|The list of group names to whose hosts the file should be uploaded.|
 |**node**|no|`None`|The name of node where the file should be uploaded.|
 |**nodes**|no|`None`|The list of node names where the file should be uploaded.|
-|**binary**|no|`true`|Specifies whether to treat the file as binary or as text. This is applicable, for example, for bash scripts. It is required to specify the property carefully in case of deploying from Windows deployer.|
+|**binary**|no|`true`|Specifies whether to treat the file as a binary or as a text. This is applicable, for example, for bash scripts. It is required to specify the property carefully in case of deploying from Windows deployer.|
 
 **Warning**: verify that you specified the path to the correct version of the thirdparty.
 
@@ -2374,7 +2374,7 @@ services:
 
 *Can restart service*: Always yes, `auditd`.
 
-*OS specific*: Yes, `prepare.system.audit.install` task is performed only on Debian OS family.
+*OS specific*: Yes, `prepare.system.audit.install` task is performed only on the Debian OS family.
 
 ```yaml
 services:
@@ -2391,7 +2391,7 @@ services:
       - -w /usr/bin/dockerd -k docker
 ```
 
-All except `-w /usr/bin/containerd -k docker` rules are applied only when `docker` container runtime is used.
+Except `-w /usr/bin/containerd -k docker`, all the other rules are applied only when the `docker` container runtime is used.
 
 #### ntp
 
@@ -2784,7 +2784,7 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 ##### haproxy
 
-This section contains the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
+This section describes the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
 By default, the following configuration is used:
 
 ```yaml
@@ -3277,7 +3277,7 @@ The yaml file that is created from the above template is applied to the cluster 
 
 *Installation task*: `deploy.plugins`
 
-In the `plugins` section, you can configure the parameters of the plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
+In the `plugins` section, you can configure the parameters of plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
 If you skip the plugin installation task, no plugins are installed.
 
 #### Predefined Plugins
@@ -4501,9 +4501,9 @@ To define a strategy in the list, you must specify a new list element. In
 this element, you need to put a key-value pair, where the key is `<<`, and value
 is the name of the join strategy.
 
-**Note**: This functionality is available only for lists and only single strategy pointer is allowed inside the list.
+**Note**: This functionality is available only for lists and only a single strategy pointer is allowed inside the list.
 
-**Note**: The functionality is available only in specific sections of inventory file.
+**Note**: This functionality is available only in specific sections of the inventory file.
 For a detailed set of allowed sections, refer to [List Merge Allowed Sections](#list-merge-allowed-sections).
 
 The following is an example of `replace` strategy:
@@ -4641,7 +4641,7 @@ plugins:
 
 #### List Merge Allowed Sections
 
-Applying of the list merge strategy is allowed in the following sections:
+Application of the list merge strategy is allowed in the following sections:
 * `plugins.installation.procedures`
 * `services.kubeadm.apiServer.extraVolumes`
 * `services.kernel_security.permissive`
