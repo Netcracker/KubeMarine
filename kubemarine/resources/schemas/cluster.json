@@ -15,7 +15,7 @@
     },
     "cluster_name": {
       "type": "string",
-      "description": "Address of the cluster on which the Control Plane Endpoint is raised, and used in the calculated parameters."
+      "description": "Address of the cluster. On this address, the Control Plane Endpoint is raised, and it is used in the calculated parameters."
     },
     "control_plain": {
       "type": "object",
@@ -23,11 +23,11 @@
       "properties": {
         "internal": {
           "type": "string",
-          "description": "Internal network address for the connection. It is used for all internal kubeapi traffic."
+          "description": "Internal network address for the connection. It is to be used for all internal kubeapi traffic."
         },
         "external": {
           "type": "string",
-          "description": "External network address for the connection. It is used for serving and balancing external traffic and external connections."
+          "description": "External network address for the connection. It is to be used for serving and balancing external traffic and external connections."
         }
       },
       "additionalProperties": false
