@@ -5,37 +5,37 @@
     "backup_location": {
       "type": "string",
       "default": "backup.tar.gz",
-      "description": "Target location of the backup archive"
+      "description": "Target location of the backup archive."
     },
     "backup_plan": {
       "type": "object",
-      "description": "Backup procedure configuration",
+      "description": "Backup procedure configuration.",
       "properties": {
         "etcd": {
           "type": "object",
-          "description": "Custom parameters for ETCD snapshot creation task",
+          "description": "Custom parameters for the ETCD snapshot creation task.",
           "properties": {
             "source_node": {
               "$ref": "definitions/common/node_ref.json#/definitions/Name",
-              "description": "the name of the node to create snapshot from. The node must be a control-plane and have a ETCD data located on it."
+              "description": "The name of the node to create a snapshot from. The node must be a control-plane and have an ETCD data located on it."
             }
           },
           "additionalProperties": false
         },
         "nodes": {
           "type": "object",
-          "description": "Add additional files for backup, or disable the default ones. Keys are the full file or directory paths. Values are the enable or exclude indicators",
+          "description": "Add additional files for backup, or disable the default ones. Keys are the full file or directory paths. Values are the enable or exclude indicators.",
           "additionalProperties": {
             "type": "boolean"
           }
         },
         "kubernetes": {
           "type": "object",
-          "description": "Specify resources for export if you need only restricted set of resources",
+          "description": "Specify resources for export if you need only a restricted set of resources.",
           "properties": {
             "namespaced_resources": {
               "type": "object",
-              "description": "Namespaced resources to export",
+              "description": "Namespaced resources to export.",
               "properties": {
                 "namespaces": {
                   "$ref": "#/definitions/ListOrEverything",
