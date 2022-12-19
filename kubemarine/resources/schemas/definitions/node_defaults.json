@@ -39,10 +39,6 @@
     "CommonNodeProperties": {
       "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],
       "properties": {
-        "roles": {
-          "$ref": "common/node_ref.json#/definitions/Roles",
-          "description": "Cluster member roles"
-        },
         "labels": {
           "type": "object",
           "description": "Additional labels for node(s)",
@@ -63,7 +59,7 @@
     "CommonNodePropertyNames": {
       "anyOf": [
         {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
-        {"enum": ["roles", "labels", "taints", "gateway"]}
+        {"enum": ["labels", "taints", "gateway"]}
       ]
     }
   }

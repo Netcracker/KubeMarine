@@ -330,7 +330,7 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
         try:
             for type in validator.TYPE_CHECKER._type_checkers:
                 if validator.is_type(error.instance, type):
-                    return f"Actual instance type {type!r} is not one of {reprs}"
+                    return f"Actual instance type is {type!r}. Expected: {reprs}."
         except (AttributeError, TypeError, jsonschema.exceptions.UnknownType):
             # In current 3rd-party version the error should not appear, but let's still fall back to default behaviour
             pass

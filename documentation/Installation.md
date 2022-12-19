@@ -537,8 +537,8 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, username, connection_port, and connection_timeout.
-* roles, labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
+* keyfile, username, connection_port, connection_timeout, and gateway.
+* labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 
 For more information about the listed parameters, refer to the following section.
 

@@ -22,6 +22,10 @@
           "type": "string",
           "description": "Internal node's IP-address"
         },
+        "roles": {
+          "$ref": "common/node_ref.json#/definitions/Roles",
+          "description": "Cluster member roles"
+        },
         "control_endpoint": {
           "type": "boolean",
           "default": false,
@@ -33,7 +37,7 @@
     "PropertyNames": {
       "anyOf": [
         {"$ref": "node_defaults.json#/definitions/CommonNodePropertyNames"},
-        {"enum": ["name", "address", "internal_address", "control_endpoint", "connect_to"]}
+        {"enum": ["name", "address", "internal_address", "roles", "control_endpoint", "connect_to"]}
       ]
     }
   }

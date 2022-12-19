@@ -116,7 +116,7 @@ class TestErrorHeuristics(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['vrrp_ips'][0] = 123
         with self.assertRaisesRegex(errors.FailException,
-                                    "Actual instance type '(integer|number)' is not one of 'string', 'object'"):
+                                    r"Actual instance type is '(integer|number)'\. Expected: 'string', 'object'\."):
             demo.new_cluster(inventory)
 
     def test_key_not_in_propertyNames(self):
