@@ -115,7 +115,8 @@ class TestErrorHeuristics(unittest.TestCase):
         """
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['vrrp_ips'][0] = 123
-        with self.assertRaisesRegex(errors.FailException, "123 is not of type 'string', 'object'"):
+        with self.assertRaisesRegex(errors.FailException,
+                                    "Actual instance type '(integer|number)' is not one of 'string', 'object'"):
             demo.new_cluster(inventory)
 
     def test_key_not_in_propertyNames(self):
@@ -126,7 +127,7 @@ class TestErrorHeuristics(unittest.TestCase):
         """
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['nodes'][0]['unsupported_property'] = 'value'
-        with self.assertRaisesRegex(errors.FailException, r"'unsupported_property' is not one of \[.*]"):
+        with self.assertRaisesRegex(errors.FailException, r"Property name 'unsupported_property' is not one of \[.*]"):
             demo.new_cluster(inventory)
 
     def test_raise_max_relevant_from_subschema(self):
@@ -162,7 +163,7 @@ class TestErrorHeuristics(unittest.TestCase):
                 "unsupported_property": "value"
             }
         }
-        with self.assertRaisesRegex(errors.FailException, r"'unsupported_property' is not one of \[.*]"):
+        with self.assertRaisesRegex(errors.FailException, r"Property name 'unsupported_property' is not one of \[.*]"):
             demo.new_cluster(inventory)
 
     def test_list_merging_strong_heuristic(self):

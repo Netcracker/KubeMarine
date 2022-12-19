@@ -14,7 +14,8 @@
 
 import json
 import pathlib
-from typing import List, Dict, Callable
+from textwrap import dedent
+from typing import List, Dict, Callable, Iterable
 
 import jsonschema
 from ordered_set import OrderedSet
@@ -67,7 +68,7 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     errs = _resolve_errors(errs)
     for err in errs:
         logger.verbose("------------------------------------------")
-        logger.verbose(err)
+        logger.verbose(_verbose_msg(validator, err))
 
     debug_filepath = log.get_dump_debug_filepath(context)
     if debug_filepath:
@@ -82,7 +83,7 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
            f"To validate the file manually, you can use JSON schema {root_schema_uri}\n" \
            f"or its public alternative {public_schema}\n"
 
-    msg = errs[0].message
+    msg = _error_msg(validator, errs[0])
     if ignore_schema_errors:
         context['schema_errors_ignored'] = True
         logger.warning(msg + "\n\n" + hint)
@@ -284,3 +285,70 @@ def _append_relevance_element(relevance_value: tuple, elem):
     relevance_value = list(relevance_value)
     relevance_value.append(elem)
     return tuple(relevance_value)
+
+
+def _error_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError):
+    return dedent(
+        f"""\
+        {_friendly_msg(validator, error)}
+        On inventory{_convert_to_indices(error.absolute_path)}
+        """.rstrip()
+    )
+
+
+def _verbose_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError):
+    schema_path = _convert_to_indices(list(error.absolute_schema_path)[:-1])
+    return dedent(
+        f"""\
+        {_friendly_msg(validator, error)}
+        
+        Failed validating {error.validator!r} in {schema_path}
+        On inventory{_convert_to_indices(error.absolute_path)}
+        """.rstrip()
+    )
+
+
+def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError) -> str:
+    if error.validator == 'minProperties':
+        return f"Number of properties is less than the minimum of {error.validator_value!r}. " \
+               f"Property names: {[prop for prop in error.instance]!r}"
+
+    if error.validator == 'maxProperties':
+        return f"Number of properties is greater than the maximum of {error.validator_value!r}. " \
+               f"Property names: {[prop for prop in error.instance]!r}"
+
+    if error.validator == 'minItems':
+        return f"Number of items equal to {len(error.instance)} is less than the minimum of {error.validator_value!r}"
+
+    if error.validator == 'maxItems':
+        return f"Number of items equal to {len(error.instance)} is greater than the maximum of {error.validator_value!r}"
+
+    if error.validator == 'type':
+        value = error.validator_value
+        expected_types = [value] if isinstance(value, str) else value
+        reprs = ", ".join(repr(type) for type in expected_types)
+        try:
+            for type in validator.TYPE_CHECKER._type_checkers:
+                if validator.is_type(error.instance, type):
+                    return f"Actual instance type {type!r} is not one of {reprs}"
+        except (AttributeError, TypeError, jsonschema.exceptions.UnknownType):
+            # In current 3rd-party version the error should not appear, but let's still fall back to default behaviour
+            pass
+
+    if error.validator == 'not' and isinstance(error.validator_value, dict) \
+            and error.validator_value.get('enum', {}) == ['<<'] and "propertyNames" in error.schema_path:
+        return "Property name '<<' is unexpected"
+
+    if error.validator == 'enum':
+        if "propertyNames" not in error.schema_path:
+            return f"Value should be one of {error.validator_value!r}"
+        else:
+            return f"Property name {error.instance!r} is not one of {error.validator_value!r}"
+
+    return error.message
+
+
+def _convert_to_indices(path: Iterable[str]):
+    if not path:
+        return ""
+    return f"[{']['.join(repr(p) for p in path)}]"
