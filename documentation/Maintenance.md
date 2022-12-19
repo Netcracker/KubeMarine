@@ -133,7 +133,7 @@ upgrade_nodes:
     roles: [worker]
 ```
 
-There is support for a shortened format.
+A shortened format is also supported.
 
 ```yaml
 upgrade_nodes:
