@@ -367,62 +367,62 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
     broken = []
     warnings = []
 
-    # Load script for checking sources
-    all_group = cluster.nodes['all']
-    local_path = utils.get_resource_absolute_path("resources/scripts/check_url_availability.py",
-                                                  script_relative=True)
-    random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
-    all_group.put(local_path, random_temp_path, binary=False)
-
-    # Collect repository urls
-    # TODO: think about better parsing
-    repository_urls = set()
-    repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
-    cluster_os = cluster.get_os_family()
-    if cluster_os == 'debian':
-        # For debian
-        for repository in repositories:
-            repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repository.split(' ')), None)
-            if repository_url is not None:
-                repository_urls.add(repository_url)
-            else:
-                broken.append(f"Found broken repository: '{repository}'")
-    elif cluster_os in ['rhel', 'rhel8']:
-        # For rhel
-        for repo_name, repo_conf in repositories.items():
-            repository_url = repo_conf.get('baseurl')
-            if repository_url is not None:
-                repository_urls.add(repository_url)
-            else:
-                broken.append(f"Found broken repository: '{repo_name}'")
-    else:
-        raise Exception('Failed to parse package repositories for unknown or multiple OS')
-
-    for node in all_group.get_ordered_members_list(provide_node_configs=True):
-        # Check if resolv.conf is actual
-        resolv_conf_actual = check_resolv_conf(node['connection'])
-
-        if not resolv_conf_actual:
-            warnings.append(f"resolv.conf is not installed for node {node['connect_to']}: "
-                            f"Package repositories can be unavailable. You can install resolv.conf using task "
-                            f"`install --tasks prepare.dns.resolv_conf`")
-
-        # Check with script
-        python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
-        for repository_url in repository_urls:
-            res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, repository_url,
-                                                          cluster.inventory['timeout_download']), warn=True)
-            _, result = list(res.items())[0]
-            if result.failed and resolv_conf_actual:
-                broken.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
-            elif result.failed:
-                warnings.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
-
-    # Remove file
-    rm_command = "rm %s" % random_temp_path
-    all_group.run(rm_command)
-
     with TestCase(cluster.context['testsuite'], '013', 'Software', 'Package Repositories') as tc:
+        # Collect repository urls
+        # TODO: think about better parsing
+        repository_urls = set()
+        repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
+        cluster_os = cluster.get_os_family()
+        if cluster_os == 'debian':
+            # For debian
+            for repo in repositories:
+                repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
+                if repository_url is not None:
+                    repository_urls.add(repository_url)
+                else:
+                    broken.append(f"Found broken repository: '{repo}'")
+        elif cluster_os in ['rhel', 'rhel8']:
+            # For rhel
+            for repo_name, repo_conf in repositories.items():
+                if repo_conf.get('baseurl') is not None:
+                    repository_urls.add(repo_conf.get('baseurl'))
+                else:
+                    broken.append(f"Found broken repository: '{repo_name}'")
+        else:
+            # Skip check in case of multiply or unknown OS
+            raise TestWarn("Can't check package repositories on multiply OS")
+
+        # Load script for checking sources
+        all_group = cluster.nodes['all']
+        local_path = utils.get_resource_absolute_path("resources/scripts/check_url_availability.py",
+                                                  script_relative=True)
+        random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+        all_group.put(local_path, random_temp_path, binary=False)
+
+        for node in all_group.get_ordered_members_list(provide_node_configs=True):
+            # Check if resolv.conf is actual
+            resolv_conf_actual = check_resolv_conf(node['connection'])
+
+            if not resolv_conf_actual:
+                warnings.append(f"resolv.conf is not installed for node {node['connect_to']}: "
+                                f"Package repositories can be unavailable. You can install resolv.conf using task "
+                                f"`install --tasks prepare.dns.resolv_conf`")
+
+            # Check with script
+            python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+            for repository_url in repository_urls:
+                res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, repository_url,
+                                                          cluster.inventory['timeout_download']), warn=True)
+                _, result = list(res.items())[0]
+                if result.failed and resolv_conf_actual:
+                    broken.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
+                elif result.failed:
+                    warnings.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
+
+        # Remove file
+        rm_command = "rm %s" % random_temp_path
+        all_group.run(rm_command)
+
         if broken:
             raise TestFailure('Found problems for package repositories', hint=yaml.safe_dump(broken))
         elif warnings:
@@ -438,7 +438,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
         # Check if package repos are actual
         package_repos_are_actual = check_package_repositories(node['connection'])
         if not package_repos_are_actual:
-            warnings.append(f"Package repos are not installed for {node['connect_to']}: "
+            warnings.append(f"Package repositories are not installed for {node['connect_to']}: "
                             f"Packages can be unavailable. You can install it using tasks "
                             f"`install --tasks prepare.dns.resolv_conf,prepare.package_manager.configure`")
 
