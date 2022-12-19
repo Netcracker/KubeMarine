@@ -4,7 +4,7 @@
   "properties": {
     "nodes": {
       "type": "array",
-      "description": "New nodes in the same format as that of the installation procedure",
+      "description": "New nodes in the same format as that of the installation procedure.",
       "minItems": 1,
       "items": {
         "$ref": "definitions/node.json"
@@ -12,7 +12,7 @@
     },
     "vrrp_ips": {
       "type": "array",
-      "description": "List of VRRP IPs to assign to balancers that redefines vrrp_ips section of cluster.yaml. Each item can be either a simple address string or a dictionary with the address and additional parameters.",
+      "description": "List of VRRP IPs to assign to balancers that redefine the vrrp_ips section of cluster.yaml. Each item can be either a simple address string or a dictionary with the address and additional parameters.",
       "items": {
         "$ref": "definitions/vrrp_ip.json"
       }
