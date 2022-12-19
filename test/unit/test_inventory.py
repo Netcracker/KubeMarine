@@ -14,9 +14,10 @@
 # limitations under the License.
 import copy
 import unittest
+from copy import deepcopy
 
 from kubemarine import demo
-from kubemarine.core import utils
+from kubemarine.core import errors, utils
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -48,6 +49,142 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(master=1, balancer=0, worker=0)
         inventory["nodes"][0]["name"] = "correct-node.name123"
         demo.new_cluster(inventory, fake=False)
+
+    def test_missed_roles(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        del inventory['nodes'][0]['roles']
+        with self.assertRaisesRegex(errors.FailException, r"'roles' is a required property"):
+            demo.new_cluster(inventory)
+
+    def test_not_supported_role(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['nodes'][0]['roles'] = ['test']
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['worker', 'control-plane', 'master', 'balancer']"):
+            demo.new_cluster(inventory)
+
+    def test_explicitly_added_service_role(self):
+        error_regex = r"Value should be one of \['worker', 'control-plane', 'master', 'balancer']"
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['nodes'][1]['roles'].append('add_node')
+        context = demo.create_silent_context(procedure='add_node')
+        context['nodes'] = demo.generate_nodes_context(inventory)
+        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
+        with self.assertRaisesRegex(errors.FailException, error_regex):
+            demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
+
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['nodes'][1]['roles'].append('remove_node')
+        context = demo.create_silent_context(procedure='remove_node')
+        context['nodes'] = demo.generate_nodes_context(inventory)
+        procedure_inventory = {'nodes': deepcopy([inventory['nodes'][0]])}
+        with self.assertRaisesRegex(errors.FailException, error_regex):
+            demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
+
+    def test_remove_node_invalid_specification(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        context = demo.create_silent_context(procedure='remove_node')
+        procedure_inventory = {'nodes': [inventory['nodes'][0]['name']]}
+        with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'\. Expected: 'object'"):
+            demo.new_cluster(deepcopy(inventory), context=deepcopy(context), procedure_inventory=procedure_inventory)
+
+        procedure_inventory = {'nodes': [{}]}
+        with self.assertRaisesRegex(errors.FailException, r"'name' is a required property"):
+            demo.new_cluster(deepcopy(inventory), context=deepcopy(context), procedure_inventory=procedure_inventory)
+
+    def test_empty_roles_node_names(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['nodes'][0]['roles'] = []
+        del inventory['nodes'][0]['name']
+        with self.assertRaisesRegex(errors.FailException, r"Number of items equal to 0 is less than the minimum of 1"):
+            demo.new_cluster(inventory)
+
+    def test_missed_any_address(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        context = demo.create_silent_context()
+        context['nodes'] = demo.generate_nodes_context(inventory)
+        del inventory['nodes'][0]['address']
+        del inventory['nodes'][0]['internal_address']
+        with self.assertRaisesRegex(errors.FailException, r"'internal_address' is a required property"):
+            cluster = demo.FakeKubernetesCluster(inventory, context)
+            cluster.enrich()
+
+    def test_mix_registry_approaches(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['registry'] = {
+            'endpoints': ['one'],
+            'docker_port': 1000
+        }
+        with self.assertRaisesRegex(errors.FailException, r"'docker_port' was unexpected"):
+            demo.new_cluster(inventory)
+
+    def test_registry_unexpected_endpoints_format(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['registry'] = {
+            'endpoints': [True],
+        }
+        with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'boolean'. Expected: 'string'"):
+            demo.new_cluster(inventory)
+
+    def test_apparmor_unexpected_state(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kernel_security'] = {
+            'apparmor': {"unexpected_state": []}
+        }
+        with self.assertRaisesRegex(errors.FailException, r"'unexpected_state' was unexpected"):
+            demo.new_cluster(inventory)
+
+    def test_selinux_unexpected_state(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kernel_security'] = {
+            'selinux': {"state": 'unexpected'}
+        }
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['enforcing', 'permissive', 'disabled']"):
+            demo.new_cluster(inventory)
+
+    def test_selinux_unexpected_policy(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['kernel_security'] = {
+            'selinux': {"policy": 'unexpected'}
+        }
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['targeted', 'strict']"):
+            demo.new_cluster(inventory)
+
+    def test_old_docker_declaration(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['docker'] = {}
+        with self.assertRaisesRegex(errors.FailException, r"'docker' was unexpected"):
+            demo.new_cluster(inventory)
+
+    def test_unexpected_container_runtime(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['cri'] = {
+            'containerRuntime': 'unexpected'
+        }
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['containerd', 'docker']"):
+            demo.new_cluster(inventory)
+
+    def test_account_name_not_defined(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory.setdefault('rbac', {})['accounts'] = [
+            {'role': 'cluster-admin'}
+        ]
+        with self.assertRaisesRegex(errors.FailException, r"'name' is a required property"):
+            demo.new_cluster(inventory)
+
+    def test_account_role_not_defined(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory.setdefault('rbac', {})['accounts'] = [
+            {'name': 'superadmin'}
+        ]
+        with self.assertRaisesRegex(errors.FailException, r"'role' is a required property"):
+            demo.new_cluster(inventory)
+
+    def test_valid_accounts(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory.setdefault('rbac', {})['accounts'] = [
+            {'name': 'superadmin', 'role': 'cluster-admin'}
+        ]
+        demo.new_cluster(inventory)
 
     def test_new_group_from_nodes(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)

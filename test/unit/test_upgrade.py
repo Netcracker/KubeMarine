@@ -18,6 +18,7 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import kubernetes
+from kubemarine.core import errors
 from kubemarine.procedures import upgrade
 from kubemarine import demo
 from test.unit import utils
@@ -97,38 +98,51 @@ def generate_upgrade_environment(old, new) -> (dict, dict):
 
 class UpgradeDefaultsEnrichment(unittest.TestCase):
 
-    def prepare_cluster(self, old, new):
-        inventory, context = generate_upgrade_environment(old, new)
-        upgrade = {'upgrade_plan': [new]}
-        cluster = demo.new_cluster(inventory, procedure_inventory=upgrade, context=context)
-        return cluster
+    def prepare_inventory(self, old, new):
+        self.inventory, self.context = generate_upgrade_environment(old, new)
+        self.upgrade: dict = {'upgrade_plan': [new]}
+
+    def _new_cluster(self):
+        return demo.new_cluster(self.inventory, procedure_inventory=self.upgrade, context=self.context)
 
     def test_correct_inventory(self):
         old_kubernetes_version = 'v1.24.0'
         new_kubernetes_version = 'v1.24.2'
-        cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
+        cluster = self._new_cluster()
         self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
     def test_incorrect_inventory_high_range(self):
         old_kubernetes_version = 'v1.22.9'
         new_kubernetes_version = 'v1.24.2'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (old_kubernetes_version, new_kubernetes_version)):
-            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
+            self._new_cluster()
 
     def test_incorrect_inventory_downgrade(self):
         old_kubernetes_version = 'v1.24.2'
         new_kubernetes_version = 'v1.22.9'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (old_kubernetes_version, new_kubernetes_version)):
-            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
+            self._new_cluster()
 
     def test_incorrect_inventory_same_version(self):
         old_kubernetes_version = 'v1.24.2'
         new_kubernetes_version = 'v1.24.2'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
                                                % (old_kubernetes_version, new_kubernetes_version)):
-            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
+            self._new_cluster()
+
+    def test_incorrect_disable_eviction(self):
+        old_kubernetes_version = 'v1.24.0'
+        new_kubernetes_version = 'v1.24.2'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
+        self.upgrade['disable-eviction'] = 'true'
+        with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'\. Expected: 'boolean'\."):
+            self._new_cluster()
 
 
 class UpgradePackagesEnrichment(unittest.TestCase):

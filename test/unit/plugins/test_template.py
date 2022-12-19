@@ -15,10 +15,20 @@
 import unittest
 
 from kubemarine import demo
+from kubemarine.core import errors
 from kubemarine.plugins import verify_template, apply_template
 
 
 class TestTemplate(unittest.TestCase):
+
+    def test_verify_missed_source(self):
+        for procedure_type in ('template', 'config'):
+            inventory = demo.generate_inventory(**demo.ALLINONE)
+            inventory['plugins'] = {'custom': {'installation': {'procedures': [
+                {procedure_type: {'not as source': 'something'}}
+            ]}}}
+            with self.assertRaisesRegex(errors.FailException, r"'source' is a required property"):
+                demo.new_cluster(inventory)
 
     def test_verify_template(self):
         test_cases = [

@@ -90,7 +90,7 @@ def upgrade_packages(cluster):
     upgrade_version = cluster.context["upgrade_version"]
 
     packages = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
-    if packages.get("install") or packages.get("upgrade") or packages.get("remove"):
+    if packages.get("install") is not None or packages.get("upgrade") is not None or packages.get("remove") is not None:
         install.system_prepare_package_manager_manage_packages(cluster)
 
 

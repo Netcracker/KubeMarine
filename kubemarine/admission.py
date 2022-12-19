@@ -615,6 +615,8 @@ def manage_enrichment(inventory, cluster):
     elif admission_impl == "pss":
         return manage_pss_enrichment(inventory, cluster)
 
+    return inventory
+
 
 def manage_pss(cluster, manage_type):
     first_control_plane = cluster.nodes["control-plane"].get_first_member()

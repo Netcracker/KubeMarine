@@ -277,33 +277,34 @@ def system_prepare_package_manager_configure(group: NodeGroup):
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_package_manager_manage_packages(group: NodeGroup):
     cluster = group.cluster
-    if not cluster.inventory["services"].get("packages", {}):
-        cluster.log.debug("Skipped - no packages configuration defined in config file")
-        return
-
     batch_tasks = []
     batch_parameters = {}
 
-    if cluster.inventory["services"]["packages"].get("remove", []):
+    packages_section = cluster.inventory["services"].get("packages", {})
+    if packages_section.get("remove", {}).get("include"):
         batch_tasks.append(packages.remove)
         batch_parameters["kubemarine.packages.remove"] = {
-            "include": cluster.inventory["services"]["packages"]['remove']['include'],
-            "exclude": cluster.inventory["services"]["packages"]['remove'].get('exclude')
+            "include": packages_section['remove']['include'],
+            "exclude": packages_section['remove'].get('exclude')
         }
 
-    if cluster.inventory["services"]["packages"].get("install", []):
+    if packages_section.get("install", {}).get("include"):
         batch_tasks.append(packages.install)
         batch_parameters["kubemarine.packages.install"] = {
-            "include": cluster.inventory["services"]["packages"]['install']['include'],
-            "exclude": cluster.inventory["services"]["packages"]['install'].get('exclude')
+            "include": packages_section['install']['include'],
+            "exclude": packages_section['install'].get('exclude')
         }
 
-    if cluster.inventory["services"]["packages"].get("upgrade", []):
+    if packages_section.get("upgrade", {}).get("include"):
         batch_tasks.append(packages.upgrade)
         batch_parameters["kubemarine.packages.upgrade"] = {
-            "include": cluster.inventory["services"]["packages"]['upgrade']['include'],
-            "exclude": cluster.inventory["services"]["packages"]['upgrade'].get('exclude')
+            "include": packages_section['upgrade']['include'],
+            "exclude": packages_section['upgrade'].get('exclude')
         }
+
+    if not batch_tasks:
+        cluster.log.debug("Skipped - no packages configuration defined in config file")
+        return
 
     try:
         batch_results = group.call_batch(batch_tasks, **batch_parameters)

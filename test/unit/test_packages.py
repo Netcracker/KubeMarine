@@ -17,7 +17,7 @@ from copy import deepcopy
 from typing import Optional
 
 from kubemarine import demo, packages
-from kubemarine.core import static, defaults, log
+from kubemarine.core import static, defaults, log, errors
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
 from test.unit import utils
@@ -77,6 +77,57 @@ def get_package_name(os_family, package) -> str:
 
 def cache_installed_packages(cluster: FakeKubernetesCluster):
     add_node.cache_installed_packages(cluster)
+
+
+class PackagesEnrichment(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.inventory['services']['packages'] = {}
+
+    def _new_cluster(self):
+        return demo.new_cluster(self.inventory)
+
+    def _packages(self, _type=None, __type=None):
+        packages = self.inventory['services']['packages']
+        if _type is None:
+            return packages
+        if __type is None:
+            return packages.setdefault(_type, [])
+        return packages.setdefault(_type, {}).setdefault(__type, [])
+
+    def test_invalid_include_type(self):
+        self._packages().setdefault('install', {})['include'] = 'curl'
+        with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'. Expected: 'array'"):
+            self._new_cluster()
+
+    def test_move_list_to_include(self):
+        for type_ in ('install', 'upgrade', 'remove'):
+            self._packages(type_).append('curl')
+        cluster = self._new_cluster()
+        packages_section = cluster.inventory['services']['packages']
+        for type_ in ('install', 'upgrade', 'remove'):
+            self.assertEqual(['curl'], packages_section[type_]['include'])
+
+    def test_allow_empty_action_list(self):
+        for type_ in ('install', 'upgrade', 'remove'):
+            self._packages(type_)
+        cluster = self._new_cluster()
+        packages_section = cluster.inventory['services']['packages']
+        for type_ in ('install', 'upgrade', 'remove'):
+            self.assertEqual([], packages_section[type_]['include'])
+
+    def test_missed_install_include(self):
+        self._packages('install', 'exclude').append('curl')
+        with self.assertRaisesRegex(errors.FailException, r"'include' is a required property"):
+            self._new_cluster()
+
+    def test_allowed_empty_upgrade_remove_include(self):
+        for type_ in ('upgrade', 'remove'):
+            self._packages(type_, 'exclude').append('curl')
+        cluster = self._new_cluster()
+        packages_section = cluster.inventory['services']['packages']
+        for type_ in ('upgrade', 'remove'):
+            self.assertEqual(['*'], packages_section[type_]['include'])
 
 
 class AssociationsEnrichment(unittest.TestCase):
