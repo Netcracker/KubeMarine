@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import copy
 import unittest
 
 from kubemarine import demo
@@ -109,6 +108,41 @@ class TestInventoryValidation(unittest.TestCase):
         final_inventory = utils.get_final_inventory(cluster, inventory)
         for node in final_inventory['nodes']:
             self.assertNotIn('address', node)
+
+    def test_internal_address_remove_node_inventory(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        for node in inventory['nodes']:
+            node.pop('address')
+        procedure_inventory = {
+            'nodes': [copy.deepcopy(inventory['nodes'][0])]
+        }
+
+        # Remove node inventory
+        context = demo.create_silent_context(procedure='remove_node')
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        final_inventory = utils.get_final_inventory(cluster)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
+
+    def test_internal_address_add_node_inventory(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        for node in inventory['nodes']:
+            node.pop('address')
+        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
+
+        # Add node inventory
+        context = demo.create_silent_context()
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        final_inventory = utils.get_final_inventory(cluster)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
+
 
 if __name__ == '__main__':
     unittest.main()
