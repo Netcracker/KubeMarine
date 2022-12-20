@@ -33,8 +33,6 @@ u''.encode('idna')
 # but Fabric2 writes to stderr if hide=false used and remote console has stderr messages.
 sys.stderr = sys.stdout
 
-release_version = 'non-release version'
-
 procedures = OrderedDict({
     'install': {
         'description': "Install a cluster from scratch",
@@ -107,17 +105,14 @@ procedures = OrderedDict({
     },
 })
 
-
 def main():
-
     arguments = sys.argv[1:]
 
     if len(arguments) > 0:
         if arguments[0] == 'selftest':
             return selftest()
         elif arguments[0] == 'version':
-            print('Kubemarine %s' % release_version)
-            return
+            return version()
 
     if len(arguments) < 1 or arguments[0] not in procedures.keys():
         descriptions_print_list = []
@@ -156,8 +151,14 @@ def import_procedure(name):
     return __import__(module_name, fromlist=['object'])
 
 
-def selftest():
+def version():
+    from kubemarine.core import utils
 
+    with open(utils.get_resource_absolute_path("version", script_relative=True), 'r') as f:
+        print('Kubemarine %s' % f.read())
+
+
+def selftest():
     print("Running selftest")
 
     import time
