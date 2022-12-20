@@ -19,6 +19,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [etcdctl compaction and defragmentation](#etcdctl-compaction-and-defragmentation)
   - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
   - [HTTPS Ingress doesn't work](#https-ingress-doesnt-work)
+  - [Garbage Collector does not initialize if convert webhook is broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -475,6 +476,31 @@ metadata:
 ...
 
 ```
+
+## Garbage Collector does not initialize if convert webhook is broken
+
+**Symptoms**: If the pod deletion process is in the background (which is the default setting), the namespace quota is not updated. If pod deletion is in the foreground, the pod freezes in `Terminating` state. If you create new quota then the REQUEST and LIMIT fields are empty:
+```
+# kubectl get quota -n test
+NAME            AGE    REQUEST   LIMIT
+default-quota   79m
+```
+
+**Root cause**: Creating a custom resource definition (CRD) with a broken converter webhook prevents garbage collector (GC) controller from initialization, which breaks on informer sync. Further, this issue is not visible until the GC controller restarts, because dynamically added CRD resources with non-working converter webhook do not break GC run, only GC initialization.
+
+This is a known issue in the kubernetes community (https://github.com/kubernetes/kubernetes/issues/101078), but it has not been fixed yet.
+
+**Solution**: In the `kube-controller-manager` pod logs, messages of the following type can be found:
+```
+E1202 03:28:26.861927       1 reflector.go:138] k8s.io/client-go/metadata/metadatainformer/informer.go:90: Failed to watch *v1.PartialObjectMetadata: failed to list *v1.PartialObjectMetadata: conversion webhook for deployment.nrm.netcracker.com/v1alpha22, Kind=Scale-product-rebase-ci-1-billing failed: Post "https://nrm-deployments-webhook-service.product-rebase-ci-1-billing.svc:443/convertv1-96-0-rc3?timeout=30s": service "nrm-deployments-webhook-service" not found
+
+```
+From this message you can find kind of CR. Use it to find broken CRD:
+```
+# kubectl get crd -o custom-columns=CRD_Name:.metadata.name,CR_Kind:.spec.names.kind | grep Scale-product-rebase-ci-1-billing
+scales-product-rebase-ci-1-billing.deployment.nrm.netcracker.com                               Scale-product-rebase-ci-1-billing
+```
+Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
 
 # Troubleshooting Kubemarine
 
