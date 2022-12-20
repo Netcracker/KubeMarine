@@ -131,10 +131,12 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         for node in inventory['nodes']:
             node.pop('address')
-        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
 
         # Add node inventory
-        context = demo.create_silent_context()
+        context = demo.create_silent_context(procedure='add_node')
+        host_different_os = inventory['nodes'][0]['internal_address']
+        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
+        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
         cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
@@ -143,6 +145,14 @@ class TestInventoryValidation(unittest.TestCase):
         for node in final_inventory['nodes']:
             self.assertNotIn('address', node)
 
+    def _nodes_context_one_different_os(self, inventory, host_different_os):
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context[host_different_os]['os'] = {
+            'name': 'centos',
+            'family': 'rhel',
+            'version': '7.9'
+        }
+        return nodes_context
 
 if __name__ == '__main__':
     unittest.main()
