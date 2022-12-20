@@ -96,5 +96,14 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertIn('master', roles)
         self.assertIn('control-plane', roles)
 
+    def test_internal_address_inventory(self):
+        inventory = demo.generate_inventory()
+        for node in inventory['nodes']:
+            node.pop('address')
+        cluster = demo.new_cluster(inventory)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+
 if __name__ == '__main__':
     unittest.main()
