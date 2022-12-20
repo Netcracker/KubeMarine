@@ -76,8 +76,7 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     else:
         detailed_msg = "Enable verbose logs to see details."
 
-    with open(utils.get_version_filepath(), 'r') as f:
-        version = f.read().strip()
+    version = utils.get_version()
     public_schema = f"https://raw.githubusercontent.com/Netcracker/KubeMarine/{version}/kubemarine/{root_schema_resource}"
     hint = f"Inventory file{for_procedure} has incorrect format. {detailed_msg}\n" \
            f"To validate the file manually, you can use JSON schema {root_schema_uri}\n" \

@@ -314,6 +314,11 @@ def get_version_filepath():
     return get_resource_absolute_path("version", script_relative=True)
 
 
+def get_version():
+    with open(get_version_filepath(), 'r') as f:
+        return f.read().strip()
+
+
 class ClusterStorage:
     """
     File preservation:

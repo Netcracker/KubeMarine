@@ -154,8 +154,7 @@ def import_procedure(name):
 def version():
     from kubemarine.core import utils
 
-    with open(utils.get_resource_absolute_path("version", script_relative=True), 'r') as f:
-        print('Kubemarine %s' % f.read())
+    print('Kubemarine %s' % utils.get_version())
 
 
 def selftest():
