@@ -123,10 +123,10 @@ spec:
     spec:
       serviceAccountName: haproxy-ingress-service-account
       nodeSelector:
-        {{ plugins['haproxy-ingress-controller']['backend']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['haproxy-ingress-controller']['backend']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       {% if plugins['haproxy-ingress-controller']['backend']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['haproxy-ingress-controller']['backend']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['haproxy-ingress-controller']['backend']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       containers:
       - name: ingress-default-backend
@@ -171,10 +171,10 @@ spec:
     spec:
       serviceAccountName: haproxy-ingress-service-account
       nodeSelector:
-        {{ plugins['haproxy-ingress-controller']['controller']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['haproxy-ingress-controller']['controller']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       {% if plugins['haproxy-ingress-controller']['controller']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['haproxy-ingress-controller']['controller']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['haproxy-ingress-controller']['controller']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       containers:
       - name: haproxy-ingress

@@ -4417,7 +4417,7 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
     spec:
       nodeSelector:
-        {{ plugins['calico']['typha']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['calico']['typha']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       hostNetwork: true
       tolerations:
         # Mark the pod as a critical add-on for rescheduling.
@@ -4428,7 +4428,7 @@ spec:
         - key: node.kubernetes.io/network-unavailable
           effect: NoExecute
         {% if plugins['calico']['typha']['tolerations'] is defined -%}
-          {{ plugins['calico']['typha']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+          {{ plugins['calico']['typha']['tolerations'] | toyaml | indent(width=8, first=False) -}}
         {%- endif %}
       # Since Calico can't network a pod until Typha is up, we need to run Typha itself
       # as a host-networked pod.
@@ -4807,7 +4807,7 @@ spec:
         k8s-app: calico-kube-controllers
     spec:
       nodeSelector:
-        {{ plugins['calico']['kube-controllers']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) }}
+        {{ plugins['calico']['kube-controllers']['nodeSelector'] | toyaml | indent(width=8, first=False) }}
       tolerations:
         # Mark the pod as a critical add-on for rescheduling.
         - key: CriticalAddonsOnly

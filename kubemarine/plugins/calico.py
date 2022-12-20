@@ -36,7 +36,7 @@ def enrich_inventory(inventory, cluster):
         if not flannel_required and not canal_required:
             inventory["plugins"]["calico"]["install"] = True
 
-    if inventory["plugins"]["calico"]["install"] == True:
+    if inventory["plugins"]["calico"]["install"]:
         # Check if original YAML and final YAML have different paths (applicable for non Jinja2 template)
         items = inventory['plugins']['calico']['installation']['procedures']
         for item in items:
@@ -86,7 +86,7 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
         else:
             # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
             # in other case those objects must be excluded
-            str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+            str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
             if str_value == 'false':
                 obj_list.pop(key)
                 excluded_list.append(key)
@@ -128,7 +128,7 @@ def enrich_configmap_calico_config(cluster, obj_list):
     val = cluster.inventory['plugins']['calico']['mtu']
     obj_list[key]['data']['veth_mtu'] = str(val)
     cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-    str_value = true_or_false(str(cluster.inventory['plugins']['calico']['typha']['enabled']))
+    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
     if str_value == "true":
         val = "calico-typha"
     elif str_value == "false":
@@ -221,7 +221,7 @@ def enrich_daemonset_calico_node(cluster, obj_list):
                         env_list.append({'name': name, 'valueFrom': value})
                     cluster.log.verbose(f"The {key} has been patched in "
                                         f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                if cluster.inventory['plugins']['calico']['typha']['enabled'] and \
+                if utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled']) == "true" and \
                         name == 'FELIX_TYPHAK8SSERVICENAME':
                     env_list.append({'name': name, 'valueFrom': value})
                     cluster.log.verbose(f"The {key} has been patched in "
@@ -392,21 +392,6 @@ def save_multiple_yaml(filepath, multi_yaml) -> None:
             yaml.dump_all(source_yamls, stream)
     except Exception as exc:
         print(f"Failed to save {filepath}", exc)
-
-
-def true_or_false(input_string):
-    """
-    The method check string and boolean value
-    :param input_string: String that should be checked
-    """
-    if input_string in ['true', 'True', 'TRUE']:
-        result = "true"
-    elif input_string in ['false', 'False', 'FALSE']:
-        result = "false"
-    else:
-        result = "undefined"
-
-    return result
 
 
 def enrich_image(cluster, image):

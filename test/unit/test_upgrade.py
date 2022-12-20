@@ -15,8 +15,10 @@
 
 
 import unittest
+from copy import deepcopy
 
 from kubemarine import kubernetes
+from kubemarine.core import utils
 from kubemarine.procedures import upgrade
 from kubemarine import demo
 
@@ -83,45 +85,88 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
         ], result)
 
 
+def generate_upgrade_environment(old, new) -> (dict, dict):
+    inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+    inventory['services']['kubeadm'] = {
+        'kubernetesVersion': old
+    }
+    context = demo.create_silent_context(procedure='upgrade')
+    context['upgrade_version'] = new
+    return inventory, context
+
+
 class UpgradeDefaultsEnrichment(unittest.TestCase):
 
     def prepare_cluster(self, old, new):
-        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        inventory['services']['kubeadm'] = {
-            'kubernetesVersion': old
-        }
-        cluster = demo.new_cluster(inventory)
-        cluster.context['upgrade_version'] = new
-        cluster.context['initial_procedure'] = 'upgrade'
+        inventory, context = generate_upgrade_environment(old, new)
+        upgrade = {'upgrade_plan': [new]}
+        cluster = demo.new_cluster(inventory, procedure_inventory=upgrade, context=context)
         return cluster
 
     def test_correct_inventory(self):
-        old_kubernetes_version = 'v1.22.2'
-        new_kubernetes_version = 'v1.22.10'
+        old_kubernetes_version = 'v1.24.0'
+        new_kubernetes_version = 'v1.24.2'
         cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
-        cluster._inventory = kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
         self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
     def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.22.2'
-        new_kubernetes_version = 'v1.28.2'
-        cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaises(Exception):
-            kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
+        old_kubernetes_version = 'v1.22.9'
+        new_kubernetes_version = 'v1.24.2'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
+                                               % (old_kubernetes_version, new_kubernetes_version)):
+            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
 
     def test_incorrect_inventory_downgrade(self):
-        old_kubernetes_version = 'v1.22.2'
-        new_kubernetes_version = 'v1.18.4'
-        cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaises(Exception):
-            kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
+        old_kubernetes_version = 'v1.24.2'
+        new_kubernetes_version = 'v1.22.9'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
+                                               % (old_kubernetes_version, new_kubernetes_version)):
+            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
 
     def test_incorrect_inventory_same_version(self):
-        old_kubernetes_version = 'v1.22.2'
-        new_kubernetes_version = 'v1.22.2'
-        cluster = self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaises(Exception):
-            kubernetes.enrich_upgrade_inventory(cluster.inventory, cluster)
+        old_kubernetes_version = 'v1.24.2'
+        new_kubernetes_version = 'v1.24.2'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
+                                               % (old_kubernetes_version, new_kubernetes_version)):
+            self.prepare_cluster(old_kubernetes_version, new_kubernetes_version)
+
+
+class UpgradePackagesEnrichment(unittest.TestCase):
+    def prepare_procedure_inventory(self, new):
+        return {
+            'upgrade_plan': [new],
+            new: {
+                'packages': {
+                    'associations': {
+                        'docker': {
+                            'package_name': 'docker-ce'
+                        }
+                    },
+                    'install': ['curl']
+                }
+            }
+        }
+
+    def test_enrich_packages_propagate_associations(self):
+        old = 'v1.24.0'
+        new = 'v1.24.2'
+        inventory, context = generate_upgrade_environment(old, new)
+        upgrade = self.prepare_procedure_inventory(new)
+        cluster = demo.new_cluster(inventory, procedure_inventory=upgrade, context=context)
+        self.assertEqual(['curl'], cluster.inventory['services']['packages']['install']['include'],
+                         "Custom packages are enriched incorrectly")
+        self.assertEqual('docker-ce', cluster.inventory['services']['packages']['associations']['rhel']['docker']['package_name'],
+                         "Associations packages are enriched incorrectly")
+
+    def test_final_inventory_enrich_global(self):
+        old = 'v1.24.0'
+        new = 'v1.24.2'
+        inventory, context = generate_upgrade_environment(old, new)
+        upgrade = self.prepare_procedure_inventory(new)
+        cluster = demo.new_cluster(deepcopy(inventory), procedure_inventory=deepcopy(upgrade), context=context)
+        final_inventory = utils.get_final_inventory(cluster, inventory)
+        self.assertEqual(upgrade[new]['packages'], final_inventory['services']['packages'],
+                         "Final inventory is recreated incorrectly")
 
 
 if __name__ == '__main__':

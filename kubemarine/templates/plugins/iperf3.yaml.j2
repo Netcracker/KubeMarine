@@ -39,11 +39,11 @@ spec:
     spec:
       {% if plugins['iperf3']['nodeSelector'] is defined -%}
       nodeSelector:
-        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       {% if plugins['iperf3']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       affinity:
         nodeAffinity:
@@ -98,11 +98,11 @@ spec:
     spec:
       {% if plugins['iperf3']['nodeSelector'] is defined -%}
       nodeSelector:
-        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['iperf3']['nodeSelector'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       {% if plugins['iperf3']['tolerations'] is defined -%}
       tolerations:
-        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, indentfirst=False) -}}
+        {{ plugins['iperf3']['tolerations'] | toyaml | indent(width=8, first=False) -}}
       {%- endif %}
       serviceAccountName: iperf3
       containers:

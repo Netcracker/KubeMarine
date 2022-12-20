@@ -25,18 +25,16 @@ import time
 from collections import OrderedDict
 import yaml
 
-from kubemarine import system
 from kubemarine.core import utils, flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
-from kubemarine.procedures import install
 
 
-def get_default_backup_files_list(cluster):
-    haproxy_service = cluster.inventory['services']['packages']['associations']['haproxy']['service_name']
-    keepalived_service = cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
+def get_default_backup_files_list(cluster: KubernetesCluster):
+    haproxy_service = cluster.get_package_association('haproxy', 'service_name')
+    keepalived_service = cluster.get_package_association('keepalived', 'service_name')
 
     backup_files_list = [
         "/etc/resolv.conf",
@@ -91,9 +89,9 @@ def export_ansible_inventory(cluster):
     cluster.log.verbose('ansible-inventory.ini exported to backup')
 
 
-def export_packages_list(cluster):
+def export_packages_list(cluster: KubernetesCluster):
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if system.get_os_family(cluster) in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8']:
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"

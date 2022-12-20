@@ -147,10 +147,15 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
     return inventory
 
 
-def install(group):
-    log = group.cluster.log
+def install(group: NodeGroup):
+    cluster = group.cluster
+    log = cluster.log
 
-    package_associations = group.cluster.inventory['services']['packages']['associations']['keepalived']
+    # todo why check and try to install all keepalives but finally filter out only new nodes?
+    group = group.get_new_nodes_or_self()
+    # todo consider probably different associations for nodes with different OS families
+    any_host = group.get_first_member().get_host()
+    package_associations = cluster.get_associations_for_node(any_host, 'keepalived')
 
     keepalived_version = group.sudo("%s -v" % package_associations['executable_name'], warn=True)
     keepalived_installed = True
@@ -163,9 +168,9 @@ def install(group):
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
-        installation_result = packages.install(group.get_new_nodes_or_self(), include=package_associations['package_name'])
+        installation_result = packages.install(group, include=package_associations['package_name'])
 
-    service_name = group.cluster.inventory['services']['packages']['associations']['keepalived']['service_name']
+    service_name = package_associations['service_name']
     patch_path = utils.get_resource_absolute_path("./resources/drop_ins/keepalived.conf", script_relative=True)
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     group.call(install_haproxy_check_script)
@@ -184,30 +189,31 @@ def uninstall(group):
     return packages.remove(group, include='keepalived')
 
 
-def restart(group):
+def restart(group: NodeGroup):
     results = NodeGroupResult(group.cluster)
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-        package_associations = os_specific_associations['keepalived']
-        results.update(system.restart_service(node['connection'], name=package_associations['service_name']))
+        service_name = group.cluster.get_package_association_for_node(
+            node['connect_to'], 'keepalived', 'service_name')
+        results.update(system.restart_service(node['connection'], name=service_name))
         group.cluster.log.debug("Sleep while keepalived comes-up...")
         time.sleep(group.cluster.globals['keepalived']['restart_wait'])
     return results
 
 
-def enable(group):
+def enable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.enable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'],
-                                  now=True)
+            service_name = group.cluster.get_package_association_for_node(
+                node['connect_to'], 'keepalived', 'service_name')
+            system.enable_service(node['connection'], name=service_name, now=True)
 
 
-def disable(group):
+def disable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'])
-            system.disable_service(node['connection'], name=os_specific_associations['keepalived']['service_name'])
+            service_name = group.cluster.get_package_association_for_node(
+                node['connect_to'], 'keepalived', 'service_name')
+            system.disable_service(node['connection'], name=service_name)
 
 
 def generate_config(inventory, node):
@@ -253,7 +259,7 @@ def configure(group: NodeGroup) -> NodeGroupResult:
 
             log.debug("Configuring keepalived on '%s'..." % node['name'])
 
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'])['keepalived']
+            package_associations = group.cluster.get_associations_for_node(node['connect_to'], 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
             group.sudo('mkdir -p %s' % configs_directory, hide=True)

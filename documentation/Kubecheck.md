@@ -22,6 +22,10 @@ This section provides information about the Kubecheck functionality.
       - [007 RAM Amount - Control-planes](#007-ram-amount-control-planes)
       - [007 RAM Amount - Workers](#007-ram-amount-workers)
     - [008 Distributive](#008-distributive)
+    - [009 PodSubnet](#009-podsubnet)
+    - [010 ServiceSubnet](#010-servicesubnet)
+    - [011 TCPPorts](#011-tcpports)
+    - [012 Thirdparties Availability](#012-thirdparties availability)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -58,6 +62,8 @@ This section provides information about the Kubecheck functionality.
     - [224 Calico configuration check](#224-calico-configuration-check)
     - [225 Pod security admission status](#225-pod-security-admission-status)
     - [226 Geo connectivity status](#226-geo-connectivity-status)
+    - [227 Apparmor status](#227-apparmor-status)
+    - [228 Apparmor configuration](#228-apparmor-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -139,6 +145,7 @@ The task tree is as follows:
   * pod_subnet_connectivity
   * service_subnet_connectivity
   * check_tcp_ports
+  * thirdparties_available
 * hardware
   * members_amount
     * vips
@@ -156,6 +163,8 @@ The task tree is as follows:
     * workers
 * system
   * distributive
+* thirdparties
+  * availability
 
 ##### 001 Connectivity
 
@@ -287,6 +296,12 @@ This test checks the connectivity between nodes inside the service's subnetwork.
 *Task*: `network.check_tcp_ports`
 
 This test checks if necessary ports are opened on the nodes.
+
+##### 012 Thirdparties Availability
+
+*Task*: `thirdparties.availability`
+
+This test checks if thirdparties are available from sources on needed nodes.
 
 #### PAAS Procedure
 
@@ -552,6 +567,18 @@ geo-monitor:
 ```
 
 For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
+
+###### 227 AppArmor status
+
+*Task*: `services.security.apparmor.status`
+
+The test checks the status of AppArmor. It should be `enabled` by default.
+
+###### 228 AppArmor configuration
+
+*Task*: `services.security.apparmor.config`
+
+The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may incude only part of the profiles.
 
 ### Report File Generation
 

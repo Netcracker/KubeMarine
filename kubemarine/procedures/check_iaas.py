@@ -24,6 +24,7 @@ import time
 from contextlib import contextmanager
 
 import fabric
+import yaml
 
 from kubemarine.core import flow, utils
 from kubemarine import system
@@ -272,8 +273,51 @@ def system_distributive(cluster):
             raise TestFailure("Unsupported version: %s" % ", ".join(detected_unsupported_version),
                               hint="Reinstall the OS on the host to one of the supported versions: %s" % \
                                       ", ".join(supported_versions))
-
+        
+        os_ids = cluster.get_os_identifiers()
+        different_os = set(os_ids.values())
+        if len(different_os) > 1:
+            cluster.log.warning(
+                f"Nodes have different OS families or versions. "
+                f"List of (OS family, version): {list(different_os)}")
+            raise TestWarn(f"Nodes have different OS families or versions")
+        
         tc.success(results=", ".join(detected_supported_os))
+
+
+def check_access_to_thirdparties(cluster: KubernetesCluster):
+    detect_preinstalled_python(cluster)
+    broken = []
+
+    # Load script for checking sources
+    all_group = cluster.nodes['all']
+    local_path = utils.get_resource_absolute_path("resources/scripts/check_thirdparty_avaliability.py",
+                                                  script_relative=True)
+    random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+    all_group.put(local_path, random_temp_path, binary=False)
+
+    for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
+        # Check if curl
+        if config['source'][:4] != 'http' or '://' not in config['source'][4:8]:
+            continue
+        # Check with script
+        common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
+        for node in common_group.get_ordered_members_list(provide_node_configs=True):
+            python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+            res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
+                                                           cluster.inventory['timeout_download']), warn=True)
+            _, result = list(res.items())[0]
+            if result.failed:
+                broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")
+
+    # Remove file
+    rm_command = "rm %s" % random_temp_path
+    all_group.run(rm_command)
+
+    with TestCase(cluster.context['testsuite'], '012', 'Thirdparties', 'Availability') as tc:
+        if broken:
+            raise TestFailure('Some thirdparties are unavailable', hint=yaml.safe_dump(broken))
+        tc.success('All thirdparties are available')
 
 
 def detect_preinstalled_python(cluster: KubernetesCluster):
@@ -639,6 +683,9 @@ tasks = OrderedDict({
     },
     'system': {
         'distributive': system_distributive
+    },
+    'thirdparties': {
+        'availability': check_access_to_thirdparties
     }
 })
 
@@ -681,7 +728,7 @@ def main(cli_arguments=None):
                         action='store_true',
                         help='forcibly disable HTML report file creation')
 
-    context = flow.create_context(parser, cli_arguments, procedure='iaas')
+    context = flow.create_context(parser, cli_arguments, procedure='check_iaas')
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 

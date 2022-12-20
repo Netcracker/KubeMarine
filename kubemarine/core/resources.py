@@ -143,7 +143,7 @@ class DynamicResources:
     def _create_cluster(self, context):
         log = self.logger()
         context = deepcopy(context)
-        default_merger.merge(context, self._get_nodes_context())
+        context['nodes'] = deepcopy(self._get_nodes_context())
         try:
             cluster = self._new_cluster_instance(context)
             cluster.enrich()
