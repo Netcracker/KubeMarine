@@ -17,6 +17,7 @@
 import unittest
 
 from kubemarine import demo
+from kubemarine.core import utils
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -100,10 +101,14 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory()
         for node in inventory['nodes']:
             node.pop('address')
+
         cluster = demo.new_cluster(inventory)
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
 
+        final_inventory = utils.get_final_inventory(cluster, inventory)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
 
 if __name__ == '__main__':
     unittest.main()
