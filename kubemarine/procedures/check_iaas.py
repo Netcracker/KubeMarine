@@ -363,17 +363,19 @@ def check_package_repositories(group: NodeGroup):
 
 
 def check_access_to_package_repositories(cluster: KubernetesCluster):
-    detect_preinstalled_python(cluster)
-    broken = []
-    warnings = []
-
     with TestCase(cluster.context['testsuite'], '013', 'Software', 'Package Repositories') as tc:
+        detect_preinstalled_python(cluster)
+        broken = []
+        warnings = []
+
         # Collect repository urls
         # TODO: think about better parsing
         repository_urls = set()
         repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
-        cluster_os = cluster.get_os_family()
-        if cluster_os == 'debian':
+        if cluster.get_os_family() not in ['debian', 'rhel', 'rhel8']:
+            # Skip check in case of multiply or unknown OS
+            raise TestWarn("Can't check package repositories on multiply OS")
+        if isinstance(repositories, list):
             # For debian
             for repo in repositories:
                 repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
@@ -381,16 +383,23 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                     repository_urls.add(repository_url)
                 else:
                     broken.append(f"Found broken repository: '{repo}'")
-        elif cluster_os in ['rhel', 'rhel8']:
+        elif isinstance(repositories, dict):
             # For rhel
             for repo_name, repo_conf in repositories.items():
                 if repo_conf.get('baseurl') is not None:
                     repository_urls.add(repo_conf.get('baseurl'))
                 else:
                     broken.append(f"Found broken repository: '{repo_name}'")
+        elif isinstance(repositories, str):
+            # String value
+            for repo in repositories.split('\n'):
+                repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
+                if repository_url is not None:
+                    repository_urls.add(repository_url)
+            if not repository_urls:
+                broken.append(f"Repositories configuration is broken: '{repositories}'")
         else:
-            # Skip check in case of multiply or unknown OS
-            raise TestWarn("Can't check package repositories on multiply OS")
+            broken.append(f"Repositories configuration is broken: '{repositories}'")
 
         # Load script for checking sources
         all_group = cluster.nodes['all']
