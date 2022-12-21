@@ -645,7 +645,7 @@ def manage_pss_enrichment(inventory, cluster):
                     if item.endswith("version"):
                         verify_version(item, profiles[item], minor_version)
                     else:
-                        verify_parameter(item, namespace[item], valid_profiles)
+                        verify_parameter(item, profiles[item], valid_profiles)
                 raise Exception("Custom labels for each namespace are currently not supported")
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
