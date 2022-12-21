@@ -1391,7 +1391,7 @@ def main(cli_arguments=None):
 
     '''
 
-    parser = flow.new_procedure_parser(cli_help, optional_config=True)
+    parser = flow.new_procedure_parser(cli_help, optional_config=True, tasks=tasks)
 
     parser.add_argument('--csv-report',
                         default='report.csv',
