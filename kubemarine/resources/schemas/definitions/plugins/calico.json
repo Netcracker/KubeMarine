@@ -41,7 +41,7 @@
       "description": "Enable announces of ClusterIP services CIDR through BGP"
     },
     "defaultAsNumber": {
-      "type": "integer",
+      "type": ["string", "integer"],
       "default": 64512,
       "description": "AS Number to be used by default for this cluster"
     },
@@ -52,7 +52,7 @@
         "type": "object",
         "properties": {
           "ip": {"type": "string"},
-          "as": {"type": "string"}
+          "as": {"type": ["string", "integer"]}
         },
         "required": ["ip", "as"],
         "additionalProperties": false
