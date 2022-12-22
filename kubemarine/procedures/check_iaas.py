@@ -321,50 +321,63 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
         tc.success('All thirdparties are available')
 
 
-def check_resolv_conf(group: NodeGroup):
-    resolv_conf_is_actual = True
-    cluster = group.cluster
+def check_resolv_conf(cluster: KubernetesCluster):
+    nodes_context = cluster.context['nodes']
+    hosts = [host for host, node_context in nodes_context.items() if 'resolv_conf_is_actual' not in node_context]
+    group = cluster.make_group(hosts)
 
-    if cluster.inventory["services"].get("resolv.conf") is not None:
+    if cluster.inventory["services"].get("resolv.conf") is None:
+        for host in hosts:
+            nodes_context[host]["resolv_conf_is_actual"] = True
+    else:
         # Create temp resolv.conf file
         resolv_conf_buffer = system.get_resolv_conf_buffer(cluster.inventory["services"].get("resolv.conf"))
         random_resolv_conf_path = "/tmp/%s.conf" % uuid.uuid4().hex
         group.put(resolv_conf_buffer, random_resolv_conf_path, binary=False)
 
         # Compare with existed resolv.conf
-        resolv_conf_is_actual = not group.run('[ -f /etc/resolv.conf ] && '
-                                              'cmp --silent /etc/resolv.conf %s' % random_resolv_conf_path,
-                                              warn=True).is_any_failed()
+        with RemoteExecutor(cluster) as exe:
+            group.run('[ -f /etc/resolv.conf ] && '
+                      'cmp --silent /etc/resolv.conf %s' % random_resolv_conf_path,
+                      warn=True)
+
+        for conn, res in exe.get_last_results().items():
+            nodes_context[conn.host]["resolv_conf_is_actual"] = not res[0].failed
         # Remove temp resolv.conf file
         group.run("rm %s" % random_resolv_conf_path)
 
-    return resolv_conf_is_actual
 
-
-def check_package_repositories(group: NodeGroup):
-    package_repos_are_actual = True
-    cluster = group.cluster
+def check_package_repositories(cluster: KubernetesCluster):
+    nodes_context = cluster.context['nodes']
+    hosts = [host for host, node_context in nodes_context.items() if 'package_repos_are_actual' not in node_context]
 
     repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
-    if repositories is not None:
-        # Create temp repos file
+    if repositories is None:
+        for host in hosts:
+            nodes_context[host]["package_repos_are_actual"] = True
+    else:
+        group = cluster.make_group(hosts)
         random_repos_conf_path = "/tmp/%s.repo" % uuid.uuid4().hex
-        packages.create_repo_file(group, repositories, random_repos_conf_path)
+        with RemoteExecutor(cluster) as exe:
+            for node in group.get_ordered_members_list(provide_node_configs=True):
+                # Create temp repos file
+                packages.create_repo_file(node['connection'], repositories, random_repos_conf_path)
 
-        # Compare with existed resolv.conf
-        predefined_repos_file = packages.get_repo_filename(group)
-        package_repos_are_actual = not group.sudo('[ -f %s ] && cmp --silent %s %s' %
-                                                 (predefined_repos_file, predefined_repos_file, random_repos_conf_path),
-                                                 warn=True).is_any_failed()
-        # Remove temp .repo file
-        group.sudo("rm %s" % random_repos_conf_path)
-
-    return package_repos_are_actual
+                # Compare with existed resolv.conf
+                predefined_repos_file = packages.get_repo_filename(node['connection'])
+                node['connection'].sudo('[ -f %s ] && cmp --silent %s %s' %
+                                        (predefined_repos_file, predefined_repos_file, random_repos_conf_path),
+                                        warn=True, hide=False)
+                # Remove temp .repo file
+                node['connection'].sudo("rm %s" % random_repos_conf_path)
+        for conn, results in exe.get_last_results().items():
+            nodes_context[conn.host]["package_repos_are_actual"] = not list(results.values())[-2].failed
 
 
 def check_access_to_package_repositories(cluster: KubernetesCluster):
     with TestCase(cluster.context['testsuite'], '013', 'Software', 'Package Repositories') as tc:
         detect_preinstalled_python(cluster)
+        check_resolv_conf(cluster)
         broken = []
         warnings = []
 
@@ -408,25 +421,26 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
         all_group.put(local_path, random_temp_path, binary=False)
 
-        for node in all_group.get_ordered_members_list(provide_node_configs=True):
-            # Check if resolv.conf is actual
-            resolv_conf_actual = check_resolv_conf(node['connection'])
+        with RemoteExecutor(cluster) as exe:
+            for node in all_group.get_ordered_members_list(provide_node_configs=True):
+                # Check with script
+                python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+                for repository_url in repository_urls:
+                    node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, repository_url,
+                                                            cluster.inventory['timeout_download']), warn=True)
 
+        for conn, url_results in exe.get_last_results().items():
+            # Check if resolv.conf is actual
+            resolv_conf_actual = cluster.context['nodes'][conn.host]['resolv_conf_is_actual']
             if not resolv_conf_actual:
-                warnings.append(f"resolv.conf is not installed for node {node['connect_to']}: "
+                warnings.append(f"resolv.conf is not installed for node {conn.host}: "
                                 f"Package repositories can be unavailable. You can install resolv.conf using task "
                                 f"`install --tasks prepare.dns.resolv_conf`")
-
-            # Check with script
-            python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
-            for repository_url in repository_urls:
-                res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, repository_url,
-                                                          cluster.inventory['timeout_download']), warn=True)
-                _, result = list(res.items())[0]
+            for i, result in url_results.items():
                 if result.failed and resolv_conf_actual:
-                    broken.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
+                    broken.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
                 elif result.failed:
-                    warnings.append(f"{node['connect_to']}, {repository_url}: {result.stderr}")
+                    warnings.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -440,35 +454,37 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 
 
 def check_access_to_packages(cluster: KubernetesCluster):
-    broken = []
-    warnings = []
+    with TestCase(cluster.context['testsuite'], '014', 'Software', 'Package Availability') as tc:
+        check_package_repositories(cluster)
+        broken = []
+        warnings = []
+        packages_to_check = cluster.inventory["services"]["packages"].get("install", {}).get('include', [])
 
-    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-        # Check if package repos are actual
-        package_repos_are_actual = check_package_repositories(node['connection'])
-        if not package_repos_are_actual:
-            warnings.append(f"Package repositories are not installed for {node['connect_to']}: "
-                            f"Packages can be unavailable. You can install it using tasks "
-                            f"`install --tasks prepare.dns.resolv_conf,prepare.package_manager.configure`")
+        with RemoteExecutor(cluster) as exe:
+            for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+                for package in packages_to_check:
+                    packages.search_package(node['connection'], package, warn=True)
 
-        packages_to_check = cluster.inventory["services"]["packages"].get("install", {}).get('include', []).copy()
-        for association_name, association in cluster.inventory["services"]["packages"].get("associations", {})\
-                .get(node['connection'].get_nodes_os(), {}).items():
-            if isinstance(association['package_name'], list):
-                packages_to_check.extend(association['package_name'])
-            else:
-                packages_to_check.append(association['package_name'])
+        #for association_name, association in cluster.inventory["services"]["packages"].get("associations", {})\
+        #        .get(node['connection'].get_nodes_os(), {}).items():
+        #    if isinstance(association['package_name'], list):
+        #        packages_to_check.extend(association['package_name'])
+       #     else:
+        #        packages_to_check.append(association['package_name'])
 
         # Check packages from install section
-        for package in packages_to_check:
-            result = packages.search_package(node['connection'], package, warn=True)
-            _, result = list(result.items())[0]
-            if result.failed and package_repos_are_actual:
-                broken.append(f"Package {package} is unavailable for node {node['connect_to']}")
-            elif result.failed:
-                warnings.append(f"Package {package} is unavailable for node {node['connect_to']}")
+        for conn, results in exe.get_last_results().items():
+            package_repos_are_actual = cluster.context['nodes'][conn.host]["package_repos_are_actual"]
+            if not package_repos_are_actual:
+                warnings.append(f"Package repositories are not installed for {conn.host}: "
+                                f"Packages can be unavailable. You can install it using tasks "
+                                f"`install --tasks prepare.dns.resolv_conf,prepare.package_manager.configure`")
+            for i, result in enumerate(results.values()):
+                if result.failed and package_repos_are_actual:
+                    broken.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")
+                elif result.failed:
+                    warnings.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")
 
-    with TestCase(cluster.context['testsuite'], '014', 'Software', 'Package Availability') as tc:
         if broken:
             raise TestFailure('Required packages are unavailable', hint=yaml.safe_dump(broken))
         elif warnings:
