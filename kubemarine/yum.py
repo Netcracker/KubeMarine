@@ -111,5 +111,5 @@ def upgrade(group, include=None, exclude=None, **kwargs):
 def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
     if package is None:
         raise Exception('You must specify package to search')
-    command = 'yum list %s' % package
+    command = 'yum list %s || echo "Package is unavailable"' % package
     return group.sudo(command, **kwargs)

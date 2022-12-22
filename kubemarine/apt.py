@@ -110,6 +110,5 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
 def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
     if package is None:
         raise Exception('You must specify package to search')
-    command = DEBIAN_HEADERS + 'apt update && ' + \
-              DEBIAN_HEADERS + 'apt show %s' % package
+    command = DEBIAN_HEADERS + 'apt show %s  || echo "Package is unavailable"' % package
     return group.sudo(command, **kwargs)

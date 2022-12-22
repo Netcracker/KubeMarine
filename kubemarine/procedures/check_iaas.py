@@ -22,6 +22,7 @@ import uuid
 from collections import OrderedDict
 import time
 from contextlib import contextmanager
+from copy import copy
 
 import fabric
 import yaml
@@ -33,7 +34,6 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
-from kubemarine.core.group import NodeGroup
 
 
 def connection_ssh_connectivity(cluster):
@@ -368,10 +368,12 @@ def check_package_repositories(cluster: KubernetesCluster):
                 node['connection'].sudo('[ -f %s ] && cmp --silent %s %s' %
                                         (predefined_repos_file, predefined_repos_file, random_repos_conf_path),
                                         warn=True, hide=False)
-                # Remove temp .repo file
-                node['connection'].sudo("rm %s" % random_repos_conf_path)
+
         for conn, results in exe.get_last_results().items():
-            nodes_context[conn.host]["package_repos_are_actual"] = not list(results.values())[-2].failed
+            nodes_context[conn.host]["package_repos_are_actual"] = not list(results.values())[-1].failed
+
+        # Remove temp .repo file
+        group.sudo("rm %s" % random_repos_conf_path)
 
 
 def check_access_to_package_repositories(cluster: KubernetesCluster):
@@ -413,6 +415,8 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                 broken.append(f"Repositories configuration is broken: '{repositories}'")
         else:
             broken.append(f"Repositories configuration is broken: '{repositories}'")
+        repository_urls = list(repository_urls)
+        cluster.log.debug(f"Repositories to check: {repository_urls}")
 
         # Load script for checking sources
         all_group = cluster.nodes['all']
@@ -421,13 +425,14 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
         all_group.put(local_path, random_temp_path, binary=False)
 
-        with RemoteExecutor(cluster) as exe:
+        with RemoteExecutor(cluster, ignore_failed=True) as exe:
             for node in all_group.get_ordered_members_list(provide_node_configs=True):
                 # Check with script
                 python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
                 for repository_url in repository_urls:
-                    node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, repository_url,
-                                                            cluster.inventory['timeout_download']), warn=True)
+                    node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
+                                           % (python_executable, random_temp_path, repository_url,
+                                              cluster.inventory['timeout_download']), warn=True)
 
         for conn, url_results in exe.get_last_results().items():
             # Check if resolv.conf is actual
@@ -436,11 +441,12 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                 warnings.append(f"resolv.conf is not installed for node {conn.host}: "
                                 f"Package repositories can be unavailable. You can install resolv.conf using task "
                                 f"`install --tasks prepare.dns.resolv_conf`")
-            for i, result in url_results.items():
-                if result.failed and resolv_conf_actual:
-                    broken.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
-                elif result.failed:
-                    warnings.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
+                problem_handler = warnings
+            else:
+                problem_handler = broken
+            for i, result in enumerate(url_results.values()):
+                if "Package repository is unavailable" in result.stdout:
+                    problem_handler.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -454,23 +460,46 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 
 
 def check_access_to_packages(cluster: KubernetesCluster):
+    def get_packages_to_install(node):
+        '''
+        This function get list of packages, that should be installed on node
+        '''
+        packages_to_install = copy(cluster.inventory["services"]["packages"].get("install", {}).get('include', []))
+        packages_associations = []
+
+        # Add docker or containerd
+        if cluster.inventory['services']['cri']['containerRuntime'] == 'docker':
+            packages_associations.append('docker')
+        else:
+            packages_associations.append('containerd')
+        # Add haproxy for balancer nodes
+        if 'balancer' in node['roles']:
+            packages_associations.append('haproxy')
+        # Add keepalived for keepalived nodes with vrrp_ips enabled
+        if cluster.inventory.get('vrrp_ips') and 'keepalived' in node['roles']:
+            packages_associations.append('keepalived')
+        # Add audit for debian
+        if node['connection'].get_nodes_os() not in ['rhel', 'rhel8']:
+            packages_associations.append('audit')
+
+        for association in packages_associations:
+            package_name = cluster.get_package_association_for_node(node['connect_to'], association, 'package_name')
+            if isinstance(package_name, list):
+                packages_to_install.extend(package_name)
+            else:
+                packages_to_install.append(package_name)
+        return packages_to_install
+
     with TestCase(cluster.context['testsuite'], '014', 'Software', 'Package Availability') as tc:
         check_package_repositories(cluster)
         broken = []
         warnings = []
-        packages_to_check = cluster.inventory["services"]["packages"].get("install", {}).get('include', [])
-
-        with RemoteExecutor(cluster) as exe:
+        with RemoteExecutor(cluster, ignore_failed=True) as exe:
             for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+                packages_to_check = get_packages_to_install(node)
+                cluster.log.debug(f"Packages to check for node {node['connect_to']}: {packages_to_check}")
                 for package in packages_to_check:
                     packages.search_package(node['connection'], package, warn=True)
-
-        #for association_name, association in cluster.inventory["services"]["packages"].get("associations", {})\
-        #        .get(node['connection'].get_nodes_os(), {}).items():
-        #    if isinstance(association['package_name'], list):
-        #        packages_to_check.extend(association['package_name'])
-       #     else:
-        #        packages_to_check.append(association['package_name'])
 
         # Check packages from install section
         for conn, results in exe.get_last_results().items():
@@ -479,11 +508,13 @@ def check_access_to_packages(cluster: KubernetesCluster):
                 warnings.append(f"Package repositories are not installed for {conn.host}: "
                                 f"Packages can be unavailable. You can install it using tasks "
                                 f"`install --tasks prepare.dns.resolv_conf,prepare.package_manager.configure`")
+                problem_handler = warnings
+            else:
+                problem_handler = broken
+            packages_to_check = get_packages_to_install(cluster.get_node(conn))
             for i, result in enumerate(results.values()):
-                if result.failed and package_repos_are_actual:
-                    broken.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")
-                elif result.failed:
-                    warnings.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")
+                if "Package is unavailable" in result.stdout:
+                    problem_handler.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")
 
         if broken:
             raise TestFailure('Required packages are unavailable', hint=yaml.safe_dump(broken))
