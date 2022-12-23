@@ -1,6 +1,5 @@
 documentation
 dump
-examples
 ansible-inventory.ini
 cluster.yaml
 build.sh

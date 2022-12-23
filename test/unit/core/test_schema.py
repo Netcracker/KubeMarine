@@ -19,7 +19,7 @@ from unittest import mock
 import yaml
 
 from kubemarine import demo, coredns, __main__
-from kubemarine.core import errors, utils
+from kubemarine.core import errors, utils, schema
 from kubemarine.procedures import install
 from test.unit import utils as test_utils
 
@@ -73,20 +73,30 @@ class FinalizedInventoryValidation(unittest.TestCase):
 
 class TestValidExamples(unittest.TestCase):
     def test_cluster_examples_valid(self):
-        inventories_dir = utils.get_resource_absolute_path("../examples/cluster.yaml", script_relative=True)
-        for inventory_filepath in Path(inventories_dir).glob('*'):
+        inventories_dir = Path(utils.get_resource_absolute_path("../examples/cluster.yaml", script_relative=True))
+        self.assertTrue(inventories_dir.is_dir(), "Examples not found")
+        for inventory_filepath in inventories_dir.glob('**/*'):
+            if inventory_filepath.is_dir() or 'cluster' not in inventory_filepath.name:
+                continue
             with open(inventory_filepath, 'r') as stream:
                 inventory = yaml.safe_load(stream)
 
             # check that enrichment is successful and the inventory is valid against the schema
+            context = demo.create_silent_context()
+            context['nodes'] = demo.generate_nodes_context(inventory)
             try:
-                demo.new_cluster(inventory)
+                cluster = demo.FakeKubernetesCluster(inventory, context=context)
+                schema.verify_inventory(cluster.raw_inventory, cluster)
             except Exception as e:
                 self.fail(f"Enrichment of {inventory_filepath.relative_to(inventories_dir)} failed: {e}")
 
     def test_procedure_examples_valid(self):
-        inventories_dir = utils.get_resource_absolute_path("../examples/procedure.yaml", script_relative=True)
-        for inventory_filepath in Path(inventories_dir).glob('*'):
+        inventories_dir = Path(utils.get_resource_absolute_path("../examples/procedure.yaml", script_relative=True))
+        if not inventories_dir.is_dir():
+            self.skipTest("Examples not found")
+        for inventory_filepath in inventories_dir.glob('**/*'):
+            if inventory_filepath.is_dir():
+                continue
             with open(inventory_filepath, 'r') as stream:
                 procedure_inventory = yaml.safe_load(stream)
 
