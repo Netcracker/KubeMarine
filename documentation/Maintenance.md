@@ -23,7 +23,8 @@ This section describes the features and steps for performing maintenance procedu
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
-  - [Changing Calico Settings](#changing-calico-settings)
+    - [Changing Calico Settings](#changing-calico-settings)
+    - [Changing Cluster CIDR](#changing-cluster-cidr)
 - [Common Practice](#common-practice)
 
 # Prerequisites
@@ -1279,6 +1280,114 @@ plugins:
     version: v3.10.1
 	
 ```
+
+## Changing Cluster CIDR
+
+There might be a situation when you have to change pod network  used in the cluster. Default `podSubnet` (`10.128.0.0/14` for IPv4 and `fd02::/48` for IPv6) may be inappropriate for some reason.
+
+If you are going to deploy a cluster from scratch you can set custom `podSubnet` in the cluster.yaml:
+```
+services:
+  kubeadm:
+    networking:
+      podSubnet: '<NEW_NETWORK>'
+```
+
+If an existing cluster has to be updated with new `podSubnet` the following steps should be taken:
+
+1. Check that any network security policies are disabled or new podSubnet is whitelisted. This is especially important for OpenStack environments.
+
+2. Create an ippool for new podSubnet:
+```
+# cat <<EOF | calicoctl apply -f -
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: new-ipv4-pool
+spec:
+  cidr: 10.228.0.0/14
+  ipipMode: CrossSubnet
+  natOutgoing: true
+EOF
+```
+
+**Note:** The pod subnet mask size for a node cannot be greater than 16 more than the cluster mask size. This is especially important for IPv6 networks. Default `node-cidr-mask-size` for IPv6 is `64`. Therefore you should use cluster network mask not shorter than 48 or change `node-cidr-mask-size` value respectively.
+
+3. Disable old ippool:
+```
+# calicoctl get ippool -o yaml > ./ippools.yaml
+# vi ippools.yaml
+...
+- apiVersion: projectcalico.org/v3
+  kind: IPPool
+  metadata:
+    name: <OLD_IPPOOL_NAME>
+  spec:
+    disabled: true
+...
+# calicoctl apply -f ./ippools.yaml
+```
+
+4. Change `podCIDR` parameter for all the nodes:
+```
+# export NODENAME=<NODENAME>
+# kubectl get node ${NODENAME} -o yaml > ${NODENAME}.yaml
+# sed -i "s~OLD_NODENET~NEW_NODENET~" ${NODENAME}.yaml
+# kubectl delete node ${NODENAME} && kubectl create -f ${NODENAME}.yaml
+``` 
+
+5. Change `cluster-cidr` in kube-controller-manager manifest at all the master nodes:
+```
+#vi /etc/kubernetes/manifests/kube-controller-manager.yaml
+...
+    - --cluster-cidr=10.228.0.0/14
+...
+```
+After changing the manifest kube-controller-manager por will restart automatically. Check that it has restarted successfully.
+
+6. Edit `calico-config` configmap, remove old ippool name and change ip range:
+```
+# kubectl -n kube-system edit cm calico-config
+...
+          "ipam": {"assign_ipv4": "true", "ipv4_pools": ["10.228.0.0/14"], "type": "calico-ipam"},
+...
+```
+
+7. Edit `calico-node` daemonset, change ip range:
+```
+# kubectl -n kube-system edit ds calico-node
+...
+        - name: CALICO_IPV4POOL_CIDR
+          value: 10.228.0.0/14
+...
+```
+and check that all the calico-node pods have restarted successfully.
+
+8. Change `clusterCIDR` in `kube-proxy` configmap and restart kube-proxy:
+```
+# kubectl -n kube-system edit cm kube-proxy
+...
+    clusterCIDR: 10.228.0.0/14
+...
+# kubectl -n kube-system rollout restart ds kube-proxy
+```
+
+9. Delete pods with ip addresses from the old ippool and check that they have restarted with addresses from the new pool successfully.
+
+10. Update `kubeadm-config` configmap with new cluster network:
+```
+# kubectl -n kube-system edit cm kubeadm-config
+...
+data:
+  ClusterConfiguration: |
+...
+    networking:
+      podSubnet: 10.228.0.0/14
+...
+```
+
+11. Check that everything works properly and remove old ippool if necessary.
+
 
 # Common Practice
 
