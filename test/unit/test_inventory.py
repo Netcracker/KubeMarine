@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import copy
 import unittest
 
 from kubemarine import demo
+from kubemarine.core import utils
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -95,6 +95,64 @@ class TestInventoryValidation(unittest.TestCase):
         roles = cluster.roles
         self.assertIn('master', roles)
         self.assertIn('control-plane', roles)
+
+    def test_internal_address_inventory(self):
+        inventory = demo.generate_inventory()
+        for node in inventory['nodes']:
+            node.pop('address')
+
+        cluster = demo.new_cluster(inventory)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        final_inventory = utils.get_final_inventory(cluster, inventory)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
+
+    def test_internal_address_remove_node_inventory(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        for node in inventory['nodes']:
+            node.pop('address')
+        procedure_inventory = {
+            'nodes': [copy.deepcopy(inventory['nodes'][0])]
+        }
+
+        # Remove node inventory
+        context = demo.create_silent_context(procedure='remove_node')
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        final_inventory = utils.get_final_inventory(cluster)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
+
+    def test_internal_address_add_node_inventory(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        for node in inventory['nodes']:
+            node.pop('address')
+
+        # Add node inventory
+        context = demo.create_silent_context(procedure='add_node')
+        host_different_os = inventory['nodes'][0]['internal_address']
+        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
+        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
+        for node in cluster.inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        final_inventory = utils.get_final_inventory(cluster)
+        for node in final_inventory['nodes']:
+            self.assertNotIn('address', node)
+
+    def _nodes_context_one_different_os(self, inventory, host_different_os):
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
+        nodes_context[host_different_os]['os'] = {
+            'name': 'centos',
+            'family': 'rhel',
+            'version': '7.9'
+        }
+        return nodes_context
 
 if __name__ == '__main__':
     unittest.main()
