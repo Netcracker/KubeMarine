@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Check thirdparty availability script.
+# Check url availability script.
 # The script is for testing purpose only.
-# The first argv parameter is thirdparty source. The second argv parameter is the timeout.
+# The first argv parameter is source. The second argv parameter is the timeout.
 
 import sys
 

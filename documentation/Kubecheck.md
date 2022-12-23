@@ -25,7 +25,9 @@ This section provides information about the Kubecheck functionality.
     - [009 PodSubnet](#009-podsubnet)
     - [010 ServiceSubnet](#010-servicesubnet)
     - [011 TCPPorts](#011-tcpports)
-    - [012 Thirdparties Availability](#012-thirdparties availability)
+    - [012 Thirdparties Availability](#012-thirdparties-availability)
+    - [013 Package Repositories](#013-package-repositories)
+    - [014 Package Availability](#014-package-availability)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -299,9 +301,21 @@ This test checks if necessary ports are opened on the nodes.
 
 ##### 012 Thirdparties Availability
 
-*Task*: `thirdparties.availability`
+*Task*: `software.thirdparties.availability`
 
 This test checks if thirdparties are available from sources on needed nodes.
+
+##### 013 Package Repositories
+
+*Task*: `software.packages.repositories`
+
+This test checks if defined package repositories are available from nodes.
+
+##### 014 Package Availability
+
+*Task*: `software.packages.availability`
+
+This test checks if needed package are available from nodes.
 
 #### PAAS Procedure
 

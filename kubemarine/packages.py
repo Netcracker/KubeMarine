@@ -332,3 +332,15 @@ def get_package_name(os_family: str, package: str) -> str:
             package_name = package.split("=")[0]
 
     return package_name
+
+
+def search_package(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
+    return get_package_manager(group).search(group, package, **kwargs)
+
+
+def create_repo_file(group: NodeGroup, repo_data, repo_file):
+    get_package_manager(group).create_repo_file(group, repo_data, repo_file)
+
+
+def get_repo_filename(group: NodeGroup, repo_filename="predefined"):
+    return get_package_manager(group).get_repo_file_name(repo_filename)

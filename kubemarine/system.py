@@ -263,16 +263,19 @@ def update_resolv_conf(group, config=None):
         raise Exception("Data can't be empty")
 
     # TODO: Use Jinja template
+    buffer = get_resolv_conf_buffer(config)
+    utils.dump_file(group.cluster, buffer, 'resolv.conf')
+    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True, hide=True)
+
+
+def get_resolv_conf_buffer(config):
     buffer = io.StringIO()
     if config.get("search") is not None:
         buffer.write("search %s\n" % config["search"])
     if config.get("nameservers") is not None:
         for address in config.get("nameservers"):
             buffer.write("nameserver %s\n" % address)
-
-    utils.dump_file(group.cluster, buffer, 'resolv.conf')
-
-    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True, hide=True)
+    return buffer
 
 
 def generate_etc_hosts_config(inventory, cluster=None):

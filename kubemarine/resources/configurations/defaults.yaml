@@ -375,7 +375,7 @@ services:
           config_location: '/etc/keepalived/keepalived.conf'
         audit:
           executable_name: 'auditctl'
-          package_name: 'auditd'
+          package_name: 'audit'
           service_name: 'auditd'
           config_location: '/etc/audit/rules.d/predefined.rules'
       rhel8:
@@ -406,7 +406,7 @@ services:
           config_location: '/etc/keepalived/keepalived.conf'
         audit:
           executable_name: 'auditctl'
-          package_name: 'auditd'
+          package_name: 'audit'
           service_name: 'auditd'
           config_location: '/etc/audit/rules.d/predefined.rules'
  
