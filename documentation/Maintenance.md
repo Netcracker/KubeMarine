@@ -1343,7 +1343,7 @@ EOF
     - --cluster-cidr=10.228.0.0/14
 ...
 ```
-After changing the manifest kube-controller-manager por will restart automatically. Check that it has restarted successfully.
+After changing the manifest kube-controller-manager pod will restart automatically. Check that it has restarted successfully.
 
 6. Edit `calico-config` configmap, remove old ippool name and change ip range:
 ```
@@ -1361,7 +1361,7 @@ After changing the manifest kube-controller-manager por will restart automatical
           value: 10.228.0.0/14
 ...
 ```
-and check that all the calico-node pods have restarted successfully.
+and check that all the `calico-node` pods have restarted successfully.
 
 8. Change `clusterCIDR` in `kube-proxy` configmap and restart kube-proxy:
 ```
