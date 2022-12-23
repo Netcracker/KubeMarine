@@ -131,7 +131,6 @@ services:
     kernel.panic: 10
     vm.overcommit_memory: 1
     kernel.panic_on_oops: 1
-    fs.may_detach_mounts: 1
 
   etc_hosts:
     127.0.0.1:
