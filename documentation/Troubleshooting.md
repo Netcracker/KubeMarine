@@ -505,9 +505,9 @@ Next, you need to restore this webhook, or if this is not possible, delete this 
 
 ## Pods stuck in "terminating" status
 
-Intended only for Centos 7.x versions starting from 7.4 and should be enabled on hosts where containerd container runtimes are being used:
+Intended only for RHEL, Centos 7.x versions starting from 7.4 and should be enabled on hosts where containerd container runtime are being used:
 
-**Solution**: Add parameter `fs.may_detach_mounts=1` in `/etc/sysctl.conf`
+**Solution**: Add parameter `fs.may_detach_mounts=1` in `/etc/sysctl.conf`and apply by `sysctl -p /etc/sysctl.conf` 
 
 # Troubleshooting Kubemarine
 
