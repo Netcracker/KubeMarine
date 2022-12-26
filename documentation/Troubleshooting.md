@@ -502,6 +502,12 @@ scales-product-rebase-ci-1-billing.deployment.nrm.netcracker.com                
 ```
 Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
 
+## Pods stuck in "terminating" status
+
+Intended only for Centos versions starting from 7.4 and Should be enabled on hosts where container runtimes are being used:
+
+**Solution**: Add parameter `fs.may_detach_mounts=1` in `/etc/sysctl.conf`
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
