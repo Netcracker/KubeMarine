@@ -529,7 +529,7 @@ Check the status of Port Security for a port:
 Add `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for a port:
 ```
 # openstack port set --allowed-address ip-address=10.128.0.0/14 ${PORT_ID} --insecure
-# openstack port set --allowed-address ip_address=172.30.0.0/16 ${PORT_ID} --insecure
+# openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
 ```
 
 # Troubleshooting Kubemarine
