@@ -20,6 +20,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
   - [HTTPS Ingress doesn't work](#https-ingress-doesnt-work)
   - [Garbage Collector does not initialize if convert webhook is broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
+  - [Pods stuck in "terminating" status during deletion](#pods-stuck-in-terminating-status-during-deletion)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -501,6 +502,12 @@ From this message you can find kind of CR. Use it to find broken CRD:
 scales-product-rebase-ci-1-billing.deployment.nrm.netcracker.com                               Scale-product-rebase-ci-1-billing
 ```
 Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
+
+## Pods stuck in "terminating" status during deletion
+
+Intended only for RHEL, Centos 7.x versions starting from 7.4 and should be enabled on hosts where containerd container runtime are being used:
+
+**Solution**: Add parameter `fs.may_detach_mounts=1` in `/etc/sysctl.conf`and apply by `sysctl -p /etc/sysctl.conf` 
 
 # Troubleshooting Kubemarine
 
