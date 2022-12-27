@@ -104,6 +104,20 @@ workaround:
   retries: 10
   delay_period: 5
 
+taint:
+  v1.21:
+    - 'node-role.kubernetes.io/master'
+  v1.22:
+    - 'node-role.kubernetes.io/master'
+  v1.23:
+    - 'node-role.kubernetes.io/master'
+  v1.24:
+    - 'node-role.kubernetes.io/master'
+    - 'node-role.kubernetes.io/control-plane'
+  v1.25:
+    - 'node-role.kubernetes.io/control-plane'
+
+
 thirdparties:
   /usr/bin/kubeadm:
     software_name: kubeadm

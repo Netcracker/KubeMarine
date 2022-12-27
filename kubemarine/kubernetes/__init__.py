@@ -171,28 +171,6 @@ def enrich_inventory(inventory, cluster):
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
 
-            if "control-plane" in node["roles"]:
-                # node is both control-plane and worker, thus we remove NoSchedule taint
-                if "taints" not in node:
-                    node["taints"] = []
-                # TODO if-else case should be revised for future Kubernetes releases
-                minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-                if minor_version < 24:
-                    # Do not add taints for upgrade procedure
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                elif minor_version == 24:
-                    # For Kubernetes v1.24 taints for upgrade procedure and installation procedure should be different
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                    else:
-                        if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
-                            node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                elif minor_version > 24:
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-
     # use first control plane internal address as a default bind-address
     # for other control-planes we override it during initialization
     # todo: use patches approach for node-specific options
@@ -663,23 +641,33 @@ def apply_labels(group):
 
 def apply_taints(group):
     log = group.cluster.log
-
-    log.debug("Applying additional taints for nodes")
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            if "taints" not in node:
-                log.verbose("No additional taints found for %s" % node['name'])
-                continue
-            log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
-            for taint in node["taints"]:
-                group.cluster.nodes["control-plane"].get_first_member() \
-                    .sudo("kubectl taint node %s %s" % (node["name"], taint))
+    minor_version = '.'.join((group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]).split('.')[:-1])
+    global_taint = group.cluster.globals['taint'][minor_version]
+    log.debug("Check taints for nodes")
+    for node in group.get_ordered_members_list(provide_node_configs=True):
+        result = node['connection'].sudo("kubectl get nodes %s -o=jsonpath='{range}{.spec.taints[*].key}{end}'" % (node['name']))
+        for node_result in list(result.values()):
+            taints = (node_result.stdout).split(' ')
+            for taint_line in global_taint:
+                if taint_line in taints:
+                    log.verbose("No additional default taint found for %s" % node['name'])
+                    continue
+                else:
+                    log.verbose("Add default taint %s on node %s " % (taint_line, node["name"]))
+                    node['connection'].sudo("kubectl taint node %s %s:NoSchedule" % (node["name"], taint_line))
+        if "taints" not in node:
+            log.verbose("No additional custom taints found for %s" % node['name'])
+            continue
+        log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
+        for taint in node["taints"]:
+            node['connection'].sudo("kubectl taint node %s %s" % (node["name"], taint))
+            log.verbose("Found additional custom taints on %s: %s" % (node['name'], node['taints']))
 
     log.debug("Successfully applied additional taints")
 
     return group.cluster.nodes["control-plane"].get_first_member() \
-        .sudo("kubectl get nodes -o=jsonpath="
-              "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
+            .sudo("kubectl get nodes -o=jsonpath="
+                  "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
 
 
 def is_cluster_installed(cluster):
