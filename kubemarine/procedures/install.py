@@ -584,10 +584,10 @@ cumulative_points = {
     # - net.ipv6.ip_nonlocal_bind = 1
     # - net.ipv6.conf.all.forwarding = 1
     # That is why reboot required BEFORE this task
-    'kubemarine.system.reboot_nodes': [
+    system.reboot_nodes: [
         "prepare.system.sysctl"
     ],
-    'kubemarine.system.verify_system': [
+    system.verify_system: [
         "prepare.system.sysctl"
     ]
 
