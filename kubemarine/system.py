@@ -411,11 +411,6 @@ def is_swap_disabled(group):
 
 
 def disable_swap(group):
-
-
-    group.cluster.schedule_cumulative_point(reboot_nodes)
-    group.cluster.schedule_cumulative_point(verify_system)
-
     log = group.cluster.log
 
     already_disabled, result = is_swap_disabled(group)
