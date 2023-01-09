@@ -1444,14 +1444,14 @@ More information:
 chmod 0700 /etc/kubernetes/enc/
 ```
 
-* The proper way for encryption using is to rotate the keys. The rotation keys procedure should take into consideration the fact that `EncryptionConfiguration` file must be equal on each `control-plane` node. During the rotation keys pocedure some operation of getting the encrypted resources may be unsuccessful.
+* The proper way for encryption using is to rotate the keys. The keys rotation procedure should take into consideration the fact that `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation pocedure some operation of getting the encrypted resources may be unsuccessful.
 * The `kube-apiserver` has `--encryption-provider-config-automatic-reload` option that allows applying new `EncryptionConfiguration` without `kube-apiserver` reload.
 
 * The proper `EncryptionConfiguration` disabling procedure must include replacement step for all resources that were previously encrypted(e.g. `secrets`):
 ```
 kubectl get secrets --all-namespaces -o json | kubectl replace -f -
 ```
-* ETCD restore procedures should take into consideration the keys rotaion, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup  but it prevents the inconvenience in the future.
+* ETCD restore procedures should take into consideration the keys rotaion, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup  but it prevents the inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
 * External services that interact with ETCD may stop working due to encryption enabling
 
 # Common Practice
