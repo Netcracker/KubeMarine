@@ -349,7 +349,7 @@ def parse_args(parser, arguments: list = None):
     return args
 
 
-def schedule_cumulative_point(cluster, point_method):
+def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method):
     _check_within_flow(cluster)
 
     point_fullname = point_method.__module__ + '.' + point_method.__qualname__
@@ -372,7 +372,7 @@ def schedule_cumulative_point(cluster, point_method):
         cluster.log.verbose('Method %s already scheduled' % point_fullname)
 
 
-def proceed_cumulative_point(cluster, points_list, point_task_path):
+def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list, point_task_path):
     _check_within_flow(cluster)
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
@@ -393,7 +393,7 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
 
             cluster.log.info("*** CUMULATIVE POINT %s ***" % point_method_fullname)
 
-            call_result = cluster.nodes["all"].get_new_nodes_or_self().call(point_method)
+            call_result = point_method(cluster)
             if point_method in scheduled_methods:
                 scheduled_methods.remove(point_method)
             results[point_method_fullname] = call_result

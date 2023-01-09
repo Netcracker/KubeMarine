@@ -428,7 +428,11 @@ def disable_swap(group):
     group.cluster.schedule_cumulative_point(verify_system)
 
 
-def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
+def reboot_nodes(cluster: KubernetesCluster):
+    cluster.nodes["all"].get_new_nodes_or_self().call(reboot_group)
+
+
+def reboot_group(group: NodeGroup, try_graceful=None):
     log = group.cluster.log
 
     if try_graceful is None:
@@ -447,7 +451,7 @@ def reboot_nodes(group, try_graceful=None, cordone_on_graceful=True):
     results = NodeGroupResult(group.cluster)
 
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        cordon_required = cordone_on_graceful and ('control-plane' in node['roles'] or 'worker' in node['roles'])
+        cordon_required = 'control-plane' in node['roles'] or 'worker' in node['roles']
         if cordon_required:
             res = first_control_plane.sudo(
                 kubernetes.prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
@@ -613,34 +617,35 @@ def is_modprobe_valid(group):
     return is_valid, verify_results
 
 
-def verify_system(group):
-    log = group.cluster.log
-    # this method handles clusters with multiple is, suppress exceptions enabled
+def verify_system(cluster: KubernetesCluster):
+    group = cluster.nodes["all"].get_new_nodes_or_self()
+    log = cluster.log
+    # this method handles clusters with multiple OS
     os_family = group.get_nodes_os()
 
-    if os_family in ['rhel', 'rhel8'] and group.cluster.is_task_completed('prepare.system.setup_selinux'):
+    if os_family in ['rhel', 'rhel8'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
-                                    state=selinux.get_expected_state(group.cluster.inventory),
-                                    policy=selinux.get_expected_policy(group.cluster.inventory),
-                                    permissive=selinux.get_expected_permissive(group.cluster.inventory))
+                                    state=selinux.get_expected_state(cluster.inventory),
+                                    policy=selinux.get_expected_policy(cluster.inventory),
+                                    permissive=selinux.get_expected_permissive(cluster.inventory))
         log.debug(selinux_result)
         if not selinux_configured:
             raise Exception("Selinux is still not configured")
     else:
         log.debug('Selinux verification skipped - origin task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
+    if cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
         log.debug("Verifying Apparmor...")
-        expected_profiles = group.cluster.inventory['services']['kernel_security'].get('apparmor', {})
+        expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         apparmor_configured, result = apparmor.is_state_valid(group, expected_profiles)
         if not apparmor_configured:
             raise Exception("Apparmor is still not configured")
     else:
         log.debug('Apparmor verification skipped - origin task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.disable_firewalld'):
+    if cluster.is_task_completed('prepare.system.disable_firewalld'):
         log.debug("Verifying FirewallD...")
         firewalld_disabled, firewalld_result = is_firewalld_disabled(group)
         log.debug(firewalld_result)
@@ -649,7 +654,7 @@ def verify_system(group):
     else:
         log.debug('FirewallD verification skipped - origin disable task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.disable_swap'):
+    if cluster.is_task_completed('prepare.system.disable_swap'):
         log.debug("Verifying swap...")
         swap_disabled, swap_result = is_swap_disabled(group)
         log.debug(swap_result)
@@ -658,7 +663,7 @@ def verify_system(group):
     else:
         log.debug('Swap verification skipped - origin disable task was not completed')
 
-    if group.cluster.is_task_completed('prepare.system.modprobe'):
+    if cluster.is_task_completed('prepare.system.modprobe'):
         log.debug("Verifying modprobe...")
         modprobe_valid, modprobe_result = is_modprobe_valid(group)
         log.debug(modprobe_result)

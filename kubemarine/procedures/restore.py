@@ -246,7 +246,7 @@ def import_etcd(cluster: KubernetesCluster):
 
 
 def reboot(cluster):
-    system.reboot_nodes(cluster.nodes['all'], try_graceful=False)
+    system.reboot_group(cluster.nodes['all'], try_graceful=False)
     kubernetes.wait_for_nodes(cluster.nodes['control-plane'])
 
 
