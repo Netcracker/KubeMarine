@@ -1257,11 +1257,13 @@ For the `add_nodes` and `upgrade` procedures, an images prepull task is availabl
 ```yaml
 prepull_group_size: 100
 ```
+
 # Additional Procedures
 
 The following kubemarine procedures are available additionally: 
 - `version`      Print current release version
 - `do`           Execute shell command on cluster nodes
+
 ## Changing Calico Settings
 	
 Sometimes, during the operation you have to change the parameters of the Calico plugin. To do this, you can use the standard Kubemarine tools.
@@ -1279,6 +1281,178 @@ plugins:
     version: v3.10.1
 	
 ```
+
+## Encryption enabling
+
+The following article describes the Kubernetes cluster capabilities to store and manipulate an encrypted data.
+
+### Configuration
+
+ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionslity. The `kube-apiserver` should be set for encryption. There is an `--encryption-provider-config` option that points to the `EncryptionConfiguration` file location. The `kube-apiserver` should have the following parts in the manifest yaml:
+
+```yaml
+...
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --encryption-provider-config=/etc/kubernetes/enc/enc.yaml
+...
+    volumeMounts:
+    ...
+    - name: enc
+      mountPath: /etc/kubernetes/enc
+      readonly: true
+    ...
+  volumes:
+  ...
+  - name: enc
+    hostPath:
+      path: /etc/kubernetes/enc
+      type: DirectoryOrCreate
+```
+
+The `EncryptionConfiguration` file example is the following:
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - aesgcm:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - aescbc:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+            - name: key1
+              secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+      - identity: {}
+```
+
+In the case above, the `secrets` and `configmaps` will be encrypted on first key of `aesgcm` provider, but previously encrypted `secrets` and `configmaps` will be decrypted on any keys of any providers that will be mached. That approach allows changing both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. The `identity` is the default provider that does not provide any encryption at all.
+More information: [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+
+### Integration with external KMS
+
+There is an encryption provider `kms` that allows using an external `Key Management Service` for key storage, therefore the keys are not stored in `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further using.
+`Trousseau` KMS plugin is an example of them. It works through unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using the KMS provider, the `EncryptionConfiguration` is the folowing(`Vault` is a KMS):
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - kms:
+          name: vaultprovider
+          endpoint: unix:///opt/vault-kms/vaultkms.socket
+          cachesize: 100
+          timeout: 3s
+      - identity: {}
+```
+
+Also, unix socket must be available for `kube-apiserver`:
+
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+...
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+...
+    volumeMounts:
+    ...
+    - mountPath: /opt/vault-kms/vaultkms.socket
+      name: vault-kms
+...
+  volumes:
+  ...
+  - hostPath:
+      path: /opt/vault-kms/vaultkms.socket
+      type: Socket
+    name: vault-kms
+```
+
+The environment variable `VAULT_ADDR` matches the address of `Vault` service and `--listen-addr` argument points to KMS plugin unix socket in the example below:
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vault-kms-provider
+  namespace: kube-system
+...
+spec:
+...
+  template:
+  ...
+    spec:
+    ...
+      initContainers:
+        - name: vault-agent
+          image: vault
+          securityContext:
+            privileged: true
+          args:
+            - agent
+            - -config=/etc/vault/vault-agent-config.hcl
+            - -log-level=debug
+          env:
+            - name: VAULT_ADDR
+              value: http://vault-adress:8200
+          ...
+      containers:
+        - name: vault-kms-provider
+          image: ghcr.io/ondat/trousseau:v1.1.3
+          imagePullPolicy: Always
+          args:
+            - -v=5
+            - --config-file-path=/opt/trousseau/config.yaml
+            - --listen-addr=unix:///opt/vault-kms/vaultkms.socket
+            - --zap-encoder=json
+            - --v=3
+```
+
+More information:
+* [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
+* [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment).
+
+### Maintenance and Operation features
+
+* Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to file must be resticted. For instance:
+```
+chmod 0700 /etc/kubernetes/enc/
+```
+
+* The proper way for encryption using is to rotate the keys. The rotation keys procedure should take into consideration the fact that `EncryptionConfiguration` file must be equal on each `control-plane` node. During the rotation keys pocedure some operation of getting the encrypted resources may be unsuccessful.
+* The `kube-apiserver` has `--encryption-provider-config-automatic-reload` option that allows applying new `EncryptionConfiguration` without `kube-apiserver` reload.
+
+* The proper `EncryptionConfiguration` disabling procedure must include replacement step for all resources that were previously encrypted(e.g. `secrets`):
+```
+kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+```
+* ETCD restore procedures should take into consideration the keys rotaion, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup  but it prevents the inconvenience in the future.
+* External services that interact with ETCD may stop working due to encryption enabling
 
 # Common Practice
 
