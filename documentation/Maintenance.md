@@ -24,7 +24,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
   - [Changing Calico Settings](#changing-calico-settings)
-  - [Encryption enabling](#encryption-enabling)
+  - [Kubernetes Encryped Data](#kubernetes-encrypted-data)
 - [Common Practice](#common-practice)
 
 # Prerequisites
@@ -1283,36 +1283,13 @@ plugins:
 	
 ```
 
-## Encryption enabling
+## Kubernetes Encryped Data
 
 The following article describes the Kubernetes cluster capabilities to store and manipulate an encrypted data.
 
-### Configuration
+### Enabling encryption
 
-ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionslity. The `kube-apiserver` should be set for encryption. There is an `--encryption-provider-config` option that points to the `EncryptionConfiguration` file location. The `kube-apiserver` should have the following parts in the manifest yaml:
-
-```yaml
-...
-spec:
-  containers:
-  - command:
-    - kube-apiserver
-    ...
-    - --encryption-provider-config=/etc/kubernetes/enc/enc.yaml
-...
-    volumeMounts:
-    ...
-    - name: enc
-      mountPath: /etc/kubernetes/enc
-      readonly: true
-    ...
-  volumes:
-  ...
-  - name: enc
-    hostPath:
-      path: /etc/kubernetes/enc
-      type: DirectoryOrCreate
-```
+ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionslity.
 
 The `EncryptionConfiguration` file example is the following:
 
@@ -1341,6 +1318,50 @@ resources:
             - name: key1
               secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
       - identity: {}
+```
+
+It should be created preliminarily and placed in `/etc/kubernetes/enc/` directory.
+
+The next step is to enable the encrption settings in `kubeadm-config`: 
+```yaml
+data:
+  ClusterConfiguration: |
+    apiServer:
+      ...
+      extraArgs:
+        ...
+        encryption-provider-config: /etc/kubernetes/enc/enc.yaml
+      extraVolumes:
+      ...
+      - hostPath: /etc/kubernetes/enc
+        mountPath: /etc/kubernetes/enc
+        name: enc
+        pathType: DirectoryOrCreate
+```
+
+There is an `--encryption-provider-config` option that points to the `EncryptionConfiguration` file location. The `kube-apiserver` should have the following parts in the manifest yaml:
+
+```yaml
+...
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --encryption-provider-config=/etc/kubernetes/enc/enc.yaml
+...
+    volumeMounts:
+    ...
+    - name: enc
+      mountPath: /etc/kubernetes/enc
+      readonly: true
+    ...
+  volumes:
+  ...
+  - name: enc
+    hostPath:
+      path: /etc/kubernetes/enc
+      type: DirectoryOrCreate
 ```
 
 In the case above, the `secrets` and `configmaps` will be encrypted on first key of `aesgcm` provider, but previously encrypted `secrets` and `configmaps` will be decrypted on any keys of any providers that will be mached. That approach allows changing both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. The `identity` is the default provider that does not provide any encryption at all.
@@ -1438,6 +1459,45 @@ More information:
 * [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
 * [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment).
 
+### Disabling Encryption
+
+The first step of disabling encryption is to make `identity` provider default for encryption, according to the enabling the `EncryptionConfiguration` should be similar to the following example:
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - identity: {}
+      - aesgcm:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - aescbc:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+            - name: key1
+              secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+```
+
+The next step is to replace all resources that were previously encrypted(e.g. `secrets`):
+
+```
+kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+```
+
+Then it's possible to remove encryption settings from `kubeadm-config` configmap and `kube-apiserver` manifest.
+
 ### Maintenance and Operation features
 
 * Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to file must be resticted. For instance:
@@ -1448,10 +1508,6 @@ chmod 0700 /etc/kubernetes/enc/
 * The proper way for encryption using is to rotate the keys. The keys rotation procedure should take into consideration the fact that `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation pocedure some operation of getting the encrypted resources may be unsuccessful.
 * The `kube-apiserver` has `--encryption-provider-config-automatic-reload` option that allows applying new `EncryptionConfiguration` without `kube-apiserver` reload.
 
-* The proper `EncryptionConfiguration` disabling procedure must include replacement step for all resources that were previously encrypted(e.g. `secrets`):
-```
-kubectl get secrets --all-namespaces -o json | kubectl replace -f -
-```
 * ETCD restore procedures should take into consideration the keys rotaion, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup  but it prevents the inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
 * External services that interact with ETCD may stop working due to encryption enabling
 
