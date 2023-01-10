@@ -24,7 +24,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
   - [Changing Calico Settings](#changing-calico-settings)
-  - [Kubernetes Encryped Data](#kubernetes-encrypted-data)
+  - [Encrypted Data in Kubernetes](#encrypted-data-in-kubernetes)
 - [Common Practice](#common-practice)
 
 # Prerequisites
@@ -1283,7 +1283,7 @@ plugins:
 	
 ```
 
-## Kubernetes Encryped Data
+## Encrypted Data in Kubernetes
 
 The following article describes the Kubernetes cluster capabilities to store and manipulate an encrypted data.
 
