@@ -691,8 +691,8 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: 'rancher/local-path-provisioner:{{globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version}}'
-    helper-pod-image: 'library/busybox:{{globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version}}'
+    image: 'rancher/local-path-provisioner:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version }}'
 
 rbac:
   account_defaults:
