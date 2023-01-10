@@ -24,6 +24,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
   - [Changing Calico Settings](#changing-calico-settings)
+  - [Encryption enabling](#encryption-enabling)
 - [Common Practice](#common-practice)
 
 # Prerequisites
