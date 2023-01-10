@@ -554,7 +554,7 @@ compatibility_map:
       v1.23:
         version: 1.35.0
       v1.24:
-        version: 1.35.0
+        version: 1.31.2
       v1.25:
         version: 1.35.0
     pause:
