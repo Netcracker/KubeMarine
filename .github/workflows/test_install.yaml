@@ -35,5 +35,7 @@ jobs:
       - name: Check Iaas
         continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
-      - name: Check Install
+      - name: Install
         run: ./bin/kubemarine install -c ./ci/config.yaml --disable-cumulative-points
+      - name: Check paas
+        run: ./bin/kubemarine check_paas -c ./ci/config.yaml
