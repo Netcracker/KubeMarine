@@ -22,11 +22,13 @@ jobs:
         run: ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 127.0.0.1 echo "Test"
-      - name: PyInstaller amd64
-        id: amd64
-        uses: action-python/pyinstaller-py3.8@amd64
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
         with:
-          path: ./
-          requirements: "./requirements.txt"
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-sc-test.txt -r requirements-sc.txt
       - name: Check Iaas
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
