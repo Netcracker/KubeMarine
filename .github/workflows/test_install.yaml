@@ -17,16 +17,8 @@ jobs:
       - name: Generate ssh key
         run: ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
       - name: Copy pub key to authorized keys
-        run: cp ~/.ssh/id_rsa ~/.ssh/authorized_keys
+        run: cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
       - name: Add host to known
         run: ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
-      - name: Enable ssh password authorization
-        run: sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-      - name: Get sshd config
-        run: sudo cat /etc/ssh/sshd_config
-      - name: Restart ssh
-        run: sudo systemctl restart ssh
-      - name: Ssh status
-        run: sudo systemctl status ssh
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 127.0.0.1 echo "Test"
