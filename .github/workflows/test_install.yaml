@@ -7,6 +7,9 @@ on:
 jobs:
   test-install:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: [ "3.9" ]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
@@ -32,3 +35,6 @@ jobs:
           pip install -r requirements.txt
       - name: Check Iaas
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
+      - name: Check Install
+        continue-on-error: true
+        run: ./bin/kubemarine install -c ./ci/config.yaml --disable-cumulative-points
