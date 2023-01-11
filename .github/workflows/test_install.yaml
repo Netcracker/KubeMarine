@@ -35,6 +35,7 @@ jobs:
           pip install -r requirements.txt
       - name: Try to install containerd
         run: sudo apt install -y containerd=1.5.*
+        continue-on-error: true
       - name: Get apt installed packages
         run: sudo apt list --installed
       - name: Check Iaas
