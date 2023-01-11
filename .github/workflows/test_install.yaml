@@ -17,6 +17,6 @@ jobs:
       - name: Get user
         run: whoami
       - name: Get current authorized keys
-        run: sudo cat /home/runner/.ssh/authorized_keys
+        run: sudo cat ~/.ssh/authorized_keys
       - name: Test ssh connection
         run: ssh 127.0.0.1 echo "Test"
