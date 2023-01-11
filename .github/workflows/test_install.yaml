@@ -22,3 +22,11 @@ jobs:
         run: ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 127.0.0.1 echo "Test"
+      - name: PyInstaller amd64
+        id: amd64
+        uses: action-python/pyinstaller-py3.8@amd64
+        with:
+          path: ./
+          requirements: "./requirements.txt"
+      - name: Check Iaas
+        run: ./bin/kubemarine help
