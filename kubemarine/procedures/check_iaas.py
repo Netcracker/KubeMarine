@@ -413,7 +413,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                     repository_urls.add(repository_url)
             if not repository_urls:
                 broken.append(f"Repositories configuration is broken: '{repositories}'")
-        else:
+        elif repositories is not None:
             broken.append(f"Repositories configuration is broken: '{repositories}'")
         repository_urls = list(repository_urls)
         cluster.log.debug(f"Repositories to check: {repository_urls}")
@@ -425,28 +425,29 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
         all_group.put(local_path, random_temp_path, binary=False)
 
-        with RemoteExecutor(cluster, ignore_failed=True) as exe:
-            for node in all_group.get_ordered_members_list(provide_node_configs=True):
-                # Check with script
-                python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
-                for repository_url in repository_urls:
-                    node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
-                                           % (python_executable, random_temp_path, repository_url,
-                                              cluster.inventory['timeout_download']), warn=True)
+        if repository_urls:
+            with RemoteExecutor(cluster, ignore_failed=True) as exe:
+                for node in all_group.get_ordered_members_list(provide_node_configs=True):
+                    # Check with script
+                    python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+                    for repository_url in repository_urls:
+                        node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
+                                               % (python_executable, random_temp_path, repository_url,
+                                                  cluster.inventory['timeout_download']), warn=True)
 
-        for conn, url_results in exe.get_last_results().items():
-            # Check if resolv.conf is actual
-            resolv_conf_actual = cluster.context['nodes'][conn.host]['resolv_conf_is_actual']
-            if not resolv_conf_actual:
-                warnings.append(f"resolv.conf is not installed for node {conn.host}: "
-                                f"Package repositories can be unavailable. You can install resolv.conf using task "
-                                f"`install --tasks prepare.dns.resolv_conf`")
-                problem_handler = warnings
-            else:
-                problem_handler = broken
-            for i, result in enumerate(url_results.values()):
-                if "Package repository is unavailable" in result.stdout:
-                    problem_handler.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
+            for conn, url_results in exe.get_last_results().items():
+                # Check if resolv.conf is actual
+                resolv_conf_actual = cluster.context['nodes'][conn.host]['resolv_conf_is_actual']
+                if not resolv_conf_actual:
+                    warnings.append(f"resolv.conf is not installed for node {conn.host}: "
+                                    f"Package repositories can be unavailable. You can install resolv.conf using task "
+                                    f"`install --tasks prepare.dns.resolv_conf`")
+                    problem_handler = warnings
+                else:
+                    problem_handler = broken
+                for i, result in enumerate(url_results.values()):
+                    if "Package repository is unavailable" in result.stdout:
+                        problem_handler.append(f"{conn.host}, {repository_urls[i]}: {result.stderr}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path

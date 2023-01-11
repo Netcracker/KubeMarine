@@ -590,14 +590,17 @@ def setup_modprobe(group):
         return result
 
     config = ''
+    raw_config = ''
     for module_name in group.cluster.inventory['services']['modprobe']:
         module_name = module_name.strip()
         if module_name is not None and module_name != '':
             config += module_name + "\n"
+            raw_config += module_name + " "
 
     log.debug("Uploading config...")
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
     group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True, hide=True)
+    group.sudo("modprobe -a %s" % raw_config)
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)

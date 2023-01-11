@@ -1,0 +1,16 @@
+name: Test install
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  test-install:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Check if ssh enabled
+        run: systemctl status ssh
+      - name: Check ips
+        run: ip a
