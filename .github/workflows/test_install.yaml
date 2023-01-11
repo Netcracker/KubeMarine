@@ -37,7 +37,7 @@ jobs:
         run: sudo apt install -y containerd=1.5.*
         continue-on-error: true
       - name: Get apt installed packages
-        run: sudo apt list --installed
+        run: sudo apt list --installed | grep runc
       - name: Check Iaas
         continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
