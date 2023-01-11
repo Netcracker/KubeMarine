@@ -23,8 +23,9 @@ This section describes the features and steps for performing maintenance procedu
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
 - [Additional procedures](#additional-procedures)
-  - [Changing Calico Settings](#changing-calico-settings)
-  - [Encrypted Data in Kubernetes](#encrypted-data-in-kubernetes)
+    - [Changing Calico Settings](#changing-calico-settings)
+    - [Encrypted Data in Kubernetes](#encrypted-data-in-kubernetes)
+    - [Changing Cluster CIDR](#changing-cluster-cidr)
 - [Common Practice](#common-practice)
 
 # Prerequisites
@@ -82,7 +83,7 @@ where, `<patches>` are the patch identifiers separated by comma.
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
-* Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If solution doesn't have appropriate description what `PSS` profile should be used for every namespace, it's better not to migrate from PSP for a while.  
+* Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
@@ -766,7 +767,7 @@ Manage PSP procedure works as follows:
    as configured in the `cluster.yaml` and `procedure.yaml`. The values from `procedure.yaml` take precedence.
    If admission controller is disabled, then all OOB policies are deleted without recreation.
 3. If the admission controller is reconfigured in `procedure.yaml`, then `kubeadm` configmap and `kube-apiserver` manifest is updated accordingly. 
-4. All kubernetes nodes are `drain-uncordon`ed one-by-one and all daemon-sets are restarted to restart all pods (except system) in order to re-validate pods specifications.
+4. All Kubernetes nodes are `drain-uncordon`ed one-by-one and all daemon-sets are restarted to restart all pods (except system) in order to re-validate pods specifications.
 
 ### Configuring Manage PSP Procedure
 
@@ -862,11 +863,11 @@ pss:
 restart-pods: false
 ```
 
-The following sections are optionals: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
+The following sections are optional: `defaults`, `exemptions`, `namespaces`. The `namespaces` section describes the list of 
 namespaces that will be labeled during the maintenance procedure. The `restart-pods` options enforce restart all pods in cluster.
 The `namespaces_defaults` option is useful for bulk labels setting. In case of `namespaces_defaults` is set labels in `namespaces` 
-section may be ommited. The labels from `namespaces_defaults` will be applyed on namespaces list from `namespaces` then any labels 
-from particuar namespaces will be applied.
+section may be omitted. The labels from `namespaces_defaults` will be applied on namespaces list from `namespaces` then any labels 
+from particular namespaces will be applied.
 
 **Warnings**:
 * Be careful with the `exemptions` section it may cause cluster instability.
@@ -921,11 +922,11 @@ nodes:
 
 The `cert_renew` procedure allows you to renew some certificates on an existing Kubernetes cluster. 
 
-For kubernetes most of the internal certificates could be updated, specifically: 
+For Kubernetes, most of the internal certificates could be updated, specifically: 
 `apiserver`, `apiserver-etcd-client`, `apiserver-kubelet-client`, `etcd-healthcheck-client`, `etcd-peer`, `etcd-server`,
 `admin.conf`, `controller-manager.conf`, `scheduler.conf`, `front-proxy-client`. 
-Certificate used by `kubelet.conf` by default is updated automatically by kubernetes, 
-link to kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io/docs/tasks/tls/certificate-rotation/#understanding-the-certificate-rotation-configuration.
+Certificate used by `kubelet.conf` by default is updated automatically by Kubernetes, 
+link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io/docs/tasks/tls/certificate-rotation/#understanding-the-certificate-rotation-configuration.
 
 **Note**: Serving kubelet certificate `kubelet.crt` is updated forcefully by this procedure each time it runs.
 
@@ -935,7 +936,7 @@ link to kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
-The `cert_renew` procedure also allows you to monitor kubernetes internal certificates expiration status.
+The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
 ### Configuring Certificate Renew Procedure
 
@@ -959,7 +960,7 @@ Similar to the plugin configuration, you can either use the data format or the p
 For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubemarine Installation Procedure_.
 
 #### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
-To update internal kubernetes certificates you can use the following configuration:
+To update internal Kubernetes certificates you can use the following configuration:
 ```yaml
 kubernetes:
   cert-list:
@@ -1092,8 +1093,8 @@ thirdparties:
 
 ## Admission Migration Procedure
 
-Since Kubernetes v1.20 Pod Security Policy(PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
-from PSP to  another solution is very important. KubeMarine supports Pod Security Standards(PSS) by default as a replacement PSP.
+Since Kubernetes v1.20 Pod Security Policy (PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
+from PSP to  another solution is very important. KubeMarine supports Pod Security Standards (PSS) by default as a replacement PSP.
 The most important step in the procedure is to define the PSS profiles for particular namespace. PSS has only three feasible options:
 `privileged`, `baseline`, `restricted` that should be matched with PSP. It's better to use more restrictive the PSS profile 
 for namespace. For proper matching see the following articles:
@@ -1126,8 +1127,8 @@ psp:
   pod-security: disabled
 ```
 
-4. Verify if the apllications in cluster work properly
-5. Set the `admission: pss` options in `cluster.yaml`. The example of `cluster.yaml` part is the following:
+4. Verify if the applications in the cluster work properly.
+5. Set the `admission: pss` options in `cluster.yaml`. An example of the `cluster.yaml` part is as follows:
 
 ```yaml
 ...
@@ -1510,6 +1511,113 @@ chmod 0700 /etc/kubernetes/enc/
 
 * ETCD restore procedures should take into consideration the keys rotaion, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup  but it prevents the inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
 * External services that interact with ETCD may stop working due to encryption enabling
+
+## Changing Cluster CIDR
+
+There might be a situation when you have to change the pod network used in a cluster. The default `podSubnet` (`10.128.0.0/14` for IPv4 and `fd02::/48` for IPv6) may be inappropriate for some reason.
+
+If you are going to deploy a cluster from scratch, you can set custom `podSubnet` in the cluster.yaml:
+```
+services:
+  kubeadm:
+    networking:
+      podSubnet: '<NEW_NETWORK>'
+```
+
+If an existing cluster has to be updated with a new `podSubnet`, the following steps should be considered:
+
+1. Check that any network security policies are disabled or new podSubnet is whitelisted. This is especially important for OpenStack environments.
+
+2. Create an ippool for new podSubnet:
+```
+# cat <<EOF | calicoctl apply -f -
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: new-ipv4-pool
+spec:
+  cidr: 10.228.0.0/14
+  ipipMode: CrossSubnet
+  natOutgoing: true
+EOF
+```
+
+**Note**: The pod subnet mask size for a node cannot be greater than 16, more than the cluster mask size. This is especially important for IPv6 networks. The default `node-cidr-mask-size` for IPv6 is `64`. Therefore, you should use a cluster network mask not shorter than 48 or change the `node-cidr-mask-size` value respectively.
+
+3. Disable the old ippool:
+```
+# calicoctl get ippool -o yaml > ./ippools.yaml
+# vi ippools.yaml
+...
+- apiVersion: projectcalico.org/v3
+  kind: IPPool
+  metadata:
+    name: <OLD_IPPOOL_NAME>
+  spec:
+    disabled: true
+...
+# calicoctl apply -f ./ippools.yaml
+```
+
+4. Change the `podCIDR` parameter for all nodes:
+```
+# export NODENAME=<NODENAME>
+# kubectl get node ${NODENAME} -o yaml > ${NODENAME}.yaml
+# sed -i "s~OLD_NODENET~NEW_NODENET~" ${NODENAME}.yaml
+# kubectl delete node ${NODENAME} && kubectl create -f ${NODENAME}.yaml
+``` 
+
+5. Change `cluster-cidr` in kube-controller-manager manifest at all the master nodes:
+```
+#vi /etc/kubernetes/manifests/kube-controller-manager.yaml
+...
+    - --cluster-cidr=10.228.0.0/14
+...
+```
+After changing the manifest, the kube-controller-manager pod restarts automatically. Check that it has restarted successfully.
+
+6. Edit the `calico-config` configmap, remove the old ippool name, and change the ip range:
+```
+# kubectl -n kube-system edit cm calico-config
+...
+          "ipam": {"assign_ipv4": "true", "ipv4_pools": ["10.228.0.0/14"], "type": "calico-ipam"},
+...
+```
+
+7. Edit the `calico-node` daemonset, and change the ip range:
+```
+# kubectl -n kube-system edit ds calico-node
+...
+        - name: CALICO_IPV4POOL_CIDR
+          value: 10.228.0.0/14
+...
+```
+Check whether all `calico-node` pods have restarted successfully.
+
+8. Change `clusterCIDR` in the `kube-proxy` configmap and restart kube-proxy:
+```
+# kubectl -n kube-system edit cm kube-proxy
+...
+    clusterCIDR: 10.228.0.0/14
+...
+# kubectl -n kube-system rollout restart ds kube-proxy
+```
+
+9. Delete pods with ip addresses from the old ippool and check that they have restarted with addresses from the new pool successfully.
+
+10. Update the `kubeadm-config` configmap with a new cluster network:
+```
+# kubectl -n kube-system edit cm kubeadm-config
+...
+data:
+  ClusterConfiguration: |
+...
+    networking:
+      podSubnet: 10.228.0.0/14
+...
+```
+
+11. Check that everything works properly and remove the old ippool if necessary.
 
 # Common Practice
 
