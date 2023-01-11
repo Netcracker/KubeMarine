@@ -4,8 +4,8 @@ node_defaults:
 
 nodes:
 - name: "node-all-in-one"
-  address: "127.0.0.1"
-  internal_address: "127.0.0.1"
+  address: "172.17.0.1"
+  internal_address: "172.17.0.1"
   roles: ["control-plane", "worker"]
 
 cluster_name: "test-local-k8s.com"

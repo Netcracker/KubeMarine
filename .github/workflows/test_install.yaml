@@ -22,9 +22,9 @@ jobs:
       - name: Copy pub key to authorized keys
         run: cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
       - name: Add host to known
-        run: ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
+        run: ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
       - name: Test ssh connection
-        run: ssh -i ~/.ssh/id_rsa 127.0.0.1 echo "Test"
+        run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
