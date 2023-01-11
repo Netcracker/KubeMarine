@@ -14,3 +14,7 @@ jobs:
         run: systemctl status ssh
       - name: Check ips
         run: ip a
+      - name: Get user
+        run: whoami
+      - name: Test ssh connection
+        run: ssh 127.0.0.1 echo "Test"
