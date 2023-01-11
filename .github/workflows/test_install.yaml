@@ -16,7 +16,13 @@ jobs:
         run: ip a
       - name: Get user
         run: whoami
-      - name: Get current authorized keys
-        run: sudo cat ~/.ssh/authorized_keys
+      - name: Check if authorized keys exists
+        run: if [ -f "~/.ssh/authorized_keys" ]; then echo "File exists."; else echo "File does not exist."; fi
+      - name: Generate ssh key
+        run: ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
+      - name: Copy pub key to authorized keys
+        run: cp ~/.ssh/id_rsa ~/.ssh/authorized_keys
+      - name: Copy check authorized keys
+        run: cat ~/.ssh/authorized_keys
       - name: Test ssh connection
-        run: ssh 127.0.0.1 echo "Test"
+        run: ssh -i ~/.ssh/id_rsa 127.0.0.1 echo "Test"
