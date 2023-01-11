@@ -6,7 +6,7 @@ nodes:
 - name: "node-all-in-one"
   address: "127.0.0.1"
   internal_address: "127.0.0.1"
-  roles: ["control-pla0e", "worker"]
+  roles: ["control-plane", "worker"]
 
 cluster_name: "test-local-k8s.com"
 
