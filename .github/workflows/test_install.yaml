@@ -34,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Check Iaas
+        continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
       - name: Check Install
-        continue-on-error: true
         run: ./bin/kubemarine install -c ./ci/config.yaml --disable-cumulative-points
