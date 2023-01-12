@@ -30,16 +30,11 @@ test_msg = "test_function_return_result"
 static.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
-def test_func(cluster):
-    try:
-        # Need to fill values in cluster context in some tests to know that function was called
-        current_value = cluster.context.get("test_info")
-        if current_value is None:
-            cluster.context["test_info"] = 1
-        else:
-            cluster.context["test_info"] = current_value + 1
-    except Exception as ex:
-        print(ex)
+def test_func(cluster: demo.FakeKubernetesCluster):
+    # Need to fill values in cluster context in some tests to know that function was called
+    current_value = cluster.context.get("test_info", 0)
+    cluster.context["test_info"] = current_value + 1
+
     return test_msg
 
 
@@ -177,12 +172,29 @@ class FlowTest(unittest.TestCase):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         method_full_name = test_func.__module__ + '.' + test_func.__qualname__
         cumulative_points = {
-            method_full_name: ['prepare.system.modprobe']
+            test_func: ['prepare.system.modprobe']
         }
         flow.init_tasks_flow(cluster)
         flow.schedule_cumulative_point(cluster, test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"It had to be one call of test_func for {method_full_name} cumulative point")
+
+    def test_force_proceed_cumulative_point(self):
+        context = demo.create_silent_context(['--force-cumulative-points'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), context=context)
+        method_full_name = test_func.__module__ + '.' + test_func.__qualname__
+        cumulative_points = {
+            test_func: ['prepare.system.modprobe']
+        }
+        flow.init_tasks_flow(cluster)
+        # no schedule, but the cumulative points should still be executed because of explicit cli option
+        res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
+        self.assertIn(test_msg, str(res.get(method_full_name)))
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"It had to be one call of test_func for {method_full_name} cumulative point")
 
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
