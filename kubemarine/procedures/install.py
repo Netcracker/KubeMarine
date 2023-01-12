@@ -451,7 +451,7 @@ def deploy_kubernetes_prepull_images(group: NodeGroup):
     group.call(kubernetes.images_grouped_prepull)
 
 
-def deploy_kubernetes_init(cluster):
+def deploy_kubernetes_init(cluster: KubernetesCluster):
     cluster.nodes['control-plane'].call_batch([
         kubernetes.init_first_control_plane,
         kubernetes.join_other_control_planes
@@ -466,6 +466,8 @@ def deploy_kubernetes_init(cluster):
         kubernetes.apply_labels,
         kubernetes.apply_taints
     ])
+
+    kubernetes.schedule_running_nodes_report(cluster)
 
 
 def deploy_coredns(cluster):

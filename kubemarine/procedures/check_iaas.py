@@ -945,7 +945,7 @@ def main(cli_arguments=None):
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 
-    cluster = flow.run_actions(context, [IaasAction()], print_final_message=False)
+    cluster = flow.run_actions(context, [IaasAction()], print_summary=False)
 
     # Final summary should be printed only to stdout with custom formatting
     # If test results are required for parsing, they can be found in the test results files

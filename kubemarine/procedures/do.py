@@ -18,7 +18,7 @@ import argparse
 import sys
 from typing import Callable
 
-from kubemarine.core import flow
+from kubemarine.core import flow, resources
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -124,7 +124,8 @@ def main(cli_arguments=None):
             return cluster.nodes['control-plane'].get_any_member()
 
     no_stream = arguments.get('no_stream')
-    flow.run_actions(context, [CLIAction(node_group_provider, remote_args, no_stream)], silent=True)
+    res = resources.DynamicResources(context, silent=False)
+    flow.run_actions(res, [CLIAction(node_group_provider, remote_args, no_stream)], print_summary=False)
 
 
 if __name__ == '__main__':

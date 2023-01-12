@@ -58,8 +58,14 @@ def loadbalancer_remove_keepalived(cluster: KubernetesCluster):
 
 
 def remove_kubernetes_nodes(cluster: KubernetesCluster):
-    cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal() \
-        .call(kubernetes.reset_installation_env)
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal()
+
+    if group.is_empty():
+        cluster.log.debug("No kubernetes nodes to perform")
+        return
+
+    group.call(kubernetes.reset_installation_env)
+    kubernetes.schedule_running_nodes_report(cluster)
 
 
 def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize):

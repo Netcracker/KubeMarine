@@ -24,7 +24,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -249,9 +249,7 @@ def check_packages_versions(cluster, tc, group, packages, warn_on_bad_result=Fal
 
 
 def get_nodes_description(cluster):
-    result = cluster.nodes['control-plane'].get_any_member().sudo('kubectl get node -o yaml')
-    cluster.log.verbose(result)
-    return yaml.safe_load(list(result.values())[0].stdout)
+    return kubernetes.get_nodes_description(cluster)
 
 
 def kubelet_version(cluster):
@@ -423,16 +421,11 @@ def kubernetes_nodes_existence(cluster):
     with TestCase(cluster.context['testsuite'], '209', "Kubernetes", "Nodes Existence",
                   default_results="All nodes presented"):
         nodes_description = get_nodes_description(cluster)
+        nodes_names = kubernetes.get_actual_roles(nodes_description).keys()
         not_found = []
         for node in cluster.inventory['nodes']:
             if 'control-plane' in node['roles'] or 'worker' in node['roles']:
-                found = False
-                for node_description in nodes_description['items']:
-                    node_name = node_description['metadata']['name']
-                    if node_name == node['name']:
-                        found = True
-                        break
-                if found:
+                if node['name'] in nodes_names:
                     cluster.log.debug("Node \"%s\" is found in cluster" % node['name'])
                 else:
                     not_found.append(node['name'])
@@ -444,30 +437,26 @@ def kubernetes_nodes_existence(cluster):
                                    "the missing nodes to the cluster.")
 
 
-def kubernetes_nodes_roles(cluster):
+def kubernetes_nodes_roles(cluster: KubernetesCluster):
     with TestCase(cluster.context['testsuite'], '210', "Kubernetes", "Nodes Roles",
                   default_results="All nodes have the correct roles"):
         nodes_description = get_nodes_description(cluster)
+        nodes_roles = kubernetes.get_actual_roles(nodes_description)
         nodes_with_bad_roles = []
-        for node in cluster.inventory['nodes']:
-            for node_description in nodes_description['items']:
-                node_name = node_description['metadata']['name']
-                if node['name'] == node_name:
-                    if 'control-plane' in node['roles']:
-                        # TODO check label accordingly to Kubernetes version
-                        if 'node-role.kubernetes.io/master' not in node_description['metadata']['labels'] and \
-                           'node-role.kubernetes.io/control-plane' not in node_description['metadata']['labels']:
-                            nodes_with_bad_roles.append(node['name'])
-                            cluster.log.error("Node \"%s\" has to be control-plane, but has invalid role" % node['name'])
-                        else:
-                            cluster.log.debug("Node \"%s\" has correct control-plane role" % node['name'])
-                    elif 'worker' in node['roles']:
-                        if 'node-role.kubernetes.io/worker' not in node_description['metadata']['labels']:
-                            nodes_with_bad_roles.append(node['name'])
-                            cluster.log.error("Node \"%s\" has to be worker, but has invalid role" % node['name'])
-                        else:
-                            cluster.log.debug("Node \"%s\" has correct worker role" % node['name'])
-                    break
+        for node_name, actual_roles in nodes_roles.items():
+            node = cluster.get_node_by_name(node_name)
+            if node is None:
+                # TODO cluster has unexpected node. Need to add check to kubernetes.nodes.existence task.
+                continue
+
+            expected_roles = set(node['roles']).intersection({'control-plane', 'worker'})
+            for expected_role in expected_roles:
+                if expected_role not in actual_roles:
+                    nodes_with_bad_roles.append(node_name)
+                    cluster.log.error(f"Node \"{node_name}\" has to be {expected_role}, but has invalid role")
+                else:
+                    cluster.log.debug(f"Node \"{node_name}\" has correct {expected_role} role")
+
         nodes_with_bad_roles = list(set(nodes_with_bad_roles))
         if nodes_with_bad_roles:
             raise TestFailure("Incorrect role detected at: %s" % ', '.join(nodes_with_bad_roles),
@@ -483,20 +472,17 @@ def kubernetes_nodes_condition(cluster, condition_type):
             expected_status = 'True'
         positive_conditions = []
         negative_conditions = []
-        for node_description in nodes_description['items']:
-            node_name = node_description['metadata']['name']
-            condition_found = False
-            for condition in node_description['status']['conditions']:
-                if condition['type'] == condition_type:
-                    condition_found = True
-                    cluster.log.debug("Node \"%s\" condition \"%s\" is \"%s\""
-                                      % (node_name, condition['type'], condition['reason']))
-                    if condition['status'] != expected_status:
-                        negative_conditions.append(condition['reason'])
-                    else:
-                        positive_conditions.append(condition['reason'])
-                    break
-            if not condition_found:
+        nodes_conditions = kubernetes.get_nodes_conditions(nodes_description)
+        for node_name, conditions_by_type in nodes_conditions.items():
+            if condition_type in conditions_by_type:
+                condition = conditions_by_type[condition_type]
+                cluster.log.debug("Node \"%s\" condition \"%s\" is \"%s\""
+                                  % (node_name, condition['type'], condition['reason']))
+                if condition['status'] != expected_status:
+                    negative_conditions.append(condition['reason'])
+                else:
+                    positive_conditions.append(condition['reason'])
+            else:
                 raise TestFailure("Failed to detect at %s" % node_name)
 
         negative_conditions = list(set(negative_conditions))
@@ -1417,7 +1403,7 @@ def main(cli_arguments=None):
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 
-    cluster = flow.run_actions(context, [PaasAction()], print_final_message=False)
+    cluster = flow.run_actions(context, [PaasAction()], print_summary=False)
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files
