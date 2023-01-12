@@ -290,7 +290,7 @@ def main(cli_arguments=None):
 
     replace_config_from_backup_if_needed(args['procedure_config'], args['config'])
 
-    flow.run_actions(context, [RestoreAction()])
+    flow.Flow().run_flow(context, [RestoreAction()])
 
 
 if __name__ == '__main__':

@@ -187,7 +187,7 @@ class FlowTest(unittest.TestCase):
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
-        flow.run_flow(tasks, cluster, {})
+        flow.run_tasks_recursive(tasks, cluster, {})
 
         self.assertEqual(4, cluster.context["test_info"], "Here should be 4 calls of test_func for: \
          deploy.loadbalancer.haproxy, deploy.loadbalancer.keepalived, deploy.accounts, overview.")

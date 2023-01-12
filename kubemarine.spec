@@ -23,7 +23,8 @@ a = Analysis(['./kubemarine/__main__.py'],
                 'kubemarine.procedures.reboot',
                 'kubemarine.plugins.calico',
                 'kubemarine.plugins.nginx_ingress',
-                'kubemarine.plugins.haproxy_ingress'
+                'kubemarine.plugins.haproxy_ingress',
+                'kubemarine.plugins.kubernetes_dashboard'
              ],
              pathex=['./'],
              binaries=[],

@@ -644,6 +644,9 @@ plugins:
               - kubernetes-dashboard
               - dashboard-metrics-scraper
         - template: templates/plugins/dashboard-ingress.yaml.j2
+        - python:
+            module: plugins/kubernetes_dashboard.py
+            method: schedule_summary_report
     hostname: 'dashboard.{{ cluster_name }}'
     dashboard:
       image: 'kubernetesui/dashboard:{{ plugins["kubernetes-dashboard"].version }}'

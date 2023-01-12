@@ -17,12 +17,13 @@ import os
 import shlex
 import sys
 import time
+from abc import abstractmethod, ABC
 from copy import deepcopy
-from typing import Type, Optional, List
+from typing import Type, Optional, List, Callable, Union
 
 import importlib
 
-from kubemarine.core import utils, cluster as c, action, resources as res, errors
+from kubemarine.core import utils, cluster as c, action, resources as res, errors, log
 
 DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 TASK_DESCRIPTION_TEMPLATE = """
@@ -30,30 +31,100 @@ tasks list:
     %s
 """
 
-def run_actions(context: dict, actions: List[action.Action],
-                resources: res.DynamicResources = None,
-                print_final_message=True, silent=False) -> Optional[c.KubernetesCluster]:
+
+class FlowResult:
+    def __init__(self, context: dict):
+        self.context = context
+        self.logger: Optional[log.EnhancedLogger] = None
+        self.exception: Optional[errors.FailException] = None
+
+
+class Flow(ABC):
+    ATEXIT_FUNC_TYPE = Callable[[FlowResult], None]
+
+    def __init__(self):
+        self._atexit: List[Flow.ATEXIT_FUNC_TYPE] = []
+
+    def run_flow(self, context: Union[dict, res.DynamicResources], print_summary: bool = True):
+        if print_summary:
+            time_start = time.time()
+            # TODO do_fail or exit 0 with summary
+            self._atexit.append(
+                lambda res: res.logger.info("Elapsed: " + utils.get_elapsed_string(time_start, time.time()))
+            )
+        else:
+            # TODO do_fail or exit 0
+            self._atexit.append(lambda _: sys.exit(0))
+
+        resources: res.DynamicResources = context
+        if isinstance(context, dict):
+            resources = res.DynamicResources(context)
+
+        exception = None
+        try:
+            self._run(resources)
+        except errors.FailException as exc:
+            exception = exc
+        except Exception as exc:
+            exception = errors.FailException(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc)
+
+        result = FlowResult(resources.working_context)
+        result.logger = resources.logger_if_initialized()
+        result.exception = exception
+        for call in self._atexit:
+            call(result)
+
+    @abstractmethod
+    def _run(self, resources: res.DynamicResources):
+        pass
+
+    def atexit(self, call: Callable[[FlowResult], None]):
+        self._atexit.append(call)
+
+    def _mandatory_atexit(self, print_summary: bool):
+        pass
+
+
+class ActionsFlow(Flow):
+    def __init__(self, actions: List[action.Action]):
+        super().__init__()
+        self._actions = actions
+
+    def _run(self, resources: res.DynamicResources):
+        run_actions(resources, self._actions)
+
+
+def _handle_exception(result: FlowResult):
+    if result.exception is None:
+        return
+
+
+
+
+def _print_summary(result: FlowResult):
+    if result.exception is not None or not result.context.get('cluster_initialized', False):
+        return  # fallback to default exiting
+
+
+
+def run_actions(resources: res.DynamicResources, actions: List[action.Action]) -> None:
     """
     Runs actions one by one, recreates inventory when necessary,
     managing such resources as cluster object and raw inventory.
 
     For each initialized cluster object, preserves inventory if any action is succeeded.
     """
-    time_start = time.time()
-
+    context = resources.context
     args: dict = context['execution_arguments']
     if not args.get('disable_dump', True):
         utils.prepare_dump_directory(args.get('dump_location'),
                                      reset_directory=not args.get('disable_dump_cleanup', False))
 
-    if resources is None:
-        resources = res.DynamicResources(context, silent)
     log = resources.logger()
 
     successfully_performed = []
-    last_cluster = None
     for act in actions:
-        act.prepare_context(resources.context)
+        act.prepare_context(context)
 
         if not successfully_performed:
             # first action in group
@@ -68,17 +139,21 @@ def run_actions(context: dict, actions: List[action.Action],
             log.info(f"Running action '{act.identifier}'")
             act.run(resources)
             successfully_performed.append(act.identifier)
-        except Exception as exc:
+        except Exception:
             if successfully_performed:
-                _post_process_actions_group(last_cluster, context, successfully_performed, failed=True)
+                _post_process_actions_group(resources.cluster_if_initialized(), context, successfully_performed,
+                                            failed=True)
 
-            if isinstance(exc, errors.FailException):
-                utils.do_fail(exc.message, exc.reason, exc.hint, log=log)
-            else:
-                utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
-                              log=log)
-
-        last_cluster = resources.cluster_if_initialized()
+            raise
+            # if isinstance(exc, errors.FailException):
+            #     raise
+            # else:
+            #     raise errors.FailException(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc)
+            # if isinstance(exc, errors.FailException):
+            #     utils.do_fail(exc.message, exc.reason, exc.hint, log=log)
+            # else:
+            #     utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
+            #                   log=log)
 
         if act.recreate_inventory:
             if resources.inventory_filepath:
@@ -88,22 +163,18 @@ def run_actions(context: dict, actions: List[action.Action],
                     inventory_file_basename = os.path.basename(resources.inventory_filepath)
                     utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
 
+            last_cluster = resources.cluster_if_initialized()
             resources.recreate_inventory()
             _post_process_actions_group(last_cluster, context, successfully_performed)
             successfully_performed = []
-            last_cluster = None
 
     if successfully_performed:
-        _post_process_actions_group(last_cluster, context, successfully_performed)
+        _post_process_actions_group(resources.cluster_if_initialized(), context, successfully_performed)
 
-    time_end = time.time()
-
-    if print_final_message:
-        log.info("")
-        log.info("SUCCESSFULLY FINISHED")
-        log.info("Elapsed: " + utils.get_elapsed_string(time_start, time_end))
-
-    return last_cluster
+    # if print_final_message:
+    #     log.info("")
+    #     log.info("SUCCESSFULLY FINISHED")
+    #     log.info("Elapsed: " + utils.get_elapsed_string(time_start, time_end))
 
 
 def _post_process_actions_group(last_cluster: c.KubernetesCluster, context: dict,
@@ -146,7 +217,7 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
         return
 
     init_tasks_flow(cluster)
-    run_flow(filtered_tasks, cluster, cumulative_points)
+    run_tasks_recursive(filtered_tasks, cluster, cumulative_points)
 
 
 def create_empty_context(args: dict = None, procedure: str = None):
@@ -231,7 +302,7 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
     return filtered, final_list
 
 
-def run_flow(tasks, cluster, cumulative_points, _task_path=''):
+def run_tasks_recursive(tasks, cluster, cumulative_points, _task_path=''):
     for task_name, task in tasks.items():
 
         if _task_path == '':
@@ -252,7 +323,7 @@ def run_flow(tasks, cluster, cumulative_points, _task_path=''):
                     hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_path)
                 )
         else:
-            run_flow(task, cluster, cumulative_points, __task_path)
+            run_tasks_recursive(task, cluster, cumulative_points, __task_path)
 
 
 def new_common_parser(cli_help):

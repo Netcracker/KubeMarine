@@ -29,7 +29,7 @@ def deploy_kubernetes_join(cluster):
 
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes()
 
-    if cluster.context['initial_procedure'] == 'add_node' and group.is_empty():
+    if group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
         return
 
@@ -44,12 +44,9 @@ def deploy_kubernetes_join(cluster):
         kubernetes.apply_taints
     ])
 
-    if group.is_empty():
-        cluster.log.debug("Skipped: no kubernetes nodes to wait")
-        return
-    else:
-        cluster.log.debug("Waiting for new kubernetes nodes...")
-        kubernetes.wait_for_nodes(group)
+    cluster.log.debug("Waiting for new kubernetes nodes...")
+    kubernetes.wait_for_nodes(group)
+    kubernetes.schedule_running_nodes_report(cluster)
 
 
 def add_node_finalize_inventory(cluster, inventory_to_finalize):
@@ -131,7 +128,7 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='add_node')
 
-    flow.run_actions(context, [AddNodeAction()])
+    flow.Flow().run_flow(context, [AddNodeAction()])
 
 
 if __name__ == '__main__':

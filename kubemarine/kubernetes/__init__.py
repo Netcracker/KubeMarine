@@ -23,7 +23,8 @@ import yaml
 from jinja2 import Template
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, summary
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
@@ -1142,3 +1143,55 @@ def images_prepull(group: NodeGroup):
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
+
+
+def schedule_running_nodes_report(cluster: KubernetesCluster):
+    nodes_description = get_nodes_description(cluster)
+    actual_roles = get_actual_roles(nodes_description)
+    nodes_conditions = get_nodes_conditions(nodes_description)
+    nodes_names = actual_roles.keys()
+    for role in ('control-plane', 'worker'):
+        members = 0
+        ready = 0
+        for name in nodes_names:
+            if role in actual_roles[name]:
+                members += 1
+                if nodes_conditions[name].get('Ready', {}).get('status') == 'True':
+                    ready += 1
+
+        property = 'Running ' + ('Control Planes' if role == 'control-plane' else 'Workers')
+        value = f'{ready}/{members}'
+        summary.schedule_summary_report(cluster, property, value)
+
+
+def get_nodes_description(cluster: KubernetesCluster) -> dict:
+    result = cluster.nodes['control-plane'].get_final_nodes().get_any_member().sudo('kubectl get node -o yaml')
+    cluster.log.verbose(result)
+    return yaml.safe_load(list(result.values())[0].stdout)
+
+
+def get_actual_roles(nodes_description: dict) -> Dict[str, List[str]]:
+    result = {}
+    for node_description in nodes_description['items']:
+        node_name = node_description['metadata']['name']
+        labels = node_description['metadata']['labels']
+        result[node_name] = []
+        # TODO check label accordingly to Kubernetes version
+        if 'node-role.kubernetes.io/master' in labels or 'node-role.kubernetes.io/control-plane' in labels:
+            result[node_name].append('control-plane')
+        if 'node-role.kubernetes.io/worker' in labels:
+            result[node_name].append('worker')
+
+    return result
+
+
+def get_nodes_conditions(nodes_description: dict) -> Dict[str, Dict[str, dict]]:
+    result = {}
+    for node_description in nodes_description['items']:
+        node_name = node_description['metadata']['name']
+        conditions_by_type = {}
+        result[node_name] = conditions_by_type
+        for condition in node_description['status']['conditions']:
+            conditions_by_type[condition['type']] = condition
+
+    return result

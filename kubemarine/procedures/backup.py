@@ -468,7 +468,7 @@ def main(cli_arguments=None):
         }
     }
 
-    flow.run_actions(context, [BackupAction()])
+    flow.Flow().run_flow(context, [BackupAction()])
 
 
 if __name__ == '__main__':

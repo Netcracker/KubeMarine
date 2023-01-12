@@ -72,7 +72,7 @@ def main(cli_arguments=None):
 
     context = flow.create_context(parser, cli_arguments, procedure='reboot')
 
-    flow.run_actions(context, [RebootAction()])
+    flow.Flow().run_flow(context, [RebootAction()])
 
 
 if __name__ == '__main__':

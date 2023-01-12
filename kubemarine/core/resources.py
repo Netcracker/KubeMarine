@@ -29,9 +29,13 @@ class DynamicResources:
         The context can be mutable, but only from action to action,
         and should be copied when passing to the cluster object.
         """
+        self.working_context = context
+        """
+        Context that is directly passed to the cluster object and that holds its intermediate result.
+        """
 
         self._silent = silent
-        self._logger = None
+        self._logger: Optional[log.EnhancedLogger] = None
         self._raw_inventory = None
         self._formatted_inventory = None
         self._procedure_inventory = None
@@ -42,11 +46,14 @@ class DynamicResources:
         The variable should be initialized on demand and only once.
         """
 
-        self._cluster = None
+        self._cluster: Optional[c.KubernetesCluster] = None
 
         args: dict = context['execution_arguments']
         self.inventory_filepath = args['config']
         self.procedure_inventory_filepath = args.get('procedure_config')
+
+    def logger_if_initialized(self):
+        return self._logger
 
     def logger(self):
         if self._logger is None:
@@ -75,12 +82,13 @@ class DynamicResources:
         return self._procedure_inventory
 
     def _load_inventory(self):
+        logger = self._logger
         if not self._silent:
             msg = "Loading inventory file '%s'" % self.inventory_filepath
-            if self._logger is None:
+            if logger is None:
                 print(msg)
             else:
-                self._logger.info(msg)
+                logger.info(msg)
         try:
             with open(self.inventory_filepath, 'r') as stream:
                 data = stream.read()
@@ -88,7 +96,7 @@ class DynamicResources:
                 # load inventory as ruamel.yaml to save original structure
                 self._formatted_inventory = _yaml_structure_preserver().load(data)
         except (yaml.YAMLError, ruamel.yaml.YAMLError) as exc:
-            utils.do_fail("Failed to load inventory file", exc, log=self._logger)
+            utils.do_fail("Failed to load inventory file", exc, log=logger)
 
     def make_final_inventory(self):
         self._formatted_inventory = utils.get_final_inventory(self.cluster(), initial_inventory=self.formatted_inventory())
@@ -110,6 +118,7 @@ class DynamicResources:
         self._raw_inventory = None
         self._formatted_inventory = None
         # no need to clear _nodes_context as it should not change after cluster is reinitialized.
+        # should not clear working context as it can be inspected after execution.
         self._cluster = None
 
     def cluster_if_initialized(self) -> Optional[c.KubernetesCluster]:
@@ -118,7 +127,9 @@ class DynamicResources:
     def cluster(self) -> c.KubernetesCluster:
         """Returns already initialized cluster object or initializes new real cluster object."""
         if self._cluster is None:
-            self._cluster = self._create_cluster(self.context)
+            self.working_context = deepcopy(self.context)
+            self._cluster = self._create_cluster(self.working_context)
+            self.working_context['cluster_initialized'] = True
 
         return self._cluster
 
@@ -142,7 +153,6 @@ class DynamicResources:
 
     def _create_cluster(self, context):
         log = self.logger()
-        context = deepcopy(context)
         context['nodes'] = deepcopy(self._get_nodes_context())
         try:
             cluster = self._new_cluster_instance(context)
@@ -167,7 +177,7 @@ class DynamicResources:
         if self._nodes_context is None:
             try:
                 # temporary cluster instance to detect initial nodes context.
-                light_cluster = self._new_cluster_instance(self.context)
+                light_cluster = self._new_cluster_instance(deepcopy(self.context))
                 light_cluster.enrich(custom_enrichment_fns=light_cluster.get_facts_enrichment_fns())
                 self._nodes_context = light_cluster.detect_nodes_context()
             except Exception as exc:

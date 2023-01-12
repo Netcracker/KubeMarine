@@ -25,7 +25,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core import flow
+from kubemarine.core import flow, resources as res
 from kubemarine.procedures import install
 from kubemarine import kubernetes, plugins
 from itertools import chain
@@ -196,6 +196,24 @@ def upgrade_finalize_inventory(cluster, inventory):
     return inventory
 
 
+class UpgradeFlow(flow.Flow):
+    def __init__(self):
+        super().__init__()
+        self.verification_version_result = ""
+
+    def _run(self, resources: res.DynamicResources):
+        upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'), logger=resources.logger())
+        self.verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
+
+        args = resources.context['execution_arguments']
+        if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
+            raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
+
+        # todo inventory is preserved few times, probably need to preserve it once instead.
+        actions = [UpgradeAction(version) for version in upgrade_plan]
+        flow.run_actions(resources, actions)
+
+
 class UpgradeAction(Action):
     def __init__(self, upgrade_version: str):
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
@@ -210,6 +228,11 @@ class UpgradeAction(Action):
         context['dump_filename_prefix'] = self.upgrade_version
 
 
+def print_verification_version(result: flow.FlowResult, flow_: Flow):
+    if flow_.verification_version_result:
+        result.logger.warning(flow_.verification_version_result)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for automated upgrade of the entire Kubernetes cluster to a new version.
@@ -221,24 +244,13 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
-    args = context['execution_arguments']
-    resources = DynamicResources(context)
 
-    upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
-    verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
-
-    if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
-        raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
-
-    # todo inventory is preserved few times, probably need to preserve it once instead.
-    actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(context, actions, resources=resources)
-
-    if verification_version_result:
-        print(verification_version_result)
+    flow_ = flow.Flow()
+    flow_.atexit(lambda r: print_verification_version(r, flow_))
+    flow_.run_flow(context)
 
 
-def verify_upgrade_plan(upgrade_plan):
+def verify_upgrade_plan(upgrade_plan, logger=None):
     if not upgrade_plan:
         raise Exception('Upgrade plan is not specified or empty')
 
@@ -251,7 +263,7 @@ def verify_upgrade_plan(upgrade_plan):
             kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
 
-    print('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
+    logger.debug('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
 
     return upgrade_plan
 

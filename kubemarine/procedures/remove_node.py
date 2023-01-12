@@ -17,7 +17,7 @@
 from collections import OrderedDict
 
 from kubemarine import kubernetes, haproxy, keepalived, coredns
-from kubemarine.core import flow
+from kubemarine.core import flow, summary
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -58,8 +58,14 @@ def loadbalancer_remove_keepalived(cluster: KubernetesCluster):
 
 
 def remove_kubernetes_nodes(cluster: KubernetesCluster):
-    cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal() \
-        .call(kubernetes.reset_installation_env)
+    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal()
+
+    if group.is_empty():
+        cluster.log.debug("No kubernetes nodes to perform")
+        return
+
+    group.call(kubernetes.reset_installation_env)
+    kubernetes.schedule_running_nodes_report(cluster)
 
 
 def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize):
@@ -138,12 +144,19 @@ tasks = OrderedDict({
 })
 
 
+cumulative_points = {
+    summary.print_summary: [
+        flow.END_OF_TASKS
+    ],
+}
+
+
 class RemoveNodeAction(Action):
     def __init__(self):
         super().__init__('remove node', recreate_inventory=True)
 
     def run(self, res: DynamicResources):
-        flow.run_tasks(res, tasks)
+        flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
         res.make_final_inventory()
 
 
@@ -159,7 +172,7 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='remove_node')
 
-    flow.run_actions(context, [RemoveNodeAction()])
+    flow.Flow().run_flow(context, [RemoveNodeAction()])
 
 
 if __name__ == '__main__':

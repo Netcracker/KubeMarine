@@ -94,7 +94,7 @@ def main(cli_arguments=None):
     if not actions:
         print("No patches to apply")
         exit(0)
-    flow.run_actions(context, actions)
+    flow.Flow().run_flow(context, actions)
 
 
 if __name__ == '__main__':

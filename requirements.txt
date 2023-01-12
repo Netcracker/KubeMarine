@@ -9,6 +9,7 @@ pygelf==0.4.*
 toml==0.10.*
 python-dateutil==2.8.*
 deepdiff==5.7.*
+tabulate==0.9.*
 # Unix specific dependencies
 ansible==6.7.*
 paramiko==2.9.*

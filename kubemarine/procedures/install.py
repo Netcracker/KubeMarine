@@ -450,7 +450,7 @@ def deploy_kubernetes_prepull_images(group: NodeGroup):
     group.call(kubernetes.images_grouped_prepull)
 
 
-def deploy_kubernetes_init(cluster):
+def deploy_kubernetes_init(cluster: KubernetesCluster):
     cluster.nodes['control-plane'].call_batch([
         kubernetes.init_first_control_plane,
         kubernetes.join_other_control_planes
@@ -465,6 +465,8 @@ def deploy_kubernetes_init(cluster):
         kubernetes.apply_labels,
         kubernetes.apply_taints
     ])
+
+    kubernetes.schedule_running_nodes_report(cluster)
 
 
 def deploy_coredns(cluster):
@@ -609,6 +611,11 @@ class InstallAction(Action):
         flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
 
 
+def print_verification_version(result: flow.FlowResult, install: InstallAction):
+    if install.verification_version_result:
+        result.logger.warning(install.verification_version_result)
+
+
 def main(cli_arguments=None):
     cli_help = '''
     Script for installing Kubernetes cluster.
@@ -621,10 +628,9 @@ def main(cli_arguments=None):
     context = flow.create_context(parser, cli_arguments, procedure='install')
 
     install = InstallAction()
-    flow.run_actions(context, [install])
-
-    if install.verification_version_result:
-        print(install.verification_version_result)
+    flow_ = flow.ActionsFlow([install])
+    flow_.atexit(lambda r: print_verification_version(r, install))
+    flow_.run_flow(context)
 
 
 if __name__ == '__main__':

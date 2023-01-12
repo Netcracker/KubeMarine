@@ -52,7 +52,7 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='manage_psp')
 
-    flow.run_actions(context, [PSPAction()])
+    flow.Flow().run_flow(context, [PSPAction()])
 
 
 if __name__ == '__main__':
