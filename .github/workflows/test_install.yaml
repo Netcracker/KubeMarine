@@ -1,11 +1,11 @@
-name: Test install
+name: Test Installation
 on:
   push:
     branches:
       - '**'
 
 jobs:
-  test-default-install:
+  test-default-installation:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -60,7 +60,7 @@ jobs:
           retention-days: 7
 
 
-  test-extended-install:
+  test-extended-installation:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
