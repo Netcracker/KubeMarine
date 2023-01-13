@@ -5,7 +5,62 @@ on:
       - '**'
 
 jobs:
-  test-install:
+  test-default-install:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: [ "3.9" ]
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Check ips
+        run: ip a
+      - name: Ssh preparation
+        run: |
+          ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
+          cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+          ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
+      - name: Test ssh connection
+        run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Remove moby-runc to resolve conflicts
+        run: sudo apt remove moby-runc
+      - name: Check Iaas
+        id: test_check_iaas
+        continue-on-error: true
+        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
+      - name: Copy check iaas dumps
+        if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/check_iaas_dump/
+      - name: Install
+        id: test_install
+        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points
+      - name: Copy install dumps
+        if: (success() || failure()) && steps.test_install.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/install_dump/
+      - name: Check paas
+        id: test_check_paas
+        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
+      - name: Copy check paas dumps
+        if:  (success() || failure()) && steps.test_check_paas.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/check_paas_dump/
+      - name: Collect dump artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: default_cluster_procedure_dumps
+          path: results/
+          retention-days: 7
+
+
+  test-extended-install:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -37,38 +92,26 @@ jobs:
       - name: Check Iaas
         id: test_check_iaas
         continue-on-error: true
-        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
+        run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml
       - name: Copy check iaas dumps
         if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/check_iaas_dump/
-      - name: Install default cluster
-        id: test_default_install
-        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points
-      - name: Copy default install dumps
-        if: (success() || failure()) && steps.test_default_install.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/default_install_dump/
-      - name: Check paas default cluster
-        id: test_default_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
-      - name: Copy default check paas dumps
-        if:  (success() || failure()) && steps.test_default_check_paas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/default_check_paas_dump/
-      - name: Install extended cluster
-        id: test_extended_install
+      - name: Install
+        id: test_install
         run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points
-      - name: Copy extended install dumps
-        if: (success() || failure()) && steps.test_extended_install.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/extended_install_dump/
-      - name: Check paas extended cluster
-        id: test_extended_check_paas
+      - name: Copy install dumps
+        if: (success() || failure()) && steps.test_install.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/install_dump/
+      - name: Check paas
+        id: test_check_paas
         run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml
-      - name: Copy extended check paas dumps
-        if:  (success() || failure()) && steps.test_extended_check_paas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/extended_check_paas_dump/
+      - name: Copy check paas dumps
+        if:  (success() || failure()) && steps.test_check_paas.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/check_paas_dump/
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
         with:
-          name: procedure_dumps
+          name: extended_cluster_procedure_dumps
           path: results/
           retention-days: 7
