@@ -43,7 +43,7 @@ jobs:
         id: test_default_install
         run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points
       - name: Copy default install dumps
-        if: steps.test_default_install.outcome == 'failure'
+        if: (success() || failure()) && steps.test_default_install.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/default_install_dump/
       - name: Check paas default cluster
         id: test_default_check_paas
