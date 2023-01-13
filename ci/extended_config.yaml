@@ -11,7 +11,7 @@ nodes:
     test-label: label
 
 vrrp_ips:
-- ip: "192.168.10.10"
+- ip: "172.17.1.1"
 
 cluster_name: "test-local-k8s.com"
 

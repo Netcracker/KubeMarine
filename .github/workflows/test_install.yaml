@@ -20,6 +20,8 @@ jobs:
           ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
           cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
           ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
+      - name: Add ip alias
+        run: ifconfig docker0:0 172.17.1.1 up
       - name: Test ssh connection
         run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
       - name: Set up Python ${{ matrix.python-version }}
