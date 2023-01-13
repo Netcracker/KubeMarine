@@ -420,12 +420,15 @@ plugins:
     installation:
       priority: 0
       procedures:
+        - config: # This is for validation and to only save the original yaml on control planes
+            source: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
+            apply_required: false
+            do_render: false
         - python:
             module: plugins/calico.py
             method: apply_calico_yaml
             arguments:
               calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
-              calico_yaml: './dump/calico-{{ plugins.calico.version }}.yaml'
         - expect:
             daemonsets:
               - calico-node

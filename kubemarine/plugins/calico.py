@@ -47,7 +47,7 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
+def apply_calico_yaml(cluster, calico_original_yaml):
     """
     The method implements full proccessing for Calico plugin
     :param calico_original_yaml: path to original Calico manifest
@@ -55,8 +55,14 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     :param cluster: Cluster object
     """
 
+    # create config for plugin module
+    config = {
+        "source": calico_original_yaml,
+        "do_render": False
+    }
+
     # get original YAML and parse it into dict of objects
-    calico_original_yaml_path = utils.determine_resource_absolute_path(calico_original_yaml)
+    calico_original_yaml_path = plugins.get_source_absolute_pattern(config)
     obj_list = load_multiple_yaml(calico_original_yaml_path, cluster)
 
     validate_original(cluster, obj_list)
@@ -114,6 +120,11 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
             "source": calico_yaml,
             "do_render": False
             }
+
+    # TODO
+    cluster.log.debug("Uploading %s..." % file_type)
+    cluster.log.debug("\tSource: %s" % file)
+    cluster.log.debug("\tDestination: %s" % destination_path)
 
     plugins.apply_config(cluster, config)
 

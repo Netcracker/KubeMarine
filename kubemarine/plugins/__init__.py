@@ -906,6 +906,13 @@ def _convert_file(config):
     return config
 
 
+def get_source_absolute_pattern(config):
+    return os.path.join(
+        utils.determine_resource_absolute_dir(config['source']),
+        os.path.basename(config['source'])
+    )
+
+
 def _verify_file(config, file_type):
     """
         Verifies if the path matching the config 'source' key exists and points to
@@ -915,11 +922,7 @@ def _verify_file(config, file_type):
         raise Exception('%s file source is missing' % file_type)
 
     # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
+    source = get_source_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
@@ -933,7 +936,44 @@ def _verify_file(config, file_type):
         # TODO: verify fields types and contents
 
 
-def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
+def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> None:
+    log = cluster.log
+    do_render = config.get('do_render', True)
+
+    source = get_source_absolute_pattern(config)
+    files = glob.glob(source)
+
+    if len(files) == 0:
+        raise ValueError('Cannot find any %s files matching this '
+                         'source value: %s' % (source, file_type))
+
+    for file in files:
+        cfg_copy = dict(config)
+        source_filename = os.path.basename(file)
+        if do_render:
+            # templates usually have '.j2' extension, which we want to remove from resulting filename
+            # but we also support usual '.yaml' files without '.j2' extension, in this case we do not want to remove extension
+            split_extension = os.path.splitext(source_filename)
+            if split_extension[1] == ".j2":
+                source_filename = split_extension[0]
+
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            generated_data = jinja.new(log).from_string(
+                open(file).read()).render(**render_vars)
+            utils.dump_file(cluster, generated_data, source_filename)
+            stream = io.StringIO(generated_data)
+        else:
+            stream = open(file)
+
+        destination_path = cfg_copy.setdefault('destination', '/etc/kubernetes/%s' % source_filename)
+        cfg_copy.setdefault('apply_command', 'kubectl apply -f %s' % destination_path)
+
+        log.debug("Uploading %s..." % file_type)
+        log.debug("\tSource: %s" % file)
+        log.debug("\tDestination: %s" % destination_path)
+
+
+def _apply_stream(cluster, config, file_type) -> None:
     """
         Apply yamls as is or
         renders and applies templates that match the config 'source' key.
@@ -947,12 +987,7 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     apply_nodes = config.get('apply_nodes', [])
     do_render = config.get('do_render', True)
 
-    # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
+    source = get_source_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
