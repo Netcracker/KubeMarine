@@ -6,13 +6,56 @@ nodes:
 - name: "node-all-in-one"
   address: "172.17.0.1"
   internal_address: "172.17.0.1"
-  roles: ["control-plane", "worker"]
+  roles: ["balancer", "control-plane", "worker"]
+  labels:
+    test-label: label
+
+vrrp_ips:
+- ip: "192.168.10.10"
 
 cluster_name: "test-local-k8s.com"
 
 services:
-    packages:
-        install:
-        - conntrack
-        - kmod
-        - curl
+  selinux:
+    state: disabled
+
+  packages:
+    install:
+    - conntrack
+    - kmod
+    - ethtool
+    - ebtables
+    - socat
+    - curl
+    - openssl
+    - unzip
+    - policycoreutils-python-utils
+
+plugins:
+  kubernetes-dashboard:
+    install: true
+  nginx-ingress-controller:
+    install: true
+    controller:
+      nodeSelector:
+        test-label: label
+      tolerations:
+      - key: node-role.kubernetes.io/test-example
+        operator: Exists
+        effect: NoSchedule
+  local-path-provisioner:
+    install: true
+  calico:
+    install: true
+
+rbac:
+  accounts:
+  accounts:
+  - name: superadmin
+    role: cluster-admin
+  - name: basic-user
+    role: system:basic-user
+    namespace: kube-system
+  admission: pss
+  pss:
+    pod-security: enabled

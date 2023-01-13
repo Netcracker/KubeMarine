@@ -47,10 +47,22 @@ jobs:
         run: mkdir -p results && cp -a dump/. results/default_install_dump/
       - name: Check paas default cluster
         id: test_default_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/config.yaml
+        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
       - name: Copy default check paas dumps
         if:  (success() || failure()) && steps.test_default_check_paas.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/default_check_paas_dump/
+      - name: Install extended cluster
+        id: test_extended_install
+        run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points
+      - name: Copy extended install dumps
+        if: (success() || failure()) && steps.test_extended_install.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/extended_install_dump/
+      - name: Check paas extended cluster
+        id: test_extended_check_paas
+        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml
+      - name: Copy extended check paas dumps
+        if:  (success() || failure()) && steps.test_extended_check_paas.outcome != 'skipped'
+        run: mkdir -p results && cp -a dump/. results/extended_check_paas_dump/
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
