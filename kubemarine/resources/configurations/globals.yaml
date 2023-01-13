@@ -570,7 +570,7 @@ compatibility_map:
         ram: 2
       worker:
         amount: 1
-        vcpu: 4
+        vcpu: 2
         ram: 4
       vip:
         amount: 0

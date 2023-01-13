@@ -34,7 +34,7 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Check Iaas
         id: test_check_iaas
-        continue-on-error: true
+        #continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
       - name: Collect check_iaas artifacts
         if: failure() && steps.test_check_iaas.outcome == 'failure'
