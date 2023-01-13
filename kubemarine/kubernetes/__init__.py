@@ -1164,8 +1164,13 @@ def schedule_running_nodes_report(cluster: KubernetesCluster):
         utils.schedule_summary_report(cluster.context, property, value)
 
 
+def get_nodes_description_cmd() -> str:
+    return 'kubectl get node -o yaml'
+
+
 def get_nodes_description(cluster: KubernetesCluster) -> dict:
-    result = cluster.nodes['control-plane'].get_final_nodes().get_any_member().sudo('kubectl get node -o yaml')
+    cmd = get_nodes_description_cmd()
+    result = cluster.nodes['control-plane'].get_final_nodes().get_any_member().sudo(cmd)
     cluster.log.verbose(result)
     return yaml.safe_load(list(result.values())[0].stdout)
 
