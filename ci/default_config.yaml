@@ -1,0 +1,18 @@
+node_defaults:
+  keyfile: ~/.ssh/id_rsa
+  username: runner
+
+nodes:
+- name: "node-all-in-one"
+  address: "172.17.0.1"
+  internal_address: "172.17.0.1"
+  roles: ["balancer", "control-plane", "worker"]
+
+cluster_name: "test-local-k8s.com"
+
+services:
+    packages:
+        install:
+        - conntrack
+        - kmod
+        - curl

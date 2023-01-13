@@ -34,32 +34,24 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Check Iaas
         id: test_check_iaas
-        #continue-on-error: true
-        run: ./bin/kubemarine check_iaas -c ./ci/config.yaml
-      - name: Collect check_iaas artifacts
-        if: failure() && steps.test_check_iaas.outcome == 'failure'
+        continue-on-error: true
+        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
+      - name: Copy check iaas dumps
+        run: cp -a dump/. results/check_iaas_dump/
+      - name: Install default cluster
+        id: test_default_install
+        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points
+      - name: Copy default install dumps
+        run: cp -a dump/. results/default_install_dump/
+      - name: Check paas default cluster
+        id: test_default_check_paas
+        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
+      - name: Copy default check paas dumps
+        run: cp -a dump/. results/default_check_paas_dump/
+      - name: Collect dump artifacts
+        if: failure()
         uses: actions/upload-artifact@v3
         with:
-          name: test_check_iaas_dump
-          path: dump/
-          retention-days: 7
-      - name: Install
-        id: test_install
-        run: ./bin/kubemarine install -c ./ci/config.yaml --disable-cumulative-points
-      - name: Collect install artifacts
-        if: failure() && steps.test_install.outcome == 'failure'
-        uses: actions/upload-artifact@v3
-        with:
-          name: test_install_dump
-          path: dump/
-          retention-days: 7
-      - name: Check paas
-        id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/config.yaml
-      - name: Collect install artifacts
-        if: failure() && steps.test_check_paas.outcome == 'failure'
-        uses: actions/upload-artifact@v3
-        with:
-          name: test_check_paas_dump
-          path: dump/
+          name: procedure_dumps
+          path: results/
           retention-days: 7
