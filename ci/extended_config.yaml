@@ -50,7 +50,6 @@ plugins:
 
 rbac:
   accounts:
-  accounts:
   - name: superadmin
     role: cluster-admin
   - name: basic-user
