@@ -37,7 +37,7 @@ jobs:
         continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
       - name: Copy check iaas dumps
-        if: steps.test_check_iaas.outcome != 'skipped'
+        if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/check_iaas_dump/
       - name: Install default cluster
         id: test_default_install
@@ -49,7 +49,7 @@ jobs:
         id: test_default_check_paas
         run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
       - name: Copy default check paas dumps
-        if: steps.test_default_check_paas.outcome != 'skipped'
+        if:  (success() || failure()) && steps.test_default_check_paas.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/default_check_paas_dump/
       - name: Collect dump artifacts
         if: failure()
