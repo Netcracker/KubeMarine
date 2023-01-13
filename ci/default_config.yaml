@@ -6,7 +6,7 @@ nodes:
 - name: "node-all-in-one"
   address: "172.17.0.1"
   internal_address: "172.17.0.1"
-  roles: ["balancer", "control-plane", "worker"]
+  roles: ["control-plane", "worker"]
 
 cluster_name: "test-local-k8s.com"
 

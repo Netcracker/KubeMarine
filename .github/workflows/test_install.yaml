@@ -47,7 +47,7 @@ jobs:
         run: mkdir -p results && cp -a dump/. results/default_install_dump/
       - name: Check paas default cluster
         id: test_default_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
+        run: ./bin/kubemarine check_paas -c ./ci/config.yaml
       - name: Copy default check paas dumps
         if:  (success() || failure()) && steps.test_default_check_paas.outcome != 'skipped'
         run: mkdir -p results && cp -a dump/. results/default_check_paas_dump/
