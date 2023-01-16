@@ -18,13 +18,13 @@ This section describes the features and steps for performing maintenance procedu
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
-    - [Inventory preservation](#inventory-preservation)
+    - [Inventory Preservation](#inventory-preservation)
     - [Additional Parameters](#additional-parameters)
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
-- [Additional procedures](#additional-procedures)
+- [Additional Procedures](#additional-procedures)
     - [Changing Calico Settings](#changing-calico-settings)
-    - [Data encryption in Kubernetes](#data-encryption-in-kubernetes)
+    - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
 - [Common Practice](#common-practice)
 
@@ -745,7 +745,7 @@ To change the operating system on an already running cluster:
 1. Start Kubemarine IAAS and PAAS checks, make sure all services, pods, entire cluster are healthy and running correctly.
 1. If something is not functioning correctly in the cluster, manually correct it before resuming.
 1. Start the migration for the next node, and migrate all the remaining nodes.
-1. After the migration finished, manually replace all OS-specific information in your `cluster.yaml`: repositories, packages, associations, if any. Also pay attention to their versions. In further procedures, use only the new inventory instead of the old one.
+1. After the migration finished, manually replace all OS-specific information in your `cluster.yaml`: repositories, packages, and associations, if any. Also pay attention to their versions. In further procedures, use only the new inventory instead of the old one.
 
 **Note**: It is possible to migrate the OS removing/adding groups of nodes, not only for a single node. However, be careful with the selected group of nodes - incorrectly selected nodes for removal or their amount can damage the cluster or lead it to an unusable state. Select the nodes at your discretion.
 
@@ -940,7 +940,7 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 
 ### Configuring Certificate Renew Procedure
 
-#### Configuring Certificate Renew Procedure For nginx-ingress-controller
+#### Configuring Certificate Renew Procedure for nginx-ingress-controller
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
 ```yaml
@@ -1207,7 +1207,7 @@ kubemarine add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalanc
 Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
 For more information, refer to the [Configuring Kubemarine Logging](Logging.md) guide.
 
-## Inventory preservation
+## Inventory Preservation
 
 The Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes under the following path:
 ```
@@ -1262,7 +1262,7 @@ prepull_group_size: 100
 
 # Additional Procedures
 
-The following kubemarine procedures are available additionally: 
+The following Kubemarine procedures are available additionally: 
 - `version`      Print current release version
 - `do`           Execute shell command on cluster nodes
 
@@ -1284,15 +1284,15 @@ plugins:
 	
 ```
 
-## Data encryption in Kubernetes
+## Data Encryption in Kubernetes
 
-The following article describes the Kubernetes cluster capabilities to store and manipulate an encrypted data.
+The following section describes the Kubernetes cluster capabilities to store and manipulate encrypted data.
 
-### Enabling encryption
+### Enabling Encryption
 
 ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionality.
 
-The `EncryptionConfiguration` file example is the following:
+An example of the `EncryptionConfiguration` file is as follows:
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
@@ -1321,7 +1321,7 @@ resources:
       - identity: {}
 ```
 
-It should be created preliminarily and placed in `/etc/kubernetes/enc/` directory.
+It should be created preliminarily and placed in the `/etc/kubernetes/enc/` directory.
 
 The next step is to enable the encryption settings in `kubeadm-config`: 
 ```yaml
@@ -1363,13 +1363,13 @@ spec:
       type: DirectoryOrCreate
 ```
 
-In the case above, the `secrets` and `configmaps` will be encrypted on first key of `aesgcm` provider, but previously encrypted `secrets` and `configmaps` will be decrypted on any keys of any providers that will be matched. That approach allows changing both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. The `identity` is the default provider that does not provide any encryption at all.
-More information: [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+In the above case, the `secrets` and `configmaps` are encrypted on the first key of the `aesgcm` provider, but the previously encrypted `secrets` and `configmaps` are decrypted on any keys of any providers that are matched. This approach allows to change both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. `identity` is the default provider that does not provide any encryption at all.
+For more information, refer to [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
 
-### Integration with external KMS
+### Integration with External KMS
 
-There is an encryption provider `kms` that allows using an external `Key Management Service` for key storage, therefore the keys are not stored in `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further using.
-`Trousseau` KMS plugin is an example of them. It works through unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using the KMS provider, the `EncryptionConfiguration` is the folowing(`Vault` is a KMS):
+There is an encryption provider `kms` that allows using an external `Key Management Service` for the key storage, therefore the keys are not stored in the `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further use.
+The `Trousseau` KMS plugin is an example. It works through a unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using the KMS provider, the `EncryptionConfiguration` is as follows (`Vault` is a KMS):
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
@@ -1410,7 +1410,7 @@ spec:
     name: vault-kms
 ```
 
-The environment variable `VAULT_ADDR` matches the address of `Vault` service and `--listen-addr` argument points to KMS plugin unix socket in the example below:
+The environment variable `VAULT_ADDR` matches the address of the `Vault` service and `--listen-addr` argument points to KMS plugin unix socket in the following example:
 
 ```yaml
 apiVersion: apps/v1
@@ -1447,13 +1447,13 @@ spec:
             - --v=3
 ```
 
-More information:
+For more information, refer to:
 * [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
 * [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment)
 
 ### Disabling Encryption
 
-The first step of disabling encryption is to make `identity` provider default for encryption, according to the enabling the `EncryptionConfiguration` should be similar to the following example:
+The first step of disabling encryption is to make the `identity` provider default for encryption. The enabling of `EncryptionConfiguration` should be similar to the following example:
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
@@ -1482,26 +1482,26 @@ resources:
               secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
 ```
 
-The next step is to replace all resources that were previously encrypted(e.g. `secrets`):
+The next step is to replace all resources that were previously encrypted (e.g. `secrets`):
 
 ```console
 # kubectl get secrets --all-namespaces -o json | kubectl replace -f -
 ```
 
-Then it's possible to remove encryption settings from `kubeadm-config` configmap and `kube-apiserver` manifest.
+It is then possible to remove encryption settings from the `kubeadm-config` configmap and `kube-apiserver` manifest.
 
-### Maintenance and Operation features
+### Maintenance and Operation Features
 
-* Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to file must be restricted. For instance:
+* Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to the file must be restricted. For instance:
 ```console
 # chmod 0700 /etc/kubernetes/enc/
 ```
 
-* The proper way for encryption using is to rotate the keys. The keys rotation procedure should take into consideration the fact that `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation procedure some operation of getting the encrypted resources may be unsuccessful.
-* The `kube-apiserver` has `--encryption-provider-config-automatic-reload` option that allows applying new `EncryptionConfiguration` without `kube-apiserver` reload.
+* The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
+* The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows applying a new `EncryptionConfiguration` without `kube-apiserver` reload.
 
-* ETCD restore procedures should take into consideration the keys rotation, otherwise some data may be unavailable due to keys that were used for encryption is not available after restoration. The backup procedure may include additional step that renews all encrypted data before ETCD backup. This approach decrease security level for data in ETCD backup, but it prevents the inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
-* External services that interact with ETCD may stop working due to encryption enabling
+* ETCD restore procedures should take into consideration the keys rotation, otherwise some data may be unavailable due to keys that were used for encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
+* External services that interact with ETCD may stop working due to encryption enabling.
 
 ## Changing Cluster CIDR
 
