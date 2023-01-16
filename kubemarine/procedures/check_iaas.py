@@ -166,8 +166,11 @@ def hardware_members_amount(cluster, group_name):
 
 
 def hardware_cpu(cluster, group_name):
+    minimal_cpu = cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'] \
+        if group_name == 'balancer' or cluster.nodes.get('all').nodes_amount() > 1 \
+        else cluster.globals['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
     with TestCase(cluster.context['testsuite'], '006',  'Hardware', 'VCPUs Amount - %ss' % group_name.capitalize(),
-                  minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'],
+                  minimal=minimal_cpu,
                   recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']) as tc:
         if cluster.nodes.get(group_name) is None or cluster.nodes[group_name].is_empty():
             return tc.success(results='Skipped')
@@ -178,7 +181,7 @@ def hardware_cpu(cluster, group_name):
             amount = int(result.stdout)
             if minimal_amount is None or minimal_amount > amount:
                 minimal_amount = amount
-            if amount < cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu']:
+            if amount < minimal_cpu:
                 cluster.log.error('%s node %s has insufficient VCPUs: expected %s, but %s found.'
                                   % (group_name.capitalize(), connection.host, cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'], amount))
             elif amount < cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']:
@@ -191,7 +194,7 @@ def hardware_cpu(cluster, group_name):
         if minimal_amount != 1:
             s = 's'
 
-        if minimal_amount < cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu']:
+        if minimal_amount < minimal_cpu:
             raise TestFailure("Less than minimal. Detected %s VCPU%s" % (minimal_amount, s),
                               hint="Increase the number of VCPUs in the node configuration to at least the minimum "
                                    "value: %s VCPUs." % cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'])

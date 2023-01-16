@@ -34,7 +34,6 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Check Iaas
         id: test_check_iaas
-        continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
       - name: Copy check iaas dumps
         if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
@@ -91,7 +90,6 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Check Iaas
         id: test_check_iaas
-        continue-on-error: true
         run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml
       - name: Copy check iaas dumps
         if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
