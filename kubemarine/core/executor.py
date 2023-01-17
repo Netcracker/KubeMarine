@@ -301,7 +301,7 @@ class RemoteExecutor:
 
                 if output != "":
                     output += "\n"
-                output += "\t%s (%s): code=%i" % (conn, token, result.exited)
+                output += "\t%s (%s): code=%i" % (conn.host, token, result.exited)
                 if result.stdout:
                     output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
                 if result.stderr:

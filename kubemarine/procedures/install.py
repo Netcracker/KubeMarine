@@ -165,12 +165,12 @@ def system_prepare_system_modprobe(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
 def system_install_audit(group: NodeGroup):
-    group.cluster.log.debug(group.call(audit.install))
+    group.call(audit.install)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
 def system_prepare_audit_daemon(group: NodeGroup):
-    group.cluster.log.debug(group.call(audit.apply_audit_rules))
+    group.call(audit.apply_audit_rules)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane')

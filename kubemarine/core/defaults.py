@@ -61,6 +61,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.system.verify_inventory",
     "kubemarine.system.enrich_etc_hosts",
     "kubemarine.packages.enrich_inventory_include_all",
+    "kubemarine.audit.verify_inventory",
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
