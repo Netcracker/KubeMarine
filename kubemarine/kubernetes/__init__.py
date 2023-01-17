@@ -643,35 +643,48 @@ def apply_taints(group):
     log = group.cluster.log
     minor_version = '.'.join((group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]).split('.')[:-1])
     global_taint = group.cluster.globals['taint'][minor_version]
-    worker_found = False
-    log.debug("Check taints for nodes")
-    for node in group.get_ordered_members_list(provide_node_configs=True):
 
+    log.debug("Check default taints for nodes")
+
+    with RemoteExecutor(group.cluster) as exe:
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            if "worker" in node["roles"] and "control-plane" in node["roles"]:
+                result = node['connection'].sudo(
+                    'kubectl get nodes %s -ojsonpath="{range}{.metadata.name} {.spec.taints[*].key}{end}"' % (node['name']))
+
+    results = exe.get_merged_nodegroup_results()
+
+    with RemoteExecutor(group.cluster):
         if "worker" in node["roles"] and "control-plane" in node["roles"]:
-            result = node['connection'].sudo("kubectl get nodes %s -o=jsonpath='{range}{.spec.taints[*].key}{end}'" % (node['name']))
-            for node_result in list(result.values()):
-                taints = (node_result.stdout).split(' ')
+            for node_result in list(results.values()):
+                results = (node_result.stdout).split(' ')
                 for taint_line in global_taint:
-                    if taint_line in taints:
-                        log.verbose("Remove default taint %s found for %s" % (taint_line, node['name']))
-                        node['connection'].sudo("kubectl taint node %s %s:NoSchedule-" % (node["name"], taint_line))
+                    if taint_line in results[1:]:
+                        log.verbose("Remove default taint %s found for %s" % (taint_line, results[0]))
+                        node_result.connection.sudo("kubectl taint node %s %s-" % (results[0], taint_line))
                         continue
                     else:
                         log.verbose("Not default taint %s on node %s " % (taint_line, node["name"]))
 
-        if "taints" not in node:
-            log.verbose("No additional custom taints found for %s" % node['name'])
-            continue
-        log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
-        for taint in node["taints"]:
-            node['connection'].sudo("kubectl taint node %s %s" % (node["name"], taint))
-            log.verbose("Found additional custom taints on %s: %s" % (node['name'], node['taints']))
+    log.debug("Applying additional taints for nodes")
+    with RemoteExecutor(group.cluster):
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            if "taints" not in node:
+                log.verbose("No additional taints found for %s" % node['name'])
+                continue
+            log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
+            for taint in node["taints"]:
+                group.cluster.nodes["control-plane"].get_first_member() \
+                    .sudo("kubectl taint node %s %s" % (node["name"], taint))
 
     log.debug("Successfully applied additional taints")
 
     return group.cluster.nodes["control-plane"].get_first_member() \
-            .sudo("kubectl get nodes -o=jsonpath="
-                  "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
+        .sudo("kubectl get nodes -o=jsonpath="
+              "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
+
+
+
 
 
 def is_cluster_installed(cluster):
