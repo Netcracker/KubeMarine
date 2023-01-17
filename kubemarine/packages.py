@@ -14,6 +14,8 @@
 
 from typing import List, Dict
 
+import fabric
+
 from kubemarine import yum, apt
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
@@ -273,7 +275,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
+def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -291,6 +293,45 @@ def detect_installed_package_version(group: NodeGroup, package: str) -> NodeGrou
 
     cmd = get_detect_package_version_cmd(os_family, package_name)
     return group.sudo(cmd)
+
+
+def _parse_node_detected_package(result: fabric.runners.Result, package: str) -> str:
+    node_detected_package = result.stdout.strip() + result.stderr.strip()
+    # consider version, which ended with special symbol = or - as not installed
+    # (it is possible in some cases to receive "containerd=" version)
+    if "not installed" in node_detected_package or "no packages found" in node_detected_package \
+            or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
+        node_detected_package = f"not installed {package}"
+
+    return node_detected_package
+
+
+def detect_installed_association_packages(group: NodeGroup, association_name: str) -> Dict[str, List[str]]:
+    cluster = group.cluster
+
+    result = {}
+    host_to_packages = {}
+    with RemoteExecutor(cluster) as exe:
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            the_node: NodeGroup = node['connection']
+            host: str = node['connect_to']
+
+            packages = cluster.get_package_association_for_node(host, association_name, 'package_name')
+            if isinstance(packages, str):
+                packages = [packages]
+
+            host_to_packages[host] = packages
+            for pkg in packages:
+                _detect_installed_package_version(the_node, pkg)
+
+    for conn, multiple_results in exe.get_last_results().items():
+        host = conn.host
+        multiple_results = list(multiple_results.values())
+        for i, package in enumerate(host_to_packages[host]):
+            node_detected_package = _parse_node_detected_package(multiple_results[i], package)
+            result.setdefault(host, []).append(node_detected_package)
+
+    return result
 
 
 def detect_installed_packages_version_groups(group: NodeGroup, packages_list: List or str) -> Dict[str, Dict[str, List]]:
@@ -313,7 +354,7 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
 
     with RemoteExecutor(cluster) as exe:
         for package in packages_list:
-            detect_installed_package_version(group, package)
+            _detect_installed_package_version(group, package)
 
     raw_result = exe.get_last_results()
     results: Dict[str, Dict[str, List]] = {}
@@ -321,12 +362,7 @@ def detect_installed_packages_version_groups(group: NodeGroup, packages_list: Li
     for i, package in enumerate(packages_list):
         detected_grouped_packages = {}
         for conn, multiple_results in raw_result.items():
-            node_detected_package = multiple_results[i].stdout.strip() + multiple_results[i].stderr.strip()
-            # consider version, which ended with special symbol = or - as not installed
-            # (it is possible in some cases to receive "containerd=" version)
-            if "not installed" in node_detected_package or "no packages found" in node_detected_package \
-                    or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
-                node_detected_package = f"not installed {package}"
+            node_detected_package = _parse_node_detected_package(multiple_results[i], package)
             detected_grouped_packages.setdefault(node_detected_package, []).append(conn.host)
 
         results[package] = detected_grouped_packages

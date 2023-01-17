@@ -14,7 +14,7 @@
 
 import random
 import time
-from typing import Tuple, List, Dict, Callable, Any
+from typing import Tuple, List, Dict, Callable, Any, Optional
 from contextvars import Token, ContextVar
 
 import fabric
@@ -36,11 +36,15 @@ class RemoteExecutor:
                  enforce_children=False,
                  timeout=None):
         self.cluster = cluster
-        self.warn = warn
+        # TODO revise necessity of warn option
+        self.warn = False
         self.lazy = lazy
         self.parallel = parallel
-        self.ignore_failed = ignore_failed
-        self.enforce_children = enforce_children
+        # TODO support ignore_failed option.
+        #  Probably it should be chosen automatically depending on warn=? of commands kwargs (not of the same executor option).
+        self.ignore_failed = False
+        # TODO revise this option
+        self.enforce_children = False
         self.timeout = timeout
         self.connections_queue: Dict[Connection, List[Tuple]] = {}
         self._last_token = -1
@@ -99,13 +103,13 @@ class RemoteExecutor:
             action, callbacks, tokens = batch_no_cnx[host]
             if isinstance(result,
                           fabric.runners.Result) and executor.command_separator in result.stdout and executor.command_separator in result.stderr:
-                stderrs = result.stderr.strip().split(executor.command_separator)
-                raw_stdouts = result.stdout.strip().split(executor.command_separator)
+                stderrs = result.stderr.split(executor.command_separator + '\n')
+                raw_stdouts = result.stdout.split(executor.command_separator + '\n')
                 stdouts = []
                 exit_codes = []
                 i = 0
                 while i < len(raw_stdouts):
-                    stdouts.append(raw_stdouts[i].strip())
+                    stdouts.append(raw_stdouts[i])
                     if i + 1 < len(raw_stdouts):
                         exit_codes.append(int(raw_stdouts[i + 1].strip()))
                     i += 2
@@ -177,6 +181,8 @@ class RemoteExecutor:
         return batches
 
     def queue(self, target, action: Tuple, callback: Callable = None) -> int or dict:
+        # TODO support callbacks
+        callback = None
         executor = self._get_active_executor()
         executor._last_token = token = executor._last_token + 1
 
@@ -208,12 +214,14 @@ class RemoteExecutor:
             return None
         return executor.results[-1]
 
-    def get_merged_nodegroup_results(self):
+    def get_merged_nodegroup_results(self, filter_tokens: Optional[List[int]] = None):
         """
         Merges last tokenized results into NodeGroupResult.
 
-        The method is useful to check exceptions, or to check result in case only one command per node is executed.
+        The method is useful to check exceptions, to check result in case only one command per node is executed,
+        or to check result of specific commands in the batch if tokens parameter is provided.
 
+        :param filter_tokens: tokens to filter result of specific commands in the batch
         :return: None or NodeGroupResult
         """
         # TODO: Get rid of this WA import, added to avoid circular import problem
@@ -229,14 +237,20 @@ class RemoteExecutor:
                 "exited": 0
             }
             object_result = None
+
+            tokens = host_results.keys() if filter_tokens is None else filter_tokens
             for token, result in host_results.items():
+                if isinstance(result, Exception):
+                    object_result = result
+                    continue
+                elif token not in tokens:
+                    continue
+
                 if isinstance(result, fabric.runners.Result):
                     if result.stdout:
-                        merged_result['stdout'] = result.stdout if not merged_result['stdout'] \
-                            else merged_result['stdout'] + '\n\n' + result.stdout
+                        merged_result['stdout'] += result.stdout
                     if result.stderr:
-                        merged_result['stderr'] = result.stderr if not merged_result['stderr'] \
-                            else merged_result['stderr'] + '\n\n' + result.stderr
+                        merged_result['stderr'] += result.stderr
 
                     # Exit codes can not be merged, that's why they are assigned by priority:
                     # 1. Most important code is 1, it should be assigned if any results contains it

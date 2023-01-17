@@ -360,10 +360,10 @@ class NodeGroup:
 
         return group_result
 
-    def run(self, *args, **kwargs) -> NodeGroupResult:
+    def run(self, *args, **kwargs) -> NodeGroupResult or int:
         return self.do("run", *args, **kwargs)
 
-    def sudo(self, *args, **kwargs) -> NodeGroupResult:
+    def sudo(self, *args, **kwargs) -> NodeGroupResult or int:
         return self.do("sudo", *args, **kwargs)
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):

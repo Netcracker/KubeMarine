@@ -55,10 +55,7 @@ def clean(group, **kwargs) -> NodeGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean", **kwargs)
 
 
-def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    if include is None:
-        raise Exception('You must specify included packages to install')
-
+def get_install_cmd(include: str or list, exclude=None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = DEBIAN_HEADERS + 'apt update && ' + \
@@ -68,6 +65,15 @@ def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
         if isinstance(exclude, list):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
+
+    return command
+
+
+def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+    if include is None:
+        raise Exception('You must specify included packages to install')
+
+    command = get_install_cmd(include, exclude)
 
     return group.sudo(command, **kwargs)
     # apt fails to install (downgrade) package if it is already present and has higher version,

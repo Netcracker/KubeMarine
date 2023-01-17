@@ -56,10 +56,7 @@ def clean(group, mode="all", **kwargs):
     return group.sudo("yum clean %s" % mode, **kwargs)
 
 
-def install(group, include=None, exclude=None, **kwargs):
-    if include is None:
-        raise Exception('You must specify included packages to install')
-
+def get_install_cmd(include: str or list, exclude=None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = 'yum install -y %s' % include
@@ -71,9 +68,17 @@ def install(group, include=None, exclude=None, **kwargs):
     command += f"; rpm -q {include}; if [ $? != 0 ]; then echo \"Failed to check version for some packages. " \
                f"Make sure packages are not already installed with higher versions. " \
                f"Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi "
-    install_result = group.sudo(command, **kwargs)
 
-    return install_result
+    return command
+
+
+def install(group, include=None, exclude=None, **kwargs):
+    if include is None:
+        raise Exception('You must specify included packages to install')
+
+    command = get_install_cmd(include, exclude)
+
+    return group.sudo(command, **kwargs)
 
 
 def remove(group, include=None, exclude=None, **kwargs):

@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubemarine import demo, keepalived
+from kubemarine import demo, keepalived, yum
 
 
 class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
@@ -183,11 +183,7 @@ class TestKeepalivedInstallation(unittest.TestCase):
         cluster.fake_shell.add(missing_package_result, 'sudo', missing_package_command)
 
         # simulate package installation
-        installation_command = ['yum install -y %s; rpm -q %s; if [ $? != 0 ]; then echo '
-                                '\"Failed to check version for some packages. '
-                                'Make sure packages are not already installed with higher versions. '
-                                'Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi '
-                                % (package_associations['package_name'], package_associations['package_name'])]
+        installation_command = [yum.get_install_cmd(package_associations['package_name'])]
         expected_results = demo.create_nodegroup_result(cluster.nodes['keepalived'], code=0,
                                                         stdout='Successfully installed keepalived')
         cluster.fake_shell.add(expected_results, 'sudo', installation_command)

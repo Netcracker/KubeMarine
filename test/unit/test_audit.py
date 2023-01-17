@@ -18,7 +18,7 @@ import unittest
 
 import fabric
 
-from kubemarine import demo, audit
+from kubemarine import demo, audit, packages, apt, yum
 from kubemarine.core.group import NodeGroupResult
 from kubemarine.demo import FakeKubernetesCluster
 
@@ -34,10 +34,34 @@ class NodeGroupResultsTest(unittest.TestCase):
         context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         return demo.new_cluster(self.inventory, context=context)
 
+    def get_detect_package_version_cmd(self, os_family: str, package_name: str):
+        return packages.get_detect_package_version_cmd(os_family, package_name)
+
     def test_audit_installation_for_centos(self):
         context = demo.create_silent_context()
         context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
         cluster = demo.new_cluster(self.inventory, context=context)
+
+        package_associations = cluster.inventory['services']['packages']['associations']['rhel']['audit']
+
+        package_name = package_associations['package_name']
+        service_name = package_associations['service_name']
+
+        # simulate package detection command
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=0,
+                                                    stderr='package %s is not installed' % package_name)
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
+
+        # simulate package installation command
+        installation_command = [yum.get_install_cmd(package_name)]
+        exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
+                                                    code=0, stdout='Successfully installed audit')
+        cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
+
+        # simulate enable package command
+        exp_results3 = demo.create_nodegroup_result(cluster.nodes['master'], stdout='ok')
+        cluster.fake_shell.add(exp_results3, 'sudo', ['systemctl enable %s --now' % service_name])
+
         audit.install(cluster.nodes['master'])
 
     def test_audit_installation_for_debian(self):
@@ -50,12 +74,10 @@ class NodeGroupResultsTest(unittest.TestCase):
         # simulate package detection command
         exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=0,
                                                     stderr='dpkg-query: no packages found matching %s' % package_name)
-        cluster.fake_shell.add(exp_results1, 'sudo', ['dpkg-query -f \'${Package}=${Version}\\n\' -W %s || true'
-                                                      % package_name])
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        installation_command = ['DEBIAN_FRONTEND=noninteractive apt update && '
-                                'DEBIAN_FRONTEND=noninteractive sudo apt install -y %s' % package_name]
+        installation_command = [apt.get_install_cmd(package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)
@@ -74,9 +96,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         package_name = package_associations['package_name']
 
         # simulate package detection command
-        exp_results = demo.create_nodegroup_result(cluster.nodes['master'], code=0, stdout='%s=' % package_name)
-        cluster.fake_shell.add(exp_results, 'sudo', ['dpkg-query -f \'${Package}=${Version}\\n\' -W %s || true'
-                                                     % package_name])
+        exp_results = demo.create_nodegroup_result(cluster.nodes['master'], code=0, stdout='%s=1:2.8.5-2ubuntu6' % package_name)
+        cluster.fake_shell.add(exp_results, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # run task
         audit.install(cluster.nodes['master'])
@@ -91,23 +112,21 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         # simulate package detection command with partly installed audit
         host_to_result = {
-            '10.101.1.2': fabric.runners.Result(stdout='%s=' % package_name,
+            '10.101.1.2': fabric.runners.Result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
                                                 exited=0,
                                                 connection=all_nodes_group['10.101.1.2']),
             '10.101.1.3': fabric.runners.Result(stderr='dpkg-query: no packages found matching %s' % package_name,
                                                 exited=0,
                                                 connection=all_nodes_group['10.101.1.3']),
-            '10.101.1.4': fabric.runners.Result(stdout='%s=' % package_name,
+            '10.101.1.4': fabric.runners.Result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
                                                 exited=0,
                                                 connection=all_nodes_group['10.101.1.4'])
         }
         exp_results1 = NodeGroupResult(cluster, host_to_result)
-        cluster.fake_shell.add(exp_results1, 'sudo', ['dpkg-query -f \'${Package}=${Version}\\n\' -W %s || true'
-                                                      % package_name])
+        cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
-        installation_command = ['DEBIAN_FRONTEND=noninteractive apt update && '
-                                'DEBIAN_FRONTEND=noninteractive sudo apt install -y %s' % package_name]
+        installation_command = [apt.get_install_cmd(package_name)]
         exp_results2 = demo.create_nodegroup_result(cluster.nodes['master'],
                                                     code=0, stdout='Successfully installed audit')
         cluster.fake_shell.add(exp_results2, 'sudo', installation_command)

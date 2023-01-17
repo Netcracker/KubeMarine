@@ -216,7 +216,6 @@ If you have other solution, remove or switch off the IP firewall before the inst
   * kmod
   * semanage
   * conntrack
-  * audit
   * unzip. By default it is not required. Install if you intend to unzip third-party files with **.zip** extension.
 * Recommended
   Installation of the below packages is highly recommended; however, Kubernetes is able to work without them, but may show warnings:
@@ -2374,7 +2373,7 @@ services:
 
 *Can restart service*: Always yes, `auditd`.
 
-*OS specific*: Yes, `prepare.system.audit.install` task is performed only on the Debian OS family.
+*OS specific*: No
 
 ```yaml
 services:
@@ -4809,7 +4808,7 @@ The following is the installation tasks tree:
     * **modprobe** - Configures Linux Kernel modules. For more information about parameters for this task, see [modprobe](#modprobe).
     * **sysctl** - Configures Linux Kernel parameters. For more information about parameters for this task, see [sysctl](#sysctl).
     * **audit**
-      * **install** - Installs auditd daemon on Ubuntu/Debian nodes.
+      * **install** - Installs auditd daemon on nodes.
       * **configure_daemon** - Configures Linux audit rules. For more information about parameters for this task, see [audit-daemon](#audit-daemon).
       * **configure_policy** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
       

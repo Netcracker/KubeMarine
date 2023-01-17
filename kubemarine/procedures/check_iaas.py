@@ -429,14 +429,14 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         all_group.put(local_path, random_temp_path, binary=False)
 
         if repository_urls:
-            with RemoteExecutor(cluster, ignore_failed=True) as exe:
+            with RemoteExecutor(cluster) as exe:
                 for node in all_group.get_ordered_members_list(provide_node_configs=True):
                     # Check with script
                     python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
                     for repository_url in repository_urls:
                         node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
                                                % (python_executable, random_temp_path, repository_url,
-                                                  cluster.inventory['timeout_download']), warn=True)
+                                                  cluster.inventory['timeout_download']))
 
             for conn, url_results in exe.get_last_results().items():
                 # Check if resolv.conf is actual
@@ -498,12 +498,12 @@ def check_access_to_packages(cluster: KubernetesCluster):
         check_package_repositories(cluster)
         broken = []
         warnings = []
-        with RemoteExecutor(cluster, ignore_failed=True) as exe:
+        with RemoteExecutor(cluster) as exe:
             for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
                 packages_to_check = get_packages_to_install(node)
                 cluster.log.debug(f"Packages to check for node {node['connect_to']}: {packages_to_check}")
                 for package in packages_to_check:
-                    packages.search_package(node['connection'], package, warn=True)
+                    packages.search_package(node['connection'], package)
 
         # Check packages from install section
         for conn, results in exe.get_last_results().items():
