@@ -646,20 +646,18 @@ def apply_taints(group):
     worker_found = False
     log.debug("Check taints for nodes")
     for node in group.get_ordered_members_list(provide_node_configs=True):
-        if "worker" in node["roles"]:
-            worker_found = True
 
-            if "control-plane" in node["roles"] and worker_found:
-                result = node['connection'].sudo("kubectl get nodes %s -o=jsonpath='{range}{.spec.taints[*].key}{end}'" % (node['name']))
-                for node_result in list(result.values()):
-                    taints = (node_result.stdout).split(' ')
-                    for taint_line in global_taint:
-                        if taint_line in taints:
-                            log.verbose("Remove default taint %s found for %s" % (taint_line, node['name']))
-                            node['connection'].sudo("kubectl taint node %s %s:NoSchedule-" % (node["name"], taint_line))
-                            continue
-                        else:
-                            log.verbose("Not default taint %s on node %s " % (taint_line, node["name"]))
+        if "worker" in node["roles"] and "control-plane" in node["roles"]:
+            result = node['connection'].sudo("kubectl get nodes %s -o=jsonpath='{range}{.spec.taints[*].key}{end}'" % (node['name']))
+            for node_result in list(result.values()):
+                taints = (node_result.stdout).split(' ')
+                for taint_line in global_taint:
+                    if taint_line in taints:
+                        log.verbose("Remove default taint %s found for %s" % (taint_line, node['name']))
+                        node['connection'].sudo("kubectl taint node %s %s:NoSchedule-" % (node["name"], taint_line))
+                        continue
+                    else:
+                        log.verbose("Not default taint %s on node %s " % (taint_line, node["name"]))
 
         if "taints" not in node:
             log.verbose("No additional custom taints found for %s" % node['name'])
