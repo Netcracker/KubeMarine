@@ -111,9 +111,8 @@ def get_default_node_names(inventory):
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
-    for i, node in enumerate(inventory.get('nodes', [])):
-        if 'balancer' in node['roles'] and \
-                (node.get('address') is not None or node.get('internal_address') is not None):
+    for i, node in enumerate(inventory['nodes']):
+        if 'balancer' in node['roles']:
             default_names.append(node['name'])
 
     # just in case, we remove duplicates
