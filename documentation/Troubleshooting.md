@@ -532,7 +532,7 @@ Add `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for a 
 # openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
 ```
 
-## Nodes `NotReady` status
+## Nodes have `NotReady` status periodically
 
 **Symptoms**: Nodes that work on Ubuntu 20.04 become `NotReady` without any sufficient workload. The `kubelet` has the following messages in log:
 
