@@ -18,12 +18,13 @@ This section describes the features and steps for performing maintenance procedu
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
-    - [Inventory preservation](#inventory-preservation)
+    - [Inventory Preservation](#inventory-preservation)
     - [Additional Parameters](#additional-parameters)
       - [Grace Period and Drain Timeout](#grace-period-and-drain-timeout)
       - [Images Prepull](#images-prepull)
-- [Additional procedures](#additional-procedures)
+- [Additional Procedures](#additional-procedures)
     - [Changing Calico Settings](#changing-calico-settings)
+    - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
 - [Common Practice](#common-practice)
 
@@ -616,7 +617,7 @@ nodes:
 
 **Note**:
 
-* The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#node_defaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
+* The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#nodedefaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
 * You can add the `vrrp_ips` section to **procedure.yaml** if you intend to add the new `balancer` node and have previously not configured the `vrrp_ips` section.
 
 ### Add Node Tasks Tree
@@ -744,7 +745,7 @@ To change the operating system on an already running cluster:
 1. Start Kubemarine IAAS and PAAS checks, make sure all services, pods, entire cluster are healthy and running correctly.
 1. If something is not functioning correctly in the cluster, manually correct it before resuming.
 1. Start the migration for the next node, and migrate all the remaining nodes.
-1. After the migration finished, manually replace all OS-specific information in your `cluster.yaml`: repositories, packages, associations, if any. Also pay attention to their versions. In further procedures, use only the new inventory instead of the old one.
+1. After the migration finished, manually replace all OS-specific information in your `cluster.yaml`: repositories, packages, and associations, if any. Also pay attention to their versions. In further procedures, use only the new inventory instead of the old one.
 
 **Note**: It is possible to migrate the OS removing/adding groups of nodes, not only for a single node. However, be careful with the selected group of nodes - incorrectly selected nodes for removal or their amount can damage the cluster or lead it to an unusable state. Select the nodes at your discretion.
 
@@ -939,7 +940,7 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 
 ### Configuring Certificate Renew Procedure
 
-#### Configuring Certificate Renew Procedure For nginx-ingress-controller
+#### Configuring Certificate Renew Procedure for nginx-ingress-controller
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
 ```yaml
@@ -1206,7 +1207,7 @@ kubemarine add_node procedure.yaml --tasks="deploy" --exclude="deploy.loadbalanc
 Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
 For more information, refer to the [Configuring Kubemarine Logging](Logging.md) guide.
 
-## Inventory preservation
+## Inventory Preservation
 
 The Kubemarine collects information about each `successful` procedure operation with the cluster and stores it on all master nodes under the following path:
 ```
@@ -1258,11 +1259,13 @@ For the `add_nodes` and `upgrade` procedures, an images prepull task is availabl
 ```yaml
 prepull_group_size: 100
 ```
+
 # Additional Procedures
 
-The following kubemarine procedures are available additionally: 
+The following Kubemarine procedures are available additionally: 
 - `version`      Print current release version
 - `do`           Execute shell command on cluster nodes
+
 ## Changing Calico Settings
 	
 Sometimes, during the operation you have to change the parameters of the Calico plugin. To do this, you can use the standard Kubemarine tools.
@@ -1281,12 +1284,231 @@ plugins:
 	
 ```
 
+## Data Encryption in Kubernetes
+
+The following section describes the Kubernetes cluster capabilities to store and manipulate encrypted data.
+
+### Enabling Encryption
+
+ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionality.
+
+An example of the `EncryptionConfiguration` file is as follows:
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - aesgcm:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - aescbc:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+            - name: key1
+              secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+      - identity: {}
+```
+
+It should be created preliminarily and placed in the `/etc/kubernetes/enc/` directory.
+
+The next step is to enable the encryption settings in `kubeadm-config`: 
+```yaml
+data:
+  ClusterConfiguration: |
+    apiServer:
+      ...
+      extraArgs:
+        ...
+        encryption-provider-config: /etc/kubernetes/enc/enc.yaml
+      extraVolumes:
+      ...
+      - hostPath: /etc/kubernetes/enc
+        mountPath: /etc/kubernetes/enc
+        name: enc
+        pathType: DirectoryOrCreate
+```
+
+There is an `--encryption-provider-config` option that points to the `EncryptionConfiguration` file location. The `kube-apiserver` should have the following parts in the manifest yaml:
+
+```yaml
+...
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+     ...
+    - --encryption-provider-config=/etc/kubernetes/enc/enc.yaml
+      ...
+    volumeMounts:
+    - name: enc
+      mountPath: /etc/kubernetes/enc
+      readonly: true
+       ...
+  volumes:
+  - name: enc
+    hostPath:
+      path: /etc/kubernetes/enc
+      type: DirectoryOrCreate
+```
+
+In the above case, the `secrets` and `configmaps` are encrypted on the first key of the `aesgcm` provider, but the previously encrypted `secrets` and `configmaps` are decrypted on any keys of any providers that are matched. This approach allows to change both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. `identity` is the default provider that does not provide any encryption at all.
+For more information, refer to [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
+
+### Integration with External KMS
+
+There is an encryption provider `kms` that allows using an external `Key Management Service` for the key storage, therefore the keys are not stored in the `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further use.
+The `Trousseau` KMS plugin is an example. It works through a unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using the KMS provider, the `EncryptionConfiguration` is as follows (`Vault` is a KMS):
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - kms:
+          name: vaultprovider
+          endpoint: unix:///opt/vault-kms/vaultkms.socket
+          cachesize: 100
+          timeout: 3s
+      - identity: {}
+```
+
+Also, unix socket must be available for `kube-apiserver`:
+
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    volumeMounts:
+    - mountPath: /opt/vault-kms/vaultkms.socket
+      name: vault-kms
+       ...
+  volumes:
+  - hostPath:
+      path: /opt/vault-kms/vaultkms.socket
+      type: Socket
+    name: vault-kms
+```
+
+The environment variable `VAULT_ADDR` matches the address of the `Vault` service and `--listen-addr` argument points to KMS plugin unix socket in the following example:
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vault-kms-provider
+  namespace: kube-system
+    ...
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: vault-agent
+          image: vault
+          securityContext:
+            privileged: true
+          args:
+            - agent
+            - -config=/etc/vault/vault-agent-config.hcl
+            - -log-level=debug
+          env:
+            - name: VAULT_ADDR
+              value: http://vault-adress:8200
+               ...
+      containers:
+        - name: vault-kms-provider
+          image: ghcr.io/ondat/trousseau:v1.1.3
+          imagePullPolicy: Always
+          args:
+            - -v=5
+            - --config-file-path=/opt/trousseau/config.yaml
+            - --listen-addr=unix:///opt/vault-kms/vaultkms.socket
+            - --zap-encoder=json
+            - --v=3
+```
+
+For more information, refer to:
+* [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
+* [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment)
+
+### Disabling Encryption
+
+The first step of disabling encryption is to make the `identity` provider default for encryption. The enabling of `EncryptionConfiguration` should be similar to the following example:
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - identity: {}
+      - aesgcm:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - aescbc:
+          keys:
+            - name: key1
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+            - name: key1
+              secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+```
+
+The next step is to replace all resources that were previously encrypted (e.g. `secrets`):
+
+```console
+# kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+```
+
+It is then possible to remove encryption settings from the `kubeadm-config` configmap and `kube-apiserver` manifest.
+
+### Maintenance and Operation Features
+
+* Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to the file must be restricted. For instance:
+```console
+# chmod 0700 /etc/kubernetes/enc/
+```
+
+* The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
+* The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows applying a new `EncryptionConfiguration` without `kube-apiserver` reload.
+
+* ETCD restore procedures should take into consideration the keys rotation, otherwise some data may be unavailable due to keys that were used for encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
+* External services that interact with ETCD may stop working due to encryption enabling.
+
 ## Changing Cluster CIDR
 
 There might be a situation when you have to change the pod network used in a cluster. The default `podSubnet` (`10.128.0.0/14` for IPv4 and `fd02::/48` for IPv6) may be inappropriate for some reason.
 
 If you are going to deploy a cluster from scratch, you can set custom `podSubnet` in the cluster.yaml:
-```
+```yaml
 services:
   kubeadm:
     networking:
@@ -1297,8 +1519,8 @@ If an existing cluster has to be updated with a new `podSubnet`, the following s
 
 1. Check that any network security policies are disabled or new podSubnet is whitelisted. This is especially important for OpenStack environments.
 
-2. Create an ippool for new podSubnet:
-```
+2. Create an _ippool_ for new podSubnet:
+```console
 # cat <<EOF | calicoctl apply -f -
 apiVersion: projectcalico.org/v3
 kind: IPPool
@@ -1313,8 +1535,8 @@ EOF
 
 **Note**: The pod subnet mask size for a node cannot be greater than 16, more than the cluster mask size. This is especially important for IPv6 networks. The default `node-cidr-mask-size` for IPv6 is `64`. Therefore, you should use a cluster network mask not shorter than 48 or change the `node-cidr-mask-size` value respectively.
 
-3. Disable the old ippool:
-```
+3. Disable the old _ippool_:
+```console
 # calicoctl get ippool -o yaml > ./ippools.yaml
 # vi ippools.yaml
 ...
@@ -1329,7 +1551,7 @@ EOF
 ```
 
 4. Change the `podCIDR` parameter for all nodes:
-```
+```console
 # export NODENAME=<NODENAME>
 # kubectl get node ${NODENAME} -o yaml > ${NODENAME}.yaml
 # sed -i "s~OLD_NODENET~NEW_NODENET~" ${NODENAME}.yaml
@@ -1337,8 +1559,8 @@ EOF
 ``` 
 
 5. Change `cluster-cidr` in kube-controller-manager manifest at all the master nodes:
-```
-#vi /etc/kubernetes/manifests/kube-controller-manager.yaml
+```console
+# vi /etc/kubernetes/manifests/kube-controller-manager.yaml
 ...
     - --cluster-cidr=10.228.0.0/14
 ...
@@ -1346,7 +1568,7 @@ EOF
 After changing the manifest, the kube-controller-manager pod restarts automatically. Check that it has restarted successfully.
 
 6. Edit the `calico-config` configmap, remove the old ippool name, and change the ip range:
-```
+```console
 # kubectl -n kube-system edit cm calico-config
 ...
           "ipam": {"assign_ipv4": "true", "ipv4_pools": ["10.228.0.0/14"], "type": "calico-ipam"},
@@ -1354,17 +1576,16 @@ After changing the manifest, the kube-controller-manager pod restarts automatica
 ```
 
 7. Edit the `calico-node` daemonset, and change the ip range:
-```
+```console
 # kubectl -n kube-system edit ds calico-node
 ...
         - name: CALICO_IPV4POOL_CIDR
           value: 10.228.0.0/14
-...
 ```
 Check whether all `calico-node` pods have restarted successfully.
 
 8. Change `clusterCIDR` in the `kube-proxy` configmap and restart kube-proxy:
-```
+```console
 # kubectl -n kube-system edit cm kube-proxy
 ...
     clusterCIDR: 10.228.0.0/14
@@ -1375,19 +1596,16 @@ Check whether all `calico-node` pods have restarted successfully.
 9. Delete pods with ip addresses from the old ippool and check that they have restarted with addresses from the new pool successfully.
 
 10. Update the `kubeadm-config` configmap with a new cluster network:
-```
+```console
 # kubectl -n kube-system edit cm kubeadm-config
-...
 data:
   ClusterConfiguration: |
-...
+    ...
     networking:
       podSubnet: 10.228.0.0/14
-...
 ```
 
 11. Check that everything works properly and remove the old ippool if necessary.
-
 
 # Common Practice
 
