@@ -684,9 +684,6 @@ def apply_taints(group):
               "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
 
 
-
-
-
 def is_cluster_installed(cluster):
     cluster.log.verbose('Searching for already installed cluster...')
     try:
