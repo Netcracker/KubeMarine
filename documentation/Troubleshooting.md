@@ -532,6 +532,18 @@ Add `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for a 
 # openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
 ```
 
+## Nodes `NotReady` status
+
+**Symptoms**: Nodes that work on Ubuntu 20.04 become `NotReady` without any sufficient workload. The `kubelet` has the following messages in log:
+
+```
+Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go:1870] "Skipping pod synchronization" err="PLEG is not healthy: pleg was last seen active 3m0.416753742s ago; threshold is 3m0s"
+```
+
+**Root cause**: The Linux kernel version `5.4.0-132-generic` has an issue that affects the `CRI` work.
+
+**Solution**: Upgrade Linux kernel to `5.4.0-135-generic`
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
