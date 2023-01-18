@@ -664,7 +664,7 @@ def apply_taints(group):
                         node_result.connection.sudo("kubectl taint node %s %s-" % (results[0], taint_line))
                         continue
                     else:
-                        log.verbose("Not default taint %s on node %s " % (taint_line, node["name"]))
+                        log.verbose("Not default taint %s on node %s " % (taint_line, results[0]))
 
     log.debug("Applying additional taints for nodes")
     with RemoteExecutor(group.cluster):
