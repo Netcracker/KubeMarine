@@ -27,7 +27,7 @@
           "description": "Specify associations for containerd",
           "properties": {
             "containerd": {
-              "$ref": "definitions/services/packages/associations.json#/definitions/PackageAssociations"
+              "$ref": "definitions/services/packages/associations.json#/definitions/ServicePackageAssociations"
             }
           },
           "additionalProperties": false

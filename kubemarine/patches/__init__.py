@@ -22,7 +22,9 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_mandatory_packages_off import MandatoryPackagesOff
 
 patches: List[Patch] = [
+    MandatoryPackagesOff()
 ]
 """List of patches which can be executed strictly in the declared order"""

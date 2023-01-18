@@ -119,7 +119,7 @@ class KubernetesCluster(Environment):
         return self.make_group(ips)
 
     def create_group_from_groups_nodes_names(self, groups_names: List[str], nodes_names: List[str]) -> NodeGroup:
-        common_group = None
+        common_group = self.make_group([])
 
         if nodes_names:
             common_group = self.make_group_from_nodes(nodes_names)
@@ -131,10 +131,7 @@ class KubernetesCluster(Environment):
                     self.log.verbose('Group \'%s\' is requested for usage, but this group is not exists.' % group)
                     continue
 
-                if common_group is None:
-                    common_group = self.nodes[group]
-                else:
-                    common_group = common_group.include_group(self.nodes[group])
+                common_group = common_group.include_group(self.nodes[group])
 
         return common_group
 

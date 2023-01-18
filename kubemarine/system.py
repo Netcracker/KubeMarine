@@ -155,7 +155,7 @@ def get_system_packages_for_upgrade(cluster):
 
 
 def get_system_packages(cluster):
-    return ["haproxy", "keepalived", cluster.inventory['services']['cri']['containerRuntime']]
+    return [cluster.inventory['services']['cri']['containerRuntime']]
 
 
 def fetch_os_versions(cluster: KubernetesCluster):

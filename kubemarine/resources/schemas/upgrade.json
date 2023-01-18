@@ -50,10 +50,11 @@
           "associations": {
             "type": "object",
             "description": "Configure associations of package objects to be used during upgrade",
-            "allOf": [{"$ref": "definitions/services/packages/associations.json#/definitions/Associations"}],
-            "propertyNames": {
-              "$ref": "definitions/services/packages/associations.json#/definitions/AssociationsNames"
-            }
+            "properties": {
+              "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/ServicePackageAssociations"},
+              "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/ServicePackageAssociations"}
+            },
+            "additionalProperties": false
           }
         },
         "propertyNames": {

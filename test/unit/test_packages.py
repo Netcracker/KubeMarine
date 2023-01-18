@@ -18,6 +18,7 @@ from typing import Optional
 
 from kubemarine import demo, packages
 from kubemarine.core import static, defaults, log, errors
+from kubemarine.core.yaml_merger import default_merger
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
 from test.unit import utils
@@ -37,7 +38,18 @@ def prepare_compiled_associations_defaults() -> dict:
 
     root = deepcopy(defs)
     root['globals'] = static.GLOBALS
-    return defaults.compile_object(logger, defs['services']['packages']['associations'], root)
+    compiled_defaults = defaults.compile_object(logger, defs['services']['packages']['associations'], root)
+
+    for association_name in packages.get_associations_os_family_keys():
+        os_associations: dict = deepcopy(static.GLOBALS['packages']['common_associations'])
+        if association_name == 'debian':
+            del os_associations['semanage']
+        for association_params in os_associations.values():
+            del association_params['groups']
+        default_merger.merge(os_associations, compiled_defaults[association_name])
+        compiled_defaults[association_name] = os_associations
+
+    return compiled_defaults
 
 
 COMPILED_ASSOCIATIONS_DEFAULTS = prepare_compiled_associations_defaults()
@@ -253,7 +265,8 @@ class PackagesUtilities(unittest.TestCase):
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
         cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('debian', 'containerd')])
 
-        detected_packages = packages.detect_installed_packages_version_groups(group, queried_pkg)
+        hosts_to_packages = {host: queried_pkg for host in group.get_hosts()}
+        detected_packages = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
         self.assertEqual({queried_pkg}, detected_packages.keys(),
                          "Incorrect initially queries package")
 
@@ -275,7 +288,8 @@ class PackagesUtilities(unittest.TestCase):
         results = demo.create_nodegroup_result(group, stdout=expected_pkg)
         cluster.fake_shell.add(results, 'sudo', [packages.get_detect_package_version_cmd('rhel', 'docker-ce')])
 
-        detected_packages = packages.detect_installed_packages_version_groups(group, [queried_pkg])
+        hosts_to_packages = {host: [queried_pkg] for host in group.get_hosts()}
+        detected_packages = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
         self.assertEqual({queried_pkg}, detected_packages.keys(),
                          "Incorrect initially queries package")
 
@@ -307,15 +321,15 @@ class CacheVersions(unittest.TestCase):
             .setdefault('include', [])
 
     def test_cache_versions_and_finalize_inventory(self):
-        self._packages_install(self.inventory).extend(['curl', 'unzip'])
+        self._packages_install(self.inventory).extend(['curl2', 'unzip2'])
         cluster = self._new_cluster()
         utils.stub_associations_packages(cluster, {
             'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
         })
         utils.stub_detect_packages(cluster, {
-            'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.hosts},
-            'unzip': {host: 'unzip=6.0-25ubuntu1.1' for host in self.hosts},
+            'curl2': {host: 'curl2=7.68.0-1ubuntu2.14' for host in self.hosts},
+            'unzip2': {host: 'unzip2=6.0-25ubuntu1.1' for host in self.hosts},
         })
 
         cache_installed_packages(cluster)
@@ -326,7 +340,7 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(cluster.inventory, 'debian', 'audit')['package_name'],
                          "auditd was not detected")
-        self.assertEqual({'curl', 'unzip'}, set(self._packages_include(cluster.inventory)),
+        self.assertEqual({'curl2', 'unzip2'}, set(self._packages_include(cluster.inventory)),
                          "Custom packages versions should be not detected when adding node")
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
@@ -336,7 +350,7 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(finalized_inventory, 'debian', 'audit')['package_name'],
                          "auditd was not detected")
-        self.assertEqual({'curl=7.68.0-1ubuntu2.14', 'unzip=6.0-25ubuntu1.1'}, set(self._packages_include(finalized_inventory)),
+        self.assertEqual({'curl2=7.68.0-1ubuntu2.14', 'unzip2=6.0-25ubuntu1.1'}, set(self._packages_include(finalized_inventory)),
                          "Custom packages versions should be detected in finalized inventory")
 
     def test_cache_versions_global_off(self):
@@ -413,7 +427,7 @@ class CacheVersions(unittest.TestCase):
     def test_finalize_inventory_different_package_versions(self):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
 
-        self._packages_install(self.inventory).extend(['curl=7.*', 'unzip=6.*'])
+        self._packages_install(self.inventory).extend(['curl2=7.*', 'unzip2=6.*'])
         cluster = self._new_cluster()
 
         utils.stub_associations_packages(cluster, {
@@ -424,11 +438,11 @@ class CacheVersions(unittest.TestCase):
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
         })
         utils.stub_detect_packages(cluster, {
-            'curl': {
-                self.initial_hosts[0]: 'curl=7.68.0-1ubuntu2.14',
-                self.initial_hosts[1]: 'curl=2',
+            'curl2': {
+                self.initial_hosts[0]: 'curl2=7.68.0-1ubuntu2.14',
+                self.initial_hosts[1]: 'curl2=2',
             },
-            'unzip': {host: 'unzip=6.0-25ubuntu1.1' for host in self.hosts},
+            'unzip2': {host: 'unzip2=6.0-25ubuntu1.1' for host in self.hosts},
         })
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
@@ -438,21 +452,21 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(finalized_inventory, 'debian', 'audit')['package_name'],
                          "auditd was not detected")
-        self.assertEqual({'curl=7.*', 'unzip=6.0-25ubuntu1.1'}, set(self._packages_include(finalized_inventory)),
+        self.assertEqual({'curl2=7.*', 'unzip2=6.0-25ubuntu1.1'}, set(self._packages_include(finalized_inventory)),
                          "Custom packages versions should be partially detected in finalized inventory")
 
     def test_not_cache_versions_if_multiple_os_family_versions(self):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
 
         self.context['nodes'][self.new_host]['os']['version'] = '22.04'
-        self._packages_install(self.inventory).extend(['curl=7.*'])
+        self._packages_install(self.inventory).extend(['curl2=7.*'])
         cluster = self._new_cluster()
 
         utils.stub_associations_packages(cluster, {
             'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
         })
         utils.stub_detect_packages(cluster, {
-            'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.hosts},
+            'curl2': {host: 'curl2=7.68.0-1ubuntu2.14' for host in self.hosts},
         })
 
         cache_installed_packages(cluster)
@@ -465,7 +479,7 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual(default_containerd,
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd should be default because multiple OS versions are detected")
-        self.assertEqual({'curl=7.*'}, set(self._packages_include(finalized_inventory)),
+        self.assertEqual({'curl2=7.*'}, set(self._packages_include(finalized_inventory)),
                          "Custom packages should be default because multiple OS versions are detected")
 
 

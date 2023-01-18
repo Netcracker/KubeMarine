@@ -4654,7 +4654,6 @@ Application of the list merge strategy is allowed in the following sections:
 * `services.packages.install`
 * `services.packages.upgrade`
 * `services.packages.remove`
-* `services.packages.package_manager.repositories`
 * `plugins.nginx-ingress-controller.ports`
 * `plugins.kubernetes-dashboard.ingress.spec.tls`
 * `plugins.kubernetes-dashboard.ingress.spec.rules`

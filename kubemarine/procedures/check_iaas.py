@@ -464,46 +464,21 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 
 
 def check_access_to_packages(cluster: KubernetesCluster):
-    def get_packages_to_install(node):
-        '''
-        This function get list of packages, that should be installed on node
-        '''
-        packages_to_install = copy(cluster.inventory["services"]["packages"].get("install", {}).get('include', []))
-        packages_associations = []
-
-        # Add docker or containerd
-        if cluster.inventory['services']['cri']['containerRuntime'] == 'docker':
-            packages_associations.append('docker')
-        else:
-            packages_associations.append('containerd')
-        # Add haproxy for balancer nodes
-        if 'balancer' in node['roles']:
-            packages_associations.append('haproxy')
-        # Add keepalived for keepalived nodes with vrrp_ips enabled
-        if cluster.inventory.get('vrrp_ips') and 'keepalived' in node['roles']:
-            packages_associations.append('keepalived')
-        # Add audit for debian
-        if node['connection'].get_nodes_os() not in ['rhel', 'rhel8']:
-            packages_associations.append('audit')
-
-        for association in packages_associations:
-            package_name = cluster.get_package_association_for_node(node['connect_to'], association, 'package_name')
-            if isinstance(package_name, list):
-                packages_to_install.extend(package_name)
-            else:
-                packages_to_install.append(package_name)
-        return packages_to_install
-
     with TestCase(cluster.context['testsuite'], '014', 'Software', 'Package Availability') as tc:
         check_package_repositories(cluster)
         broken = []
         warnings = []
+        group = cluster.nodes['all']
+        hosts_to_packages = packages.get_all_managed_packages_for_group(group, cluster.inventory)
         with RemoteExecutor(cluster) as exe:
-            for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-                packages_to_check = get_packages_to_install(node)
-                cluster.log.debug(f"Packages to check for node {node['connect_to']}: {packages_to_check}")
+            for host, packages_to_check in hosts_to_packages.items():
+                packages_to_check = list(set(packages_to_check))
+                hosts_to_packages[host] = packages_to_check
+                cluster.log.debug(f"Packages to check for node {host}: {packages_to_check}")
+
+                node = cluster.make_group([host])
                 for package in packages_to_check:
-                    packages.search_package(node['connection'], package)
+                    packages.search_package(node, package)
 
         # Check packages from install section
         for conn, results in exe.get_last_results().items():
@@ -515,7 +490,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
                 problem_handler = warnings
             else:
                 problem_handler = broken
-            packages_to_check = get_packages_to_install(cluster.get_node(conn))
+            packages_to_check = hosts_to_packages[conn.host]
             for i, result in enumerate(results.values()):
                 if "Package is unavailable" in result.stdout:
                     problem_handler.append(f"Package {packages_to_check[i]} is unavailable for node {conn.host}")

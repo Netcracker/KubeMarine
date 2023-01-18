@@ -116,6 +116,63 @@ thirdparties:
   /usr/bin/crictl.tar.gz:
     software_name: crictl
 
+packages:
+  common_associations:
+    docker:
+      executable_name: 'docker'
+      service_name: 'docker'
+      config_location: '/etc/docker/daemon.json'
+      groups:
+        - control-plane
+        - worker
+    containerd:
+      executable_name: 'containerd'
+      service_name: 'containerd'
+      config_location: '/etc/containerd/config.toml'
+      groups:
+        - control-plane
+        - worker
+    haproxy:
+      config_location: '/etc/haproxy/haproxy.cfg'
+      groups:
+        - balancer
+    keepalived:
+      executable_name: 'keepalived'
+      service_name: 'keepalived'
+      config_location: '/etc/keepalived/keepalived.conf'
+      groups:
+        - keepalived
+    audit:
+      executable_name: 'auditctl'
+      service_name: 'auditd'
+      config_location: '/etc/audit/rules.d/predefined.rules'
+      groups:
+        - control-plane
+        - worker
+    conntrack:
+      groups:
+        - control-plane
+        - worker
+    iptables:
+      package_name: 'iptables'
+      groups:
+        - control-plane
+        - worker
+    openssl:
+      package_name: 'openssl'
+      groups: [ control-plane, worker, balancer ]
+    curl:
+      package_name: 'curl'
+      groups: [ control-plane, worker, balancer ]
+    unzip:
+      package_name: 'unzip'
+      groups: []
+    kmod:
+      package_name: 'kmod'
+      groups: [ control-plane, worker, balancer ]
+    semanage:
+      groups: [ control-plane, worker, balancer ]
+
 compatibility_map:
   software:
     docker:

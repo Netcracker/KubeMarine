@@ -14,14 +14,8 @@
     ]
   },
   "definitions": {
-    "PackageAssociations": {
-      "type": "object",
-      "description": "Associations related to specific package",
+    "PackageAssociationsProperties": {
       "properties": {
-        "executable_name": {
-          "type": "string",
-          "description": "Path to or name of the associated binary executable"
-        },
         "package_name": {
           "description": "Packages with versions to install if the associated service is required for the cluster",
           "oneOf": [
@@ -39,6 +33,33 @@
             }
           ]
         },
+        "cache_versions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure"
+        }
+      }
+    },
+    "PackageAssociationsPropertyNames": {
+      "enum": ["package_name", "cache_versions"]
+    },
+    "PackageAssociations": {
+      "type": "object",
+      "description": "Associations related to specific package",
+      "allOf": [{"$ref": "#/definitions/PackageAssociationsProperties"}],
+      "propertyNames": {
+        "$ref": "#/definitions/PackageAssociationsPropertyNames"
+      }
+    },
+    "ServicePackageAssociations": {
+      "type": "object",
+      "description": "Associations related to specific package",
+      "allOf": [{"$ref": "#/definitions/PackageAssociationsProperties"}],
+      "properties": {
+        "executable_name": {
+          "type": "string",
+          "description": "Path to or name of the associated binary executable"
+        },
         "service_name": {
           "type": "string",
           "description": "Name of systemd service"
@@ -46,14 +67,14 @@
         "config_location": {
           "type": "string",
           "description": "Path to the configuration file of the associated service"
-        },
-        "cache_versions": {
-          "type": "boolean",
-          "default": true,
-          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure"
         }
       },
-      "additionalProperties": false
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "#/definitions/PackageAssociationsPropertyNames"},
+          {"enum": ["executable_name", "service_name", "config_location"]}
+        ]
+      }
     },
     "OSFamilyAssociations": {
       "type": "object",
@@ -65,15 +86,25 @@
     },
     "Associations": {
       "properties": {
-        "docker": {"$ref": "#/definitions/PackageAssociations"},
-        "containerd": {"$ref": "#/definitions/PackageAssociations"},
-        "haproxy": {"$ref": "#/definitions/PackageAssociations"},
-        "keepalived": {"$ref": "#/definitions/PackageAssociations"},
-        "audit": {"$ref": "#/definitions/PackageAssociations"}
+        "docker": {"$ref": "#/definitions/ServicePackageAssociations"},
+        "containerd": {"$ref": "#/definitions/ServicePackageAssociations"},
+        "haproxy": {"$ref": "#/definitions/ServicePackageAssociations"},
+        "keepalived": {"$ref": "#/definitions/ServicePackageAssociations"},
+        "audit": {"$ref": "#/definitions/ServicePackageAssociations"},
+        "conntrack": {"$ref": "#/definitions/PackageAssociations"},
+        "iptables": {"$ref": "#/definitions/PackageAssociations"},
+        "openssl": {"$ref": "#/definitions/PackageAssociations"},
+        "curl": {"$ref": "#/definitions/PackageAssociations"},
+        "unzip": {"$ref": "#/definitions/PackageAssociations"},
+        "semanage": {"$ref": "#/definitions/PackageAssociations"},
+        "kmod": {"$ref": "#/definitions/PackageAssociations"}
       }
     },
     "AssociationsNames": {
-      "enum": ["docker", "containerd", "haproxy", "keepalived", "audit"]
+      "enum": [
+        "docker", "containerd", "haproxy", "keepalived", "audit",
+        "conntrack", "iptables", "openssl", "curl", "unzip", "semanage", "kmod"
+      ]
     }
   }
 }

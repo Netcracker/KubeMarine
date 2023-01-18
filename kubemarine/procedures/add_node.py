@@ -96,7 +96,7 @@ def cache_installed_packages(cluster: KubernetesCluster):
     It is called first during "add_node" procedure,
     so that new nodes install exactly the same packages as on other already existing nodes.
     """
-    packages.cache_package_versions(cluster, cluster.inventory, ensured_associations_only=True)
+    packages.cache_package_versions(cluster, cluster.inventory, by_initial_nodes=True)
 
 
 tasks = OrderedDict(copy.deepcopy(install.tasks))

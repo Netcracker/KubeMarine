@@ -276,6 +276,30 @@ def system_prepare_package_manager_configure(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_package_manager_manage_packages(group: NodeGroup):
+    group.call_batch([
+        manage_mandatory_packages,
+        manage_custom_packages
+    ])
+
+
+def manage_mandatory_packages(group: NodeGroup):
+    cluster = group.cluster
+
+    with RemoteExecutor(cluster) as exe:
+        for node in group.get_ordered_members_list():
+            pkgs = []
+            for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
+                hosts_to_packages = packages.get_association_hosts_to_packages(node, cluster.inventory, package)
+                pkgs.extend(next(iter(hosts_to_packages.values()), []))
+
+            if pkgs:
+                cluster.log.debug(f"Installing {pkgs} on {node.get_node_name()!r}")
+                packages.install(node, pkgs)
+
+    return exe.get_merged_result()
+
+
+def manage_custom_packages(group: NodeGroup):
     cluster = group.cluster
     batch_tasks = []
     batch_parameters = {}

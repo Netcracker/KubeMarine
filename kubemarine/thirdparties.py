@@ -16,6 +16,7 @@ from copy import deepcopy
 
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 
 def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
@@ -117,13 +118,39 @@ def enrich_inventory_apply_defaults(inventory, cluster):
     return inventory
 
 
-def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
+def get_install_group(cluster: KubernetesCluster, config: dict):
+    return cluster.create_group_from_groups_nodes_names(
+        config.get('groups', []), config.get('nodes', []))
 
-    if config is None:
-        config = cluster.inventory['services'].get('thirdparties', {}).get(destination)
+
+def get_group_require_unzip(cluster: KubernetesCluster, inventory: dict) -> NodeGroup:
+    thirdparties: dict = inventory['services']['thirdparties']
+
+    group = cluster.make_group([])
+    for destination, config in thirdparties.items():
+        extension = destination.split('.')[-1]
+        if config.get('unpack') is None or extension != 'zip':
+            continue
+
+        install_group = get_install_group(cluster, config)
+        group = group.include_group(install_group)
+
+    return group
+
+
+def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupResult or None:
+    cluster = filter_group.cluster
+    config = cluster.inventory['services'].get('thirdparties', {}).get(destination)
 
     if config is None:
         raise Exception('Not possible to install thirdparty %s - not found in configfile' % destination)
+
+    common_group = get_install_group(cluster, config)
+    common_group = common_group.intersection_group(filter_group)
+
+    if common_group.is_empty():
+        cluster.log.verbose(f'No destination nodes to install thirdparty {destination!r}')
+        return
 
     cluster.log.debug("Thirdparty \"%s\" will be installed" % destination)
     is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]
@@ -134,11 +161,6 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
     # directory will be created if it is not exists
     destination_directory = '/'.join(destination.split('/')[:-1])
     cluster.log.verbose('Destination directory: %s' % destination_directory)
-
-    common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
-
-    if cluster.context['initial_procedure'] == 'add_node':
-        common_group = common_group.get_new_nodes()
 
     # ! In the further code there is no error and nothing is missing !
     # Here a long shell command is intentionally constructed and executed at once to speed up work
@@ -184,6 +206,7 @@ def install_thirdparty(cluster: KubernetesCluster, destination, config=None):
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
 
+        # TODO zip does not work!
         remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
                            % (destination, config['mode'], config['unpack'])
         remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
@@ -197,15 +220,15 @@ def install_all_thirparties(group):
     cluster = group.cluster
     log = cluster.log
 
-    if not group.cluster.inventory['services'].get('thirdparties', {}):
+    if not cluster.inventory['services'].get('thirdparties', {}):
         return
 
-    for destination, config in group.cluster.inventory['services']['thirdparties'].items():
+    for destination in cluster.inventory['services']['thirdparties'].keys():
         skip_thirdparty = False
 
         if cluster.context.get("initial_procedure") != "add_node":
             # TODO: speed up algorithm via else/continue/break
-            for plugin_name, plugin_configs in group.cluster.inventory['plugins'].items():
+            for plugin_name, plugin_configs in cluster.inventory['plugins'].items():
                 for plugin_procedure in plugin_configs['installation']['procedures']:
                     if plugin_procedure.get('thirdparty') == destination:
                         log.verbose('Thirdparty \'%s\' should be installed with \'%s\' plugin'
@@ -215,5 +238,6 @@ def install_all_thirparties(group):
         if skip_thirdparty:
             log.verbose('Thirdparty %s installation delayed' % destination)
         else:
-            res = install_thirdparty(group.cluster, destination, config)
-            log.debug(res)
+            res = install_thirdparty(group, destination)
+            if res is not None:
+                log.debug(res)

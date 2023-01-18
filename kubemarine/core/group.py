@@ -875,6 +875,12 @@ class NodeGroup:
             result.append(node['name'])
         return result
 
+    def get_node_name(self) -> str:
+        if len(self.nodes) != 1:
+            raise Exception("Cannot get the only name from not a single node")
+
+        return self.get_first_member(provide_node_configs=True)['name']
+
     def get_hosts(self) -> List[str]:
         members = self.get_ordered_members_list(provide_node_configs=True)
         return [node['connect_to'] for node in members]

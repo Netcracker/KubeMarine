@@ -27,14 +27,15 @@ from kubemarine.core.group import NodeGroup, NodeGroupResult
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for host in cluster.nodes['all'].get_hosts():
+    for host in cluster.nodes['all'].get_final_nodes().get_hosts():
         package_name = cluster.get_package_association_for_node(host, 'audit', 'package_name')
         if isinstance(package_name, str):
             package_name = [package_name]
 
         if len(package_name) != 1:
-            raise Exception(f'Audit can not be installed with not single associated package {package_name} '
-                            f'for node {host!r}')
+            os_family = cluster.get_os_family_for_node(host)
+            raise Exception(f'Audit has multiple associated packages {package_name} for OS {os_family!r} '
+                            f'that is currently not supported')
 
     return inventory
 
@@ -51,13 +52,15 @@ def install(group: NodeGroup) -> str or None:
     log.verbose('Searching for already installed auditd package...')
 
     # Reduce nodes amount for installation
+    hosts_to_packages = packages.get_association_hosts_to_packages(group, cluster.inventory, 'audit')
+
     not_installed_hosts = []
-    audit_installed_results = packages.detect_installed_association_packages(group, 'audit')
-    for host, detected_audit_version in audit_installed_results.items():
-        detected_audit_version = detected_audit_version[0]
-        log.verbose(f'{host}: {detected_audit_version}')
-        if 'not installed' in detected_audit_version:
-            not_installed_hosts.append(host)
+    audit_installed_results = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
+    for detected_audit_versions in audit_installed_results.values():
+        for detected_version, hosts in detected_audit_versions.items():
+            log.verbose(f'{detected_version}: {hosts}')
+            if 'not installed' in detected_version:
+                not_installed_hosts.extend(hosts)
 
     if not not_installed_hosts:
         log.debug('Auditd is already installed on all nodes')
