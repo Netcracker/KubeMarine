@@ -246,7 +246,7 @@ def main(cli_arguments=None):
 
     # todo inventory is preserved few times, probably need to preserve it once instead.
     actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(context, actions, resources=resources)
+    flow.run_actions(resources, actions)
 
     if verification_version_result:
         print(verification_version_result)

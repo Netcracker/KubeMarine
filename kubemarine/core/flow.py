@@ -18,7 +18,7 @@ import shlex
 import sys
 import time
 from copy import deepcopy
-from typing import Type, Optional, List
+from typing import Type, Optional, List, Union
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors
 
@@ -28,9 +28,9 @@ tasks list:
     %s
 """
 
-def run_actions(context: dict, actions: List[action.Action],
-                resources: res.DynamicResources = None,
-                print_final_message=True, silent=False) -> Optional[c.KubernetesCluster]:
+
+def run_actions(context: Union[dict, res.DynamicResources], actions: List[action.Action],
+                print_summary: bool = True) -> Optional[c.KubernetesCluster]:
     """
     Runs actions one by one, recreates inventory when necessary,
     managing such resources as cluster object and raw inventory.
@@ -39,13 +39,17 @@ def run_actions(context: dict, actions: List[action.Action],
     """
     time_start = time.time()
 
+    resources: res.DynamicResources = context
+    if isinstance(context, dict):
+        resources = res.DynamicResources(context)
+
+    context = resources.context
+
     args: dict = context['execution_arguments']
     if not args.get('disable_dump', True):
         utils.prepare_dump_directory(args.get('dump_location'),
                                      reset_directory=not args.get('disable_dump_cleanup', False))
 
-    if resources is None:
-        resources = res.DynamicResources(context, silent)
     log = resources.logger()
 
     successfully_performed = []
@@ -96,10 +100,11 @@ def run_actions(context: dict, actions: List[action.Action],
 
     time_end = time.time()
 
-    if print_final_message:
-        log.info("")
+    if print_summary:
+        utils.schedule_summary_report(resources.working_context, utils.SummaryItem.EXECUTION_TIME,
+                                      utils.get_elapsed_string(time_start, time_end))
+        utils.print_summary(resources.working_context, log)
         log.info("SUCCESSFULLY FINISHED")
-        log.info("Elapsed: " + utils.get_elapsed_string(time_start, time_end))
 
     return last_cluster
 

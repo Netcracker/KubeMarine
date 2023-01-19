@@ -14,7 +14,7 @@
 
 import re
 from copy import deepcopy
-from typing import Dict, List, Union, Iterable, Tuple
+from typing import Dict, List, Union, Iterable, Tuple, Optional
 
 import fabric
 import yaml
@@ -48,7 +48,8 @@ class KubernetesCluster(Environment):
         self.nodes: Dict[str, NodeGroup] = {}
 
         self.raw_inventory = deepcopy(inventory)
-        self.context = deepcopy(context)
+        # Should not be copied. Can be used after successful of failed execution and might store intermediate result.
+        self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
         self._logger = logger if logger is not None \
@@ -102,13 +103,21 @@ class KubernetesCluster(Environment):
 
         return address
 
-    def get_addresses_from_node_names(self, node_names: List[str]) -> List[str]:
+    def get_nodes_by_names(self, node_names: List[str]) -> List[dict]:
         result = []
         for node in self.inventory["nodes"]:
-            for requested_node_name in node_names:
-                if requested_node_name == node['name']:
-                    result.append(self.get_access_address_from_node(node))
+            if node['name'] in node_names:
+                result.append(node)
+
         return result
+
+    def get_node_by_name(self, node_name) -> Optional[dict]:
+        nodes = self.get_nodes_by_names([node_name])
+        return next(iter(nodes), None)
+
+    def get_addresses_from_node_names(self, node_names: List[str]) -> List[str]:
+        return [self.get_access_address_from_node(node)
+                for node in self.get_nodes_by_names(node_names)]
 
     def get_node(self, host: Union[str, fabric.connection.Connection]) -> dict:
         return self.make_group([host]).get_first_member(provide_node_configs=True)

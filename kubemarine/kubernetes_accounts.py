@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import io
+import os
 
 import yaml
 
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
+
 
 def enrich_inventory(inventory, cluster):
     rbac = inventory['rbac']
@@ -64,7 +67,7 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def install(cluster):
+def install(cluster: KubernetesCluster):
     rbac = cluster.inventory['rbac']
     if not rbac.get("accounts"):
         cluster.log.debug("No accounts specified to install, skipping...")
@@ -117,7 +120,9 @@ def install(cluster):
         })
 
     cluster.log.debug('\nSaving tokens...')
-    token_filename = './account-tokens.yaml'
+    token_filename = os.path.abspath('account-tokens.yaml')
     with open(token_filename, 'w') as tokenfile:
         tokenfile.write(yaml.dump(tokens, default_flow_style=False))
         cluster.log.debug('Tokens saved to %s' % token_filename)
+
+    utils.schedule_summary_report(cluster.context, utils.SummaryItem.ACCOUNT_TOKENS, token_filename)

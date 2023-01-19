@@ -45,7 +45,7 @@ class RunActionsTest(unittest.TestCase):
                 super().__init__('test', recreate_inventory=True)
 
         res = FakeResources(self.context, {"p1": "v1"})
-        flow.run_actions(self.context, [TheAction()], resources=res, print_final_message=False)
+        flow.run_actions(res, [TheAction()], print_summary=False)
         self.assertEqual(res.recreated_inventory, {"p1": "v1", "p2": "v2"})
 
     def test_patch_cluster(self):
@@ -64,7 +64,7 @@ class RunActionsTest(unittest.TestCase):
         self.assertFalse('successfully_performed' in self.cluster.context)
 
         res = FakeResources(self.context, self.inventory, cluster=self.cluster)
-        flow.run_actions(self.context, [TheAction()], resources=res, print_final_message=False)
+        flow.run_actions(res, [TheAction()], print_summary=False)
         for host in nodes.get_hosts():
             history = fake_shell.history_find(host, 'sudo', ['whoami'])
             self.assertTrue(len(history) == 1 and history[0]["used_times"] == 1)
