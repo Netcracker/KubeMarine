@@ -105,6 +105,12 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     cluster.log.verbose(f"The total number of excluded objects is {len(excluded_list)} "
                         f"the objects are the following: {excluded_list}")
 
+    # put this file into a dump_location folder or in /tmp if dump is disabled
+    if not cluster.context['execution_arguments']['disable_dump']:
+        calico_yaml = cluster.context['execution_arguments']['dump_location'] + "/" + calico_yaml
+    else:
+        calico_yaml = '/tmp/' + calico_yaml
+
     # TODO: check results 
     #validate_result()
     save_multiple_yaml(calico_yaml, obj_list, cluster)
