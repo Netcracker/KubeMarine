@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "psp": {
+      "type": "object",
+      "description": "PSP configuration section",
+      "properties": {
+        "pod-security": {
+          "$ref": "definitions/rbac/psp.json#/definitions/PodSecurity"
+        },
+        "oob-policies": {
+          "$ref": "definitions/rbac/psp.json#/definitions/OOBPolicies"
+        },
+        "add-policies": {
+          "$ref": "definitions/rbac/psp.json#/definitions/CustomPolicies"
+        },
+        "delete-policies": {
+          "$ref": "definitions/rbac/psp.json#/definitions/CustomPolicies"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["psp"],
+  "additionalProperties": false
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "backup_location": {
+      "type": "string",
+      "default": "backup.tar.gz",
+      "description": "Target location of the backup archive."
+    },
+    "backup_plan": {
+      "type": "object",
+      "description": "Backup procedure configuration.",
+      "properties": {
+        "etcd": {
+          "type": "object",
+          "description": "Custom parameters for the ETCD snapshot creation task.",
+          "properties": {
+            "source_node": {
+              "$ref": "definitions/common/node_ref.json#/definitions/Name",
+              "description": "The name of the node to create a snapshot from. The node must be a control-plane and have an ETCD data located on it."
+            }
+          },
+          "additionalProperties": false
+        },
+        "nodes": {
+          "type": "object",
+          "description": "Add additional files for backup, or disable the default ones. Keys are the full file or directory paths. Values are the enable or exclude indicators.",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "kubernetes": {
+          "type": "object",
+          "description": "Specify resources for export if you need only a restricted set of resources.",
+          "properties": {
+            "namespaced_resources": {
+              "type": "object",
+              "description": "Namespaced resources to export.",
+              "properties": {
+                "namespaces": {
+                  "$ref": "#/definitions/ListOrEverything",
+                  "description": "Namespaces from which to export. Specify 'all' to export everything."
+                },
+                "resources": {
+                  "$ref": "#/definitions/ListOrEverything",
+                  "description": "Full names of the resources to be exported. Specify 'all' to export everything."
+                }
+              },
+              "additionalProperties": false
+            },
+            "nonnamespaced_resources": {
+              "$ref": "#/definitions/ListOrEverything",
+              "description": "Full names of the non-namespaced resources to be exported. Specify 'all' to export everything."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ListOrEverything": {
+      "oneOf": [
+        {"type": "string", "enum": ["all"], "default": "all"},
+        {"$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings"}
+      ]
+    }
+  }
+}

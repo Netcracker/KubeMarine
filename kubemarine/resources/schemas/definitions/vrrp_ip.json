@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "oneOf": [
+    {"type": "string"},
+    {"$ref": "#/definitions/ExtendedVRRP"}
+  ],
+  "definitions": {
+    "ExtendedVRRP": {
+      "type": "object",
+      "properties": {
+        "ip": {
+          "type": "string",
+          "description": "The IP address for virtual IP"
+        },
+        "floating_ip": {
+          "type": "string",
+          "description": "The floating IP address for virtual IP"
+        },
+        "hosts": {
+          "type": "array",
+          "description": "List of hosts on which the VRRP IP should be set. Each item can be either a name of the balancer node, or a dictionary with the balancer name and additional parameters.",
+          "items": {
+            "$ref": "#/definitions/HostToApplyVRRP"
+          }
+        },
+        "interface": {
+          "type": "string",
+          "default": "auto",
+          "description": "The interface on which the address must be listened. The value of this property is propagated to the corresponding hosts[i].interface property, if the latter is not explicitly defined."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the VRRP IP. It must be unique for each VRRP IP."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for VRRP IP set. It must be unique for every VRRP IP ID."
+        },
+        "router_id": {
+          "type": "string",
+          "description": "The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size."
+        },
+        "control_endpoint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Parameter to help the algorithm in choosing which address to take as the control_plain"
+        },
+        "params": {
+          "type": "object",
+          "description": "Additional params for other non-keepalived services",
+          "properties": {
+            "maintenance-type": {
+              "enum": ["not bind"],
+              "description": "Label for IPs that describes what type of traffic should be received in maintenance mode"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["ip"],
+      "additionalProperties": false
+    },
+    "HostToApplyVRRP": {
+      "oneOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the node. It must match the name in the nodes list."
+            },
+            "priority": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255,
+              "description": "The priority of the VRRP IP host"
+            },
+            "interface": {
+              "type": "string",
+              "default": "auto",
+              "description": "The interface on which the address must be listened for the particular host"
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

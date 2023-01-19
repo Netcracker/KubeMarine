@@ -75,6 +75,12 @@ def main(cli_arguments=None):
                             default='cluster.yaml',
                             help='define main cluster configuration file')
 
+    # TODO remove in next release
+    parser.add_argument('--ignore-schema-errors',
+                        action='store_true',
+                        help='Do not stop the run if validation by schema fails. '
+                             'The option will be removed in next release.')
+
     parser.add_argument('-n', '--node',
                             help='node(s) name to execute on, can be combined with groups')
 
@@ -87,13 +93,15 @@ def main(cli_arguments=None):
 
     arguments = vars(parser.parse_args(kubemarine_args))
     configfile_path = arguments.get('config')
+    ignore_schema_errors = arguments.get('ignore_schema_errors')
 
     context = flow.create_empty_context({
         'disable_dump': True,
         'log': [
             ['stdout;level=error;colorize=true;correct_newlines=true']
         ],
-        'config': configfile_path
+        'config': configfile_path,
+        'ignore_schema_errors': ignore_schema_errors
     })
     context['preserve_inventory'] = False
 

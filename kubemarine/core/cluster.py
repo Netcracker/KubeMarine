@@ -63,7 +63,7 @@ class KubernetesCluster(Environment):
         make_dumps = custom_enrichment_fns is None
         from kubemarine.core import defaults
         self._inventory = defaults.enrich_inventory(
-            self, self.raw_inventory, make_dumps=make_dumps, custom_fns=custom_enrichment_fns)
+            self, self.raw_inventory, make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
 
     @property
     def inventory(self) -> dict:
@@ -147,6 +147,8 @@ class KubernetesCluster(Environment):
 
     def get_facts_enrichment_fns(self):
         return [
+            "kubemarine.core.schema.verify_inventory",
+            "kubemarine.core.defaults.merge_defaults",
             "kubemarine.kubernetes.add_node_enrichment",
             "kubemarine.kubernetes.remove_node_enrichment",
             "kubemarine.controlplane.controlplane_node_enrichment",
@@ -160,12 +162,6 @@ class KubernetesCluster(Environment):
     def detect_nodes_context(self) -> dict:
         """The method should fetch only node specific information that is not changed during Kubemarine run"""
         self.log.debug('Start detecting nodes context...')
-
-        for node in self.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-            self.context['nodes'][node['connect_to']] = {
-                "name": node['name'],
-                "roles": node['roles']
-            }
 
         from kubemarine import system
         system.whoami(self)
@@ -256,6 +252,13 @@ class KubernetesCluster(Environment):
             os_ids[host] = (os_details['family'], os_details['version'])
 
         return os_ids
+
+    def get_associations(self):
+        """
+        Returns association for all packages from inventory for the cluster.
+        The method can be used only if cluster has nodes with the same and supported OS family.
+        """
+        return self.inventory['services']['packages']['associations'][self.get_os_family()]
 
     def _get_associations_for_os(self, os_family: str, package: str) -> dict:
         if os_family in ('unknown', 'unsupported', 'multiple'):

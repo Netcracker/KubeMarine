@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "backup_location": {
+      "type": "string",
+      "description": "Path to the file with the backup from which the recovery is performed"
+    },
+    "restore_plan": {
+      "type": "object",
+      "description": "Restore procedure configuration",
+      "properties": {
+        "etcd": {
+          "type": "object",
+          "description": "Additional parameters for ETCD restore",
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Full name of the ETCD image, including the registry address. On its basis, the restoration is performed."
+            },
+            "certificates": {
+              "type": "object",
+              "description": "ETCD certificates for etcdctl connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.",
+              "properties": {
+                "cert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/server.crt"
+                },
+                "key": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/server.key"
+                },
+                "cacert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/ca.crt"
+                },
+                "peer_cert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/peer.crt"
+                },
+                "peer_key": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/peer.key"
+                },
+                "peer_cacert": {
+                  "type": "string",
+                  "default": "/etc/kubernetes/pki/etcd/ca.crt"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "thirdparties": {
+          "type": "object",
+          "description": "Specify sources of the 3rd-parties to restore in case the corresponding sources in cluster.yaml are outdated",
+          "properties": {
+            "/usr/bin/etcdctl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubeadm": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubelet": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/kubectl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/calicoctl": {"$ref": "#/definitions/ThirdParty"},
+            "/usr/bin/crictl.tar.gz": {"$ref": "#/definitions/ThirdParty"}
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/ThirdParty"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["backup_location"],
+  "additionalProperties": false,
+  "definitions": {
+    "ThirdParty": {
+      "type": "object",
+      "description": "The absolute destination path of the 3rd-party on the host system of the cluster",
+      "allOf": [{"$ref": "definitions/services/thirdparties.json#/definitions/MinimalThirdPartyProperties"}],
+      "required": ["source"],
+      "propertyNames": {
+        "$ref": "definitions/services/thirdparties.json#/definitions/MinimalThirdPartyPropertyNames"
+      }
+    }
+  }
+}

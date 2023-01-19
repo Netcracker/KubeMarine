@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "chart_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "values": {
+      "type": "object"
+    },
+    "values_file": {
+      "type": "string"
+    },
+    "release": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "default"
+    }
+  },
+  "required": ["chart_path"],
+  "additionalProperties": false
+}

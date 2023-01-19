@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Common section for selinux and apparmor properties",
+  "properties": {
+    "apparmor": {
+      "$ref": "#/definitions/AppArmor"
+    },
+    "selinux": {
+      "$ref": "#/definitions/SELinux"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AppArmor": {
+      "type": "object",
+      "description": "Declare the already existing AppArmor profiles, the state of which needs to be changed",
+      "properties": {
+        "enforce": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Default mode, prohibits everything according to the profile settings"
+        },
+        "complain": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Does not prohibit, but only displays violation warnings in the logs"
+        },
+        "disable": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Disables and unloads security profile"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SELinux": {
+      "type": "object",
+      "description": "SELinux settings",
+      "properties": {
+        "state": {
+          "enum": ["enforcing", "permissive", "disabled"],
+          "default": "enforcing",
+          "description": "Defines the top-level state of SELinux on a system"
+        },
+        "policy": {
+          "enum": ["targeted", "strict"],
+          "default": "targeted",
+          "description": "Specifies which policy is currently being enforced by SELinux."
+        },
+        "permissive": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+          "description": "Certain SELinux object type policy records, applicable without requiring modification to or recompilation from the policy sources"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

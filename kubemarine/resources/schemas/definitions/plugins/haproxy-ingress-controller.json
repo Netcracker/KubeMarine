@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Enable and/or change default settings for experimental 'haproxy-ingress-controller' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "controller": {
+      "type": "object",
+      "description": "HAProxy Ingress Controller configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "default": "haproxytech/kubernetes-ingress:1.2.7",
+          "description": "HAProxy Ingress Controller image"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "description": "HAProxy Ingress Default Backend configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "default": "k8s.gcr.io/defaultbackend:1.0",
+          "description": "Default Backend image for HAProxy Ingress Controller"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["controller", "backend"]}
+    ]
+  }
+}

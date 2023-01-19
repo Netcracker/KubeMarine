@@ -23,7 +23,9 @@ from jinja2 import Template
 
 from kubemarine import kubernetes
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.yaml_merger import default_merger
 
 privileged_policy_filename = "privileged.yaml"
 policies_file_path = "./resources/psp/"
@@ -633,20 +635,18 @@ def manage_pss_enrichment(inventory, cluster):
                 verify_parameter(item, procedure_config["defaults"][item], valid_profiles)
             inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
     if "exemptions" in procedure_config:
-        for item in procedure_config["exemptions"]:
-            if type(procedure_config["exemptions"][item]) is list:
-                inventory["rbac"]["pss"]["exemptions"][item] = procedure_config["exemptions"][item]
+        default_merger.merge(inventory["rbac"]["pss"]["exemptions"], procedure_config["exemptions"])
     if "namespaces" in procedure_config:
         for namespace in procedure_config["namespaces"]:
             # check if the namespace has its own profiles
-            if type(namespace) is dict:
-                for item in namespace:
-                    # exclude name of namespace
-                    if namespace[item]:
-                        if item.endswith("version"):
-                            verify_version(item, namespace[item], minor_version)
-                        else:
-                            verify_parameter(item, namespace[item], valid_profiles)
+            if isinstance(namespace, dict):
+                profiles = list(namespace.values())[0]
+                for item in profiles:
+                    if item.endswith("version"):
+                        verify_version(item, profiles[item], minor_version)
+                    else:
+                        verify_parameter(item, profiles[item], valid_profiles)
+                raise Exception("Custom labels for each namespace are currently not supported")
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
             if item.endswith("version"):
@@ -822,31 +822,19 @@ def finalize_inventory(cluster, inventory_to_finalize):
         return finalize_inventory_pss(cluster, inventory_to_finalize)
 
 
-def finalize_inventory_pss(cluster, inventory_to_finalize):
+def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: dict):
     if cluster.context.get('initial_procedure') != 'manage_pss':
         return inventory_to_finalize
     procedure_config = cluster.procedure_inventory["pss"]
 
-    if "rbac" not in inventory_to_finalize:
-        inventory_to_finalize["rbac"] = {}
-    if "pss" not in inventory_to_finalize["rbac"]:
-        inventory_to_finalize["rbac"]["pss"] = {}
-    current_config = inventory_to_finalize["rbac"]["pss"]
+    current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("pss", {})
 
     # merge flags from procedure config and cluster config
     current_config["pod-security"] = procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
     if "defaults" in procedure_config:
-        if "defaults" not in current_config:
-            current_config["defaults"] = procedure_config["defaults"]
-        else:
-            for default_option in procedure_config["defaults"]:
-                current_config["defaults"][default_option] = procedure_config["defaults"][default_option]
+        default_merger.merge(current_config.setdefault("defaults", {}), procedure_config["defaults"])
     if "exemptions" in procedure_config:
-        if "exemptions" not in current_config:
-            current_config["exemptions"] = procedure_config["exemptions"]
-        else:
-            for exemption in procedure_config["exemptions"]:
-                current_config["exemptions"][exemption] = procedure_config["exemptions"][exemption]
+        default_merger.merge(current_config.setdefault("exemptions", {}), procedure_config["exemptions"])
 
     return inventory_to_finalize
 

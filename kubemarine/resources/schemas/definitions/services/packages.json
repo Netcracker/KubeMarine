@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Section for packages and their management",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "properties": {
+    "associations": {
+      "$ref": "packages/associations.json",
+      "description": "Configure predefined associations of package objects. If configured in the common section, the associations are automatically switched to the section corresponding to your operating system."
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "#/definitions/PropertyNames"},
+      {"enum": ["associations"]}
+    ]
+  },
+  "definitions": {
+    "Properties": {
+      "properties": {
+        "package_manager": {
+          "type": "object",
+          "description": "Additional package manager repositories for the cluster in closed environment",
+          "properties": {
+            "replace-repositories": {
+              "type": "boolean",
+              "default": false,
+              "description": "Deletes old repositories on hosts and installs new ones instead"
+            },
+            "repositories": {
+              "description": "List of new repositories. Can be specified as string with all repositories content, or as list for apt repositories, or as dictionary for yum repositories.",
+              "oneOf": [
+                {"type": "string"},
+                {"$ref": "#/definitions/YumRepositories"},
+                {"$ref": "#/definitions/AptRepositories"}
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "install": {
+          "description": "List of custom packages to install. Can be specified as list or as two lists that are to be included and excluded during processing.",
+          "oneOf": [
+            {
+              "type": "object",
+              "allOf": [{"$ref": "#/definitions/IncludeExcludeProperties"}],
+              "required": ["include"],
+              "propertyNames": {
+                "$ref": "#/definitions/IncludeExcludePropertyNames"
+              }
+            },
+            {
+              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+            }
+          ]
+        },
+        "upgrade": {
+          "description": "List of custom packages to upgrade. Can be specified as list or as two lists that are to be included and excluded during processing.",
+          "oneOf": [
+            {"$ref": "#/definitions/IncludeExcludePermissive"},
+            {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
+          ]
+        },
+        "remove": {
+          "description": "List of custom packages to remove. Can be specified as list or as two lists that are to be included and excluded during processing.",
+          "oneOf": [
+            {"$ref": "#/definitions/IncludeExcludePermissive"},
+            {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
+          ]
+        },
+        "cache_versions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Specifies whether to install exactly the same package versions from associations section during the add_node procedure"
+        }
+      }
+    },
+    "PropertyNames": {
+      "enum": ["package_manager", "install", "upgrade", "remove", "cache_versions"]
+    },
+    "YumRepositories": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "enabled": {"type": "integer"},
+          "gpgcheck": {"type": "integer"},
+          "baseurl": {"type": "string"}
+        }
+      }
+    },
+    "AptRepositories": {
+      "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+    },
+    "IncludeExcludePermissive": {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/IncludeExcludeProperties"}],
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/definitions/IncludeExcludePropertyNames"
+      }
+    },
+    "IncludeExcludeProperties": {
+      "properties": {
+        "include": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+          "description": "List of packages to include in processing. Type of processing is defined by parent section."
+        },
+        "exclude": {
+          "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+          "description": "List of packages to exclude from processing. Type of processing is defined by parent section."
+        }
+      }
+    },
+    "IncludeExcludePropertyNames": {
+      "enum": ["include", "exclude"]
+    }
+  }
+}

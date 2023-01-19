@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "account_defaults.json#/definitions/CommonAccountProperties"}],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Account name that is applied by default to items in 'configs' section"
+    },
+    "role": {
+      "type": "string",
+      "description": "Account role that is applied to ClusterRoleBinding item in 'configs' section"
+    }
+  },
+  "required": ["name", "role"],
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "account_defaults.json#/definitions/CommonAccountPropertyNames"},
+      {"enum": ["name", "role"]}
+    ]
+  }
+}

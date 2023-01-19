@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Override the original settings for the kubelet",
+  "properties": {
+    "readOnlyPort": {"type": "integer", "default": 0},
+    "protectKernelDefaults": {"type": "boolean", "default": true},
+    "podPidsLimit": {"type": "integer", "default": 4096},
+    "cgroupDriver": {"type": "string", "default": "systemd"},
+    "maxPods": {"type": "integer", "default": 110},
+    "apiVersion": {"type": ["string"], "default": "kubelet.config.k8s.io/v1beta1"},
+    "kind": {"enum": ["KubeletConfiguration"], "default": "KubeletConfiguration"}
+  }
+}

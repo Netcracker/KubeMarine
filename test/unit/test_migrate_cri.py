@@ -16,7 +16,7 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import demo
-from kubemarine.core import utils
+from test.unit import utils
 
 
 def generate_migrate_cri_environment() -> (dict, dict):

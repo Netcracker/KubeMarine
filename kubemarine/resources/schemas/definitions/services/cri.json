@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Configure container runtime used for Kubernetes",
+  "properties": {
+    "containerRuntime": {
+      "enum": ["containerd", "docker"],
+      "default": "containerd",
+      "description": "A particular container runtime implementation used for Kubernetes"
+    },
+    "containerdConfig": {
+      "$ref": "#/definitions/ContainerdConfig"
+    },
+    "dockerConfig": {
+      "$ref": "#/definitions/DockerConfig"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ContainerdConfig": {
+      "type": "object",
+      "description": "Parameters for containerd passed to config.toml",
+      "properties": {
+        "version": {"type": "integer", "default": 2},
+        "plugins.\"io.containerd.grpc.v1.cri\"": {
+          "type": "object",
+          "properties": {
+            "sandbox_image": {"type": "string"}
+          }
+        },
+        "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc": {
+          "type": "object",
+          "properties": {
+            "runtime_type": {"type": "string", "default": "io.containerd.runc.v2"}
+          }
+        },
+        "plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc.options": {
+          "type": "object",
+          "properties": {
+            "SystemdCgroup": {"type": ["string", "boolean"]}
+          }
+        }
+      }
+    },
+    "DockerConfig": {
+      "type": "object",
+      "description": "Parameters for docker passed to daemon.json",
+      "properties": {
+        "insecure-registries": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it."
+        },
+        "registry-mirrors": {
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Docker Registry Mirrors. Additional image sources for the container's images pull."
+        },
+        "ipv6": {"type": "boolean", "default": false},
+        "log-driver": {"type": "string", "default": "json-file"},
+        "log-opts": {
+          "type": "object",
+          "properties": {
+            "max-size": {"type": "string", "default": "64m"},
+            "max-file": {"type": "string", "default": "'3'"}
+          }
+        },
+        "exec-opts": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
+        "icc": {"type": "boolean", "default": false},
+        "live-restore": {"type": "boolean", "default": true},
+        "userland-proxy": {"type": "boolean", "default": false}
+      }
+    }
+  }
+}

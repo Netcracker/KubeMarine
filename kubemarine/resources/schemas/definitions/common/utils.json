@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "definitions": {
+    "ArrayOfStrings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "NonEmptyArrayOfStrings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "SetOfStrings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "NonEmptySetOfStrings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "ArrayOfObjects": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "NonEmptyArrayOfObjects": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1
+    },
+    "MergeableArrayOfObjects": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "object", "propertyNames": {"not": {"enum": ["<<"]}}},
+          {"$ref": "#/definitions/ListMergingSymbol"}
+        ]
+      }
+    },
+    "MergeableSetOfStrings": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+        ]
+      },
+      "uniqueItems": true
+    },
+    "ListMergingDefinition": {
+      "enum": ["replace", "merge"],
+      "default": "replace",
+      "description": "Specify '<<' instead of <<. List merging strategy."
+    },
+    "ListMergingSymbol": {
+      "type": "object",
+      "properties": {
+        "<<": {"$ref": "#/definitions/ListMergingDefinition"}
+      },
+      "required": ["<<"],
+      "additionalProperties": false
+    }
+  }
+}

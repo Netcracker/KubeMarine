@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Change the default settings for the by-default installed 'nginx-ingress-controller' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "install": {
+      "type": ["string", "boolean"],
+      "default": "true"
+    },
+    "version": {
+      "type": "string"
+    },
+    "webhook": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "controller": {
+      "type": "object",
+      "description": "NGINX Ingress Controller configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Specifies the string for the NGINX Ingress Controller image"
+        },
+        "ssl": {
+          "type": "object",
+          "description": "SSL configuration",
+          "properties": {
+            "enableSslPassthrough": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable the ssl-passthrough feature. The feature introduces a small performance penalty."
+            },
+            "default-certificate": {
+              "$ref": "#/definitions/DefaultCertificate"
+            }
+          },
+          "additionalProperties": false
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ports": {
+      "$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"
+    },
+    "config_map": {
+      "type": "object",
+      "description": "Customize or fine tune NGINX behavior"
+    },
+    "custom_headers": {
+      "type": "object",
+      "description": "The parameter sets specified custom headers before sending the traffic to backends"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "webhook", "controller", "ports", "config_map", "custom_headers"]}
+    ]
+  },
+  "definitions": {
+    "DefaultCertificate": {
+      "type": "object",
+      "description": "Configure a custom default certificate for ingress resources",
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/CertAndKey",
+          "description": "Provide a certificate and a key inplace in the pem format"
+        },
+        "paths": {
+          "$ref": "#/definitions/CertAndKey",
+          "description": "Provide a certificate and a key as paths to the pem files"
+        }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    },
+    "CertAndKey": {
+      "type": "object",
+      "properties": {
+        "cert": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": ["cert", "key"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/DefaultProperties"}],
+  "properties": {
+    "priority": {
+      "type": "integer",
+      "description": "Parameter that defines the installation order of the plugin relative to the other plugins"
+    },
+    "procedures": {
+      "type": "array",
+      "description": "Installation procedures to perform during the installation of the plugin",
+      "items": {
+        "type": "object",
+        "properties": {
+          "template": {"$ref": "installation/template.json"},
+          "config": {"$ref": "installation/config.json"},
+          "expect": {"$ref": "installation/expect.json"},
+          "python": {"$ref": "installation/python.json"},
+          "shell": {"$ref": "installation/shell.json"},
+          "ansible": {"$ref": "installation/ansible.json"},
+          "helm": {"$ref": "installation/helm.json"},
+          "thirdparty": {"type": "string"},
+          "<<": {"$ref": "../common/utils.json#/definitions/ListMergingDefinition"}
+        },
+        "minProperties": 1,
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "#/definitions/DefaultPropertyNames"},
+      {"enum": ["priority", "procedures"]}
+    ]
+  },
+  "definitions": {
+    "DefaultProperties": {
+      "properties": {
+        "registry": {
+          "type": "string",
+          "description": "The plugin(s) container's images are loaded from this registry"
+        }
+      }
+    },
+    "DefaultPropertyNames": {
+      "enum": ["registry"]
+    }
+  }
+}

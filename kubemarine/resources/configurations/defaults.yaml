@@ -4,7 +4,7 @@ node_defaults: {}
 
 nodes: []
 
-public_cluster_ip: '{{ control_plain["external"] }}'
+public_cluster_ip: '{{ control_plain.external }}'
 
 services:
   kubeadm_kubelet:

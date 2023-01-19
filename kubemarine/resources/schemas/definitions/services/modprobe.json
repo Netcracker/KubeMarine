@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "array",
+  "description": "Manage Linux Kernel modules to be loaded in the host operating system",
+  "items": {
+    "anyOf": [
+      {
+        "type": "string",
+        "enum": ["br_netfilter", "ip6table_filter", "nf_conntrack_ipv6", "nf_nat_masquerade_ipv6", "nf_reject_ipv6", "nf_defrag_ipv6"]
+      },
+      {"type": "string"},
+      {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+    ]
+  },
+  "uniqueItems": true
+}

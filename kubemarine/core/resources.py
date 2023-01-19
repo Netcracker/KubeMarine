@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from contextlib import contextmanager
 from copy import deepcopy
 from typing import Optional
 
@@ -140,15 +141,22 @@ class DynamicResources:
         del args['ansible_inventory_location']
         return self._create_cluster(sample_context)
 
+    @contextmanager
+    def _handle_enrichment_error(self):
+        try:
+            yield
+        except errors.FailException:
+            raise
+        except Exception as exc:
+            raise errors.FailException("Failed to proceed inventory file", exc)
+
     def _create_cluster(self, context):
         log = self.logger()
         context = deepcopy(context)
         context['nodes'] = deepcopy(self._get_nodes_context())
-        try:
+        with self._handle_enrichment_error():
             cluster = self._new_cluster_instance(context)
             cluster.enrich()
-        except Exception as exc:
-            raise errors.FailException("Failed to proceed inventory file", exc)
 
         if not self._silent:
             log.debug("Inventory file loaded:")
@@ -165,13 +173,11 @@ class DynamicResources:
 
     def _get_nodes_context(self):
         if self._nodes_context is None:
-            try:
+            with self._handle_enrichment_error():
                 # temporary cluster instance to detect initial nodes context.
                 light_cluster = self._new_cluster_instance(self.context)
                 light_cluster.enrich(custom_enrichment_fns=light_cluster.get_facts_enrichment_fns())
                 self._nodes_context = light_cluster.detect_nodes_context()
-            except Exception as exc:
-                raise errors.FailException("Failed to proceed inventory file", exc)
 
         return self._nodes_context
 

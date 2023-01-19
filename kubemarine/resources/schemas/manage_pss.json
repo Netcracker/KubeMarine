@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "pss": {
+      "type": "object",
+      "description": "PSS configuration section",
+      "allOf": [{"$ref": "definitions/rbac/pss.json#/definitions/Properties"}],
+      "properties": {
+        "namespaces": {
+          "type": "array",
+          "description": "List of namespaces that will be labeled during the maintenance procedure. Each item can be either a namespace name, or dictionary where key is a namespace name and values are profile labels.",
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "definitions/rbac/pss.json#/definitions/Profiles"
+                },
+                "minProperties": 1,
+                "maxProperties": 1
+              }
+            ]
+          }
+        },
+        "namespaces_defaults": {
+          "$ref": "definitions/rbac/pss.json#/definitions/Profiles",
+          "description": "Labels to be applied on namespaces list from 'namespaces' section"
+        }
+      },
+      "required": ["pod-security"],
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "definitions/rbac/pss.json#/definitions/PropertyNames"},
+          {"enum": ["namespaces", "namespaces_defaults"]}
+        ]
+      }
+    },
+    "restart-pods": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enforce restart all pods in cluster. It drains nodes one by one and may cause cluster instability."
+    }
+  },
+  "required": ["pss"],
+  "additionalProperties": false
+}

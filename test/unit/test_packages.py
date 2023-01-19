@@ -14,12 +14,13 @@
 
 import unittest
 from copy import deepcopy
-from typing import Optional, Dict
+from typing import Optional
 
 from kubemarine import demo, packages
 from kubemarine.core import static, defaults, log
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
+from test.unit import utils
 
 
 def new_debian_cluster(inventory: dict) -> FakeKubernetesCluster:
@@ -72,10 +73,6 @@ def set_cache_versions_false(inventory: dict, os_family: Optional[str], package:
 
 def get_package_name(os_family, package) -> str:
     return packages.get_package_name(os_family, package)
-
-
-def make_finalized_inventory(cluster: FakeKubernetesCluster):
-    return cluster.make_finalized_inventory()
 
 
 def cache_installed_packages(cluster: FakeKubernetesCluster):
@@ -240,7 +237,6 @@ class PackagesUtilities(unittest.TestCase):
 
 class CacheVersions(unittest.TestCase):
     def setUp(self) -> None:
-        self.fake_shell = demo.FakeShell()
         self.inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         self.context = demo.create_silent_context(procedure='add_node')
         self.context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
@@ -250,35 +246,7 @@ class CacheVersions(unittest.TestCase):
         self.initial_hosts = [node['address'] for node in self.inventory['nodes']]
 
     def _new_cluster(self):
-        cluster = FakeKubernetesCluster(self.inventory, self.context, procedure_inventory=self.procedure_inventory,
-                                        fake_shell=self.fake_shell)
-        cluster.enrich()
-        return cluster
-
-    def _stub_detect_package_result(self, package, hosts_stub: Dict[str, str]):
-        results = {}
-        for host in self.hosts:
-            if host in hosts_stub:
-                results[host] = demo.create_result(stdout=hosts_stub[host])
-            else:
-                results[host] = demo.create_result(stdout='not installed')
-
-        cmd = packages.get_detect_package_version_cmd('debian', package)
-        self.fake_shell.add(results, 'sudo', [cmd])
-
-    def _stub_associations_packages(self, packages_hosts_stub: Dict[str, Dict[str, str]]):
-        packages_list = []
-        for association_params in get_compiled_defaults()['debian'].values():
-            pkgs = association_params['package_name']
-            if isinstance(pkgs, str):
-                pkgs = [pkgs]
-
-            packages_list.extend(pkgs)
-
-        packages_list = list(set(packages_list))
-        for package in packages_list:
-            package = get_package_name('debian', package)
-            self._stub_detect_package_result(package, packages_hosts_stub.get(package, {}))
+        return demo.new_cluster(self.inventory, context=self.context, procedure_inventory=self.procedure_inventory)
 
     def _packages_install(self, inventory: dict):
         return inventory.setdefault('services', {}).setdefault('packages', {}).setdefault('install', [])
@@ -287,23 +255,18 @@ class CacheVersions(unittest.TestCase):
         return inventory.setdefault('services', {}).setdefault('packages', {}).setdefault('install', {})\
             .setdefault('include', [])
 
-    def _stub_custom_packages(self, packages_hosts_stub: Dict[str, Dict[str, str]]):
-        for package, hosts_stub in packages_hosts_stub.items():
-            self._packages_install(self.inventory).append(package)
-            package = get_package_name('debian', package)
-            self._stub_detect_package_result(package, hosts_stub)
-
     def test_cache_versions_and_finalize_inventory(self):
-        self._stub_associations_packages({
+        self._packages_install(self.inventory).extend(['curl', 'unzip'])
+        cluster = self._new_cluster()
+        utils.stub_associations_packages(cluster, {
             'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
         })
-        self._stub_custom_packages({
+        utils.stub_detect_packages(cluster, {
             'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.hosts},
             'unzip': {host: 'unzip=6.0-25ubuntu1.1' for host in self.hosts},
         })
 
-        cluster = self._new_cluster()
         cache_installed_packages(cluster)
 
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
@@ -315,7 +278,7 @@ class CacheVersions(unittest.TestCase):
         self.assertEqual({'curl', 'unzip'}, set(self._packages_include(cluster.inventory)),
                          "Custom packages versions should be not detected when adding node")
 
-        finalized_inventory = make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd was not detected")
@@ -330,19 +293,19 @@ class CacheVersions(unittest.TestCase):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
         self.assertNotEqual(expected_containerd, default_containerd)
 
-        self._stub_associations_packages({
+        set_cache_versions_false(self.inventory, None, None)
+        cluster = self._new_cluster()
+        utils.stub_associations_packages(cluster, {
             'containerd': {host: expected_containerd for host in self.initial_hosts},
         })
 
-        set_cache_versions_false(self.inventory, None, None)
-        cluster = self._new_cluster()
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
                          package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd should be default because caching versions is off")
 
-        finalized_inventory = make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(expected_containerd,
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd was not detected")
@@ -351,15 +314,15 @@ class CacheVersions(unittest.TestCase):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
         default_haproxy = get_compiled_defaults()['debian']['haproxy']['package_name']
 
-        self._stub_associations_packages({
+        set_cache_versions_false(self.inventory, None, 'containerd')
+        set_cache_versions_false(self.inventory, 'debian', 'haproxy')
+        cluster = self._new_cluster()
+        utils.stub_associations_packages(cluster, {
             'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
             'haproxy': {host: 'haproxy=2.0.29-0ubuntu1' for host in self.initial_hosts},
         })
 
-        set_cache_versions_false(self.inventory, None, 'containerd')
-        set_cache_versions_false(self.inventory, 'debian', 'haproxy')
-        cluster = self._new_cluster()
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
@@ -372,7 +335,7 @@ class CacheVersions(unittest.TestCase):
                          package_associations(cluster.inventory, 'debian', 'haproxy')['package_name'],
                          "haproxy should be default because caching versions is off")
 
-        finalized_inventory = make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd was not detected")
@@ -384,14 +347,14 @@ class CacheVersions(unittest.TestCase):
                          "haproxy was not detected")
 
     def test_add_node_fails_different_package_versions(self):
-        self._stub_associations_packages({
+        cluster = self._new_cluster()
+        utils.stub_associations_packages(cluster, {
             'containerd': {
                 self.initial_hosts[0]: 'containerd=1.5.9-0ubuntu1~20.04.4',
                 self.initial_hosts[1]: 'containerd=2',
             },
         })
 
-        cluster = self._new_cluster()
         expected_error_regex = packages.ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED.replace('%s', '.*')
         with self.assertRaisesRegex(Exception, expected_error_regex):
             cache_installed_packages(cluster)
@@ -399,24 +362,25 @@ class CacheVersions(unittest.TestCase):
     def test_finalize_inventory_different_package_versions(self):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
 
-        self._stub_associations_packages({
+        self._packages_install(self.inventory).extend(['curl=7.*', 'unzip=6.*'])
+        cluster = self._new_cluster()
+
+        utils.stub_associations_packages(cluster, {
             'containerd': {
                 self.initial_hosts[0]: 'containerd=1.5.9-0ubuntu1~20.04.4',
                 self.initial_hosts[1]: 'containerd=2',
             },
             'auditd': {host: 'auditd=1:2.8.5-2ubuntu6' for host in self.initial_hosts},
         })
-        self._stub_custom_packages({
-            'curl=7.*': {
+        utils.stub_detect_packages(cluster, {
+            'curl': {
                 self.initial_hosts[0]: 'curl=7.68.0-1ubuntu2.14',
                 self.initial_hosts[1]: 'curl=2',
             },
-            'unzip=6.*': {host: 'unzip=6.0-25ubuntu1.1' for host in self.hosts},
+            'unzip': {host: 'unzip=6.0-25ubuntu1.1' for host in self.hosts},
         })
 
-        cluster = self._new_cluster()
-
-        finalized_inventory = make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(default_containerd,
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd should be default because multiple versions are installed")
@@ -429,24 +393,30 @@ class CacheVersions(unittest.TestCase):
     def test_not_cache_versions_if_multiple_os_family_versions(self):
         default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
 
-        self._stub_associations_packages({
+        self.context['nodes'][self.new_host]['os']['version'] = '22.04'
+        self._packages_install(self.inventory).extend(['curl=7.*'])
+        cluster = self._new_cluster()
+
+        utils.stub_associations_packages(cluster, {
             'containerd': {host: 'containerd=1.5.9-0ubuntu1~20.04.4' for host in self.initial_hosts},
         })
-        self._stub_custom_packages({
-            'curl=7.*': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.hosts},
+        utils.stub_detect_packages(cluster, {
+            'curl': {host: 'curl=7.68.0-1ubuntu2.14' for host in self.hosts},
         })
 
-        self.context['nodes'][self.new_host]['os']['version'] = '22.04'
-        cluster = self._new_cluster()
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
                          package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd should be default because multiple OS versions are detected")
 
-        finalized_inventory = make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(default_containerd,
                          package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
                          "containerd should be default because multiple OS versions are detected")
         self.assertEqual({'curl=7.*'}, set(self._packages_include(finalized_inventory)),
                          "Custom packages should be default because multiple OS versions are detected")
+
+
+if __name__ == '__main__':
+    unittest.main()

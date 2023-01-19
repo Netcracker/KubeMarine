@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Manage the Linux Kernel parameters for all hosts in a cluster",
+  "properties": {
+    "net.bridge.bridge-nf-call-iptables": {"type": ["string", "integer"], "default": 1},
+    "net.ipv4.ip_forward": {"type": ["string", "integer"], "default": 1},
+    "net.ipv4.ip_nonlocal_bind": {"type": ["string", "integer"], "default": 1},
+    "net.ipv4.conf.all.route_localnet": {"type": ["string", "integer"], "default": 1},
+    "net.bridge.bridge-nf-call-ip6tables": {"type": ["string", "integer"]},
+    "net.ipv6.conf.all.forwarding": {"type": ["string", "integer"]},
+    "net.ipv6.ip_nonlocal_bind": {"type": ["string", "integer"]},
+    "kernel.panic": {"type": ["string", "integer"], "default": 10},
+    "vm.overcommit_memory": {"type": ["string", "integer"], "default": 1},
+    "kernel.panic_on_oops": {"type": ["string", "integer"], "default": 1},
+    "kernel.pid_max": {
+      "type": ["string", "integer"],
+      "description": "If this parameter is not explicitly indicated in the cluster.yaml, then this value is calculated by this formula: maxPods * podPidsLimit + 2048"
+    }
+  }
+}

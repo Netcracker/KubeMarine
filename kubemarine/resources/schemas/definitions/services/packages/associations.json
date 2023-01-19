@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/Associations"}],
+  "properties": {
+    "debian": {"$ref": "#/definitions/OSFamilyAssociations"},
+    "rhel": {"$ref": "#/definitions/OSFamilyAssociations"},
+    "rhel8": {"$ref": "#/definitions/OSFamilyAssociations"}
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "#/definitions/AssociationsNames"},
+      {"enum": ["debian", "rhel", "rhel8"]}
+    ]
+  },
+  "definitions": {
+    "PackageAssociations": {
+      "type": "object",
+      "description": "Associations related to specific package",
+      "properties": {
+        "executable_name": {
+          "type": "string",
+          "description": "Path to or name of the associated binary executable"
+        },
+        "package_name": {
+          "description": "Packages with versions to install if the associated service is required for the cluster",
+          "oneOf": [
+            {"type": "string"},
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {"type": "string"},
+                  {"$ref": "../../common/utils.json#/definitions/ListMergingSymbol"}
+                ]
+              },
+              "uniqueItems": true,
+              "minItems": 1
+            }
+          ]
+        },
+        "service_name": {
+          "type": "string",
+          "description": "Name of systemd service"
+        },
+        "config_location": {
+          "type": "string",
+          "description": "Path to the configuration file of the associated service"
+        },
+        "cache_versions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OSFamilyAssociations": {
+      "type": "object",
+      "description": "Associations related to specific OS family. Specifying in this section is not required in common case, but can be necessary during operating system migration.",
+      "allOf": [{"$ref": "#/definitions/Associations"}],
+      "propertyNames": {
+        "$ref": "#/definitions/AssociationsNames"
+      }
+    },
+    "Associations": {
+      "properties": {
+        "docker": {"$ref": "#/definitions/PackageAssociations"},
+        "containerd": {"$ref": "#/definitions/PackageAssociations"},
+        "haproxy": {"$ref": "#/definitions/PackageAssociations"},
+        "keepalived": {"$ref": "#/definitions/PackageAssociations"},
+        "audit": {"$ref": "#/definitions/PackageAssociations"}
+      }
+    },
+    "AssociationsNames": {
+      "enum": ["docker", "containerd", "haproxy", "keepalived", "audit"]
+    }
+  }
+}

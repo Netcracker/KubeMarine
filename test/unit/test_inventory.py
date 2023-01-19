@@ -154,5 +154,17 @@ class TestInventoryValidation(unittest.TestCase):
         }
         return nodes_context
 
+    def test_allow_omitted_name(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        for node in inventory['nodes']:
+            del node['name']
+
+        cluster = demo.new_cluster(inventory)
+        names = [node['name'] for node in cluster.inventory['nodes']]
+        self.assertEqual(['balancer-1', 'balancer-2',
+                          'control-plane-1', 'control-plane-2', 'control-plane-3',
+                          'worker-1', 'worker-2', 'worker-3'], names)
+
+
 if __name__ == '__main__':
     unittest.main()

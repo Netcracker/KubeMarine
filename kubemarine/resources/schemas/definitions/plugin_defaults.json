@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Describe parameters that are to be applied by default to each record in the Plugins section",
+  "properties": {
+    "installation": {
+      "type": "object",
+      "description": "The section describes the plugins installation process",
+      "allOf": [{"$ref": "plugins/installation.json#/definitions/DefaultProperties"}],
+      "propertyNames": {
+        "$ref": "plugins/installation.json#/definitions/DefaultPropertyNames"
+      }
+    }
+  },
+  "additionalProperties": false
+}

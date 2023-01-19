@@ -31,6 +31,7 @@ This section provides information about the inventory, features, and steps for i
         - [Kubernetes version](#kubernetes-version)
         - [Cloud Provider Plugin](#cloud-provider-plugin)
         - [Service Account Issuer](#service-account-issuer)
+      - [kubeadm_kubelet](#kubeadm_kubelet)
       - [kernel_security](#kernel_security)
         - [selinux](#selinux)
         - [apparmor](#apparmor)
@@ -42,6 +43,9 @@ This section provides information about the inventory, features, and steps for i
       - [CRI](#cri)
       - [modprobe](#modprobe)
       - [sysctl](#sysctl)
+      - [audit](#audit)
+        - [Kubernetes Policy](#audit-kubernetes-policy)
+        - [Daemon](#audit-daemon)
       - [ntp](#ntp)
         - [chrony](#chrony)
         - [timesyncd](#timesyncd)
@@ -49,8 +53,6 @@ This section provides information about the inventory, features, and steps for i
       - [etc_hosts](#etc_hosts)
       - [coredns](#coredns)
       - [loadbalancer](#loadbalancer)
-      - [audit-Kubernetes Policy](#audit-kubernetes-policy)
-      - [audit-daemon](#audit-daemon)
     - [RBAC Admission](#rbac-admission)
     - [Admission psp](#admission-psp)
       - [Configuring Admission Controller](#configuring-admission-controller)
@@ -77,6 +79,7 @@ This section provides information about the inventory, features, and steps for i
         - [Tolerations](#tolerations)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
+        - [config](#config) 
         - [expect pods](#expect-pods)
         - [python](#python)
         - [thirdparty](#thirdparty)
@@ -86,6 +89,7 @@ This section provides information about the inventory, features, and steps for i
   - [Advanced features](#advanced-features)
     - [List Merge Strategy](#list-merge-strategy)
       - [Merge Strategy Positioning](#merge-strategy-positioning)
+      - [List Merge Allowed Sections](#list-merge-allowed-sections)
     - [Dynamic Variables](#dynamic-variables)
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
@@ -532,6 +536,12 @@ node:
     roles: ["control-plane"]
 ```
 
+Following are the parameters allowed to be specified in the `node_defaults` section:
+* keyfile, username, connection_port, connection_timeout, and gateway.
+* labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
+
+For more information about the listed parameters, refer to the following section.
+
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
@@ -541,13 +551,13 @@ The following options are supported:
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
 |keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
-|username|string|no|`centos`|`root`|Username for SSH-access the cluster machines|
-|name|string|**yes**| |`k8s-control-plane-1`|Cluster member name|
-|address|ip address|no|`10.101.0.1`|External node's IP-address|
+|username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
+|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, KubeMarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
+|address|ip address|no| |`10.101.0.1`|External node's IP-address|
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
-|connection_port|int|no| |`22`|Port for SSH-connection to cluster node|
+|connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, `control-plane` or `master`.|
+|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
 
@@ -790,7 +800,7 @@ The following parameters are supported:
 |-------------|---------|---------------|--------------------------------------------------------------|
 | address     | string  |               | Full address to the registry, without protocol and port.     |
 | docker_port | number  |               | Custom port for connecting to the image registry.               |
-| webserver   | boolean | `False`       | A special parameter indicating whether registry is has ability to serve http files. When enabled, the `thirdparties` are patched and the `/k8s.gcr.io` path appended to the address in `services.kubeadm.imageRepository`. | 
+| webserver   | boolean | `False`       | A special parameter indicating whether registry has ability to serve http files. When enabled, the `thirdparties` are patched with the `address` provided. | 
 | ssl         | boolean | `False`       | Registry SSL support switch.                                 |
 
 Example:
@@ -913,25 +923,28 @@ nodes:
 
 *Can restart service*: Always yes, `keepalived`
 
-*OS specific*: Yes, different OS may have different default network interfaces. For interfaces with autodetection mode selected, it is automatically detected.
+*OS specific*: Yes, different OS may have different default network interfaces.
+For interfaces with the autodetection mode selected, it is automatically detected by the `internal_address` property of the node on which the particular VRRP IP should be set.
+By default, autodetection is enabled.
 
 In order to assign VRRP IP you need to create a `vrrp_ips` section in the inventory and specify the appropriate configuration.
 You can specify several VRRP IP addresses.
 
 The following parameters are supported:
 
-|Parameter|Default Automatically Calculated Value|Description|
+|Parameter|Default or Automatically Calculated Value|Description|
 |---|---|---|
 |hosts| | List of hosts on which the VRRP IP should be set.|
 |hosts[i].name| |The name of the node. It must match the name in the `nodes` list.|
 |hosts[i].priority|`255 - {{ i }}`|The priority of the VRRP IP host.|
+|hosts[i].interface|`auto`|The interface on which the address must be listened for the particular host.|
 |ip| |The IP address for virtual IP.|
 |floating_ip| |The floating IP address for virtual IP.|
-|interface|`eth0`|The interface on which the address must be listened.|
+|interface|`auto`|The interface on which the address must be listened. The value of this property is propagated to the corresponding `hosts[i].interface` property, if the latter is not explicitly defined.|
 |id|`md5({{ interface }} + {{ ip }})` cropped to 10 characters|The ID of the VRRP IP. It must be unique for each VRRP IP.|
 |password|Randomly generated 8-digit string|Password for VRRP IP set. It must be unique for every VRRP IP ID.|
 |router_id|Last octet of IP|The router ID of the VRRP IP. Must be unique for each VRRP IP ID and have maximum 3-character size.|
-|params.maintenance-type||Label for IPs that describes what type of traffic should be received in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
+|params.maintenance-type| |Label for IPs that describes what type of traffic should be received in `maintenance` mode. See [maintenance mode](#maintenance-mode) and [maintenance type](#maintenance-type)|
 
 There are several formats in which you can specify values.
 
@@ -966,10 +979,11 @@ vrrp_ips:
 - hosts:
   - name: balancer-1
     priority: 254
+    interface: eth0
   - name: balancer-2
     priority: 253
+    interface: ens3
   id: d8efc729e4
-  interface: eth0
   ip: 192.168.0.1
   floating_ip: 10.101.1.1
   password: 11a1aabe
@@ -1010,7 +1024,7 @@ By default, the installer uses the following parameters:
 
 |Parameter|Default Value|
 |---|---|
-|kubernetesVersion|`v1.20.3`|
+|kubernetesVersion|`v1.24.0`|
 |controlPlaneEndpoint|`{{ cluster_name }}:6443`|
 |networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6|
 |networking.serviceSubnet|`172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6|
@@ -1087,7 +1101,7 @@ services:
 
 #### Kubernetes version
 
-By default, the `1.20.2` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
+By default, the `1.24.0` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
 
 ```yaml
 services:
@@ -1394,7 +1408,7 @@ Example result:
 }
 ```
 
-### kubeadm_kubelet
+#### kubeadm_kubelet
 
 *Installation task*: `deploy.kubernetes`
 
@@ -1415,7 +1429,7 @@ By default, the installer uses the following parameters:
 |maxPods|110|
 |cgroupDriver|systemd|
 
-`pidsPidsLimit` the default value is chosen to prevent [Fork Bomb](https://en.wikipedia.org/wiki/Fork_bomb)
+`podPidsLimit` the default value is chosen to prevent [Fork Bomb](https://en.wikipedia.org/wiki/Fork_bomb)
 
 `cgroupDriver` field defines which cgroup driver the kubelet controls. [Configuring the kubelet cgroup driver](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/#configuring-the-kubelet-cgroup-driver).
 
@@ -1423,8 +1437,7 @@ By default, the installer uses the following parameters:
 
 The following is an example of kubeadm defaults override:
 
-```
-yaml
+```yaml
 services:
   kubeadm_kubelet:
     readOnlyPort: 0
@@ -1530,7 +1543,7 @@ The procedure for applying SELinux settings is as follows:
 
 *OS specific*: Yes, performs only on Ubuntu OS family.
 
-All the Ubuntu settings are specified in the `services.kernel_security.ubuntu` section of the inventory.
+All the AppArmor settings are specified in the `services.kernel_security.apparmor` section of the inventory.
 
 **Note**: AppArmor configuration is possible only on nodes running Ubuntu or Debian operating system.
 
@@ -1582,7 +1595,7 @@ If you need to disable AppArmor, you cannot do this using KubeMarine. If you abs
 
 **Warning**: This section is specific to different OS families. Ensure that you use the proper definition format for your OS distributive - it may differ from the presented examples in this document.
 
-If your cluster is in a closed environment or if you need to add additional package manager repositories, you can specify them in the `services.yum` section of inventory.
+If your cluster is in a closed environment or if you need to add additional package manager repositories, you can specify them in the `services.packages.package_manager` section of inventory.
 The following parameters are supported:
 
 |Parameter|Default value|Description|
@@ -1796,7 +1809,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>rh-haproxy18</td>
+    <td>rh-haproxy18-haproxy-{{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -1813,7 +1826,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>keepalived</td>
+    <td>keepalived-{{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -1822,6 +1835,23 @@ The following associations are used by default:
   <tr>
     <td>config_location</td>
     <td>/etc/keepalived/keepalived.conf</td>
+  </tr>
+  <tr>
+    <td rowspan="4">audit</td>
+    <td>executable_name</td>
+    <td>auditctl</td>
+  </tr>
+  <tr>
+    <td>package_name</td>
+    <td>auditd</td>
+  </tr>
+  <tr>
+    <td>service_name</td>
+    <td>auditd</td>
+  </tr>
+  <tr>
+    <td>config_location</td>
+    <td>/etc/audit/rules.d/predefined.rules</td>
   </tr>
 </table>
 
@@ -1858,7 +1888,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>containerd.io</td>
+    <td>containerd={{k8s-version-specific}}<br/>podman={{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -1875,7 +1905,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>haproxy</td>
+    <td>haproxy={{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -1892,7 +1922,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>keepalived</td>
+    <td>keepalived={{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -1901,6 +1931,23 @@ The following associations are used by default:
   <tr>
     <td>config_location</td>
     <td>/etc/keepalived/keepalived.conf</td>
+  </tr>
+  <tr>
+    <td rowspan="4">audit</td>
+    <td>executable_name</td>
+    <td>auditctl</td>
+  </tr>
+  <tr>
+    <td>package_name</td>
+    <td>auditd</td>
+  </tr>
+  <tr>
+    <td>service_name</td>
+    <td>auditd</td>
+  </tr>
+  <tr>
+    <td>config_location</td>
+    <td>/etc/audit/rules.d/predefined.rules</td>
   </tr>
 </table>
 
@@ -1978,6 +2025,7 @@ This is configured in the `services.thirdparties` section. The contents of this 
 |**groups**|no|`None`|The list of group names to whose hosts the file should be uploaded.|
 |**node**|no|`None`|The name of node where the file should be uploaded.|
 |**nodes**|no|`None`|The list of node names where the file should be uploaded.|
+|**binary**|no|`true`|Specifies whether to treat the file as a binary or as a text. This is applicable, for example, for bash scripts. It is required to specify the property carefully in case of deploying from Windows deployer.|
 
 **Warning**: verify that you specified the path to the correct version of the thirdparty.
 
@@ -2156,10 +2204,6 @@ The `services.modprobe` section manages Linux Kernel modules to be loaded in the
 |Key|Note|
 |---|---|
 |br_netfilter| |
-|ip_vs| |
-|ip_vs_rr| |
-|ip_vs_wrr| |
-|ip_vs_sh| |
 |ip6table_filter|Only when IPv6 detected in node IP|
 |nf_conntrack_ipv6|Only when IPv6 detected in node IP|
 |nf_nat_masquerade_ipv6|Only when IPv6 detected in node IP|
@@ -2229,15 +2273,15 @@ services:
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.
 
-#### audit-Kubernetes Policy
+#### audit
+
+##### Audit Kubernetes Policy
 
 *Installation task*: `prepare.system.audit.configure_policy`
 
 *Can cause reboot*: No
 
 *Can restart service*: Always yes, container kube-apiserver.
-
-*OS specific*: No.
 
 *OS specific*: No.
 
@@ -2320,15 +2364,17 @@ services:
           - group: "authorization.k8s.io"
 ```
 
-#### audit-daemon
+##### Audit Daemon
 
-*Installation task*: `prepare.system.audit_daemon`
+*Installation tasks*:
+* `prepare.system.audit.install`
+* `prepare.system.audit.configure_daemon`
 
 *Can cause reboot*: No
 
 *Can restart service*: Always yes, `auditd`.
 
-*OS specific*: Yes, performs only on RHEL OS family.
+*OS specific*: Yes, `prepare.system.audit.install` task is performed only on the Debian OS family.
 
 ```yaml
 services:
@@ -2341,9 +2387,11 @@ services:
       - -w /etc/default/docker -k docker
       - -w /etc/docker/daemon.json -k docker
       - -w /usr/bin/containerd -k docker
-      - -w /usr/sbin/runc -k dockerks
+      - -w /usr/sbin/runc -k docker
       - -w /usr/bin/dockerd -k docker
 ```
+
+Except `-w /usr/bin/containerd -k docker`, all the other rules are applied only when the `docker` container runtime is used.
 
 #### ntp
 
@@ -2376,7 +2424,7 @@ The following parameters are supported:
 |Name|Mandatory|Type|Default value|Description|
 |---|---|---|---|---|
 |servers|**yes**|list| |NTP servers addresses with additional configurations.|
-|makestep|no|string|`5 10`|Step the system clock if large correction is needed.|
+|makestep|no|string|`5 -1`|Step the system clock if large correction is needed.|
 |rtcsync|no|boolean|`True`|Specify that RTC should be automatically synchronized by kernel.|
 
 For more information about Chrony configuration, refer to the official documentation at [https://chrony.tuxfamily.org/documentation.html](https://chrony.tuxfamily.org/documentation.html).
@@ -2666,12 +2714,12 @@ The following settings are supported:
   <tr>
     <td>rewrite</td>
     <td>dict</td>
-    <td>False</td>
+    <td>Not provided</td>
     <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. </td>
   </tr>
   <tr>
     <td>hosts</td>
-    <td>string</td>
+    <td>dict</td>
     <td>/etc/coredns/Hosts</td>
     <td>The hosts plugin is useful for serving zones from a /etc/hosts like file. It serves from a preloaded file, which is applied from ConfigMap during the installation.</td>
   </tr>
@@ -2736,7 +2784,8 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 ##### haproxy
 
-This section contains the configuration parameters that are applied to the **haproxy.cfg** config file. By default, the following configuration is used:
+This section describes the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
+By default, the following configuration is used:
 
 ```yaml
 services:
@@ -2821,7 +2870,7 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
   <tr>
     <td>maintenance_mode</td>
     <td>boolean</td>
-    <td></td>
+    <td>False</td>
     <td>Enable maintenance config for HAproxy</td>
   </tr>
   <tr>
@@ -2842,8 +2891,8 @@ Parameter `config_file` allows to specify path to Jinja-compiled template. Examp
 services:
   loadbalancer:
     haproxy:
-        keep_configs_updated: True
-        config_file: '/root/my_haproxy_config.cfg.j2'
+      keep_configs_updated: True
+      config_file: '/root/my_haproxy_config.cfg.j2'
 ```
 
 This parameter use the following context options for template rendering:
@@ -2861,14 +2910,6 @@ The `KubeMarine` supports maintenance mode for HAproxy balancer. HAproxy balance
 services:
   loadbalancer:
     haproxy:
-      defaults:
-        timeout_connect: '10s'
-        timeout_client: '1m'
-        timeout_server: '1m'
-        timeout_tunnel: '60m'
-        timeout_client_fin: '1m'
-        maxconn: 10000
-      keep_configs_updated: True
       maintenance_mode: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
@@ -3236,7 +3277,7 @@ The yaml file that is created from the above template is applied to the cluster 
 
 *Installation task*: `deploy.plugins`
 
-In the `deploy.plugins` section, you can configure the parameters of the plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
+In the `plugins` section, you can configure the parameters of plugins, as well as register your own plugins. Plugins are installed during the `deploy.plugins` task.
 If you skip the plugin installation task, no plugins are installed.
 
 #### Predefined Plugins
@@ -3360,20 +3401,20 @@ The plugin configuration supports the following parameters:
 | Name                   | Type    | Default Value                       | Value Rules                                      | Description                                                        |
 |------------------------|---------|-------------------------------------|--------------------------------------------------|--------------------------------------------------------------------|
 | mode                   | string  | `ipip`                              | `ipip` / `vxlan`                                 | Network protocol to be used in network plugin                      |
-| crossSubnet            | boolean | `true`                              |                                                  | Enables crossing subnet boundaries to improve network performance  |
+| crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to improve network performance  |
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
 | fullmesh               | boolean | true                                | true/false                                       | Enable of disable full mesh BGP topology                           |
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
 | defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
 | typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
-| typha.replicas         | int     | `((nodes length)/50) + 2)` | Starts from 2 replicas amd increments for every 50  nodes | Number of Typha running replicas|
-| typha.image            | string  | `calico/typha:{calico.version}` | Should contain both image name and version | Calico Typha image |
-| typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of tolerations | Additional custom tolerations for calico-typha pods |
-| cni.image              | string  | `calico/cni:{calico.version}`                | Should contain both image name and version       | Calico CNI image                                                   |
-| node.image             | string  | `calico/node:{calico.version}`               | Should contain both image name and version       | Calico Node image                                                  |
-| kube-controllers.image | string  | `calico/kube-controllers:{calico.version}`   | Should contain both image name and version       | Calico Kube Controllers image                                      |
-| flexvol.image          | string  | `calico/pod2daemon-flexvol:{calico.version}` | Should contain both image name and version       | Calico Flexvol image                                               |
+| typha.replicas         | int     | <code>{{ (((nodes&#124;length)/50) + 2) &#124; round(1) }}</code> | Starts from 2 replicas amd increments for every 50 nodes | Number of Typha running replicas |
+| typha.image            | string  | `calico/typha:{calico.version}`     | Should contain both image name and version       | Calico Typha image                                                 |
+| typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of tolerations          | Additional custom tolerations for calico-typha pods                |
+| cni.image              | string  | `calico/cni:{calico.version}`                | Should contain both image name and version | Calico CNI image                                                |
+| node.image             | string  | `calico/node:{calico.version}`               | Should contain both image name and version | Calico Node image                                               |
+| kube-controllers.image | string  | `calico/kube-controllers:{calico.version}`   | Should contain both image name and version | Calico Kube Controllers image                                   |
+| flexvol.image          | string  | `calico/pod2daemon-flexvol:{calico.version}` | Should contain both image name and version | Calico Flexvol image                                            |
 
 ###### Default Typha Tolerations
 
@@ -3385,7 +3426,7 @@ The plugin configuration supports the following parameters:
 - key: node.kubernetes.io/network-unavailable
   effect: NoExecute
 ```
-**Note:** The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by KubeMarine itself. 
+**Note:** The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by KubeMarine itself.
 
 ###### Calico Environment Properties
 
@@ -3434,8 +3475,7 @@ For example:
 plugins:
   flannel:
     install: true
-    node:
-      image: quay.io/coreos/flannel:v0.11.0-amd64
+    image: quay.io/coreos/flannel:v0.11.0-amd64
 ```
 
 An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
@@ -3851,7 +3891,7 @@ The following table contains details about existing nodeSelector configuration o
             <li><code>typha.nodeSelector</code></li>
             <li><code>kube-controllers.nodeSelector</code></li>
         </ul></td>
-        <td><code>beta.kubernetes.io/os: linux</code></td>
+        <td><code>kubernetes.io/os: linux</code></td>
         <td>nodeSelector applicable only for calico <b>typha</b> <br> and calico <b>kube-controllers</b> containers, <br> but not for ordinary calico containers, <br> which should be deployed on all nodes</td>
     </tr>
     <tr>
@@ -4418,7 +4458,7 @@ For example:
 
 ```yaml
 plugins:
-    some_plugin: 
+  some_plugin: 
     install: True   
     installation:
       priority: 10
@@ -4461,7 +4501,10 @@ To define a strategy in the list, you must specify a new list element. In
 this element, you need to put a key-value pair, where the key is `<<`, and value
 is the name of the join strategy.
 
-**Note**: This functionality is available only for lists and only single strategy pointer is allowed inside the list.
+**Note**: This functionality is available only for lists and only a single strategy pointer is allowed inside the list.
+
+**Note**: This functionality is available only in specific sections of the inventory file.
+For a detailed set of allowed sections, refer to [List Merge Allowed Sections](#list-merge-allowed-sections).
 
 The following is an example of `replace` strategy:
 
@@ -4596,6 +4639,30 @@ plugins:
         - template: /var/data/custom_template2.yaml.j2
 ```
 
+#### List Merge Allowed Sections
+
+Application of the list merge strategy is allowed in the following sections:
+* `plugins.installation.procedures`
+* `services.kubeadm.apiServer.extraVolumes`
+* `services.kernel_security.permissive`
+* `services.modprobe`
+* `services.etc_hosts`
+* `services.audit.cluster_policy.omitStages`
+* `services.audit.cluster_policy.rules`
+* `services.audit.rules`
+* `services.coredns.deployment.spec.template.spec.volumes`
+* `services.packages.associations.package_name`
+* `services.packages.install`
+* `services.packages.upgrade`
+* `services.packages.remove`
+* `services.packages.package_manager.repositories`
+* `plugins.nginx-ingress-controller.ports`
+* `plugins.kubernetes-dashboard.ingress.spec.tls`
+* `plugins.kubernetes-dashboard.ingress.spec.rules`
+* `rbac.pss.exemptions.usernames`
+* `rbac.pss.exemptions.runtimeClasses`
+* `rbac.pss.exemptions.namespaces`
+
 ### Dynamic Variables
 
 There are settings in the configuration file that borrow their contents from the settings of the other sections. To avoid any duplication of the settings, the mechanism of dynamic variables is used.
@@ -4660,6 +4727,14 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
+* All variables should be either valid variables that KubeMarine understands,
+  or custom variables defined in the dedicated `values` section.
+  ```yaml
+  values:
+    custom_variable: value
+  kubemarine_section:
+    kubemarine_variable: '{{ values.custom_variable }}'
+  ```
 * The start pointer of the Jinja2 template must be inside a pair of single or double quotes. The `{{` or `{%` out of quotes leads to a parsing error of the yaml file.
 * The variable cannot refer to itself. It does not lead to any result, but it slows down the compilation process.
 * The variables cannot mutually refer to each other. For example, the following configuration:

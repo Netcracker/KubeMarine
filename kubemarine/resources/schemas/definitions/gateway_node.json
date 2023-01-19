@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "node_defaults.json#/definitions/SSHAccessCommonProperties"}],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Gateway node name"
+    },
+    "address": {
+      "type": "string",
+      "description": "Gateway node's IP or hostname address for connection"
+    }
+  },
+  "required": ["name", "address", "username", "keyfile"],
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "node_defaults.json#/definitions/SSHAccessCommonPropertyNames"},
+      {"enum": ["name", "address"]}
+    ]
+  }
+}

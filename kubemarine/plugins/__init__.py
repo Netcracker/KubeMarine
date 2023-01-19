@@ -37,7 +37,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -46,15 +46,7 @@ from kubemarine.kubernetes.replicaset import ReplicaSet
 from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
-
-oob_plugins = [
-    "calico",
-    "flannel",
-    "nginx-ingress-controller",
-    "haproxy-ingress-controller",
-    "kubernetes-dashboard",
-    "local-path-provisioner",
-]
+oob_plugins = list(static.DEFAULTS["plugins"].keys())
 
 
 def verify_inventory(inventory, cluster):
@@ -77,8 +69,7 @@ def enrich_inventory(inventory, cluster):
         for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
             for procedure_type, configs in step.items():
                 if procedure_types[procedure_type].get('convert') is not None:
-                    inventory["plugins"][plugin_name]['installation']['procedures'][i][procedure_type] = \
-                        procedure_types[procedure_type]['convert'](cluster, configs)
+                    step[procedure_type] = procedure_types[procedure_type]['convert'](cluster, configs)
     return inventory
 
 
@@ -132,29 +123,28 @@ def verify_image_redefined(plugin_name, previous_version, base_plugin, cluster_p
 def install(cluster, plugins=None):
     if not plugins:
         plugins = cluster.inventory["plugins"]
-    plugins_queue = []
+    plugins_queue: List[str] = []
     max_priority = 0
     for plugin_name, plugin_item in plugins.items():
         if plugin_item.get("install", False) and plugin_item.get("installation", {}).get('procedures') is not None:
-            plugin_item['plugin_name'] = plugin_name
-            plugins_queue.append(plugin_item)
+            plugins_queue.append(plugin_name)
             if plugin_item.get("installation", {}).get('priority') is not None \
                     and plugin_item['installation']['priority'] > max_priority:
                 max_priority = plugin_item['installation']['priority']
 
-    plugins_queue.sort(key=lambda item: item.get("installation", {}).get('priority', max_priority + 1))
+    plugins_queue.sort(key=lambda name: plugins[name].get("installation", {}).get('priority', max_priority + 1))
 
     cluster.log.debug('The following plugins will be installed:')
-    for plugin_item in plugins_queue:
+    for plugin_name in plugins_queue:
         cluster.log.debug('%i. %s' % (
-            plugin_item.get("installation", {}).get('priority', max_priority + 1),
-            plugin_item['plugin_name']
+            plugins[plugin_name].get("installation", {}).get('priority', max_priority + 1),
+            plugin_name
         ))
 
     cluster.log.debug('Starting plugins installation:')
 
-    for plugin_item in plugins_queue:
-        install_plugin(cluster, plugin_item['plugin_name'], plugin_item["installation"]['procedures'])
+    for plugin_name in plugins_queue:
+        install_plugin(cluster, plugin_name, plugins[plugin_name]["installation"]['procedures'])
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
@@ -695,15 +685,18 @@ def convert_ansible(cluster, config):
         config = {
             'playbook': config
         }
-    # if config['playbook'][0] != '/':
-    #     config['playbook'] = os.path.abspath(os.path.dirname(__file__) + '../../../' + config['playbook'])
     return config
+
+
+def _get_absolute_playbook(config):
+    return utils.determine_resource_absolute_path(config['playbook'])
 
 
 def verify_ansible(cluster: KubernetesCluster, config):
     if config.get('playbook') is None or config['playbook'] == '':
         raise Exception('Playbook path is missing')
-    if not os.path.isfile(config['playbook']):
+    playbook_path = _get_absolute_playbook(config)
+    if not os.path.isfile(playbook_path):
         raise Exception('Playbook file %s not exists' % config['playbook'])
     if cluster.is_deploying_from_windows():
         raise Exception("Executing of playbooks on Windows deployer is currently not supported")
@@ -711,7 +704,7 @@ def verify_ansible(cluster: KubernetesCluster, config):
 
 
 def apply_ansible(cluster, step, plugin_name=None):
-    playbook_path = utils.determine_resource_absolute_path(step.get('playbook'))
+    playbook_path = _get_absolute_playbook(step)
     external_vars = step.get('vars', {})
     become = step.get('become', False)
     groups = step.get('groups', [])
@@ -901,25 +894,26 @@ def _convert_file(config):
         config = {
             'source': config
         }
-    # if config['source'][0] != '/':
-    #     config['source'] = os.path.abspath(os.path.dirname(__file__) + '../../../' + config['source'])
     return config
+
+
+def _get_absolute_pattern(config):
+    return os.path.join(
+        utils.determine_resource_absolute_dir(config['source']),
+        os.path.basename(config['source'])
+    )
 
 
 def _verify_file(config, file_type):
     """
         Verifies if the path matching the config 'source' key exists and points to
         existing files.
-        """
+    """
     if config.get('source') is None or config['source'] == '':
         raise Exception('%s file source is missing' % file_type)
 
     # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
+    source = _get_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
@@ -947,12 +941,7 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     apply_nodes = config.get('apply_nodes', [])
     do_render = config.get('do_render', True)
 
-    # Determite absolute path to templates
-    source = os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
-
+    source = _get_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:

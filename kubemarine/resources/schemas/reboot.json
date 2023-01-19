@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "graceful_reboot": {
+      "type": "boolean",
+      "default": false,
+      "description": "What type of reboot to perform. If specified to true, pods are drained to other nodes and the nodes are rebooted one after another."
+    },
+    "nodes": {
+      "type": "array",
+      "description": "List of node names that should be rebooted. By default, all nodes are rebooted.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "definitions/common/node_ref.json#/definitions/Name"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

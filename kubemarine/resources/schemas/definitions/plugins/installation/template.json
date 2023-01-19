@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "oneOf": [
+    {"type": "string"},
+    {
+      "type": "object",
+      "allOf": [{"$ref": "#/definitions/Properties"}],
+      "required": ["source"],
+      "propertyNames": {
+        "$ref": "#/definitions/PropertyNames"
+      }
+    }
+  ],
+  "definitions": {
+    "Properties": {
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "apply_required": {
+          "type": "boolean",
+          "default": true
+        },
+        "apply_command": {
+          "type": "string"
+        },
+        "sudo": {
+          "type": "boolean",
+          "default": true
+        },
+        "destination_groups": {
+          "$ref": "../../common/node_ref.json#/definitions/Roles"
+        },
+        "destination_nodes": {
+          "$ref": "../../common/node_ref.json#/definitions/Names"
+        },
+        "apply_groups": {
+          "$ref": "../../common/node_ref.json#/definitions/Roles"
+        },
+        "apply_nodes": {
+          "$ref": "../../common/node_ref.json#/definitions/Names"
+        }
+      }
+    },
+    "PropertyNames": {
+      "enum": [
+        "source", "destination", "apply_required", "apply_command", "sudo",
+        "destination_groups", "destination_nodes", "apply_groups", "apply_nodes"
+      ]
+    }
+  }
+}

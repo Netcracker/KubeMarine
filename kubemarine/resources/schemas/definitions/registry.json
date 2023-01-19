@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Defines addresses of remote resources to use in private environments without access to internet",
+  "oneOf": [
+    {"$ref": "#/definitions/NewEndpointsFormat"},
+    {"$ref": "#/definitions/OldAddressPortFormat"}
+  ],
+  "definitions": {
+    "NewEndpointsFormat": {
+      "type": "object",
+      "properties": {
+        "endpoints": {
+          "$ref": "common/utils.json#/definitions/NonEmptySetOfStrings",
+          "description": "Address list of registry endpoints"
+        },
+        "mirror_registry": {
+          "type": "string",
+          "default": "registry.cluster.local",
+          "description": "The internal address of the containerd mirror registry, which should be defined in containers"
+        },
+        "thirdparties": {
+          "type": "string",
+          "description": "Address for the webserver, where thirdparties hosted"
+        }
+      },
+      "required": ["endpoints"],
+      "additionalProperties": false
+    },
+    "OldAddressPortFormat": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "Full address to the registry, without protocol and port"
+        },
+        "docker_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Custom port for connecting to the image registry"
+        },
+        "webserver": {
+          "type": "boolean",
+          "default": false,
+          "description": "A special parameter indicating whether registry has ability to serve http files. When enabled, the 'thirdparties' are patched with the 'address' provided."
+        },
+        "ssl": {
+          "type": "boolean",
+          "default": false,
+          "description": "Registry SSL support switch"
+        }
+      },
+      "required": ["address"],
+      "additionalProperties": false
+    }
+  }
+}

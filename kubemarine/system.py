@@ -23,8 +23,8 @@ from typing import Dict
 
 from dateutil.parser import parse
 import fabric
-import invoke
 import yaml
+from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils
@@ -47,53 +47,31 @@ def verify_inventory(inventory, cluster):
     return inventory
 
 
-def enrich_inventory(inventory, cluster):
-    if inventory['services'].get('packages'):
-        for _type in ['install', 'upgrade', 'remove']:
-            if inventory['services']['packages'].get(_type) is not None:
-                if isinstance(inventory['services']['packages'][_type], list):
-                    inventory['services']['packages'][_type] = {
-                        'include': inventory['services']['packages'][_type]
-                    }
-                for __type in ['include', 'exclude']:
-                    if inventory['services']['packages'][_type].get(__type) is not None:
-                        if not isinstance(inventory['services']['packages'][_type][__type], list):
-                            raise Exception('Packages %s section in configfile has invalid type. '
-                                            'Expected \'list\', but found \'%s\''
-                                            % (__type, type(inventory['services']['packages'][_type][__type])))
-                        if not inventory['services']['packages'][_type][__type]:
-                            raise Exception('Packages %s section contains empty \'%s\' definition. ' % (__type, __type))
-                    elif __type == 'include':
-                        if _type != 'install':
-                            inventory['services']['packages'][_type]['include'] = ['*']
-                        else:
-                            raise Exception('Definition \'include\' is missing in \'install\' packages section, '
-                                            'but should be specified.')
+def enrich_etc_hosts(inventory, cluster):
+    control_plain = inventory['control_plain']['internal']
 
-    if inventory['services'].get('etc_hosts'):
+    control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
+    control_plain_names.append(cluster.inventory['cluster_name'])
+    control_plain_names.append('control-plain')
+    control_plain_names = list(OrderedSet(control_plain_names))
+    inventory['services']['etc_hosts'][control_plain] = control_plain_names
 
-        control_plain = inventory['control_plain']['internal']
+    for node in cluster.inventory['nodes']:
+        if 'remove_node' in node['roles']:
+            continue
 
-        control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
-        control_plain_names.append(cluster.inventory['cluster_name'])
-        control_plain_names.append('control-plain')
-        inventory['services']['etc_hosts'][control_plain] = control_plain_names
+        internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
+        internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
+        internal_node_ip_names.append(node['name'])
+        internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
+        inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
 
-        for node in cluster.inventory['nodes']:
-            if 'remove_node' in node['roles']:
-                continue
-
-            internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
-            internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
-            internal_node_ip_names.append(node['name'])
-            inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
-
-            if node.get('address'):
-                external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
-                external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
-                external_node_ip_names.append(node['name'] + "-external")
-                external_node_ip_names = list(set(external_node_ip_names))
-                inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
+        if node.get('address'):
+            external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
+            external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
+            external_node_ip_names.append(node['name'] + "-external")
+            external_node_ip_names = list(OrderedSet(external_node_ip_names))
+            inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
 
     return inventory
 
@@ -139,6 +117,14 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
     # but in future the restriction can be eliminated.
     associations = packages_section.pop("associations", {})
     default_merger.merge(inventory["services"]["packages"]["associations"][os_family], associations)
+
+    for _type in ['install', 'upgrade', 'remove']:
+        packages = packages_section.pop(_type, None)
+        if packages is None:
+            continue
+        if isinstance(packages, list):
+            packages = {'include': packages}
+        default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
 
     # merge remained packages section
     default_merger.merge(inventory["services"]["packages"], packages_section)

@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Change the default settings for the by-default installed 'calico' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "install": {
+      "type": ["string", "boolean"],
+      "default": "true"
+    },
+    "version": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": ["ipip", "vxlan"],
+      "default": "ipip",
+      "description": "Network protocol to be used in network plugin"
+    },
+    "crossSubnet": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enables crossing subnet boundaries to improve network performance"
+    },
+    "natOutgoing": {
+      "type": "boolean",
+      "default": true
+    },
+    "mtu": {
+      "type": "integer",
+      "default": 1440,
+      "description": "MTU size for Calico interface"
+    },
+    "fullmesh": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable of disable full mesh BGP topology"
+    },
+    "announceServices": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable announces of ClusterIP services CIDR through BGP"
+    },
+    "defaultAsNumber": {
+      "type": ["string", "integer"],
+      "default": 64512,
+      "description": "AS Number to be used by default for this cluster"
+    },
+    "globalBgpPeers": {
+      "type": "array",
+      "description": "List of global BGP Peer (IP,AS) values",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ip": {"type": "string"},
+          "as": {"type": ["string", "integer"]}
+        },
+        "required": ["ip", "as"],
+        "additionalProperties": false
+      }
+    },
+    "typha": {
+      "type": "object",
+      "description": "Typha Daemon configuration",
+      "properties": {
+        "enabled": {
+          "type": ["string", "boolean"],
+          "description": "Enables the Typha Daemon"
+        },
+        "replicas": {
+          "type": ["string", "integer"],
+          "description": "Number of Typha running replicas"
+        },
+        "image": {
+          "type": "string",
+          "description": "Calico Typha image"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations",
+          "description": "Custom toleration for calico-typha pods"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        }
+      },
+      "additionalProperties": false
+    },
+    "env": {
+      "type": "object",
+      "description": "Change the default Calico environment properties",
+      "properties": {
+        "FELIX_USAGEREPORTINGENABLED": {"type": ["string", "boolean"], "default": "'false'"},
+        "WAIT_FOR_DATASTORE": {"type": ["string", "boolean"], "default": "'true'"},
+        "FELIX_DEFAULTENDPOINTTOHOSTACTION": {"type": "string", "default": "ACCEPT"},
+        "CALICO_ROUTER_ID": {"type": "string"}
+      }
+    },
+    "cni": {
+      "type": "object",
+      "description": "CNI configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Calico CNI image"
+        },
+        "ipam": {
+          "type": "object",
+          "properties": {
+            "ipv4": {
+              "type": "object"
+            },
+            "ipv6": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "description": "Calico Node configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Calico Node image"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kube-controllers": {
+      "type": "object",
+      "description": "Calico Kube Controllers configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Calico Kube Controllers image"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        }
+      },
+      "additionalProperties": false
+    },
+    "flexvol": {
+      "type": "object",
+      "description": "Calico Flexvol configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Calico Flexvol image"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": [
+        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "announceServices", "defaultAsNumber",
+        "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol"
+      ]}
+    ]
+  }
+}

@@ -21,18 +21,22 @@ from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 
 
-def autodetect_interface(cluster, name):
-    for node_address, node_context in cluster.context['nodes'].items():
-        if node_context['name'] == name and node_context.get('active_interface'):
-            return node_context['active_interface']
-        if cluster.context['initial_procedure'] == 'remove_node':
-            for node_to_remove in cluster.procedure_inventory['nodes']:
-                if node_to_remove['name'] == name:
-                    return None
+def autodetect_interface(cluster: KubernetesCluster, name):
+    for node in cluster.inventory['nodes']:
+        if node['name'] == name:
+            address = cluster.get_access_address_from_node(node)
+            interface = cluster.context['nodes'].get(address, {}).get('active_interface')
+            if interface:
+                return interface
+    if cluster.context['initial_procedure'] == 'remove_node':
+        for node_to_remove in cluster.procedure_inventory['nodes']:
+            if node_to_remove['name'] == name:
+                return None
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
@@ -232,6 +236,8 @@ def generate_config(inventory, node):
 
         priority = 100
         interface = 'eth0'
+        # todo Probably skip the VRRP if it not defined for this node?
+        #  Currently behaviour does not correspond to documentation.
         for record in item['hosts']:
             if record['name'] == node['name']:
                 priority = record['priority']

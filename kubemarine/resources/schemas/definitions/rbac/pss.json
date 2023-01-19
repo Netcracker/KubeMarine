@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "PSS configuration section",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "propertyNames": {
+    "$ref": "#/definitions/PropertyNames"
+  },
+  "definitions": {
+    "Properties": {
+      "properties": {
+        "pod-security": {
+          "enum": ["enabled", "disabled"],
+          "default": "enabled",
+          "description": "Specify if PSS should be enabled/disabled"
+        },
+        "defaults": {
+          "$ref": "#/definitions/Profiles",
+          "description": "Default profiles that are passed to 'defaults' section of PodSecurityConfiguration"
+        },
+        "exemptions": {
+          "type": "object",
+          "description": "The section describes objects that are not enforced by the policy",
+          "properties": {
+            "usernames": {
+              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+              "description": "List of User or ServiceAccount names"
+            },
+            "runtimeClasses": {
+              "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+            },
+            "namespaces": {
+              "type": "array",
+              "description": "List of namespaces to not enforce the policy",
+              "items": {
+                "anyOf": [
+                  {"type": "string", "enum": ["kube-system"]},
+                  {"type": "string"},
+                  {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+                ]
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "PropertyNames": {
+      "enum": ["pod-security", "defaults", "exemptions"]
+    },
+    "Profiles": {
+      "type": "object",
+      "properties": {
+        "enforce": {"$ref":  "#/definitions/Profile"},
+        "enforce-version": {"$ref": "#/definitions/ProfileVersion"},
+        "audit": {"$ref":  "#/definitions/Profile"},
+        "audit-version": {"$ref": "#/definitions/ProfileVersion"},
+        "warn": {"$ref":  "#/definitions/Profile"},
+        "warn-version": {"$ref": "#/definitions/ProfileVersion"}
+      },
+      "additionalProperties": false
+    },
+    "Profile": {
+      "enum": ["privileged", "baseline", "restricted"],
+      "default": "baseline"
+    },
+    "ProfileVersion": {
+      "type": ["string"],
+      "default": "latest"
+    }
+  }
+}

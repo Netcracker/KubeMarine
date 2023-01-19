@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Section to hold the parameters to be applied by default to each record in the nodes section",
+  "allOf": [{"$ref": "#/definitions/CommonNodeProperties"}],
+  "propertyNames": {
+    "$ref": "#/definitions/CommonNodePropertyNames"
+  },
+  "definitions": {
+    "SSHAccessCommonProperties": {
+      "properties": {
+        "keyfile": {
+          "type": "string",
+          "description": "Absolute path to keyfile on local machine to access the remote machine(s)"
+        },
+        "username": {
+          "type": "string",
+          "default": "root",
+          "description": "Username for SSH-access the remote machine(s)"
+        },
+        "connection_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 22,
+          "description": "Port for SSH-connection to remote machine(s)"
+        },
+        "connection_timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Timeout for SSH-connection to remote machine(s)"
+        }
+      }
+    },
+    "SSHAccessCommonPropertyNames": {
+      "enum": ["keyfile", "username", "connection_port", "connection_timeout"]
+    },
+    "CommonNodeProperties": {
+      "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],
+      "properties": {
+        "labels": {
+          "type": "object",
+          "description": "Additional labels for node(s)",
+          "additionalProperties": {
+            "type": ["string", "boolean", "integer"]
+          }
+        },
+        "taints": {
+          "$ref": "common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Additional taints for node(s). Caution: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences."
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Gateway that should be used to connect to node(s)"
+        }
+      }
+    },
+    "CommonNodePropertyNames": {
+      "anyOf": [
+        {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
+        {"enum": ["labels", "taints", "gateway"]}
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Enable and/or change default settings for 'kubernetes-dashboard' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "hostname": {
+      "type": "string",
+      "default": "'dashboard.{{ cluster_name }}'",
+      "description": "Address on which the Kubernetes Dashboard UI is located. Actually an alias for ingress.spec"
+    },
+    "dashboard": {
+      "type": "object",
+      "description": "Kubernetes Dashboard configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Kubernetes Dashboard image"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics-scraper": {
+      "type": "object",
+      "description": "Kubernetes Dashboard Metrics Scraper configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Kubernetes Dashboard Metrics Scraper image"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ingress": {
+      "type": "object",
+      "description": "Configuration of Ingress resource for Kubernetes Dashboard",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "description": "Ingress metadata, typically contains namespace and NGINX-specific parameters",
+          "properties": {
+            "name": {"type": "string", "default": "kubernetes-dashboard"},
+            "namespace": {"type": "string", "default": "kubernetes-dashboard"},
+            "annotations": {
+              "type": "object",
+              "properties": {
+                "nginx.ingress.kubernetes.io/backend-protocol": {"type": "string", "default": "HTTPS"}
+              }
+            }
+          }
+        },
+        "spec": {
+          "type": "object",
+          "description": "Ingress specs, determining where and on which port the Kubernetes Dashboard UI is located",
+          "properties": {
+            "tls": {"$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"},
+            "rules": {"$ref": "../common/utils.json#/definitions/MergeableArrayOfObjects"}
+          }
+        }
+      }
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["version", "hostname", "dashboard", "metrics-scraper", "ingress"]}
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "nginx-ingress-controller": {
+      "$ref": "definitions/plugins/nginx-ingress-controller.json#/definitions/DefaultCertificate"
+    },
+    "kubernetes": {
+      "type": "object",
+      "description": "Update internal Kubernetes certificates.",
+      "properties": {
+        "cert-list": {
+          "type": "array",
+          "description": "List with particular certificates, or 'all' if all possible certificates should be updated.",
+          "items": {
+            "enum": [
+              "all",
+              "apiserver", "apiserver-etcd-client", "apiserver-kubelet-client",
+              "etcd-healthcheck-client", "etcd-peer", "etcd-server",
+              "admin.conf", "controller-manager.conf", "scheduler.conf",
+              "front-proxy-client"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Configure the balancers for the Kubernetes cluster. Currently, only the Haproxy configuration can be customized.",
+  "properties": {
+    "haproxy": {
+      "type": "object",
+      "description": "The section contains the configuration parameters that are applied to the haproxy.cfg config file, and also some Kubemarine related parameters",
+      "properties": {
+        "keep_configs_updated": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allows Kubemarine update haproxy configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)"
+        },
+        "config": {
+          "type": "string",
+          "description": "Custom haproxy config value to be used instead of the default one"
+        },
+        "config_file": {
+          "type": "string",
+          "description": "Path to the Jinja-template file with custom haproxy config to be used instead of the default one"
+        },
+        "maintenance_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable maintenance config for HAproxy"
+        },
+        "mntc_config_location": {
+          "type": "string",
+          "default": "/etc/haproxy/haproxy_mntc.cfg",
+          "description": "Maintenance config flie location"
+        },
+        "defaults": {
+          "type": "object",
+          "description": "Parameters that are passed directly to the 'defaults' section of haproxy.cfg file.",
+          "properties": {
+            "timeout_connect": {
+              "type": "string",
+              "default": "10s",
+              "description": "Set the maximum time to wait for a connection attempt to a server to succeed"
+            },
+            "timeout_client": {
+              "type": "string",
+              "default": "1m",
+              "description": "Set the maximum inactivity time on the client side"
+            },
+            "timeout_server": {
+              "type": "string",
+              "default": "1m",
+              "description": "Set the maximum inactivity time on the server side"
+            },
+            "timeout_tunnel": {
+              "type": "string",
+              "default": "60m",
+              "description": "Set the maximum inactivity time on the client and server sides for tunnels"
+            },
+            "timeout_client_fin": {
+              "type": "string",
+              "default": "1m",
+              "description": "Set the inactivity timeout on the client side for half-closed connections"
+            },
+            "maxconn": {
+              "type": "integer",
+              "default": 10000,
+              "description": "Limits the sockets to this number of concurrent connections"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

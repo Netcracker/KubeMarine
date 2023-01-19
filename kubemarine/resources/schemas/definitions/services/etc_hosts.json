@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Specify custom records for /etc/hosts. The key is an IP-address, the value is either a DNS name or an array of names.",
+  "properties": {
+    "127.0.0.1": {
+      "$ref": "#/definitions/DNSNames"
+    },
+    "::1": {
+      "$ref": "#/definitions/DNSNames"
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/DNSNames"
+  },
+  "definitions": {
+    "DNSNames": {
+      "description": "IP-address",
+      "oneOf": [
+        {"type": "string"},
+        {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
+      ]
+    }
+  }
+}

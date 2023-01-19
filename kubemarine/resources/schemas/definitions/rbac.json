@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Section describing Kubernetes admission and accounts",
+  "properties": {
+    "account_defaults": {
+      "$ref": "rbac/account_defaults.json"
+    },
+    "accounts": {
+      "type": "array",
+      "description": "List of Kubernetes accounts",
+      "items": {
+        "$ref": "rbac/account.json"
+      },
+      "minItems": 1
+    },
+    "admission": {
+      "enum": ["psp", "pss"],
+      "default": "psp",
+      "description": "PSP/PSS admission implementation switcher"
+    },
+    "psp": {
+      "$ref": "rbac/psp.json"
+    },
+    "pss": {
+      "$ref": "rbac/pss.json"
+    }
+  },
+  "additionalProperties": false
+}

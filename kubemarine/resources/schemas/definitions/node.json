@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "required": ["internal_address", "roles"],
+  "propertyNames": {
+    "$ref": "#/definitions/PropertyNames"
+  },
+  "definitions": {
+    "Properties": {
+      "allOf": [{"$ref": "node_defaults.json#/definitions/CommonNodeProperties"}],
+      "properties": {
+        "name": {
+          "$ref": "common/node_ref.json#/definitions/Name",
+          "description": "Cluster member name. If omitted, KubeMarine will calculate the name by the member role and position in the inventory."
+        },
+        "address": {
+          "type": "string",
+          "description": "External node's IP-address"
+        },
+        "internal_address": {
+          "type": "string",
+          "description": "Internal node's IP-address"
+        },
+        "roles": {
+          "$ref": "common/node_ref.json#/definitions/Roles",
+          "description": "Cluster member roles"
+        },
+        "control_endpoint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Parameter to help the algorithm in choosing which address to take as the control_plain"
+        },
+        "connect_to": {"type": "string"}
+      }
+    },
+    "PropertyNames": {
+      "anyOf": [
+        {"$ref": "node_defaults.json#/definitions/CommonNodePropertyNames"},
+        {"enum": ["name", "address", "internal_address", "roles", "control_endpoint", "connect_to"]}
+      ]
+    }
+  }
+}

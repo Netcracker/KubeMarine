@@ -16,9 +16,6 @@ vrrp_ips:
 cluster_name: "test-local-k8s.com"
 
 services:
-  selinux:
-    state: disabled
-
   packages:
     install:
     - conntrack

@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "description": "Nodes to remove. Each item can be specified in the same format as that of the installation procedure, or in short format where only the node name is present.",
+      "items": {
+        "type": "object",
+        "allOf": [{"$ref": "definitions/node.json#/definitions/Properties"}],
+        "required": ["name"],
+        "propertyNames": {
+          "$ref": "definitions/node.json#/definitions/PropertyNames"
+        }
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
+    "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
+  },
+  "required": ["nodes"],
+  "additionalProperties": false
+}

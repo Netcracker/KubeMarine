@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "PSP configuration section",
+  "properties": {
+    "pod-security": {
+      "$ref": "#/definitions/PodSecurity"
+    },
+    "oob-policies": {
+      "$ref": "#/definitions/OOBPolicies"
+    },
+    "custom-policies": {
+      "$ref": "#/definitions/CustomPolicies"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PodSecurity": {
+      "enum": ["enabled", "disabled"],
+      "default": "enabled",
+      "description": "Specify if PSP should be enabled/disabled"
+    },
+    "OOBPolicies": {
+      "type": "object",
+      "description": "Policies that are configured out of the box",
+      "properties": {
+        "default": {
+          "enum": ["enabled", "disabled"],
+          "default": "enabled",
+          "description": "Used for 'authenticated' group, enforces unauthorized users to deploy pods with severe restrictions"
+        },
+        "host-network": {
+          "enum": ["enabled", "disabled"],
+          "default": "enabled",
+          "description": "Used for pods which require host network access"
+        },
+        "anyuid": {
+          "enum": ["enabled", "disabled"],
+          "default": "enabled",
+          "description": "Used for pods which require root privileges"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomPolicies": {
+      "type": "object",
+      "description": "Custom policies section",
+      "properties": {
+        "psp-list": {
+          "type": "array",
+          "description": "List of PodSecurityPolicy resources",
+          "items": {
+            "$ref": "#/definitions/PodSecurityPolicy"
+          }
+        },
+        "roles-list": {
+          "type": "array",
+          "description": "List of Role/ClusterRole resources",
+          "items": {
+            "$ref": "#/definitions/Roles"
+          }
+        },
+        "bindings-list": {
+          "type": "array",
+          "description": "List of RoleBinding/ClusterRoleBinding resources",
+          "items": {
+            "$ref": "#/definitions/RoleBindings"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PodSecurityPolicy": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "policy/v1beta1"},
+        "kind": {"enum": ["PodSecurityPolicy"], "default": "PodSecurityPolicy"},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "required": ["name"]
+        },
+        "spec": {"type": "object"}
+      },
+      "required": ["apiVersion", "kind", "metadata"]
+    },
+    "Roles": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "rbac.authorization.k8s.io/v1"},
+        "kind": {"enum": ["Role", "ClusterRole"]},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "required": ["name"]
+        },
+        "rules": {"$ref": "../common/utils.json#/definitions/ArrayOfObjects"}
+      },
+      "required": ["apiVersion", "kind", "metadata"]
+    },
+    "RoleBindings": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "rbac.authorization.k8s.io/v1"},
+        "kind": {"enum": ["RoleBinding", "ClusterRoleBinding"]},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "required": ["name"]
+        },
+        "roleRef": {"type": "object"},
+        "subjects": {"$ref": "../common/utils.json#/definitions/ArrayOfObjects"}
+      },
+      "required": ["apiVersion", "kind", "metadata"]
+    }
+  }
+}

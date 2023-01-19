@@ -51,13 +51,14 @@ services:
       - 2606:4700:4700::1001
 
   ntp:
-    # For RHEL OS use chrony:
-    chrony:
-      servers:
-        - 0.de.pool.ntp.org iburst
-        - 1.de.pool.ntp.org iburst
-      makestep: 5 10
-      rtcsync: True
+    # For RHEL OS use chrony. Uncomment and customize the following section:
+    # chrony:
+    #   servers:
+    #     - 0.de.pool.ntp.org iburst
+    #     - 1.de.pool.ntp.org iburst
+    #   makestep: 5 10
+    #   rtcsync: True
+
     # For Debian OS use timesyncd:
     timesyncd:
       Time:

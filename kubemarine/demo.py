@@ -407,7 +407,6 @@ def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', 
     context = {}
     for node in inventory['nodes']:
         node_context = {
-            'name': node['name'],
             'access': {
                 'online': True,
                 'accessible': True,

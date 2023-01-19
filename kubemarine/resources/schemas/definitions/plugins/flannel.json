@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Enable and/or change default settings for experimental 'flannel' plugin",
+  "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
+  "properties": {
+    "image": {
+      "type": "string",
+      "default": "quay.io/coreos/flannel:v0.11.0-amd64",
+      "description": "Specifies the string for the Flannel image"
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
+      {"enum": ["image"]}
+    ]
+  }
+}

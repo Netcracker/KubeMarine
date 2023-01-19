@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Configure the nameserver addresses to which cluster systems has access",
+  "properties": {
+    "search": {
+      "type": "string",
+      "description": "The domain name to search"
+    },
+    "nameservers": {
+      "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings",
+      "description": "The DNS servers for usage in the OS"
+    }
+  },
+  "additionalProperties": false
+}

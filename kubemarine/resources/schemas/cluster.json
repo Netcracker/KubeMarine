@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "description": "Describe each node of the cluster.",
+      "minItems": 1,
+      "items": {
+        "$ref": "definitions/node.json"
+      }
+    },
+    "node_defaults": {
+      "$ref": "definitions/node_defaults.json"
+    },
+    "cluster_name": {
+      "type": "string",
+      "description": "Address of the cluster. On this address, the Control Plane Endpoint is raised, and it is used in the calculated parameters."
+    },
+    "control_plain": {
+      "type": "object",
+      "description": "Specifies which addresses are to be available for Kubernetes.",
+      "properties": {
+        "internal": {
+          "type": "string",
+          "description": "Internal network address for the connection. It is to be used for all internal kubeapi traffic."
+        },
+        "external": {
+          "type": "string",
+          "description": "External network address for the connection. It is to be used for serving and balancing external traffic and external connections."
+        }
+      },
+      "additionalProperties": false
+    },
+    "public_cluster_ip": {
+      "type": "string",
+      "default": "'{{ control_plain.external }}'",
+      "description": "An obsolete variable that is used if you are using Helm plugins installation."
+    },
+    "registry": {
+      "$ref": "definitions/registry.json"
+    },
+    "gateway_nodes": {
+      "type": "array",
+      "description": "Specify the gateway nodes through which you need to create an SSH-tunnel.",
+      "items": {
+        "$ref": "definitions/gateway_node.json"
+      }
+    },
+    "vrrp_ips": {
+      "type": "array",
+      "description": "List of VRRP IPs to assign to balancers. Each item can either be a simple address string or a dictionary with the address and additional parameters.",
+      "items": {
+        "$ref": "definitions/vrrp_ip.json"
+      }
+    },
+    "services": {
+      "$ref": "definitions/services.json"
+    },
+    "rbac": {
+      "$ref": "definitions/rbac.json"
+    },
+    "plugin_defaults": {
+      "$ref": "definitions/plugin_defaults.json"
+    },
+    "plugins": {
+      "$ref": "definitions/plugins.json"
+    },
+    "timeout_download": {
+      "type": "integer",
+      "default": 60,
+      "description": "Timeout for the thirdparties download on nodes."
+    },
+    "procedure_history": {
+      "type": "object",
+      "description": "Parameters for the inventory preservation on nodes after each procedure run.",
+      "properties": {
+        "archive_threshold": {
+          "type": "integer",
+          "default": 5,
+          "description": "Number of procedure runs after which the information about old runs is archived."
+        },
+        "delete_threshold": {
+          "type": "integer",
+          "default": 10,
+          "description": "Number of procedure runs after which the information about old runs is deleted."
+        }
+      },
+      "additionalProperties": false
+    },
+    "values": {
+      "type": "object",
+      "description": "Section to hold custom variables to be used in Jinja2 templates."
+    }
+  },
+  "required": ["nodes", "cluster_name"],
+  "additionalProperties": false
+}

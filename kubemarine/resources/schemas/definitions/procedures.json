@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "definitions": {
+    "PrepullGroupSize": {
+      "type": "integer",
+      "default": 20,
+      "description": "Max number of nodes in groups, into which all nodes are split for simultaneous images prepull"
+    },
+    "GracePeriod": {
+      "type": "integer",
+      "default": 60,
+      "description": "Time to wait in seconds for the pods' migration to other nodes during draining before killing them"
+    },
+    "DrainTimeout": {
+      "type": "integer",
+      "description": "Time to wait for the pods' killing"
+    }
+  }
+}

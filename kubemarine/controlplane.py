@@ -11,23 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from kubemarine.core.cluster import KubernetesCluster
 
-def controlplane_node_enrichment(inventory, cluster):
+
+def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster):
     """
     Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
     The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
     """
     for node in inventory["nodes"]:
+        node_info = node.get('name', cluster.get_access_address_from_node(node))
         if "master" in node["roles"] and "control-plane" not in node["roles"]:
-            cluster.log.debug(f"The 'control-plane' role will be added for {node['name']}")
-            cluster.log.warning(f"Node wich name is {node['name']} has legacy role 'master'."
-                                f"Please use 'control-plane' instead")
+            cluster.log.debug(f"The 'control-plane' role will be added for {node_info}")
+            cluster.log.warning(f"Node {node_info} has legacy role 'master'. "
+                                f"Please use 'control-plane' instead.")
             node["roles"].append("control-plane")
         if "control-plane" in node["roles"] and "master" not in node["roles"]:
-            cluster.log.debug(f"The 'master' role will be added for {node['name']}")
+            cluster.log.debug(f"The 'master' role will be added for {node_info}")
             node["roles"].append("master")
 
     return inventory
+
 
 def controlplane_finalize_inventory(cluster, inventory):
     """
@@ -36,7 +40,8 @@ def controlplane_finalize_inventory(cluster, inventory):
     # remove 'master' role from inventory before dump
     for node in inventory["nodes"]:
         if 'master' in node["roles"]:
-            cluster.log.debug(f"The 'master' role will be removed for {node['name']} node before saving")
+            node_info = node.get('name', cluster.get_access_address_from_node(node))
+            cluster.log.debug(f"The 'master' role will be removed for {node_info} node before saving")
             node["roles"].remove("master")
 
     return inventory

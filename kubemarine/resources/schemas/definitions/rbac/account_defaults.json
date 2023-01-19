@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Describe parameters that needs to be applied by default to each record in the rbac.accounts section",
+  "allOf": [{"$ref": "#/definitions/CommonAccountProperties"}],
+  "propertyNames": {
+    "$ref": "#/definitions/CommonAccountPropertyNames"
+  },
+  "definitions": {
+    "CommonAccountProperties": {
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "default": "kube-system",
+          "description": "Namespace to apply by default to items in 'configs' section"
+        },
+        "configs": {
+          "type": "array",
+          "description": "YAML settings for ServiceAccount, ClusterRoleBinding and Secret (since Kubernetes 1.24)",
+          "items": [
+            {"$ref": "#/definitions/ServiceAccount"},
+            {"$ref": "#/definitions/ClusterRoleBinding"}
+          ],
+          "additionalItems": {"$ref": "#/definitions/Secret"},
+          "minItems": 2,
+          "maxItems": 3
+        }
+      }
+    },
+    "CommonAccountPropertyNames": {
+      "enum": ["namespace", "configs"]
+    },
+    "ServiceAccount": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "v1"},
+        "kind": {"enum": ["ServiceAccount"], "default": "ServiceAccount"},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "namespace": {"type": "string", "default": "kube-system"}
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"}
+            }
+          }
+        }
+      },
+      "required": ["apiVersion", "kind"]
+    },
+    "ClusterRoleBinding": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "rbac.authorization.k8s.io/v1"},
+        "kind": {"enum": ["ClusterRoleBinding"], "default": "ClusterRoleBinding"},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          }
+        },
+        "roleRef": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          }
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "namespace": {"type": "string", "default": "kube-system"}
+            }
+          }
+        }
+      },
+      "required": ["apiVersion", "kind"]
+    },
+    "Secret": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {"type": "string", "default": "v1"},
+        "kind": {"enum": ["Secret"], "default": "Secret"},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "namespace": {"type": "string", "default": "kube-system"},
+            "annotations": {
+              "type": "object"
+            }
+          }
+        },
+        "type": {"type": "string", "default": "kubernetes.io/service-account-token"}
+      },
+      "required": ["apiVersion", "kind"]
+    }
+  }
+}

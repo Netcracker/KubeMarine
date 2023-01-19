@@ -15,6 +15,7 @@
 
 
 from collections import OrderedDict
+from copy import deepcopy
 from io import StringIO
 
 import toml
@@ -188,10 +189,23 @@ def upgrade_finalize_inventory(cluster, inventory):
 
     if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
         inventory['services'].setdefault("packages", {})
-        packages = cluster.procedure_inventory[upgrade_version]["packages"]
+        packages_section = deepcopy(cluster.procedure_inventory[upgrade_version]["packages"])
+        for _type in ['install', 'upgrade', 'remove']:
+            packages = packages_section.pop(_type, None)
+            if packages is None:
+                continue
+            if isinstance(packages, list):
+                packages = {'include': packages}
+
+            packages_list = inventory['services']['packages'].get(_type)
+            if isinstance(packages_list, list):
+                inventory['services']['packages'][_type] = {
+                    'include': packages_list
+                }
+            default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
         # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
         # we still merge global associations section because it has priority during enrichment.
-        default_merger.merge(inventory["services"]["packages"], packages)
+        default_merger.merge(inventory["services"]["packages"], packages_section)
 
     return inventory
 

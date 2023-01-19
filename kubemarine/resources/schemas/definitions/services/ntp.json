@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "This is a common section for chrony and timesyncd properties",
+  "properties": {
+    "chrony": {
+      "$ref": "#/definitions/Chrony"
+    },
+    "timesyncd": {
+      "$ref": "#/definitions/Timesyncd"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Chrony": {
+      "type": "object",
+      "description": "Section for chrony properties",
+      "properties": {
+        "servers": {
+          "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings",
+          "description": "NTP servers addresses with additional configurations"
+        },
+        "makestep": {
+          "type": "string",
+          "default": "5 -1",
+          "description": "Step the system clock if large correction is needed"
+        },
+        "rtcsync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Specify that RTC should be automatically synchronized by kernel"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Timesyncd": {
+      "type": "object",
+      "description": "Section for timesyncd properties",
+      "properties": {
+        "Time": {
+          "type": "object",
+          "description": "Specify NTP servers and/or override default parameters",
+          "properties": {
+            "NTP": {
+              "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings",
+              "description": "NTP servers addresses"
+            },
+            "FallbackNTP": {
+              "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings",
+              "description": "Backup NTP servers addresses when NTP servers are unavailable"
+            },
+            "RootDistanceMaxSec": {
+              "type": "integer",
+              "default": 5,
+              "description": "Step the system clock if large correction is needed"
+            },
+            "PollIntervalMinSec": {
+              "type": "integer",
+              "default": 32,
+              "description": "The minimal poll interval"
+            },
+            "PollIntervalMaxSec": {
+              "type": "integer",
+              "default": 2048,
+              "description": "The maximum poll interval"
+            }
+          }
+        }
+      }
+    }
+  }
+}

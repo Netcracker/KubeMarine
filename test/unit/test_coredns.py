@@ -118,3 +118,37 @@ data:
         config = coredns.generate_configmap(cluster.inventory)
         self.assertIn('Hosts: |', config)
         self.assertIn('192.168.0.2  master-1.k8s.fake.local', config)
+
+    def test_configmap_generation_with_corefile_defaults(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        cluster = demo.new_cluster(inventory)
+        config = coredns.generate_configmap(cluster.inventory)
+        self.assertIn('prometheus :9153', config)
+        self.assertIn('cache 30', config)
+        self.assertIn('loadbalance', config)
+        self.assertIn('hosts /etc/coredns/Hosts', config)
+        self.assertIn('template IN A k8s.fake.local', config)
+        self.assertIn('forward . /etc/resolv.conf', config)
+
+    def test_configmap_generation_with_corefile_defaults_disabled(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['services']['coredns'] = {
+            'configmap': {
+                'Corefile': {
+                    '.:53': {
+                        'prometheus': False,
+                        'loadbalance': False,
+                        'hosts': False,
+                        'forward': False
+                    }
+                }
+            }
+        }
+        cluster = demo.new_cluster(inventory)
+        config = coredns.generate_configmap(cluster.inventory)
+        self.assertNotIn('prometheus :9153', config)
+        self.assertIn('cache 30', config)
+        self.assertNotIn('loadbalance', config)
+        self.assertNotIn('hosts /etc/coredns/Hosts', config)
+        self.assertIn('template IN A k8s.fake.local', config)
+        self.assertNotIn('forward . /etc/resolv.conf', config)

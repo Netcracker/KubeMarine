@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Manage audit service and Kubernetes cluster policy",
+  "properties": {
+    "rules": {
+      "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings",
+      "description": "Audit rules for auditd daemon to apply"
+    },
+    "cluster_policy": {
+      "type": "object",
+      "description": "Policy for Kubernetes logging",
+      "properties": {
+        "apiVersion": {"type": ["string"], "default": "audit.k8s.io/v1"},
+        "kind": {"enum": ["Policy"], "default": "Policy"},
+        "omitStages": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["RequestReceived"]
+              },
+              {"type": "string"},
+              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+            ]
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"$ref": "#/definitions/PolicyRule"},
+              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+            ]
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PolicyRule": {
+      "type": "object",
+      "properties": {
+        "level": {"type": "string"},
+        "verbs": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "group": {"type": "string"},
+              "resources": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"}
+            }
+          }
+        }
+      },
+      "required": ["level"],
+      "propertyNames": {
+        "not": {"enum": ["<<"]}
+      }
+    }
+  }
+}
