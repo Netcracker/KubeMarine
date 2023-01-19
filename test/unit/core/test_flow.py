@@ -17,6 +17,7 @@ import random
 import socket
 import unittest
 import ast
+from copy import deepcopy
 from typing import Optional
 
 import invoke
@@ -30,16 +31,11 @@ test_msg = "test_function_return_result"
 static.GLOBALS["nodes"]["remove"]["check_active_timeout"] = 0
 
 
-def test_func(cluster):
-    try:
-        # Need to fill values in cluster context in some tests to know that function was called
-        current_value = cluster.context.get("test_info")
-        if current_value is None:
-            cluster.context["test_info"] = 1
-        else:
-            cluster.context["test_info"] = current_value + 1
-    except Exception as ex:
-        print(ex)
+def test_func(cluster: demo.FakeKubernetesCluster):
+    # Need to fill values in cluster context in some tests to know that function was called
+    current_value = cluster.context.get("test_info", 0)
+    cluster.context["test_info"] = current_value + 1
+
     return test_msg
 
 
@@ -73,6 +69,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {'deploy': {'loadbalancer': {'haproxy': 'a'}}}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual(["deploy.loadbalancer.haproxy"], final_list, "Incorrect filtered flow.")
 
     def test_filter_flow_2(self):
         test_tasks = ["deploy"]
@@ -82,6 +79,8 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {'deploy': {'accounts': 'a', 'loadbalancer': {'haproxy': 'a', 'keepalived': 'a'}}}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual(["deploy.loadbalancer.haproxy", "deploy.loadbalancer.keepalived", "deploy.accounts"],
+                         final_list, "Incorrect filtered flow.")
 
     def test_filter_flow_3(self):
         test_tasks = ["deploy.loadbalancer.haproxy", "overview"]
@@ -91,6 +90,8 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {'deploy': {'loadbalancer': {'haproxy': 'a'}}, 'overview': 'a'}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual(["deploy.loadbalancer.haproxy", "overview"],
+                         final_list, "Incorrect filtered flow.")
 
     def test_filter_flow_excluded(self):
         test_tasks = ["deploy"]
@@ -101,6 +102,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {'deploy': {'accounts': 'a'}}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual(["deploy.accounts"], final_list, "Incorrect filtered flow.")
 
     def test_filter_flow_excluded_whitespaces(self):
         test_tasks = ["deploy"]
@@ -111,6 +113,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {'deploy': {'accounts': 'a'}}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual(["deploy.accounts"], final_list, "Incorrect filtered flow.")
 
     def test_filter_flow_excluded_all_subtree(self):
         test_tasks = ["deploy"]
@@ -121,6 +124,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual([], final_list, "Incorrect filtered flow.")
 
     def test_incorrect_task_endswith_correct(self):
         test_tasks = ["my.deploy.loadbalancer.haproxy"]
@@ -130,6 +134,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual([], final_list, "Incorrect filtered flow.")
 
     def test_incorrect_task_startswith_correct(self):
         test_tasks = ["deploy.loadbalancer.haproxy.xxx"]
@@ -139,6 +144,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual([], final_list, "Incorrect filtered flow.")
 
     def test_union_of_incorrect_tasks_is_incorrect(self):
         for test_tasks in [["my.deploy"], ["loadbalancer"], ["my.deploy", "loadbalancer"]]:
@@ -148,6 +154,7 @@ class FlowTest(unittest.TestCase):
 
             expected_res = {}
             self.assertEqual(expected_res, test_res, f"Incorrect filtered flow for initial tasks {test_tasks}.")
+            self.assertEqual([], final_list, "Incorrect filtered flow.")
 
     def test_incorrect_group_and_task_substring_of_correct(self):
         test_tasks = ["deploy.loadbalancer.h"]
@@ -157,6 +164,7 @@ class FlowTest(unittest.TestCase):
 
         expected_res = {}
         self.assertEqual(expected_res, test_res, "Incorrect filtered flow.")
+        self.assertEqual([], final_list, "Incorrect filtered flow.")
 
     def test_schedule_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
@@ -177,20 +185,23 @@ class FlowTest(unittest.TestCase):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         method_full_name = test_func.__module__ + '.' + test_func.__qualname__
         cumulative_points = {
-            method_full_name: ['prepare.system.modprobe']
+            test_func: ['prepare.system.modprobe']
         }
         flow.init_tasks_flow(cluster)
         flow.schedule_cumulative_point(cluster, test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"It had to be one call of test_func for {method_full_name} cumulative point")
 
     def test_run_flow(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
-        flow.run_flow(tasks, cluster, {})
+        final_task_names = ["deploy.loadbalancer.haproxy", "deploy.loadbalancer.keepalived",
+                            "deploy.accounts", "overview"]
+        flow.run_flow(tasks, final_task_names, cluster, {}, [])
 
-        self.assertEqual(4, cluster.context["test_info"], "Here should be 4 calls of test_func for: \
-         deploy.loadbalancer.haproxy, deploy.loadbalancer.keepalived, deploy.accounts, overview.")
+        self.assertEqual(4, cluster.context["test_info"], f"Here should be 4 calls of test_func for: {final_task_names}")
 
     def test_run_tasks(self):
         context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
@@ -200,6 +211,44 @@ class FlowTest(unittest.TestCase):
         flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks)
         self.assertEqual(1, cluster.context["test_info"],
                          "It had to be one call of test_func for deploy.loadbalancer.haproxy action")
+
+    def test_force_proceed_cumulative_point_task_present(self):
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+        cumulative_points = {
+            test_func: ['deploy.loadbalancer.haproxy']
+        }
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks, cumulative_points=cumulative_points)
+        self.assertEqual(2, cluster.context.get("test_info"),
+                         f"Both task and cumulative points should be run")
+
+    def test_force_proceed_cumulative_point_task_absent(self):
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+        cumulative_points = {
+            test_func: ['deploy.loadbalancer.haproxy']
+        }
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks, cumulative_points=cumulative_points)
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"Cumulative point should be skipped as task is not run")
+
+    def test_scheduled_cumulative_point_task_absent(self):
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+        cumulative_points = {
+            test_func: ['overview']
+        }
+        tasks_copy = deepcopy(tasks)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, test_func)
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks_copy, cumulative_points=cumulative_points)
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"Cumulative point should be executed despite the related task is not run")
 
     def test_detect_nodes_context(self):
         inventory = demo.generate_inventory(**demo.FULLHA)

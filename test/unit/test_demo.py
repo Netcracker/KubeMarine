@@ -60,7 +60,7 @@ class TestFakeShell(unittest.TestCase):
         self.cluster.fake_shell.add(demo.create_nodegroup_result(self.cluster.nodes['all'], stdout='example result 2'),
                                     'run', ["sudo -S -p '[sudo] password: ' last reboot"], usage_limit=1)
 
-        system.reboot_nodes(self.cluster.nodes['master'])
+        system.reboot_group(self.cluster.nodes['master'])
 
         for host in self.cluster.nodes['master'].get_hosts():
             self.assertEqual(1,

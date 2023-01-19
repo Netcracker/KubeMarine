@@ -39,7 +39,7 @@ def reboot(cluster):
         nodes.append(node['name'])
         cluster.log.verbose('  - ' + node['name'])
 
-    system.reboot_nodes(cluster.make_group_from_nodes(nodes),
+    system.reboot_group(cluster.make_group_from_nodes(nodes),
                         try_graceful=cluster.procedure_inventory.get("graceful_reboot"))
 
 

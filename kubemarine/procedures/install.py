@@ -316,7 +316,8 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
     for action, results in batch_results.items():
         cluster.log.verbose('Verifying packages changes after \'%s\' action...' % action)
         for conn, result in results.items():
-            if "Nothing to do" not in result.stdout:
+            if "Nothing to do" not in result.stdout \
+                    and "0 upgraded, 0 newly installed, 0 to remove" not in result.stdout:
                 cluster.log.verbose('Packages changed at %s' % conn.host)
                 any_changes_found = True
 
@@ -583,10 +584,10 @@ cumulative_points = {
     # - net.ipv6.ip_nonlocal_bind = 1
     # - net.ipv6.conf.all.forwarding = 1
     # That is why reboot required BEFORE this task
-    'kubemarine.system.reboot_nodes': [
+    system.reboot_nodes: [
         "prepare.system.sysctl"
     ],
-    'kubemarine.system.verify_system': [
+    system.verify_system: [
         "prepare.system.sysctl"
     ]
 

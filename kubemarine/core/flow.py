@@ -20,8 +20,6 @@ import time
 from copy import deepcopy
 from typing import Type, Optional, List
 
-import importlib
-
 from kubemarine.core import utils, cluster as c, action, resources as res, errors
 
 DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
@@ -154,7 +152,7 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
         return
 
     init_tasks_flow(cluster)
-    run_flow(filtered_tasks, cluster, cumulative_points)
+    run_flow(tasks, final_list, cluster, cumulative_points, [])
 
 
 def create_empty_context(args: dict = None, procedure: str = None):
@@ -208,6 +206,7 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
 
     for task_name, task in tasks.items():
         __task_path = _task_path + [task_name]
+        __task_name = ".".join(__task_path)
 
         allowed = True
         # if task_filter is not empty - smb specified filter argument
@@ -221,12 +220,11 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
                 if (task_path[:len(__task_path)] == __task_path and not callable(task)) \
                         or __task_path[:len(task_path)] == task_path:
                     allowed = True
-                    # print("Allowed %s in %s" % (__task_path, task_path))
 
         if allowed and __task_path not in excluded_tasks:
             if callable(task):
                 filtered[task_name] = task
-                final_list.append(".".join(__task_path))
+                final_list.append(__task_name)
             else:
                 filtered_flow, _final_list = _filter_flow_internal(task, tasks_filter, excluded_tasks, __task_path)
                 # there is something to execute in subtree
@@ -234,33 +232,37 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
                     filtered[task_name] = filtered_flow
                     final_list += _final_list
         else:
-            print("\t%s" % ".".join(__task_path))
+            print("\t%s" % __task_name)
 
     return filtered, final_list
 
 
-def run_flow(tasks, cluster, cumulative_points, _task_path=''):
+def run_flow(tasks: dict, final_task_names: List[str], cluster: c.KubernetesCluster,
+             cumulative_points: dict, _task_path: List[str]):
     for task_name, task in tasks.items():
+        __task_path = _task_path + [task_name]
+        __task_name = ".".join(__task_path)
+        run = __task_name in final_task_names
 
-        if _task_path == '':
-            __task_path = task_name
-        else:
-            __task_path = _task_path + "." + task_name
-
-        proceed_cumulative_point(cluster, cumulative_points, __task_path)
+        args = cluster.context['execution_arguments']
+        # --force-cumulative-points forcibly run the point only if the related task is going to be executed
+        force_cumulative_point = run and args.get('force_cumulative_points', False)
+        proceed_cumulative_point(cluster, cumulative_points, __task_name, force=force_cumulative_point)
 
         if callable(task):
-            cluster.log.info("*** TASK %s ***" % __task_path)
+            if not run:
+                continue
+            cluster.log.info("*** TASK %s ***" % __task_name)
             try:
                 task(cluster)
-                add_task_to_proceeded_list(cluster, __task_path)
+                add_task_to_proceeded_list(cluster, __task_name)
             except Exception as exc:
                 raise errors.FailException(
                     "TASK FAILED %s" % __task_path, exc,
-                    hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_path)
+                    hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_name)
                 )
         else:
-            run_flow(task, cluster, cumulative_points, __task_path)
+            run_flow(task, final_task_names, cluster, cumulative_points, __task_path)
 
 
 def new_common_parser(cli_help):
@@ -365,7 +367,7 @@ def parse_args(parser, arguments: list = None):
     return args
 
 
-def schedule_cumulative_point(cluster, point_method):
+def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method):
     _check_within_flow(cluster)
 
     point_fullname = point_method.__module__ + '.' + point_method.__qualname__
@@ -388,7 +390,7 @@ def schedule_cumulative_point(cluster, point_method):
         cluster.log.verbose('Method %s already scheduled' % point_fullname)
 
 
-def proceed_cumulative_point(cluster, points_list, point_task_path):
+def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict, point_task_name: str, force=False):
     _check_within_flow(cluster)
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
@@ -397,24 +399,21 @@ def proceed_cumulative_point(cluster, points_list, point_task_path):
     scheduled_methods = cluster.context.get('scheduled_cumulative_points', [])
 
     results = {}
-    for point_method_fullname, points_tasks_paths in points_list.items():
-        if point_task_path in points_tasks_paths:
+    for point_method, points_tasks_names in points_list.items():
+        if point_task_name in points_tasks_names:
 
-            if cluster.context['execution_arguments'].get('force_cumulative_points', False):
+            point_method_fullname = point_method.__module__ + '.' + point_method.__qualname__
+            if force:
                 cluster.log.verbose('Method %s will be forcibly executed' % point_method_fullname)
-            else:
-                if point_method_fullname not in [x.__module__+'.'+x.__qualname__ for x in scheduled_methods]:
-                    cluster.log.verbose('Method %s not scheduled - cumulative point call skipped' % point_method_fullname)
-                    continue
+            elif point_method not in scheduled_methods:
+                cluster.log.verbose('Method %s not scheduled - cumulative point call skipped' % point_method_fullname)
+                continue
 
             cluster.log.info("*** CUMULATIVE POINT %s ***" % point_method_fullname)
 
-            mod_name, func_name = point_method_fullname.rsplit('.', 1)
-            mod = importlib.import_module(mod_name)
-            func = getattr(mod, func_name)
-
-            call_result = cluster.nodes["all"].get_new_nodes_or_self().call(func)
-            cluster.context['scheduled_cumulative_points'].remove(func)
+            call_result = point_method(cluster)
+            if point_method in scheduled_methods:
+                scheduled_methods.remove(point_method)
             results[point_method_fullname] = call_result
 
     return results
