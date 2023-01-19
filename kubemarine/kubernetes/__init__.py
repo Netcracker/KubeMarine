@@ -655,16 +655,18 @@ def apply_taints(group):
     results = exe.get_merged_nodegroup_results()
 
     with RemoteExecutor(group.cluster):
-        if "worker" in node["roles"] and "control-plane" in node["roles"]:
-            for node_result in list(results.values()):
-                results = (node_result.stdout).split(' ')
-                for taint_line in global_taint:
-                    if taint_line in results[1:]:
-                        log.verbose("Remove default taint %s found for %s" % (taint_line, results[0]))
-                        node_result.connection.sudo("kubectl taint node %s %s-" % (results[0], taint_line))
-                        continue
-                    else:
-                        log.verbose("Not default taint %s on node %s " % (taint_line, results[0]))
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            if "worker" in node["roles"] and "control-plane" in node["roles"]:
+                for node_result in list(results.values()):
+                    node_results = (node_result.stdout).split(' ')
+                    if node['name'] == node_results[0]:
+                        for taint_line in global_taint:
+                            if taint_line in node_results[1:]:
+                                log.verbose("Remove default taint %s found for %s" % (taint_line, node['name']))
+                                node['connection'].sudo("kubectl taint node %s %s:NoSchedule-" % (node['name'], taint_line))
+                                continue
+                            else:
+                                log.verbose("Not default taint %s on node %s " % (taint_line, node['name']))
 
     log.debug("Applying additional taints for nodes")
     with RemoteExecutor(group.cluster):
