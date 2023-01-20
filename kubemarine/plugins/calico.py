@@ -14,6 +14,7 @@
 
 import ipaddress
 import ruamel.yaml
+import os
 
 from copy import deepcopy
 
@@ -105,11 +106,11 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     cluster.log.verbose(f"The total number of excluded objects is {len(excluded_list)} "
                         f"the objects are the following: {excluded_list}")
 
-    # put this file into a dump_location folder or in /tmp if dump is disabled
+    # TODO: make calico_yaml upload to the nodes without intermediate saving to the disk
+    #
+    # put this file into a dump_location folder or in the current directory if dump is disabled
     if not cluster.context['execution_arguments']['disable_dump']:
-        calico_yaml = cluster.context['execution_arguments']['dump_location'] + "/" + calico_yaml
-    else:
-        calico_yaml = '/tmp/' + calico_yaml
+        calico_yaml = utils.get_resource_absolute_path(os.path.join(cluster.context['execution_arguments']['dump_location'],calico_yaml))
 
     # TODO: check results 
     #validate_result()
