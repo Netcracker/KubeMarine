@@ -228,7 +228,7 @@ This task is executed to restore the required CoreDNS configuration.
 
 #### Packages Upgrade Section and Task
 
-This inventory section contains the configuration to upgrade custom and system packages, such as docker, containerd, haproxy, and keepalived. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
+This inventory section contains the configuration to upgrade custom and system packages, such as docker, containerd, and podman. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
 
 ```yaml
 v1.18.8:

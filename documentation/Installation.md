@@ -210,19 +210,10 @@ If you have other solution, remove or switch off the IP firewall before the inst
 
 **Preinstalled software**
 
-* Mandatory:
-  * curl
-  * OpenSSL library
-  * kmod
-  * semanage
-  * conntrack
-  * unzip. By default it is not required. Install if you intend to unzip third-party files with **.zip** extension.
-* Recommended
-  Installation of the below packages is highly recommended; however, Kubernetes is able to work without them, but may show warnings:
+* Installation of the below packages is highly recommended; however, Kubernetes is able to work without them, but may show warnings:
   * ethtool
   * ebtables
   * socat
-  * policycoreutils-python
 
 **Warning**: You have to specify packages names in "RPM format" if it is possible for you OS,
 For example, specify `conntrack-tools` instead of `conntrack`.
@@ -1654,7 +1645,42 @@ services:
 
 *OS specific*: Yes, the necessary package manager is selected for different OS families.
 
-By default, the installer does not install any packages from the package manager. However, if you need it, you can manage the packages directly during installation.
+###### mandatory
+
+By default, the installer installs predefined list of mandatory packages from the package manager. The list of mandatory packages is the following:
+* conntrack
+* iptables
+* curl
+* openssl
+* unzip
+* semanage
+* kmod
+
+Exact package names are detected automatically depending on the OS family of the cluster.
+For more information, see [associations](#associations).
+
+**Warning**: Make sure to have all the mandatory packages available in the repositories. 
+You can configure the necessary repositories in the [package_manager](#package_manager) section of inventory.
+
+Most of the mandatory packages are installed on all nodes with the following exceptions:
+* conntrack and iptables are installed only on control-plane and worker nodes.
+* unzip is installed only on nodes that require thirdparties that are packed in .zip archives.
+  For more information, see **unpack** option in [thirdparties](#thirdparties).
+* semanage is installed only on RHEL nodes. 
+
+If you need to turn some mandatory packages off for some reason,
+this can be done in `services.packages.mandatory` section. For example:
+
+```yaml
+services:
+  packages:
+    mandatory:
+      conntrack: false
+```
+
+###### custom
+
+If you need other custom packages, you can manage them directly during installation.
 You can choose any one action from the following types of actions:
 
 * remove
@@ -1678,10 +1704,6 @@ services:
       - ethtool
       - ebtables
       - socat
-      - curl
-      - openssl
-      - unzip
-      - policycoreutils-python
 ```
 
 The following is an example to install, upgrade, and remove packages:
@@ -1690,12 +1712,11 @@ The following is an example to install, upgrade, and remove packages:
 services:
   packages:
     remove:
-      - curl
+      - socat
     install:
-      - unzip
-      - policycoreutils-python
+      - ebtables
     upgrade:
-      - openssl
+      - ethtool
 ```
 
 The format of package definition is same as in the package manager. You can specify the exact version of package to install:
@@ -1704,8 +1725,8 @@ The format of package definition is same as in the package manager. You can spec
 services:
   packages:
     install:
-      - openssl-1.0
-      - unzip-1.1
+      - ebtables-2.0.*
+      - ethtool-4.*
 ```
 
 To update all packages, you can use an asterisk. For example:
@@ -1852,6 +1873,41 @@ The following associations are used by default:
     <td>config_location</td>
     <td>/etc/audit/rules.d/predefined.rules</td>
   </tr>
+  <tr>
+    <td rowspan="1">conntrack</td>
+    <td>package_name</td>
+    <td>conntrack-tools</td>
+  </tr>
+  <tr>
+    <td rowspan="1">iptables</td>
+    <td>package_name</td>
+    <td>iptables</td>
+  </tr>
+  <tr>
+    <td rowspan="1">openssl</td>
+    <td>package_name</td>
+    <td>openssl</td>
+  </tr>
+  <tr>
+    <td rowspan="1">curl</td>
+    <td>package_name</td>
+    <td>curl</td>
+  </tr>
+  <tr>
+    <td rowspan="1">unzip</td>
+    <td>package_name</td>
+    <td>unzip</td>
+  </tr>
+  <tr>
+    <td rowspan="1">kmod</td>
+    <td>package_name</td>
+    <td>kmod</td>
+  </tr>
+  <tr>
+    <td rowspan="1">semanage</td>
+    <td>package_name</td>
+    <td>policycoreutils-python</td>
+  </tr>
 </table>
 
 
@@ -1947,6 +2003,36 @@ The following associations are used by default:
   <tr>
     <td>config_location</td>
     <td>/etc/audit/rules.d/predefined.rules</td>
+  </tr>
+  <tr>
+    <td rowspan="1">conntrack</td>
+    <td>package_name</td>
+    <td>conntrack</td>
+  </tr>
+  <tr>
+    <td rowspan="1">iptables</td>
+    <td>package_name</td>
+    <td>iptables</td>
+  </tr>
+  <tr>
+    <td rowspan="1">openssl</td>
+    <td>package_name</td>
+    <td>openssl</td>
+  </tr>
+  <tr>
+    <td rowspan="1">curl</td>
+    <td>package_name</td>
+    <td>curl</td>
+  </tr>
+  <tr>
+    <td rowspan="1">unzip</td>
+    <td>package_name</td>
+    <td>unzip</td>
+  </tr>
+  <tr>
+    <td rowspan="1">kmod</td>
+    <td>package_name</td>
+    <td>kmod</td>
   </tr>
 </table>
 
@@ -4994,13 +5080,12 @@ services:
           - containerd.io-1.4.6*
         service_name: 'docker'
         config_location: '/etc/docker/daemon.json'
+      conntrack:
+        package_name: conntrack-tools
     install:
-      - conntrack
       - ethtool
       - ebtables
       - socat
-      - unzip
-      - policycoreutils-python-utils
 ```
 
 The above configuration is converted to the following finalized configuration, provided that the cluster is based on RHEL nodes:
@@ -5018,14 +5103,13 @@ services:
             - containerd.io-1.4.6-3.1.el7.x86_64
           service_name: 'docker'
           config_location: '/etc/docker/daemon.json'
+        conntrack:
+          package_name: conntrack-tools-1.4.4-7.el7.x86_64
     install:
       include:
-        - conntrack
         - ethtool-4.8-10.el7.x86_64
         - ebtables-2.0.10-16.el7.x86_64
         - socat-1.7.3.2-2.el7.x86_64
-        - unzip-6.0-21.el7.x86_64
-        - policycoreutils-python-utils
 ```
 
 **Note**: Some of the packages are impossible to be detected in the system, therefore such packages remain unchanged.
