@@ -1016,7 +1016,7 @@ This procedure includes the following steps:
     3. Move the pods on the node from the docker's containers to those of containerd.
     4. Uncordon the node.
 
-**Warning**: Before starting the migration procedure, verify that you already have the actual claster.yaml structure. The services.docker scheme is deprecated. 
+**Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
 ### migrate_cri Parameters
 
