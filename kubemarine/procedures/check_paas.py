@@ -720,7 +720,7 @@ def check_kernel_version(cluster):
     """
     with TestCase(cluster.context['testsuite'], '212', "System", "Kernel version") as tc:
         bad_results = []
-        default_kernel = cluster.inventory['system']['kernel_version']
+        default_kernel = cluster.inventory['services']['kernel_version']
         group = cluster.nodes['all']
         result_group = group.sudo('uname -r', warn=True)
         for host, results in result_group.items():
