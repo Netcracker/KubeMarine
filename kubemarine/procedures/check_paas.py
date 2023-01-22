@@ -342,7 +342,6 @@ def thirdparties_hashes(cluster):
                 cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
                 # Skip checking sha if something went wrong or this sha can't be loaded
                 continue
-
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
