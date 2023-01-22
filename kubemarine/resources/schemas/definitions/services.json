@@ -24,6 +24,9 @@
     "kernel_linux": {
       "$ref": "services/kernel_linux.json"
     },
+    "kernel_security": {
+      "$ref": "services/kernel_security.json"
+    },
     "packages": {
       "$ref": "services/packages.json"
     },
