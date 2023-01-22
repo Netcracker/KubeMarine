@@ -48,6 +48,7 @@ This section provides information about the Kubecheck functionality.
       - [210 Nodes Condition - DiskPressure](#210-nodes-condition-diskpressure)
       - [210 Nodes Condition - PIDPressure](#210-nodes-condition-pidpressure)
       - [210 Nodes Condition - Ready](#210-nodes-condition-ready)
+    - [212 Kernel version](#212-kernel-version)
     - [213 Selinux security policy](#213-selinux-security-policy)
     - [214 Selinux configuration](#214-selinux-configuration)
     - [215 Firewalld status](#215-firewalld-status)
@@ -463,6 +464,12 @@ This test checks the condition `PIDPressure` of the Kubernetes nodes of the clus
 *Task*: `kubernetes.nodes.condition.ready`
 
 This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
+
+###### 212 Kernel verison
+
+*Task*: `services.system.kernel_version`
+
+This test checks the linux kernel version with the default version, if it is lower than the required one, it issues a warning
 
 ###### 213 Selinux security policy
 

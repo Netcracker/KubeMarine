@@ -18,7 +18,7 @@ import time
 from collections import OrderedDict
 import re
 from typing import List
-
+from packaging import version
 import yaml
 import ruamel.yaml
 import ipaddress
@@ -199,6 +199,20 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
             packages = [packages]
         return check_packages_versions(cluster, tc, group, packages)
 
+def check_kernel_version(cluster):
+    with TestCase(cluster.context['testsuite'], '212', "System", "Kernel version") as tc:
+        bad_results = []
+        default_kernel = "5.4.0-135-generic"
+        group = cluster.nodes['all']
+        result_group = group.sudo('uname -r', warn=True)
+        for host, results in result_group.items():
+            if version._parse_local_version(results.stdout) < version._parse_local_version(default_kernel):
+                bad_results.append(host.original_host)
+        if len(bad_results) > 0:
+            cluster.log.debug(f"Bad kernel on: {bad_results}")
+            raise TestWarn("Version kernel old")
+        else:
+            tc.success("all kernel have correct versions")
 
 def generic_packages_versions(cluster: KubernetesCluster):
     """
@@ -1300,6 +1314,7 @@ tasks = OrderedDict({
             }
         },
         'system': {
+            'kernel_version': check_kernel_version,
             'time': verify_time_sync,
             'swap': {
                 'status': verify_swap_state
