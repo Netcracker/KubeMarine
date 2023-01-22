@@ -4,6 +4,7 @@
   "description": "Kernel version linux on nodes",
   "properties": {
     "version": {
+      "type":  "string",
       "default": "5.4.0-135-generic",
       "description": "Default version linux kernel"
     }
