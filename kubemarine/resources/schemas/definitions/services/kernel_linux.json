@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Kernel version linux on nodes",
+  "properties": {
+    "version": {
+      "default": "5.4.0-135-generic",
+      "description": "Default version linux kernel"
+    }
+  }
+}

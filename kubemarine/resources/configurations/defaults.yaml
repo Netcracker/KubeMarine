@@ -63,7 +63,8 @@ services:
         PollIntervalMinSec: 32
         PollIntervalMaxSec: 2048
 
-  kernel_version: '5.4.0-135-generic'
+  kernel_linux:
+    version: '5.4.0-135-generic'
 
   kernel_security:
     selinux:
