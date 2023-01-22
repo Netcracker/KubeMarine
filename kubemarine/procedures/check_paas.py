@@ -727,8 +727,8 @@ def check_kernel_version(cluster):
             if version._parse_local_version(results.stdout) < version._parse_local_version(default_kernel):
                 bad_results.append(host.original_host)
         if len(bad_results) > 0:
-            cluster.log.debug(f"Bad kernel on: {bad_results}")
             raise TestWarn("Version kernel old")
+            cluster.log.debug(f"Bad kernel on: {bad_results}")
         else:
             tc.success("All kernel have correct versions")
 
