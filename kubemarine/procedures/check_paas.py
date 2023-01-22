@@ -212,7 +212,7 @@ def check_kernel_version(cluster):
             cluster.log.debug(f"Bad kernel on: {bad_results}")
             raise TestWarn("Version kernel old")
         else:
-            tc.success("all kernel have correct versions")
+            tc.success("All kernel have correct versions")
 
 def generic_packages_versions(cluster: KubernetesCluster):
     """
