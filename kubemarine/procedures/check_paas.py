@@ -18,6 +18,7 @@ import time
 from collections import OrderedDict
 import re
 from typing import List
+from packaging import version
 
 import yaml
 import ruamel.yaml
@@ -341,7 +342,7 @@ def thirdparties_hashes(cluster):
                 cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
                 # Skip checking sha if something went wrong or this sha can't be loaded
                 continue
-        
+
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
@@ -714,6 +715,23 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
                                    f"issues. To solve this problem, execute the firewalld disable task in the installation "
                                    f"procedure.")
 
+def check_kernel_version(cluster):
+    """
+    This method compares the linux kernel version with the default version
+    """
+    with TestCase(cluster.context['testsuite'], '212', "System", "Kernel version") as tc:
+        bad_results = []
+        default_kernel = cluster.inventory['services']['kernel_version']
+        group = cluster.nodes['all']
+        result_group = group.sudo('uname -r', warn=True)
+        for host, results in result_group.items():
+            if version._parse_local_version(results.stdout) < version._parse_local_version(default_kernel):
+                bad_results.append(host.original_host)
+        if len(bad_results) > 0:
+            cluster.log.debug(f"Bad kernel on: {bad_results}")
+            raise TestWarn("Version kernel old")
+        else:
+            tc.success("All kernel have correct versions")
 
 def verify_time_sync(cluster: KubernetesCluster) -> None:
     """
@@ -1083,8 +1101,8 @@ def kubernetes_admission_status(cluster):
         cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
         api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
-        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
-        admission_path = "" 
+        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]
+        admission_path = ""
         for item in ext_args:
             if item.startswith("--"):
                 key = re.split('=',item)[0]
@@ -1286,6 +1304,7 @@ tasks = OrderedDict({
             }
         },
         'system': {
+            'kernel_version': check_kernel_version,
             'time': verify_time_sync,
             'swap': {
                 'status': verify_swap_state
