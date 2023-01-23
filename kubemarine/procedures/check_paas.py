@@ -713,30 +713,6 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
                                    f"issues. To solve this problem, execute the firewalld disable task in the installation "
                                    f"procedure.")
 
-def check_kernel_version(cluster):
-    """
-    This method compares the linux kernel version with the bad version
-    """
-    with TestCase(cluster.context['testsuite'], '212', "System", "Kernel version") as tc:
-        bad_results = []
-        bad_kernel_ubuntu = ['5.4.0-132-generic']
-        bad_kernel_centos = []
-        group = cluster.nodes['all']
-        result_group = group.sudo('uname -r', warn=True)
-        for host, results in result_group.items():
-            if host.user == 'ubuntu':
-                if results.stdout.rstrip() in bad_kernel_ubuntu:
-                    bad_results.append(host.original_host)
-            else:
-                if results.stdout in bad_kernel_centos:
-                    bad_results.append(host.original_host)
-
-        if len(bad_results) > 0:
-            cluster.log.debug(f"Bad kernel on: {bad_results}")
-            raise TestWarn("Kernel version bad")
-        else:
-            tc.success("All kernel have correct versions")
-
 def verify_time_sync(cluster: KubernetesCluster) -> None:
     """
     This method is a test that verifies that the time between all nodes does not lag behind.
@@ -1308,7 +1284,6 @@ tasks = OrderedDict({
             }
         },
         'system': {
-            'kernel_version': check_kernel_version,
             'time': verify_time_sync,
             'swap': {
                 'status': verify_swap_state
