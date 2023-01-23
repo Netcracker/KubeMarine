@@ -1,5 +1,5 @@
 # Project-specific excludes
-config
+kubeconfig
 /local_chart_folder
 !examples/*
 /dump

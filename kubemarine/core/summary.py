@@ -8,6 +8,7 @@ from kubemarine.core.cluster import KubernetesCluster
 
 @total_ordering
 class SummaryItem(enum.Enum):
+    KUBECONFIG = (0, "Kubeconfig")
     DASHBOARD_URL = (1, "Dashboard URL")
     CONTROL_PLANES = (2, "Running Control Planes")
     WORKERS = (3, "Running Workers")
