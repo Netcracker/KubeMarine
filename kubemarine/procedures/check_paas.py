@@ -18,7 +18,6 @@ import time
 from collections import OrderedDict
 import re
 from typing import List
-from packaging import version
 
 import yaml
 import ruamel.yaml
@@ -716,19 +715,25 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
 
 def check_kernel_version(cluster):
     """
-    This method compares the linux kernel version with the default version
+    This method compares the linux kernel version with the bad version
     """
     with TestCase(cluster.context['testsuite'], '212', "System", "Kernel version") as tc:
         bad_results = []
-        default_kernel = cluster.inventory['services']['kernel_linux']['version']
+        bad_kernel_ubuntu = ['5.4.0-72-generic']
+        bad_kernel_centos = []
         group = cluster.nodes['all']
         result_group = group.sudo('uname -r', warn=True)
         for host, results in result_group.items():
-            if version._parse_local_version(results.stdout) < version._parse_local_version(default_kernel):
-                bad_results.append(host.original_host)
+            if host.user == 'ubuntu':
+                if results.stdout.rstrip() in bad_kernel_ubuntu:
+                    bad_results.append(host.original_host)
+            else:
+                if results.stdout in bad_kernel_centos:
+                    bad_results.append(host.original_host)
+
         if len(bad_results) > 0:
             cluster.log.debug(f"Bad kernel on: {bad_results}")
-            raise TestWarn("Version kernel old")
+            raise TestWarn("Kernel version  bad")
         else:
             tc.success("All kernel have correct versions")
 

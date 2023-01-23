@@ -21,9 +21,6 @@
     "kubeadm": {
       "$ref": "services/kubeadm.json"
     },
-    "kernel_linux": {
-      "$ref": "services/kernel_linux.json"
-    },
     "kernel_security": {
       "$ref": "services/kernel_security.json"
     },
