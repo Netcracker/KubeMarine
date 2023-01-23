@@ -304,7 +304,7 @@ def check_kernel_version(cluster):
                 if result[0] in bad_kernel_ubuntu:
                     bad_results.append(host.original_host)
             else:
-                if results.stdout in bad_kernel_centos:
+                if result[0] in bad_kernel_centos:
                     bad_results.append(host.original_host)
 
         if len(bad_results) > 0:
