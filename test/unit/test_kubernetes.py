@@ -16,7 +16,7 @@ import unittest
 from textwrap import dedent
 
 from kubemarine import demo, kubernetes
-from kubemarine.core import utils
+from kubemarine.core import summary
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -34,6 +34,8 @@ class TestInventoryValidation(unittest.TestCase):
                 conditions:
                 - status: "False"
                   type: Ready
+                - status: "True"
+                  type: NetworkUnavailable
             - metadata:
                 labels:
                   node-role.kubernetes.io/control-plane: ""
@@ -43,6 +45,8 @@ class TestInventoryValidation(unittest.TestCase):
                 conditions:
                 - status: "True"
                   type: Ready
+                - status: "False"
+                  type: NetworkUnavailable
             - metadata:
                 labels:
                   node-role.kubernetes.io/worker: worker
@@ -51,16 +55,18 @@ class TestInventoryValidation(unittest.TestCase):
                 conditions:
                 - status: "True"
                   type: Ready
+                - status: "True"
+                  type: NetworkUnavailable
             """.rstrip()
         )
         get_nodes = demo.create_nodegroup_result(cluster.nodes['control-plane'], stdout=stdout)
         cluster.fake_shell.add(get_nodes, 'sudo', [kubernetes.get_nodes_description_cmd()])
-        kubernetes.schedule_running_nodes_report(cluster)
+        kubernetes.exec_running_nodes_report(cluster)
         summary_report = cluster.context.get('summary_report')
         self.assertEquals(
             {
-                utils.SummaryItem.CONTROL_PLANES: "1/2",
-                utils.SummaryItem.WORKERS: "2/3",
+                summary.SummaryItem.CONTROL_PLANES: "1/2",
+                summary.SummaryItem.WORKERS: "1/3",
             },
             summary_report
         )

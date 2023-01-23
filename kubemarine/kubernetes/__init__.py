@@ -23,7 +23,7 @@ import yaml
 from jinja2 import Template
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, summary
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
@@ -1128,6 +1128,10 @@ def images_prepull(group: NodeGroup):
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
+    summary.schedule_delayed_report(cluster, exec_running_nodes_report)
+
+
+def exec_running_nodes_report(cluster: KubernetesCluster):
     nodes_description = get_nodes_description(cluster)
     actual_roles = get_actual_roles(nodes_description)
     nodes_conditions = get_nodes_conditions(nodes_description)
@@ -1138,12 +1142,14 @@ def schedule_running_nodes_report(cluster: KubernetesCluster):
         for name in nodes_names:
             if role in actual_roles[name]:
                 members += 1
-                if nodes_conditions[name].get('Ready', {}).get('status') == 'True':
+                conditions = nodes_conditions[name]
+                if conditions.get('Ready', {}).get('status') == 'True' \
+                        and conditions.get('NetworkUnavailable', {}).get('status') == 'False':
                     ready += 1
 
-        property = utils.SummaryItem.CONTROL_PLANES if role == 'control-plane' else utils.SummaryItem.WORKERS
+        property = summary.SummaryItem.CONTROL_PLANES if role == 'control-plane' else summary.SummaryItem.WORKERS
         value = f'{ready}/{members}'
-        utils.schedule_summary_report(cluster.context, property, value)
+        summary.schedule_report(cluster.context, property, value)
 
 
 def get_nodes_description_cmd() -> str:

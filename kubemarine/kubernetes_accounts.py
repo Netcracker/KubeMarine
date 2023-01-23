@@ -17,7 +17,7 @@ import os
 
 import yaml
 
-from kubemarine.core import utils
+from kubemarine.core import utils, summary
 from kubemarine.core.cluster import KubernetesCluster
 
 
@@ -122,4 +122,4 @@ def install(cluster: KubernetesCluster):
         tokenfile.write(yaml.dump(tokens, default_flow_style=False))
         cluster.log.debug('Tokens saved to %s' % token_filename)
 
-    utils.schedule_summary_report(cluster.context, utils.SummaryItem.ACCOUNT_TOKENS, token_filename)
+    summary.schedule_report(cluster.context, summary.SummaryItem.ACCOUNT_TOKENS, token_filename)

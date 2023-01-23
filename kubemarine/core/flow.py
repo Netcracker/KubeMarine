@@ -20,13 +20,15 @@ import time
 from copy import deepcopy
 from typing import Type, Optional, List, Union
 
-from kubemarine.core import utils, cluster as c, action, resources as res, errors
+from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary
 
 DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 TASK_DESCRIPTION_TEMPLATE = """
 tasks list:
     %s
 """
+
+END_OF_TASKS = object()
 
 
 def run_actions(context: Union[dict, res.DynamicResources], actions: List[action.Action],
@@ -101,9 +103,9 @@ def run_actions(context: Union[dict, res.DynamicResources], actions: List[action
     time_end = time.time()
 
     if print_summary:
-        utils.schedule_summary_report(resources.working_context, utils.SummaryItem.EXECUTION_TIME,
-                                      utils.get_elapsed_string(time_start, time_end))
-        utils.print_summary(resources.working_context, log)
+        summary.schedule_report(resources.working_context, summary.SummaryItem.EXECUTION_TIME,
+                                utils.get_elapsed_string(time_start, time_end))
+        summary.print_summary(resources.working_context, log)
         log.info("SUCCESSFULLY FINISHED")
 
     return last_cluster
@@ -158,6 +160,8 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
 
     init_tasks_flow(cluster)
     run_flow(tasks, final_list, cluster, cumulative_points, [])
+    proceed_cumulative_point(cluster, cumulative_points, END_OF_TASKS,
+                             force=args.get('force_cumulative_points', False))
 
 
 def create_empty_context(args: dict = None, procedure: str = None):
@@ -263,7 +267,7 @@ def run_flow(tasks: dict, final_task_names: List[str], cluster: c.KubernetesClus
                 add_task_to_proceeded_list(cluster, __task_name)
             except Exception as exc:
                 raise errors.FailException(
-                    "TASK FAILED %s" % __task_path, exc,
+                    "TASK FAILED %s" % __task_name, exc,
                     hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_name)
                 )
         else:
@@ -395,7 +399,8 @@ def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method):
         cluster.log.verbose('Method %s already scheduled' % point_fullname)
 
 
-def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict, point_task_name: str, force=False):
+def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
+                             point_task_name: Union[str, type(END_OF_TASKS)], force=False):
     _check_within_flow(cluster)
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):

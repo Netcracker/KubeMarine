@@ -17,7 +17,7 @@
 from collections import OrderedDict
 
 from kubemarine import kubernetes, haproxy, keepalived, coredns
-from kubemarine.core import flow
+from kubemarine.core import flow, summary
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -144,12 +144,19 @@ tasks = OrderedDict({
 })
 
 
+cumulative_points = {
+    summary.exec_delayed: [
+        flow.END_OF_TASKS
+    ]
+}
+
+
 class RemoveNodeAction(Action):
     def __init__(self):
         super().__init__('remove node', recreate_inventory=True)
 
     def run(self, res: DynamicResources):
-        flow.run_tasks(res, tasks)
+        flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
         res.make_final_inventory()
 
 
