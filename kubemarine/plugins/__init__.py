@@ -563,7 +563,7 @@ def convert_shell(cluster, config):
 def verify_shell(cluster, config):
     out_vars = config.get('out_vars', [])
     explicit_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
-    if out_vars and explicit_group.nodes_amount() > 1:
+    if out_vars and explicit_group.nodes_amount() != 1:
         raise Exception('Shell output variables could be used for single-node groups, but multi-node group was found')
 
     in_vars = config.get('in_vars', [])

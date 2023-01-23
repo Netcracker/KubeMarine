@@ -219,7 +219,7 @@ class RemoteExecutor:
         Merges last tokenized results into NodeGroupResult.
 
         The method is useful to check exceptions, to check result in case only one command per node is executed,
-        or to check result of specific commands in the batch if tokens parameter is provided.
+        or to check result of specific commands in the batch if filter_tokens parameter is provided.
 
         :param filter_tokens: tokens to filter result of specific commands in the batch
         :return: None or NodeGroupResult
