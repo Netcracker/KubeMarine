@@ -301,7 +301,7 @@ def check_kernel_version(cluster):
         for host, results in result_group.items():
             result = results.stdout.split('\n')
             if 'Ubuntu' in result[1]:
-                if results.stdout.rstrip() in bad_kernel_ubuntu:
+                if result[0] in bad_kernel_ubuntu:
                     bad_results.append(host.original_host)
             else:
                 if results.stdout in bad_kernel_centos:
