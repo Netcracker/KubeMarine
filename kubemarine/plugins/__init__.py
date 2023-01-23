@@ -851,7 +851,7 @@ def _convert_file(config):
     return config
 
 
-def _get_absolute_pattern(config):
+def get_source_absolute_pattern(config):
     return os.path.join(
         utils.determine_resource_absolute_dir(config['source']),
         os.path.basename(config['source'])
@@ -865,7 +865,7 @@ def _verify_file(config, file_type):
     """
 
     # Determite absolute path to templates
-    source = _get_absolute_pattern(config)
+    source = get_source_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
@@ -879,10 +879,48 @@ def _verify_file(config, file_type):
         # TODO: verify fields types and contents
 
 
-def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
+def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> None:
     """
         Apply yamls as is or
         renders and applies templates that match the config 'source' key.
+    """
+    log = cluster.log
+    do_render = config.get('do_render', True)
+
+    files = glob.glob(get_source_absolute_pattern(config))
+
+    for file in files:
+        cfg_copy = dict(config)
+        source_filename = os.path.basename(file)
+        source = file
+        if do_render:
+            # templates usually have '.j2' extension, which we want to remove from resulting filename
+            # but we also support usual '.yaml' files without '.j2' extension, in this case we do not want to remove extension
+            split_extension = os.path.splitext(source_filename)
+            if split_extension[1] == ".j2":
+                source_filename = split_extension[0]
+
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            with open(file) as template_stream:
+                generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
+
+            utils.dump_file(cluster, generated_data, source_filename)
+            source = io.StringIO(generated_data)
+
+        cfg_copy['source'] = source
+
+        destination_path = cfg_copy.setdefault('destination', '/etc/kubernetes/%s' % source_filename)
+
+        log.debug("Uploading %s..." % file_type)
+        log.debug("\tSource: %s" % file)
+        log.debug("\tDestination: %s" % destination_path)
+
+        apply_source(cluster, cfg_copy)
+
+
+def apply_source(cluster: KubernetesCluster, config: dict) -> None:
+    """
+        Apply resource from 'source' key as is.
     """
     # Set needed settings from config
     apply_required = config.get('apply_required', True)
@@ -891,55 +929,30 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
     destination_nodes = config.get('destination_nodes', [])
     apply_groups = config.get('apply_groups', [])
     apply_nodes = config.get('apply_nodes', [])
-    do_render = config.get('do_render', True)
+    source = config['source']
+    destination_path = config['destination']
+    apply_command = config.get('apply_command', 'kubectl apply -f %s' % destination_path)
 
-    files = glob.glob(_get_absolute_pattern(config))
+    if not destination_groups and not destination_nodes:
+        destination_common_group = cluster.nodes['control-plane']
+    else:
+        destination_common_group = cluster.create_group_from_groups_nodes_names(destination_groups, destination_nodes)
 
-    for file in files:
-        source_filename = os.path.basename(file)
+    if not apply_groups and not apply_nodes:
+        apply_common_group = cluster.nodes['control-plane'].get_any_member()
+    else:
+        apply_common_group = cluster.create_group_from_groups_nodes_names(apply_groups, apply_nodes)
 
-        if do_render:
-            # templates usually have '.j2' extension, which we want to remove from resulting filename
-            # but we also support usual '.yaml' files without '.j2' extension, in this case we do not want to remove extension
-            split_extension = os.path.splitext(source_filename)
-            if split_extension[1] == ".j2":
-                source_filename = split_extension[0]
+    destination_common_group.put(source, destination_path, backup=True, sudo=use_sudo)
 
-        destination_path = config.get('destination', '/etc/kubernetes/%s' % source_filename)
-        apply_command = config.get('apply_command', 'kubectl apply -f %s' % destination_path)
-
-        if not destination_groups and not destination_nodes:
-            destination_common_group = cluster.nodes['control-plane']
-        else:
-            destination_common_group = cluster.create_group_from_groups_nodes_names(destination_groups,
-                                                                                    destination_nodes)
-
-        if not apply_groups and not apply_nodes:
-            apply_common_group = cluster.nodes['control-plane'].get_any_member()
-        else:
-            apply_common_group = cluster.create_group_from_groups_nodes_names(apply_groups, apply_nodes)
-
-        cluster.log.debug("Uploading %s..." % file_type)
-        cluster.log.debug("\tSource: %s" % file)
-        cluster.log.debug("\tDestination: %s" % destination_path)
-
-        if do_render:
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
-            generated_data = jinja.new(cluster.log).from_string(
-                open(utils.determine_resource_absolute_path(file)).read()).render(**render_vars)
-            utils.dump_file(cluster, generated_data, source_filename)
-            destination_common_group.put(io.StringIO(generated_data), destination_path, backup=True, sudo=use_sudo)
-        else:
-            destination_common_group.put(utils.determine_resource_absolute_path(file), destination_path, backup=True, sudo=use_sudo)
-
-        if apply_required:
-            method = apply_common_group.run
-            if use_sudo:
-                method = apply_common_group.sudo
-            cluster.log.debug("Applying yaml...")
-            method(apply_command, hide=False)
-        else:
-            cluster.log.debug('Apply is not required')
+    if apply_required:
+        method = apply_common_group.run
+        if use_sudo:
+            method = apply_common_group.sudo
+        cluster.log.debug("Applying yaml...")
+        method(apply_command, hide=False)
+    else:
+        cluster.log.debug('Apply is not required')
 
 
 procedure_types = {
