@@ -341,6 +341,7 @@ def thirdparties_hashes(cluster):
                 cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
                 # Skip checking sha if something went wrong or this sha can't be loaded
                 continue
+
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
@@ -712,6 +713,7 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
                               hint=f"FirewallD must be disabled as it is not supported and can create compatibility "
                                    f"issues. To solve this problem, execute the firewalld disable task in the installation "
                                    f"procedure.")
+
 
 def verify_time_sync(cluster: KubernetesCluster) -> None:
     """
