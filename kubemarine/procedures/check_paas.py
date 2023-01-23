@@ -733,7 +733,7 @@ def check_kernel_version(cluster):
 
         if len(bad_results) > 0:
             cluster.log.debug(f"Bad kernel on: {bad_results}")
-            raise TestWarn("Kernel version  bad")
+            raise TestWarn("Kernel version bad")
         else:
             tc.success("All kernel have correct versions")
 
