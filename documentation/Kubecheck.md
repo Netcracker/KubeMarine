@@ -483,7 +483,7 @@ This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
 
 *Task*: `services.system.kernel_version`
 
-This test checks the linux kernel version with the default version, if it is lower than the required one, it issues a warning
+This test checks the Linux kernel version for a bad kernel version, if it is equal to a bad one, it issues a warning
 
 ###### 213 Selinux security policy
 
