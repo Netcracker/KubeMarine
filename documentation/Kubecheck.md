@@ -28,6 +28,7 @@ This section provides information about the Kubecheck functionality.
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
+    - [015 Kernel version](#015-kernel-version)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -50,7 +51,6 @@ This section provides information about the Kubecheck functionality.
       - [210 Nodes Condition - DiskPressure](#210-nodes-condition-diskpressure)
       - [210 Nodes Condition - PIDPressure](#210-nodes-condition-pidpressure)
       - [210 Nodes Condition - Ready](#210-nodes-condition-ready)
-    - [212 Kernel version](#212-kernel-version)
     - [213 Selinux security policy](#213-selinux-security-policy)
     - [214 Selinux configuration](#214-selinux-configuration)
     - [215 Firewalld status](#215-firewalld-status)
@@ -318,6 +318,13 @@ This test checks if defined package repositories are available from nodes.
 
 This test checks if needed package are available from nodes.
 
+###### 015 Kernel version
+
+*Task*: `software.kernel.version`
+
+This test checks the Linux kernel version for a bad kernel version, if it is equal to a bad one, it issues a warning
+
+
 #### PAAS Procedure
 
 The PAAS procedure verifies the platform solution. For example, it checks the health of a cluster or service statuses on nodes. This test checks the already configured environment. All services and the Kubernetes cluster must be installed and should be in working condition. Apart from the environment installed and configured by Kubemarine, the test can check other environments too.
@@ -478,12 +485,6 @@ This test checks the condition `PIDPressure` of the Kubernetes nodes of the clus
 *Task*: `kubernetes.nodes.condition.ready`
 
 This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
-
-###### 212 Kernel verison
-
-*Task*: `services.system.kernel_version`
-
-This test checks the Linux kernel version for a bad kernel version, if it is equal to a bad one, it issues a warning
 
 ###### 213 Selinux security policy
 
