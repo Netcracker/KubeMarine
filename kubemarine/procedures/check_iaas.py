@@ -297,7 +297,7 @@ def check_kernel_version(cluster):
         bad_kernel_ubuntu = ['5.4.0-132-generic']
         bad_kernel_centos = []
         group = cluster.nodes['all']
-        result_group = group.sudo('uname -r', warn=True)
+        result_group = group.sudo('uname -r')
         for connection, results in result_group.items():
             os_name = cluster.get_os_family_for_node(connection.host)
             result = results.stdout.rstrip()
