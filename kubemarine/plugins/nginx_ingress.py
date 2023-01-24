@@ -18,30 +18,6 @@ from kubemarine.core import utils
 from kubemarine.core.group import NodeGroup
 
 
-def verify_inventory(inventory, _):
-    if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
-        return inventory
-
-    nginx_plugin = inventory["plugins"]["nginx-ingress-controller"]
-
-    # verify default certificate config
-    if nginx_plugin["controller"]["ssl"].get("default-certificate"):
-        default_cert = nginx_plugin["controller"]["ssl"]["default-certificate"]
-
-        if default_cert.get("data") is None and default_cert.get("paths") is None:
-            raise Exception("Default ingress certificate is specified, but no certificate and private key provided")
-        if default_cert.get("data") and default_cert.get("paths"):
-            raise Exception("Default ingress certificate and key should be provided either as raw data, "
-                            "or either as paths, but not both at the same time")
-
-        cert = default_cert.get("data", default_cert.get("paths"))
-        if cert.get("cert") is None or cert.get("key") is None:
-            raise Exception("Default ingress certificate should have both certificate and private key specified, "
-                            "but one of them is missing")
-
-    return inventory
-
-
 def enrich_inventory(inventory, _):
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
@@ -67,7 +43,7 @@ def cert_renew_enrichment(inventory, cluster):
     if not nginx_plugin["install"]:
         raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
 
-    # update certificates in inventory, other check will be performed in "verify_inventory" function
+    # update certificates in inventory
     nginx_plugin["controller"]["ssl"]["default-certificate"] = cluster.procedure_inventory["nginx-ingress-controller"]
 
     return inventory

@@ -16,7 +16,64 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import demo
+from kubemarine.core import errors
 from test.unit import utils
+
+
+class EnrichmentValidation(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.inventory['rbac'] = {
+            'admission': 'pss',
+            'pss': {
+                'pod-security': 'enabled'
+            }
+        }
+        self.context = demo.create_silent_context(procedure='manage_pss')
+        self.manage_pss: dict = {
+            'pss': {
+                'pod-security': 'enabled',
+                'defaults': {},
+                'namespaces': [],
+                'namespaces_defaults': {}
+            }
+        }
+
+    def _create_cluster(self):
+        return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.manage_pss),
+                                context=self.context)
+
+    def test_missed_pss(self):
+        del self.manage_pss['pss']
+        with self.assertRaisesRegex(errors.FailException, r"'pss' is a required property"):
+            self._create_cluster()
+
+    def test_missed_pss_pod_security(self):
+        del self.manage_pss['pss']['pod-security']
+        with self.assertRaisesRegex(errors.FailException, r"'pod-security' is a required property"):
+            self._create_cluster()
+
+    def test_unexpected_pod_security(self):
+        self.manage_pss['pss']['pod-security'] = 'unexpected'
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['enabled', 'disabled']"):
+            self._create_cluster()
+
+    def test_invalid_defaults_profile(self):
+        self.manage_pss['pss']['defaults']['enforce'] = 'unexpected'
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['privileged', 'baseline', 'restricted']"):
+            self._create_cluster()
+
+    def test_invalid_namespaces_profile(self):
+        self.manage_pss['pss']['namespaces'] = [
+            {'custom_ns': {'enforce': 'unexpected'}}
+        ]
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['privileged', 'baseline', 'restricted']"):
+            self._create_cluster()
+
+    def test_invalid_namespaces_defaults_profile(self):
+        self.manage_pss['pss']['namespaces_defaults'] = {'enforce': 'unexpected'}
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['privileged', 'baseline', 'restricted']"):
+            self._create_cluster()
 
 
 class EnrichmentAndFinalization(unittest.TestCase):

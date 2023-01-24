@@ -16,6 +16,7 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import demo
+from kubemarine.core import errors
 from test.unit import utils
 
 
@@ -26,6 +27,30 @@ def generate_migrate_cri_environment() -> (dict, dict):
     }
     context = demo.create_silent_context(procedure='migrate_cri')
     return inventory, context
+
+
+class EnrichmentValidation(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.context = demo.create_silent_context(procedure='migrate_cri')
+        self.migrate_cri = {}
+
+    def _new_cluster(self):
+        return demo.new_cluster(self.inventory, procedure_inventory=self.migrate_cri, context=self.context)
+
+    def test_missed_cri(self):
+        with self.assertRaisesRegex(errors.FailException,  r"'cri' is a required property"):
+            self._new_cluster()
+
+    def test_missed_cri_container_runtime(self):
+        self.migrate_cri['cri'] = {}
+        with self.assertRaisesRegex(errors.FailException,  r"'containerRuntime' is a required property"):
+            self._new_cluster()
+
+    def test_migrate_not_containerd(self):
+        self.migrate_cri['cri'] = {'containerRuntime': 'docker'}
+        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['containerd']"):
+            self._new_cluster()
 
 
 class MigrateCriPackagesEnrichment(unittest.TestCase):
@@ -57,3 +82,7 @@ class MigrateCriPackagesEnrichment(unittest.TestCase):
         final_inventory = utils.get_final_inventory(cluster, inventory)
         self.assertEqual(migrate_cri['packages'], final_inventory['services']['packages'],
                          "Final inventory is recreated incorrectly")
+
+
+if __name__ == '__main__':
+    unittest.main()

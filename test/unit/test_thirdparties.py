@@ -16,9 +16,20 @@
 
 import unittest
 from kubemarine import demo, thirdparties
+from kubemarine.core import errors
 
 
-class K8sCertTest(unittest.TestCase):
+class EnrichmentValidation(unittest.TestCase):
+    def test_missed_source(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'] = {'thirdparties': {
+            '/custom/path': {}}
+        }
+        with self.assertRaisesRegex(errors.FailException, r"'source' is a required property"):
+            demo.new_cluster(inventory)
+
+
+class SHACalculationTest(unittest.TestCase):
 
     customized_services = {
         'kubeadm': {

@@ -39,13 +39,9 @@ psp_list_option = "psp-list"
 roles_list_option = "roles-list"
 bindings_list_option = "bindings-list"
 
-valid_flags = ["enabled", "disabled"]
 provided_oob_policies = ["default", "host-network", "anyuid"]
 
-valid_switches = ["pss", "psp"]
-valid_profiles = ["privileged", "baseline", "restricted"]
 valid_modes = ['enforce', 'audit', 'warn']
-valid_exemptions = ["usernames", "runtimeClasses", "namespaces"]
 valid_versions_templ = r"^v1\.\d{1,2}$"
 
 baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard"} 
@@ -60,11 +56,6 @@ loaded_oob_policies = {}
 def enrich_inventory_psp(inventory, _):
     global loaded_oob_policies
     loaded_oob_policies = load_oob_policies_files()
-
-    # check flags
-    verify_parameter("pod-security", inventory["rbac"]["psp"]["pod-security"], valid_flags)
-    for oob_name in provided_oob_policies:
-        verify_parameter("oob-policies", inventory["rbac"]["psp"]["oob-policies"][oob_name], valid_flags)
 
     # validate custom
     custom_policies = inventory["rbac"]["psp"]["custom-policies"]
@@ -90,12 +81,9 @@ def enrich_inventory_pss(inventory, _):
     minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
     if minor_version < 23:
         raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
-    verify_parameter("pod-security", inventory["rbac"]["pss"]["pod-security"], valid_flags)
     for item in inventory["rbac"]["pss"]["defaults"]:
         if item.endswith("version"):
             verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
-        else:
-            verify_parameter(item, inventory["rbac"]["pss"]["defaults"][item], valid_profiles)
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
     # add extraArgs to kube-apiserver config
     if enabled_admissions:
@@ -111,7 +99,6 @@ def enrich_inventory_pss(inventory, _):
 
 
 def enrich_inventory(inventory, _):
-    verify_parameter("admission", inventory["rbac"]["admission"], valid_switches)
     admission_impl = inventory['rbac']['admission']
     if admission_impl == "psp":
         return enrich_inventory_psp(inventory, _)
@@ -125,19 +112,9 @@ def manage_psp_enrichment(inventory, cluster):
         raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
-    if "psp" not in cluster.procedure_inventory:
-        raise Exception("'manage_psp' config should have 'psp' in its root")
 
     procedure_config = cluster.procedure_inventory["psp"]
     current_config = cluster.inventory["rbac"]["psp"]
-
-    # check flags
-    if "pod-security" in procedure_config:
-        verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
-    if "oob-policies" in procedure_config:
-        for oob_policy in provided_oob_policies:
-            if oob_policy in procedure_config["oob-policies"]:
-                verify_parameter("oob-policy", procedure_config["oob-policies"][oob_policy], valid_flags)
 
     # validate added custom
     custom_add_policies = procedure_config.get("add-policies", {})
@@ -153,37 +130,25 @@ def manage_psp_enrichment(inventory, cluster):
     if final_security_state == "disabled" and procedure_config.get("oob-policies"):
         raise Exception("OOB policies can not be configured when security is disabled")
 
-    # forbid defining 'custom-policies' in procedure inventory
-    if "custom-policies" in procedure_config:
-        raise Exception("'manage_psp' procedure should not be configured using 'custom-policies', "
-                        "use 'add-policies' or 'delete-policies' instead")
-
     return inventory
-
-
-def verify_parameter(owner, value, parameters):
-    if value not in parameters:
-        raise Exception("incorrect value for %s, valid values: %s" % (owner, parameters))
 
 
 def verify_custom(custom_scope):
     psp_list = custom_scope.get(psp_list_option, None)
     if psp_list:
-        verify_custom_list(psp_list, "PSP", ["PodSecurityPolicy"])
+        verify_custom_list(psp_list, "PSP")
 
     roles_list = custom_scope.get(roles_list_option, None)
     if roles_list:
-        verify_custom_list(roles_list, "role", ["Role", "ClusterRole"])
+        verify_custom_list(roles_list, "role")
 
     bindings_list = custom_scope.get(bindings_list_option, None)
     if bindings_list:
-        verify_custom_list(bindings_list, "binding", ["RoleBinding", "ClusterRoleBinding"])
+        verify_custom_list(bindings_list, "binding")
 
 
-def verify_custom_list(custom_list, type, supported_kinds):
+def verify_custom_list(custom_list, type):
     for item in custom_list:
-        if item["kind"] not in supported_kinds:
-            raise Exception("Type %s should have %s kind" % (type, supported_kinds))
         # forbid using 'oob-' prefix in order to avoid conflicts of our policies and users policies
         if item["metadata"]["name"].startswith("oob-"):
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
@@ -519,8 +484,6 @@ def resolve_oob_scope(oob_policies_conf, selector):
     }
 
     for key, value in oob_policies_conf.items():
-        if key not in provided_oob_policies:
-            raise Exception("Unknown oob policy configured")
         if value == selector or selector == "all":
             policy = loaded_oob_policies[key]
             if "psp" in policy:
@@ -611,13 +574,8 @@ def install(cluster):
 def manage_pss_enrichment(inventory, cluster):
     if cluster.context.get('initial_procedure') != 'manage_pss':
         return inventory
-    if "pss" not in cluster.procedure_inventory:
-        raise Exception("'manage_pss' config should have 'pss' in its root")
-    if "pod-security" not in cluster.procedure_inventory["pss"]:
-        raise Exception("Procedure config should include 'pod-security'")
 
     procedure_config = cluster.procedure_inventory["pss"]
-    current_config = cluster.inventory["rbac"]["pss"]
     minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
         
     if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
@@ -626,13 +584,10 @@ def manage_pss_enrichment(inventory, cluster):
     # check flags, profiles; enrich inventory
     if minor_version < 23:
         raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
-    verify_parameter("pod-security", procedure_config["pod-security"], valid_flags)
     if "defaults" in procedure_config:
         for item in procedure_config["defaults"]:
             if item.endswith("version"):
                 verify_version(item, procedure_config["defaults"][item], minor_version)
-            else:
-                verify_parameter(item, procedure_config["defaults"][item], valid_profiles)
             inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
     if "exemptions" in procedure_config:
         default_merger.merge(inventory["rbac"]["pss"]["exemptions"], procedure_config["exemptions"])
@@ -644,15 +599,11 @@ def manage_pss_enrichment(inventory, cluster):
                 for item in profiles:
                     if item.endswith("version"):
                         verify_version(item, profiles[item], minor_version)
-                    else:
-                        verify_parameter(item, profiles[item], valid_profiles)
                 raise Exception("Custom labels for each namespace are currently not supported")
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
             if item.endswith("version"):
                 verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
-            else:
-                verify_parameter(item, procedure_config["namespaces_defaults"][item], valid_profiles)
 
     return inventory
 
@@ -663,6 +614,8 @@ def manage_enrichment(inventory, cluster):
         return manage_psp_enrichment(inventory, cluster)
     elif admission_impl == "pss":
         return manage_pss_enrichment(inventory, cluster)
+
+    return inventory
 
 
 def manage_pss(cluster, manage_type):

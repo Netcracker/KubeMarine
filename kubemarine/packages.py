@@ -57,22 +57,10 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
 def enrich_inventory_packages(inventory: dict, _):
     for _type in ['install', 'upgrade', 'remove']:
         packages_list = inventory['services']['packages'].get(_type)
-        if packages_list is not None:
-            if isinstance(packages_list, list):
-                inventory['services']['packages'][_type] = {
-                    'include': packages_list
-                }
-            for __type in ['include', 'exclude']:
-                if inventory['services']['packages'][_type].get(__type) is not None:
-                    if not isinstance(inventory['services']['packages'][_type][__type], list):
-                        raise Exception('Packages %s section in configfile has invalid type. '
-                                        'Expected \'list\', but found \'%s\''
-                                        % (__type, type(inventory['services']['packages'][_type][__type])))
-                    if not inventory['services']['packages'][_type][__type]:
-                        raise Exception('Packages %s section contains empty \'%s\' definition. ' % (__type, __type))
-                elif __type == 'include' and _type == 'install':
-                    raise Exception('Definition \'include\' is missing in \'install\' packages section, '
-                                    'but should be specified.')
+        if isinstance(packages_list, list):
+            inventory['services']['packages'][_type] = {
+                'include': packages_list
+            }
 
     return inventory
 

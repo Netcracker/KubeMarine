@@ -33,14 +33,6 @@ class KubernetesCluster(Environment):
 
     def __init__(self, inventory: dict, context: dict, procedure_inventory: dict = None,
                  logger: log.EnhancedLogger = None):
-
-        self.supported_roles = [
-            "balancer",
-            "master",
-            "worker",
-            "control-plane"
-        ]
-
         self.roles = []
         self.ips = {
             "all": []
@@ -164,6 +156,7 @@ class KubernetesCluster(Environment):
             "kubemarine.core.defaults.append_controlplain",
             "kubemarine.core.defaults.compile_inventory",
             "kubemarine.core.defaults.calculate_node_names",
+            "kubemarine.core.defaults.verify_node_names",
             "kubemarine.core.defaults.apply_defaults",
             "kubemarine.core.defaults.calculate_nodegroups"
         ]

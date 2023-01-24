@@ -19,8 +19,8 @@ from collections import OrderedDict
 import io
 import uuid
 
-from kubemarine import kubernetes, etcd, thirdparties, cri, plugins
-from kubemarine.core import flow, utils
+from kubemarine import kubernetes, etcd, thirdparties, cri
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -114,12 +114,6 @@ def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization=Fa
 
 
 def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
-    if "cri" not in cluster.procedure_inventory or "containerRuntime" not in cluster.procedure_inventory["cri"]:
-        raise Exception("Please specify mandatory parameter cri.containerRuntime in procedure.yaml")
-
-    if cluster.procedure_inventory["cri"]["containerRuntime"] != "containerd":
-        raise Exception("Migration could be possible only to containerd")
-
     if inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
         raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
 

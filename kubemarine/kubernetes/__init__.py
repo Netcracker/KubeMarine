@@ -41,13 +41,6 @@ def add_node_enrichment(inventory, cluster):
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
 
-    for new_node in inventory["nodes"]:
-        if "add_node" in new_node["roles"]:
-            raise Exception("Manually setting 'new_node' role not permitted")
-
-    # adding new supported role to be able to select group of "add_node"s
-    cluster.supported_roles.append("add_node")
-
     # adding role "new_node" for all specified new nodes and putting these nodes to all "nodes" list
     for new_node in cluster.procedure_inventory.get("nodes", []):
         # deepcopy is necessary, otherwise role append will happen in procedure_inventory too
@@ -64,13 +57,6 @@ def add_node_enrichment(inventory, cluster):
 def remove_node_enrichment(inventory, cluster):
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory
-
-    for node in inventory['nodes']:
-        if 'remove_node' in node['roles']:
-            raise Exception("Manually setting 'remove_node' role is not permitted")
-
-    # adding new supported role to be able to select group of "remove_node"s
-    cluster.supported_roles.append('remove_node')
 
     # adding role "remove_node" for all specified nodes
     node_names_to_remove = [node['name'] for node in cluster.procedure_inventory.get("nodes", [])]
@@ -89,10 +75,6 @@ def enrich_upgrade_inventory(inventory, cluster):
             inventory['services']['kubeadm'] = {}
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
         inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
-
-        disable_eviction = cluster.procedure_inventory.get("disable-eviction")
-        if disable_eviction not in (None, True, False):
-            raise Exception(f"'disable-eviction' value could be either True or False, found {disable_eviction}")
 
         test_version_upgrade_possible(cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version'])
         cluster.log.info(

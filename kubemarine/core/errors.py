@@ -33,16 +33,9 @@ KME_DICTIONARY = {
     "KME0005": {
         "name": "{hostnames} are not sudoers"
     },
-    "KME0006": {
-        "name": "You cannot use the new and old format in the registry section. "
-                "Use either docker port or endpoints."
-    },
     "KME0007": {
         "name": "Docker CRI can not be used with endpoints registry definition."
     },
-    "KME0008": {
-        "name": "Unknown endpoint registry type specified"
-    }
 }
 
 

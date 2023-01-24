@@ -54,7 +54,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes_accounts.enrich_inventory",
     "kubemarine.plugins.calico.enrich_inventory",
     "kubemarine.plugins.nginx_ingress.cert_renew_enrichment",
-    "kubemarine.plugins.nginx_ingress.verify_inventory",
     "kubemarine.plugins.nginx_ingress.enrich_inventory",
     "kubemarine.core.defaults.calculate_nodegroups",
     "kubemarine.keepalived.enrich_inventory_calculate_nodegroup",
@@ -62,8 +61,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.system.verify_inventory",
     "kubemarine.system.enrich_etc_hosts",
     "kubemarine.packages.enrich_inventory_include_all",
-    "kubemarine.selinux.verify_inventory",
-    "kubemarine.apparmor.verify_inventory",
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
@@ -88,18 +85,7 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     recursive_apply_defaults(supported_defaults, inventory)
 
     for i, node in enumerate(inventory["nodes"]):
-
-        node_name = node.get("name")
-        if node_name is None:
-            raise Exception('Some nodes from inventory are unnamed')
-
-        if re.findall(invalid_node_name_regex, node_name):
-            raise Exception('Node name \"%s\" contains invalid characters. A DNS-1123 subdomain must consist of lower '
-                            'case alphanumeric characters, \'-\' or \'.\'' % node_name)
-
         address = cluster.get_access_address_from_node(node)
-        if address is None:
-            raise Exception('Node %s do not have any address' % node_name)
 
         # we have definitely know how to connect
         cluster.inventory["nodes"][i]["connect_to"] = address
@@ -108,15 +94,10 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
         if not cluster.context["nodes"].get(address):
             cluster.context["nodes"][address] = {}
 
-        if not node.get("roles"):
-            raise Exception('There are no roles defined for the node %s' % node_name)
-
         if address not in cluster.ips["all"]:
             cluster.ips['all'].append(address)
 
         for role in node.get("roles"):
-            if role not in cluster.supported_roles:
-                raise Exception('An unknown role defined for the node %s' % node_name)
             if role not in cluster.roles:
                 cluster.roles.append(role)
                 cluster.ips[role] = []
@@ -131,9 +112,6 @@ def apply_registry(inventory, cluster):
     if not inventory.get('registry'):
         cluster.log.verbose('Unified registry is not used')
         return inventory
-
-    if inventory['registry'].get('endpoints') and inventory['registry'].get('docker_port'):
-        raise KME('KME0006')
 
     thirdparties_address = None
     containerd_endpoints = None
@@ -259,10 +237,6 @@ def apply_registry_endpoints(inventory, cluster):
 
     registry_mirror_address = inventory['registry']['mirror_registry']
 
-    for i, endpoint_address in enumerate(inventory['registry']['endpoints']):
-        if not isinstance(endpoint_address, str):
-            raise KME('KME0008')
-
     # todo Currently registry.endpoints is used only for containerd registry mirrors, but it can be provided explicitly.
     #  Probably we could make endpoints optional in this case.
     containerd_endpoints = inventory['registry']['endpoints']
@@ -373,11 +347,11 @@ def recursive_apply_defaults(defaults, section):
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
 
-def calculate_node_names(inventory, cluster):
+def calculate_node_names(inventory: dict, cluster):
     roles_iterators = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
-            if role_name in node.get('roles', []):
+            if role_name in node['roles']:
                 # The idea is this:
                 # If the name is already specified, we must skip this node,
                 # however, we must consider that we already have a node of this type
@@ -404,11 +378,13 @@ def calculate_node_names(inventory, cluster):
 def verify_node_names(inventory, cluster):
     known_names = []
     for i, node in enumerate(inventory['nodes']):
-        if node.get('name') is None:
-            raise Exception('Node item %s in nodes section do not contain name' % i)
-        if node['name'] in known_names:
-            raise Exception('Node name %s is duplicated in configfile' % node['name'])
-        known_names.append(node['name'])
+        node_name = node['name']
+        if node_name in known_names:
+            raise Exception('Node name %s is duplicated in configfile' % node_name)
+        if re.findall(invalid_node_name_regex, node_name):
+            raise Exception('Node name \"%s\" contains invalid characters. A DNS-1123 subdomain must consist of lower '
+                            'case alphanumeric characters, \'-\' or \'.\'' % node_name)
+        known_names.append(node_name)
     return inventory
 
 

@@ -17,17 +17,10 @@ from kubemarine.cri import docker, containerd
 
 
 def enrich_inventory(inventory, cluster):
-    if "docker" in cluster.inventory['services']:
-        raise Exception(f"docker configuration no longer belongs to 'services.docker' section, "
-                        f"please move docker configuration to 'services.cri.dockerConfig' section")
-
-    cri_impl = inventory['services']['cri']['containerRuntime']
-    if cri_impl != "docker" and cri_impl != "containerd":
-        raise Exception("Unexpected container runtime specified: %s, supported are: docker, containerd" % cri_impl)
-
     if cluster.context.get("initial_procedure") == "migrate_cri":
         return inventory
 
+    cri_impl = inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":
         forbidden_cri_sections = {"containerd": "containerdConfig"}
     else:

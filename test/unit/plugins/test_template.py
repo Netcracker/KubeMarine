@@ -15,10 +15,20 @@
 import unittest
 
 from kubemarine import demo
+from kubemarine.core import errors
 from kubemarine.plugins import verify_template, apply_template
 
 
 class TestTemplate(unittest.TestCase):
+
+    def test_verify_missed_source(self):
+        for procedure_type in ('template', 'config'):
+            inventory = demo.generate_inventory(**demo.ALLINONE)
+            inventory['plugins'] = {'custom': {'installation': {'procedures': [
+                {procedure_type: {'not as source': 'something'}}
+            ]}}}
+            with self.assertRaisesRegex(errors.FailException, r"'source' is a required property"):
+                demo.new_cluster(inventory)
 
     def test_verify_template(self):
         test_cases = [
@@ -72,29 +82,16 @@ class TestTemplate(unittest.TestCase):
                 "name": "One yaml template",
                 "apply_files": ["test_template1.yaml"],
                 "source": "../test/unit/plugins/test_templates/test_template1.yaml",
-                "valid": True,
             },
             {
                 "name": "Wildcard path matching three yaml templates",
                 "apply_files": ["test_template1.yaml", "test_template2.yaml", "test_template3.yaml"],
                 "source": "../test/unit/plugins/test_templates/*.yaml",
-                "valid": True,
             },
             {
                 "name": "Directory wildcard path matching three yaml templates",
                 "apply_files": ["test_template1.yaml", "test_template2.yaml", "test_template3.yaml"],
                 "source": "../test/unit/plugins/test_templates/*",
-                "valid": True,
-            },
-            {
-                "name": "Wildcard path matching zero templates",
-                "source": "../test/unit/plugins/test_templates/*.conf",
-                "valid": False,
-            },
-            {
-                "name": "Path to non-existent template",
-                "source": "../test/unit/plugins/test_templates/template.conf",
-                "valid": False,
             },
         ]
 
@@ -109,25 +106,17 @@ class TestTemplate(unittest.TestCase):
                     "source": tc["source"],
                 }
 
-                if tc["valid"]:
-                    for file in tc["apply_files"]:
-                        result = demo.create_nodegroup_result(cluster.nodes["master"])
-                        cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"], usage_limit=1)
+                for file in tc["apply_files"]:
+                    result = demo.create_nodegroup_result(cluster.nodes["master"])
+                    cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"], usage_limit=1)
 
-                    # If test case is valid just run the function
-                    apply_template(cluster, config)
+                # If test case is valid just run the function
+                apply_template(cluster, config)
 
-                    for file in tc["apply_files"]:
-                        cnt = 0
-                        for host in cluster.nodes['master'].get_hosts():
-                            history = cluster.fake_shell.history_find(host, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"])
-                            if len(history) == 1 and history[0]["used_times"] == 1:
-                                cnt += 1
-                        self.assertEqual(1, cnt)
-                else:
-                    # If test case is not valid check for exception raise
-                    self.assertRaises(
-                        ValueError,
-                        apply_template,
-                        cluster, config
-                    )
+                for file in tc["apply_files"]:
+                    cnt = 0
+                    for host in cluster.nodes['master'].get_hosts():
+                        history = cluster.fake_shell.history_find(host, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"])
+                        if len(history) == 1 and history[0]["used_times"] == 1:
+                            cnt += 1
+                    self.assertEqual(1, cnt)
