@@ -33,6 +33,8 @@ ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED = \
     "Align them to the single version manually or using corresponding task of install procedure. " \
     "Alternatively, specify cache_versions=false for corresponding association."
 
+ERROR_SEMANAGE_NOT_MANAGED_DEBIAN = "semanage is not managed for debian OS family by KubeMarine"
+
 
 def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     associations: dict = inventory['services']['packages']['associations']
@@ -58,7 +60,7 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
             default_merger.merge(enriched_associations[os_family], associations)
 
     if 'semanage' in enriched_associations['debian']:
-        raise Exception("semanage is not managed for debian OS family by KubeMarine")
+        raise Exception(ERROR_SEMANAGE_NOT_MANAGED_DEBIAN)
 
     inventory['services']['packages']['associations'] = enriched_associations
 
