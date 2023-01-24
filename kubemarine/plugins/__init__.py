@@ -978,10 +978,11 @@ def _apply_file(cluster, config, file_type) -> None or NodeGroupResult:
 
         if do_render:
             render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            # Open with explicit encoding utf-8 to correctly decode symbols on Windows deployer
             generated_data = jinja.new(cluster.log).from_string(
-                open(utils.determine_resource_absolute_path(file)).read()).render(**render_vars)
-            utils.dump_file(cluster, generated_data, source_filename)
-            destination_common_group.put(io.StringIO(generated_data), destination_path, backup=True, sudo=use_sudo)
+                open(utils.determine_resource_absolute_path(file), encoding='utf-8').read()).render(**render_vars)
+            # utils.dump_file(cluster, generated_data, source_filename)
+            destination_common_group.put(io.BytesIO(generated_data.encode('utf-8')), destination_path, backup=True, sudo=use_sudo)
         else:
             destination_common_group.put(utils.determine_resource_absolute_path(file), destination_path, backup=True, sudo=use_sudo)
 

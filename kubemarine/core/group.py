@@ -370,7 +370,8 @@ class NodeGroup:
         # pop it early, so that StringIO "put" is not affected by unexpected keyword argument
         binary = kwargs.pop("binary", True) is not False
 
-        if isinstance(local_file, io.StringIO):
+        # TODO get rid of StringIO entirely to avoid https://github.com/paramiko/paramiko/issues/1133
+        if isinstance(local_file, io.StringIO) or isinstance(local_file, io.BytesIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s with options %s"
                                      % (remote_file, list(self.nodes.keys()), kwargs))
             self._put(local_file, remote_file, **kwargs)
