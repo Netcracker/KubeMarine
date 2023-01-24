@@ -297,15 +297,16 @@ def check_kernel_version(cluster):
         bad_kernel_ubuntu = ['5.4.0-132-generic']
         bad_kernel_centos = []
         group = cluster.nodes['all']
-        result_group = group.sudo('uname -r && cat /etc/os-release', warn=True)
-        for host, results in result_group.items():
-            result = results.stdout.split('\n')
-            if 'Ubuntu' in result[1]:
-                if result[0] in bad_kernel_ubuntu:
-                    bad_results.append(host.original_host)
-            else:
-                if result[0] in bad_kernel_centos:
-                    bad_results.append(host.original_host)
+        result_group = group.sudo('uname -r', warn=True)
+        for connection, results in result_group.items():
+            os_name = cluster.get_os_family_for_node(connection.host)
+            result = results.stdout.rstrip()
+            if os_name == 'debian':
+                if result in bad_kernel_ubuntu:
+                    bad_results.append(connection.host)
+            elif os_name == 'rhel':
+                if result in bad_kernel_centos:
+                    bad_results.append(connection.host)
 
         if len(bad_results) > 0:
             cluster.log.debug(f"Bad kernel on: {bad_results}")
