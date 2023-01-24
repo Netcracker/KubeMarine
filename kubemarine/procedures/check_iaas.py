@@ -294,7 +294,7 @@ def check_kernel_version(cluster):
     """
     with TestCase(cluster.context['testsuite'], '015', "Software", "Kernel version") as tc:
         bad_results = []
-        bad_kernel_ubuntu = ['5.4.0-132-generic']
+        bad_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('bad_kernel')
         bad_kernel_centos = []
         group = cluster.nodes['all']
         result_group = group.sudo('uname -r')

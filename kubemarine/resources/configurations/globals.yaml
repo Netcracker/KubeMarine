@@ -634,6 +634,8 @@ compatibility_map:
         versions:
           - '20.04'
           - '22.04'
+        bad_kernel:
+          - '5.4.0-132-generic'
     debian:
       - os_family: 'debian'
         versions:
