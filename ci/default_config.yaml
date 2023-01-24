@@ -9,10 +9,3 @@ nodes:
   roles: ["control-plane", "worker"]
 
 cluster_name: "test-local-k8s.com"
-
-services:
-    packages:
-        install:
-        - conntrack
-        - kmod
-        - curl

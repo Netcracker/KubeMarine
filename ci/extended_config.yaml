@@ -18,15 +18,9 @@ cluster_name: "test-local-k8s.com"
 services:
   packages:
     install:
-    - conntrack
-    - kmod
     - ethtool
     - ebtables
     - socat
-    - curl
-    - openssl
-    - unzip
-    - policycoreutils-python-utils
 
 plugins:
   kubernetes-dashboard:
