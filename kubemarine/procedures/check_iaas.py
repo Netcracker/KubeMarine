@@ -293,7 +293,7 @@ def check_kernel_version(cluster):
     This method compares the linux kernel version with the bad version
     """
     with TestCase(cluster.context['testsuite'], '015', "Software", "Kernel version") as tc:
-        bad_results = []
+        bad_results = {}
         bad_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('bad_kernel')
         bad_kernel_centos = []
         group = cluster.nodes['all']
@@ -303,13 +303,15 @@ def check_kernel_version(cluster):
             result = results.stdout.rstrip()
             if os_name == 'ubuntu':
                 if result in bad_kernel_ubuntu:
-                    bad_results.append(connection.host)
+                    bad_results[connection.host] = result
             elif os_name == 'centos':
                 if result in bad_kernel_centos:
-                    bad_results.append(connection.host)
+                    bad_results[connection.host] = result
 
         if len(bad_results) > 0:
-            cluster.log.debug(f"Bad kernel on: {bad_results}")
+            for host, kernel_version in bad_results.items():
+                cluster.log.debug(f"Bad kernel %s on: %s" % (kernel_version, host))
+            cluster.log.debug(f"Use a newer linux kernel")
             raise TestWarn("Kernel version bad")
         else:
             tc.success("All kernel have correct versions")
@@ -881,7 +883,6 @@ def make_reports(cluster):
 
 tasks = OrderedDict({
     'ssh': {
-'version': check_kernel_version,
         # todo this is useless, because flow.load_inventory already fails in case of no connectivity
         'connectivity': connection_ssh_connectivity,
         'latency': {
