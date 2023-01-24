@@ -297,7 +297,7 @@ def check_kernel_version(cluster):
         bad_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('bad_kernel')
         bad_kernel_centos = []
         group = cluster.nodes['all']
-        result_group = group.sudo('uname -r')
+        result_group = group.run('uname -r')
         for connection, results in result_group.items():
             os_name = cluster.context['nodes'][connection.host]['os']['name']
             result = results.stdout.rstrip()
@@ -311,7 +311,7 @@ def check_kernel_version(cluster):
         if len(bad_results) > 0:
             for host, kernel_version in bad_results.items():
                 cluster.log.debug(f"Bad kernel %s on: %s" % (kernel_version, host))
-            cluster.log.debug(f"Use a newer linux kernel")
+            cluster.log.debug(f"Update the linux kernel version to 5.4.0-132-generic")
             raise TestWarn("Kernel version bad")
         else:
             tc.success("All kernel have correct versions")
