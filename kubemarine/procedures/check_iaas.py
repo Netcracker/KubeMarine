@@ -311,7 +311,7 @@ def check_kernel_version(cluster):
         if len(bad_results) > 0:
             for host, kernel_version in bad_results.items():
                 cluster.log.debug(f"Bad kernel %s on: %s" % (kernel_version, host))
-            cluster.log.debug(f"Update the linux kernel version to 5.4.0-132-generic")
+            cluster.log.debug(f"Update the linux kernel version to 5.4.0-135-generic")
             raise TestWarn("Kernel version bad")
         else:
             tc.success("All kernel have correct versions")
