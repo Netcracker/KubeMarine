@@ -299,12 +299,12 @@ def check_kernel_version(cluster):
         group = cluster.nodes['all']
         result_group = group.sudo('uname -r')
         for connection, results in result_group.items():
-            os_name = cluster.get_os_family_for_node(connection.host)
+            os_name = cluster.context['nodes'][connection.host]['os']['name']
             result = results.stdout.rstrip()
-            if os_name == 'debian':
+            if os_name == 'ubuntu':
                 if result in bad_kernel_ubuntu:
                     bad_results.append(connection.host)
-            elif os_name == 'rhel':
+            elif os_name == 'centos':
                 if result in bad_kernel_centos:
                     bad_results.append(connection.host)
 
@@ -881,6 +881,7 @@ def make_reports(cluster):
 
 tasks = OrderedDict({
     'ssh': {
+'version': check_kernel_version,
         # todo this is useless, because flow.load_inventory already fails in case of no connectivity
         'connectivity': connection_ssh_connectivity,
         'latency': {
