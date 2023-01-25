@@ -1007,6 +1007,20 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 
 **Warning**: The migration procedure removes the docker daemon from all nodes in the cluster.
 
+### Procedure Execution Steps
+
+This procedure includes the following steps:
+1. Verify and merge all the specified parameters into the inventory
+2. Install and configure containerd and podman
+3. Install crictl
+4. Implement the following steps on each control-plane and worker node by node:
+    1. Drain the node
+    2. Update configurations on the node for migration to containerd
+    3. Move the pods on the node from the docker's containers to those of containerd
+    4. Uncordon the node
+
+**Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
+
 ### migrate_cri Parameters
 
 The following sections describe the `migrate_cri` parameters.
@@ -1079,20 +1093,6 @@ thirdparties:
   /usr/bin/crictl.tar.gz:
     source: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.20.0/crictl-v1.20.0-linux-amd64.tar.gz
 ```
-
-
-### Procedure Execution Steps
-
-1. Verify and merge all the specified parameters into the inventory.
-2. Install and configure containerd and podman.
-3. Install crictl.
-4. Implement the following steps on each control-plane and worker node by node. 
-    1. Drain the node.
-    2. Update configurations on the node for migration to containerd.
-    3. Move the pods on the node from the docker's containers to those of containerd.
-    4. Uncordon the node.
-
-**Warning**: Before starting the migration procedure, verify that you already have the actual claster.yaml structure. The services.docker scheme is deprecated. 
 
 ## Admission Migration Procedure
 
