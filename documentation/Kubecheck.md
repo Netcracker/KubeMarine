@@ -322,7 +322,9 @@ This test checks if needed package are available from nodes.
 
 *Task*: `software.kernel.version`
 
-This test checks the Linux kernel version for a bad kernel version, if it is equal to a bad one, it issues a warning
+This test checks the Linux kernel version for a `bad kernel version`, if it is equal to a bad one, it issues a warning
+
+`Bad kernel version` - is a kernel with detected serious issue that affects any part of cluster, therefore it's unsupported
 
 
 #### PAAS Procedure
