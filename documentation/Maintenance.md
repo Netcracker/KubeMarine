@@ -1007,14 +1007,14 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 ### Procedure Execution Steps
 
 This procedure includes the following steps:
-1. Verify and merge all the specified parameters into the inventory.
-2. Install and configure containerd and podman.
-3. Install crictl.
-4. Implement the following steps on each control-plane and worker node by node. 
-    1. Drain the node.
-    2. Update configurations on the node for migration to containerd.
-    3. Move the pods on the node from the docker's containers to those of containerd.
-    4. Uncordon the node.
+1. Verify and merge all the specified parameters into the inventory
+2. Install and configure containerd and podman
+3. Install crictl
+4. Implement the following steps on each control-plane and worker node by node:
+    1. Drain the node
+    2. Update configurations on the node for migration to containerd
+    3. Move the pods on the node from the docker's containers to those of containerd
+    4. Uncordon the node
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
