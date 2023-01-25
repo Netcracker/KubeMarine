@@ -14,13 +14,13 @@ This section provides information about the Kubecheck functionality.
       - [005 Workers Amount](#005-workers-amount)
       - [005 Total Nodes Amount](#005-total-nodes-amount)
     - [006 VCPUs Amount](#006-vcpus-amount)
-      - [006 VCPUs Amount - Balancers](#006-vcpus-amount-balancers)
-      - [006 VCPUs Amount - Control-planes](#006-vcpus-amount-control-planes)
-      - [006 VCPUs Amount - Workers](#006-vcpus-amount-workers)
+      - [006 VCPUs Amount - Balancers](#006-vcpus-amount---balancers)
+      - [006 VCPUs Amount - Control-planes](#006-vcpus-amount---control-planes)
+      - [006 VCPUs Amount - Workers](#006-vcpus-amount---workers)
     - [007 RAM Amount](#007-ram-amount)
-      - [007 RAM Amount - Balancers](#007-ram-amount-balancers)
-      - [007 RAM Amount - Control-planes](#007-ram-amount-control-planes)
-      - [007 RAM Amount - Workers](#007-ram-amount-workers)
+      - [007 RAM Amount - Balancers](#007-ram-amount---balancers)
+      - [007 RAM Amount - Control-planes](#007-ram-amount---control-planes)
+      - [007 RAM Amount - Workers](#007-ram-amount---workers)
     - [008 Distributive](#008-distributive)
     - [009 PodSubnet](#009-podsubnet)
     - [010 ServiceSubnet](#010-servicesubnet)
@@ -34,22 +34,26 @@ This section provides information about the Kubecheck functionality.
       - [201 Keepalived Status](#201-keepalived-status)
       - [201 Container Runtime Status](#201-container-runtime-status)
       - [201 Kubelet Status](#201-kubelet-status)
-    - [202 Kubelet Version](#202-kubelet-version)
-    - [203 Recommended packages versions](#203-recommended-packages-version)  
-    - [204 Docker Version](#204-cri-versions)
-    - [204 HAproxy Version](#204-haproxy-version)
-    - [204 Keepalived Version](#204-keepalived-version)
-    - [205 Generic Packages Version](#205-generic-packages-version)
-    - [206 Pods Condition](#206-pods-condition)
-    - [207 Dashboard Availability](#207-dashboard-availability)
-    - [208 Nodes Existence](#208-nodes-existence)
-    - [209 Nodes Roles](#209-nodes-roles)
-    - [210 Nodes Condition](#210-nodes-condition)
-      - [210 Nodes Condition - NetworkUnavailable](#210-nodes-condition-networkunavailable)
-      - [210 Nodes Condition - MemoryPressure](#210-nodes-condition-memorypressure)
-      - [210 Nodes Condition - DiskPressure](#210-nodes-condition-diskpressure)
-      - [210 Nodes Condition - PIDPressure](#210-nodes-condition-pidpressure)
-      - [210 Nodes Condition - Ready](#210-nodes-condition-ready)
+        - [202 Nodes pid_max](#202-nodes-pid_max)
+        - [203 Kubelet Version](#203-kubelet-version)
+    - [204 Recommended packages versions](#204-recommended-packages-version)
+    - [205 System packages versions](#205-system-packages-version)
+      - [205 CRI Versions](#205-cri-versions)
+      - [205 HAproxy Version](#205-haproxy-version)
+      - [205 Keepalived Version](#205-keepalived-version)
+      - [205 Audit Version](#205-audit-version)
+      - [205 Mandatory Package Versions](#205-mandatory-package-versions)
+    - [206 Generic Packages Version](#206-generic-packages-version)
+    - [207 Pods Condition](#207-pods-condition)
+    - [208 Dashboard Availability](#208-dashboard-availability)
+    - [209 Nodes Existence](#209-nodes-existence)
+    - [210 Nodes Roles](#210-nodes-roles)
+    - [211 Nodes Condition](#211-nodes-condition)
+      - [211 Nodes Condition - NetworkUnavailable](#211-nodes-condition---networkunavailable)
+      - [211 Nodes Condition - MemoryPressure](#211-nodes-condition---memorypressure)
+      - [211 Nodes Condition - DiskPressure](#211-nodes-condition---diskpressure)
+      - [211 Nodes Condition - PIDPressure](#211-nodes-condition---pidpressure)
+      - [211 Nodes Condition - Ready](#211-nodes-condition---ready)
     - [213 Selinux security policy](#213-selinux-security-policy)
     - [214 Selinux configuration](#214-selinux-configuration)
     - [215 Firewalld status](#215-firewalld-status)
@@ -324,6 +328,21 @@ The PAAS procedure verifies the platform solution. For example, it checks the he
 The task tree is as follows:
 
 * services
+  * security
+    * selinux
+      * status
+      * config
+    * apparmor
+      * status
+      * config
+    * firewalld
+      * status
+  * system
+    * time
+    * swap
+      * status
+    * modprobe
+      * rules
   * haproxy
     * status
   * keepalived
@@ -332,8 +351,24 @@ The task tree is as follows:
     * status
   * kubelet
     * status
+    * configuration
+    * version
+  * packages
+    * system
+      * recommended_versions
+      * cri_version
+      * haproxy_version
+      * keepalived_version
+      * audit_version
+      * mandatory_versions
+    * generic
+      * version
+* thirdparties
+  * hashes
 * kubernetes
-  * version
+  * pods
+  * plugins
+    * dashboard
   * nodes
     * existence
     * roles
@@ -343,6 +378,18 @@ The task tree is as follows:
       * disk
       * pid
       * ready
+  * admission
+* etcd
+  * health_status
+* control_plane
+  * configuration_status
+  * health_status
+* default_services
+  * configuration_status
+  * health_status
+* calico
+  * config_check
+* geo_check
 
 ##### 201 Service Status
 
@@ -386,31 +433,47 @@ This test checks the Kubelet version on all hosts in a cluster.
 
 ##### 204 Recommended Packages Version
 
-*Task*: `packages.system.recommened_versions`
+*Task*: `services.packages.system.recommended_versions`
 
 This test checks that system package versions in the inventory are recommended.
 
-##### 205 CRI Versions
+##### 205 System Packages Version
 
-*Task*: `packages.system.cri_version`
+Tests of this type check that the system packages are installed and have equal versions.
+
+###### 205 CRI Versions
+
+*Task*: `services.packages.system.cri_version`
 
 This test checks that the configured CRI package is installed on all nodes and has an equal version.
 
-##### 205 HAproxy Version
+###### 205 HAproxy Version
 
-*Task*: `packages.system.haproxy`
+*Task*: `services.packages.system.haproxy_version`
 
 This test checks that the configured HAproxy package is installed on all nodes and has an equal version.
 
-##### 205 Keepalived Version
+###### 205 Keepalived Version
 
-*Task*: `packages.system.keepalived`
+*Task*: `services.packages.system.keepalived_version`
 
 This test checks that the configured Keepalived package is installed on all nodes and has an equal version.
 
+###### 205 Audit Version
+
+*Task*: `services.packages.system.audit_version`
+
+This test checks that the configured Audit package is installed on all nodes and has an equal version.
+
+###### 205 Mandatory Package Versions
+
+*Task*: `services.packages.system.mandatory_versions`
+
+This test checks that the configured mandatory packages are installed on all nodes and have equal versions.
+
 ##### 206 Generic Packages Version
 
-*Task*: `packages.generic.versions`
+*Task*: `services.packages.generic.version`
 
 This test checks that the configured generic packages are installed on all nodes and have equal versions.
 
@@ -569,7 +632,7 @@ The test checks status of Pod Security Admissions, default PSS(Pod Security Stan
 
 ###### 226 Geo connectivity status
 
-*Task*: `geo_monitor`
+*Task*: `geo_check`
 
 The task checks status of DNS resolving, pod-to-service and pod-to-pod connectivity between cluster in geographically
 distributed schemas. This task works only if procedure config file is provided with information about `paas-geo-monitor`,

@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from copy import deepcopy
 from typing import List, Dict
+
+import fabric
 
 from kubemarine import yum, apt
 from kubemarine.core.cluster import KubernetesCluster
@@ -31,16 +33,22 @@ ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED = \
     "Align them to the single version manually or using corresponding task of install procedure. " \
     "Alternatively, specify cache_versions=false for corresponding association."
 
+ERROR_SEMANAGE_NOT_MANAGED_DEBIAN = "semanage is not managed for debian OS family by KubeMarine"
+
 
 def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     associations: dict = inventory['services']['packages']['associations']
-    os_propagated_associations = {}
+    enriched_associations = {}
 
-    # move associations for OS families as-is
+    # Move associations for OS families and merge with globals
     for association_name in get_associations_os_family_keys():
-        os_propagated_associations[association_name] = associations.pop(association_name)
-
-    inventory['services']['packages']['associations'] = os_propagated_associations
+        os_associations: dict = deepcopy(cluster.globals['packages']['common_associations'])
+        if association_name == 'debian':
+            del os_associations['semanage']
+        for association_params in os_associations.values():
+            del association_params['groups']
+        default_merger.merge(os_associations, associations.pop(association_name))
+        enriched_associations[association_name] = os_associations
 
     # Check remained associations section if they are customized at global level.
     if associations:
@@ -49,7 +57,12 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
             raise Exception(ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS)
         elif os_family not in ('unknown', 'unsupported'):
             # move remained associations properties to the specific OS family section and merge with priority
-            default_merger.merge(os_propagated_associations[os_family], associations)
+            default_merger.merge(enriched_associations[os_family], associations)
+
+    if 'semanage' in enriched_associations['debian']:
+        raise Exception(ERROR_SEMANAGE_NOT_MANAGED_DEBIAN)
+
+    inventory['services']['packages']['associations'] = enriched_associations
 
     return inventory
 
@@ -74,7 +87,7 @@ def enrich_inventory_include_all(inventory: dict, _):
     return inventory
 
 
-def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_associations_only=False) -> dict:
+def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes=False) -> dict:
     os_ids = cluster.get_os_identifiers()
     different_os = list(set(os_ids.values()))
     if len(different_os) > 1:
@@ -89,73 +102,126 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, ensured_
         cluster.log.debug("Skip caching of packages for unsupported OS.")
         return inventory
 
-    nodes_cache_versions = cluster.nodes['all'].get_final_nodes().get_sudo_nodes()
-    if nodes_cache_versions.is_empty():
+    group = cluster.nodes['all'].get_final_nodes()
+    if group.nodes_amount() != group.get_sudo_nodes().nodes_amount():
         # For add_node/install procedures we check that all nodes are sudoers in prepare.check.sudoer task.
-        # For check_iaas procedure the nodes might still be not sudoers, so skip caching.
-        cluster.log.debug(f"There are no nodes with sudo privileges, packages will not be cached.")
+        # For check_iaas procedure the nodes might still be not sudoers.
+        # Skip caching if any not-sudoer node found.
+        cluster.log.debug(f"Some nodes are not sudoers, packages will not be cached.")
         return inventory
 
-    packages_list = _get_packages_to_detect_versions(cluster, inventory, ensured_associations_only)
-    detected_packages = detect_installed_packages_version_groups(nodes_cache_versions, packages_list)
+    if by_initial_nodes:
+        group = group.get_initial_nodes()
 
-    _cache_package_associations(cluster, inventory, detected_packages, ensured_associations_only)
-    _cache_custom_packages(cluster, inventory, detected_packages, ensured_associations_only)
+    hosts_to_packages = get_all_managed_packages_for_group(group, inventory, by_initial_nodes)
+    detected_packages = detect_installed_packages_version_hosts(cluster, hosts_to_packages)
+
+    _cache_package_associations(group, inventory, detected_packages, by_initial_nodes)
+    _cache_custom_packages(cluster, inventory, detected_packages, by_initial_nodes)
 
     cluster.log.debug('Package versions detection finished')
     return inventory
 
 
-def _get_associations(cluster: KubernetesCluster, inventory: dict):
-    return inventory['services']['packages']['associations'][cluster.get_os_family()]
+def get_all_managed_packages_for_group(group: NodeGroup, inventory: dict, ensured_association_only: bool = False) \
+        -> Dict[str, List[str]]:
+    """
+    Returns hosts with list of all managed packages for them.
+    For associations, only subset of hosts is considered on which the associations are managed by KubeMarine.
+
+    :param group: Group of nodes to get the manager packages for.
+    :param inventory: Inventory of the cluster. May be different from the inventory of the cluster instance,
+                      if used during finalization.
+    :param ensured_association_only: Specify whether to take 'cache_versions' property into account for associations.
+                                     Additionally, if true, will skip custom packages.
+    :return: List of packages for each relevant host.
+    """
+    packages_section = inventory['services']['packages']
+    hosts_to_packages = {}
+    for node in group.get_ordered_members_list():
+        os_family = node.get_nodes_os()
+        node_associations = packages_section['associations'].get(os_family, {})
+        for association_name in node_associations.keys():
+            packages = get_association_hosts_to_packages(
+                node, inventory, association_name, ensured_association_only)
+
+            packages = next(iter(packages.values()), [])
+            hosts_to_packages.setdefault(node.get_host(), []).extend(packages)
+
+    custom_install_packages = inventory['services']['packages'].get('install', {}).get('include', [])
+    if not ensured_association_only and custom_install_packages:
+        for host in group.get_hosts():
+            hosts_to_packages.setdefault(host, []).extend(custom_install_packages)
+
+    return hosts_to_packages
 
 
-def _get_package_names_for_association(cluster: KubernetesCluster, inventory: dict, association_name: str) -> list:
-    if association_name in get_associations_os_family_keys():
-        return []
+def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, association_name: str,
+                                      ensured_association_only: bool = False) \
+        -> Dict[str, List[str]]:
+    """
+    Returns hosts with associated packages list for the specified association name.
+    Only subset of hosts is returned on which the association is managed by KubeMarine.
 
-    associated_packages = _get_associations(cluster, inventory)[association_name].get('package_name')
-    if isinstance(associated_packages, str):
-        associated_packages = [associated_packages]
-    elif not isinstance(associated_packages, list):
-        raise Exception('Unsupported associated packages object type')
+    :param group: Group of nodes to check the applicability of the association.
+    :param inventory: Inventory of the cluster. May be different from the inventory of the cluster instance,
+                      if used during finalization.
+    :param association_name: target association name
+    :param ensured_association_only: Specify whether to take 'cache_versions' property into account.
+    :return: List of packages for each relevant host.
+    """
+    cluster = group.cluster
 
-    return associated_packages
+    packages_section = inventory['services']['packages']
+    if not packages_section['mandatory'].get(association_name, True):
+        return {}
+
+    hosts_to_packages = {}
+
+    if association_name == 'unzip':
+        from kubemarine import thirdparties
+        relevant_group = thirdparties.get_group_require_unzip(cluster, inventory)
+    else:
+        groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
+        relevant_group = cluster.create_group_from_groups_nodes_names(groups, [])
+
+    if association_name in ('docker', 'containerd') \
+            and association_name != inventory['services']['cri']['containerRuntime']:
+        relevant_group = cluster.make_group([])
+
+    relevant_group = relevant_group.intersection_group(group)
+
+    global_cache_versions = packages_section['cache_versions']
+    for node in relevant_group.get_ordered_members_list():
+        os_family = node.get_nodes_os()
+        package_associations = packages_section['associations'].get(os_family, {}).get(association_name, {})
+        packages = package_associations.get('package_name', [])
+
+        if isinstance(packages, str):
+            packages = [packages]
+
+        if ensured_association_only and not (global_cache_versions and package_associations.get('cache_versions', True)):
+            packages = []
+
+        if packages:
+            hosts_to_packages[node.get_host()] = packages
+
+    return hosts_to_packages
 
 
-def _get_packages_for_associations_to_detect(cluster: KubernetesCluster, inventory: dict, association_name: str,
-                                             ensured_association_only: bool) -> list:
-    packages_list = _get_package_names_for_association(cluster, inventory, association_name)
-    if not packages_list:
-        return []
-
-    global_cache_versions = inventory['services']['packages']['cache_versions']
-    associated_params = _get_associations(cluster, inventory)[association_name]
-    if not ensured_association_only or (global_cache_versions and associated_params.get('cache_versions', True)):
-        return packages_list
-
-    return []
-
-
-def _get_packages_to_detect_versions(cluster: KubernetesCluster, inventory: dict, ensured_association_only: bool) -> list:
-    packages_list = []
-    for association_name in _get_associations(cluster, inventory).keys():
-        packages_list.extend(_get_packages_for_associations_to_detect(
-            cluster, inventory, association_name, ensured_association_only))
-
-    if not ensured_association_only and inventory['services']['packages'].get('install', {}):
-        packages_list.extend(inventory['services']['packages']['install']['include'])
-
-    return packages_list
-
-
-def _cache_package_associations(cluster: KubernetesCluster, inventory: dict,
+def _cache_package_associations(group: NodeGroup, inventory: dict,
                                 detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
-    for association_name, associated_params in _get_associations(cluster, inventory).items():
-        packages_list = _get_packages_for_associations_to_detect(
-            cluster, inventory, association_name, ensured_association_only)
-        if not packages_list:
+    cluster = group.cluster
+    associations = inventory['services']['packages']['associations'][cluster.get_os_family()]
+    for association_name, associated_params in associations.items():
+        hosts_to_packages = get_association_hosts_to_packages(
+            group, inventory, association_name, ensured_association_only)
+        if not hosts_to_packages:
             continue
+
+        # Since all nodes have the same OS family in this case,
+        # the packages list is the same for all relevant hosts, so take any available.
+        packages_list = next(iter(hosts_to_packages.values()))
 
         final_packages_list = []
         for package in packages_list:
@@ -177,13 +243,12 @@ def _cache_custom_packages(cluster: KubernetesCluster, inventory: dict,
         return
     # packages from direct installation section
     custom_install_packages = inventory['services']['packages'].get('install', {})
-    if custom_install_packages:
+    if custom_install_packages.get('include', []):
         final_packages_list = []
         for package in custom_install_packages['include']:
             final_package = _detect_final_package(cluster, detected_packages, package, False)
             final_packages_list.append(final_package)
         custom_install_packages['include'] = final_packages_list
-    return detected_packages
 
 
 def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[str, Dict[str, List]],
@@ -273,7 +338,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
+def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -293,43 +358,52 @@ def detect_installed_package_version(group: NodeGroup, package: str) -> NodeGrou
     return group.sudo(cmd)
 
 
-def detect_installed_packages_version_groups(group: NodeGroup, packages_list: List or str) -> Dict[str, Dict[str, List]]:
+def _parse_node_detected_package(result: fabric.runners.Result, package: str) -> str:
+    node_detected_package = result.stdout.strip() + result.stderr.strip()
+    # consider version, which ended with special symbol = or - as not installed
+    # (it is possible in some cases to receive "containerd=" version)
+    if "not installed" in node_detected_package or "no packages found" in node_detected_package \
+            or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
+        node_detected_package = f"not installed {package}"
+
+    return node_detected_package
+
+
+def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to_packages: Dict[str, List[str]]) \
+        -> Dict[str, Dict[str, List]]:
     """
-    Detect grouped packages versions on remote group from specified list of packages.
-    :param group: Group of nodes, where packages should be found
-    :param packages_list: Single package or list of packages, which versions should be detected.
+    Detect grouped packages versions for specified list of packages for each remote host.
+
+    :param cluster: KubernetesCluster instance
+    :param hosts_to_packages: Remote hosts with list of packages to detect versions.
     :return: Dictionary with grouped versions for each queried package, pointing to list of hosts,
         e.g. {"foo" -> {"foo-1": [host1, host2]}, "bar" -> {"bar-1": [host1], "bar-2": [host2]}}
     """
-
-    cluster = group.cluster
-
-    if isinstance(packages_list, str):
-        packages_list = [packages_list]
-    # deduplicate
-    packages_list = list(set(packages_list))
-    if not packages_list:
-        return {}
+    for host, packages_list in hosts_to_packages.items():
+        if isinstance(packages_list, str):
+            packages_list = [packages_list]
+        # deduplicate
+        hosts_to_packages[host] = list(set(packages_list))
 
     with RemoteExecutor(cluster) as exe:
-        for package in packages_list:
-            detect_installed_package_version(group, package)
+        for host, packages_list in hosts_to_packages.items():
+            node = cluster.make_group([host])
+            for package in packages_list:
+                _detect_installed_package_version(node, package)
 
     raw_result = exe.get_last_results()
+    if not raw_result:
+        return {}
+
     results: Dict[str, Dict[str, List]] = {}
 
-    for i, package in enumerate(packages_list):
-        detected_grouped_packages = {}
-        for conn, multiple_results in raw_result.items():
-            node_detected_package = multiple_results[i].stdout.strip() + multiple_results[i].stderr.strip()
-            # consider version, which ended with special symbol = or - as not installed
-            # (it is possible in some cases to receive "containerd=" version)
-            if "not installed" in node_detected_package or "no packages found" in node_detected_package \
-                    or node_detected_package[-1] == '=' or node_detected_package[-1] == '-':
-                node_detected_package = f"not installed {package}"
-            detected_grouped_packages.setdefault(node_detected_package, []).append(conn.host)
-
-        results[package] = detected_grouped_packages
+    for conn, multiple_results in raw_result.items():
+        multiple_results = list(multiple_results.values())
+        host = conn.host
+        packages_list = hosts_to_packages[host]
+        for i, package in enumerate(packages_list):
+            node_detected_package = _parse_node_detected_package(multiple_results[i], package)
+            results.setdefault(package, {}).setdefault(node_detected_package, []).append(host)
 
     return results
 

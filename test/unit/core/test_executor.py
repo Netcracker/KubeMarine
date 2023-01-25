@@ -70,6 +70,56 @@ class RemoteExecutorTest(unittest.TestCase):
             for cxn, result in exe.get_merged_nodegroup_results().items():
                 self.assertIsInstance(result, TimeoutError)
 
+    def test_get_merged_results_multiple_commands(self):
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
+        with RemoteExecutor(self.cluster) as exe:
+            for host in self.cluster.nodes["all"].get_hosts():
+                node = self.cluster.make_group([host])
+                node.run("echo \"foo\"")
+                node.run("echo \"bar\"")
+
+            exe.flush()
+
+            for cxn, result in exe.get_merged_nodegroup_results().items():
+                self.assertEqual("foo\nbar\n", result.stdout)
+
+    def test_get_merged_results_filter_last_command_result(self):
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
+        tokens = []
+        with RemoteExecutor(self.cluster) as exe:
+            for host in self.cluster.nodes["all"].get_hosts():
+                node = self.cluster.make_group([host])
+                node.run("echo \"foo\"")
+                tokens.append(node.run("echo \"bar\""))
+
+            exe.flush()
+
+            for cxn, result in exe.get_merged_nodegroup_results(tokens).items():
+                self.assertEqual("bar\n", result.stdout)
+
+    def test_get_merged_results_filter_last_command_result_first_excepted(self):
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
+        self.cluster.fake_shell.add(results, "run", ["false"])
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
+        tokens = []
+        with RemoteExecutor(self.cluster) as exe:
+            for host in self.cluster.nodes["all"].get_hosts():
+                node = self.cluster.make_group([host])
+                node.run("false")
+                tokens.append(node.run("echo \"bar\""))
+
+            exe.flush()
+
+            for cxn, result in exe.get_merged_nodegroup_results(tokens).items():
+                self.assertIsInstance(result, UnexpectedExit)
+
     def test_not_throw_on_failed_all_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])

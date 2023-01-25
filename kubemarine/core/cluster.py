@@ -119,7 +119,7 @@ class KubernetesCluster(Environment):
         return self.make_group(ips)
 
     def create_group_from_groups_nodes_names(self, groups_names: List[str], nodes_names: List[str]) -> NodeGroup:
-        common_group = None
+        common_group = self.make_group([])
 
         if nodes_names:
             common_group = self.make_group_from_nodes(nodes_names)
@@ -131,10 +131,7 @@ class KubernetesCluster(Environment):
                     self.log.verbose('Group \'%s\' is requested for usage, but this group is not exists.' % group)
                     continue
 
-                if common_group is None:
-                    common_group = self.nodes[group]
-                else:
-                    common_group = common_group.include_group(self.nodes[group])
+                common_group = common_group.include_group(self.nodes[group])
 
         return common_group
 
@@ -317,38 +314,6 @@ class KubernetesCluster(Environment):
         """
         os_family = self.get_os_family_for_node(host)
         return self._get_package_associations_for_os(os_family, package, association_key)
-
-    def get_package_association_for_group(self, group: NodeGroup, package: str, association_key: str) -> dict:
-        """
-        Returns the specified association dict for the specified package from inventory for entire NodeGroup.
-
-        :param group: NodeGroup for which required to find the association
-        :param package: The package name to get the association for
-        :param association_key: Association key to get
-        :return: Association values for every host in group, e.g. { host -> value }
-        """
-        results = {}
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            association_value = self.get_package_association_for_node(node['connect_to'], package, association_key)
-            results[node['connect_to']] = association_value
-        return results
-
-    def get_package_association_str_for_group(self, group: NodeGroup,
-                                              package: str, association_key: str) -> str or list:
-        """
-        Returns the specified association string or list for the specified package from inventory for entire NodeGroup.
-        If association value is different between some nodes, an exception will be thrown.
-
-        :param group: NodeGroup for which required to find the association
-        :param package: The package name to get the association for
-        :param association_key: Association key to get
-        :return: Association string or list value
-        """
-        results = self.get_package_association_for_group(group, package, association_key)
-        results_values = list(set(results.values()))
-        if len(results_values) == 1:
-            return results_values[0]
-        raise Exception(f'Too many values returned for package associations str "{association_key}" for package "{package}"')
 
     def make_finalized_inventory(self):
         from kubemarine.core import defaults

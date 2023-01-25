@@ -17,7 +17,7 @@ import sys
 import time
 from collections import OrderedDict
 import re
-from typing import List
+from typing import List, Dict
 
 import yaml
 import ruamel.yaml
@@ -184,20 +184,33 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
     """
     with TestCase(cluster.context['testsuite'], '205', "Services", f"{pckg_alias} version") as tc:
         _check_same_os(cluster)
-        if pckg_alias == "docker" or pckg_alias == "containerd":
-            group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
-        elif pckg_alias == "keepalived" or pckg_alias == "haproxy":
-            if "balancer" in cluster.nodes and not cluster.nodes['balancer'].is_empty():
-                group = cluster.nodes['balancer']
-            else:
-                raise TestWarn("balancer group is not present")
-        else:
-            raise Exception(f"Unknown system package alias: {pckg_alias}")
+        hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
+        if not hosts_to_packages:
+            raise TestWarn(f"No nodes to check {pckg_alias!r} version")
 
-        packages = cluster.get_package_association(pckg_alias, 'package_name')
-        if not isinstance(packages, list):
-            packages = [packages]
-        return check_packages_versions(cluster, tc, group, packages)
+        return check_packages_versions(cluster, tc, hosts_to_packages)
+
+
+def mandatory_packages_versions(cluster: KubernetesCluster):
+    """
+    Verifies that mandatory packages are installed on required nodes and have equal versions.
+    Failure is shown if check is not successful.
+    :param cluster: main cluster object.
+    """
+    with TestCase(cluster.context['testsuite'], '205', "Services", "Mandatory package versions") as tc:
+        _check_same_os(cluster)
+        hosts_to_packages = {}
+        group = cluster.nodes['all']
+        for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
+            packages = pckgs.get_association_hosts_to_packages(group, cluster.inventory, package)
+
+            for host, packages_list in packages.items():
+                hosts_to_packages.setdefault(host, []).extend(packages_list)
+
+        if not hosts_to_packages:
+            raise TestWarn(f"No mandatory packages to check")
+
+        return check_packages_versions(cluster, tc, hosts_to_packages)
 
 
 def generic_packages_versions(cluster: KubernetesCluster):
@@ -207,23 +220,23 @@ def generic_packages_versions(cluster: KubernetesCluster):
     """
     with TestCase(cluster.context['testsuite'], '206', "Services", f"Generic packages version") as tc:
         _check_same_os(cluster)
-        packages = cluster.inventory['services']['packages']['install']['include']
-        return check_packages_versions(cluster, tc, cluster.nodes['all'], packages, warn_on_bad_result=True)
+        packages = cluster.inventory['services']['packages'].get('install', {}).get('include', [])
+        hosts_to_packages = {host: packages for host in cluster.nodes['all'].get_hosts()}
+        return check_packages_versions(cluster, tc, hosts_to_packages, warn_on_bad_result=True)
 
 
-def check_packages_versions(cluster, tc, group, packages, warn_on_bad_result=False):
+def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]], warn_on_bad_result=False):
     """
     Verifies that all packages are installed on required nodes and have equal versions
     :param cluster: main cluster object
     :param tc: current test case object
-    :param group: nodes where to check packages
-    :param packages: list of packages to check
+    :param hosts_to_packages: hosts where to check packages
     :param warn_on_bad_result: if true then uses Warning instead of Failure. Default False.
     """
     bad_results = []
     good_results = []
 
-    packages_map = pckgs.detect_installed_packages_version_groups(group, packages)
+    packages_map = pckgs.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
     for package, version_map in packages_map.items():
         if len(version_map) != 1:
             cluster.log.debug(f"Package {package} has different versions:")
@@ -372,6 +385,7 @@ def thirdparties_hashes(cluster):
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
+                # TODO support zip
                 res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo tar xfO %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
@@ -617,7 +631,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() == 'debian':
+    if cluster.get_os_family() not in ('rhel', 'rhel8'):
         return
 
     with TestCase(cluster.context['testsuite'], '213', "Security", "Selinux security policy") as tc:
@@ -676,7 +690,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() == 'debian':
+    if cluster.get_os_family() not in ('rhel', 'rhel8'):
         return
 
     with TestCase(cluster.context['testsuite'], '214', "Security", "Selinux configuration") as tc:
@@ -1311,7 +1325,9 @@ tasks = OrderedDict({
                 'cri_version': lambda cluster:
                     system_packages_versions(cluster, cluster.inventory['services']['cri'][ 'containerRuntime']),
                 'haproxy_version': lambda cluster: system_packages_versions(cluster, 'haproxy'),
-                'keepalived_version': lambda cluster: system_packages_versions(cluster, 'keepalived')
+                'keepalived_version': lambda cluster: system_packages_versions(cluster, 'keepalived'),
+                'audit_version': lambda cluster: system_packages_versions(cluster, 'audit'),
+                'mandatory_versions': mandatory_packages_versions
             },
             'generic': {
                 'version': generic_packages_versions

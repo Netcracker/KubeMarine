@@ -4,6 +4,40 @@
   "description": "Section for packages and their management",
   "allOf": [{"$ref": "#/definitions/Properties"}],
   "properties": {
+    "package_manager": {
+      "type": "object",
+      "description": "Additional package manager repositories for the cluster in closed environment",
+      "properties": {
+        "replace-repositories": {
+          "type": "boolean",
+          "default": false,
+          "description": "Deletes old repositories on hosts and installs new ones instead"
+        },
+        "repositories": {
+          "description": "List of new repositories. Can be specified as string with all repositories content, or as list for apt repositories, or as dictionary for yum repositories.",
+          "oneOf": [
+            {"type": "string"},
+            {"$ref": "#/definitions/YumRepositories"},
+            {"$ref": "#/definitions/AptRepositories"}
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "mandatory": {
+      "type": "object",
+      "description": "Specify whether to install or skip mandatory packages",
+      "properties": {
+        "conntrack": {"type": "boolean", "default": true},
+        "iptables": {"type": "boolean", "default": true},
+        "openssl": {"type": "boolean", "default": true},
+        "curl": {"type": "boolean", "default": true},
+        "unzip": {"type": "boolean", "default": true},
+        "semanage": {"type": "boolean", "default": true},
+        "kmod": {"type": "boolean", "default": true}
+      },
+      "additionalProperties": false
+    },
     "associations": {
       "$ref": "packages/associations.json",
       "description": "Configure predefined associations of package objects. If configured in the common section, the associations are automatically switched to the section corresponding to your operating system."
@@ -12,32 +46,12 @@
   "propertyNames": {
     "anyOf": [
       {"$ref": "#/definitions/PropertyNames"},
-      {"enum": ["associations"]}
+      {"enum": ["package_manager", "mandatory", "associations"]}
     ]
   },
   "definitions": {
     "Properties": {
       "properties": {
-        "package_manager": {
-          "type": "object",
-          "description": "Additional package manager repositories for the cluster in closed environment",
-          "properties": {
-            "replace-repositories": {
-              "type": "boolean",
-              "default": false,
-              "description": "Deletes old repositories on hosts and installs new ones instead"
-            },
-            "repositories": {
-              "description": "List of new repositories. Can be specified as string with all repositories content, or as list for apt repositories, or as dictionary for yum repositories.",
-              "oneOf": [
-                {"type": "string"},
-                {"$ref": "#/definitions/YumRepositories"},
-                {"$ref": "#/definitions/AptRepositories"}
-              ]
-            }
-          },
-          "additionalProperties": false
-        },
         "install": {
           "description": "List of custom packages to install. Can be specified as list or as two lists that are to be included and excluded during processing.",
           "oneOf": [
@@ -76,7 +90,7 @@
       }
     },
     "PropertyNames": {
-      "enum": ["package_manager", "install", "upgrade", "remove", "cache_versions"]
+      "enum": ["install", "upgrade", "remove", "cache_versions"]
     },
     "YumRepositories": {
       "type": "object",
@@ -91,7 +105,7 @@
       }
     },
     "AptRepositories": {
-      "$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"
+      "$ref": "../common/utils.json#/definitions/NonEmptySetOfStrings"
     },
     "IncludeExcludePermissive": {
       "type": "object",

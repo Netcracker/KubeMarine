@@ -40,7 +40,7 @@ class CLIAction(Action):
 
     def run(self, res: DynamicResources):
         executors_group = self.node_group_provider(res.cluster())
-        if not executors_group or executors_group.nodes_amount() < 1:
+        if executors_group.is_empty():
             print('Failed to find any of specified nodes or groups')
             sys.exit(1)
 

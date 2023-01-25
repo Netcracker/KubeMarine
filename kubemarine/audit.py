@@ -21,124 +21,90 @@ import io
 
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.annotations import restrict_multi_os_group
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 
 
-def is_audit_rules_defined(inventory) -> bool:
-    """
-    Checks for the presence of the specified audit rules in the inventory
-    :param inventory: Cluster inventory, where the rules will be checked
-    :return: Boolean
-    """
-    rules = inventory['services'].get('audit', {}).get('rules')
-    return rules is not None
+def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    for host in cluster.nodes['all'].get_final_nodes().get_hosts():
+        package_name = cluster.get_package_association_for_node(host, 'audit', 'package_name')
+        if isinstance(package_name, str):
+            package_name = [package_name]
+
+        if len(package_name) != 1:
+            os_family = cluster.get_os_family_for_node(host)
+            raise Exception(f'Audit has multiple associated packages {package_name} for OS {os_family!r} '
+                            f'that is currently not supported')
+
+    return inventory
 
 
-@restrict_multi_os_group
-def install(group: NodeGroup, enable_service: bool = True, force: bool = False) -> NodeGroupResult or None:
+def install(group: NodeGroup) -> str or None:
     """
     Automatically installs and enables the audit service for the specified nodes
     :param group: Nodes group on which audit installation should be performed
-    :param enable_service: Flag, automatically enables the service after installation
-    :param force: A flag that causes a forced installation even on centos nodes and nodes where the audit is already
-    installed
     :return: String with installation output from nodes or None, when audit installation was skipped
     """
     cluster = group.cluster
     log = cluster.log
 
-    if not is_audit_rules_defined(cluster.inventory):
-        log.debug('Skipped - no audit rules in inventory')
+    log.verbose('Searching for already installed auditd package...')
+
+    # Reduce nodes amount for installation
+    hosts_to_packages = packages.get_association_hosts_to_packages(group, cluster.inventory, 'audit')
+
+    not_installed_hosts = []
+    audit_installed_results = packages.detect_installed_packages_version_hosts(cluster, hosts_to_packages)
+    for detected_audit_versions in audit_installed_results.values():
+        for detected_version, hosts in detected_audit_versions.items():
+            log.verbose(f'{detected_version}: {hosts}')
+            if 'not installed' in detected_version:
+                not_installed_hosts.extend(hosts)
+
+    if not not_installed_hosts:
+        log.debug('Auditd is already installed on all nodes')
         return
-
-    # This method handles cluster with multiple os, exceptions should be suppressed
-    if not force and group.get_nodes_os() in ['rhel', 'rhel8']:
-        log.debug('Auditd installation is not required on RHEL nodes')
-        return
-
-    install_group = group
-
-    if not force:
-        log.verbose('Searching for already installed auditd package...')
-        debian_group = group.get_subgroup_with_os('debian')
-        debian_package_name = cluster.get_package_association_str_for_group(debian_group, 'audit', 'package_name')
-        if isinstance(debian_package_name, list):
-            raise Exception(f'Audit can not be installed, because nodes already contains different package versions: '
-                            f'{str(debian_package_name)}')
-        audit_installed_results = packages.detect_installed_package_version(debian_group, debian_package_name)
-        log.verbose(audit_installed_results)
-
-        # Reduce nodes amount for installation
-        install_group = audit_installed_results.get_nodes_group_where_value_in_stderr("no packages found matching")
-
-        if install_group.nodes_amount() == 0:
-            log.debug('Auditd is already installed on all nodes')
-            return
-        else:
-            log.debug('Auditd package is not installed, installing...')
-
-    package_name = cluster.get_package_association_str_for_group(install_group, 'audit', 'package_name')
+    else:
+        log.debug(f'Auditd package is not installed on {not_installed_hosts}, installing...')
 
     with RemoteExecutor(cluster) as exe:
-        packages.install(install_group, include=package_name)
-        if enable_service:
-            enable(install_group)
+        for host in not_installed_hosts:
+            the_node = cluster.make_group([host])
+
+            package_name = cluster.get_package_association_for_node(host, 'audit', 'package_name')
+            packages.install(the_node, include=package_name)
+
+            service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
+            system.enable_service(the_node, name=service_name)
 
     return exe.get_last_results_str()
 
 
-@restrict_multi_os_group
-def enable(group: NodeGroup, now: bool = True) -> NodeGroupResult:
-    """
-    Enables and optionally starts the audit service for the specified nodes
-    :param group: Nodes group, where audit service should be enabled
-    :param now: Flag indicating that the audit service should be started immediately
-    :return: NodeGroupResult of enabling output from nodes
-    """
-    cluster = group.cluster
-
-    service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
-    return system.enable_service(group, name=service_name, now=now)
-
-
-@restrict_multi_os_group
-def restart(group: NodeGroup) -> NodeGroupResult:
-    """
-    Restarts the audit service for the specified nodes
-    :param group: Nodes group, where audit service should be restarted
-    :return: Service restart NodeGroupResult
-    """
-    cluster = group.cluster
-
-    service_name = cluster.get_package_association_str_for_group(group, 'audit', 'service_name')
-    return group.sudo(f'service {service_name} restart')
-
-
-@restrict_multi_os_group
-def apply_audit_rules(group: NodeGroup, now: bool = True) -> NodeGroupResult or None:
+def apply_audit_rules(group: NodeGroup) -> NodeGroupResult:
     """
     Generates and applies audit rules to the group
     :param group: Nodes group, where audit service should be configured
-    :param now: Flag indicating that the audit service should be restarted immediately
     :return: Service restart result or nothing if audit rules are non exists, or restart is not required
     """
     cluster = group.cluster
     log = cluster.log
 
-    if not is_audit_rules_defined(group.cluster.inventory):
-        log.debug('Skipped - no audit rules in inventory')
-        return
-
     log.debug('Applying audit rules...')
-    rules_content = " \n".join(group.cluster.inventory['services']['audit']['rules'])
+    rules_content = " \n".join(cluster.inventory['services']['audit']['rules'])
+    utils.dump_file(cluster, rules_content, 'audit.rules')
 
-    rules_config_location = cluster.get_package_association_str_for_group(group, 'audit', 'config_location')
+    restart_tokens = []
+    with RemoteExecutor(cluster) as exe:
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            the_node: NodeGroup = node['connection']
+            host: str = node['connect_to']
 
-    utils.dump_file(group.cluster, rules_content, 'audit.rules')
-    group.put(io.StringIO(rules_content), rules_config_location,
-              sudo=True, backup=True)
+            rules_config_location = cluster.get_package_association_for_node(host, 'audit', 'config_location')
+            the_node.put(io.StringIO(rules_content), rules_config_location,
+                         sudo=True, backup=True)
 
-    if now:
-        return restart(group)
+            service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
+            restart_tokens.append(the_node.sudo(f'service {service_name} restart'))
+
+    return exe.get_merged_nodegroup_results(restart_tokens)

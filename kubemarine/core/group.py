@@ -360,10 +360,10 @@ class NodeGroup:
 
         return group_result
 
-    def run(self, *args, **kwargs) -> NodeGroupResult:
+    def run(self, *args, **kwargs) -> NodeGroupResult or int:
         return self.do("run", *args, **kwargs)
 
-    def sudo(self, *args, **kwargs) -> NodeGroupResult:
+    def sudo(self, *args, **kwargs) -> NodeGroupResult or int:
         return self.do("sudo", *args, **kwargs)
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):
@@ -874,6 +874,12 @@ class NodeGroup:
         for node in members:
             result.append(node['name'])
         return result
+
+    def get_node_name(self) -> str:
+        if len(self.nodes) != 1:
+            raise Exception("Cannot get the only name from not a single node")
+
+        return self.get_first_member(provide_node_configs=True)['name']
 
     def get_hosts(self) -> List[str]:
         members = self.get_ordered_members_list(provide_node_configs=True)

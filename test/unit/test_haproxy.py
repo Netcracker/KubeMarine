@@ -16,7 +16,7 @@
 
 import unittest
 
-from kubemarine import haproxy
+from kubemarine import haproxy, yum
 from kubemarine import demo
 
 
@@ -107,11 +107,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         cluster.fake_shell.add(missing_package_result, 'sudo', missing_package_command)
 
         # simulate package installation
-        installation_command = ['yum install -y %s; rpm -q %s; if [ $? != 0 ]; then echo '
-                                '\"Failed to check version for some packages. '
-                                'Make sure packages are not already installed with higher versions. '
-                                'Also, make sure user-defined packages have rpm-compatible names. \"; exit 1; fi '
-                                % (package_associations['package_name'], package_associations['package_name'])]
+        installation_command = [yum.get_install_cmd(package_associations['package_name'])]
         expected_results = demo.create_nodegroup_result(cluster.nodes['balancer'], code=0,
                                                         stdout='Successfully installed haproxy')
         cluster.fake_shell.add(expected_results, 'sudo', installation_command)
@@ -148,7 +144,7 @@ def get_result_str(results):
     for conn, result in results.items():
         if output != "":
             output += "\n"
-        output += "\t%s (%s): code=%i" % (conn, 0, result.exited)
+        output += "\t%s (%s): code=%i" % (conn.host, 0, result.exited)
         if result.stdout:
             output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
         if result.stderr:
