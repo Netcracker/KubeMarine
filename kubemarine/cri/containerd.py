@@ -70,9 +70,10 @@ def configure(group: NodeGroup):
     # if there are any insecure registries in containerd config, then it is required to configure them for podman too
     config_toml = toml.loads(config_string)
     insecure_registries = []
-    if config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {}).get('mirrors'):
-        for mirror, mirror_conf in config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['mirrors'].items():
-            is_insecure = False
+    registry = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {})
+    if registry.get('mirrors'):
+        for mirror, mirror_conf in registry['mirrors'].items():
+            is_insecure = registry.get('configs', {}).get(mirror, {}).get('tls', {}).get('insecure_skip_verify', False)
             for endpoint in mirror_conf.get('endpoint', []):
                 if "http://" in endpoint:
                     is_insecure = True
@@ -81,8 +82,8 @@ def configure(group: NodeGroup):
                 insecure_registries.append(mirror)
     # save 'auth.json' if there are credentials for registry
     auth_registries = {"auths": {}}
-    if config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {}).get('configs'):
-        registry_configs = config_toml['plugins']['io.containerd.grpc.v1.cri']['registry']['configs']
+    if registry.get('configs'):
+        registry_configs = registry['configs']
         for auth_registry in registry_configs:
             auth_registries['auths'][auth_registry] = {}
             if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
