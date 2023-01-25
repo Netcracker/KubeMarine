@@ -154,28 +154,6 @@ def enrich_inventory(inventory, cluster):
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
 
-            if "control-plane" in node["roles"]:
-                # node is both control-plane and worker, thus we remove NoSchedule taint
-                if "taints" not in node:
-                    node["taints"] = []
-                # TODO if-else case should be revised for future Kubernetes releases
-                minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-                if minor_version < 24:
-                    # Do not add taints for upgrade procedure
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                elif minor_version == 24:
-                    # For Kubernetes v1.24 taints for upgrade procedure and installation procedure should be different
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                        node["taints"].append("node-role.kubernetes.io/master:NoSchedule-")
-                    else:
-                        if inventory["services"]["kubeadm"]["kubernetesVersion"] == "v1.24.0":
-                            node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-                elif minor_version > 24:
-                    if cluster.context.get('initial_procedure') != 'upgrade':
-                        node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
-
     # use first control plane internal address as a default bind-address
     # for other control-planes we override it during initialization
     # todo: use patches approach for node-specific options
@@ -392,6 +370,11 @@ def join_control_plane(group, node, join_dict):
             }
         }
 
+    if 'worker' in node['roles']:
+        join_config['nodeRegistration'] = {
+            'taints': []
+        }
+
     configure_container_runtime(group.cluster, join_config)
 
     config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(join_config, default_flow_style=False)
@@ -470,6 +453,11 @@ def init_first_control_plane(group):
             }
         }
 
+    if 'worker' in first_control_plane['roles']:
+        init_config['nodeRegistration'] = {
+            'taints': []
+        }
+
     configure_container_runtime(group.cluster, init_config)
 
     config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(init_config, default_flow_style=False)
@@ -479,7 +467,7 @@ def init_first_control_plane(group):
     log.debug("Uploading init config to initial control_plane...")
     first_control_plane_group.sudo("mkdir -p /etc/kubernetes")
     first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
-    
+
     # copy admission config to first control-plane
     first_control_plane_group.call(admission.copy_pss)
 
