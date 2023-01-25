@@ -385,7 +385,7 @@ def thirdparties_hashes(cluster):
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
-                # TODO zip does not work!
+                # TODO support zip
                 res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo tar xfO %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
