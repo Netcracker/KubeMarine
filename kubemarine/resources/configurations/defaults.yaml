@@ -403,7 +403,7 @@ plugins:
             method: apply_calico_yaml
             arguments:
               calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
-              calico_yaml: './dump/calico-{{ plugins.calico.version }}.yaml'
+              calico_yaml: 'calico-{{ plugins.calico.version }}.yaml'
         - expect:
             daemonsets:
               - calico-node

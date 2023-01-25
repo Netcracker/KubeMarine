@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import io
 import ipaddress
 import ruamel.yaml
+import os
 
 from copy import deepcopy
 
@@ -37,12 +38,18 @@ def enrich_inventory(inventory, cluster):
             inventory["plugins"]["calico"]["install"] = True
 
     if inventory["plugins"]["calico"]["install"]:
-        # Check if original YAML and final YAML have different paths (applicable for non Jinja2 template)
+        # Check if original YAML exists
         items = inventory['plugins']['calico']['installation']['procedures']
         for item in items:
-            if item.get('python', ''):
-                if item['python']["arguments"]["calico_yaml"] == item['python']["arguments"]["calico_original_yaml"]:
-                    raise Exception("'Calico' plugin error: 'calico_yaml' and 'calico_original_yaml' arguments must be different")
+            if item.get('python'):
+                # create config for plugin module
+                calico_original_yaml = item['python']["arguments"]["calico_original_yaml"]
+                config = {
+                    "source": calico_original_yaml
+                }
+                calico_original_yaml_path = plugins.get_source_absolute_pattern(config)
+                if not os.path.isfile(calico_original_yaml_path):
+                    raise Exception(f"Cannot find original Calico manifest {calico_original_yaml_path}")
 
     return inventory
 
@@ -51,12 +58,22 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     """
     The method implements full proccessing for Calico plugin
     :param calico_original_yaml: path to original Calico manifest
-    :param calico_yaml: path to result of Calico manifest
+    :param calico_yaml: file name of the resulting Calico manifest
     :param cluster: Cluster object
     """
 
+    calico_yaml = os.path.basename(calico_yaml)
+    destination = '/etc/kubernetes/%s' % calico_yaml
+
+    # create config for plugin module
+    config = {
+        "source": calico_original_yaml,
+        "destination": destination,
+        "do_render": False
+    }
+
     # get original YAML and parse it into dict of objects
-    calico_original_yaml_path = utils.determine_resource_absolute_path(calico_original_yaml)
+    calico_original_yaml_path = plugins.get_source_absolute_pattern(config)
     obj_list = load_multiple_yaml(calico_original_yaml_path, cluster)
 
     validate_original(cluster, obj_list)
@@ -107,15 +124,15 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
 
     # TODO: check results 
     #validate_result()
-    save_multiple_yaml(calico_yaml, obj_list, cluster)
+    enriched_manifest = dump_multiple_yaml(obj_list)
+    utils.dump_file(cluster, enriched_manifest, calico_yaml)
+    config['source'] = io.StringIO(enriched_manifest)
 
-    # create config for plugin module
-    config = {
-            "source": calico_yaml,
-            "do_render": False
-            }
+    cluster.log.debug("Uploading calico manifest enriched from %s ..." % calico_original_yaml_path)
+    cluster.log.debug("\tDestination: %s" % destination)
 
-    plugins.apply_config(cluster, config)
+    plugins.apply_source(cluster, config)
+
 
 def enrich_configmap_calico_config(cluster, obj_list):
     """
@@ -386,21 +403,18 @@ def load_multiple_yaml(filepath, cluster) -> dict:
         cluster.log.error(f"Failed to load {filepath}", exc)
 
 
-def save_multiple_yaml(filepath, multi_yaml, cluster) -> None:
+def dump_multiple_yaml(multi_yaml: dict) -> str:
     """
-    The method implements the dumping some dictionary as the file that includes several YAMLs inside
-    :param filepath: Path to file that should be created as the result
+    The method implements the dumping some dictionary to the string that includes several YAMLs inside
     :param multi_yaml: dictionary with the 'kind' and 'name' of object as 'key' and whole YAML structure as 'value'
     """
     yaml = ruamel.yaml.YAML()
-    source_yamls = []
-    try:
-        with open(filepath, 'w') as stream:
-            for item in multi_yaml:
-                source_yamls.append(deepcopy(multi_yaml[item]))
-            yaml.dump_all(source_yamls, stream)
-    except Exception as exc:
-        cluster.log.error(f"Failed to save {filepath}", exc)
+
+    with io.StringIO() as stream:
+        yaml.dump_all(multi_yaml.values(), stream)
+        result = stream.getvalue()
+
+    return result
 
 
 def enrich_image(cluster, image):
