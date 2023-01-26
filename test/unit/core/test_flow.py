@@ -236,8 +236,20 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(1, cluster.context.get("test_info"),
                          f"Cumulative point should be skipped as task is not run")
 
+    def test_force_proceed_cumulative_point_end_of_tasks(self):
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+        cumulative_points = {
+            test_func: [flow.END_OF_TASKS]
+        }
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks, cumulative_points=cumulative_points)
+        self.assertEqual(2, cluster.context.get("test_info"),
+                         f"Cumulative point should be executed at the end of tasks")
+
     def test_scheduled_cumulative_point_task_absent(self):
-        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'],
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
                                              parser=flow.new_tasks_flow_parser("Help text"))
         inventory = demo.generate_inventory(**demo.FULLHA)
         cluster = demo.new_cluster(inventory, context=context)
@@ -249,6 +261,27 @@ class FlowTest(unittest.TestCase):
         flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, cluster.context.get("test_info"),
                          f"Cumulative point should be executed despite the related task is not run")
+
+    def test_scheduled_cumulative_point_end_of_tasks(self):
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
+                                             parser=flow.new_tasks_flow_parser("Help text"))
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory, context=context)
+
+        def cumulative_func(cluster: demo.FakeKubernetesCluster):
+            proceeded_tasks = cluster.context["proceeded_tasks"]
+            self.assertIn('deploy.loadbalancer.haproxy', proceeded_tasks,
+                          f"Cumulative point should be executed at the end of tasks")
+            test_func(cluster)
+
+        cumulative_points = {
+            cumulative_func: [flow.END_OF_TASKS]
+        }
+        tasks_copy = deepcopy(tasks)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, cumulative_func)
+        flow.run_tasks(demo.FakeResources(context, inventory, cluster=cluster), tasks_copy, cumulative_points=cumulative_points)
+        self.assertEqual(1, cluster.context.get("test_info"),
+                         f"Cumulative point should be executed at the end of tasks")
 
     def test_detect_nodes_context(self):
         inventory = demo.generate_inventory(**demo.FULLHA)

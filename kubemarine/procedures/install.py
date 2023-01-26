@@ -27,7 +27,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
-from kubemarine.core import flow, utils
+from kubemarine.core import flow, utils, summary
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
@@ -616,8 +616,10 @@ cumulative_points = {
     ],
     system.verify_system: [
         "prepare.system.sysctl"
+    ],
+    summary.exec_delayed: [
+        flow.END_OF_TASKS
     ]
-
 }
 
 

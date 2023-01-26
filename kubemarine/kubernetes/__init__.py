@@ -14,6 +14,7 @@
 
 import io
 import math
+import os
 import time
 from copy import deepcopy
 from typing import List, Dict, Union
@@ -23,7 +24,7 @@ import yaml
 from jinja2 import Template
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, summary
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
@@ -430,6 +431,29 @@ def copy_admin_config(log, nodes):
     nodes.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
 
 
+def fetch_admin_config(cluster: KubernetesCluster) -> str:
+    log = cluster.log
+
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    log.debug(f"Downloading kubeconfig from node {first_control_plane['name']!r}...")
+
+    kubeconfig = list(first_control_plane['connection'].sudo('cat /root/.kube/config').values())[0].stdout
+
+    # Replace cluster FQDN with ip
+    public_cluster_ip = cluster.inventory.get('public_cluster_ip')
+    if public_cluster_ip:
+        cluster_name = cluster.inventory['cluster_name']
+        kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)
+
+    kubeconfig_filename = os.path.abspath("kubeconfig")
+    with open(kubeconfig_filename, 'w') as f:
+        f.write(kubeconfig)
+
+    cluster.log.debug(f"Kubeconfig saved to {kubeconfig_filename}")
+
+    return kubeconfig_filename
+
+
 def get_join_dict(group):
     first_control_plane = group.cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
     token_result = first_control_plane['connection'].sudo("kubeadm token create --print-join-command", hide=False)
@@ -491,14 +515,13 @@ def init_first_control_plane(group):
                                      " --v=5",
                                      hide=False)
 
-    log.debug("Setting up admin-config...")
-    first_control_plane_group.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
+    copy_admin_config(log, first_control_plane_group)
+
+    kubeconfig_filepath = fetch_admin_config(group.cluster)
+    summary.schedule_report(group.cluster.context, summary.SummaryItem.KUBECONFIG, kubeconfig_filepath)
+
     # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
     first_control_plane_group.call(admission.apply_admission)
-
-    log.debug('Downloading admin.conf...')
-    group.cluster.context['kube_config'] = \
-        list(first_control_plane_group.sudo('cat /etc/kubernetes/admin.conf').values())[0].stdout
 
     # Preparing join_dict to init other nodes
     control_plane_lines = list(result.values())[0].stdout. \
@@ -1128,6 +1151,10 @@ def images_prepull(group: NodeGroup):
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
+    summary.schedule_delayed_report(cluster, exec_running_nodes_report)
+
+
+def exec_running_nodes_report(cluster: KubernetesCluster):
     nodes_description = get_nodes_description(cluster)
     actual_roles = get_actual_roles(nodes_description)
     nodes_conditions = get_nodes_conditions(nodes_description)
@@ -1138,12 +1165,14 @@ def schedule_running_nodes_report(cluster: KubernetesCluster):
         for name in nodes_names:
             if role in actual_roles[name]:
                 members += 1
-                if nodes_conditions[name].get('Ready', {}).get('status') == 'True':
+                conditions = nodes_conditions[name]
+                if conditions.get('Ready', {}).get('status') == 'True' \
+                        and conditions.get('NetworkUnavailable', {}).get('status') == 'False':
                     ready += 1
 
-        property = utils.SummaryItem.CONTROL_PLANES if role == 'control-plane' else utils.SummaryItem.WORKERS
+        property = summary.SummaryItem.CONTROL_PLANES if role == 'control-plane' else summary.SummaryItem.WORKERS
         value = f'{ready}/{members}'
-        utils.schedule_summary_report(cluster.context, property, value)
+        summary.schedule_report(cluster.context, property, value)
 
 
 def get_nodes_description_cmd() -> str:

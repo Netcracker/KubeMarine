@@ -702,22 +702,8 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
-    common_group = cluster.nodes['control-plane'].get_first_member()
-
-    cluster.log.debug('Loading kubeconfig from control-plane...')
-    kubeconfig = common_group.sudo("cat /root/.kube/config")
-
-    kubeconfig_stdout = list(kubeconfig.values())[0].stdout
-
-    # Replace cluster FQDN with ip
-    public_cluster_ip = cluster.inventory.get('public_cluster_ip')
-    cluster_name = cluster.inventory.get('cluster_name')
-    kubeconfig_stdout = kubeconfig_stdout.replace(cluster_name, public_cluster_ip)
-
-    cluster.log.debug("Writing config to file...")
-    local_config_path = "config"
-    with open(local_config_path, 'w') as f:
-        f.write(kubeconfig_stdout)
+    from kubemarine import kubernetes
+    local_config_path = kubernetes.fetch_admin_config(cluster)
 
     with open(os.path.join(chart_path, 'Chart.yaml'), 'r') as stream:
         chart_metadata = yaml.safe_load(stream)
