@@ -354,7 +354,7 @@ def thirdparties_hashes(cluster):
                 cluster.log.verbose(f"Can`t get expected sha for {path}, skip it")
                 # Skip checking sha if something went wrong or this sha can't be loaded
                 continue
-        
+
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
             actual_sha = None
             first_host = None
@@ -1097,8 +1097,8 @@ def kubernetes_admission_status(cluster):
         cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
         api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
-        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]                
-        admission_path = "" 
+        ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]
+        admission_path = ""
         for item in ext_args:
             if item.startswith("--"):
                 key = re.split('=',item)[0]

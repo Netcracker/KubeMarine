@@ -28,6 +28,7 @@ This section provides information about the Kubecheck functionality.
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
+    - [015 Kernel version](#015-kernel-version)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -320,6 +321,15 @@ This test checks if defined package repositories are available from nodes.
 *Task*: `software.packages.availability`
 
 This test checks if needed package are available from nodes.
+
+###### 015 Kernel version
+
+*Task*: `software.kernel.version`
+
+This test checks the Linux kernel version for a `unstable kernel version`, if it is equal to a unstable one, it issues a warning
+
+`Unstable kernel version` - is a kernel with detected serious issue that affects any part of cluster, therefore it's unsupported
+
 
 #### PAAS Procedure
 

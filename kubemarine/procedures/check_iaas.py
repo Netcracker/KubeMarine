@@ -288,6 +288,33 @@ def system_distributive(cluster):
         
         tc.success(results=", ".join(detected_supported_os))
 
+def check_kernel_version(cluster):
+    """
+    This method compares the linux kernel version with the bad version
+    """
+    with TestCase(cluster.context['testsuite'], '015', "Software", "Kernel version") as tc:
+        bad_results = {}
+        unstable_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('unstable_kernel')
+        unstable_kernel_centos = []
+        group = cluster.nodes['all']
+        result_group = group.run('uname -r')
+        for connection, results in result_group.items():
+            os_name = cluster.context['nodes'][connection.host]['os']['name']
+            result = results.stdout.rstrip()
+            if os_name == 'ubuntu':
+                if result in unstable_kernel_ubuntu:
+                    bad_results[connection.host] = result
+            elif os_name == 'centos':
+                if result in unstable_kernel_centos:
+                    bad_results[connection.host] = result
+
+        if len(bad_results) > 0:
+            for host, kernel_version in bad_results.items():
+                cluster.log.debug(f"Unstable kernel %s on: %s" % (kernel_version, host))
+            cluster.log.debug(f"Update the linux kernel version to 5.4.0-135-generic")
+            raise TestWarn("Kernel version unstable")
+        else:
+            tc.success("All kernel have stable versions")
 
 def check_access_to_thirdparties(cluster: KubernetesCluster):
     detect_preinstalled_python(cluster)
@@ -867,6 +894,9 @@ tasks = OrderedDict({
         'distributive': system_distributive
     },
     'software': {
+        'kernel': {
+            'version': check_kernel_version
+        },
         'thirdparties': {
             'availability': check_access_to_thirdparties
         },
