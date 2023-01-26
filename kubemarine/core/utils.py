@@ -19,7 +19,7 @@ import sys
 import time
 import tarfile
 
-from typing import Union
+from typing import Union, Tuple
 
 import yaml
 from copy import deepcopy
@@ -147,7 +147,7 @@ def make_ansible_inventory(location, cluster):
             config_compiled += '\n' + string
         config_compiled += '\n\n'
 
-    with open(location, 'w') as configfile:
+    with open_external(location, 'w') as configfile:
         configfile.write(config_compiled)
 
 
@@ -206,7 +206,7 @@ def dump_file(context, data, filename):
             or (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
 
         prepare_dump_directory(args.get('dump_location'), reset_directory=False)
-        with open(get_dump_filepath(context, filename), 'w') as file:
+        with open_utf8(get_dump_filepath(context, filename), 'w') as file:
             file.write(data)
 
 
@@ -214,7 +214,7 @@ def get_dump_filepath(context, filename):
     if context.get("dump_filename_prefix"):
         filename = f"{context['dump_filename_prefix']}_{filename}"
 
-    return get_resource_absolute_path(os.path.join(context['execution_arguments']['dump_location'], filename))
+    return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], filename))
 
 
 def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
@@ -232,55 +232,73 @@ def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hi
     raise Exception("Command failed")
 
 
-def get_resource_absolute_path(path, script_relative=False):
-    initial_relative = ''
-    if script_relative:
-        initial_relative = os.path.dirname(__file__) + '/../'
-    return os.path.abspath(initial_relative + path)
+def open_utf8(path: str, mode='r'):
+    return open(path, mode + 't', encoding='utf-8')
 
 
-def determine_resource_absolute_path(path):
+def open_internal(path: str, mode='r'):
+    return open_utf8(get_internal_resource_path(path), mode)
+
+
+def open_external(path: str, mode='r'):
+    return open_utf8(get_external_resource_path(path), mode)
+
+
+def read_internal(path: str) -> str:
+    with open_internal(path) as f:
+        return f.read()
+
+
+def read_external(path: str) -> str:
+    with open_external(path) as f:
+        return f.read()
+
+
+def get_external_resource_path(path):
+    return os.path.abspath(path)
+
+
+def get_internal_resource_path(path: str) -> str:
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', path)
+    )
+
+
+def determine_resource_absolute_file(path: str) -> Tuple[str, bool]:
+    """
+    Get and verify absolute path to resource file
+    :param path: Relative path to resource
+    :return: Tuple of absolute path to resource file and flag defining if is an external resource
+    """
     # is resource exists as it is defined?
-    initial_definition = get_resource_absolute_path(path, script_relative=False)
+    initial_definition = get_external_resource_path(path)
     if os.path.isfile(initial_definition):
-        return initial_definition
+        return initial_definition, True
 
     # is resource exists as internal resource?
-    patched_definition = get_resource_absolute_path(path, script_relative=True)
+    patched_definition = get_internal_resource_path(path)
     if os.path.isfile(patched_definition):
-        return patched_definition
+        return patched_definition, False
 
     raise Exception('Requested resource %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
 
-def get_resource_absolute_dir(path: str, script_relative=False) -> str:
-    """
-    Get absolute path to resource directory
-    :param path: Relative path to resource
-    :param script_relative: True, if resource is internal
-    :return: Absolute path to resource directory
-    """
-    initial_relative = ''
-    if script_relative:
-        initial_relative = os.path.dirname(__file__) + '/../'
-    return os.path.abspath(os.path.dirname(initial_relative + path))
-
-
-def determine_resource_absolute_dir(path: str) -> str:
+def determine_resource_absolute_dir(path: str) -> Tuple[str, bool]:
     """
     Get and verify absolute path to resource directory
     :param path: Relative path to resource
-    :return: Absolute path to resource directory
+    :return: Tuple of absolute path to resource directory and flag defining if is an external resource
     """
+    dirname = os.path.dirname(path)
     # is resource dir exists as it is defined?
-    initial_definition = get_resource_absolute_dir(path, script_relative=False)
+    initial_definition = get_external_resource_path(dirname)
     if os.path.isdir(initial_definition):
-        return initial_definition
+        return initial_definition, True
 
     # is resource dir exists as internal resource?
-    patched_definition = get_resource_absolute_dir(path, script_relative=True)
+    patched_definition = get_internal_resource_path(dirname)
     if os.path.isdir(patched_definition):
-        return patched_definition
+        return patched_definition, False
 
     raise Exception(
         'Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
@@ -288,7 +306,7 @@ def determine_resource_absolute_dir(path: str) -> str:
 
 def load_yaml(filepath) -> dict:
     try:
-        with open(filepath, 'r') as stream:
+        with open_utf8(filepath, 'r') as stream:
             return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
@@ -310,12 +328,11 @@ def true_or_false(value):
 
 
 def get_version_filepath():
-    return get_resource_absolute_path("version", script_relative=True)
+    return get_internal_resource_path("version")
 
 
 def get_version():
-    with open(get_version_filepath(), 'r') as f:
-        return f.read().strip()
+    return read_internal(get_version_filepath()).strip()
 
 
 class ClusterStorage:

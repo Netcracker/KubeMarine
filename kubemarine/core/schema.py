@@ -36,14 +36,14 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     for_procedure = "" if schema_name == 'cluster' else f" for procedure '{schema_name}'"
 
     root_schema_resource = f'resources/schemas/{schema_name}.json'
-    root_schema = utils.get_resource_absolute_path(root_schema_resource, script_relative=True)
+    root_schema = utils.get_internal_resource_path(root_schema_resource)
     root_schema = pathlib.Path(root_schema)
     if not root_schema.exists():
         if schema_name == 'cluster' or inventory:
             raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
         return
 
-    with open(root_schema, 'r') as f:
+    with utils.open_internal(root_schema_resource) as f:
         schema = json.load(f)
 
     validator_cls = jsonschema.validators.validator_for(schema)

@@ -31,7 +31,7 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import yaml
 
@@ -72,9 +72,7 @@ def enrich_upgrade_inventory(inventory, cluster):
     if cluster.context.get("initial_procedure") != "upgrade":
         return inventory
 
-    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
-            as stream:
-        base_plugins = yaml.safe_load(stream)["plugins"]
+    base_plugins = static.DEFAULTS["plugins"]
     current_plugins = deepcopy(inventory["plugins"])
 
     # validate all plugin sections in procedure inventory
@@ -533,7 +531,7 @@ def verify_python(cluster, step):
 
 
 def apply_python(cluster, step, plugin_name=None):
-    module_path = utils.determine_resource_absolute_path(step['module'])
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
 
@@ -662,14 +660,12 @@ def convert_ansible(cluster, config):
     return config
 
 
-def _get_absolute_playbook(config):
-    return utils.determine_resource_absolute_path(config['playbook'])
+def _get_absolute_playbook(config) -> str:
+    return utils.determine_resource_absolute_file(config['playbook'])[0]
 
 
 def verify_ansible(cluster: KubernetesCluster, config):
-    playbook_path = _get_absolute_playbook(config)
-    if not os.path.isfile(playbook_path):
-        raise Exception('Playbook file %s not exists' % config['playbook'])
+    _get_absolute_playbook(config)
     if cluster.is_deploying_from_windows():
         raise Exception("Executing of playbooks on Windows deployer is currently not supported")
     # TODO: verify fields types and contents
@@ -713,7 +709,7 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
     from kubemarine import kubernetes
     local_config_path = kubernetes.fetch_admin_config(cluster)
 
-    with open(os.path.join(chart_path, 'Chart.yaml'), 'r') as stream:
+    with utils.open_external(os.path.join(chart_path, 'Chart.yaml'), 'r') as stream:
         chart_metadata = yaml.safe_load(stream)
         chart_name = chart_metadata["name"]
 
@@ -753,7 +749,7 @@ def process_chart_values(config, local_chart_path):
     config_values_file = config.get("values_file")
 
     if config_values is not None:
-        with open(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
+        with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
             original_values = yaml.safe_load(stream)
             stream.seek(0)
             merged_values = default_merger.merge(original_values, config_values)
@@ -761,8 +757,8 @@ def process_chart_values(config, local_chart_path):
             stream.truncate()
     else:
         if config_values_file is not None:
-            with open(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
-                with open(config_values_file, 'r+') as additional_stream:
+            with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
+                with utils.open_external(config_values_file, 'r+') as additional_stream:
                     original_values = yaml.safe_load(stream)
                     additional_values = yaml.safe_load(additional_stream)
                     if additional_values is None:
@@ -847,11 +843,10 @@ def _convert_file(config):
     return config
 
 
-def get_source_absolute_pattern(config):
-    return os.path.join(
-        utils.determine_resource_absolute_dir(config['source']),
-        os.path.basename(config['source'])
-    )
+def get_source_absolute_pattern(config) -> Tuple[str, bool]:
+    abs_dir, is_external = utils.determine_resource_absolute_dir(config['source'])
+    basename = os.path.basename(config['source'])
+    return os.path.join(abs_dir, basename), is_external
 
 
 def _verify_file(config, file_type):
@@ -861,7 +856,7 @@ def _verify_file(config, file_type):
     """
 
     # Determite absolute path to templates
-    source = get_source_absolute_pattern(config)
+    source, _ = get_source_absolute_pattern(config)
     files = glob.glob(source)
 
     if len(files) == 0:
@@ -869,9 +864,8 @@ def _verify_file(config, file_type):
                         'source value: %s' % (file_type, source))
 
     for file in files:
-        source = utils.determine_resource_absolute_path(file)
-        if not os.path.isfile(source):
-            raise Exception('%s file %s not exists' % (file_type, source))
+        if not os.path.isfile(file):
+            raise Exception('%s resource %s is not a file' % (file_type, file))
         # TODO: verify fields types and contents
 
 
@@ -883,7 +877,8 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
     log = cluster.log
     do_render = config.get('do_render', True)
 
-    files = glob.glob(get_source_absolute_pattern(config))
+    source, is_external = get_source_absolute_pattern(config)
+    files = glob.glob(source)
 
     for file in files:
         cfg_copy = dict(config)
@@ -897,11 +892,14 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
                 source_filename = split_extension[0]
 
             render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
-            with open(file) as template_stream:
+            with utils.open_utf8(file, 'r') as template_stream:
                 generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
 
             utils.dump_file(cluster, generated_data, source_filename)
             source = io.StringIO(generated_data)
+        elif not is_external:
+            with utils.open_utf8(file, 'r') as config_stream:
+                source = io.StringIO(config_stream.read())
 
         cfg_copy['source'] = source
 

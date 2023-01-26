@@ -66,18 +66,13 @@
             "nodes": {
               "$ref": "../common/node_ref.json#/definitions/Names",
               "description": "The list of node names where the file should be uploaded"
-            },
-            "binary": {
-              "type": "boolean",
-              "default": true,
-              "description": "Specifies whether to treat the file as binary or as text"
             }
           },
           "required": ["source"],
           "propertyNames": {
             "anyOf": [
               {"$ref": "#/definitions/MinimalThirdPartyPropertyNames"},
-              {"enum": ["owner", "mode", "unpack", "group", "groups", "node", "nodes", "binary"]}
+              {"enum": ["owner", "mode", "unpack", "group", "groups", "node", "nodes"]}
             ]
           }
         }

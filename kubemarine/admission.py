@@ -469,9 +469,9 @@ def delete_default_pss(cluster):
 def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
     if manage_type not in ["apply", "delete"]:
         raise Exception("unexpected manage type for privileged policy")
-    local_path = utils.get_resource_absolute_path(os.path.join(policies_file_path, filename), script_relative=True)
+    privileged_policy = utils.read_internal(os.path.join(policies_file_path, filename))
     remote_path = tmp_filepath_pattern % filename
-    group.put(local_path, remote_path, backup=True, sudo=True, binary=False)
+    group.put(io.StringIO(privileged_policy), remote_path, backup=True, sudo=True)
 
     return group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
 
@@ -499,9 +499,8 @@ def resolve_oob_scope(oob_policies_conf, selector):
 def load_oob_policies_files():
     oob_policies = {}
     for oob_name in provided_oob_policies:
-        local_path = utils.get_resource_absolute_path(os.path.join(policies_file_path, "%s.yaml" % oob_name),
-                                                      script_relative=True)
-        with open(local_path) as stream:
+        local_path = os.path.join(policies_file_path, "%s.yaml" % oob_name)
+        with utils.open_internal(local_path) as stream:
             oob_policies[oob_name] = yaml.safe_load(stream)
 
     return oob_policies
@@ -808,7 +807,7 @@ def copy_pss(group):
     defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
     exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
     # create admission config from template and cluster.yaml
-    admission_config = Template(open(utils.get_resource_absolute_path(admission_template, script_relative=True)).read())\
+    admission_config = Template(utils.read_internal(admission_template))\
                        .render(defaults=defaults,exemptions=exemptions)
 
     # put admission config on every control-planes

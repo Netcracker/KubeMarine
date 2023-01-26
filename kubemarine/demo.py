@@ -336,7 +336,7 @@ class FakeNodeGroup(group.NodeGroup):
     def __init__(self, connections: Connections, cluster_: FakeKubernetesCluster):
         super().__init__(connections, cluster_)
 
-    def get_local_file_sha1(self, filename, open_mode: str):
+    def get_local_file_sha1(self, filename):
         return '0'
 
     def get_remote_file_sha1(self, filename):

@@ -118,7 +118,7 @@ def install(cluster: KubernetesCluster):
 
     cluster.log.debug('\nSaving tokens...')
     token_filename = os.path.abspath('account-tokens.yaml')
-    with open(token_filename, 'w') as tokenfile:
+    with utils.open_external(token_filename, 'w') as tokenfile:
         tokenfile.write(yaml.dump(tokens, default_flow_style=False))
         cluster.log.debug('Tokens saved to %s' % token_filename)
 

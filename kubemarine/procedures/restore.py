@@ -33,7 +33,7 @@ from kubemarine import system, kubernetes, etcd
 def missing_or_empty(file):
     if not os.path.exists(file):
         return True
-    content = open(file, 'r').read()
+    content = utils.read_external(file)
     if re.search(r'^\s*$', content):
         return True
 
@@ -41,7 +41,7 @@ def missing_or_empty(file):
 def replace_config_from_backup_if_needed(procedure_inventory_filepath, config):
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
-        with open(utils.get_resource_absolute_path(procedure_inventory_filepath), 'r') as stream:
+        with utils.open_external(procedure_inventory_filepath, 'r') as stream:
             procedure = yaml.safe_load(stream)
         backup_location = procedure.get("backup_location")
         if not backup_location:
@@ -61,7 +61,7 @@ def unpack_data(cluster):
     if not backup_file_source:
         raise Exception('Backup source not specified in procedure')
 
-    backup_file_source = utils.get_resource_absolute_path(backup_file_source)
+    backup_file_source = utils.get_external_resource_path(backup_file_source)
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
@@ -84,7 +84,7 @@ def unpack_data(cluster):
     if not os.path.isfile(descriptor_filepath):
         raise FileNotFoundError('Descriptor not found in backup file')
 
-    with open(descriptor_filepath, 'r') as stream:
+    with utils.open_external(descriptor_filepath, 'r') as stream:
         cluster.context['backup_descriptor'] = yaml.safe_load(stream)
 
 

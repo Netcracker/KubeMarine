@@ -84,7 +84,6 @@ services:
     /usr/bin/etcdctl:
       source: 'resources/scripts/etcdctl.sh'
       group: control-plane
-      binary: false
     /usr/bin/kubeadm:
       source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
     /usr/bin/kubelet:

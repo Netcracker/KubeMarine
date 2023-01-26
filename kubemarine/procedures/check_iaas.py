@@ -12,10 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import io
 import ipaddress
 import math
+import os
 import re
 import sys
 import uuid
@@ -322,10 +322,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
 
     # Load script for checking sources
     all_group = cluster.nodes['all']
-    local_path = utils.get_resource_absolute_path("resources/scripts/check_url_availability.py",
-                                                  script_relative=True)
+    check_script = utils.read_internal("resources/scripts/check_url_availability.py")
     random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
-    all_group.put(local_path, random_temp_path, binary=False)
+    all_group.put(io.StringIO(check_script), random_temp_path)
 
     for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
         # Check if curl
@@ -363,7 +362,7 @@ def check_resolv_conf(cluster: KubernetesCluster):
         # Create temp resolv.conf file
         resolv_conf_buffer = system.get_resolv_conf_buffer(cluster.inventory["services"].get("resolv.conf"))
         random_resolv_conf_path = "/tmp/%s.conf" % uuid.uuid4().hex
-        group.put(resolv_conf_buffer, random_resolv_conf_path, binary=False)
+        group.put(resolv_conf_buffer, random_resolv_conf_path)
 
         # Compare with existed resolv.conf
         with RemoteExecutor(cluster) as exe:
@@ -436,24 +435,25 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                 else:
                     broken.append(f"Found broken repository: '{repo_name}'")
         elif isinstance(repositories, str):
-            # String value
+            path = utils.get_external_resource_path(repositories)
+            if not os.path.isfile(path):
+                broken.append(f"File {path} with the repositories content does not exist")
+            repositories = utils.read_external(path)
             for repo in repositories.split('\n'):
                 repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
                 if repository_url is not None:
                     repository_urls.add(repository_url)
             if not repository_urls:
-                broken.append(f"Repositories configuration is broken: '{repositories}'")
-        elif repositories is not None:
-            broken.append(f"Repositories configuration is broken: '{repositories}'")
+                broken.append(f"Failed to detect repository URLs in file {path}")
+
         repository_urls = list(repository_urls)
         cluster.log.debug(f"Repositories to check: {repository_urls}")
 
         # Load script for checking sources
         all_group = cluster.nodes['all']
-        local_path = utils.get_resource_absolute_path("resources/scripts/check_url_availability.py",
-                                                  script_relative=True)
+        check_script = utils.read_internal("resources/scripts/check_url_availability.py")
         random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
-        all_group.put(local_path, random_temp_path, binary=False)
+        all_group.put(io.StringIO(check_script), random_temp_path)
 
         if repository_urls:
             with RemoteExecutor(cluster) as exe:
@@ -782,9 +782,9 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
 def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
     detect_preinstalled_python(cluster)
     # currently tcp listener can be run on both python 2 and 3
-    local_path = utils.get_resource_absolute_path('resources/scripts/simple_tcp_listener.py', script_relative=True)
+    check_script = utils.read_internal('resources/scripts/simple_tcp_listener.py')
     tcp_listener = "/tmp/%s.py" % uuid.uuid4().hex
-    cluster.make_group(list(nodes.keys())).put(local_path, tcp_listener, binary=False)
+    cluster.make_group(list(nodes.keys())).put(io.StringIO(check_script), tcp_listener)
 
     skipped_nodes = {}
     nodes_to_rollback = cluster.make_group([])
