@@ -363,14 +363,14 @@ def join_control_plane(group, node, join_dict):
     }
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
-            'external-cloud-volume-plugin'):
+            'external-cloud-volume-plugin') and 'worker' in node['roles']:
         join_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
                 'cloud-provider': 'external'
-            }
+            },
+            'taints': []
         }
-
-    if 'worker' in node['roles']:
+    else:
         join_config['nodeRegistration'] = {
             'taints': []
         }
@@ -446,14 +446,14 @@ def init_first_control_plane(group):
     }
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
-            'external-cloud-volume-plugin'):
+            'external-cloud-volume-plugin') and 'worker' in first_control_plane['roles']:
         init_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
                 'cloud-provider': 'external'
-            }
+            },
+            'taints': []
         }
-
-    if 'worker' in first_control_plane['roles']:
+    else:
         init_config['nodeRegistration'] = {
             'taints': []
         }
