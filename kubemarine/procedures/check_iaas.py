@@ -438,13 +438,14 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
             path = utils.get_external_resource_path(repositories)
             if not os.path.isfile(path):
                 broken.append(f"File {path} with the repositories content does not exist")
-            repositories = utils.read_external(path)
-            for repo in repositories.split('\n'):
-                repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
-                if repository_url is not None:
-                    repository_urls.add(repository_url)
-            if not repository_urls:
-                broken.append(f"Failed to detect repository URLs in file {path}")
+            else:
+                repositories = utils.read_external(path)
+                for repo in repositories.split('\n'):
+                    repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
+                    if repository_url is not None:
+                        repository_urls.add(repository_url)
+                if not repository_urls:
+                    broken.append(f"Failed to detect repository URLs in file {path}")
 
         repository_urls = list(repository_urls)
         cluster.log.debug(f"Repositories to check: {repository_urls}")
