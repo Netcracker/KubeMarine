@@ -89,14 +89,14 @@ class TestFakeFS(unittest.TestCase):
 
         self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal")
 
-    def test_put_stringio(self):
+    def test_put_bytesio(self):
         self.cluster.fake_fs.reset()
 
-        expected_data = io.StringIO('hello\nworld')
+        expected_data = io.BytesIO(b'hello\nworld')
         node_hostname = list(self.cluster.nodes['master'].nodes.keys())[0]
 
         self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', expected_data)
-        actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
+        actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt').encode('utf-8')
 
         self.assertEqual(expected_data.getvalue(), actual_data, msg="Written and read data are not equal")
 
