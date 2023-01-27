@@ -370,7 +370,14 @@ def join_control_plane(group, node, join_dict):
             },
             'taints': []
         }
-    else:
+    elif group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
+            'external-cloud-volume-plugin'):
+        join_config['nodeRegistration'] = {
+            'kubeletExtraArgs': {
+                'cloud-provider': 'external'
+            }
+        }
+    elif 'worker' in node['roles']:
         join_config['nodeRegistration'] = {
             'taints': []
         }
@@ -453,7 +460,14 @@ def init_first_control_plane(group):
             },
             'taints': []
         }
-    else:
+    elif group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
+            'external-cloud-volume-plugin'):
+        init_config['nodeRegistration'] = {
+            'kubeletExtraArgs': {
+                'cloud-provider': 'external'
+            }
+        }
+    elif 'worker' in first_control_plane['roles']:
         init_config['nodeRegistration'] = {
             'taints': []
         }
