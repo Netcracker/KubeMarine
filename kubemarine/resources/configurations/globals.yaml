@@ -52,7 +52,7 @@ pods:
       retries: 30
     plugins:
       timeout: 5
-      retries: 45
+      retries: 360
   critical_states:
     - Error
     - ErrImagePull
