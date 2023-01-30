@@ -342,7 +342,7 @@ def join_new_control_plane(group):
 def join_control_plane(group, node, join_dict):
     log = group.cluster.log
 
-    join_config = {
+    join_config: dict = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'JoinConfiguration',
         'discovery': {
@@ -363,24 +363,15 @@ def join_control_plane(group, node, join_dict):
     }
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
-            'external-cloud-volume-plugin') and 'worker' in node['roles']:
-        join_config['nodeRegistration'] = {
-            'kubeletExtraArgs': {
-                'cloud-provider': 'external'
-            },
-            'taints': []
-        }
-    elif group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
         join_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
                 'cloud-provider': 'external'
             }
         }
-    elif 'worker' in node['roles']:
-        join_config['nodeRegistration'] = {
-            'taints': []
-        }
+
+    if 'worker' in node['roles']:
+        join_config.setdefault('nodeRegistration', {})['taints'] = []
 
     configure_container_runtime(group.cluster, join_config)
 
@@ -444,7 +435,7 @@ def init_first_control_plane(group):
     first_control_plane = group.get_first_member(provide_node_configs=True)
     first_control_plane_group = first_control_plane["connection"]
 
-    init_config = {
+    init_config: dict = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
@@ -453,24 +444,15 @@ def init_first_control_plane(group):
     }
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
-            'external-cloud-volume-plugin') and 'worker' in first_control_plane['roles']:
-        init_config['nodeRegistration'] = {
-            'kubeletExtraArgs': {
-                'cloud-provider': 'external'
-            },
-            'taints': []
-        }
-    elif group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
         init_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
                 'cloud-provider': 'external'
             }
         }
-    elif 'worker' in first_control_plane['roles']:
-        init_config['nodeRegistration'] = {
-            'taints': []
-        }
+
+    if 'worker' in first_control_plane['roles']:
+        init_config.setdefault('nodeRegistration', {})['taints'] = []
 
     configure_container_runtime(group.cluster, init_config)
 
