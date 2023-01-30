@@ -253,6 +253,7 @@ def expect_replicaset(cluster: KubernetesCluster,
 
     raise Exception('In the expected time, the ReplicaSets did not become ready')
 
+
 def expect_statefulset(cluster: KubernetesCluster,
                        statefulsets_names: List[str] or List[Dict[str, str]],
                        timeout: int = None,
