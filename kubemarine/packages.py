@@ -326,6 +326,17 @@ def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroup
     return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
 
 
+def no_changes_found(group: NodeGroup, action: callable, result: fabric.runners.Result) -> bool:
+    pkg_mgr = get_package_manager(group)
+    if action is install:
+        action = pkg_mgr.install
+    elif action is upgrade:
+        action = pkg_mgr.upgrade
+    elif action is remove:
+        action = pkg_mgr.remove
+    return pkg_mgr.no_changes_found(action, result)
+
+
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     if os_family in ["rhel", "rhel8"]:
         cmd = r"rpm -q %s" % package_name

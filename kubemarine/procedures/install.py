@@ -341,8 +341,8 @@ def manage_custom_packages(group: NodeGroup):
     for action, results in batch_results.items():
         cluster.log.verbose('Verifying packages changes after \'%s\' action...' % action)
         for conn, result in results.items():
-            if "Nothing to do" not in result.stdout \
-                    and "0 upgraded, 0 newly installed, 0 to remove" not in result.stdout:
+            node = cluster.make_group([conn])
+            if not packages.no_changes_found(node, action, result):
                 cluster.log.verbose('Packages changed at %s' % conn.host)
                 any_changes_found = True
 

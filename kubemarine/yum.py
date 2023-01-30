@@ -15,6 +15,8 @@
 import configparser
 import io
 
+import fabric
+
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 
@@ -111,6 +113,17 @@ def upgrade(group, include=None, exclude=None, **kwargs):
         command += ' --exclude=%s' % exclude
 
     return group.sudo(command, **kwargs)
+
+
+def no_changes_found(action: callable, result: fabric.runners.Result) -> bool:
+    if action is install:
+        return "Nothing to do" in result.stdout
+    elif action is upgrade:
+        return "No packages marked for update" in result.stdout
+    elif action is remove:
+        return "No Packages marked for removal" in result.stdout
+    else:
+        raise Exception(f"Unknown action {action}")
 
 
 def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
