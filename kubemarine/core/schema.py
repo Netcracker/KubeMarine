@@ -59,11 +59,7 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
 
     context = cluster.context
     logger = cluster.log
-    # TODO remove in next release
-    ignore_schema_errors = context['execution_arguments']['ignore_schema_errors']
-
-    log_method = logger.warning if ignore_schema_errors else logger.error
-    log_method(f"Inventory file{for_procedure} is failed to be validated against the schema.")
+    logger.error(f"Inventory file{for_procedure} is failed to be validated against the schema.")
 
     errs = _resolve_errors(errs)
     for err in errs:
@@ -83,14 +79,6 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
            f"or its public alternative {public_schema}\n"
 
     msg = _error_msg(validator, errs[0])
-    if ignore_schema_errors:
-        context['schema_errors_ignored'] = True
-        logger.warning(msg + "\n\n" + hint)
-        return
-    else:
-        hint += f"If you are sure that the file is correct, please contact support,\n" \
-                f"and use --ignore-schema-errors to proceed (option will be removed in next release).\n"
-
     raise errors.FailException(msg, hint=hint)
 
 
