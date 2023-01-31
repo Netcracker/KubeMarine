@@ -261,6 +261,8 @@ def verify_upgrade_plan(upgrade_plan):
     previous_version = None
     for i in range(0, len(upgrade_plan)):
         version = upgrade_plan[i]
+        if version == 'v1.24.0':
+            raise Exception('Attempt to upgrade to an unstable version of kubernetes')
         if previous_version is not None:
             kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
