@@ -177,13 +177,15 @@ def enrich_inventory(inventory, cluster):
                     if cluster.context.get('initial_procedure') != 'upgrade':
                         node["taints"].append("node-role.kubernetes.io/control-plane:NoSchedule-")
 
-    # use first control plane internal address as a default bind-address
-    # for other control-planes we override it during initialization
-    # todo: use patches approach for node-specific options
-    for node in inventory["nodes"]:
-        if "control-plane" in node["roles"] and "remove_node" not in node["roles"]:
-            inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
-            break
+    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+    if "v1.21" in inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        # use first control plane internal address as a default bind-address
+        # for other control-planes we override it during initialization
+        # todo: use patches approach for node-specific options
+        for node in inventory["nodes"]:
+            if "control-plane" in node["roles"] and "remove_node" not in node["roles"]:
+                inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
+                break
 
     if not any_worker_found:
         raise KME("KME0004")
@@ -264,7 +266,7 @@ def reset_installation_env(group: NodeGroup):
         result = active_nodes.sudo(
             'sudo kubeadm reset phase cleanup-node; '  # it is required to "cleanup-node" for all procedures
             'sudo systemctl stop kubelet; '
-            'sudo rm -rf /etc/kubernetes/manifests /var/lib/kubelet/pki /var/lib/etcd; '
+            'sudo rm -rf /etc/kubernetes/manifests /var/lib/kubelet/pki /var/lib/etcd /etc/kubernetes/patches; '
             'sudo mkdir -p /etc/kubernetes/manifests; ', warn=True)
 
         # Disabled initial prune for images prepull feature. Need analysis for possible negative impact.
@@ -382,6 +384,9 @@ def join_control_plane(group, node, join_dict):
             'localAPIEndpoint': {
                 'advertiseAddress': node['internal_address'],
             }
+        },
+        'patches': {
+            'directory': '/etc/kubernetes/patches'
         }
     }
 
@@ -403,25 +408,62 @@ def join_control_plane(group, node, join_dict):
     node['connection'].sudo("mkdir -p /etc/kubernetes")
     node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
+    # put control-plane patches
+    node['connection'].sudo("mkdir -p /etc/kubernetes/patches")
+
+    control_plane_patch_files = {
+        'apiServer' : 'kube-apiserver+json.json',
+        'etcd' : 'etcd+json.json',
+        'controllerManager' : 'kube-controller-manager+json.json',
+        'scheduler' : 'kube-scheduler_json.json',
+        'kubelet' : 'kubeletconfiguration.yaml'
+    }
+
+    # read patches content from inventory and upload patch files to a node
+    for control_plane_item in group.cluster.inventory['services']['kubeadm_patches']:
+        patched_flags = get_patched_flags_for_control_plane_item(group.cluster.inventory, control_plane_item, node)
+        if patched_flags:
+            control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
+                                 control_plane_patch_files[control_plane_item] + '.j2',
+                                 script_relative=True)).read()).render(flags=patched_flags)
+            node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
+                                 control_plane_patch_files[control_plane_item], sudo=True)
+            node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
+                                 control_plane_patch_files[control_plane_item])
+
+
     # copy admission config to control-plane
     admission.copy_pss(node['connection'])
 
     # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
     log.debug('Joining control-plane \'%s\'...' % node['name'])
 
-    node['connection'].sudo("kubeadm join "
+    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+    # and only "else" branch remains
+    if "v1.21" in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        node['connection'].sudo("kubeadm join "
                             " --config=/etc/kubernetes/join-config.yaml"
                             " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
                             " --v=5",
                             is_async=False, hide=False)
 
-    log.debug("Patching apiServer bind-address for control-plane %s" % node['name'])
+        log.debug("Patching apiServer bind-address for control-plane %s" % node['name'])
 
-    with RemoteExecutor(group.cluster):
-        node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
-                                "/etc/kubernetes/manifests/kube-apiserver.yaml" % node['internal_address'])
-        node['connection'].sudo("systemctl restart kubelet")
-        copy_admin_config(log, node['connection'])
+        with RemoteExecutor(group.cluster):
+            node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
+                                    "/etc/kubernetes/manifests/kube-apiserver.yaml" % node['internal_address'])
+            node['connection'].sudo("systemctl restart kubelet")
+            copy_admin_config(log, node['connection'])
+    else:
+        node['connection'].sudo("kubeadm join "
+                           " --config=/etc/kubernetes/join-config.yaml "
+                           " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+                            " --v=5",
+                            is_async=False, hide=False)
+        with RemoteExecutor(group.cluster):
+            node['connection'].sudo("systemctl restart kubelet")
+            copy_admin_config(log, node['connection'])
+       
 
     wait_for_any_pods(group.cluster, node['connection'], apply_filter=node['name'])
 
@@ -483,6 +525,9 @@ def init_first_control_plane(group):
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
             'advertiseAddress': first_control_plane['internal_address']
+        },
+        'patches': {
+            'directory': '/etc/kubernetes/patches'
         }
     }
 
@@ -503,7 +548,30 @@ def init_first_control_plane(group):
     log.debug("Uploading init config to initial control_plane...")
     first_control_plane_group.sudo("mkdir -p /etc/kubernetes")
     first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
-    
+
+    # put control-plane patches
+    first_control_plane_group.sudo("mkdir -p /etc/kubernetes/patches")
+
+    control_plane_patch_files = {
+        'apiServer' : 'kube-apiserver+json.json',
+	'etcd' : 'etcd+json.json',
+	'controllerManager' : 'kube-controller-manager+json.json',
+	'scheduler' : 'kube-scheduler_json.json',
+	'kubelet' : 'kubeletconfiguration.yaml'
+    }
+
+    # read patches content from inventory and upload patch files to a node
+    for control_plane_item in group.cluster.inventory['services']['kubeadm_patches']:
+        patched_flags = get_patched_flags_for_control_plane_item(group.cluster.inventory, control_plane_item, first_control_plane)
+        if patched_flags:
+            control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' + 
+                                 control_plane_patch_files[control_plane_item] + '.j2',
+                                 script_relative=True)).read()).render(flags=patched_flags)
+            first_control_plane['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' + 
+                                 control_plane_patch_files[control_plane_item], sudo=True)
+            first_control_plane['connection'].sudo('chmod 644 /etc/kubernetes/patches/' + 
+                                 control_plane_patch_files[control_plane_item])
+
     # copy admission config to first control-plane
     first_control_plane_group.call(admission.copy_pss)
 
@@ -617,6 +685,9 @@ def init_workers(group):
                     join_dict['discovery-token-ca-cert-hash']
                 ]
             }
+        },
+        'patches': {
+            'directory': '/etc/kubernetes/patches'
         }
     }
 
@@ -637,12 +708,46 @@ def init_workers(group):
     group.sudo("mkdir -p /etc/kubernetes")
     group.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
+    # put control-plane patches
+    group.sudo("mkdir -p /etc/kubernetes/patches")
+
+    control_plane_patch_files = {
+        'kubelet' : 'kubeletconfiguration.yaml'
+    }
+
+    # read patches content from inventory and upload patch files to a node
+    for node in group.get_ordered_members_list(provide_node_configs=True):
+        for control_plane_item in group.cluster.inventory['services']['kubeadm_patches']:
+            # we need only those from control_plane_patch_files
+            if control_plane_item in control_plane_patch_files:
+                patched_flags = get_patched_flags_for_control_plane_item(group.cluster.inventory, control_plane_item, node)
+                if patched_flags:
+                    # create patch file for this control plane item
+                    control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
+                                         control_plane_patch_files[control_plane_item] + '.j2',
+                                         script_relative=True)).read()).render(flags=patched_flags)
+                    node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
+                                         control_plane_patch_files[control_plane_item], sudo=True)
+                    node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
+                                         control_plane_patch_files[control_plane_item])
+
+
     group.cluster.log.debug('Joining workers...')
-    return group.sudo(
-        "kubeadm join --config=/etc/kubernetes/join-config.yaml"
-        " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-        " --v=5",
-        is_async=False, hide=False)
+
+    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+    # and only "else" branch remains
+    if "v1.21" in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        return group.sudo(
+            "kubeadm join --config=/etc/kubernetes/join-config.yaml"
+            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+            " --v=5",
+            is_async=False, hide=False)
+    else:
+        return group.sudo(
+            "kubeadm join --config=/etc/kubernetes/join-config.yaml"
+            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+            " --v=5",
+            is_async=False, hide=False)
 
 def apply_labels(group):
     log = group.cluster.log
@@ -720,7 +825,36 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=N
 
     cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
 
-    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
+    # put control-plane patches
+    first_control_plane['connection'].sudo("sudo rm -rf /etc/kubernetes/patches && sudo mkdir -p /etc/kubernetes/patches")
+    
+    control_plane_patch_files = {
+        'apiServer' : 'kube-apiserver+json.json',
+        'etcd' : 'etcd+json.json',
+        'controllerManager' : 'kube-controller-manager+json.json',
+        'scheduler' : 'kube-scheduler_json.json',
+        'kubelet' : 'kubeletconfiguration.yaml'
+    }
+
+    # read patches content from inventory and upload patch files to a node
+    for control_plane_item in cluster.inventory['services']['kubeadm_patches']:
+        patched_flags = get_patched_flags_for_control_plane_item(cluster.inventory, control_plane_item, first_control_plane)
+        if patched_flags:
+            control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
+                                 control_plane_patch_files[control_plane_item] + '.j2',
+                                 script_relative=True)).read()).render(flags=patched_flags)
+            first_control_plane['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
+                                 control_plane_patch_files[control_plane_item], sudo=True)
+            first_control_plane['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
+                                 control_plane_patch_files[control_plane_item])
+
+
+    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+    # and only "else" branch remains
+    if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
+    else:
+        flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s' --patches=/etc/kubernetes/patches" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
 
     if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"
@@ -754,6 +888,30 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=
 
             cluster.log.debug("Upgrading control-plane \"%s\"" % node['name'])
 
+            # put control-plane patches
+            node['connection'].sudo("sudo rm -rf /etc/kubernetes/patches && sudo mkdir -p /etc/kubernetes/patches")
+
+            control_plane_patch_files = {
+                'apiServer' : 'kube-apiserver+json.json',
+                'etcd' : 'etcd+json.json',
+                'controllerManager' : 'kube-controller-manager+json.json',
+                'scheduler' : 'kube-scheduler_json.json',
+                'kubelet' : 'kubeletconfiguration.yaml'
+            }
+
+            # read patches content from inventory and upload patch files to a node
+            for control_plane_item in cluster.inventory['services']['kubeadm_patches']:
+                patched_flags = get_patched_flags_for_control_plane_item(cluster.inventory, control_plane_item, node)
+                if patched_flags:
+                    control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
+                                         control_plane_patch_files[control_plane_item] + '.j2',
+                                         script_relative=True)).read()).render(flags=patched_flags)
+                    node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
+                                         control_plane_patch_files[control_plane_item], sudo=True)
+                    node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
+                                         control_plane_patch_files[control_plane_item])
+
+
             disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
             drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
                                               drain_timeout, grace_period)
@@ -761,9 +919,16 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=
 
             upgrade_cri_if_required(node['connection'])
 
-            node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true && "
+            # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+            # and only "else" branch remains
+            if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+                node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true && "
                                     f"sudo sed -i 's/--bind-address=.*$/--bind-address={node['internal_address']}/' "
                                     f"/etc/kubernetes/manifests/kube-apiserver.yaml && "
+                                    f"sudo kubectl uncordon {node['name']} && "
+                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+            else:
+                node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
                                     f"sudo kubectl uncordon {node['name']} && "
                                     f"sudo systemctl restart kubelet", is_async=False, hide=False)
 
@@ -827,6 +992,25 @@ def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_p
 
         cluster.log.debug("Upgrading worker \"%s\"" % node['name'])
 
+        # put control-plane patches
+        node['connection'].sudo("sudo rm -rf /etc/kubernetes/patches && sudo mkdir -p /etc/kubernetes/patches")
+
+        control_plane_patch_files = {
+            'kubelet' : 'kubeletconfiguration.yaml'
+        }
+
+        # read patches content from inventory and upload patch files to a node
+        for control_plane_item in cluster.inventory['services']['kubeadm_patches']:
+            patched_flags = get_patched_flags_for_control_plane_item(group.cluster.inventory, control_plane_item, node)
+            if patched_flags:
+                control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
+                                     control_plane_patch_files[control_plane_item] + '.j2',
+                                     script_relative=True)).read()).render(flags=patched_flags)
+                node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
+                                     control_plane_patch_files[control_plane_item], sudo=True)
+                node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
+                                     control_plane_patch_files[control_plane_item])
+
         disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
         drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
                                           drain_timeout, grace_period)
@@ -834,7 +1018,13 @@ def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_p
 
         upgrade_cri_if_required(node['connection'])
 
-        node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true && "
+        # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+        # and only "else" branch remains
+        if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+            node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true && "
+                                "sudo systemctl restart kubelet")
+        else:
+           node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
                                 "sudo systemctl restart kubelet")
 
         first_control_plane['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False)
@@ -1211,3 +1401,22 @@ def get_nodes_conditions(nodes_description: dict) -> Dict[str, Dict[str, dict]]:
             conditions_by_type[condition['type']] = condition
 
     return result
+
+# function to get dictionary of flags to be patched for a given control plane item and a given node
+def get_patched_flags_for_control_plane_item(inventory, control_plane_item, node):
+    flags = {}
+
+    for n in inventory['services']['kubeadm_patches'][control_plane_item]:
+        if n == 'all_nodes':
+            for arg, value in inventory['services']['kubeadm_patches'][control_plane_item][n].items():
+                flags[arg] = value
+        if n == node['name']:
+            for arg, value in inventory['services']['kubeadm_patches'][control_plane_item][n].items():
+                flags[arg] = value
+
+    # we always set binding-address to the node's internal address for apiServer
+    if control_plane_item == 'apiServer':
+        flags['bind-address'] = node['internal_address']
+
+    return flags
+

@@ -203,11 +203,23 @@ def system_prepare_policy(group: NodeGroup):
         for control_plane in collect_node:
             config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
             control_plane['connection'].put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-            control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
+
+            # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
+            # and only "else" branch remains
+            if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+                control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
                                              f"--config=/etc/kubernetes/audit-on-config.yaml && "
                                              f"sudo sed -i 's/--bind-address=.*$/--bind-address="
                                              f"{control_plane['internal_address']}/' "
                                              f"/etc/kubernetes/manifests/kube-apiserver.yaml")
+            else:
+               # bind-address argument should be added (not updated) in case of patches usage
+               control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
+                                             f"--config=/etc/kubernetes/audit-on-config.yaml && "
+                                             f"sudo sed -i '/- kube-apiserver.*$/a\ \ \ \ - --bind-address="
+                                             f"{control_plane['internal_address']}' "
+                                             f"/etc/kubernetes/manifests/kube-apiserver.yaml")
+
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
                 control_plane['connection'].call(utils.wait_command_successful,
                                                  command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Override the original settings for patches of control-plane pods and kubelet",
+  "properties": {
+    "apiServer": {
+      "$ref": "#/definitions/ApiServer"
+    },
+    "etcd": {
+      "$ref": "#/definitions/ETCD"
+    },
+    "controllerManager": {
+      "$ref": "#/definitions/ControllerManager"
+    },
+    "scheduler": {
+      "$ref": "#/definitions/Scheduler"
+    },
+    "kubelet": {
+      "$ref": "#/definitions/Kubelet"
+    }
+  },
+  "definitions": {
+    "ApiServer": {
+      "all_nodes": {
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "ETCD": {
+      "all_nodes": {
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "ControllerManager": {
+      "all_nodes": {
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "Scheduler": {
+      "all_nodes": {
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "Kubelet": {
+      "all_nodes": {
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+

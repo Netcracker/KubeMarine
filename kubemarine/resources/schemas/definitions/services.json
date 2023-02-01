@@ -6,6 +6,9 @@
     "kubeadm_kubelet": {
       "$ref": "services/kubeadm_kubelet.json"
     },
+    "kubeadm_patches": {
+      "$ref": "services/kubeadm_patches.json"
+    },
     "kubeadm_flags": {
       "type": "object",
       "description": "Flags for kubeadm command line tool",
