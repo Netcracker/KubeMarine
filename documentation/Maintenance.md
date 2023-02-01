@@ -85,6 +85,13 @@ where, `<patches>` are the patch identifiers separated by comma.
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
 * Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
+### Upgrade Procedure Parameters
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
+#### Upgrade Plan
+
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
 ```yaml
@@ -364,6 +371,9 @@ backup-Jan-01-21-09-00-00.tar.gz
 
 ### Backup Procedure Parameters
 
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
 By default, no parameters are required. However, if necessary, you can specify custom.
@@ -515,6 +525,9 @@ After recovery, the procedure reboots all cluster nodes.
 
 ### Restore Procedure Parameters
 
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
@@ -603,6 +616,9 @@ Also pay attention to the following:
 **Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
 
 ### Configuring Add Node Procedure
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
@@ -697,6 +713,9 @@ Removing a node from a Kubernetes cluster is done in the following order:
 
 ### Configuring Remove Node Procedure
 
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
 To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
 For example:
@@ -774,6 +793,9 @@ Manage PSP procedure works as follows:
 
 ### Configuring Manage PSP Procedure
 
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
 To manage PSPs on existing cluster, use the configuration similar to PSP installation, except the
 `custom-policies` is replaced by `add-policies` and `delete-policies` as follows:
 
@@ -828,6 +850,9 @@ The manage PSS procedure allows:
 * set PSS labels on namespaces
 
 ### Configure Manage PSS Procedure
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
 
@@ -896,7 +921,12 @@ The `manage_pss procedure executes the following sequence of tasks:
 
 This procedure allows you to safely reboot all nodes in one click. By default, all nodes in the cluster are rebooted. Gracefully reboot is performed only if installed Kubernetes cluster is detected on nodes. You can customize the process by specifying additional parameters.
 
-### graceful_reboot Parameter
+### Reboot Procedure Parameters
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
+#### graceful_reboot Parameter
 
 The parameter allows you to forcefully specify what type of reboot to perform. Possible values:
 
@@ -909,7 +939,7 @@ Example:
 graceful_reboot: False
 ```
 
-### Nodes Parameter
+#### Nodes Parameter
 
 This parameter allows you to specify which nodes should be rebooted. Other nodes are not affected. In this parameter, you must specify a list of node names, as is follows:
 
@@ -942,6 +972,9 @@ For nginx-ingress-controller, the config map along with the default certificate 
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
 ### Configuring Certificate Renew Procedure
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 #### Configuring Certificate Renew Procedure for nginx-ingress-controller
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
@@ -1022,6 +1055,9 @@ This procedure includes the following steps:
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
 ### migrate_cri Parameters
+
+JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The following sections describe the `migrate_cri` parameters.
 
