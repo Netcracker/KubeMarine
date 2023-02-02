@@ -55,12 +55,13 @@ services:
         terminated-pod-gc-threshold: "1000"
   kubeadm_patches:
     apiServer:
-      all_nodes:
-        bind-address: node_internal_address
-    etcd: {}
-    controllerManager: {}
-    scheduler: {}
-    kubelet: {}
+      - groups: [control-plane]
+        patch:
+          bind-address: node_internal_address
+    etcd: []
+    controllerManager: []
+    scheduler: []
+    kubelet: []
 
   ntp:
     chrony:

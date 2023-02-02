@@ -1458,28 +1458,37 @@ The following is an example of control-plane settings override:
 services:
   kubeadm_patches:
     apiServer:
-      all_nodes:
-        max-requests-inflight: 500
-      master-3:
-        max-requests-inflight: 600
+      - groups: [control-plane]
+        patch:
+          max-requests-inflight: 500
+      - nodes[master-3]
+        patch:
+          max-requests-inflight: 600
     etcd:
-      master-1:
-        snapshot-count: 110001
-      master-2:
-        snapshot-count: 120001
-      master-3:
-        snapshot-count: 130001
+      - nodes[master-1]
+        patch:
+          snapshot-count: 110001
+      - nodes[master-2]
+        patch:
+          snapshot-count: 120001
+      - nodes[master-3]
+        patch:
+          snapshot-count: 130001
     controllerManager:
-      all_nodes:
-        authorization-webhook-cache-authorized-ttl: 30
+      - groups: [control-plane]
+        patch:
+          authorization-webhook-cache-authorized-ttl: 30
     scheduler:
-      master-2:
-        profiling: true
+      - nodes: [master-2,master-3]
+        patch:
+          profiling: true
     kubelet:
-      worker5:
-        maxPods: 100
-      worker6:
-        maxPods: 200
+      - nodes: [worker5]
+        patch:
+          maxPods: 100
+      - nodes: [worker6]
+        patch:
+          maxPods: 200
 ```
 
 By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
