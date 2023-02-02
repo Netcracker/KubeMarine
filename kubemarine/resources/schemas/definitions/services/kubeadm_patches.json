@@ -21,39 +21,229 @@
   },
   "definitions": {
     "ApiServer": {
-      "all_nodes": {
-        "additionalProperties": {
-          "type": "string"
+      "type": "array",
+      "description": "Patches for kube-apiserver",
+      "minItems": 1,
+      "items": [
+      {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "$ref": "../common/node_ref.json#/definitions/Roles",
+            "description": "The list of group names to whose hosts the patch should be uploaded"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": [ 
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+      ]
     },
     "ETCD": {
-      "all_nodes": {
-        "additionalProperties": {
-          "type": "string"
+      "type": "array",
+      "description": "Patches for kube-apiserver",
+      "minItems": 1,
+      "items": [
+      {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "$ref": "../common/node_ref.json#/definitions/Roles",
+            "description": "The list of group names to whose hosts the patch should be uploaded"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+      ]
     },
     "ControllerManager": {
-      "all_nodes": {
-        "additionalProperties": {
-          "type": "string"
+      "type": "array",
+      "description": "Patches for kube-apiserver",
+      "minItems": 1,
+      "items": [
+      {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "$ref": "../common/node_ref.json#/definitions/Roles",
+            "description": "The list of group names to whose hosts the patch should be uploaded"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+      ]
     },
     "Scheduler": {
-      "all_nodes": {
-        "additionalProperties": {
-          "type": "string"
+      "type": "array",
+      "description": "Patches for kube-apiserver",
+      "minItems": 1,
+      "items": [
+      {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "$ref": "../common/node_ref.json#/definitions/Roles",
+            "description": "The list of group names to whose hosts the patch should be uploaded"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+      ]
     },
     "Kubelet": {
-      "all_nodes": {
-        "additionalProperties": {
-          "type": "string"
+      "type": "array",
+      "description": "Patches for kube-apiserver",
+      "minItems": 1,
+      "items": [
+      {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "$ref": "../common/node_ref.json#/definitions/Roles",
+            "description": "The list of group names to whose hosts the patch should be uploaded"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+      ]
     }
   }
 }

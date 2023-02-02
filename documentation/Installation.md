@@ -1461,17 +1461,17 @@ services:
       - groups: [control-plane]
         patch:
           max-requests-inflight: 500
-      - nodes[master-3]
+      - nodes: [master-3]
         patch:
           max-requests-inflight: 600
     etcd:
-      - nodes[master-1]
+      - nodes: [master-1]
         patch:
           snapshot-count: 110001
-      - nodes[master-2]
+      - nodes: [master-2]
         patch:
           snapshot-count: 120001
-      - nodes[master-3]
+      - nodes: [master-3]
         patch:
           snapshot-count: 130001
     controllerManager:
