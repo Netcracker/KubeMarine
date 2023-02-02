@@ -14,11 +14,5 @@ if not defined PYTHONIOENCODING (
     set PYTHONIOENCODING=utf-8
 )
 
-for /f "delims=" %%i in ('echo %cd%') do set WORKDIR=%%i
-
-set SCRIPT_DIR=%~dp0
-
-REM todo support symlinks
-cd /d %SCRIPT_DIR%\.. || exit /b 1
-
-python -m kubemarine %* -w %WORKDIR%
+REM See pyproject.toml
+_kubemarine %*

@@ -1,3 +1,59 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "kubemarine"
+version = "0.12.0"
+description = "Management tool for Kubernetes cluster deployment and maintenance"
+readme = "README.md"
+authors = [
+    {name = "Kubemarine Group", email = "kubemarinegroup@netcracker.com"},
+]
+license = {file = "LICENSE"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+]
+keywords = ["kubernetes", "devops", "administration", "helm"]
+dependencies = [
+    "PyYAML==6.0",
+    "deepmerge==1.0.*",
+    "fabric==2.6.*",
+    "jinja2==3.1.*",
+    "MarkupSafe==2.0.*",
+    "invoke==1.6.*",
+    "ruamel.yaml==0.17.*",
+    "pygelf==0.4.*",
+    "toml==0.10.*",
+    "python-dateutil==2.8.*",
+    "deepdiff==5.7.*",
+    "paramiko==2.9.*",
+    "jsonschema==4.17.*",
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+ansible = ["ansible==6.7.*"]
+
+# Auxiliary executable roughly equivalent to python -m kubemarine
+# Allows to not worry about exact path to python executable on the client machine
+# Should still no be called directly as it does not ensure necessary environment variables.
+# Real executables are installed by setup.py
+[project.scripts]
+_kubemarine = "kubemarine.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Netcracker/KubeMarine"
+Documentation = "https://github.com/Netcracker/KubeMarine#documentation"
+Issues = "https://github.com/Netcracker/KubeMarine/issues/"
