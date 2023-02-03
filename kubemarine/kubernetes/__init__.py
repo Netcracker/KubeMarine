@@ -1328,9 +1328,12 @@ def create_kubeadm_patches_for_node(cluster, node):
     for control_plane_item in cluster.inventory['services']['kubeadm_patches']:
         patched_flags = get_patched_flags_for_control_plane_item(cluster.inventory, control_plane_item, node)
         if patched_flags:
-            control_plane_patch = Template(open(utils.get_resource_absolute_path('templates/patches/' +
-                                 control_plane_patch_files[control_plane_item] + '.j2',
-                                 script_relative=True)).read()).render(flags=patched_flags)
+            if control_plane_item == 'kubelet':
+                template_filename = 'templates/patches/kubelet.yaml.j2'
+            else:
+                template_filename = 'templates/patches/control-plane-pod.json.j2'
+
+            control_plane_patch = Template(open(utils.get_resource_absolute_path(template_filename, script_relative=True)).read()).render(flags=patched_flags)
             node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
                                  control_plane_patch_files[control_plane_item], sudo=True)
             node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +

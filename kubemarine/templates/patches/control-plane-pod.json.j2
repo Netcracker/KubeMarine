@@ -1,0 +1,5 @@
+[
+{%- for key, value in flags.items() -%}
+{ "op": "add", "path": "/spec/containers/0/command/-", "value": "--{{ key }}={{ value }}" },
+{%- endfor %}
+]

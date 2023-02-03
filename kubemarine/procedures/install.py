@@ -203,7 +203,7 @@ def system_prepare_policy(group: NodeGroup):
         for control_plane in collect_node:
             config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
 
-            # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patches
+            # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
             init_config = {
                 'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
                 'kind': 'InitConfiguration',
@@ -214,14 +214,6 @@ def system_prepare_policy(group: NodeGroup):
                     'directory': '/etc/kubernetes/patches'
                 }
             }
-
-            if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
-                    'external-cloud-volume-plugin'):
-                init_config['nodeRegistration'] = {
-                    'kubeletExtraArgs': {
-                        'cloud-provider': 'external'
-                    }
-                }
 
             config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
