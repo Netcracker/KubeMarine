@@ -187,6 +187,18 @@ def enrich_inventory(inventory, cluster):
                 inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
                 break
 
+    # validate nodes in kubeadm_patches (groups are validated with JSON schema)
+    for node in inventory["nodes"]:
+        for control_plane_item in inventory["services"]["kubeadm_patches"]:
+            for i in inventory["services"]["kubeadm_patches"][control_plane_item]:
+                if i.get('nodes') is not None:
+                    for n in i['nodes']:
+                        if node['name'] == n:
+                            if control_plane_item == 'kubelet' and ('control-plane' not in node['roles'] or 'worker' not in node['roles']):
+                                raise Exception("%s patch can be uploaded only to control-plane or worker nodes" % control_plane_item)
+                            if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
+                                raise Exception("%s patch can be uploaded only to control-plane nodes" % control_plane_item)
+
     if not any_worker_found:
         raise KME("KME0004")
 
