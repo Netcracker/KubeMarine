@@ -35,7 +35,7 @@
     },
     "helper-pod-image": {
       "type": "string",
-      "default": "library/busybox:latest"
+      "default": "busybox:latest"
     }
   },
   "propertyNames": {
