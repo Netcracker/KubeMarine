@@ -592,14 +592,14 @@ def manage_pss_enrichment(inventory, cluster):
     if "exemptions" in procedure_config:
         default_merger.merge(inventory["rbac"]["pss"]["exemptions"], procedure_config["exemptions"])
     if "namespaces" in procedure_config:
-        for namespace in procedure_config["namespaces"]:
+        for namespace_item in procedure_config["namespaces"]:
             # check if the namespace has its own profiles
-            if isinstance(namespace, dict):
-                profiles = list(namespace.values())[0]
-                for item in profiles:
-                    if item.endswith("version"):
-                        verify_version(item, profiles[item], minor_version)
-                raise Exception("Custom labels for each namespace are currently not supported")
+            if isinstance(namespace_item, dict):
+                namespace = list(namespace_item.keys())[0]
+                for item in list(namespace_item[namespace]):
+                    if namespace_item[namespace][item]:
+                        if item.endswith("version"):
+                            verify_version(item, namespace_item[namespace][item], minor_version)
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
             if item.endswith("version"):
@@ -832,30 +832,30 @@ def label_namespace_pss(cluster, manage_type):
         # set/delete label 'pod-security.kubernetes.io/enforce: privileged' for local provisioner and ingress namespaces
         if manage_type in ["apply", "install"]:
             if is_install and plugin in privileged_plugins.keys() and profile != "privileged":
-                cluster.log.debug("Set PSS labels on namespace %s" % privileged_plugins[plugin])
+                cluster.log.debug(f"Set PSS labels on namespace {privileged_plugins[plugin]}")
                 for mode in valid_modes:
-                    first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                      % (privileged_plugins[plugin], mode, "privileged"))
-                    first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version=%s --overwrite" 
-                                      % (privileged_plugins[plugin], mode, "latest"))
+                    first_control_plane.sudo(f"kubectl label ns {privileged_plugins[plugin]} "
+                                             f"pod-security.kubernetes.io/{mode}=privileged --overwrite")
+                    first_control_plane.sudo(f"kubectl label ns {privileged_plugins[plugin]} "
+                                             f"pod-security.kubernetes.io/{mode}-version=latest --overwrite")
             # set/delete label 'pod-security.kubernetes.io/enforce: baseline' for kubernetes dashboard
             elif is_install and plugin in baseline_plugins.keys() and profile == "restricted":
-                cluster.log.debug("Set PSS labels on namespace %s" % baseline_plugins[plugin])
+                cluster.log.debug(f"Set PSS labels on namespace {baseline_plugins[plugin]}")
                 for mode in valid_modes:
-                    first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                      % (baseline_plugins[plugin], mode, "baseline"))
+                    first_control_plane.sudo(f"kubectl label ns {baseline_plugins[plugin]} "
+                                             f"pod-security.kubernetes.io/{mode}=baseline --overwrite"
                     first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version=%s --overwrite" 
                                       % (baseline_plugins[plugin], mode, "latest"))
         elif manage_type == "delete":
             if is_install and plugin in privileged_plugins.keys():
-                cluster.log.debug("Delete PSS labels from namespace %s" % privileged_plugins[plugin])
+                cluster.log.debug(f"Delete PSS labels from namespace {privileged_plugins[plugin]}")
                 for mode in valid_modes:
                     first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
                                       % (privileged_plugins[plugin], mode))
                     first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-version- || true" 
                                       % (privileged_plugins[plugin], mode))
             elif is_install and plugin in baseline_plugins.keys():
-                cluster.log.debug("Delete PSS labels from namespace %s" % baseline_plugins[plugin])
+                cluster.log.debug(f"Delete PSS labels from namespace {baseline_plugins[plugin]}")
                 for mode in valid_modes:
                     first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s- || true" 
                                       % (baseline_plugins[plugin], mode))
@@ -873,45 +873,35 @@ def label_namespace_pss(cluster, manage_type):
             for default_mode in namespaces_defaults:
                  default_modes[default_mode] = namespaces_defaults[default_mode]
         for namespace in namespaces:
+            # define name of namespace
+            if isinstance(namespace, dict):
+                ns_name = list(namespace.keys())[0]
+            else:
+                ns_name = namespace
             if manage_type in ["apply", "install"]:
-                # define name of namespace
-                if type(namespace) is dict:
-                    for item in namespace:
-                        if not namespace[item]:
-                            ns_name = item
-                else:
-                    ns_name = namespace
                 if default_modes:
                     # set labels that are set in default section
-                    cluster.log.debug("Set PSS labels on %s namespace from defaults" % ns_name)
+                    cluster.log.debug(f"Set PSS labels on {ns_name} namespace from defaults")
                     for mode in default_modes:
-                        first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                          % (ns_name, mode, default_modes[mode]))
-                if type(namespace) is dict:
+                        first_control_plane.sudo(f"kubectl label ns {ns_name} "
+                                f"pod-security.kubernetes.io/{mode}={default_modes[mode]} --overwrite")
+                if isinstance(namespace, dict):
                     # set labels that are set in namespaces section
-                    cluster.log.debug("Set PSS labels on %s namespace" % ns_name)
-                    for mode in namespace: 
-                        if namespace[mode]:
-                            first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s=%s --overwrite" 
-                                              % (ns_name, mode, namespace[mode]))
+                    cluster.log.debug(f"Set PSS labels on {ns_name} namespace")
+                    for item in list(namespace[ns_name]):
+                        first_control_plane.sudo(f"kubectl label ns {ns_name} " 
+                                    f"pod-security.kubernetes.io/{item}={namespace[ns_name][item]} --overwrite")
             elif manage_type == "delete":
-                # define name of namespace
-                if type(namespace) is dict:
-                    for item in namespace:
-                        if not namespace[item]:
-                            ns_name = item
-                else:
-                    ns_name = namespace
                 # delete labels that are set in default section
-                cluster.log.debug("Delete PSS labels on %s namespace from defaults" % ns_name)
+                cluster.log.debug(f"Delete PSS labels on {ns_name} namespace from defaults")
                 for mode in default_modes:
-                    first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
+                    first_control_plane.sudo(f"kubectl label ns {ns_name} pod-security.kubernetes.io/{mode}-")
                 # delete labels that are set in namespaces section
-                cluster.log.debug("Delete PSS labels on %s namespace" % ns_name)
-                if type(namespace) is dict:
-                    for mode in namespace:
-                        if namespace[mode]:
-                            first_control_plane.sudo("kubectl label ns %s pod-security.kubernetes.io/%s-" % (ns_name, mode))
+                cluster.log.debug(f"Delete PSS labels on {ns_name} namespace")
+                if isinstance(namespace, dict):
+                    for item in list(namespace[ns_name]):
+                        first_control_plane.sudo(f"kubectl label ns {ns_name} "
+                                    f"pod-security.kubernetes.io/{item}-")
 
 
 def check_inventory(cluster):
