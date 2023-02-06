@@ -32,6 +32,8 @@ jobs:
           pip install -r requirements.txt
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
         run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml  --dump-location ./results/check_iaas_dump/
@@ -81,6 +83,8 @@ jobs:
           pip install -r requirements.txt
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
         run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml --dump-location ./results/check_iaas_dump/
