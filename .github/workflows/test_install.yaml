@@ -41,6 +41,8 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
+      - name: Change not-recommended symbols in dump files
+        run: rename 's/[:]/_/g' ./results/*
       - name: Collect dump artifacts
         if: true
         uses: actions/upload-artifact@v3
@@ -87,7 +89,9 @@ jobs:
         run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./rresults/check_paas_dump/
+        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
+      - name: Change not-recommended symbols in dump files
+        run: rename 's/[:]/_/g' ./results/*
       - name: Collect dump artifacts
         if: true
         uses: actions/upload-artifact@v3
