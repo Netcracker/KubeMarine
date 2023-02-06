@@ -194,7 +194,7 @@ def enrich_inventory(inventory, cluster):
                 if i.get('nodes') is not None:
                     for n in i['nodes']:
                         if node['name'] == n:
-                            if control_plane_item == 'kubelet' and ('control-plane' not in node['roles'] or 'worker' not in node['roles']):
+                            if control_plane_item == 'kubelet' and 'control-plane' not in node['roles'] and 'worker' not in node['roles']:
                                 raise Exception("%s patch can be uploaded only to control-plane or worker nodes" % control_plane_item)
                             if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
                                 raise Exception("%s patch can be uploaded only to control-plane nodes" % control_plane_item)
@@ -396,11 +396,13 @@ def join_control_plane(group, node, join_dict):
             'localAPIEndpoint': {
                 'advertiseAddress': node['internal_address'],
             }
-        },
-        'patches': {
-            'directory': '/etc/kubernetes/patches'
         }
     }
+
+    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
+    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
+
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
@@ -516,11 +518,12 @@ def init_first_control_plane(group):
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
             'advertiseAddress': first_control_plane['internal_address']
-        },
-        'patches': {
-            'directory': '/etc/kubernetes/patches'
         }
     }
+
+    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
+    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        init_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
@@ -656,11 +659,13 @@ def init_workers(group):
                     join_dict['discovery-token-ca-cert-hash']
                 ]
             }
-        },
-        'patches': {
-            'directory': '/etc/kubernetes/patches'
         }
     }
+
+    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
+    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
+
 
     if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
