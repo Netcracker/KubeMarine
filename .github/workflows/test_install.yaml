@@ -46,7 +46,7 @@ jobs:
       - name: Change not-recommended symbols in dump files
         run: rename 's/[:]/_/g' ./results/*/*
       - name: Collect dump artifacts
-        if: true
+        if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: default_cluster_procedure_dumps
@@ -97,7 +97,7 @@ jobs:
       - name: Change not-recommended symbols in dump files
         run: rename 's/[:]/_/g' ./results/*/*
       - name: Collect dump artifacts
-        if: true
+        if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: extended_cluster_procedure_dumps
