@@ -894,9 +894,10 @@ def label_namespace_pss(cluster, manage_type):
                                     f"pod-security.kubernetes.io/{item}={namespace[ns_name][item]} --overwrite")
             elif manage_type == "delete":
                 # delete labels that are set in default section
-                cluster.log.debug(f"Delete PSS labels on {ns_name} namespace from defaults")
-                for mode in default_modes:
-                    first_control_plane.sudo(f"kubectl label ns {ns_name} pod-security.kubernetes.io/{mode}-")
+                if default_modes:
+                    cluster.log.debug(f"Delete PSS labels on {ns_name} namespace from defaults")
+                    for mode in default_modes:
+                        first_control_plane.sudo(f"kubectl label ns {ns_name} pod-security.kubernetes.io/{mode}-")
                 # delete labels that are set in namespaces section
                 cluster.log.debug(f"Delete PSS labels on {ns_name} namespace")
                 if isinstance(namespace, dict):
