@@ -82,7 +82,7 @@ class SHACalculationTest(unittest.TestCase):
         cluster = demo.new_cluster(inventory, fake=False)
 
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/etcdctl"])
-        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.0']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.2']['sha1'],
                          cluster.inventory['services']['thirdparties']["/usr/bin/kubeadm"]['sha1'])
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/kubelet"])
         self.assertEqual(self.customized_services['thirdparties']['/usr/bin/kubectl']['sha1'],
