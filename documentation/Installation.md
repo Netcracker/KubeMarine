@@ -4321,7 +4321,7 @@ All the parameters match with [template](#template).
 **Note**: If `do_render: false` is specified, KubeMarine uploads the file without any transformation.
 It is desirable for such files to have LF line endings.
 This is especially relevant for Windows deployers
-and important if the files are aimed for services that are sensitive to line endings.
+and is important if the files are aimed for services that are sensitive to line endings.
 
 ##### expect pods
 
@@ -4499,7 +4499,7 @@ plugins:
             sudo: true
 ```
 
-For more information, see [config](#config) procedure type.
+For more information, see the [config](#config) procedure type.
 
 Example of runtime variables usage in shell procedure:
 
