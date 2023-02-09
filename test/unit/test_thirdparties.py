@@ -33,7 +33,7 @@ class SHACalculationTest(unittest.TestCase):
 
     customized_services = {
         'kubeadm': {
-            'kubernetesVersion': "v1.24.0"
+            'kubernetesVersion': "v1.24.2"
         },
         'thirdparties': {
             '/usr/bin/kubelet': {
@@ -62,11 +62,11 @@ class SHACalculationTest(unittest.TestCase):
         cluster = demo.new_cluster(inventory, fake=False)
 
         self.assertIsNone(thirdparties.get_thirdparty_recommended_sha("/usr/bin/etcdctl", cluster))
-        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.0']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.2']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/kubeadm", cluster))
-        self.assertEqual(cluster.globals['compatibility_map']['software']['kubelet']['v1.24.0']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['kubelet']['v1.24.2']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/kubelet", cluster))
-        self.assertEqual(cluster.globals['compatibility_map']['software']['kubectl']['v1.24.0']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['kubectl']['v1.24.2']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/kubectl", cluster))
         self.assertEqual(cluster.globals['compatibility_map']['software']['calico']['v1.24']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/calicoctl", cluster))
@@ -82,7 +82,7 @@ class SHACalculationTest(unittest.TestCase):
         cluster = demo.new_cluster(inventory, fake=False)
 
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/etcdctl"])
-        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.0']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.2']['sha1'],
                          cluster.inventory['services']['thirdparties']["/usr/bin/kubeadm"]['sha1'])
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/kubelet"])
         self.assertEqual(self.customized_services['thirdparties']['/usr/bin/kubectl']['sha1'],
