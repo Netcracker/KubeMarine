@@ -87,7 +87,7 @@ where, `<patches>` are the patch identifiers separated by comma.
 
 ### Upgrade Procedure Parameters
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 #### Upgrade Plan
@@ -371,7 +371,7 @@ backup-Jan-01-21-09-00-00.tar.gz
 
 ### Backup Procedure Parameters
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
@@ -525,7 +525,7 @@ After recovery, the procedure reboots all cluster nodes.
 
 ### Restore Procedure Parameters
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
@@ -617,7 +617,7 @@ Also pay attention to the following:
 
 ### Configuring Add Node Procedure
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
@@ -713,7 +713,7 @@ Removing a node from a Kubernetes cluster is done in the following order:
 
 ### Configuring Remove Node Procedure
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
@@ -793,7 +793,7 @@ Manage PSP procedure works as follows:
 
 ### Configuring Manage PSP Procedure
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 To manage PSPs on existing cluster, use the configuration similar to PSP installation, except the
@@ -851,7 +851,7 @@ The manage PSS procedure allows:
 
 ### Configure Manage PSS Procedure
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
@@ -923,7 +923,7 @@ This procedure allows you to safely reboot all nodes in one click. By default, a
 
 ### Reboot Procedure Parameters
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 #### graceful_reboot Parameter
@@ -973,7 +973,7 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 
 ### Configuring Certificate Renew Procedure
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 #### Configuring Certificate Renew Procedure for nginx-ingress-controller
@@ -1056,7 +1056,7 @@ This procedure includes the following steps:
 
 ### migrate_cri Parameters
 
-JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The following sections describe the `migrate_cri` parameters.
