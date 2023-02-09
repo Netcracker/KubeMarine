@@ -25,99 +25,103 @@
       "type": "array",
       "description": "Patches for control-plane pods",
       "minItems": 0,
-      "items": [
-      {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "groups": {
-            "type": "array",
-            "items": {
-              "enum": ["control-plane"]
+      "items": {
+        "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "items": {
+                "enum": ["control-plane"]
+              }
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
             }
-          },
-          "patch": {
-            "type": "object",
-            "properties": {
-              "additionalProperties": {
-                "type": "string"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": [ 
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "additionalProperties": {
+                  "type": "string"
+                }
               }
             }
           }
         }
-      },
-      {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "nodes": {
-            "type": "array",
-            "items": [ 
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "patch": {
-            "type": "object",
-            "properties": {
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
       ]
+      }
     },
     "kubelet-patch": {
       "type": "array",
       "description": "Patches for kubelet",
       "minItems": 0,
-      "items": [
-      {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "groups": {
-            "type": "array",
-            "items": {
-              "enum": ["control-plane", "worker"]
+      "items": {
+        "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "items": {
+                "enum": ["control-plane", "worker"]
+              }
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
             }
-          },
-          "patch": {
-            "type": "object",
-            "properties": {
-              "additionalProperties": {
-                "type": "string"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "additionalProperties": {
+                  "type": "string"
+                }
               }
             }
           }
         }
-      },
-      {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "nodes": {
-            "type": "array",
-            "items": [
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "patch": {
-            "type": "object",
-            "properties": {
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
       ]
+      }
     }
   }
 }
