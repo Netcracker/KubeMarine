@@ -3,10 +3,9 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
+dynamic = ["version", "readme"]
 name = "kubemarine"
-version = "0.12.0"
 description = "Management tool for Kubernetes cluster deployment and maintenance"
-readme = "README.md"
 authors = [
     {name = "Kubemarine Group", email = "kubemarinegroup@netcracker.com"},
 ]
