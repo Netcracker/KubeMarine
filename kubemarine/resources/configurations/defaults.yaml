@@ -54,10 +54,8 @@ services:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
   kubeadm_patches:
-    apiServer:
-      - groups: [control-plane]
-        patch:
-          bind-address: node_internal_address
+    # bind-address flag for apiServer is set in the code
+    apiServer: []
     etcd: []
     controllerManager: []
     scheduler: []
