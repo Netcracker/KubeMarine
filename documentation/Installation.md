@@ -135,21 +135,7 @@ Ensure the following requirements are met:
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-Install the required python modules.
-
-Linux / MacOS:
-```bash
-pip3 install -r requirements.txt
-```
-Windows:
-```bash
-pip install -r requirements_nt.txt
-```
-or 
-
-Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
-
-Move binary kubemarine to a separate folder 
+See different types of Kubemarine installation in [README](../README.md).
 
 **System Clock**
 
