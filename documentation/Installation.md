@@ -1477,7 +1477,7 @@ services:
     controllerManager:
       - groups: [control-plane]
         patch:
-          authorization-webhook-cache-authorized-ttl: 30
+          authorization-webhook-cache-authorized-ttl: 30s
     scheduler:
       - nodes: [master-2,master-3]
         patch:
