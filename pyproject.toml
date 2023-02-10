@@ -56,3 +56,22 @@ _kubemarine = "kubemarine.__main__:main"
 Homepage = "https://github.com/Netcracker/KubeMarine"
 Documentation = "https://github.com/Netcracker/KubeMarine#documentation"
 Issues = "https://github.com/Netcracker/KubeMarine/issues/"
+
+# To change version with automatic push and triggering of the release workflow use
+# 1. pip install bumpver
+# 2. bumpver update --set-version <new version>
+[tool.bumpver]
+current_version = "0.12.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "bump version to {new_version}"
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+]
+"kubemarine/version" = [
+    '^{version}$'
+]
