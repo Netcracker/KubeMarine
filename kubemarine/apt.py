@@ -14,6 +14,8 @@
 
 import io
 
+import fabric
+
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
@@ -111,6 +113,12 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
         command += ' --exclude=%s' % exclude
 
     return group.sudo(command, **kwargs)
+
+
+def no_changes_found(action: callable, result: fabric.runners.Result) -> bool:
+    if action not in (install, upgrade, remove):
+        raise Exception(f"Unknown action {action}")
+    return "0 upgraded, 0 newly installed, 0 to remove" in result.stdout
 
 
 def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:

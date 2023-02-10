@@ -5,8 +5,7 @@
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "image": {
-      "type": "string",
-      "default": "rancher/local-path-provisioner:v0.0.23"
+      "type": "string"
     },
     "storage-class": {
       "type": "object",
@@ -34,8 +33,7 @@
       "$ref": "generic_plugin.json#/definitions/CustomTolerations"
     },
     "helper-pod-image": {
-      "type": "string",
-      "default": "library/busybox:1.35.0"
+      "type": "string"
     }
   },
   "propertyNames": {

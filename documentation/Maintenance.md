@@ -187,14 +187,14 @@ etcd:
 If the cluster is located in an isolated environment, it is possible to specify the custom paths to new thirdparties with the same syntax as in the `cluster.yaml` as shown in the following script:
 
 ```yaml
-v1.24.0:
+v1.24.2:
   thirdparties:
       /usr/bin/kubeadm:
-        source: https://example.com/thirdparty.files/kubernetes/kubeadm/v1.24.0/bin/linux/amd64/kubeadm
+        source: https://example.com/thirdparty.files/kubernetes/kubeadm/v1.24.2/bin/linux/amd64/kubeadm
       /usr/bin/kubelet:
-        source: https://example.com/thirdparty.files/kubernetes/kubelet/v1.24.0/bin/linux/amd64/kubelet
+        source: https://example.com/thirdparty.files/kubernetes/kubelet/v1.24.2/bin/linux/amd64/kubelet
       /usr/bin/kubectl:
-        source: https://example.com/thirdparty.files/kubernetes/kubectl/v1.24.0/bin/linux/amd64/kubectl
+        source: https://example.com/thirdparty.files/kubernetes/kubectl/v1.24.2/bin/linux/amd64/kubectl
       /usr/bin/calicoctl:
         source: https://example.com/thirdparty.files/projectcalico/calico/v3.22.2/calicoctl-linux-amd64
 ```
