@@ -210,7 +210,7 @@ If you have other solution, remove or switch off the IP firewall before the inst
 
 **Preinstalled software**
 
-* Installation of the below packages is highly recommended; however, Kubernetes is able to work without them, but may show warnings:
+* Installation of the following packages is highly recommended; however, Kubernetes can work without them, but may show warnings:
   * ethtool
   * ebtables
   * socat
@@ -1647,7 +1647,7 @@ services:
 
 ###### mandatory
 
-By default, the installer installs predefined list of mandatory packages from the package manager. The list of mandatory packages is the following:
+By default, the installer installs predefined list of mandatory packages from the package manager. The mandatory packages are:
 * conntrack
 * iptables
 * curl
@@ -1656,20 +1656,20 @@ By default, the installer installs predefined list of mandatory packages from th
 * semanage
 * kmod
 
-Exact package names are detected automatically depending on the OS family of the cluster.
+The exact package names are detected automatically depending on the OS family of the cluster.
 For more information, see [associations](#associations).
 
 **Warning**: Make sure to have all the mandatory packages available in the repositories. 
-You can configure the necessary repositories in the [package_manager](#package_manager) section of inventory.
+You can configure the necessary repositories in the [package_manager](#package_manager) section of the inventory.
 
 Most of the mandatory packages are installed on all nodes with the following exceptions:
 * conntrack and iptables are installed only on control-plane and worker nodes.
 * unzip is installed only on nodes that require thirdparties that are packed in .zip archives.
-  For more information, see **unpack** option in [thirdparties](#thirdparties).
+  For more information, see the **unpack** option in [thirdparties](#thirdparties).
 * semanage is installed only on RHEL nodes. 
 
 If you need to turn some mandatory packages off for some reason,
-this can be done in `services.packages.mandatory` section. For example:
+it can be done in the `services.packages.mandatory` section. For example:
 
 ```yaml
 services:
@@ -1680,8 +1680,8 @@ services:
 
 ###### custom
 
-If you need other custom packages, you can manage them directly during installation.
-You can choose any one action from the following types of actions:
+If you need other custom packages, you can manage them directly during the installation.
+You can choose any one of the following types of actions:
 
 * remove
 * install
