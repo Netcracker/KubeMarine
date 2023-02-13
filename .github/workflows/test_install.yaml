@@ -26,23 +26,23 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+      - name: Install Kubemarine with dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install .
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
-        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml  --dump-location ./results/check_iaas_dump/
+        run: kubemarine check_iaas -c ./ci/default_config.yaml  --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
+        run: kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
+        run: kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/*
@@ -78,23 +78,23 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+      - name: Install Kubemarine with dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install .
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
-        run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml --dump-location ./results/check_iaas_dump/
+        run: kubemarine check_iaas -c ./ci/extended_config.yaml --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
+        run: kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
+        run: kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/*

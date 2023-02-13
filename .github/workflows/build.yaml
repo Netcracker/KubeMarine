@@ -26,7 +26,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: kubemarine
+          name: executable
           path: ./dist/kubemarine
           retention-days: 1
   build-package:
@@ -34,11 +34,15 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2.2.2
-      - name: Install Dependencies
-        run: python3 -m pip install --upgrade pip
-      - name: Prepare Setuptools
-        run: python3 -m pip install wheel setuptools build
-      - name: Build Kubemarine Package
-        run: python3 -m build -n
+      - name: Build Package via Docker
+        run: |
+          docker build -t kubemarine --build-arg BUILD_TYPE=package --no-cache .
+          CONTAINER_ID=$(docker create kubemarine)
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist" dist
+          docker rm -v "${CONTAINER_ID}"
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: package
+          path: ./dist
+          retention-days: 1

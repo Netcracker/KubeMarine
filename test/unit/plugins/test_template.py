@@ -34,27 +34,27 @@ class TestTemplate(unittest.TestCase):
         test_cases = [
             {
                 "name": "One yaml template",
-                "source": "../test/unit/plugins/test_templates/test_template1.yaml",
+                "source": f"{__file__}/../test_templates/test_template1.yaml",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching three yaml templates",
-                "source": "../test/unit/plugins/test_templates/*.yaml",
+                "source": f"{__file__}/../test_templates/*.yaml",
                 "valid": True,
             },
             {
                 "name": "Directory wildcard path matching two yaml templates",
-                "source": "../test/unit/plugins/test_templates/*",
+                "source": f"{__file__}/../test_templates/*",
                 "valid": True,
             },
             {
                 "name": "Wildcard path matching zero templates",
-                "source": "../test/unit/plugins/test_templates/*.conf",
+                "source": f"{__file__}/../test_templates/*.conf",
                 "valid": False,
             },
             {
                 "name": "Path to non-existent template",
-                "source": "../test/unit/plugins/test_templates/template.conf",
+                "source": f"{__file__}/../test_templates/template.conf",
                 "valid": False,
             },
         ]
@@ -81,17 +81,17 @@ class TestTemplate(unittest.TestCase):
             {
                 "name": "One yaml template",
                 "apply_files": ["test_template1.yaml"],
-                "source": "../test/unit/plugins/test_templates/test_template1.yaml",
+                "source": f"{__file__}/../test_templates/test_template1.yaml",
             },
             {
                 "name": "Wildcard path matching three yaml templates",
                 "apply_files": ["test_template1.yaml", "test_template2.yaml", "test_template3.yaml"],
-                "source": "../test/unit/plugins/test_templates/*.yaml",
+                "source": f"{__file__}/../test_templates/*.yaml",
             },
             {
                 "name": "Directory wildcard path matching three yaml templates",
                 "apply_files": ["test_template1.yaml", "test_template2.yaml", "test_template3.yaml"],
-                "source": "../test/unit/plugins/test_templates/*",
+                "source": f"{__file__}/../test_templates/*",
             },
         ]
 
