@@ -135,7 +135,7 @@ Ensure the following requirements are met:
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-See different types of Kubemarine installation in [README](../README.md).
+For more information about the different types of KubeMarine installation, refer to [README](../README.md).
 
 **System Clock**
 
