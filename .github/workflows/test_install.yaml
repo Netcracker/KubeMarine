@@ -32,30 +32,26 @@ jobs:
           pip install -r requirements.txt
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
-        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml
-      - name: Copy check iaas dumps
-        if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/check_iaas_dump/
+        run: ./bin/kubemarine check_iaas -c ./ci/default_config.yaml  --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points
-      - name: Copy install dumps
-        if: (success() || failure()) && steps.test_install.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/install_dump/
+        run: ./bin/kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml
-      - name: Copy check paas dumps
-        if:  (success() || failure()) && steps.test_check_paas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/check_paas_dump/
+        run: ./bin/kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
+      - name: Change not-recommended symbols in dump files
+        if: failure()
+        run: rename 's/[:]/_/g' ./results/*/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: default_cluster_procedure_dumps
-          path: results/
+          path: ./results/
           retention-days: 7
 
 
@@ -88,28 +84,24 @@ jobs:
           pip install -r requirements.txt
       - name: Remove moby-runc to resolve conflicts
         run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
-        run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml
-      - name: Copy check iaas dumps
-        if:  (success() || failure()) && steps.test_check_iaas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/check_iaas_dump/
+        run: ./bin/kubemarine check_iaas -c ./ci/extended_config.yaml --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points
-      - name: Copy install dumps
-        if: (success() || failure()) && steps.test_install.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/install_dump/
+        run: ./bin/kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml
-      - name: Copy check paas dumps
-        if:  (success() || failure()) && steps.test_check_paas.outcome != 'skipped'
-        run: mkdir -p results && cp -a dump/. results/check_paas_dump/
+        run: ./bin/kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
+      - name: Change not-recommended symbols in dump files
+        if: failure()
+        run: rename 's/[:]/_/g' ./results/*/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: extended_cluster_procedure_dumps
-          path: results/
+          path: ./results/
           retention-days: 7
