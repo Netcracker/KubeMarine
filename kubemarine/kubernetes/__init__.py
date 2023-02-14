@@ -1290,7 +1290,7 @@ def get_patched_flags_for_control_plane_item(inventory, control_plane_item, node
                     flags[arg] = value
 
     # we always set binding-address to the node's internal address for apiServer
-    if control_plane_item == 'apiServer':
+    if control_plane_item == 'apiServer' and 'control-plane' in node['roles']:
         flags['bind-address'] = node['internal_address']
 
     return flags
