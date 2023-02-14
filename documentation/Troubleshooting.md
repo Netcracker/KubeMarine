@@ -22,6 +22,8 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Garbage Collector does not initialize if convert webhook is broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
   - [Pods stuck in "terminating" status during deletion](#pods-stuck-in-terminating-status-during-deletion)
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
+  - [Nodes have `NotReady` status periodically](#nodes-have-notready-status-periodically)
+  - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
@@ -543,6 +545,21 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 **Root cause**: The Linux kernel version `5.4.0-132-generic` has an issue that affects the `CRI` work.
 
 **Solution**: Upgrade Linux kernel to `5.4.0-135-generic`
+
+## No Pod-to-Pod Traffic for Some Nodes
+
+**Symptoms**: There is no traffic between pods located at different nodes. There are more than 1 permanent network interface at the nodes.
+
+**Root cause**: Not all calico BGP sessions between nodes are established due to wrong network interface choice.
+
+**Solution**: By default calico uses `first-found` network interface to route traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments it is necessary to set a proper interface in calico's `IP_AUTODETECTION_METHOD` variable, for example:
+```
+plugins:
+  calico:
+    env:
+      IP_AUTODETECTION_METHOD: interface=ens160
+```
+More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
 # Troubleshooting Kubemarine
 
