@@ -127,6 +127,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build-package
     strategy:
+      fail-fast: false
       matrix:
         os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version:

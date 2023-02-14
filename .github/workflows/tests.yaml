@@ -17,41 +17,13 @@ jobs:
        - uses: stefanzweifel/git-auto-commit-action@v4
          with:
            commit_message: Auto-update license header
-  selftest-image:
-    needs: license
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v2
-      - name: Build Docker Image
-        run: docker build -t kubemarine --no-cache .
-      - name: Run Selftest
-        # selftest of image internally runs selftest of package
-        run: docker run kubemarine selftest
-  selftest-binary:
-    needs: license
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v2
-      - name: Build Binary via Docker
-        run: |
-          docker build -t kubemarine --build-arg BUILD_TYPE=binary --no-cache .
-          CONTAINER_ID=$(docker create kubemarine)
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine_exe
-          docker rm -v "${CONTAINER_ID}"
-      - name: Run Selftest
-        run: ./kubemarine_exe selftest
-
   unit-tests:
-    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - run: docker build -t kubemarine --build-arg BUILD_TYPE=test --no-cache .
       - run: docker run --entrypoint=python3 kubemarine -m unittest discover -s /opt/kubemarine/test/unit -t /opt/kubemarine/test/unit
   coverage:
-    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -63,7 +35,6 @@ jobs:
       - run: pip install coverage . && pip uninstall -y kubemarine
       - run: coverage run -m unittest discover -s test/unit -t test/unit; coverage report -m
   linter:
-    needs: license
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
