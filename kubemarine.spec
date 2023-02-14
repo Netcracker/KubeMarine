@@ -3,6 +3,14 @@
 block_cipher = None
 options = [ ('u', None, 'OPTION')]
 
+# MacOS option. By default, current running architecture is targeted.
+# See macos11_build_prepare.sh
+target_arch = None
+
+# It can be changed if dependencies are installed to the separate target directory.
+# The separate directory is required to build for non-native target architecture by universal2 python on macOS.
+# See macos11_build_prepare.sh
+pathex = []
 
 a = Analysis(['./kubemarine/__main__.py'],
              hiddenimports=[
@@ -27,7 +35,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 'kubemarine.plugins.kubernetes_dashboard',
                 'kubemarine.core.schema'
              ],
-             pathex=['./'],
+             pathex=pathex,
              binaries=[],
              datas=[
                 ('./kubemarine/plugins',        './kubemarine/plugins'),
@@ -57,8 +65,6 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True)
-
-app = BUNDLE(name='kubemarine',
-             icon='kubemarine.ico',
-             bundle_identifier=None)
+          console=True,
+          target_arch=target_arch,
+          )
