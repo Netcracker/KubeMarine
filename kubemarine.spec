@@ -30,7 +30,7 @@ a = Analysis(['./kubemarine/__main__.py'],
              pathex=['./'],
              binaries=[],
              datas=[
-                ('./kubemarine/plugins/yaml/*', './kubemarine/plugins/yaml'),
+                ('./kubemarine/plugins',        './kubemarine/plugins'),
                 ('./kubemarine/version',        './kubemarine/'),
                 ('./kubemarine/resources',      './kubemarine/resources'),
                 ('./kubemarine/templates',      './kubemarine/templates')
