@@ -17,7 +17,8 @@ services:
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
-    apiVersion: kubeadm.k8s.io/v1beta2
+    # for patches functionality we need v1beta3 which is available since k8s v1.22 only
+    apiVersion: '{% if "v1.21" in services["kubeadm"]["kubernetesVersion"] %}kubeadm.k8s.io/v1beta2{% else %}kubeadm.k8s.io/v1beta3{% endif %}'
     kind: ClusterConfiguration
     kubernetesVersion: v1.24.2
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
@@ -52,6 +53,13 @@ services:
       extraArgs:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
+  kubeadm_patches:
+    # bind-address flag for apiServer is set in the code
+    apiServer: []
+    etcd: []
+    controllerManager: []
+    scheduler: []
+    kubelet: []
 
   ntp:
     chrony:

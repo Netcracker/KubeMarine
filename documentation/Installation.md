@@ -32,6 +32,7 @@ This section provides information about the inventory, features, and steps for i
         - [Cloud Provider Plugin](#cloud-provider-plugin)
         - [Service Account Issuer](#service-account-issuer)
       - [kubeadm_kubelet](#kubeadm_kubelet)
+      - [kubeadm_patches](#kubeadm_patches)
       - [kernel_security](#kernel_security)
         - [selinux](#selinux)
         - [apparmor](#apparmor)
@@ -1436,6 +1437,63 @@ services:
     maxPods: 100
     cgroupDriver: systemd
 ```
+
+#### kubeadm_patches
+
+*Installation task*: `deploy.kubernetes`
+
+*Can cause reboot*: no
+
+*Can restart service*: always yes, `kubelet`
+
+*OS specific*: No
+
+In `services.kubeadm_patches` section you can override control-plane pod settings as well as kubelet settings on per node basis.
+This feature is implemented by using of [kubeadm patches](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/control-plane-flags/#patches).
+
+**Note**: `patches` feature is available for control-plane pods (etcd, kube-apiserver, kube-controller-manager, kube-scheduler) since Kubernetes **v1.22.0** and for kubelet since Kubernetes **v1.25.0**.
+
+The following is an example of control-plane settings override:
+```
+services:
+  kubeadm_patches:
+    apiServer:
+      - groups: [control-plane]
+        patch:
+          max-requests-inflight: 500
+      - nodes: [master-3]
+        patch:
+          max-requests-inflight: 600
+    etcd:
+      - nodes: [master-1]
+        patch:
+          snapshot-count: 110001
+      - nodes: [master-2]
+        patch:
+          snapshot-count: 120001
+      - nodes: [master-3]
+        patch:
+          snapshot-count: 130001
+    controllerManager:
+      - groups: [control-plane]
+        patch:
+          authorization-webhook-cache-authorized-ttl: 30s
+    scheduler:
+      - nodes: [master-2,master-3]
+        patch:
+          profiling: true
+    kubelet:
+      - nodes: [worker5]
+        patch:
+          maxPods: 100
+      - nodes: [worker6]
+        patch:
+          maxPods: 200
+```
+
+By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
+
+**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `kubeadm.paches`, the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `kubeadm.patches`). This behaviour persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
 
 #### kernel_security
 

@@ -40,6 +40,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 ('./kubemarine/plugins/*',                  './kubemarine/plugins'),
                 ('./kubemarine/plugins/yaml/*',             './kubemarine/plugins/yaml'),
                 ('./kubemarine/templates/plugins/*',        './kubemarine/templates/plugins'),
+                ('./kubemarine/templates/patches/*',        './kubemarine/templates/patches'),
                 ('./kubemarine/version',                    './kubemarine/')
              ],
              runtime_hooks=[],
