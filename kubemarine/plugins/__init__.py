@@ -199,6 +199,8 @@ def expect_daemonset(cluster: KubernetesCluster,
             cluster.log.debug(f"DaemonSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
+    raise Exception('In the expected time, the DaemonSets did not become ready')
+
 
 def expect_replicaset(cluster: KubernetesCluster,
                       replicasets_names: List[str] or List[Dict[str, str]],
@@ -248,6 +250,8 @@ def expect_replicaset(cluster: KubernetesCluster,
             retries -= 1
             cluster.log.debug(f"ReplicaSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
+
+    raise Exception('In the expected time, the ReplicaSets did not become ready')
 
 
 def expect_statefulset(cluster: KubernetesCluster,
@@ -299,6 +303,8 @@ def expect_statefulset(cluster: KubernetesCluster,
             cluster.log.debug(f"StatefulSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
+    raise Exception('In the expected time, the StatefulSets did not become ready')
+
 
 def expect_deployment(cluster: KubernetesCluster,
                       deployments_names: List[str] or List[Dict[str, str]],
@@ -348,6 +354,8 @@ def expect_deployment(cluster: KubernetesCluster,
             retries -= 1
             cluster.log.debug(f"Deployments are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
+
+    raise Exception('In the expected time, the Deployments did not become ready')
 
 
 def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
