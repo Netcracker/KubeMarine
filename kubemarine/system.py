@@ -27,7 +27,7 @@ import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
@@ -84,9 +84,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
                         "with all nodes having the same and supported OS family")
 
     # validate all packages sections in procedure inventory
-    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
-            as stream:
-        base_associations = yaml.safe_load(stream)["services"]["packages"]["associations"][os_family]
+    base_associations = static.DEFAULTS["services"]["packages"]["associations"][os_family]
 
     cluster_associations = deepcopy(inventory["services"]["packages"]["associations"][os_family])
     previous_ver = cluster.context["initial_kubernetes_version"]
@@ -336,10 +334,11 @@ def disable_service(group, name=None, now=True):
     return group.sudo(cmd)
 
 
-def patch_systemd_service(group: NodeGroup, service_name, patch_source):
+def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str):
     group.sudo(f"mkdir -p /etc/systemd/system/{service_name}.service.d")
-    group.put(patch_source, f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
-              sudo=True, binary=False)
+    group.put(io.StringIO(utils.read_internal(patch_source)),
+              f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
+              sudo=True)
     group.sudo("systemctl daemon-reload")
 
 

@@ -159,6 +159,7 @@ System clock should be synchronized the same way as for Cluster nodes system clo
 
 There are the following restrictions when deploying from Windows:
 * [ansible](#ansible) plugin procedures are not supported.
+* All KubeMarine input text files must be in utf-8 encoding.
 
 ## Prerequisites for Cluster Nodes
 
@@ -2168,7 +2169,6 @@ This is configured in the `services.thirdparties` section. The contents of this 
 |**groups**|no|`None`|The list of group names to whose hosts the file should be uploaded.|
 |**node**|no|`None`|The name of node where the file should be uploaded.|
 |**nodes**|no|`None`|The list of node names where the file should be uploaded.|
-|**binary**|no|`true`|Specifies whether to treat the file as a binary or as a text. This is applicable, for example, for bash scripts. It is required to specify the property carefully in case of deploying from Windows deployer.|
 
 **Warning**: verify that you specified the path to the correct version of the thirdparty.
 
@@ -4318,6 +4318,11 @@ All the parameters match with [template](#template).
 |---|---|---|---|
 |**do_render**|**no**|**True**| Allows you not to render the contents of the file.|
 
+**Note**: If `do_render: false` is specified, KubeMarine uploads the file without any transformation.
+It is desirable for such files to have LF line endings.
+This is especially relevant for Windows deployers
+and is important if the files are aimed for services that are sensitive to line endings.
+
 ##### expect pods
 
 This procedure allows you to wait until the necessary pods are ready. You have to declare a procedure section and specify the list of the pod names that should be expected.
@@ -4482,16 +4487,19 @@ plugins:
   calico:
     installation:
       procedures:
-        - template:
+        - config:
             source: /var/data/plugins/script.sh
             destination: /etc/calico/script.sh
             destination_nodes: ['control-plane-1']
             apply_required: false
+            do_render: false
         - shell:
             command: bash -x /etc/calico/script.sh
             nodes: ['control-plane-1']
             sudo: true
 ```
+
+For more information, see the [config](#config) procedure type.
 
 Example of runtime variables usage in shell procedure:
 

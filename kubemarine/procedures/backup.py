@@ -68,8 +68,7 @@ def prepare_backup_tmpdir(cluster):
     backup_directory = cluster.context.get('backup_tmpdir')
     if not backup_directory:
         cluster.log.verbose('Backup directory is not ready yet, preparing..')
-        backup_directory = cluster.context['backup_tmpdir'] = cluster.context['execution_arguments'][
-                                                                    'dump_location'] + '/backup'
+        backup_directory = cluster.context['backup_tmpdir'] = utils.get_dump_filepath(cluster.context, 'backup')
         shutil.rmtree(backup_directory, ignore_errors=True)
         os.mkdir(backup_directory)
         cluster.log.verbose('Backup directory prepared')
@@ -77,7 +76,7 @@ def prepare_backup_tmpdir(cluster):
 
 
 def verify_backup_location(cluster):
-    target = utils.get_resource_absolute_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
+    target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         raise FileNotFoundError('Backup location directory not exists')
 
@@ -110,9 +109,9 @@ def export_hostname(cluster):
 
 def export_cluster_yaml(cluster):
     backup_directory = prepare_backup_tmpdir(cluster)
-    shutil.copyfile(os.path.join(cluster.context['execution_arguments']['dump_location'], 'cluster.yaml'),
+    shutil.copyfile(utils.get_dump_filepath(cluster.context, 'cluster.yaml'),
                     os.path.join(backup_directory, 'cluster.yaml'))
-    shutil.copyfile(utils.get_resource_absolute_path(cluster.context['execution_arguments']['config']),
+    shutil.copyfile(utils.get_external_resource_path(cluster.context['execution_arguments']['config']),
                     os.path.join(backup_directory, 'original_cluster.yaml'))
     cluster.log.verbose('cluster.yaml exported to backup')
 
@@ -284,7 +283,7 @@ def download_resources(log, resources, location, control_plane: NodeGroup, names
         result = result.strip()
         if result and result != '':
             actual_resources.append(resource)
-            with open(resource_file_path, 'w') as resource_file_stream:
+            with utils.open_external(resource_file_path, 'w') as resource_file_stream:
                 resource_file_stream.write(result)
 
     return actual_resources
@@ -388,7 +387,7 @@ def make_descriptor(cluster):
     cluster.context['backup_descriptor']['kubernetes']['thirdparties'] = cluster.inventory['services']['thirdparties']
     cluster.context['backup_descriptor']['meta']['time']['finished'] = datetime.datetime.now()
 
-    with open(os.path.join(backup_directory, 'descriptor.yaml'), 'w') as output:
+    with utils.open_external(os.path.join(backup_directory, 'descriptor.yaml'), 'w') as output:
         output.write(yaml.dump(cluster.context['backup_descriptor']))
 
 
@@ -398,7 +397,7 @@ def pack_data(cluster):
 
     backup_filename = 'backup-%s-%s.tar.gz' % (cluster_name, utils.get_current_timestamp_formatted())
 
-    target = utils.get_resource_absolute_path(cluster.procedure_inventory.get('backup_location', backup_filename))
+    target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', backup_filename))
     if os.path.isdir(target):
         target = os.path.join(target, backup_filename)
 

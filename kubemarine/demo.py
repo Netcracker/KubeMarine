@@ -136,13 +136,13 @@ class FakeFS:
     # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
     def write(self, host, filename, data):
         with self._lock:
-            if isinstance(data, io.StringIO):
-                data = data.getvalue()
+            if isinstance(data, io.BytesIO):
+                data = data.getvalue().decode('utf-8')
             elif isinstance(data, str):
                 # this is for self-testing purpose
                 pass
             elif isinstance(data, io.IOBase):
-                data = data.read()
+                data = data.read().decode('utf-8')
             else:
                 raise ValueError("Unsupported data type " + str(type(data)))
             if self.storage.get(host) is None:
@@ -336,7 +336,7 @@ class FakeNodeGroup(group.NodeGroup):
     def __init__(self, connections: Connections, cluster_: FakeKubernetesCluster):
         super().__init__(connections, cluster_)
 
-    def get_local_file_sha1(self, filename, open_mode: str):
+    def get_local_file_sha1(self, filename):
         return '0'
 
     def get_remote_file_sha1(self, filename):

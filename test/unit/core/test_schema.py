@@ -73,7 +73,7 @@ class FinalizedInventoryValidation(unittest.TestCase):
 
 class TestValidExamples(unittest.TestCase):
     def test_cluster_examples_valid(self):
-        inventories_dir = Path(utils.get_resource_absolute_path("../examples/cluster.yaml", script_relative=True))
+        inventories_dir = Path(utils.get_internal_resource_path("../examples/cluster.yaml"))
         self.assertTrue(inventories_dir.is_dir(), "Examples not found")
         for inventory_filepath in inventories_dir.glob('**/*'):
             if inventory_filepath.is_dir() or 'cluster' not in inventory_filepath.name:
@@ -91,7 +91,7 @@ class TestValidExamples(unittest.TestCase):
                 self.fail(f"Enrichment of {inventory_filepath.relative_to(inventories_dir)} failed: {e}")
 
     def test_procedure_examples_valid(self):
-        inventories_dir = Path(utils.get_resource_absolute_path("../examples/procedure.yaml", script_relative=True))
+        inventories_dir = Path(utils.get_internal_resource_path("../examples/procedure.yaml"))
         if not inventories_dir.is_dir():
             self.skipTest("Examples not found")
         for inventory_filepath in inventories_dir.glob('**/*'):

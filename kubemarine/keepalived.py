@@ -174,7 +174,7 @@ def install(group: NodeGroup):
         installation_result = packages.install(group, include=package_associations['package_name'])
 
     service_name = package_associations['service_name']
-    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/keepalived.conf", script_relative=True)
+    patch_path = "./resources/drop_ins/keepalived.conf"
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     group.call(install_haproxy_check_script)
     enable(group)
@@ -183,8 +183,8 @@ def install(group: NodeGroup):
 
 
 def install_haproxy_check_script(group: NodeGroup):
-    local_path = utils.get_resource_absolute_path("./resources/scripts/check_haproxy.sh", script_relative=True)
-    group.put(local_path, "/usr/local/bin/check_haproxy.sh", sudo=True, binary=False)
+    script = utils.read_internal("./resources/scripts/check_haproxy.sh")
+    group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
 
@@ -247,10 +247,10 @@ def generate_config(inventory, node):
                 if i_node['name'] == record['name'] and i_node['internal_address'] != ips['source']:
                     ips['peers'].append(i_node['internal_address'])
 
-        template_location = utils.get_resource_absolute_path('templates/keepalived.conf.j2', script_relative=True)
-        config += Template(open(template_location).read()).render(inventory=inventory, item=item, node=node,
-                                                                  interface=interface,
-                                                                  priority=priority, **ips) + "\n"
+        config_source = utils.read_internal('templates/keepalived.conf.j2')
+        config += Template(config_source).render(inventory=inventory, item=item, node=node,
+                                                 interface=interface,
+                                                 priority=priority, **ips) + "\n"
 
     return config
 

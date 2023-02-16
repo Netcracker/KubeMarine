@@ -259,7 +259,7 @@ class TestSuite:
         return results
 
     def save_csv(self, destination_file_path, delimiter=';'):
-        with open(destination_file_path, mode='w') as stream:
+        with utils.open_external(destination_file_path, mode='w') as stream:
             csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
             csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
             for tc in self.tcs:
@@ -274,7 +274,7 @@ class TestSuite:
                 ])
 
     def save_html(self, destination_file_path, check_type, append_styles=True):
-        with open(destination_file_path, mode='w') as stream:
+        with utils.open_external(destination_file_path, mode='w') as stream:
             stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
             for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
                 stream.write('<div class="%s">%s %s</div>' % (key, value, key))
@@ -299,8 +299,7 @@ class TestSuite:
                               ))
             stream.write('</tbody></table>')
             if append_styles:
-                with open(utils.get_resource_absolute_path('resources/reports/check_report.css',
-                                                           script_relative=True)) as css_stream:
-                    stream.write('<style>\n%s\n</style>' % css_stream.read())
+                css = utils.read_internal('resources/reports/check_report.css')
+                stream.write('<style>\n%s\n</style>' % css)
 
             stream.write('</body></html>')

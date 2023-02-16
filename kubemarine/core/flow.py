@@ -62,11 +62,11 @@ def run_actions(context: Union[dict, res.DynamicResources], actions: List[action
         if not successfully_performed:
             # first action in group
             if resources.inventory_filepath:
-                with open(resources.inventory_filepath, "r") as stream:
+                with utils.open_external(resources.inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "cluster_initial.yaml")
 
             if resources.procedure_inventory_filepath:
-                with open(resources.procedure_inventory_filepath, "r") as stream:
+                with utils.open_external(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
         try:
             log.info(f"Running action '{act.identifier}'")
@@ -86,7 +86,7 @@ def run_actions(context: Union[dict, res.DynamicResources], actions: List[action
 
         if act.recreate_inventory:
             if resources.inventory_filepath:
-                with open(resources.inventory_filepath, "r") as stream:
+                with utils.open_external(resources.inventory_filepath, "r") as stream:
                     # write original file data to backup file with timestamp
                     timestamp = utils.get_current_timestamp_formatted()
                     inventory_file_basename = os.path.basename(resources.inventory_filepath)

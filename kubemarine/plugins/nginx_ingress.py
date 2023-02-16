@@ -112,11 +112,11 @@ def put_custom_certificate(first_control_plane: NodeGroup, default_cert, crt_pat
         cert = io.StringIO(default_cert["data"]["cert"])
         key = io.StringIO(default_cert["data"]["key"])
     else:
-        cert = utils.get_resource_absolute_path(default_cert["paths"]["cert"])
-        key = utils.get_resource_absolute_path(default_cert["paths"]["key"])
+        cert = io.StringIO(utils.read_external(default_cert["paths"]["cert"]))
+        key = io.StringIO(utils.read_external(default_cert["paths"]["key"]))
 
-    first_control_plane.put(cert, crt_path, sudo=True, binary=False)
-    first_control_plane.put(key, key_path, sudo=True, binary=False)
+    first_control_plane.put(cert, crt_path, sudo=True)
+    first_control_plane.put(key, key_path, sudo=True)
 
 
 def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path, key_path):

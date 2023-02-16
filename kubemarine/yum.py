@@ -17,6 +17,7 @@ import io
 
 import fabric
 
+from kubemarine.core import utils
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 
@@ -51,6 +52,8 @@ def create_repo_file(group, repo_data, repo_file):
             config[repo_id] = data
         repo_data = io.StringIO()
         config.write(repo_data)
+    else:
+        repo_data = io.StringIO(utils.read_external(repo_data))
     group.put(repo_data, repo_file, sudo=True)
 
 

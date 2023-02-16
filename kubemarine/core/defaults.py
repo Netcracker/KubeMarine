@@ -396,9 +396,7 @@ def calculate_nodegroups(inventory, cluster):
 
 
 def merge_defaults(inventory: dict, cluster: KubernetesCluster):
-    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml',
-                                               script_relative=True), 'r') as stream:
-        base_inventory = yaml.safe_load(stream)
+    base_inventory = deepcopy(static.DEFAULTS)
 
     inventory = default_merger.merge(base_inventory, inventory)
     # it is necessary to temporary put half-compiled inventory to cluster inventory field

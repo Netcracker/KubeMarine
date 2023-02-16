@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import io
 from copy import deepcopy
 
 from kubemarine.core import utils, static
@@ -183,9 +183,8 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         cluster.log.debug(common_group.sudo(remote_commands))
         remote_commands = ''
         # TODO: Possible use SHA1 from inventory instead of calculating if provided?
-        local_path = utils.get_resource_absolute_path(config['source'], script_relative=True)
-        binary = bool(config.get('binary', True))
-        common_group.put(local_path, destination, sudo=True, binary=binary)
+        script = utils.read_internal(config['source'])
+        common_group.put(io.StringIO(script), destination, sudo=True)
 
         # TODO: Do not upload local files if they already exists on remote machines
 
@@ -207,7 +206,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
 
-        # TODO acсess rights do not work for zip
+        # TODO access rights do not work for zip
         remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
                            % (destination, config['mode'], config['unpack'])
         remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \

@@ -181,9 +181,7 @@ def enrich_inventory(inventory, cluster):
         raise KME("KME0004")
 
     # check ignorePreflightErrors value and add mandatory errors from defaults.yaml if they're absent
-    with open(utils.get_resource_absolute_path('resources/configurations/defaults.yaml', script_relative=True), 'r') \
-            as stream:
-        default_preflight_errors = yaml.safe_load(stream)["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
+    default_preflight_errors = static.DEFAULTS["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
     preflight_errors = inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"].split(",")
 
     preflight_errors.extend(default_preflight_errors)
@@ -322,8 +320,7 @@ def install(group):
         for node in group.cluster.inventory["nodes"]:
             # perform only for current group members
             if node["connect_to"] in group.nodes.keys():
-                template = Template(open(utils.get_resource_absolute_path('templates/kubelet.service.j2',
-                                                                          script_relative=True)).read()).render(
+                template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
                     hostname=node["name"])
                 log.debug("Uploading to '%s'..." % node["connect_to"])
                 node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
@@ -462,7 +459,7 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
         kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)
 
     kubeconfig_filename = os.path.abspath("kubeconfig")
-    with open(kubeconfig_filename, 'w') as f:
+    with utils.open_external(kubeconfig_filename, 'w') as f:
         f.write(kubeconfig)
 
     cluster.log.debug(f"Kubeconfig saved to {kubeconfig_filename}")
@@ -829,7 +826,7 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=
 
 def patch_kubeadm_configmap(first_control_plane, cluster):
     '''
-    Сhecks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
+    Checks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
     '''
     # TODO: get rid of this method after k8s 1.21 support stop
@@ -1322,7 +1319,7 @@ def create_kubeadm_patches_for_node(cluster, node):
             else:
                 template_filename = 'templates/patches/control-plane-pod.json.j2'
 
-            control_plane_patch = Template(open(utils.get_resource_absolute_path(template_filename, script_relative=True)).read()).render(flags=patched_flags)
+            control_plane_patch = Template(utils.read_internal(template_filename)).render(flags=patched_flags)
             node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
                                  control_plane_patch_files[control_plane_item], sudo=True)
             node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +

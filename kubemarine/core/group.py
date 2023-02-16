@@ -367,28 +367,21 @@ class NodeGroup:
         return self.do("sudo", *args, **kwargs)
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):
-        # pop it early, so that StringIO "put" is not affected by unexpected keyword argument
-        binary = kwargs.pop("binary", True) is not False
-
         if isinstance(local_file, io.StringIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s with options %s"
                                      % (remote_file, list(self.nodes.keys()), kwargs))
-            self._put(local_file, remote_file, **kwargs)
+            # This is a W/A to avoid https://github.com/paramiko/paramiko/issues/1133
+            # if text contains non-ASCII characters.
+            # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
+            bytes_stream = io.BytesIO(local_file.getvalue().encode('utf-8'))
+            self._put(bytes_stream, remote_file, **kwargs)
             return
 
         self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s with options %s"
                                  % (local_file, remote_file, list(self.nodes.keys()), kwargs))
 
-        # Fabric opens file in 'rb' mode.
-        open_mode = "b"
-
-        if not binary and self.cluster.is_deploying_from_windows():
-            self.cluster.log.verbose("The file for transferring is marked as text. CRLF -> LF transformation is required")
-            # Let's open file in 'rt' mode to automatically make CRLF -> LF transformation.
-            open_mode = "t"
-
         self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
-        local_file_hash = self.get_local_file_sha1(local_file, open_mode)
+        local_file_hash = self.get_local_file_sha1(local_file)
         self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
         remote_file_hashes = self.get_remote_file_sha1(remote_file)
         self.cluster.log.verbose('Remote file hashes: %s' % remote_file_hashes)
@@ -405,7 +398,7 @@ class NodeGroup:
 
         group_to_upload = self.cluster.make_group(hosts_to_upload)
 
-        with open(local_file, "r" + open_mode) as local_stream:
+        with open(local_file, "rb") as local_stream:
             group_to_upload._put(local_stream, remote_file, **kwargs)
 
     def _put(self, local_stream: IO, remote_file: str, **kwargs):
@@ -739,17 +732,13 @@ class NodeGroup:
 
         return False
 
-    def get_local_file_sha1(self, filename, open_mode: str):
+    def get_local_file_sha1(self, filename):
         sha1 = hashlib.sha1()
 
         # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
-        with open(filename, 'r' + open_mode) as f:
+        with open(filename, 'rb') as f:
             while True:
                 data = f.read(2 ** 16)
-                # If files is opened in text mode, then it is necessary to encode the content.
-                # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
-                if isinstance(data, str):
-                    data = data.encode("utf-8")
                 if not data:
                     break
                 sha1.update(data)

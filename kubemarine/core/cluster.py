@@ -341,7 +341,7 @@ class KubernetesCluster(Environment):
         data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
-        with open(finalized_filename, 'w') as f:
+        with utils.open_external(finalized_filename, 'w') as f:
             f.write(data)
 
     def preserve_inventory(self):

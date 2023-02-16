@@ -14,7 +14,7 @@
           "description": "Deletes old repositories on hosts and installs new ones instead"
         },
         "repositories": {
-          "description": "List of new repositories. Can be specified as string with all repositories content, or as list for apt repositories, or as dictionary for yum repositories.",
+          "description": "List of new repositories. Can be specified as path to the file containing repositories, or as list for apt repositories, or as dictionary for yum repositories.",
           "oneOf": [
             {"type": "string"},
             {"$ref": "#/definitions/YumRepositories"},

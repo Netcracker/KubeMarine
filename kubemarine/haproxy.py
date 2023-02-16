@@ -121,7 +121,7 @@ def get_config_path(group: NodeGroup) -> NodeGroupResult:
     return exe.get_merged_result()
 
 
-def install(group):
+def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             package_associations = _get_associations_for_node(node)
@@ -144,7 +144,7 @@ def install(group):
         installation_result = exe.get_last_results_str()
 
     service_name = package_associations['service_name']
-    patch_path = utils.get_resource_absolute_path("./resources/drop_ins/haproxy.conf", script_relative=True)
+    patch_path = "./resources/drop_ins/haproxy.conf"
     group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
     enable(group)
     return installation_result
@@ -179,24 +179,20 @@ def enable(group):
                                   now=True)
 
 
-def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance=False):
+def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance=False) -> str:
 
     inventory = cluster.inventory
     bindings = _get_bindings(inventory, node, maintenance=maintenance)
 
-    if inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config'):
+    config_options = inventory['services']['loadbalancer']['haproxy']
+    if config_options.get('config'):
         return inventory['services']['loadbalancer']['haproxy']['config']
 
-    config_file = utils.get_resource_absolute_path('templates/haproxy.cfg.j2', script_relative=True)
     # todo support custom template for maintenance mode
-    if not maintenance and inventory['services'].get('loadbalancer', {}).get('haproxy', {}).get('config_file'):
-        config_file = utils.get_resource_absolute_path(
-            inventory['services']['loadbalancer']['haproxy']['config_file'],
-            script_relative=False)
-
-    config_source = open(config_file).read()
-
-    config_options = inventory['services'].get('loadbalancer', {}).get('haproxy', {})
+    if not maintenance and config_options.get('config_file'):
+        config_source = utils.read_external(config_options['config_file'])
+    else:
+        config_source = utils.read_internal('templates/haproxy.cfg.j2')
 
     return Template(config_source).render(nodes=future_nodes,
                                           bindings=bindings,

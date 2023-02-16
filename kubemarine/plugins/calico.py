@@ -47,7 +47,7 @@ def enrich_inventory(inventory, cluster):
                 config = {
                     "source": calico_original_yaml
                 }
-                calico_original_yaml_path = plugins.get_source_absolute_pattern(config)
+                calico_original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
                 if not os.path.isfile(calico_original_yaml_path):
                     raise Exception(f"Cannot find original Calico manifest {calico_original_yaml_path}")
 
@@ -73,7 +73,7 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     }
 
     # get original YAML and parse it into dict of objects
-    calico_original_yaml_path = plugins.get_source_absolute_pattern(config)
+    calico_original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
     obj_list = load_multiple_yaml(calico_original_yaml_path, cluster)
 
     validate_original(cluster, obj_list)
@@ -388,7 +388,7 @@ def load_multiple_yaml(filepath, cluster) -> dict:
     yaml = ruamel.yaml.YAML()
     yaml_dict = {}
     try:
-        with open(filepath, 'r') as stream:
+        with utils.open_utf8(filepath, 'r') as stream:
             source_yamls = yaml.load_all(stream)
             for source_yaml in source_yamls:
                 if source_yaml:

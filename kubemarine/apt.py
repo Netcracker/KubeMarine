@@ -16,6 +16,7 @@ import io
 
 import fabric
 
+from kubemarine.core import utils
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
@@ -49,7 +50,7 @@ def create_repo_file(group, repo_data, repo_file):
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
-        repo_data_str = str(repo_data)
+        repo_data_str = utils.read_external(repo_data)
     group.put(io.StringIO(repo_data_str), repo_file, sudo=True)
 
 
