@@ -686,6 +686,7 @@ compatibility_map:
         versions:
           - '8.4'
           - '8.6'
+          - '8.7'
     ubuntu:
       - os_family: 'debian'
         versions:
