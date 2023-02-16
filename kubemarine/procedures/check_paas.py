@@ -1062,14 +1062,14 @@ def calico_config_check(cluster):
         result = first_control_plane.sudo(f"kubectl get cm calico-config -n kube-system -oyaml").get_simple_out()
         result = yaml.safe_load(result)
         result = yaml.safe_load(result["data"]["cni_network_config"])
-        if isinstance(cluster.inventory["services"]["kubeadm"]["networking"]["podSubnet"], ipaddress.IPv4Address):
+        ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv4"]
         else:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv6"]
         ddiff = DeepDiff(ipam_config, result["plugins"][0]["ipam"], ignore_order=True)
-        ipam_diff = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
-        if ipam_diff:
-            message += f"calico cm is outdated: {ipam_diff}\n"
+        if ddiff:
+            message += f"calico cm is outdated: {ddiff.to_dict()}\n"
 
         result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'").get_simple_out()
         if int(result) > 0:
