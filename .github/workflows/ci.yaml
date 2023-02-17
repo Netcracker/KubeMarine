@@ -149,8 +149,6 @@ jobs:
     # Binaries will be built and uploaded asynchronously.
     needs: build-package
     if: startsWith(github.ref, 'refs/tags')
-    outputs:
-      release_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -171,25 +169,13 @@ jobs:
         run: zip -r package.zip dist
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref_name }}
           draft: false
           prerelease: true
-
-      - name: Upload Package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./package.zip
-            asset_name: package.zip
-            asset_content_type: application/zip
+          generate_release_notes: true
+          files: |
+            package.zip
 
   upload-binary:
     runs-on: ubuntu-latest
@@ -208,19 +194,15 @@ jobs:
         with:
           name: kubemarine-${{ matrix.arch }}
 
-      - name: Define Content Type
-        id: define_content_type
-        run: echo "value=$(file --mime-type ./kubemarine | awk '//{ print $2 }')" >> $GITHUB_OUTPUT
+      - name: Prepare Executable
+        run: mv kubemarine${{ matrix.ext }} kubemarine-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-            upload_url: ${{ needs.create-release.outputs.release_url }}
-            asset_path: kubemarine${{ matrix.ext }}
-            asset_name: kubemarine-${{ matrix.arch }}${{ matrix.ext }}
-            asset_content_type: ${{ steps.define_content_type.outputs.value }}
+          # Since the release already exists, the following does not change it, but only uploads the artifact.
+          files: |
+            kubemarine-${{ matrix.arch }}${{ matrix.ext }}
 
   publish-docker:
     runs-on: ubuntu-latest
