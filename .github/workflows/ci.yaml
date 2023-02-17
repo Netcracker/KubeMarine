@@ -152,13 +152,25 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
-      - name: Check Versions Consistency
+        with:
+          fetch-depth: 0
+      - name: Validate and Prepare
+        id: prepare
         run: |
           VERSION=$(cat kubemarine/version)
           if [[ $VERSION != "${{ github.ref_name }}" ]]; then
             echo -e "\033[91mGit tag does not equal to kubemarine/version\033[0m"
             exit 1;
           fi
+          BRANCH_OWNERS=$(git branch -r --contains HEAD | sed 's/^[[:space:]]*origin\/\(.*\)$/\1/' | grep "^\(main\|.*_branch\)$")
+          if [[ -z "$BRANCH_OWNERS" || $(echo "$BRANCH_OWNERS" | wc -l) != 1 ]]; then
+            echo -e "\033[91mFailed to detect the only release branch containing the HEAD commit.\033[0m";
+            echo "Available branches:"
+            git branch -r --contains HEAD
+            exit 1;
+          fi
+          echo -e "\033[0;32mTarget commitish: ${BRANCH_OWNERS}\033[0m"
+          echo "target_commitish=$BRANCH_OWNERS" >> $GITHUB_OUTPUT
 
       - name: Download Package
         uses: actions/download-artifact@v3
@@ -174,6 +186,9 @@ jobs:
           draft: false
           prerelease: true
           generate_release_notes: true
+          # The value is necessary to manage the branch after release is released.
+          # See patch.yaml workflow.
+          target_commitish: ${{ steps.prepare.outputs.target_commitish }}
           files: |
             package.zip
 
