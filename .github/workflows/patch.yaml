@@ -8,7 +8,7 @@ jobs:
     # Release can be done only in main branch or dedicated N.N.N_branch support branches
     if: github.event.release.target_commitish == 'main' || endsWith(github.event.release.target_commitish, '_branch')
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           token: ${{ secrets.NCCLPLCI_PAT }}
           # By default, tag is checked out. It needs to check out branch to commit to.
