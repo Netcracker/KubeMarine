@@ -1,11 +1,11 @@
 This section provides troubleshooting information for KubeMarine and Kubernetes solutions.
 
 - [KubeMarine Errors](#kubemarine-errors)
-  - [KME0001: Unexpected Exception](#kme0001-unexpected-exception)
-  - [KME0002: Remote Group Exception](#kme0002-remote-group-exception)
-  - [KME0003: Action Took Too Long to Complete and Timed Out](#kme0003-action-took-too-long-to-complete-and-timed-out)
-  - [KME0004: There Are No Workers Defined in the Cluster Scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
-  - [KME0005: {hostnames} Are Not Sudoers](#kme0005-hostnames-are-not-sudoers)
+  - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
+  - [KME0002: Remote group exception](#kme0002-remote-group-exception)
+  - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
+  - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
+  - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
   - [etcdctl Script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
@@ -37,7 +37,7 @@ This section lists all known errors with explanations and recommendations for th
 error occurs during the execution of any of these procedures, you can find it here.
 
 
-## KME0001: Unexpected Exception
+## KME0001: Unexpected exception
 
 ```
 FAILURE - TASK FAILED xxx
@@ -86,7 +86,7 @@ If you were able to solve the problem yourself, let us know about it and your so
 [opening a new PR](https://github.com/Netcracker/KubeMarine/pulls). Our team will appreciate it!
 
 
-## KME0002: Remote Group Exception
+## KME0002: Remote group exception
 
 Shell error:
 
@@ -139,7 +139,7 @@ If you still can't resolve this error yourself, start
 error with its stacktrace. We will try to help as soon as possible.
 
 
-## KME0003: Action Took Too Long to Complete and Timed Out
+## KME0003: Action took too long to complete and timed out
 
 ```
 FAILURE!
@@ -164,7 +164,7 @@ frozen stage of the procedure. It will be useful to check the cluster with
 [IAAS checker](Kubecheck.md#iaas-procedure) to detect problems with network connectivity.
 
 
-## KME0004: There Are No Workers Defined in the Cluster Scheme
+## KME0004: There are no workers defined in the cluster scheme
 
 ```
 FAILURE!
@@ -207,7 +207,7 @@ An example of specifying multiple `control-plane` and `worker` roles for a singl
 applications pods.
 
 
-## KME0005: {hostnames} Are Not Sudoers
+## KME0005: {hostnames} are not sudoers
 
 ```
 FAILURE!
