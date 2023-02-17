@@ -11,4 +11,4 @@
    *Note:*: do not forget to pass inventory file and connection key inside container.
    For more execution details refer to ["Installation of Kubernetes using CLI" guide on Github](https://github.com/Netcracker/kubemarine/blob/main/documentation/Installation.md#installation-of-kubernetes-using-cli).
 
-*Hint:* it is possible to pass building arguments (use `--build-arg`) to build using binary (argument `BUILD_TYPE=binary`) or build image with testing tools included (argument `BUILD_TYPE=test`).
+*Hint:* it is possible to pass building arguments (use `--build-arg`) to build only package (argument `BUILD_TYPE=package`) or build image with testing tools included (argument `BUILD_TYPE=test`).
