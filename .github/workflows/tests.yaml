@@ -5,7 +5,7 @@ on:
       - '**'
 env:
    COPYRIGHT_COMPANY: 'NetCracker Technology Corporation'
-   COPYRIGHT_YEAR: '2021-2022'
+   COPYRIGHT_YEAR: '2021-2023'
 jobs:
   license:
      runs-on: ubuntu-latest
