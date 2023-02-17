@@ -487,7 +487,22 @@ For more information about the structure of the inventory and how to specify the
 * [Minimal All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
 * [Minimal Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
 
-These files consists of the following sections.
+#### Inventory validation 
+
+When configuring the inventory, you can use your favorite IDE supporting YAML validation by JSON schema.
+JSON schema for inventory file can be used by [URL](../kubemarine/resources/schemas/cluster.json?raw=1).
+Do not try to copy the schema content.
+
+Make sure to use a raw URL (at raw.githubusercontent.com) without any query parameters.
+The JSON schema is naturally versioned by a KubeMarine version, specifically, by GitHub tag or branch that you are currently checking.
+
+Note that the inventory file is validated against the same schema at runtime.
+
+The known IDEs that support validation are:
+* [PyCharm](https://www.jetbrains.com/help/pycharm/json.html#ws_json_schema_add_custom) or other IntelliJ based IDEs.
+* Red Hat's extension for [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
+
+The inventory file consists of the following sections.
 
 ### node_defaults
 
