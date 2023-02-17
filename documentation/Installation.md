@@ -487,7 +487,7 @@ For more information about the structure of the inventory and how to specify the
 * [Minimal All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
 * [Minimal Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
 
-#### Validation by JSON Schemas
+#### Inventory validation 
 
 When configuring the inventory, you can use your favorite IDE supporting YAML validation by JSON schema.
 JSON schema for inventory file can be used by [URL](../kubemarine/resources/schemas/cluster.json?raw=1).
