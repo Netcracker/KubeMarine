@@ -10,7 +10,7 @@ jobs:
   license:
      runs-on: ubuntu-latest
      steps:
-       - uses: actions/checkout@v2
+       - uses: actions/checkout@v3
        - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" $(find . -type f -name "*.py" | xargs echo)
        # This currently not works for protected branches,
        # but all pushes to them should be done through PRs that already contain inserted license.
@@ -20,13 +20,13 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: docker build -t kubemarine --build-arg BUILD_TYPE=test --no-cache .
       - run: docker run --entrypoint=python3 kubemarine -m unittest discover -s /opt/kubemarine/test/unit -t /opt/kubemarine/test/unit
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: "3.9"
@@ -37,7 +37,7 @@ jobs:
   linter:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: "3.9"

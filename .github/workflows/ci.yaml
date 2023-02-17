@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build Docker Image
         run: docker build -t kubemarine --no-cache .
       - name: Run Selftest
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build Package via Docker
         run: |
           docker build -t kubemarine --build-arg BUILD_TYPE=package --no-cache .
@@ -75,7 +75,7 @@ jobs:
               pyinstaller kubemarine.spec --noconfirm
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
@@ -123,7 +123,7 @@ jobs:
             remove_files_script: 'Get-ChildItem -Exclude test,examples | Remove-Item -Recurse -Force'
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Keep Testing Files
         run: ${{ matrix.remove_files_script }}
       - name: Set up Python ${{ matrix.python-version }}
@@ -153,7 +153,7 @@ jobs:
       release_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Check Versions Consistency
         run: |
           VERSION=$(cat kubemarine/version)
@@ -226,7 +226,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags') || github.ref_name == 'main' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: docker build . -t ghcr.io/netcracker/kubemarine:${{ github.ref_name }}
       - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - run: docker push ghcr.io/netcracker/kubemarine:${{ github.ref_name }}
