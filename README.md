@@ -38,17 +38,15 @@ Proceed the following steps to install Kubemarine  on your environment:
 1. Download the binary file for your system from the latest [release](https://github.com/Netcracker/KubeMarine/releases)
 2. Move binary kubemarine to a separate folder 
 3. Now you can proceed to run Kubemarine! Try the following:
-   
-   Linux:
    ```bash
    kubemarine help
    ```
 
 
-## Kubemarine CLI Installation
-To install Kubemarine manually on your environment:
-1. Install the latest [python3](https://www.python.org/downloads/)
-2. Upgrade pip.
+## Kubemarine Package Installation
+To install Kubemarine as package on your environment:
+1. Install the latest [python](https://www.python.org/downloads/).
+1. Upgrade pip.
 
    Linux / MacOS:
    ```bash
@@ -58,47 +56,50 @@ To install Kubemarine manually on your environment:
    ```bash
    python -m pip install --upgrade pip
    ```
-3. Ensure your environment meets the [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node).
-4. [Download the latest release](https://github.com/netcracker/kubemarine/releases) or clone the repository:
-   ```bash
-   git clone https://github.com/netcracker/kubemarine.git
-   ```
-5. Unpack the project from the archive if required:
-   ```bash
-   tar xzvf X.X.X.tar.gz
-   ```
-6. Navigate to the project directory:
-   ```bash
-   cd kubemarine
-   ```
-7. Install Python dependencies.
+1. Ensure your environment meets the [Deployment Node Prerequisites](documentation/Installation.md#prerequisites-for-deployment-node).
+1. Create and activate a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/) if necessary.
+1. Install Kubemarine package.
 
    Linux / MacOS:
    ```bash
-   python3 -m pip install -r requirements.txt
+   python3 -m pip install kubemarine
    ```
    Windows:
    ```bash
-   python -m pip install -r requirements_nt.txt
+   python -m pip install kubemarine
    ```
-8. If you don't want to add something to PATH, you can execute Kubemarine directly from the `bin` location:
+1. Now you can proceed to run Kubemarine! Try the following:
    ```bash
-   cd bin
+   kubemarine help
    ```
-   Alternatively, add Kubemarine to PATH.
-   On Linux / MacOS, you can do this by adding symlink to `/usr/local/bin` being in the root directory of Kubemarine:
+
+
+## Kubemarine Installation from Sources
+Installation of Kubemarine from sources is mostly similar to [Kubemarine Package Installation](#kubemarine-package-installation).
+The exception is instead of installing the package from [PyPI](https://pypi.org/project/kubemarine/), do the following:
+1. [Download the latest release](https://github.com/netcracker/kubemarine/releases) or clone the repository:
    ```bash
-   sudo ln -s $(pwd)/bin/kubemarine /usr/local/bin/kubemarine
-   sudo chmod +x /usr/local/bin/kubemarine
+   git clone https://github.com/netcracker/kubemarine.git
    ```
-   If you do not have root privileges, you can update your PATH in *rc file. Example:
+1. Unpack the project from the archive if required:
    ```bash
-   echo "export PATH=\$PATH:$(pwd)/bin" >> ~/.bashrc
-   source ~/.bashrc
+   tar xzvf X.X.X.tar.gz
    ```
-   On Windows, it is recommended to change PATH variable only through control panel.
-   To do that, type *Edit the system environment variables* in Search box.
-9. Now you can proceed to run Kubemarine. Try the following:
+1. Navigate to the project directory:
+   ```bash
+   cd kubemarine
+   ```
+1. Install Kubemarine package from sources.
+
+   Linux / MacOS:
+   ```bash
+   python3 -m pip install -e .[ansible]
+   ```
+   Windows:
+   ```bash
+   python -m pip install -e .
+   ```
+1. Now you can proceed to run Kubemarine. Try the following:
     ```bash
     kubemarine help
     ```

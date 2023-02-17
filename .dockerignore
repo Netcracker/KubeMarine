@@ -1,11 +1,10 @@
+ci
 documentation
 dump
 ansible-inventory.ini
 cluster.yaml
-build.sh
-.git
 Dockerfile
+.git
 .DS_Store
 .gitignore
-*.md
 .github

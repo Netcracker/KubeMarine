@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import glob
+import os
 import unittest
-from pathlib import Path
 from unittest import mock
 
 import yaml
 
 from kubemarine import demo, coredns, __main__
-from kubemarine.core import errors, utils, schema
+from kubemarine.core import errors, schema
 from kubemarine.procedures import install
 from test.unit import utils as test_utils
 
@@ -73,10 +73,10 @@ class FinalizedInventoryValidation(unittest.TestCase):
 
 class TestValidExamples(unittest.TestCase):
     def test_cluster_examples_valid(self):
-        inventories_dir = Path(utils.get_internal_resource_path("../examples/cluster.yaml"))
-        self.assertTrue(inventories_dir.is_dir(), "Examples not found")
-        for inventory_filepath in inventories_dir.glob('**/*'):
-            if inventory_filepath.is_dir() or 'cluster' not in inventory_filepath.name:
+        inventories_dir = os.path.abspath(f"{__file__}/../../../../examples/cluster.yaml")
+        self.assertTrue(os.path.isdir(inventories_dir), "Examples not found")
+        for inventory_filepath in glob.glob(inventories_dir + "/**/*", recursive=True):
+            if os.path.isdir(inventory_filepath) or 'cluster' not in os.path.basename(inventory_filepath):
                 continue
             with open(inventory_filepath, 'r') as stream:
                 inventory = yaml.safe_load(stream)
@@ -88,23 +88,23 @@ class TestValidExamples(unittest.TestCase):
                 cluster = demo.FakeKubernetesCluster(inventory, context=context)
                 schema.verify_inventory(cluster.raw_inventory, cluster)
             except Exception as e:
-                self.fail(f"Enrichment of {inventory_filepath.relative_to(inventories_dir)} failed: {e}")
+                self.fail(f"Enrichment of {os.path.relpath(inventory_filepath, start=inventories_dir)} failed: {e}")
 
     def test_procedure_examples_valid(self):
-        inventories_dir = Path(utils.get_internal_resource_path("../examples/procedure.yaml"))
-        if not inventories_dir.is_dir():
-            self.skipTest("Examples not found")
-        for inventory_filepath in inventories_dir.glob('**/*'):
-            if inventory_filepath.is_dir():
+        inventories_dir = os.path.abspath(f"{__file__}/../../../../examples/procedure.yaml")
+        self.assertTrue(os.path.isdir(inventories_dir), "Examples not found")
+        for inventory_filepath in glob.glob(inventories_dir + "/**/*", recursive=True):
+            if os.path.isdir(inventory_filepath):
                 continue
             with open(inventory_filepath, 'r') as stream:
                 procedure_inventory = yaml.safe_load(stream)
 
+            relpath = os.path.relpath(inventory_filepath, start=inventories_dir)
             for procedure in __main__.procedures.keys():
-                if procedure in inventory_filepath.name:
+                if procedure in os.path.basename(inventory_filepath):
                     break
             else:
-                self.fail(f"Unknown procedure for inventory {inventory_filepath.relative_to(inventories_dir)}")
+                self.fail(f"Unknown procedure for inventory {relpath}")
 
             context = demo.create_silent_context(procedure=procedure)
             inventory = demo.generate_inventory(**demo.MINIHA)
@@ -113,7 +113,7 @@ class TestValidExamples(unittest.TestCase):
             try:
                 demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
             except Exception as e:
-                self.fail(f"Enrichment of {inventory_filepath.relative_to(inventories_dir)} failed: {e}")
+                self.fail(f"Enrichment of {relpath} failed: {e}")
 
 
 class TestErrorHeuristics(unittest.TestCase):
