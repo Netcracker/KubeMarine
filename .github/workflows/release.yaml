@@ -46,12 +46,27 @@ jobs:
     if: startsWith(github.ref, 'refs/tags')
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Validate and Prepare
+        id: prepare
+        run: |
+          BRANCH_OWNERS=$(git branch -r --contains HEAD | sed 's/^[[:space:]]*origin\/\(.*\)$/\1/' | grep "^\(main\|.*_branch\)$")
+          if [[ -z "$BRANCH_OWNERS" || $(echo "$BRANCH_OWNERS" | wc -l) != 1 ]]; then
+            echo -e "\033[91mFailed to detect the only release branch containing the HEAD commit.\033[0m";
+            echo "Available branches:"
+            git branch -r --contains HEAD
+            exit 1;
+          fi
+          echo -e "\033[0;32mTarget commitish: ${BRANCH_OWNERS}\033[0m"
+          echo "target_commitish=$BRANCH_OWNERS" >> $GITHUB_OUTPUT
       - name: Build Binary via Docker
         run: |
           docker build -t kubemarine --build-arg BUILD_TYPE=binary --no-cache .
           CONTAINER_ID=$(docker create kubemarine)
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" kubemarine_exe
+          mkdir dist
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" dist/kubemarine
           docker rm -v "${CONTAINER_ID}"
 
       - name: Download Package
@@ -63,35 +78,17 @@ jobs:
         run: zip -r package.zip dist
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref_name }}
           draft: false
           prerelease: true
-
-      - name: Upload Executable
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./kubemarine_exe
-            asset_name: kubemarine
-            asset_content_type: application/x-executable
-
-      - name: Upload Package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./package.zip
-            asset_name: package.zip
-            asset_content_type: application/zip
+          generate_release_notes: true
+          # The value is necessary to manage the branch after release is released.
+          # See patch.yaml workflow.
+          target_commitish: ${{ steps.prepare.outputs.target_commitish }}
+          files: |
+            package.zip
+            dist/kubemarine
 
 #      - name: PyInstaller win64
 #        id: win64
