@@ -61,13 +61,6 @@ jobs:
           fi
           echo -e "\033[0;32mTarget commitish: ${BRANCH_OWNERS}\033[0m"
           echo "target_commitish=$BRANCH_OWNERS" >> $GITHUB_OUTPUT
-      - name: Build Binary via Docker
-        run: |
-          docker build -t kubemarine --build-arg BUILD_TYPE=binary --no-cache .
-          CONTAINER_ID=$(docker create kubemarine)
-          mkdir dist
-          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" dist/kubemarine
-          docker rm -v "${CONTAINER_ID}"
 
       - name: Download Package
         uses: actions/download-artifact@v3
@@ -76,6 +69,13 @@ jobs:
           path: ./dist
       - name: Pack Package
         run: zip -r package.zip dist
+
+      - name: Build Binary via Docker
+        run: |
+          docker build -t kubemarine --build-arg BUILD_TYPE=binary --no-cache .
+          CONTAINER_ID=$(docker create kubemarine)
+          docker cp "${CONTAINER_ID}:/opt/kubemarine/dist/kubemarine" dist/kubemarine
+          docker rm -v "${CONTAINER_ID}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
