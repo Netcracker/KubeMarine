@@ -54,25 +54,13 @@ jobs:
           - target: {os: ubuntu-latest, arch: 'linux-x86_64'}
             build_cmd: >
               docker run -t -v $(pwd):/opt/app-root/src centos/python-38-centos7 bash -c
-              'pip install --upgrade pip wheel setuptools &&
-              pip install pyinstaller==5.8.0 dist/*.whl &&
-              pip uninstall -y kubemarine &&
-              pyinstaller kubemarine.spec --noconfirm'
+              'python scripts/ci/build_binary.py'
           - target: {os: windows-2022, arch: 'win64'}
-            build_cmd: |
-              pip install pyinstaller==5.8.0 (get-item dist\*.whl).FullName
-              pip uninstall -y kubemarine
-              pyinstaller kubemarine.spec --noconfirm
+            build_cmd: python scripts/ci/build_binary.py
           - target: {os: macos-11, arch: 'macos11-x86_64'}
-            build_cmd: |
-              ./macos11_build_prepare.sh x86_64
-              pip install pyinstaller==5.8.0
-              pyinstaller kubemarine.spec --noconfirm
+            build_cmd: python scripts/ci/build_binary.py x86_64
           - target: {os: macos-11, arch: 'macos11-arm64'}
-            build_cmd: |
-              ./macos11_build_prepare.sh arm64
-              pip install pyinstaller==5.8.0
-              pyinstaller kubemarine.spec --noconfirm
+            build_cmd: python scripts/ci/build_binary.py arm64
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
