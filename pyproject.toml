@@ -25,17 +25,12 @@ classifiers = [
     "Environment :: Console",
 ]
 keywords = ["kubernetes", "devops", "administration", "helm"]
-# Any change in dependencies should be reflected in macos11_build_prepare.sh
-# Also, the binary build for arm64-based macOS should be manually verified.
 dependencies = [
-    # cffi and cryptography are required by paramiko
-    "cffi==1.15.*",
-    "cryptography==39.0.*",
     "PyYAML==6.0",
-    "MarkupSafe==2.1.*",
     "deepmerge==1.0.*",
     "fabric==2.6.*",
     "jinja2==3.1.*",
+    "MarkupSafe==2.1.*",
     "invoke==1.6.*",
     "ruamel.yaml==0.17.*",
     "pygelf==0.4.*",
