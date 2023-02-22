@@ -630,7 +630,8 @@ class NodeGroup:
     def _await_rebooted_nodes(self, timeout=None, initial_boot_history: NodeGroupResult = None) -> _HostToResult:
 
         if timeout is None:
-            timeout = self.cluster.globals['nodes']['boot']['defaults']['timeout']
+            # boot_timeout is set for all nodes, so we can take any node's boot_timeout
+            timeout = self.cluster.inventory['nodes'][0].get('boot_timeout', self.cluster.globals['nodes']['boot']['defaults']['timeout'])
 
         delay_period = self.cluster.globals['nodes']['boot']['defaults']['delay_period']
 
@@ -642,6 +643,8 @@ class NodeGroup:
         left_nodes = self.nodes
         results: _HostToResult = {}
         time_start = datetime.now()
+
+        self.cluster.log.verbose("Trying to connect to nodes, timeout is %s seconds..." % timeout)
 
         # each connection has timeout, so the only we need is to repeat connecting attempts
         # during specified number of seconds
@@ -677,7 +680,7 @@ class NodeGroup:
                 time.sleep(delay_period - attempt_time)
 
         if left_nodes:
-            self.cluster.log.verbose("Failed to wait for boot of nodes %s." % list(left_nodes.keys()))
+            self.cluster.log.verbose("Failed to wait for boot of nodes %s. Try to increase boot_timeout parameter in node_defaults: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#node_defaults" % list(left_nodes.keys()))
         else:
             self.cluster.log.verbose("All nodes are online now")
 

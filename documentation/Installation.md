@@ -82,6 +82,7 @@ This section provides information about the inventory, features, and steps for i
         - [template](#template)
         - [config](#config) 
         - [expect pods](#expect-pods)
+        - [expect deployments/daemonsets/replicasets/statefulsets](#expect-deployments-daemonsets-replicasets-statefulsets)
         - [python](#python)
         - [thirdparty](#thirdparty)
         - [shell](#shell)
@@ -530,7 +531,7 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, username, connection_port, connection_timeout, and gateway.
+* keyfile, username, connection_port, connection_timeout, boot_timeout, ready_timeout, ready_retries and gateway.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 
 For more information about the listed parameters, refer to the following section.
@@ -550,9 +551,14 @@ The following options are supported:
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
+|ready_timeout|int|no|5|`10`|Timeout between `ready_retries` for cluster node readiness waiting|
+|ready_retries|int|no|15|`30`|Number of retries to check a cluster node readiness|
+|boot_timeout|int|no|600|`900`|Timeout for node reboot waiting|
 |roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
+
+*Warning*: In case of `ready_timeout`, `ready_retries`, `boot_timeout` should be redefined, it must be done in `node_defaults` section of `cluster.yaml`. They can be overridden only for all the nodes at once.
 
 An example with parameters values is as follows:
 
@@ -4348,7 +4354,7 @@ The procedure tries once every few seconds to find the necessary pods and detect
 |Configuration|Value|Description|
 |---|---|---|
 |timeout|`5`|The number of seconds until the next pod status check.|
-|retries|`30`|The number of attempts to check the status.|
+|retries|`45`|The number of attempts to check the status.|
 
 The total waiting time is calculated by multiplying the configuration `timeout * retries`, for default values it is 2 to 5 minutes to wait.
 If during this time, the pods do not have a ready status, then a corresponding error is thrown and the work is stopped.
@@ -4369,6 +4375,55 @@ plugins:
                 - calico-kube-controllers
                 - calico-node
 ```
+
+##### expect deployments/daemonsets/replicasets/statefulsets
+
+This procedure is similar to `expect pods`, but it is intended to wait for deployments/daemonsets/replicasets/statefulsets. For example:
+
+```
+plugins:
+  calico:
+    installation:
+      procedures:
+        - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
+
+```
+
+*Note*: You can specify some part of the resource name instead of its full name.
+
+The procedure tries once every few seconds to find the necessary resources and detect their status. If you use the standard format of this procedure, then the resources are expected in accordance with the following configurations:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next resource status check.|
+|retries|`30`|The number of attempts to check the status.|
+
+The total waiting time in seconds is calculated by multiplying the configuration `timeout * retries`.
+If during this time, the resources do not have an up-to-date status, then a corresponding error is thrown and the work is stopped.
+If you are not satisfied with the default wait values, you can use the advanced form of the procedure record. For example:
+
+```
+plugins:
+  calico:
+    installation:
+      procedures:
+        - expect:
+            daemonsets:
+              list:
+               - calico-node
+              timeout: 10
+              retries: 100
+            deployments:
+              list:
+               - calico-kube-controllers
+               retries: 60
+
+```
+
 
 ##### python
 
