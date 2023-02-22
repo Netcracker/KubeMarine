@@ -439,7 +439,7 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
             cluster.log.debug(running_pods_stdout)
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the pods did not become ready. Try to increase number of retries in expect.pods: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-pods')
+    raise Exception('In the expected time, the pods did not become ready')
 
 
 def is_critical_state_in_stdout(cluster, stdout):
