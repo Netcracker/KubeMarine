@@ -9,7 +9,7 @@ description = "Management tool for Kubernetes cluster deployment and maintenance
 authors = [
     {name = "Kubemarine Group", email = "kubemarinegroup@netcracker.com"},
 ]
-license = {file = "LICENSE"}
+license = {text = "Apache-2.0"}
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
