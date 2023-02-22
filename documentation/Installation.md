@@ -18,6 +18,7 @@ This section provides information about the inventory, features, and steps for i
       - [Full-HA Scheme](#full-ha-scheme)
   - [Taints and Toleration](#taints-and-toleration)
   - [Configuration](#configuration)
+    - [globals](#globals)
     - [node_defaults](#node_defaults)
     - [nodes](#nodes)
     - [cluster_name](#cluster_name)
@@ -491,6 +492,28 @@ The known IDEs that support validation are:
 
 The inventory file consists of the following sections.
 
+### globals
+In the `globals` section you can describe the global parameters that can be overridden. For example:
+
+```
+globals:
+  nodes:
+    ready:
+      timeout: 10
+      retries: 60
+    boot:
+      timeout: 900
+```
+
+The following parameters are supported:
+
+|Name|Type|Mandatory|Default Value|Example|Description|
+|---|---|---|---|---|---|
+|`nodes.ready.timeout`|int|no|5|`10`|Timeout between `nodes.ready.retries` for cluster node readiness waiting|
+|`nodes.ready.retries`|int|no|15|`60`|Number of retries to check a cluster node readiness|
+|`nodes.boot.timeout`|int|no|600|`900`|Timeout for node reboot waiting|
+
+
 ### node_defaults
 
 In the `node_defaults` section, you can describe the parameters to be applied by default to each record in the [nodes](#nodes) section.
@@ -531,7 +554,7 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, username, connection_port, connection_timeout, boot_timeout, ready_timeout, ready_retries and gateway.
+* keyfile, username, connection_port, connection_timeout and gateway.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 
 For more information about the listed parameters, refer to the following section.
@@ -551,14 +574,9 @@ The following options are supported:
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
 |connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|ready_timeout|int|no|5|`10`|Timeout between `ready_retries` for cluster node readiness waiting|
-|ready_retries|int|no|15|`30`|Number of retries to check a cluster node readiness|
-|boot_timeout|int|no|600|`900`|Timeout for node reboot waiting|
 |roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
-
-*Warning*: In case of `ready_timeout`, `ready_retries`, `boot_timeout` should be redefined, it must be done in `node_defaults` section of `cluster.yaml`. They can be overridden only for all the nodes at once.
 
 An example with parameters values is as follows:
 

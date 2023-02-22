@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Section to hold the parameters which override global settings",
+  "additionalProperties": false,
+  "properties": {
+    "nodes": {
+      "$ref": "#/definitions/Nodes"
+    }
+  },
+  "definitions": {
+    "Nodes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+         "ready": {
+           "type": "object",
+           "properties": {
+             "retries": {
+               "type": "integer",
+                "minimum": 1,
+                "default": 30,
+                "description": "Number of retries for node readiness check"
+             },
+             "timeout": {
+               "type": "integer",
+               "minimum": 1,
+               "default": 5,
+               "description": "Timeout for node readiness check in seconds"
+             }
+           }
+         },
+         "boot": {
+           "type": "object",
+           "properties": {
+             "timeout": {
+               "type": "integer",
+               "minimum": 1,
+               "default": 600,
+               "description": "Timeout for node reboot in seconds"
+             }
+           }
+         }
+      }
+    }
+  }
+}

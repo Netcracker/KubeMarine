@@ -53,31 +53,13 @@
         "gateway": {
           "type": "string",
           "description": "Gateway that should be used to connect to node(s)"
-        },
-        "ready_timeout": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 5,
-          "description": "Timeout for node readiness check in seconds"
-        },
-        "ready_retries": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 30,
-          "description": "Number of retries for node readiness check"
-        },
-        "boot_timeout": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 600,
-          "description": "Timeout for node reboot in seconds"
         }
       }
     },
     "CommonNodePropertyNames": {
       "anyOf": [
         {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
-        {"enum": ["labels", "taints", "gateway", "ready_timeout", "ready_retries", "boot_timeout"]}
+        {"enum": ["labels", "taints", "gateway"]}
       ]
     }
   }
