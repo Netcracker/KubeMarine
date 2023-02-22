@@ -25,9 +25,15 @@ def read(path):
 VERSION = read("kubemarine/version").strip()
 
 README = read("README.md")
+# Special case to refer to anchor within the current README page should be translated to explicit README referring.
+README = re.sub(
+    r'\[(.*?)]\((#.*?)\)',
+    rf'[\1](https://github.com/Netcracker/KubeMarine/blob/{VERSION}/README.md\2)',
+    README
+)
 # Replace all relative links (not starting with http[s]://) to absolute referring to specific version on GitHub
 README = re.sub(
-    r'\[(.*)]\((?!https?://)(.*)\)',
+    r'\[(.*?)]\((?!https?://)(.*?)\)',
     rf'[\1](https://github.com/Netcracker/KubeMarine/blob/{VERSION}/\2)',
     README
 )
