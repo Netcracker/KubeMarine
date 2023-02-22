@@ -82,7 +82,7 @@ This section provides information about the inventory, features, and steps for i
         - [template](#template)
         - [config](#config) 
         - [expect pods](#expect-pods)
-        - [expect deployments/daemonsets/replicasets/statefulsets](#expect-deployments-daemonsets-replicasets-statefulsets)
+        - [expect deployments/daemonsets/replicasets/statefulsets](#expect-deploymentsdaemonsetsreplicasetsstatefulsets)
         - [python](#python)
         - [thirdparty](#thirdparty)
         - [shell](#shell)
