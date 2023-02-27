@@ -5597,8 +5597,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5682,7 +5682,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5769,8 +5769,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5854,7 +5854,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5941,13 +5941,13 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
-    <td colspan="5">v1.23.0</td>
-    <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
+    <td colspan="5">v1.25.0</td>
+    <td>SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3<br>Required only if containerd is used as a container runtime.</td>
   </tr>
   <tr>
     <td rowspan="5">rpms</td>
@@ -6026,7 +6026,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
