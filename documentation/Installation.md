@@ -225,6 +225,7 @@ dnf -y install 'dnf-command(copr)'
 curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo
 dnf -y --refresh install containerd
 dnf -y --refresh install podman
+systemctl enable containerd
 ```
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
 

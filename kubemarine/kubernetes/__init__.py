@@ -586,7 +586,7 @@ def wait_for_any_pods(cluster, connection, apply_filter=None):
                         retries=cluster.globals['pods']['expect']['kubernetes']['retries'])
 
 
-def wait_for_nodes(group):
+def wait_for_nodes(group: NodeGroup):
     log = group.cluster.log
 
     first_control_plane = group.cluster.nodes["control-plane"].get_first_member()
@@ -607,21 +607,27 @@ def wait_for_nodes(group):
     while retries > 0:
         correct_conditions = 0
         for condition, cond_value in wait_conditions.items():
-            result = first_control_plane.sudo(status_cmd % (" ".join(node_names), condition))
-            condition_results = list(result.values())[0].stdout.split(" ")
+            result = first_control_plane.sudo(status_cmd % (" ".join(node_names), condition), warn=True)
+            node_result = list(result.values())[0]
+            if node_result.failed:
+                log.debug(f"kubectl exited with non-zero exit code. Haproxy or kube-apiserver are not yet started?")
+                log.verbose(node_result)
+                break
+            condition_results = node_result.stdout.split(" ")
             correct_values = [value for value in condition_results if value == cond_value]
             if len(correct_values) == len(node_names):
                 correct_conditions = correct_conditions + 1
                 log.debug(f"Condition {condition} is {cond_value} for all nodes.")
             else:
                 log.debug(f"Condition {condition} is not met, retrying")
-                retries = retries - 1
-                time.sleep(timeout)
                 break
 
         if correct_conditions == len(wait_conditions):
             log.debug("All nodes are ready!")
             return
+        else:
+            retries = retries - 1
+            time.sleep(timeout)
 
     raise Exception("Nodes did not become ready in the expected time")
 

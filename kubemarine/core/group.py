@@ -360,10 +360,10 @@ class NodeGroup:
 
         return group_result
 
-    def run(self, *args, **kwargs) -> NodeGroupResult or int:
+    def run(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("run", *args, **kwargs)
 
-    def sudo(self, *args, **kwargs) -> NodeGroupResult or int:
+    def sudo(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("sudo", *args, **kwargs)
 
     def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):
@@ -474,7 +474,7 @@ class NodeGroup:
     def get(self, *args, **kwargs):
         return self.do("get", *args, **kwargs)
 
-    def do(self, do_type, *args, **kwargs) -> NodeGroupResult or int:
+    def do(self, do_type, *args, **kwargs) -> Union[NodeGroupResult, int]:
         raw_results = self._do_with_wa(do_type, *args, **kwargs)
         if isinstance(raw_results, int):
             return raw_results
@@ -485,7 +485,7 @@ class NodeGroup:
 
         return group_results
 
-    def _do_with_wa(self, do_type, *args, **kwargs) -> _HostToResult or int:
+    def _do_with_wa(self, do_type, *args, **kwargs) -> Union[_HostToResult, int]:
         # by default all code is async, but can be set False forcibly
         is_async = kwargs.pop("is_async", True) is not False
 
@@ -540,7 +540,7 @@ class NodeGroup:
 
         return True
 
-    def _do(self, do_type: str, nodes: Connections, is_async, *args, **kwargs) -> _HostToResult:
+    def _do(self, do_type: str, nodes: Connections, is_async, *args, **kwargs) -> Union[_HostToResult, int]:
 
         if do_type in ["run", "sudo"]:
             # by default fabric will print all output from nodes
