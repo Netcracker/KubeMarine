@@ -37,7 +37,9 @@ dependencies = [
     "toml==0.10.*",
     "python-dateutil==2.8.*",
     "deepdiff==5.7.*",
-    "paramiko==2.9.*",
+    # cryptography is a transitive dependency of paramiko. Fix version to avoid unexpected deprecation warnings.
+    "cryptography==39.0.*",
+    "paramiko==2.11.*",
     "jsonschema==4.17.*",
 ]
 requires-python = ">=3.7"
