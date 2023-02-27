@@ -3,10 +3,10 @@ vrrp_ips: []
 globals: 
   nodes:
     ready:
-      timeout: '{{ globals.nodes.ready.timeout }}'
-      retries: '{{ globals.nodes.ready.retries }}'
+      timeout: 5
+      retries: 15
     boot:
-     timeout: '{{ globals.nodes.boot.defaults.timeout }}'
+     timeout: 600
 
 node_defaults: {}
 

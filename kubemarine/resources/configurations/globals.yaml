@@ -70,13 +70,9 @@ nodes:
     kubernetes_version:
       timeout: 10
       retries: 30
-  ready:
-    retries: 15
-    timeout: 5
   boot:
     reboot_command: 'reboot 2>/dev/null >/dev/null &'
     defaults:
-      timeout: 600
       delay_period: 5
   drain:
     timeout: 10

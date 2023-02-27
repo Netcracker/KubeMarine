@@ -17,12 +17,14 @@
            "type": "object",
            "properties": {
              "retries": {
-               "type": ["string", "integer"],
-                "default": 30,
-                "description": "Number of retries for node readiness check"
+               "type": "integer",
+               "minimal": 1, 
+               "default": 30,
+               "description": "Number of retries for node readiness check"
              },
              "timeout": {
-               "type": ["string", "integer"],
+               "type": "integer",
+               "minimal": 1,
                "default": 5,
                "description": "Timeout for node readiness check in seconds"
              }
@@ -32,7 +34,8 @@
            "type": "object",
            "properties": {
              "timeout": {
-               "type": ["string", "integer"],
+               "type": "integer",
+               "minimal": 1,
                "default": 600,
                "description": "Timeout for node reboot in seconds"
              }
