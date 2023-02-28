@@ -3445,7 +3445,7 @@ Before proceeding, refer to the [Official Documentation of the Kubernetes Cluste
 
 Calico plugin is installed by default and does not require any special enablement or configuration. However it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
 
-**Warning:** According to the Calico kernel requirements, CentOS 7 with kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. More information: [Kubernetes requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements)
+**Warning**: According to the Calico kernel requirements, CentOS 7 with a kernel lower than `3.10.0-940.el7.x86_64` is not compatible with Calico 3.24 and higher. For more information, refer to [Kubernetes requirements](https://docs.tigera.io/calico/3.24/getting-started/kubernetes/requirements#kubernetes-requirements).
 
 The following is an example to enable the calico plugin:
 
