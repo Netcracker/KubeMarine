@@ -1,4 +1,4 @@
-This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
+This section provides troubleshooting information for KubeMarine and Kubernetes solutions.
 
 - [KubeMarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
@@ -7,27 +7,29 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
   - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
-  - [etcdctl script](#etcdctl-script)
+  - [etcdctl Script](#etcdctl-script)
 - [Troubleshooting Kubernetes Generic Issues](#troubleshooting-kubernetes-generic-issues)
-  - [CoreDNS Responds with High Latency](#coredns-responds-with-high-latency)
-  - [Namespace with terminating CR/CRD cannot be deleted. Terminating CR/CRD cannot be deleted](#namespace-with-terminating-crcrd-cannot-be-deleted-terminating-crcrd-cannot-be-deleted)
-  - [Packets between nodes in different networks are lost](#packets-between-nodes-in-different-networks-are-lost)
-  - [`kubectl apply` fails with error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
-  - [`kube-apiserver` requests throttling](#kube-apiserver-requests-throttling)
-  - [Long Recovery after a Node goes Offline](#long-recovery-after-a-node-goes-offline)
-  - [`kube-controller-manager` unable to sync caches for garbage collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
-  - [etcdctl compaction and defragmentation](#etcdctl-compaction-and-defragmentation)
-  - [etcdctl defrag return context deadline exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
-  - [HTTPS Ingress doesn't work](#https-ingress-doesnt-work)
-  - [Garbage Collector does not initialize if convert webhook is broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
-  - [Pods stuck in "terminating" status during deletion](#pods-stuck-in-terminating-status-during-deletion)
+  - [CoreDNS Responds With High Latency](#coredns-responds-with-high-latency)
+  - [Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted](#namespace-with-terminating-crcrd-cannot-be-deleted-terminating-crcrd-cannot-be-deleted)
+  - [Packets Between Nodes in Different Networks Are Lost](#packets-between-nodes-in-different-networks-are-lost)
+  - [`kubectl apply` Fails With Error "metadata annotations: Too long"](#kubectl-apply-fails-with-error-metadata-annotations-too-long)
+  - [`kube-apiserver` Requests Throttling](#kube-apiserver-requests-throttling)
+  - [Long Recovery After a Node Goes Offline](#long-recovery-after-a-node-goes-offline)
+  - [`kube-controller-manager` Unable to Sync Caches for Garbage Collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
+  - [Etcdctl Compaction and Defragmentation](#etcdctl-compaction-and-defragmentation)
+  - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
+  - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
+  - [Garbage Collector Does Not Initialize If Convert Webhook Is Broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
+  - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
-- [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
+  - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
+  - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
+- [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
-  - [Numerous generation of auditd system messages ](#numerous-generation-of-auditd-system)
-  - [Failing during installation on Ubuntu OS](#failing-during-installation-on-ubuntu-os)
-  - [Troubleshooting an installation that ended incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
-  - [Kubelet has conflict with kubepods-burstable.slice and kube-proxy pods stick in ContainerCreating status](#kubelet-has-conflict-with-kubepods-burstable.-slice-and-kube-proxy-pods-stick-in-containerCreating-status)
+  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
+  - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
+  - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
+  - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
 
 # KubeMarine Errors
 
@@ -232,9 +234,9 @@ in the end of `/etc/sudoers` file, where `username` is a name of the connection 
 
 # Troubleshooting Tools
 
-This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
+This section describes the additional tools that KubeMarine provides for convenient troubleshooting of various issues.
 
-## etcdctl script
+## Etcdctl Script
 
 This script allows you to execute `etcdctl` queries without installing an additional binary file and setting up a connection. This file is installed during the `prepare.thirdparties` installation task on all control-planes and requires root privileges.
 
@@ -267,9 +269,9 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 # Troubleshooting Kubernetes Generic Issues
 
-This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubemarine installation.
+This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to KubeMarine installation.
 
-## CoreDNS Responds with High Latency
+## CoreDNS Responds With High Latency
 
 **Symptoms**: CoreDNS responds with some delay.
 
@@ -283,7 +285,7 @@ This section provides troubleshooting information for generic Kubernetes solutio
  
 Choose the number of replicas at your discretion. In addition to increasing the replicas, it is recommended to use anti-affinity rules to reassign all CoreDNS pods to each node without any duplicates.
 
-## Namespace with terminating CR/CRD cannot be deleted. Terminating CR/CRD cannot be deleted
+## Namespace With Terminating CR/CRD Cannot Be Deleted. Terminating CR/CRD Cannot Be Deleted
 
 **Symptoms**: A namespace containing a terminating `CustomResource` cannot be deleted, or simply `CustomResource` in some namespace hangs infinitely in the terminating status and cannot be deleted.
 
@@ -308,11 +310,11 @@ For example:
 kubectl patch crontab/my-new-cron-object -p '{"metadata":{"finalizers":[]}}' --type=merge
 ```
 
-## Packets between nodes in different networks are lost
+## Packets Between Nodes in Different Networks Are Lost
 
 **Symptoms**: Some packets between pods running on nodes in different networks are lost. DNS requests are also lost on the network. 
 
-**Root Cause**: Default kubernetes installation uses calico network plugin and set ipip mode with CrossSubnet. In that case all packets between pods running on nodes in one networks go to each other directly, but packets between pods running on nodes in two or more networks go to each other by tunnel. As described in [calico documentation](https://docs.projectcalico.org/networking/mtu) MTU on calico tunl interfaces should be less by 20 than MTU on main network interface.
+**Root Cause**: Default Kubernetes installation uses calico network plugin and set ipip mode with CrossSubnet. In that case all packets between pods running on nodes in one networks go to each other directly, but packets between pods running on nodes in two or more networks go to each other by tunnel. As described in [calico documentation](https://docs.projectcalico.org/networking/mtu) MTU on calico tunnel interfaces should be less by 20 than MTU on main network interface.
 
 **Solution**: To change MTU size to required value run following command on any control-plane node:
 
@@ -332,7 +334,7 @@ After updating the ConfigMap, perform a rolling restart of all calico/node pods.
 
 It changes MTU value only for new pods. To apply new MTU value for all pods in the cluster you should restart all pods or nodes one by one.
 
-## `kubectl apply` fails with error "metadata annotations: Too long"
+## `kubectl apply` Fails With Error "metadata annotations: Too long"
 
 **Symptoms**: The `kubectl apply` command fails with an error having "metadata annotations: Too long" message. 
 
@@ -342,7 +344,7 @@ The maximum size cannot be changed, so `kubectl apply` is unable to apply large 
 
 **Solution**: Use `kubectl create` instead of `kubectl apply` for large resources.
 
-## `kube-apiserver` requests throttling
+## `kube-apiserver` Requests Throttling
 
 **Symptoms**: Different services start receiving “429 Too Many Requests” HTTP error even though kube-apiservers can take more load.
  
@@ -370,7 +372,7 @@ data:
 
 ```
 
-## Long Recovery after a Node goes Offline
+## Long Recovery After a Node Goes Offline
 
 **Symptoms**: If for any reason, a cluster node goes offline, the pods from that node are redeployed in almost 6 minutes. For some installations, it might be too long and this time needs to be reduced.
 
@@ -403,7 +405,7 @@ The exact numbers should be chosen according to the environment state. If the ne
 At working clusters, these variables can be adjusted manually by updating `/var/lib/kubelet/config.yaml` (for kubelet, at all the nodes) and `/etc/kubernetes/manifests/kube-controller-manager.yaml` (for controller-manager, at the control-planes).
 
 
-## `kube-controller-manager` unable to sync caches for garbage collector
+## `kube-controller-manager` Unable to Sync Caches for Garbage Collector
 
 **Symptoms**: The following errors in the `kube-controller-manager` logs:
 ```
@@ -412,11 +414,11 @@ E0402 10:52:00.858600 8 garbagecollector.go:233] timed out waiting for dependenc
 I0402 10:52:00.883519 8 graph_builder.go:272] garbage controller monitor not yet synced 
 ```
  
-**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects control-plane API and etcd cluster and it also affects the garbage collector of the control-plane controller manager tasks due to sync failure. 
+**Root Cause**: The problem may be related to etcd I/O performance and lack of CPU resources for kubeapi (Kubernetes API uses a lot of CPU resources) and etcd. The CPU resource saturation affects control-plane API and etcd cluster and it also affects the garbage collector of the control-plane controller manager tasks due to sync failure. 
 
 **Solution**: Increase resources for control-plane nodes to match the load on the kube-api or reduce the load on the kube-api.
 
-## etcdctl compaction and defragmentation
+## Etcdctl Compaction and Defragmentation
 
 **Symptoms**: The following error in the `etcd` pod logs:
 ```
@@ -445,7 +447,7 @@ To run defragmentation for all cluster members list all endpoints sequentially
 
 > **Note**: The defragmentation to a live member blocks the system from reading and writing data while rebuilding its states. It is not recommended to run defragmentation for all etcd members at the same time.
 
-## etcdctl defrag return context deadline exceeded
+## Etcdctl Defrag Return Context Deadline Exceeded
 
 **Symptoms**: After running the defrag procedure for etcd database the following error may occur:
 ```
@@ -460,7 +462,7 @@ Failed to defragment etcd member
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
 
-## HTTPS Ingress doesn't work
+## HTTPS Ingress Doesn't Work
 
 **Symptoms**: The secure connection is not being established, the ciphers are not supported by server.
 
@@ -479,7 +481,7 @@ metadata:
 
 ```
 
-## Garbage Collector does not initialize if convert webhook is broken
+## Garbage Collector Does Not Initialize If Convert Webhook Is Broken
 
 **Symptoms**: If the pod deletion process is in the background (which is the default setting), the namespace quota is not updated. If pod deletion is in the foreground, the pod freezes in `Terminating` state. If you create new quota then the REQUEST and LIMIT fields are empty:
 ```
@@ -490,7 +492,7 @@ default-quota   79m
 
 **Root cause**: Creating a custom resource definition (CRD) with a broken converter webhook prevents garbage collector (GC) controller from initialization, which breaks on informer sync. Further, this issue is not visible until the GC controller restarts, because dynamically added CRD resources with non-working converter webhook do not break GC run, only GC initialization.
 
-This is a known issue in the kubernetes community (https://github.com/kubernetes/kubernetes/issues/101078), but it has not been fixed yet.
+This is a known issue in the Kubernetes community (https://github.com/kubernetes/kubernetes/issues/101078), but it has not been fixed yet.
 
 **Solution**: In the `kube-controller-manager` pod logs, messages of the following type can be found:
 ```
@@ -504,7 +506,7 @@ scales-product-rebase-ci-1-billing.deployment.nrm.netcracker.com                
 ```
 Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
 
-## Pods Stuck in "Terminating" Status during Deletion
+## Pods Stuck in "Terminating" Status During Deletion
 
 Intended only for RHEL, Centos 7.x versions starting from 7.4 and should be enabled on hosts where containerd container runtime is being used:
 
@@ -532,7 +534,7 @@ Add `podSubnet` and `serviceSubnet` networks to the Allowed Address Pairs for a 
 # openstack port set --allowed-address ip-address=172.30.0.0/16 ${PORT_ID} --insecure
 ```
 
-## Nodes have `NotReady` status periodically
+## Nodes Have `NotReady` Status Periodically
 
 **Symptoms**: Nodes that work on Ubuntu 20.04 become `NotReady` without any sufficient workload. The `kubelet` has the following messages in log:
 
@@ -544,13 +546,28 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 
 **Solution**: Upgrade Linux kernel to `5.4.0-135-generic`
 
-# Troubleshooting Kubemarine
+## No Pod-to-Pod Traffic for Some Nodes
 
-This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
+**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 permanent network interface at the nodes.
+
+**Root cause**: Not all Calico BGP sessions between nodes are established due to incorrect network interface choice.
+
+**Solution**: By default, Calico uses a `first-found` network interface to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
+```
+plugins:
+  calico:
+    env:
+      IP_AUTODETECTION_METHOD: interface=ens160
+```
+More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+# Troubleshooting KubeMarine
+
+This section provides troubleshooting information for KubeMarine-specific or installation-specific issues.
 
 ## Failures During Kubernetes Upgrade Procedure
 
-### Upgrade procedure failure, upgrade not completed
+### Upgrade Procedure Failure, Upgrade Not Completed
 
 **Symptoms**: The `upgrade` procedure fails at some point and leaves the upgrade process in an incomplete state.
 
@@ -563,7 +580,7 @@ After the cause of the failure is fixed, you need to run the `upgrade` procedure
 For example, imagine you are doing the following upgrade: `1.16.12 -> 1.17.7 -> 1.18.8`. 
 In this case, if the upgrade fails on version `1.18.8`, but is completed for version `1.17.7`, you have to update `cluster.yaml` with the latest information available in the regenerated inventory (`cluster.yaml` is regenerated after each minor version upgrade) and also remove version `1.17.7` from the procedure inventory. It is absolutely fine to retry upgrades for version `X.Y.Z`, but only until the moment the upgrade starts for next version `X.Y+1.M`. It is incorrect to start upgrade to version `1.17.7` after the upgrade to version `1.18.8` is started.
 
-### Upgrade procedure failure, when using custom kubernetes audit settings
+### Upgrade Procedure Failure, When Using Custom Kubernetes Audit Settings
 
 **Symptoms**: The `upgrade` procedure fails at some point, leaving the upgrade process incomplete. When the cluster has custom audit settings
 
@@ -604,7 +621,7 @@ services:
             - group: "authorization.k8s.io"
             - group: "rbac.authorization.k8s.io"
 ```
-### Cannot drain node because of PodDisruptionBudget
+### Cannot Drain Node Because of PodDisruptionBudget
 
 **Symptoms**: The `upgrade` procedure fails during node drain because of PodDisruptionBudget (PDB) limits.
 
@@ -614,7 +631,7 @@ services:
 
 If you face an issue with PDB rules during the upgrade on Kubernetes versions lower than 1.18, then temporarily change PDB limits to lower values, so that pods could be drained. After that you can run the `upgrade` procedure once again. After the upgrade, you have to return the PDB limits to the previous value.
 
-### Cannot drain node because of pod stuck in "Terminating" status
+### Cannot Drain Node Because of Pod Stuck in "Terminating" Status
 
 **Symptoms**: The `upgrade` procedure fails during node drain because of the pod stuck in the "Terminating" status.
 
@@ -627,7 +644,7 @@ If you face an issue with PDB rules during the upgrade on Kubernetes versions lo
 
 After the "Terminating" pod is deleted, run the `upgrade` procedure once again.
 
-### Etcd pod customizations are missing after upgrade
+### Etcd Pod Customizations Are Missing After Upgrade
 
 **Symptoms**: After an upgrade, you may notice that your etcd customizations are not present in the `/etc/kubernetes/manifests/etcd.yaml` file.
 
@@ -663,7 +680,7 @@ Also all the custom settings for `etcd`, `kube-apiserver`, `kube-controller`, `k
 
 If everything is done correctly, all of your etcd customizations persist among Kubernetes upgrades.
 
-### Kubernetes image repository does not change during upgrade
+### Kubernetes Image Repository Does Not Change During Upgrade
 
 **Symptoms**: You expect Kubernetes to use a new repository during and after an upgrade, 
 but Kubernetes keeps using the old image repository. Kubernetes may fail to find images and the upgrade fails.
@@ -700,7 +717,7 @@ If you use `containerd` as the container runtime, its version may also be update
 
 After making these changes, your cluster should be ready to upgrade using the new image repository.
 
-### Kubernetes garbage collector doesn't reclaim disk space
+### Kubernetes Garbage Collector Doesn't Reclaim Disk Space
 
 **Symptoms**: There are error messages in the log file like the following:
 
@@ -722,7 +739,7 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
-## Numerous generation of `auditd` system 
+## Numerous Generation of `Auditd` System 
 
 **Symptoms**: Generation of numerous system messages on nodes and their processing in graylog:
 
@@ -736,7 +753,7 @@ KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-c
 ```
 
 
-**Root cause**: The reason for generating numerous messages is to add new rules to`audit.rules`.This is due to the update of the default.yaml configuration file.The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
+**Root cause**: The reason for generating numerous messages is to add new rules to`audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
 ```
 -w /var/lib/docker -k docker 
 -w /etc/docker -k docker 
@@ -776,20 +793,20 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
 
 **After all the manipulations, you need to apply the new configuration with the command** `sudo service auditd restart`
 
-## Failing during installation on Ubuntu OS with cloud-init
+## Failure During Installation on Ubuntu OS With Cloud-init
 
-### Issues related to updating apt repositories list
+### Issues Related to Updating Apt Repositories List
  
 * In the case of Ubuntu, difficulties may arise when the `cloud-init` and the `Kubemarine` work at the same time, in order to avoid potential problems, it is recommended that if the OS is just installed on the VM, do not start any `Kubemarine` procedures for ~10 minutes, so that the `cloud-init` service can finish its preparations. 
     * You can find out the current status of `cloud-init` and wait on completion by using the command below:
     ```bash
     cloud-init status
     ```
-## Troubleshooting an installation that ended incorrectly
+## Troubleshooting an Installation That Ended Incorrectly
 
-* Sometimes the installation of kubemarine may not complete correctly, and for further analysis of the situation, kubemarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
+* Sometimes the installation of KubeMarine may not complete correctly, and for further analysis of the situation, KubeMarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
 
-### Analysis of the situation
+### Analysis of the Situation
 
 * When a user enters the node, along the path `/etc/kubemarine/kube_tasks` he can see the collected logs that were collected during the installation.
   * Logs are a set of files, namely:
@@ -804,10 +821,10 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
       cluster.yaml
       procedure_parameters
   ```
-The user can analyze these files and try to find the reason for the failed installation of kubemarine
+The user can analyze these files and try to find the reason for the failed installation of KubeMarine
 
 
-## Kubelet has conflict with kubepods-burstable.slice and kube-proxy pods stick in ContainerCreating status
+## Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status
 
 * Sometimes the `migrate_cri` procedure fails because of kubelet has conflict with kubepods-burstable.slice and `kube-proxy` pods stuck in ContainerCreating status.
 
