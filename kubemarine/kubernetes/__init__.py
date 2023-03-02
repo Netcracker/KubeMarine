@@ -154,7 +154,25 @@ def enrich_inventory(inventory, cluster):
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
+            
+    # Validate the provided podSubnet IP address
+    pod_subnet = inventory.get('services', {}).get('kubeadm', {}).get('networking', {}).get('podSubnet')
+    try:
+        ip_network = ipaddress.ip_network(pod_subnet)
+        if ip_network.version not in [4, 6]:
+            raise ValueError(f"Invalid podSubnet IP address: {pod_subnet}")
+    except ValueError:
+        raise ValueError(f"Invalid podSubnet IP address: {pod_subnet}")
 
+    # Validate the provided serviceSubnet IP address
+    service_subnet = inventory.get('services', {}).get('kubeadm', {}).get('networking', {}).get('serviceSubnet')
+    try:
+        ip_network = ipaddress.ip_network(service_subnet)
+        if ip_network.version not in [4, 6]:
+            raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
+    except ValueError:
+        raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
+        
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     if "v1.21" in inventory["services"]["kubeadm"]["kubernetesVersion"]:
         # use first control plane internal address as a default bind-address
