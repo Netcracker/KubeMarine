@@ -416,11 +416,10 @@ plugins:
       priority: 0
       procedures:
         - python:
-            module: plugins/calico.py
-            method: apply_calico_yaml
+            module: plugins/builtin.py
+            method: apply_yaml
             arguments:
-              calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
-              calico_yaml: 'calico-{{ plugins.calico.version }}.yaml'
+              plugin_name: calico
         - expect:
             daemonsets:
               - calico-node

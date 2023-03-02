@@ -11,23 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
 import ipaddress
-from typing import Optional
+from typing import Optional, Dict, List
 
-import ruamel.yaml
 import os
 
 from kubemarine import plugins
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.plugins import manifest
+from kubemarine.plugins.manifest import EnrichmentFunction
 
 
 def enrich_inventory(inventory, cluster):
 
-    # By default we use calico, but have to find it out
+    # By default, we use calico, but have to find it out
     # First of all we have to check is Calicon set to be installed or not
-    # By default installation parameter is unset, means user did not made any decision
+    # By default installation parameter is unset, means user did not make any decision
     if inventory["plugins"]["calico"].get("install") is None:
         # Is user defined Flannel plugin and set it to install?
         flannel_required = inventory["plugins"].get("flannel", {}).get("install", False)
@@ -37,79 +37,23 @@ def enrich_inventory(inventory, cluster):
         if not flannel_required and not canal_required:
             inventory["plugins"]["calico"]["install"] = True
 
-    if inventory["plugins"]["calico"]["install"]:
-        # Check if original YAML exists
-        items = inventory['plugins']['calico']['installation']['procedures']
-        for item in items:
-            if item.get('python'):
-                # create config for plugin module
-                calico_original_yaml = item['python']["arguments"]["calico_original_yaml"]
-                config = {
-                    "source": calico_original_yaml
-                }
-                calico_original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
-                if not os.path.isfile(calico_original_yaml_path):
-                    raise Exception(f"Cannot find original Calico manifest {calico_original_yaml_path}")
-
     return inventory
 
 
-def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
+# DEPRECATED
+def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str):
     """
-    The method implements full proccessing for Calico plugin
+    The method implements full processing for Calico plugin
     :param calico_original_yaml: path to original Calico manifest
     :param calico_yaml: file name of the resulting Calico manifest
     :param cluster: Cluster object
     """
 
     calico_yaml = os.path.basename(calico_yaml)
-    destination = '/etc/kubernetes/%s' % calico_yaml
-
-    # create config for plugin module
-    config = {
-        "source": calico_original_yaml,
-        "destination": destination,
-        "do_render": False
-    }
-
-    # get original YAML and parse it into dict of objects
-    calico_original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
-    obj_list = load_multiple_yaml(calico_original_yaml_path)
-
-    validate_original(cluster, obj_list)
-
-    patched_list = []
-    excluded_list = []
-
-    # enrich objects one by one
-    for key in enrich_objects_fns.keys():
-        if key not in obj_list.keys():
-            continue
-
-        target_yaml = enrich_objects_fns[key](cluster, key, obj_list[key])
-        if target_yaml is None:
-            obj_list.pop(key)
-            excluded_list.append(key)
-            cluster.log.verbose(f"The {key} has been excluded from result")
-        else:
-            patched_list.append(key)
-            obj_list[key] = target_yaml
-
-    cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
-                        f"the objects are the following: {patched_list}")
-    cluster.log.verbose(f"The total number of excluded objects is {len(excluded_list)} "
-                        f"the objects are the following: {excluded_list}")
-
-    # TODO: check results 
-    #validate_result()
-    enriched_manifest = dump_multiple_yaml(obj_list)
-    utils.dump_file(cluster, enriched_manifest, calico_yaml)
-    config['source'] = io.StringIO(enriched_manifest)
-
-    cluster.log.debug("Uploading calico manifest enriched from %s ..." % calico_original_yaml_path)
-    cluster.log.debug("\tDestination: %s" % destination)
-
-    plugins.apply_source(cluster, config)
+    processor = CalicoManifestProcessor(cluster, cluster.inventory,
+                                        original_yaml_path=calico_original_yaml,
+                                        destination_name=calico_yaml)
+    processor.apply()
 
 
 def enrich_configmap_calico_config(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
@@ -318,100 +262,6 @@ def ensure_typha_enabled(cluster: KubernetesCluster, key: str, source_yaml: dict
                         f"as string or boolean value")
 
 
-def validate_original(cluster, obj_list):
-    """
-    The method implements some validations for Calico objects
-    :param cluster: Cluster object
-    :param obj_list: list of objects for validation
-    """
-
-    known_objects = [
-        "ConfigMap_calico-config",
-        "CustomResourceDefinition_bgpconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_bgppeers.crd.projectcalico.org",
-        "CustomResourceDefinition_blockaffinities.crd.projectcalico.org",
-        "CustomResourceDefinition_caliconodestatuses.crd.projectcalico.org",
-        "CustomResourceDefinition_clusterinformations.crd.projectcalico.org",
-        "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_globalnetworkpolicies.crd.projectcalico.org",
-        "CustomResourceDefinition_globalnetworksets.crd.projectcalico.org",
-        "CustomResourceDefinition_hostendpoints.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamblocks.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamconfigs.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamhandles.crd.projectcalico.org",
-        "CustomResourceDefinition_ippools.crd.projectcalico.org",
-        "CustomResourceDefinition_ipreservations.crd.projectcalico.org",
-        "CustomResourceDefinition_kubecontrollersconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_networkpolicies.crd.projectcalico.org",
-        "CustomResourceDefinition_networksets.crd.projectcalico.org",
-        "ClusterRole_calico-kube-controllers",
-        "ClusterRoleBinding_calico-kube-controllers",
-        "ClusterRole_calico-node",
-        "ClusterRoleBinding_calico-node",
-        "DaemonSet_calico-node",
-        "ServiceAccount_calico-node",
-        "Deployment_calico-kube-controllers",
-        "ServiceAccount_calico-kube-controllers",
-        "PodDisruptionBudget_calico-kube-controllers",
-        "Deployment_calico-typha",
-        "Service_calico-typha", 
-        "PodDisruptionBudget_calico-typha"
-    ]
-
-    # check if there are new objects
-    for key in obj_list.keys():
-        if key not in known_objects:
-            cluster.log.verbose(f"The current version of original yaml has a new object: {key}")
-
-    # check if known objects were excluded
-    for key in known_objects:
-        if key not in obj_list.keys():
-            cluster.log.verbose(f"The current version of original yaml does not include"
-                                f"the following object: {key}")
-
-# TODO: implement method for validation after enrichment
-# Some validation inside the objects
-#def validate_result(cluster, obj_list):
-
-
-def load_multiple_yaml(filepath) -> dict:
-    """
-    The method implements the parse YAML file that includes several YAMLs inside
-    :param filepath: Path to file that should be parsed
-    :return: dictionary with the 'kind' and 'name' of object as 'key' and whole YAML structure as 'value'
-    """
-    yaml = ruamel.yaml.YAML()
-    yaml_dict = {}
-    try:
-        with utils.open_utf8(filepath, 'r') as stream:
-            source_yamls = yaml.load_all(stream)
-            for source_yaml in source_yamls:
-                if source_yaml:
-                    yaml_key = f"{source_yaml['kind']}_{source_yaml['metadata']['name']}"
-                    # check if there is no duplication
-                    if yaml_key not in yaml_dict:
-                        yaml_dict[yaml_key] = source_yaml
-                    else:
-                        raise Exception(f"ERROR: the {yaml_key} object is duplicated, please verify the original yaml")
-        return yaml_dict
-    except Exception as exc:
-        raise Exception(f"Failed to load {filepath}") from exc
-
-
-def dump_multiple_yaml(multi_yaml: dict) -> str:
-    """
-    The method implements the dumping some dictionary to the string that includes several YAMLs inside
-    :param multi_yaml: dictionary with the 'kind' and 'name' of object as 'key' and whole YAML structure as 'value'
-    """
-    yaml = ruamel.yaml.YAML()
-
-    with io.StringIO() as stream:
-        yaml.dump_all(multi_yaml.values(), stream)
-        result = stream.getvalue()
-
-    return result
-
-
 def enrich_image(cluster, image):
     """
     The method adds registry to image if it's necessary
@@ -425,17 +275,63 @@ def enrich_image(cluster, image):
     return image
 
 
-# name of objects and enrichment methods mapping
-enrich_objects_fns = {
-        "ConfigMap_calico-config": enrich_configmap_calico_config,
-        "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
-        "DaemonSet_calico-node": enrich_daemonset_calico_node,
-        "Deployment_calico-typha": enrich_deployment_calico_typha,
-        "ClusterRole_calico-kube-controllers": enrich_clusterrole_calico_kube_controllers,
-        "ClusterRole_calico-node": enrich_clusterrole_calico_node,
-        "Service_calico-typha": ensure_typha_enabled,
-        "PodDisruptionBudget_calico-typha": ensure_typha_enabled
-}
+class CalicoManifestProcessor(manifest.Processor):
+    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+                 plugin_name='calico',
+                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+        version = inventory['plugins'][plugin_name]['version']
+        if original_yaml_path is None:
+            original_yaml_path = f"plugins/yaml/calico-{version}.yaml.original"
+        if destination_name is None:
+            destination_name = f"calico-{version}.yaml"
+        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+
+    def get_known_objects(self) -> List[str]:
+        return [
+            "ConfigMap_calico-config",
+            "CustomResourceDefinition_bgpconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_bgppeers.crd.projectcalico.org",
+            "CustomResourceDefinition_blockaffinities.crd.projectcalico.org",
+            "CustomResourceDefinition_caliconodestatuses.crd.projectcalico.org",
+            "CustomResourceDefinition_clusterinformations.crd.projectcalico.org",
+            "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_globalnetworkpolicies.crd.projectcalico.org",
+            "CustomResourceDefinition_globalnetworksets.crd.projectcalico.org",
+            "CustomResourceDefinition_hostendpoints.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamblocks.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamconfigs.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamhandles.crd.projectcalico.org",
+            "CustomResourceDefinition_ippools.crd.projectcalico.org",
+            "CustomResourceDefinition_ipreservations.crd.projectcalico.org",
+            "CustomResourceDefinition_kubecontrollersconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_networkpolicies.crd.projectcalico.org",
+            "CustomResourceDefinition_networksets.crd.projectcalico.org",
+            "ClusterRole_calico-kube-controllers",
+            "ClusterRoleBinding_calico-kube-controllers",
+            "ClusterRole_calico-node",
+            "ClusterRoleBinding_calico-node",
+            "DaemonSet_calico-node",
+            "ServiceAccount_calico-node",
+            "Deployment_calico-kube-controllers",
+            "ServiceAccount_calico-kube-controllers",
+            "PodDisruptionBudget_calico-kube-controllers",
+            "Deployment_calico-typha",
+            "Service_calico-typha",
+            "PodDisruptionBudget_calico-typha"
+        ]
+
+    def get_enrichment_functions(self) -> Dict[str, EnrichmentFunction]:
+        return {
+            "ConfigMap_calico-config": enrich_configmap_calico_config,
+            "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
+            "DaemonSet_calico-node": enrich_daemonset_calico_node,
+            "Deployment_calico-typha": enrich_deployment_calico_typha,
+            "ClusterRole_calico-kube-controllers": enrich_clusterrole_calico_kube_controllers,
+            "ClusterRole_calico-node": enrich_clusterrole_calico_node,
+            "Service_calico-typha": ensure_typha_enabled,
+            "PodDisruptionBudget_calico-typha": ensure_typha_enabled
+        }
+
 
 psp_calico_kube_controllers = {
         "apiGroups": ["policy"],
