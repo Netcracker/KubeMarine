@@ -22,6 +22,7 @@ from typing import List, Dict, Union
 import ruamel.yaml
 import yaml
 from jinja2 import Template
+import ipaddress
 
 from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils, static, summary
