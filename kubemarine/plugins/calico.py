@@ -13,14 +13,14 @@
 # limitations under the License.
 import io
 import ipaddress
+from typing import Optional
+
 import ruamel.yaml
 import os
 
-from copy import deepcopy
-
 from kubemarine import plugins
 from kubemarine.core import utils
-
+from kubemarine.core.cluster import KubernetesCluster
 
 
 def enrich_inventory(inventory, cluster):
@@ -74,48 +74,26 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
 
     # get original YAML and parse it into dict of objects
     calico_original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
-    obj_list = load_multiple_yaml(calico_original_yaml_path, cluster)
+    obj_list = load_multiple_yaml(calico_original_yaml_path)
 
     validate_original(cluster, obj_list)
 
     patched_list = []
     excluded_list = []
 
-    # list of objects for enrichment
-    objects_for_enrichment = [
-            "ConfigMap_calico-config",
-            "Deployment_calico-kube-controllers",
-            "DaemonSet_calico-node",
-            "Deployment_calico-typha",
-            "Service_calico-typha", 
-            "PodDisruptionBudget_calico-typha",
-            "ClusterRole_calico-kube-controllers",
-            "ClusterRole_calico-node"
-           ]
-
     # enrich objects one by one
-    for key in objects_for_enrichment:
-        # enrich common Calico objects
-        if key not in ["Service_calico-typha", "PodDisruptionBudget_calico-typha", "Deployment_calico-typha"]:
-            if obj_list.get(key, ''):
-                patched_list.append(key)
-                obj_list = enrich_objects_fns[key](cluster, obj_list)
+    for key in enrich_objects_fns.keys():
+        if key not in obj_list.keys():
+            continue
+
+        target_yaml = enrich_objects_fns[key](cluster, key, obj_list[key])
+        if target_yaml is None:
+            obj_list.pop(key)
+            excluded_list.append(key)
+            cluster.log.verbose(f"The {key} has been excluded from result")
         else:
-            # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
-            # in other case those objects must be excluded
-            str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
-            if str_value == 'false':
-                obj_list.pop(key)
-                excluded_list.append(key)
-                cluster.log.verbose(f"The {key} has been excluded from result")
-            elif str_value == 'true':
-                patched_list.append(key)
-                if enrich_objects_fns[key]:
-                    obj_list = enrich_objects_fns[key](cluster, obj_list)
-            else:
-                raise Exception(f"The {key} can't be patched correctly "
-                                f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                                f"as string or boolean value")
+            patched_list.append(key)
+            obj_list[key] = target_yaml
 
     cluster.log.verbose(f"The total number of patched objects is {len(patched_list)} "
                         f"the objects are the following: {patched_list}")
@@ -134,89 +112,89 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
     plugins.apply_source(cluster, config)
 
 
-def enrich_configmap_calico_config(cluster, obj_list):
+def enrich_configmap_calico_config(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
     """
     The method implements the enrichment procedure for Calico ConfigMap
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
 
-    key = "ConfigMap_calico-config"
     val = cluster.inventory['plugins']['calico']['mtu']
-    obj_list[key]['data']['veth_mtu'] = str(val)
+    source_yaml['data']['veth_mtu'] = str(val)
     cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
     str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
     if str_value == "true":
         val = "calico-typha"
     elif str_value == "false":
         val = "none"
-    obj_list[key]['data']['typha_service_name'] = val
+    source_yaml['data']['typha_service_name'] = val
     cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
-    string_part = obj_list[key]['data']['cni_network_config']
+    string_part = source_yaml['data']['cni_network_config']
     ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
     if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
         val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
     else:
         val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
     new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
-    obj_list[key]['data']['cni_network_config'] = new_string_part
+    source_yaml['data']['cni_network_config'] = new_string_part
     log_str = new_string_part.replace("\n", "")
     cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
     
-    return obj_list
+    return source_yaml
 
-def enrich_deployment_calico_kube_controllers(cluster, obj_list):
+def enrich_deployment_calico_kube_controllers(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
     """
     The method implements the enrichment procedure for Calico controller Deployment
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
 
-    key = "Deployment_calico-kube-controllers"
-    obj_list[key]['spec']['template']['spec']['nodeSelector'] = \
+    source_yaml['spec']['template']['spec']['nodeSelector'] = \
             cluster.inventory['plugins']['calico']['kube-controllers']['nodeSelector']
-    for container in obj_list[key]['spec']['template']['spec']['containers']:
+    for container in source_yaml['spec']['template']['spec']['containers']:
         if container['name'] == "calico-kube-controllers":
-            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            num = source_yaml['spec']['template']['spec']['containers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['kube-controllers']['image'])
-            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
+            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
 
-    return obj_list
+    return source_yaml
 
-def enrich_daemonset_calico_node(cluster, obj_list):
+def enrich_daemonset_calico_node(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
     """
     The method implements the enrichment procedure for Calico node DaemonSet
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
 
-    key = "DaemonSet_calico-node"
-    for container in obj_list[key]['spec']['template']['spec']['initContainers']:
+    for container in source_yaml['spec']['template']['spec']['initContainers']:
         if container['name'] in ['upgrade-ipam', 'install-cni']: 
-            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['cni']['image'])
-            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
         if container['name'] == "mount-bpffs":
-            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
-            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
         if container['name'] == "flexvol-driver":
-            num = obj_list[key]['spec']['template']['spec']['initContainers'].index(container)
+            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['flexvol']['image'])
-            obj_list[key]['spec']['template']['spec']['initContainers'][num]['image'] = val
+            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-    for container in obj_list[key]['spec']['template']['spec']['containers']:
+    for container in source_yaml['spec']['template']['spec']['containers']:
         if container['name'] == "calico-node":
-            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            num = source_yaml['spec']['template']['spec']['containers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
-            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val 
+            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image' with '{val}'")
             ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
@@ -244,83 +222,100 @@ def enrich_daemonset_calico_node(cluster, obj_list):
                     cluster.log.verbose(f"The {key} has been patched in "
                                         f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
             i = 0
-            for env in obj_list[key]['spec']['template']['spec']['containers'][num]['env']:
+            for env in source_yaml['spec']['template']['spec']['containers'][num]['env']:
                 for item in env_list:
                     if env['name'] == item['name']:
-                        obj_list[key]['spec']['template']['spec']['containers'][num]['env'][i] = item
+                        source_yaml['spec']['template']['spec']['containers'][num]['env'][i] = item
                 i += 1
 
-    return obj_list
+    return source_yaml
 
 
-def enrich_deployment_calico_typha(cluster, obj_list):
+def enrich_deployment_calico_typha(cluster: KubernetesCluster, key: str, source_yaml: dict) -> Optional[dict]:
     """
     The method implements the enrichment procedure for Typha Deployment
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
+
+    if ensure_typha_enabled(cluster, key, source_yaml) is None:
+        return None
 
     default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                            {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
 
-    key = "Deployment_calico-typha"
     val = cluster.inventory['plugins']['calico']['typha']['replicas']
-    obj_list[key]['spec']['replicas'] = int(val)
+    source_yaml['spec']['replicas'] = int(val)
     cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
     val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
-    obj_list[key]['spec']['template']['spec']['nodeSelector'] = val
+    source_yaml['spec']['template']['spec']['nodeSelector'] = val
     cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
     for val in default_tolerations:
-        obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
+        source_yaml['spec']['template']['spec']['tolerations'].append(val)
         cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
     for val in cluster.inventory['plugins']['calico']['typha'].get('tolerations', ''):
-        obj_list[key]['spec']['template']['spec']['tolerations'].append(val)
+        source_yaml['spec']['template']['spec']['tolerations'].append(val)
         cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
-    for container in obj_list[key]['spec']['template']['spec']['containers']:
+    for container in source_yaml['spec']['template']['spec']['containers']:
         if container['name'] == "calico-typha":
-            num = obj_list[key]['spec']['template']['spec']['containers'].index(container)
+            num = source_yaml['spec']['template']['spec']['containers'].index(container)
             val = enrich_image(cluster, cluster.inventory['plugins']['calico']['typha']['image'])
-            obj_list[key]['spec']['template']['spec']['containers'][num]['image'] = val
+            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
 
-    return obj_list
+    return source_yaml
 
 
-def enrich_clusterRole_calico_kube_controllers(cluster, obj_list):
+def enrich_clusterrole_calico_kube_controllers(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
     """
     The method implements the enrichment procedure for Calico controller ClusterRole
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
 
-    key = "ClusterRole_calico-kube-controllers"
     if cluster.inventory['rbac']['admission'] == "psp" and \
             cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
-        api_list = obj_list[key]['rules']
+        api_list = source_yaml['rules']
         api_list.append(psp_calico_kube_controllers)
-        obj_list[key]['rules'] = api_list
+        source_yaml['rules'] = api_list
         cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
 
-    return obj_list
+    return source_yaml
 
 
-def enrich_clusterrole_calico_node(cluster, obj_list):
+def enrich_clusterrole_calico_node(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
     """
     The method implements the enrichment procedure for Calico node ClusterRole
     :param cluster: Cluster object
-    :param obj_list: list of objects for enrichment
+    :param key: Resource identifier
+    :param source_yaml: Resource YAML definition
     """
 
-    key = "ClusterRole_calico-node"
     if cluster.inventory['rbac']['admission'] == "psp" and \
             cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
-        api_list = obj_list[key]['rules']
+        api_list = source_yaml['rules']
         api_list.append(psp_calico_node)
-        obj_list[key]['rules'] = api_list
+        source_yaml['rules'] = api_list
         cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
 
-    return obj_list
+    return source_yaml
+
+
+def ensure_typha_enabled(cluster: KubernetesCluster, key: str, source_yaml: dict) -> Optional[dict]:
+    # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+    # in other case those objects must be excluded
+    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
+    if str_value == 'false':
+        return None
+    elif str_value == 'true':
+        return source_yaml
+    else:
+        raise Exception(f"The {key} can't be patched correctly "
+                        f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                        f"as string or boolean value")
 
 
 def validate_original(cluster, obj_list):
@@ -370,7 +365,7 @@ def validate_original(cluster, obj_list):
 
     # check if known objects were excluded
     for key in known_objects:
-        if key not in list(obj_list):
+        if key not in obj_list.keys():
             cluster.log.verbose(f"The current version of original yaml does not include"
                                 f"the following object: {key}")
 
@@ -379,7 +374,7 @@ def validate_original(cluster, obj_list):
 #def validate_result(cluster, obj_list):
 
 
-def load_multiple_yaml(filepath, cluster) -> dict:
+def load_multiple_yaml(filepath) -> dict:
     """
     The method implements the parse YAML file that includes several YAMLs inside
     :param filepath: Path to file that should be parsed
@@ -394,13 +389,13 @@ def load_multiple_yaml(filepath, cluster) -> dict:
                 if source_yaml:
                     yaml_key = f"{source_yaml['kind']}_{source_yaml['metadata']['name']}"
                     # check if there is no duplication
-                    if not yaml_dict.get(yaml_key, ''):
+                    if yaml_key not in yaml_dict:
                         yaml_dict[yaml_key] = source_yaml
                     else:
-                        raise Exception("ERROR: the {yaml_key} object is duplicated, please verify the original yaml")
+                        raise Exception(f"ERROR: the {yaml_key} object is duplicated, please verify the original yaml")
         return yaml_dict
     except Exception as exc:
-        cluster.log.error(f"Failed to load {filepath}", exc)
+        raise Exception(f"Failed to load {filepath}") from exc
 
 
 def dump_multiple_yaml(multi_yaml: dict) -> str:
@@ -436,10 +431,10 @@ enrich_objects_fns = {
         "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
         "DaemonSet_calico-node": enrich_daemonset_calico_node,
         "Deployment_calico-typha": enrich_deployment_calico_typha,
-        "ClusterRole_calico-kube-controllers": enrich_clusterRole_calico_kube_controllers,
+        "ClusterRole_calico-kube-controllers": enrich_clusterrole_calico_kube_controllers,
         "ClusterRole_calico-node": enrich_clusterrole_calico_node,
-        "Service_calico-typha": None, 
-        "PodDisruptionBudget_calico-typha": None
+        "Service_calico-typha": ensure_typha_enabled,
+        "PodDisruptionBudget_calico-typha": ensure_typha_enabled
 }
 
 psp_calico_kube_controllers = {
