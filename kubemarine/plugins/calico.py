@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ipaddress
-from typing import Optional, Dict, List
+from typing import Optional, List
 
 import os
 
-from kubemarine import plugins
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.plugins import manifest
-from kubemarine.plugins.manifest import EnrichmentFunction
+from kubemarine.plugins.manifest import EnrichmentFunction, Manifest, Processor
 
 
 def enrich_inventory(inventory, cluster):
@@ -56,14 +54,29 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
     processor.apply()
 
 
-def enrich_configmap_calico_config(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
+def exclude_typha_objects_if_disabled(cluster: KubernetesCluster, manifest: Manifest) -> None:
+    # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+    # in other case those objects must be excluded
+    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
+    if str_value == 'false':
+        for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
+            manifest.exclude(key)
+    elif str_value == 'true':
+        return
+    else:
+        raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                        f"as string or boolean value")
+
+
+def enrich_configmap_calico_config(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Calico ConfigMap
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
+    key = "ConfigMap_calico-config"
+    source_yaml = manifest.get_obj(key, patch=True)
     val = cluster.inventory['plugins']['calico']['mtu']
     source_yaml['data']['veth_mtu'] = str(val)
     cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
@@ -84,17 +97,17 @@ def enrich_configmap_calico_config(cluster: KubernetesCluster, key: str, source_
     source_yaml['data']['cni_network_config'] = new_string_part
     log_str = new_string_part.replace("\n", "")
     cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
-    
-    return source_yaml
 
-def enrich_deployment_calico_kube_controllers(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
+
+def enrich_deployment_calico_kube_controllers(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Calico controller Deployment
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
+    key = "Deployment_calico-kube-controllers"
+    source_yaml = manifest.get_obj(key, patch=True)
     source_yaml['spec']['template']['spec']['nodeSelector'] = \
             cluster.inventory['plugins']['calico']['kube-controllers']['nodeSelector']
     for container in source_yaml['spec']['template']['spec']['containers']:
@@ -105,16 +118,16 @@ def enrich_deployment_calico_kube_controllers(cluster: KubernetesCluster, key: s
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
 
-    return source_yaml
 
-def enrich_daemonset_calico_node(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
+def enrich_daemonset_calico_node(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Calico node DaemonSet
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
+    key = "DaemonSet_calico-node"
+    source_yaml = manifest.get_obj(key, patch=True)
     for container in source_yaml['spec']['template']['spec']['initContainers']:
         if container['name'] in ['upgrade-ipam', 'install-cni']: 
             num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
@@ -172,19 +185,18 @@ def enrich_daemonset_calico_node(cluster: KubernetesCluster, key: str, source_ya
                         source_yaml['spec']['template']['spec']['containers'][num]['env'][i] = item
                 i += 1
 
-    return source_yaml
 
-
-def enrich_deployment_calico_typha(cluster: KubernetesCluster, key: str, source_yaml: dict) -> Optional[dict]:
+def enrich_deployment_calico_typha(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Typha Deployment
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
-    if ensure_typha_enabled(cluster, key, source_yaml) is None:
-        return None
+    key = "Deployment_calico-typha"
+    source_yaml = manifest.get_obj(key, patch=True, allow_absent=True)
+    if source_yaml is None:
+        return
 
     default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                            {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
@@ -209,17 +221,16 @@ def enrich_deployment_calico_typha(cluster: KubernetesCluster, key: str, source_
             cluster.log.verbose(f"The {key} has been patched in "
                                 f"'spec.template.spec.containers.[{num}].image with '{val}'")
 
-    return source_yaml
 
-
-def enrich_clusterrole_calico_kube_controllers(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
+def enrich_clusterrole_calico_kube_controllers(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Calico controller ClusterRole
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
+    key = "ClusterRole_calico-kube-controllers"
+    source_yaml = manifest.get_obj(key, patch=True)
     if cluster.inventory['rbac']['admission'] == "psp" and \
             cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
         api_list = source_yaml['rules']
@@ -227,39 +238,22 @@ def enrich_clusterrole_calico_kube_controllers(cluster: KubernetesCluster, key: 
         source_yaml['rules'] = api_list
         cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
 
-    return source_yaml
 
-
-def enrich_clusterrole_calico_node(cluster: KubernetesCluster, key: str, source_yaml: dict) -> dict:
+def enrich_clusterrole_calico_node(cluster: KubernetesCluster, manifest: Manifest) -> None:
     """
     The method implements the enrichment procedure for Calico node ClusterRole
     :param cluster: Cluster object
-    :param key: Resource identifier
-    :param source_yaml: Resource YAML definition
+    :param manifest: Container to operate with manifest objects
     """
 
+    key = "ClusterRole_calico-node"
+    source_yaml = manifest.get_obj(key, patch=True)
     if cluster.inventory['rbac']['admission'] == "psp" and \
             cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
         api_list = source_yaml['rules']
         api_list.append(psp_calico_node)
         source_yaml['rules'] = api_list
         cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
-
-    return source_yaml
-
-
-def ensure_typha_enabled(cluster: KubernetesCluster, key: str, source_yaml: dict) -> Optional[dict]:
-    # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
-    # in other case those objects must be excluded
-    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
-    if str_value == 'false':
-        return None
-    elif str_value == 'true':
-        return source_yaml
-    else:
-        raise Exception(f"The {key} can't be patched correctly "
-                        f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                        f"as string or boolean value")
 
 
 def enrich_image(cluster, image):
@@ -275,7 +269,7 @@ def enrich_image(cluster, image):
     return image
 
 
-class CalicoManifestProcessor(manifest.Processor):
+class CalicoManifestProcessor(Processor):
     def __init__(self, cluster: KubernetesCluster, inventory: dict,
                  plugin_name='calico',
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
@@ -320,17 +314,16 @@ class CalicoManifestProcessor(manifest.Processor):
             "PodDisruptionBudget_calico-typha"
         ]
 
-    def get_enrichment_functions(self) -> Dict[str, EnrichmentFunction]:
-        return {
-            "ConfigMap_calico-config": enrich_configmap_calico_config,
-            "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
-            "DaemonSet_calico-node": enrich_daemonset_calico_node,
-            "Deployment_calico-typha": enrich_deployment_calico_typha,
-            "ClusterRole_calico-kube-controllers": enrich_clusterrole_calico_kube_controllers,
-            "ClusterRole_calico-node": enrich_clusterrole_calico_node,
-            "Service_calico-typha": ensure_typha_enabled,
-            "PodDisruptionBudget_calico-typha": ensure_typha_enabled
-        }
+    def get_enrichment_functions(self) -> List[EnrichmentFunction]:
+        return [
+            exclude_typha_objects_if_disabled,
+            enrich_configmap_calico_config,
+            enrich_deployment_calico_kube_controllers,
+            enrich_daemonset_calico_node,
+            enrich_deployment_calico_typha,
+            enrich_clusterrole_calico_kube_controllers,
+            enrich_clusterrole_calico_node,
+        ]
 
 
 psp_calico_kube_controllers = {
