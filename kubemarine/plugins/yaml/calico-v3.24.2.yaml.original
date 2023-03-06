@@ -1,3 +1,4 @@
+# Source: https://raw.githubusercontent.com/projectcalico/calico/v3.24.2/manifests/calico-typha.yaml
 ---
 # Source: calico/templates/calico-kube-controllers.yaml
 # This manifest creates a Pod Disruption Budget for Controller to allow K8s Cluster Autoscaler to evict
