@@ -128,7 +128,7 @@ class Manifest:
         return obj_list
 
 
-EnrichmentFunction = Callable[[KubernetesCluster, Manifest], None]
+EnrichmentFunction = Callable[[Manifest], None]
 
 
 class Processor(ABC):
@@ -142,7 +142,7 @@ class Processor(ABC):
         :param destination_name: destination manifest file name
         """
         self.cluster = cluster
-        self.log = cluster.log
+        self.log: log.EnhancedLogger = cluster.log
         self.inventory = inventory
         self.plugin_name = plugin_name
         self.original_yaml_path = original_yaml_path
@@ -188,7 +188,7 @@ class Processor(ABC):
         # check if known objects were excluded
         for key in known_objects:
             if manifest.get_obj(key, patch=False, allow_absent=True) is None:
-                self.log.verbose(f"The current version of original yaml does not include"
+                self.log.verbose(f"The current version of original yaml does not include "
                                  f"the following object: {key}")
 
     # TODO: implement method for validation after enrichment
@@ -223,7 +223,7 @@ class Processor(ABC):
         # call enrichment functions one by one
         enrichment_functions = self.get_enrichment_functions()
         for fn in enrichment_functions:
-            fn(self.cluster, manifest)
+            fn(manifest)
 
         self.log.verbose(f"The total number of patched objects is {len(manifest.patched)} "
                          f"the objects are the following: {manifest.patched}")
@@ -241,3 +241,101 @@ class Processor(ABC):
         self.log.debug("\tDestination: %s" % destination)
 
         plugins.apply_source(self.cluster, config)
+
+    def assign_default_pss_labels(self, manifest: Manifest, key: str):
+        rbac = self.inventory['rbac']
+        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
+                and rbac['pss']['defaults']['enforce'] != 'privileged':
+            source_yaml = manifest.get_obj(key, patch=True)
+            labels: dict = source_yaml['metadata']['labels']
+            labels.update({
+                'pod-security.kubernetes.io/enforce': 'privileged',
+                'pod-security.kubernetes.io/enforce-version': 'latest',
+                'pod-security.kubernetes.io/audit': 'privileged',
+                'pod-security.kubernetes.io/audit-version': 'latest',
+                'pod-security.kubernetes.io/warn': 'privileged',
+                'pod-security.kubernetes.io/warn-version': 'latest',
+            })
+            self.log.verbose(f"The {key} has been patched in 'metadata.labels' with default pss labels")
+
+    def find_container_for_patch(self, manifest: Manifest, key: str,
+                                 *,
+                                 container_name: str, is_init_container: bool, allow_absent=False) -> (int, dict):
+        """
+        Find container according to the search criteria.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param container_name: name of container to assign the image in the spec
+        :param is_init_container: whether to search container in 'initContainers' or in 'containers' spec.
+        :param allow_absent: if True, and if container is not found, return -1, None
+        :return: tuple of container index within the spec and the container data.
+        """
+        source_yaml = manifest.get_obj(key, patch=True)
+        template_spec = source_yaml['spec']['template']['spec']
+        spec_containers_section = 'initContainers' if is_init_container else 'containers'
+        container_pos, container = next(((i, c) for i, c in enumerate(template_spec[spec_containers_section])
+                                         if c['name'] == container_name),
+                                        (-1, None))
+
+        if container_pos == -1 and not allow_absent:
+            raise ValueError(f"Container {container_name!r} is not found in {spec_containers_section!r} spec of {key}")
+
+        return container_pos, container
+
+    def enrich_image_for_container(self, manifest: Manifest, key: str,
+                                   *,
+                                   plugin_service: str,
+                                   container_name: str, is_init_container: bool,
+                                   allow_absent=False) -> None:
+        """
+        The method patches the image of the specified container.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param plugin_service: section of plugin that contains the desirable 'image'
+        :param container_name: name of container to assign the image in the spec
+        :param is_init_container: whether to search container in 'initContainers' or in 'containers' spec.
+        :param allow_absent: if True, and if container is not found, silently do nothing.
+        """
+        plugin_section = self.inventory['plugins'][self.plugin_name]
+        registry = plugin_section['installation'].get('registry')
+        image = plugin_section[plugin_service]['image']
+        if registry:
+            image = f"{registry}/{image}"
+
+        spec_containers_section = 'initContainers' if is_init_container else 'containers'
+
+        container_pos, container = self.find_container_for_patch(manifest, key,
+            container_name=container_name, is_init_container=is_init_container, allow_absent=allow_absent)
+        if container_pos == -1:
+            return
+
+        container['image'] = image
+        self.log.verbose(f"The {key} has been patched in "
+                         f"'spec.template.spec.{spec_containers_section}.[{container_pos}].image' with {image!r}")
+
+    def enrich_node_selector(self, manifest: Manifest, key: str,
+                             *,
+                             plugin_service: str):
+        source_yaml = manifest.get_obj(key, patch=True)
+        node_selector = self.inventory['plugins'][self.plugin_name][plugin_service]['nodeSelector']
+        source_yaml['spec']['template']['spec']['nodeSelector'] = node_selector
+        self.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with {node_selector!r}")
+
+    def enrich_tolerations(self, manifest: Manifest, key: str,
+                           *,
+                           plugin_service: str,
+                           extra_tolerations: List[dict] = None):
+        tolerations: List[dict] = []
+        if extra_tolerations:
+            tolerations.extend(extra_tolerations)
+        tolerations.extend(self.inventory['plugins'][self.plugin_name][plugin_service].get('tolerations', []))
+        if tolerations:
+            source_yaml = manifest.get_obj(key, patch=True)
+            for val in tolerations:
+                source_yaml['spec']['template']['spec'].setdefault('tolerations', []).append(val)
+                self.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
+
+
+PROCESSOR_PROVIDER = Callable[[KubernetesCluster, dict, str, str], Processor]

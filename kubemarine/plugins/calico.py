@@ -18,7 +18,7 @@ import os
 
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.plugins.manifest import EnrichmentFunction, Manifest, Processor
+from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
 def enrich_inventory(inventory, cluster):
@@ -54,231 +54,178 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
     processor.apply()
 
 
-def exclude_typha_objects_if_disabled(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
-    # in other case those objects must be excluded
-    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
-    if str_value == 'false':
-        for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
-            manifest.exclude(key)
-    elif str_value == 'true':
-        return
-    else:
-        raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                        f"as string or boolean value")
-
-
-def enrich_configmap_calico_config(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Calico ConfigMap
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "ConfigMap_calico-config"
-    source_yaml = manifest.get_obj(key, patch=True)
-    val = cluster.inventory['plugins']['calico']['mtu']
-    source_yaml['data']['veth_mtu'] = str(val)
-    cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-    str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
-    if str_value == "true":
-        val = "calico-typha"
-    elif str_value == "false":
-        val = "none"
-    source_yaml['data']['typha_service_name'] = val
-    cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
-    string_part = source_yaml['data']['cni_network_config']
-    ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-    if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
-        val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
-    else:
-        val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
-    new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
-    source_yaml['data']['cni_network_config'] = new_string_part
-    log_str = new_string_part.replace("\n", "")
-    cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
-
-
-def enrich_deployment_calico_kube_controllers(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Calico controller Deployment
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "Deployment_calico-kube-controllers"
-    source_yaml = manifest.get_obj(key, patch=True)
-    source_yaml['spec']['template']['spec']['nodeSelector'] = \
-            cluster.inventory['plugins']['calico']['kube-controllers']['nodeSelector']
-    for container in source_yaml['spec']['template']['spec']['containers']:
-        if container['name'] == "calico-kube-controllers":
-            num = source_yaml['spec']['template']['spec']['containers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['kube-controllers']['image'])
-            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.containers.[{num}].image with '{val}'")
-
-
-def enrich_daemonset_calico_node(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Calico node DaemonSet
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "DaemonSet_calico-node"
-    source_yaml = manifest.get_obj(key, patch=True)
-    for container in source_yaml['spec']['template']['spec']['initContainers']:
-        if container['name'] in ['upgrade-ipam', 'install-cni']: 
-            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['cni']['image'])
-            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-        if container['name'] == "mount-bpffs":
-            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
-            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-        if container['name'] == "flexvol-driver":
-            num = source_yaml['spec']['template']['spec']['initContainers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['flexvol']['image'])
-            source_yaml['spec']['template']['spec']['initContainers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.initContainers.[{num}].image' with '{val}'")
-    for container in source_yaml['spec']['template']['spec']['containers']:
-        if container['name'] == "calico-node":
-            num = source_yaml['spec']['template']['spec']['containers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['node']['image'])
-            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.containers.[{num}].image' with '{val}'")
-            ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT', 
-                        'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
-            env_list = []
-            for name, value in cluster.inventory['plugins']['calico']['env'].items():
-                ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-                if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
-                    if type(value) is str:
-                        env_list.append({'name': name, 'value': value})
-                    elif type(value) is dict:
-                        env_list.append({'name': name, 'valueFrom': value})
-                    cluster.log.verbose(f"The {key} has been patched in "
-                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                elif name in ipv6_env and type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
-                    if type(value) is str:
-                        env_list.append({'name': name, 'value': value})
-                    elif type(value) is dict:
-                        env_list.append({'name': name, 'valueFrom': value})
-                    cluster.log.verbose(f"The {key} has been patched in "
-                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-                if utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled']) == "true" and \
-                        name == 'FELIX_TYPHAK8SSERVICENAME':
-                    env_list.append({'name': name, 'valueFrom': value})
-                    cluster.log.verbose(f"The {key} has been patched in "
-                                        f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-            i = 0
-            for env in source_yaml['spec']['template']['spec']['containers'][num]['env']:
-                for item in env_list:
-                    if env['name'] == item['name']:
-                        source_yaml['spec']['template']['spec']['containers'][num]['env'][i] = item
-                i += 1
-
-
-def enrich_deployment_calico_typha(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Typha Deployment
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "Deployment_calico-typha"
-    source_yaml = manifest.get_obj(key, patch=True, allow_absent=True)
-    if source_yaml is None:
-        return
-
-    default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
-                           {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
-
-    val = cluster.inventory['plugins']['calico']['typha']['replicas']
-    source_yaml['spec']['replicas'] = int(val)
-    cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
-    val = cluster.inventory['plugins']['calico']['typha']['nodeSelector']
-    source_yaml['spec']['template']['spec']['nodeSelector'] = val
-    cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.nodeSelector' with '{val}'")
-    for val in default_tolerations:
-        source_yaml['spec']['template']['spec']['tolerations'].append(val)
-        cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
-    for val in cluster.inventory['plugins']['calico']['typha'].get('tolerations', ''):
-        source_yaml['spec']['template']['spec']['tolerations'].append(val)
-        cluster.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
-    for container in source_yaml['spec']['template']['spec']['containers']:
-        if container['name'] == "calico-typha":
-            num = source_yaml['spec']['template']['spec']['containers'].index(container)
-            val = enrich_image(cluster, cluster.inventory['plugins']['calico']['typha']['image'])
-            source_yaml['spec']['template']['spec']['containers'][num]['image'] = val
-            cluster.log.verbose(f"The {key} has been patched in "
-                                f"'spec.template.spec.containers.[{num}].image with '{val}'")
-
-
-def enrich_clusterrole_calico_kube_controllers(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Calico controller ClusterRole
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "ClusterRole_calico-kube-controllers"
-    source_yaml = manifest.get_obj(key, patch=True)
-    if cluster.inventory['rbac']['admission'] == "psp" and \
-            cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
-        api_list = source_yaml['rules']
-        api_list.append(psp_calico_kube_controllers)
-        source_yaml['rules'] = api_list
-        cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
-
-
-def enrich_clusterrole_calico_node(cluster: KubernetesCluster, manifest: Manifest) -> None:
-    """
-    The method implements the enrichment procedure for Calico node ClusterRole
-    :param cluster: Cluster object
-    :param manifest: Container to operate with manifest objects
-    """
-
-    key = "ClusterRole_calico-node"
-    source_yaml = manifest.get_obj(key, patch=True)
-    if cluster.inventory['rbac']['admission'] == "psp" and \
-            cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
-        api_list = source_yaml['rules']
-        api_list.append(psp_calico_node)
-        source_yaml['rules'] = api_list
-        cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
-
-
-def enrich_image(cluster, image):
-    """
-    The method adds registry to image if it's necessary
-    :param cluster: Cluster object
-    :param image: particular image
-    """
-    if cluster.inventory['plugins']['calico']['installation'].get('registry', ''):
-        if len(cluster.inventory['plugins']['calico']['installation']['registry']):
-            return f"{cluster.inventory['plugins']['calico']['installation']['registry']}/{image}"
-
-    return image
-
-
 class CalicoManifestProcessor(Processor):
     def __init__(self, cluster: KubernetesCluster, inventory: dict,
-                 plugin_name='calico',
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+        plugin_name = 'calico'
         version = inventory['plugins'][plugin_name]['version']
         if original_yaml_path is None:
             original_yaml_path = f"plugins/yaml/calico-{version}.yaml.original"
         if destination_name is None:
             destination_name = f"calico-{version}.yaml"
         super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+
+    def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
+        # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+        # in other case those objects must be excluded
+        str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
+        if str_value == 'false':
+            for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
+                manifest.exclude(key)
+        elif str_value == 'true':
+            return
+        else:
+            raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                            f"as string or boolean value")
+
+    def enrich_configmap_calico_config(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico ConfigMap
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "ConfigMap_calico-config"
+        source_yaml = manifest.get_obj(key, patch=True)
+        cluster = self.cluster
+        val = cluster.inventory['plugins']['calico']['mtu']
+        source_yaml['data']['veth_mtu'] = str(val)
+        cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
+        str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
+        if str_value == "true":
+            val = "calico-typha"
+        elif str_value == "false":
+            val = "none"
+        source_yaml['data']['typha_service_name'] = val
+        cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
+        string_part = source_yaml['data']['cni_network_config']
+        ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
+        else:
+            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
+        new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
+        source_yaml['data']['cni_network_config'] = new_string_part
+        log_str = new_string_part.replace("\n", "")
+        cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
+
+    def enrich_deployment_calico_kube_controllers(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico controller Deployment
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "Deployment_calico-kube-controllers"
+        self.enrich_node_selector(manifest, key, plugin_service='kube-controllers')
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='kube-controllers', container_name='calico-kube-controllers', is_init_container=False)
+
+    def enrich_daemonset_calico_node(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico node DaemonSet
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "DaemonSet_calico-node"
+        cluster = self.cluster
+        for container_name in ['upgrade-ipam', 'install-cni']:
+            self.enrich_image_for_container(manifest, key,
+                plugin_service='cni', container_name=container_name, is_init_container=True)
+
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='node', container_name='mount-bpffs', is_init_container=True, allow_absent=True)
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='flexvol', container_name='flexvol-driver', is_init_container=True, allow_absent=True)
+
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='node', container_name='calico-node', is_init_container=False)
+
+        num, container = self.find_container_for_patch(manifest, key,
+            container_name='calico-node', is_init_container=False)
+
+        ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT',
+                    'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
+        env_list = []
+        for name, value in cluster.inventory['plugins']['calico']['env'].items():
+            ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+            if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
+                if type(value) is str:
+                    env_list.append({'name': name, 'value': value})
+                elif type(value) is dict:
+                    env_list.append({'name': name, 'valueFrom': value})
+                cluster.log.verbose(f"The {key} has been patched in "
+                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+            elif name in ipv6_env and type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
+                if type(value) is str:
+                    env_list.append({'name': name, 'value': value})
+                elif type(value) is dict:
+                    env_list.append({'name': name, 'valueFrom': value})
+                cluster.log.verbose(f"The {key} has been patched in "
+                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+            if utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled']) == "true" and \
+                    name == 'FELIX_TYPHAK8SSERVICENAME':
+                env_list.append({'name': name, 'valueFrom': value})
+                cluster.log.verbose(f"The {key} has been patched in "
+                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
+        i = 0
+        for env in container['env']:
+            for item in env_list:
+                if env['name'] == item['name']:
+                    container['env'][i] = item
+            i += 1
+
+    def enrich_deployment_calico_typha(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Typha Deployment
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "Deployment_calico-typha"
+        source_yaml = manifest.get_obj(key, patch=True, allow_absent=True)
+        cluster = self.cluster
+        if source_yaml is None:
+            return
+
+        default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
+                               {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
+
+        val = cluster.inventory['plugins']['calico']['typha']['replicas']
+        source_yaml['spec']['replicas'] = int(val)
+        cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
+
+        self.enrich_node_selector(manifest, key, plugin_service='typha')
+        self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
+        self.enrich_image_for_container(manifest, key,
+            plugin_service='typha', container_name='calico-typha', is_init_container=False)
+
+    def enrich_clusterrole_calico_kube_controllers(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico controller ClusterRole
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "ClusterRole_calico-kube-controllers"
+        cluster = self.cluster
+        if cluster.inventory['rbac']['admission'] == "psp" and \
+                cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+            source_yaml = manifest.get_obj(key, patch=True)
+            api_list = source_yaml['rules']
+            api_list.append(psp_calico_kube_controllers)
+            cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
+
+    def enrich_clusterrole_calico_node(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico node ClusterRole
+        :param manifest: Container to operate with manifest objects
+        """
+
+        key = "ClusterRole_calico-node"
+        cluster = self.cluster
+        if cluster.inventory['rbac']['admission'] == "psp" and \
+                cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+            source_yaml = manifest.get_obj(key, patch=True)
+            api_list = source_yaml['rules']
+            api_list.append(psp_calico_node)
+            cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -316,13 +263,13 @@ class CalicoManifestProcessor(Processor):
 
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
-            exclude_typha_objects_if_disabled,
-            enrich_configmap_calico_config,
-            enrich_deployment_calico_kube_controllers,
-            enrich_daemonset_calico_node,
-            enrich_deployment_calico_typha,
-            enrich_clusterrole_calico_kube_controllers,
-            enrich_clusterrole_calico_node,
+            self.exclude_typha_objects_if_disabled,
+            self.enrich_configmap_calico_config,
+            self.enrich_deployment_calico_kube_controllers,
+            self.enrich_daemonset_calico_node,
+            self.enrich_deployment_calico_typha,
+            self.enrich_clusterrole_calico_kube_controllers,
+            self.enrich_clusterrole_calico_node,
         ]
 
 

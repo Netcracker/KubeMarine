@@ -568,7 +568,11 @@ plugins:
         - python:
             module: plugins/nginx_ingress.py
             method: manage_custom_certificate
-        - template: 'templates/plugins/nginx-ingress-controller-{{ plugins["nginx-ingress-controller"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: nginx-ingress-controller
         - expect:
             daemonsets:
               - name: ingress-nginx-controller

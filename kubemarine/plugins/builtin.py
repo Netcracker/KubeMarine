@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Dict, Type
+from typing import Dict
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins import manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor
+from kubemarine.plugins.nginx_ingress import get_ingress_nginx_manifest_processor
 
-MANIFEST_PROCESSORS: Dict[str, Type[manifest.Processor]] = {
+MANIFEST_PROCESSOR_PROVIDERS: Dict[str, manifest.PROCESSOR_PROVIDER] = {
     "calico": CalicoManifestProcessor,
+    "nginx-ingress-controller": get_ingress_nginx_manifest_processor,
 }
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster):
-    for plugin_name, processor_cls in MANIFEST_PROCESSORS.items():
+    for plugin_name, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
         if not inventory["plugins"][plugin_name]["install"]:
             continue
 
@@ -37,8 +39,8 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
             if config['module'] != "plugins/builtin.py" or config['method'] != "apply_yaml":
                 continue
 
-            arguments = config.get('arguments', {})
-            declared_name = arguments.get('plugin_name')
+            arguments = dict(config.get('arguments', {}))
+            declared_name = arguments.pop('plugin_name', None)
             if declared_name != plugin_name:
                 raise Exception(f"Unexpected 'plugin_name={declared_name}' argument "
                                 f"in {plugin_name!r} installation step {i}.")
@@ -49,7 +51,7 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
                 raise Exception(f"Unexpected python method arguments {list(declared_args.difference(expected_args))} "
                                 f"in {plugin_name!r} installation step {i}.")
 
-            processor_cls(cluster, inventory, **arguments).validate_inventory()
+            processor_provider(cluster, inventory, **arguments).validate_inventory()
             break
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml is not found for {plugin_name!r} plugin. "
@@ -58,13 +60,12 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
-               original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-    if plugin_name not in MANIFEST_PROCESSORS:
+def apply_yaml(cluster: KubernetesCluster, **arguments):
+    arguments = dict(arguments)
+    plugin_name = arguments.pop('plugin_name')
+    if plugin_name not in MANIFEST_PROCESSOR_PROVIDERS:
         raise Exception(f"Manifest processor is not registered for {plugin_name!r} plugin.")
 
-    processor_cls = MANIFEST_PROCESSORS[plugin_name]
-    processor = processor_cls(cluster, cluster.inventory,
-                              plugin_name=plugin_name,
-                              original_yaml_path=original_yaml_path, destination_name=destination_name)
+    processor_provider = MANIFEST_PROCESSOR_PROVIDERS[plugin_name]
+    processor = processor_provider(cluster, cluster.inventory, **arguments)
     processor.apply()
