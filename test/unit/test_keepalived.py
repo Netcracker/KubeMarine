@@ -16,7 +16,10 @@
 
 import unittest
 
+import yaml
+
 from kubemarine import demo, keepalived, yum
+from test.unit import utils
 
 
 class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
@@ -132,6 +135,27 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         inventory = demo.generate_inventory(balancer=0, master=3, worker=3, keepalived=1)
         with self.assertRaises(Exception):
             demo.new_cluster(inventory)
+
+    def test_password_enrich_exponential_float(self):
+        # Make sure to execute global patches of environment / libraries
+        from kubemarine import __main__
+
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        ip = inventory['vrrp_ips'][0]
+        inventory['vrrp_ips'][0] = {
+            'ip': ip,
+            'password': '952184e0'
+        }
+        cluster = demo.new_cluster(inventory)
+
+        utils.stub_associations_packages(cluster, {})
+        finalized_inventory = utils.make_finalized_inventory(cluster)
+        finalized_dumped = yaml.dump(finalized_inventory)
+        self.assertIn("'952184e0'", finalized_dumped)
+
+        finalized_as_input = yaml.safe_load(finalized_dumped)
+        cluster = demo.new_cluster(finalized_as_input)
+        self.assertEqual('952184e0', cluster.inventory['vrrp_ips'][0]['password'])
 
 
 class TestKeepalivedInstallation(unittest.TestCase):
