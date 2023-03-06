@@ -11,10 +11,13 @@
   "definitions": {
     "Nodes": {
       "type": "object",
+      "description": "Section to hold mostly timeout-related settings, global for nodes",
       "additionalProperties": false,
       "properties": {
          "ready": {
            "type": "object",
+           "description": "Settings for Kubernetes nodes readiness check",
+           "additionalProperties": false,
            "properties": {
              "retries": {
                "type": "integer",
@@ -32,6 +35,8 @@
          },
          "boot": {
            "type": "object",
+           "description": "Nodes boot settings",
+           "additionalProperties": false,
            "properties": {
              "timeout": {
                "type": "integer",
