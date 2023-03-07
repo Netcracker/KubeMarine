@@ -601,9 +601,9 @@ def wait_for_nodes(group):
     else:
         status_cmd = "kubectl get nodes %s -o jsonpath='{.status.conditions[?(@.type==\"%s\")].status}'"
 
-    timeout = group.cluster.globals['nodes']['ready']['timeout']
-    retries = group.cluster.globals['nodes']['ready']['retries']
-    log.debug("Waiting for new kubernetes nodes to become ready")
+    timeout = int(group.cluster.inventory['globals']['nodes']['ready']['timeout'])
+    retries = int(group.cluster.inventory['globals']['nodes']['ready']['retries'])
+    log.debug("Waiting for new kubernetes nodes to become ready, %s retries every %s seconds" % (retries, timeout))
     while retries > 0:
         correct_conditions = 0
         for condition, cond_value in wait_conditions.items():
@@ -623,7 +623,7 @@ def wait_for_nodes(group):
             log.debug("All nodes are ready!")
             return
 
-    raise Exception("Nodes did not become ready in the expected time")
+    raise Exception("Nodes did not become ready in the expected time, %s retries every %s seconds. Try to increase node.ready.retries parameter in globals: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#globals" % (retries, timeout))
 
 
 def init_workers(group):

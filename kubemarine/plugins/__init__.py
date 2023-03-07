@@ -167,9 +167,9 @@ def expect_daemonset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['expect']['plugins']['timeout']
+        timeout = cluster.globals['deployments']['expect']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['plugins']['retries']
+        retries = cluster.globals['deployments']['expect']['retries']
 
     log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -197,7 +197,7 @@ def expect_daemonset(cluster: KubernetesCluster,
             cluster.log.debug(f"DaemonSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the DaemonSets did not become ready')
+    raise Exception('In the expected time, the DaemonSets did not become ready. Try to increase number of retries in expect.daemonsets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_replicaset(cluster: KubernetesCluster,
@@ -219,9 +219,9 @@ def expect_replicaset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['expect']['plugins']['timeout']
+        timeout = cluster.globals['deployments']['expect']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['plugins']['retries']
+        retries = cluster.globals['deployments']['expect']['retries']
 
     log.debug(f"Expecting the following ReplicaSets to be up to date: {replicasets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -249,7 +249,7 @@ def expect_replicaset(cluster: KubernetesCluster,
             cluster.log.debug(f"ReplicaSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the ReplicaSets did not become ready')
+    raise Exception('In the expected time, the ReplicaSets did not become ready. Try to increase number of retries in expect.replicasets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_statefulset(cluster: KubernetesCluster,
@@ -271,9 +271,9 @@ def expect_statefulset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['expect']['plugins']['timeout']
+        timeout = cluster.globals['deployments']['expect']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['plugins']['retries']
+        retries = cluster.globals['deployments']['expect']['retries']
 
     log.debug(f"Expecting the following StatefulSets to be up to date: {statefulsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -301,7 +301,7 @@ def expect_statefulset(cluster: KubernetesCluster,
             cluster.log.debug(f"StatefulSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the StatefulSets did not become ready')
+    raise Exception('In the expected time, the StatefulSets did not become ready. Try to increase number of retries in expect.statefulsets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_deployment(cluster: KubernetesCluster,
@@ -323,9 +323,9 @@ def expect_deployment(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['expect']['plugins']['timeout']
+        timeout = cluster.globals['deployments']['expect']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['plugins']['retries']
+        retries = cluster.globals['deployments']['expect']['retries']
 
     log.debug(f"Expecting the following Deployments to be up to date: {deployments_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -353,7 +353,7 @@ def expect_deployment(cluster: KubernetesCluster,
             cluster.log.debug(f"Deployments are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the Deployments did not become ready')
+    raise Exception('In the expected time, the Deployments did not become ready. Try to increase number of retries in expect.deployments: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
@@ -364,9 +364,9 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
         cluster = cluster.cluster
 
     if timeout is None:
-        timeout = cluster.globals['expect']['plugins']['timeout']
+        timeout = cluster.globals['pods']['expect']['plugins']['timeout']
     if retries is None:
-        retries = cluster.globals['expect']['plugins']['retries']
+        retries = cluster.globals['pods']['expect']['plugins']['retries']
 
     cluster.log.debug("Expecting the following pods to be ready: %s" % pods)
     cluster.log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -478,7 +478,7 @@ def convert_expect(cluster, config):
         config['statefulsets'] = {
             'list': config['statefulsets']
         }
-    if config.get('deployments') is not None and isinstance(config['pods'], list):
+    if config.get('deployments') is not None and isinstance(config['deployments'], list):
         config['deployments'] = {
             'list': config['deployments']
         }
@@ -492,35 +492,31 @@ def convert_expect(cluster, config):
 def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
 
-    plugins_timeout = cluster.globals['pods']['expect']['plugins']['timeout']
-    plugins_retries = cluster.globals['pods']['expect']['plugins']['retries']
-
     for expect_type, expect_conf in config.items():
         if expect_type == 'daemonsets':
             expect_daemonset(cluster, config['daemonsets']['list'],
-                             timeout=config['daemonsets'].get('timeout', plugins_timeout),
-                             retries=config['daemonsets'].get('retries', plugins_retries))
+                             timeout=config['daemonsets'].get('timeout'),
+                             retries=config['daemonsets'].get('retries'))
 
         elif expect_type == 'replicasets':
             expect_replicaset(cluster, config['replicasets']['list'],
-                              timeout=config['replicasets'].get('timeout', plugins_timeout),
-                              retries=config['replicasets'].get('retries', plugins_retries))
+                              timeout=config['replicasets'].get('timeout'),
+                              retries=config['replicasets'].get('retries'))
 
         elif expect_type == 'statefulsets':
             expect_statefulset(cluster, config['statefulsets']['list'],
-                               timeout=config['statefulsets'].get('timeout', plugins_timeout),
-                               retries=config['statefulsets'].get('retries', plugins_retries))
+                               timeout=config['statefulsets'].get('timeout'),
+                               retries=config['statefulsets'].get('retries'))
 
         elif expect_type == 'deployments':
             expect_deployment(cluster, config['deployments']['list'],
-                              timeout=config['deployments'].get('timeout', plugins_timeout),
-                              retries=config['deployments'].get('retries', plugins_retries))
+                              timeout=config['deployments'].get('timeout'),
+                              retries=config['deployments'].get('retries'))
 
         elif expect_type == 'pods':
-            expect_pods(cluster, config['pods']['list'],
-                        namespace=config['pods'].get('namespace'),
-                        timeout=config['pods'].get('timeout', plugins_timeout),
-                        retries=config['pods'].get('retries', plugins_retries))
+            expect_pods(cluster, config['pods']['list'], namespace=config['pods'].get('namespace'),
+                        timeout=config['pods'].get('timeout'),
+                        retries=config['pods'].get('retries'))
 
 
 # **** PYTHON ****

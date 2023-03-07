@@ -18,6 +18,7 @@ This section provides information about the inventory, features, and steps for i
       - [Full-HA Scheme](#full-ha-scheme)
   - [Taints and Toleration](#taints-and-toleration)
   - [Configuration](#configuration)
+    - [globals](#globals)
     - [node_defaults](#node_defaults)
     - [nodes](#nodes)
     - [cluster_name](#cluster_name)
@@ -82,6 +83,7 @@ This section provides information about the inventory, features, and steps for i
         - [template](#template)
         - [config](#config) 
         - [expect pods](#expect-pods)
+        - [expect deployments/daemonsets/replicasets/statefulsets](#expect-deploymentsdaemonsetsreplicasetsstatefulsets)
         - [python](#python)
         - [thirdparty](#thirdparty)
         - [shell](#shell)
@@ -490,6 +492,28 @@ The known IDEs that support validation are:
 
 The inventory file consists of the following sections.
 
+### globals
+In the `globals` section you can describe the global parameters that can be overridden. For example:
+
+```
+globals:
+  nodes:
+    ready:
+      timeout: 10
+      retries: 60
+    boot:
+      timeout: 900
+```
+
+The following parameters are supported:
+
+|Name|Type|Mandatory|Default Value|Example|Description|
+|---|---|---|---|---|---|
+|`nodes.ready.timeout`|int|no|5|`10`|Timeout between `nodes.ready.retries` for cluster node readiness waiting|
+|`nodes.ready.retries`|int|no|15|`60`|Number of retries to check a cluster node readiness|
+|`nodes.boot.timeout`|int|no|600|`900`|Timeout for node reboot waiting|
+
+
 ### node_defaults
 
 In the `node_defaults` section, you can describe the parameters to be applied by default to each record in the [nodes](#nodes) section.
@@ -530,7 +554,7 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, username, connection_port, connection_timeout, and gateway.
+* keyfile, username, connection_port, connection_timeout and gateway.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 
 For more information about the listed parameters, refer to the following section.
@@ -4350,7 +4374,7 @@ The procedure tries once every few seconds to find the necessary pods and detect
 |Configuration|Value|Description|
 |---|---|---|
 |timeout|`5`|The number of seconds until the next pod status check.|
-|retries|`30`|The number of attempts to check the status.|
+|retries|`45`|The number of attempts to check the status.|
 
 The total waiting time is calculated by multiplying the configuration `timeout * retries`, for default values it is 2 to 5 minutes to wait.
 If during this time, the pods do not have a ready status, then a corresponding error is thrown and the work is stopped.
@@ -4371,6 +4395,55 @@ plugins:
                 - calico-kube-controllers
                 - calico-node
 ```
+
+##### expect deployments/daemonsets/replicasets/statefulsets
+
+This procedure is similar to `expect pods`, but it is intended to wait for deployments/daemonsets/replicasets/statefulsets. For example:
+
+```
+plugins:
+  calico:
+    installation:
+      procedures:
+        - expect:
+            daemonsets:
+              - calico-node
+            deployments:
+              - calico-kube-controllers
+
+```
+
+*Note*: You can specify some part of the resource name instead of its full name.
+
+The procedure tries once every few seconds to find the necessary resources and detect their status. If you use the standard format of this procedure, then the resources are expected in accordance with the following configurations:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next resource status check.|
+|retries|`30`|The number of attempts to check the status.|
+
+The total waiting time in seconds is calculated by multiplying the configuration `timeout * retries`.
+If during this time, the resources do not have an up-to-date status, then a corresponding error is thrown and the work is stopped.
+If you are not satisfied with the default wait values, you can use the advanced form of the procedure record. For example:
+
+```
+plugins:
+  calico:
+    installation:
+      procedures:
+        - expect:
+            daemonsets:
+              list:
+               - calico-node
+              timeout: 10
+              retries: 100
+            deployments:
+              list:
+               - calico-kube-controllers
+               retries: 60
+
+```
+
 
 ##### python
 

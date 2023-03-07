@@ -630,7 +630,7 @@ class NodeGroup:
     def _await_rebooted_nodes(self, timeout=None, initial_boot_history: NodeGroupResult = None) -> _HostToResult:
 
         if timeout is None:
-            timeout = self.cluster.globals['nodes']['boot']['defaults']['timeout']
+            timeout = int(self.cluster.inventory['globals']['nodes']['boot']['timeout'])
 
         delay_period = self.cluster.globals['nodes']['boot']['defaults']['delay_period']
 
@@ -642,6 +642,8 @@ class NodeGroup:
         left_nodes = self.nodes
         results: _HostToResult = {}
         time_start = datetime.now()
+
+        self.cluster.log.verbose("Trying to connect to nodes, timeout is %s seconds..." % timeout)
 
         # each connection has timeout, so the only we need is to repeat connecting attempts
         # during specified number of seconds
@@ -677,7 +679,7 @@ class NodeGroup:
                 time.sleep(delay_period - attempt_time)
 
         if left_nodes:
-            self.cluster.log.verbose("Failed to wait for boot of nodes %s." % list(left_nodes.keys()))
+            self.cluster.log.verbose("Failed to wait for boot of nodes %s" % list(left_nodes.keys()))
         else:
             self.cluster.log.verbose("All nodes are online now")
 
