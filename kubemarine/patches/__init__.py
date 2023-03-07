@@ -22,7 +22,9 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_fix_nginx_ingress_k8s_1_25_x import FixNginxIngress
 
 patches: List[Patch] = [
+    FixNginxIngress(),
 ]
 """List of patches which can be executed strictly in the declared order"""
