@@ -1,7 +1,4 @@
 FROM python:3-slim-buster
-# Warning! Python and Debian versions should be strict to avoid sudden components upgrade,
-# including unreasonable upgrade of GLIBC version. If the GLIBC version suddenly goes up, a large number of consumers
-# will suddenly be unable to use the compiled binary version on older systems.
 
 ARG BUILD_TYPE
 
@@ -21,13 +18,6 @@ RUN apt update && \
       # Install from wheel with ansible to simulate real environment.
       pip3 install --no-cache-dir $(ls dist/*.whl)[ansible]; \
       find -not -path "./test*" -not -path "./examples*" -delete; \
-    elif [ "$BUILD_TYPE" = "binary" ]; then \
-      # Install from wheel without ansible. This is mostly for installation of dependencies.
-      apt install -y zlib1g-dev upx-ucl binutils; \
-      pip3 install --no-cache-dir pyinstaller $(ls dist/*.whl); \
-      pyinstaller kubemarine.spec --noconfirm; \
-      apt autoremove -y zlib1g-dev upx-ucl; \
-      find -not -path "./dist*" -delete; \
     elif [ "$BUILD_TYPE" = "package" ]; then \
       find -not -path "./dist*" -delete; \
     else \

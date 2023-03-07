@@ -3,6 +3,9 @@
 block_cipher = None
 options = [ ('u', None, 'OPTION')]
 
+# MacOS option. By default, current running architecture is targeted.
+# See scripts/ci/build_binary.py
+target_arch = None
 
 a = Analysis(['./kubemarine/__main__.py'],
              hiddenimports=[
@@ -27,7 +30,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 'kubemarine.plugins.kubernetes_dashboard',
                 'kubemarine.core.schema'
              ],
-             pathex=['./'],
+             pathex=[],
              binaries=[],
              datas=[
                 ('./kubemarine/plugins',        './kubemarine/plugins'),
@@ -57,8 +60,6 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True)
-
-app = BUNDLE(name='kubemarine',
-             icon='kubemarine.ico',
-             bundle_identifier=None)
+          console=True,
+          target_arch=target_arch,
+          )

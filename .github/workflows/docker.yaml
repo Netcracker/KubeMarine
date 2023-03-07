@@ -1,0 +1,43 @@
+name: Docker Image
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      publish_docker:
+        description: "Publish image to ghcr.io/netcracker/kubemarine"
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.ref }}" == refs/tags* ]]; then
+            echo -e "\033[91mManual workflow run on tags is not allowed!\033[0m"
+            exit 1
+          fi
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Build Docker Image
+        run: docker build -t kubemarine --no-cache .
+      - name: Run Selftest
+        # selftest of image internally runs selftest of package
+        run: docker run kubemarine selftest
+      - name: Publish to ghcr.io
+        if: startsWith(github.ref, 'refs/tags') || github.ref_name == 'main' || inputs.publish_docker
+        run: |
+          GHCRIO_TAG=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
+          GHCRIO_IMAGE=ghcr.io/netcracker/kubemarine:$GHCRIO_TAG
+          
+          docker tag kubemarine $GHCRIO_IMAGE
+          
+          echo -e "\033[0;32mPushing image ${GHCRIO_IMAGE}\033[0m"
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push $GHCRIO_IMAGE
