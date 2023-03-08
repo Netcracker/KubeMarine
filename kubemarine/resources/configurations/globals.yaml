@@ -216,6 +216,10 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:20.10.*
+      v1.24.11:
+        version_rhel: 19.03*
+        version_rhel8: 19.03*
+        version_debian: 5:20.10.*
       v1.25.2:
         version_rhel: 19.03*
         version_rhel8: 19.03*
@@ -249,6 +253,9 @@ compatibility_map:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.24.2:
+        version_rhel8: 1.4*
+        version_debian: 1.5.*
+      v1.24.11:
         version_rhel8: 1.4*
         version_debian: 1.5.*
       v1.25.2:
@@ -292,6 +299,10 @@ compatibility_map:
         version_rhel8: 1.6*
         version_debian: 1.5.*
       v1.24.2:
+        version_rhel: 1.6*
+        version_rhel8: 1.6*
+        version_debian: 1.5.*
+      v1.24.11:
         version_rhel: 1.6*
         version_rhel8: 1.6*
         version_debian: 1.5.*
@@ -340,6 +351,10 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
+      v1.24.11:
+        version_rhel: 1.6.4*
+        version_rhel8: "*"
+        version_debian: "*"
       v1.25.2:
         version_rhel: 1.6.4*
         version_rhel8: "*"
@@ -385,6 +400,10 @@ compatibility_map:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.*
+      v1.24.11:
+        version_rhel: 1.8*
+        version_rhel8: 1.8*
+        version_debian: 2.*
       v1.25.2:
         version_rhel: 1.8*
         version_rhel8: 1.8*
@@ -427,6 +446,10 @@ compatibility_map:
         version_rhel8: 2.1*
         version_debian: 1:2.*
       v1.24.2:
+        version_rhel: 1.3*
+        version_rhel8: 2.1*
+        version_debian: 1:2.*
+      v1.24.11:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.*
