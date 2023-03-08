@@ -488,6 +488,9 @@ compatibility_map:
       v1.24.2:
         version: v1.25.0
         sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 
+      v1.24.11:
+        version: v1.25.0
+        sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 
       v1.25.2:
         version: v1.25.0
         sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 
