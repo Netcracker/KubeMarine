@@ -518,7 +518,7 @@ compatibility_map:
       v1.24.2:
         sha1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726
       v1.24.11:
-        sha1: a60b0adcdc6f19e79bd98663914b694a325db819
+        sha1: 7d44b41e36ff71f5f00671d518f2e59b4540653a
       v1.25.2:
         sha1: 72b87eedc9701c1143126f4aa7375b91fc9d46fc
       v1.25.7:
@@ -547,7 +547,7 @@ compatibility_map:
       v1.24.2:
         sha1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308
       v1.24.11:
-        sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
+        sha1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d
       v1.25.2:
         sha1: afdc009cd59759626ecce007667f42bf42e7c1be 
       v1.25.7:
@@ -576,7 +576,7 @@ compatibility_map:
       v1.24.2:
         sha1: d2a8e78bcdc992addd6faccb27b0af5d533443fa
       v1.24.11:
-        sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
+        sha1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655
       v1.25.2:
         sha1: b12c0e102df89cd0579c8a3c769988aaf5dbe4ba
       v1.25.7:
