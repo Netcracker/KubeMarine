@@ -23,8 +23,10 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_fix_nginx_ingress_k8s_1_25_x import FixNginxIngress
+from kubemarine.patches.p2_fix_haproxy_user import FixHaproxy
 
 patches: List[Patch] = [
     FixNginxIngress(),
+    FixHaproxy(),
 ]
 """List of patches which can be executed strictly in the declared order"""
