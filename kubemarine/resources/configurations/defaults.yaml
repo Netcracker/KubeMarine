@@ -687,11 +687,16 @@ plugins:
                         number: 443
 
   local-path-provisioner:
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: false
     installation:
       priority: 2
       procedures:
-      - template: 'templates/plugins/local-path-provisioner.yaml.j2'
+      - python:
+          module: plugins/builtin.py
+          method: apply_yaml
+          arguments:
+            plugin_name: local-path-provisioner
       - expect:
           pods:
             - local-path-provisioner
@@ -699,7 +704,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: 'rancher/local-path-provisioner:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
     helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version }}'
 
 rbac:

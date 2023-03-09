@@ -280,9 +280,28 @@ class Processor(ABC):
 
         return container_pos, container
 
+    def get_target_image(self, plugin_service: Optional[str] = None, image_key: Optional[str] = 'image'):
+        """
+        Calculates full image path from the plugin configuration in inventory.
+
+        :param plugin_service: section of plugin that contains the desirable image_key
+        :param image_key: property name by which the inventory holds the desirable image
+        :return: target image to be used in a container
+        """
+        plugin_section = self.inventory['plugins'][self.plugin_name]
+        registry = plugin_section['installation'].get('registry')
+        plugin_service_section = plugin_section
+        if plugin_service:
+            plugin_service_section = plugin_service_section[plugin_service]
+        image = plugin_service_section[image_key]
+        if registry:
+            image = f"{registry}/{image}"
+
+        return image
+
     def enrich_image_for_container(self, manifest: Manifest, key: str,
                                    *,
-                                   plugin_service: str,
+                                   plugin_service: Optional[str] = None,
                                    container_name: str, is_init_container: bool,
                                    allow_absent=False) -> None:
         """
@@ -295,11 +314,7 @@ class Processor(ABC):
         :param is_init_container: whether to search container in 'initContainers' or in 'containers' spec.
         :param allow_absent: if True, and if container is not found, silently do nothing.
         """
-        plugin_section = self.inventory['plugins'][self.plugin_name]
-        registry = plugin_section['installation'].get('registry')
-        image = plugin_section[plugin_service]['image']
-        if registry:
-            image = f"{registry}/{image}"
+        image = self.get_target_image(plugin_service=plugin_service, image_key='image')
 
         spec_containers_section = 'initContainers' if is_init_container else 'containers'
 
@@ -322,7 +337,7 @@ class Processor(ABC):
 
     def enrich_tolerations(self, manifest: Manifest, key: str,
                            *,
-                           plugin_service: str,
+                           plugin_service: Optional[str] = None,
                            extra_tolerations: List[dict] = None,
                            override=False):
         source_yaml = manifest.get_obj(key, patch=True)
@@ -334,7 +349,10 @@ class Processor(ABC):
         tolerations: List[dict] = []
         if extra_tolerations:
             tolerations.extend(extra_tolerations)
-        tolerations.extend(self.inventory['plugins'][self.plugin_name][plugin_service].get('tolerations', []))
+        plugin_service_section = self.inventory['plugins'][self.plugin_name]
+        if plugin_service:
+            plugin_service_section = plugin_service_section[plugin_service]
+        tolerations.extend(plugin_service_section.get('tolerations', []))
 
         for val in tolerations:
             template_spec.setdefault('tolerations', []).append(val)
