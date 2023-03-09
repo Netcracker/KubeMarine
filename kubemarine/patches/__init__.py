@@ -15,14 +15,17 @@
 """
 All files and directories inside kubemarine/patches directory should participate only in patching mechanism,
 and relate to the current Kubemarine version.
-
 The whole directory is automatically cleared and reset after new version of Kubemarine is released.
 """
 
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_fix_nginx_ingress_k8s_1_25_x import FixNginxIngress
+from kubemarine.patches.p2_fix_haproxy_user import FixHaproxy
 
 patches: List[Patch] = [
+    FixNginxIngress(),
+    FixHaproxy(),
 ]
 """List of patches which can be executed strictly in the declared order"""
