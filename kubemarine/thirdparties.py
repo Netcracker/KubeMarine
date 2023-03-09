@@ -200,8 +200,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         extension = destination.split('.')[-1]
         if extension == 'zip':
             cluster.log.verbose('Unzip will be used for unpacking')
-            # TODO re-installation waits forever
-            remote_commands += ' && sudo unzip %s -d %s' % (destination, config['unpack'])
+            remote_commands += ' && sudo unzip -o %s -d %s' % (destination, config['unpack'])
         else:
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
