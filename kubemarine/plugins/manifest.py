@@ -242,21 +242,18 @@ class Processor(ABC):
 
         plugins.apply_source(self.cluster, config)
 
-    def assign_default_pss_labels(self, manifest: Manifest, key: str):
-        rbac = self.inventory['rbac']
-        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
-                and rbac['pss']['defaults']['enforce'] != 'privileged':
-            source_yaml = manifest.get_obj(key, patch=True)
-            labels: dict = source_yaml['metadata']['labels']
-            labels.update({
-                'pod-security.kubernetes.io/enforce': 'privileged',
-                'pod-security.kubernetes.io/enforce-version': 'latest',
-                'pod-security.kubernetes.io/audit': 'privileged',
-                'pod-security.kubernetes.io/audit-version': 'latest',
-                'pod-security.kubernetes.io/warn': 'privileged',
-                'pod-security.kubernetes.io/warn-version': 'latest',
-            })
-            self.log.verbose(f"The {key} has been patched in 'metadata.labels' with default pss labels")
+    def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str):
+        source_yaml = manifest.get_obj(key, patch=True)
+        labels: dict = source_yaml['metadata'].setdefault('labels', {})
+        labels.update({
+            'pod-security.kubernetes.io/enforce': profile,
+            'pod-security.kubernetes.io/enforce-version': 'latest',
+            'pod-security.kubernetes.io/audit': profile,
+            'pod-security.kubernetes.io/audit-version': 'latest',
+            'pod-security.kubernetes.io/warn': profile,
+            'pod-security.kubernetes.io/warn-version': 'latest',
+        })
+        self.log.verbose(f"The {key} has been patched in 'metadata.labels' with pss labels for {profile!r} profile")
 
     def find_container_for_patch(self, manifest: Manifest, key: str,
                                  *,
@@ -326,16 +323,22 @@ class Processor(ABC):
     def enrich_tolerations(self, manifest: Manifest, key: str,
                            *,
                            plugin_service: str,
-                           extra_tolerations: List[dict] = None):
+                           extra_tolerations: List[dict] = None,
+                           override=False):
+        source_yaml = manifest.get_obj(key, patch=True)
+        template_spec: dict = source_yaml['spec']['template']['spec']
+        if override and template_spec.get('tolerations', []):
+            del template_spec['tolerations']
+            self.log.verbose(f"The 'tolerations' property has been removed from 'spec.template.spec' in the {key}")
+
         tolerations: List[dict] = []
         if extra_tolerations:
             tolerations.extend(extra_tolerations)
         tolerations.extend(self.inventory['plugins'][self.plugin_name][plugin_service].get('tolerations', []))
-        if tolerations:
-            source_yaml = manifest.get_obj(key, patch=True)
-            for val in tolerations:
-                source_yaml['spec']['template']['spec'].setdefault('tolerations', []).append(val)
-                self.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
+
+        for val in tolerations:
+            template_spec.setdefault('tolerations', []).append(val)
+            self.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
 
 
 PROCESSOR_PROVIDER = Callable[[KubernetesCluster, dict, str, str], Processor]

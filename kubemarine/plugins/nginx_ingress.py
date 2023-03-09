@@ -181,7 +181,10 @@ class IngressNginxManifestProcessor(Processor):
 
     def enrich_namespace_ingress_nginx(self, manifest: Manifest):
         key = "Namespace_ingress-nginx"
-        self.assign_default_pss_labels(manifest, key)
+        rbac = self.inventory['rbac']
+        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
+                and rbac['pss']['defaults']['enforce'] != 'privileged':
+            self.assign_default_pss_labels(manifest, key, 'privileged')
 
     def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest):
         key = "ConfigMap_ingress-nginx-controller"

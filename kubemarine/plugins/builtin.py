@@ -17,11 +17,13 @@ from typing import Dict
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins import manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor
+from kubemarine.plugins.kubernetes_dashboard import get_dashboard_manifest_processor
 from kubemarine.plugins.nginx_ingress import get_ingress_nginx_manifest_processor
 
 MANIFEST_PROCESSOR_PROVIDERS: Dict[str, manifest.PROCESSOR_PROVIDER] = {
     "calico": CalicoManifestProcessor,
     "nginx-ingress-controller": get_ingress_nginx_manifest_processor,
+    "kubernetes-dashboard": get_dashboard_manifest_processor,
 }
 
 

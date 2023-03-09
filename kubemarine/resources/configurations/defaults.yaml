@@ -634,7 +634,11 @@ plugins:
     installation:
       priority: 2
       procedures:
-        - template: 'templates/plugins/dashboard-{{ plugins["kubernetes-dashboard"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: kubernetes-dashboard
         - expect:
             deployments:
               - name: kubernetes-dashboard
