@@ -47,7 +47,7 @@ kubernetes:
 deployments:
   expect:
     timeout: 5
-    retries: 30
+    retries: 45
 pods:
   allowed_failures: 10
   expect:
