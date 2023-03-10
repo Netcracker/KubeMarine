@@ -196,10 +196,6 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:20.10.*
-      v1.23.1:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:20.10.*
       v1.23.6:
         version_rhel: 19.03*
         version_rhel8: 19.03*
@@ -212,10 +208,6 @@ compatibility_map:
         version_rhel: 19.03*
         version_rhel8: 19.03*
         version_debian: 5:20.10.*        
-      v1.24.0:
-        version_rhel: 19.03*
-        version_rhel8: 19.03*
-        version_debian: 5:20.10.*
       v1.24.2:
         version_rhel: 19.03*
         version_rhel8: 19.03*
@@ -248,9 +240,6 @@ compatibility_map:
       v1.22.9:
         version_rhel8: 1.4*
         version_debian: 1.5.*
-      v1.23.1:
-        version_rhel8: 1.4*
-        version_debian: 1.5.*
       v1.23.6:
         version_rhel8: 1.4*
         version_debian: 1.5.*
@@ -260,9 +249,6 @@ compatibility_map:
       v1.23.17:
         version_rhel8: 1.4*
         version_debian: 1.5.*        
-      v1.24.0:
-        version_rhel8: 1.4*
-        version_debian: 1.5.*
       v1.24.2:
         version_rhel8: 1.4*
         version_debian: 1.5.*
@@ -296,10 +282,6 @@ compatibility_map:
         version_rhel: 1.6*
         version_rhel8: 1.6*
         version_debian: 1.5.*
-      v1.23.1:
-        version_rhel: 1.6*
-        version_rhel8: 1.6*
-        version_debian: 1.5.*
       v1.23.6:
         version_rhel: 1.6*
         version_rhel8: 1.6*
@@ -309,10 +291,6 @@ compatibility_map:
         version_rhel8: 1.6*
         version_debian: 1.5.*
       v1.23.17:
-        version_rhel: 1.6*
-        version_rhel8: 1.6*
-        version_debian: 1.5.*
-      v1.24.0:
         version_rhel: 1.6*
         version_rhel8: 1.6*
         version_debian: 1.5.*
@@ -353,10 +331,6 @@ compatibility_map:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
-      v1.23.1:
-        version_rhel: 1.6.4*
-        version_rhel8: "*"
-        version_debian: "*"
       v1.23.6:
         version_rhel: 1.6.4*
         version_rhel8: "*"
@@ -366,10 +340,6 @@ compatibility_map:
         version_rhel8: "*"
         version_debian: "*"
       v1.23.17:
-        version_rhel: 1.6.4*
-        version_rhel8: "*"
-        version_debian: "*"
-      v1.24.0:
         version_rhel: 1.6.4*
         version_rhel8: "*"
         version_debian: "*"
@@ -410,10 +380,6 @@ compatibility_map:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.*
-      v1.23.1:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.*
       v1.23.6:
         version_rhel: 1.8*
         version_rhel8: 1.8*
@@ -423,10 +389,6 @@ compatibility_map:
         version_rhel8: 1.8*
         version_debian: 2.*
       v1.23.17:
-        version_rhel: 1.8*
-        version_rhel8: 1.8*
-        version_debian: 2.*
-      v1.24.0:
         version_rhel: 1.8*
         version_rhel8: 1.8*
         version_debian: 2.*
@@ -467,10 +429,6 @@ compatibility_map:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.*
-      v1.23.1:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.*
       v1.23.6:
         version_rhel: 1.3*
         version_rhel8: 2.1*
@@ -480,10 +438,6 @@ compatibility_map:
         version_rhel8: 2.1*
         version_debian: 1:2.*
       v1.23.17:
-        version_rhel: 1.3*
-        version_rhel8: 2.1*
-        version_debian: 1:2.*
-      v1.24.0:
         version_rhel: 1.3*
         version_rhel8: 2.1*
         version_debian: 1:2.*
@@ -519,9 +473,6 @@ compatibility_map:
       v1.22.9:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
-      v1.23.1:
-        version: v1.23.0
-        sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
       v1.23.6:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
@@ -531,9 +482,6 @@ compatibility_map:
       v1.23.17:
         version: v1.23.0
         sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
-      v1.24.0:
-        version: v1.25.0
-        sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 
       v1.24.2:
         version: v1.25.0
         sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 
@@ -557,15 +505,11 @@ compatibility_map:
         sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
       v1.22.9:
         sha1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d
-      v1.23.1:
-        sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
       v1.23.6:
         sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
       v1.23.11:
         sha1: b93ff384df125429dcbeb18c2ea648168ae10c56
       v1.23.17:
-        sha1: a60b0adcdc6f19e79bd98663914b694a325db819
-      v1.24.0:
         sha1: a60b0adcdc6f19e79bd98663914b694a325db819
       v1.24.2:
         sha1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726
@@ -586,15 +530,11 @@ compatibility_map:
         sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
       v1.22.9:
         sha1: 21b4104937b65fdf0fdf9fbb57ff22a879b21e3f
-      v1.23.1:
-        sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
       v1.23.6:
         sha1: 326110dcb62b66e69490d039b170682fb71c5560
       v1.23.11:
         sha1: 07769c846e4a83d59f9f34370c33be5cc163120b
       v1.23.17:
-        sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
-      v1.24.0:
         sha1: ce74875b3802f4a9ac5dbd32a3f4c684b9ee4fd3
       v1.24.2:
         sha1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308
@@ -615,15 +555,11 @@ compatibility_map:
         sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
       v1.22.9:
         sha1: e4137d683b9f93211bb6d9fa155d0bb423e871c9
-      v1.23.1:
-        sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
       v1.23.6:
         sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
       v1.23.11:
         sha1: 81643da0b975102cede136d39767cdc54f2b0aef
       v1.23.17:
-        sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
-      v1.24.0:
         sha1: 5fdcf3741992427698444a75a7f27a6d6c4a22ab
       v1.24.2:
         sha1: d2a8e78bcdc992addd6faccb27b0af5d533443fa
