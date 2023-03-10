@@ -201,16 +201,23 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         if extension == 'zip':
             cluster.log.verbose('Unzip will be used for unpacking')
             remote_commands += ' && sudo unzip -o %s -d %s' % (destination, config['unpack'])
+            
+            remote_commands += ' && sudo chmod  %s %s' \
+                   % (config['mode'], config['unpack'])
+            remote_commands += ' && sudo chown -R %s %s' \
+                   % (config['owner'], config['unpack'])
+            remote_commands += ' && sudo ls -la %s' % (config['unpack'])
+            
         else:
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
-
-        # TODO access rights do not work for zip
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
+            
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
                            % (destination, config['mode'], config['unpack'])
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
                            % (destination, config['owner'], config['unpack'])
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+        
 
     return common_group.sudo(remote_commands)
 
