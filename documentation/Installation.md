@@ -234,7 +234,7 @@ After the successful execution of the commands, it is necessary to complete the 
 
 **Warning**: Do not use unattended-upgrade to automatically update packages besides security updates.
 
-**Note**: Since this mechanism is launched once a day at a random time, it may coincide with the work of other package managers (apt, aptitude, dpkg, etc.), which will cause an error in these package managers. In this case, the simplest solution is to wait for the completion of the unattended-upgrades process and restart apt, aptitude or dpkg.
+**Note**: Since this mechanism is launched once a day at a random time, it may coincide with the work of other package managers (apt, aptitude, dpkg, and so on), resulting in an error in these package managers. In this case, the simplest solution is to wait for the completion of the unattended-upgrades process and restart apt, aptitude, or dpkg.
 
 **Preconfigured**
 * SSHD running on each VM via port 22.
