@@ -1144,9 +1144,10 @@ for namespace. For proper matching see the following articles:
 * KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
 * Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
 [Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#application-prerequisites)
+* One of the way to check if the pods in particular namespace are matched with the PSS profile is the following. The `pod-security.kubernetes.io/enforce` label in namespace should be set in `privileged` whereas the `pod-security.kubernetes.io/warn` and `pod-security.kubernetes.io/audit` labels should set in `restricted`(or `baseline` as well). When the pods are up and running in namespace one could check audit messages and events in namespace. Any messages send the information about violation of `restricted` profile.
+
 
 ### Procedure Execution Steps
-
 
 1. Verify that Kubernetes cluster has version v1.23+
 2. Match the PSP permission to PSS and define the PSS profile for each namespace in cluster according to the notes above. 
