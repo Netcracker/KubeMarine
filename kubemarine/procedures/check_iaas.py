@@ -22,7 +22,6 @@ import uuid
 from collections import OrderedDict
 import time
 from contextlib import contextmanager
-from copy import copy
 
 import fabric
 import yaml
@@ -34,7 +33,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
-
+from kubemarine.core.group import NodeGroupResult
 
 def connection_ssh_connectivity(cluster):
     with TestCase(cluster.context['testsuite'], '001', 'SSH', 'Connectivity', default_results='Connected'):
@@ -288,6 +287,7 @@ def system_distributive(cluster):
         
         tc.success(results=", ".join(detected_supported_os))
 
+
 def check_kernel_version(cluster):
     """
     This method compares the linux kernel version with the bad version
@@ -316,9 +316,11 @@ def check_kernel_version(cluster):
         else:
             tc.success("All kernel have stable versions")
 
+
 def check_access_to_thirdparties(cluster: KubernetesCluster):
     detect_preinstalled_python(cluster)
     broken = []
+    nodes_without_python = set()
 
     # Load script for checking sources
     all_group = cluster.nodes['all']
@@ -333,6 +335,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
         # Check with script
         common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
         for node in common_group.get_ordered_members_list(provide_node_configs=True):
+            if cluster.context['nodes'][node['connect_to']]['python'] == "Not installed":
+                nodes_without_python.add(node["connect_to"])
+                continue
             python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
             res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
                                                            cluster.inventory['timeout_download']), warn=True)
@@ -347,6 +352,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
     with TestCase(cluster.context['testsuite'], '012', 'Software', 'Thirdparties Availability') as tc:
         if broken:
             raise TestFailure('Required thirdparties are unavailable', hint=yaml.safe_dump(broken))
+        if nodes_without_python:
+            raise TestWarn("Can't detect python version for some nodes, procedure can't be performed for them",
+                           hint=list(nodes_without_python))
         tc.success('All thirdparties are available')
 
 
@@ -460,6 +468,10 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
             with RemoteExecutor(cluster) as exe:
                 for node in all_group.get_ordered_members_list(provide_node_configs=True):
                     # Check with script
+                    if cluster.context['nodes'][node['connect_to']]['python'] == 'Not installed':
+                        warnings.append(f"Can't detect python version for node {node['connect_to']}, "
+                                        f"operation can't be performed for it")
+                        continue
                     python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
                     for repository_url in repository_urls:
                         node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
@@ -487,7 +499,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         if broken:
             raise TestFailure('Found problems for package repositories', hint=yaml.safe_dump(broken))
         elif warnings:
-            raise TestWarn('Found potential problems for package repositories', hint=yaml.safe_dump(warnings))
+            raise TestWarn('Found potential problems for package repositories or nodes', hint=yaml.safe_dump(warnings))
         tc.success('All package repositories are correct and available')
 
 
@@ -546,14 +558,14 @@ def detect_preinstalled_python(cluster: KubernetesCluster):
     for conn, result in detected_python.items():
         result = result.stdout.strip()
         if not result:
-            raise TestFailure("Failed to detect preinstalled python executable. The task cannot be performed.")
-
-        executable, version = tuple(result.splitlines())
-        version = re.match(python_version_pattern, version).group(1)
-        nodes_context[conn.host]["python"] = {
-            "executable": executable,
-            "major_version": version
-        }
+            nodes_context[conn.host]["python"] = "Not installed"
+        else:
+            executable, version = tuple(result.splitlines())
+            version = re.match(python_version_pattern, version).group(1)
+            nodes_context[conn.host]["python"] = {
+                "executable": executable,
+                "major_version": version
+            }
 
 
 @contextmanager
@@ -782,6 +794,11 @@ def check_tcp_connect_between_all_nodes(cluster, node_list, tcp_ports, host_to_i
 @contextmanager
 def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
     detect_preinstalled_python(cluster)
+    nodes_without_python = {node['name']: node for host, node in nodes.items()
+                            if cluster.context['nodes'][host]['python'] == "Not installed"}
+    for node in nodes_without_python.values():
+        del nodes[node['connect_to']]
+
     # currently tcp listener can be run on both python 2 and 3
     check_script = utils.read_internal('resources/scripts/simple_tcp_listener.py')
     tcp_listener = "/tmp/%s.py" % uuid.uuid4().hex
@@ -802,6 +819,8 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
             exe.flush()
             try:
                 results = exe.get_merged_result()
+                if results is None:
+                    results = NodeGroupResult(cluster)
                 nodes_to_rollback = results.get_group()
             except fabric.group.GroupException as e:
                 nodes_to_rollback = e.result.get_exited_nodes_group()
@@ -832,6 +851,10 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
         cluster.log.warning(f"Ports in use: {skipped_nodes}")
         raise TestWarn(f"Cannot perform check on {list(skipped_nodes.keys())}: some ports are already in use. "
                        f"Use check_paas procedure if you already have installed cluster.")
+
+    if nodes_without_python:
+        cluster.log.warning(f"Nodes without python: {nodes_without_python.keys()}")
+        raise TestWarn(f"Cannot perform check on {list(nodes_without_python.keys())}: python doesn't exist.")
 
 
 def check_tcp_ports(cluster):
