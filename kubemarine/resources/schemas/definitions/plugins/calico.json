@@ -30,6 +30,11 @@
       "default": 1440,
       "description": "MTU size for Calico interface"
     },
+    "prometheusMetrics": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable of disable calico metrics"
+    },
     "fullmesh": {
       "type": "boolean",
       "default": true,
