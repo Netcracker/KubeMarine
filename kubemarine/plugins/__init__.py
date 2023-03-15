@@ -525,6 +525,8 @@ def verify_python(cluster, step):
     module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
+    module = importlib.util.module_from_spec(spec)
+    
     if callable(getattr(module, method_name)):
        print ("Method exist")
     else:
