@@ -525,9 +525,10 @@ def verify_python(cluster, step):
     module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
-    if method_name and module_path and method_arguments and module() != 1
-       raise Exception('Python output variables could be used for single-node groups, but multi-node group was found')
-    # TODO: verify fields types and contents
+    if callable(getattr(module, method_name)):
+       print 'Method exist'
+    else:
+       print 'Method is missing'
     return
 
 
