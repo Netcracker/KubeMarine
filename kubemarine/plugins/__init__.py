@@ -526,9 +526,9 @@ def verify_python(cluster, step):
     method_name = step['method']
     method_arguments = step.get('arguments', {})
     if callable(getattr(module, method_name)):
-       print 'Method exist'
+       print ("Method exist")
     else:
-       print 'Method is missing'
+        raise Exception("Method is missing")
 
     # TODO: verify fields types and contents
     return
