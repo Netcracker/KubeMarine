@@ -163,7 +163,7 @@
     "anyOf": [
       {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
       {"enum": [
-        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "announceServices", "defaultAsNumber",
+        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "prometheusMetrics", "announceServices", "defaultAsNumber",
         "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol"
       ]}
     ]
