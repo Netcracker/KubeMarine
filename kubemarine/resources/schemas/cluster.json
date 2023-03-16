@@ -69,11 +69,6 @@
     "plugins": {
       "$ref": "definitions/plugins.json"
     },
-    "timeout_download": {
-      "type": "integer",
-      "default": 60,
-      "description": "Timeout for the thirdparties download on nodes."
-    },
     "procedure_history": {
       "type": "object",
       "description": "Parameters for the inventory preservation on nodes after each procedure run.",

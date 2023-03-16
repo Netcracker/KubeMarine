@@ -335,7 +335,7 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
         for node in common_group.get_ordered_members_list(provide_node_configs=True):
             python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
             res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
-                                                           cluster.inventory['timeout_download']), warn=True)
+                                                           cluster.inventory['globals']['timeout_download']), warn=True)
             _, result = list(res.items())[0]
             if result.failed:
                 broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")
@@ -464,7 +464,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                     for repository_url in repository_urls:
                         node['connection'].run('%s %s %s %s || echo "Package repository is unavailable"'
                                                % (python_executable, random_temp_path, repository_url,
-                                                  cluster.inventory['timeout_download']))
+                                                  cluster.inventory['globals']['timeout_download']))
 
             for conn, url_results in exe.get_last_results().items():
                 # Check if resolv.conf is actual
