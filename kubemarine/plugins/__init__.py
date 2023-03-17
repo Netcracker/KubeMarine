@@ -522,8 +522,18 @@ def apply_expect(cluster, config, plugin_name=None):
 # **** PYTHON ****
 
 def verify_python(cluster, step):
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
+    method_name = step['method']
+    method_arguments = step.get('arguments', {})
+    module_filename = os.path.basename(module_path)
+    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
+    module = importlib.util.module_from_spec(spec) 
+        if callable(getattr(module, method_name)):
+              print ("Method exist")
+        else:
+             raise Exception("Method is missing")
        # TODO: verify fields types and contents
-    return
+        return
 
 
 def apply_python(cluster, step, plugin_name=None):
