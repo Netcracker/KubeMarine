@@ -444,6 +444,14 @@ plugins:
             source: templates/plugins/calico-ippool.yaml.j2
             destination: /etc/calico/ippool.yaml
             apply_command: 'calicoctl apply -f /etc/calico/ippool.yaml'
+        - template:
+            source: templates/plugins/calico-metrics.yaml.j2
+            destination: /etc/calico/calico-metrics.yaml
+            apply_command: 'kubectl apply -f /etc/calico/calico-metrics.yaml'
+        - template:
+            source: templates/plugins/calico-kube-controllers-metrics.yaml.j2
+            destination: /etc/calico/calico-kube-controllers-metrics.yaml
+            apply_command: 'kubectl apply -f /etc/calico/calico-kube-controllers-metrics.yaml'
         - template: 'templates/plugins/calico-rr.yaml.j2'
         - template:
             source: templates/plugins/calico-rr.sh.j2

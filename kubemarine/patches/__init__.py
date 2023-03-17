@@ -22,7 +22,8 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-
+from kubemarine.patches.p1_fix_enable_calico_metrics import EnableMetrics
 patches: List[Patch] = [
+    EnableMetrics(),
 ]
 """List of patches which can be executed strictly in the declared order"""

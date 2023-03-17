@@ -90,7 +90,8 @@ def apply_calico_yaml(cluster, calico_original_yaml, calico_yaml):
             "Service_calico-typha", 
             "PodDisruptionBudget_calico-typha",
             "ClusterRole_calico-kube-controllers",
-            "ClusterRole_calico-node"
+            "ClusterRole_calico-node",
+            "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
            ]
 
     # enrich objects one by one
@@ -322,6 +323,16 @@ def enrich_clusterrole_calico_node(cluster, obj_list):
 
     return obj_list
 
+def enrich_crd_felix_configuration(cluster, obj_list):
+
+
+    key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
+
+    api_list = obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled']
+    api_list["default"] = felix_monitoring["default"]
+    obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled'] = api_list
+    return obj_list
+
 
 def validate_original(cluster, obj_list):
     """
@@ -438,6 +449,7 @@ enrich_objects_fns = {
         "Deployment_calico-typha": enrich_deployment_calico_typha,
         "ClusterRole_calico-kube-controllers": enrich_clusterRole_calico_kube_controllers,
         "ClusterRole_calico-node": enrich_clusterrole_calico_node,
+        "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org": enrich_crd_felix_configuration,
         "Service_calico-typha": None, 
         "PodDisruptionBudget_calico-typha": None
 }
@@ -454,4 +466,8 @@ psp_calico_node = {
         "resources": ["podsecuritypolicies"],
         "verbs":     ["use"],
         "resourceNames": ["oob-privileged-psp"]
+}
+
+felix_monitoring = {
+        "default": True
 }
