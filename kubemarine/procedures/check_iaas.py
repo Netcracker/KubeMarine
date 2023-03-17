@@ -318,38 +318,38 @@ def check_kernel_version(cluster):
 
 
 def check_access_to_thirdparties(cluster: KubernetesCluster):
-    detect_preinstalled_python(cluster)
-    broken = []
-    nodes_without_python = set()
-
-    # Load script for checking sources
-    all_group = cluster.nodes['all']
-    check_script = utils.read_internal("resources/scripts/check_url_availability.py")
-    random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
-    all_group.put(io.StringIO(check_script), random_temp_path)
-
-    for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
-        # Check if curl
-        if config['source'][:4] != 'http' or '://' not in config['source'][4:8]:
-            continue
-        # Check with script
-        common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
-        for node in common_group.get_ordered_members_list(provide_node_configs=True):
-            if cluster.context['nodes'][node['connect_to']]['python'] == "Not installed":
-                nodes_without_python.add(node["connect_to"])
-                continue
-            python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
-            res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
-                                                           cluster.inventory['timeout_download']), warn=True)
-            _, result = list(res.items())[0]
-            if result.failed:
-                broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")
-
-    # Remove file
-    rm_command = "rm %s" % random_temp_path
-    all_group.run(rm_command)
-
     with TestCase(cluster.context['testsuite'], '012', 'Software', 'Thirdparties Availability') as tc:
+        detect_preinstalled_python(cluster)
+        broken = []
+        nodes_without_python = set()
+
+        # Load script for checking sources
+        all_group = cluster.nodes['all']
+        check_script = utils.read_internal("resources/scripts/check_url_availability.py")
+        random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+        all_group.put(io.StringIO(check_script), random_temp_path)
+
+        for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
+            # Check if curl
+            if config['source'][:4] != 'http' or '://' not in config['source'][4:8]:
+                continue
+            # Check with script
+            common_group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
+            for node in common_group.get_ordered_members_list(provide_node_configs=True):
+                if cluster.context['nodes'][node['connect_to']]['python'] == "Not installed":
+                    nodes_without_python.add(node["connect_to"])
+                    continue
+                python_executable = cluster.context['nodes'][node['connect_to']]['python']['executable']
+                res = node['connection'].run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
+                                                           cluster.inventory['timeout_download']), warn=True)
+                _, result = list(res.items())[0]
+                if result.failed:
+                    broken.append(f"{node['connect_to']}, {destination}: {result.stderr}")
+
+        # Remove file
+        rm_command = "rm %s" % random_temp_path
+        all_group.run(rm_command)
+
         if broken:
             raise TestFailure('Required thirdparties are unavailable', hint=yaml.safe_dump(broken))
         if nodes_without_python:
