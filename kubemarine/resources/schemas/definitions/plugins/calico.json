@@ -30,11 +30,6 @@
       "default": 1440,
       "description": "MTU size for Calico interface"
     },
-    "prometheusMetrics": {
-      "type": "boolean",
-      "default": true,
-      "description": "Enable of disable calico metrics"
-    },
     "fullmesh": {
       "type": "boolean",
       "default": true,
@@ -163,7 +158,7 @@
     "anyOf": [
       {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
       {"enum": [
-        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "prometheusMetrics", "announceServices", "defaultAsNumber",
+        "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "announceServices", "defaultAsNumber",
         "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol"
       ]}
     ]
