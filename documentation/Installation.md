@@ -3696,6 +3696,13 @@ plugins:
     install: true
 ```
 
+The following is an example to disable the plugin:
+
+```yaml
+plugins:
+  nginx-ingress-controller:
+    install: false
+```
 
 After applying the plugin configurations, the plugin installation procedure waits for the `nginx-ingress-controller` pod to be in the `Running` state.
 
