@@ -336,6 +336,20 @@ def get_version():
     return read_internal(get_version_filepath()).strip()
 
 
+def minor_version(version: str) -> str:
+    """
+    Converts vN.N.N to vN.N
+    """
+    return ".".join(version.split(".")[0:2])
+
+
+def version_key(version: str):
+    """
+    Converts vN.N.N to (N, N, N) that can be used in comparisons.
+    """
+    return tuple(map(int, version[1:].split('.')))
+
+
 class ClusterStorage:
     """
     File preservation:

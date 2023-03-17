@@ -359,7 +359,7 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
 
 def get_ingress_nginx_manifest_processor(cluster: KubernetesCluster, inventory: dict, **kwargs):
     version: str = inventory['plugins']['nginx-ingress-controller']['version']
-    if '.'.join(version.split('.')[0:2]) == 'v1.2':
+    if utils.minor_version(version) == 'v1.2':
         return V1_2_X_IngressNginxManifestProcessor(cluster, inventory, **kwargs)
 
     return IngressNginxManifestProcessor(cluster, inventory, **kwargs)

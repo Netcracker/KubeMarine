@@ -13,7 +13,7 @@
 # limitations under the License.
 from typing import List, Optional
 
-from kubemarine.core import summary
+from kubemarine.core import summary, utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
@@ -100,7 +100,7 @@ class V2_5_X_DashboardManifestProcessor(DashboardManifestProcessor):
 
 def get_dashboard_manifest_processor(cluster: KubernetesCluster, inventory: dict, **kwargs):
     version: str = inventory['plugins']['kubernetes-dashboard']['version']
-    if '.'.join(version.split('.')[0:2]) == 'v2.5':
+    if utils.minor_version(version) == 'v2.5':
         return V2_5_X_DashboardManifestProcessor(cluster, inventory, **kwargs)
 
     return DashboardManifestProcessor(cluster, inventory, **kwargs)

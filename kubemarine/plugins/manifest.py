@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, IO
 
 import ruamel.yaml
 import os
@@ -25,14 +25,16 @@ from kubemarine import plugins
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 
+ERROR_MANIFEST_NOT_FOUND = "Cannot find original manifest %s for '%s' plugin"
+
 
 class Manifest:
-    def __init__(self, logger: log.EnhancedLogger, filepath: str):
+    def __init__(self, logger: log.EnhancedLogger, stream: IO):
         self.logger = logger
         self._patched = OrderedSet()
         self._excluded = OrderedSet()
         self._included = OrderedSet()
-        self._obj_list = self._load(filepath)
+        self._obj_list = self._load(stream)
 
     def obj_key(self, obj: dict) -> str:
         return f"{obj['kind']}_{obj['metadata']['name']}"
@@ -104,7 +106,7 @@ class Manifest:
 
         return result
 
-    def _load(self, filepath: str) -> List[dict]:
+    def _load(self, stream: IO) -> List[dict]:
         """
         The method implements the parse YAML file that includes several YAMLs inside
         :param filepath: Path to file that should be parsed
@@ -112,20 +114,19 @@ class Manifest:
         """
         yaml = ruamel.yaml.YAML()
         obj_list = []
-        with utils.open_utf8(filepath, 'r') as stream:
-            source_yamls = yaml.load_all(stream)
-            yaml_keys = set()
-            for source_yaml in source_yamls:
-                if source_yaml is None:
-                    continue
-                yaml_key = self.obj_key(source_yaml)
-                # check if there is no duplication
-                if yaml_key in yaml_keys:
-                    raise Exception(
-                        f"The {yaml_key} object is duplicated, please verify the original yaml")
+        source_yamls = yaml.load_all(stream)
+        yaml_keys = set()
+        for source_yaml in source_yamls:
+            if source_yaml is None:
+                continue
+            yaml_key = self.obj_key(source_yaml)
+            # check if there is no duplication
+            if yaml_key in yaml_keys:
+                raise Exception(
+                    f"The {yaml_key} object is duplicated, please verify the original yaml")
 
-                yaml_keys.add(yaml_key)
-                obj_list.append(source_yaml)
+            yaml_keys.add(yaml_key)
+            obj_list.append(source_yaml)
 
         return obj_list
 
@@ -172,7 +173,7 @@ class Processor(ABC):
         }
         original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
         if not os.path.isfile(original_yaml_path):
-            raise Exception(f"Cannot find original manifest {original_yaml_path} for {self.plugin_name!r} plugin")
+            raise Exception(ERROR_MANIFEST_NOT_FOUND % (original_yaml_path, self.plugin_name))
 
     def validate_original(self, manifest: Manifest) -> None:
         """
@@ -216,7 +217,8 @@ class Processor(ABC):
         # get original YAML and parse it into list of objects
         original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
         try:
-            manifest = Manifest(self.log, original_yaml_path)
+            with utils.open_utf8(original_yaml_path, 'r') as stream:
+                manifest = Manifest(self.log, stream)
         except Exception as exc:
             raise Exception(f"Failed to load {original_yaml_path} for {self.plugin_name!r} plugin") from exc
 
