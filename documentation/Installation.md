@@ -5525,11 +5525,11 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
     <td>1.5.*</td>
     <td>1.5.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
     <td></td>
   </tr>
   <tr>
@@ -5681,8 +5681,8 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5697,11 +5697,11 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
     <td>1.5.*</td>
     <td>1.5.*</td>				  
-    <td>1.4.*</td>
+    <td>1.6.*</td>
     <td></td>
   </tr>
   <tr>
@@ -5766,7 +5766,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5809,7 +5809,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.23.11
+## Default Dependent Components Versions for Kubernetes Versions v1.23.17
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -5840,21 +5840,21 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="5" rowspan="3">v1.23.11</td>
-    <td>SHA1: b93ff384df125429dcbeb18c2ea648168ae10c56</td>
+    <td colspan="5" rowspan="3">v1.23.17</td>
+    <td>SHA1: 0e805ff79d4099747bdf67d71d8acdc690e07e14</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 07769c846e4a83d59f9f34370c33be5cc163120b</td>
+    <td>SHA1: 42bce3cef79c9bf2c787e2bcb923ef2528834e96</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: 81643da0b975102cede136d39767cdc54f2b0aef</td>
+    <td>SHA1: 7377f28047c9c468978199cf5b9e4e7cae0c4e78</td>
   </tr>
   <tr>
     <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6 <br>Required only if calico is installed.</td>
   </tr>
   <tr>
     <td>crictl</td>
@@ -5869,11 +5869,11 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>containerd.io</td>
-    <td>1.4.*</td>
-    <td>1.4.*</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
     <td>1.5.*</td>
     <td>1.5.*</td>				  
-    <td>1.4.*</td>
+    <td>1.6.*</td>
     <td></td>
   </tr>
   <tr>
@@ -5906,7 +5906,7 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="5" rowspan="4">v1.23.11</td>
+    <td colspan="5" rowspan="4">v1.23.17</td>
     <td></td>
   </tr>
   <tr>
@@ -5933,12 +5933,12 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="5">3.5.1-0</td>
+    <td colspan="5">3.5.6-0</td>
     <td></td>
   </tr>
   <tr>
     <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
     <td>Required only if Typha is enabled in Calico config.</td>
   </tr>
   <tr>
@@ -5981,7 +5981,7 @@ The tables below shows the correspondence of versions that are supported and is 
 </table>
 
 
-## Default Dependent Components Versions for Kubernetes Versions v1.24.2
+## Default Dependent Components Versions for Kubernetes Versions v1.24.11
 
 <table style="undefined;table-layout: fixed; width: 1167px">
 <colgroup>
@@ -6012,188 +6012,16 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="5">binaries</td>
     <td>kubeadm</td>
-    <td colspan="5" rowspan="3">v1.24.2</td>
-    <td>SHA1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726</td>
+    <td colspan="5" rowspan="3">v1.24.11</td>
+    <td>SHA1: 7d44b41e36ff71f5f00671d518f2e59b4540653a</td>
   </tr>
   <tr>
     <td>kubelet</td>
-    <td>SHA1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308</td>
+    <td>SHA1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d</td>
   </tr>
   <tr>
     <td>kubectl</td>
-    <td>SHA1: d2a8e78bcdc992addd6faccb27b0af5d533443fa</td>
-  </tr>
-  <tr>
-    <td>calicoctl</td>
-    <td colspan="5">v3.24.1</td>
-    <td>SHA1: 5a2e2a391ec76fe0cf144854056b809113cb1432<br>Required only if calico is installed.</td>
-  </tr>
-  <tr>
-    <td>crictl</td>
-    <td colspan="5">v1.23.0</td>
-    <td>SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2<br>Required only if containerd is used as a container runtime.</td>
-  </tr>
-  <tr>
-    <td rowspan="5">rpms</td>
-    <td>docker-ce</td>
-    <td colspan="5">20.10</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>containerd.io</td>
-    <td>1.6.*</td>
-    <td>1.6.*</td>
-    <td>1.5.*</td>
-    <td>1.5.*</td>				  
-    <td>1.6.*</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>podman</td>
-    <td>1.6.4</td>
-    <td>latest</td>
-    <td>latest</td>
-    <td>latest</td>				   
-    <td>1.4.4</td>
-    <td>Required only if containerd is used as a container runtime.</td>
-  </tr>
-  <tr>
-    <td>haproxy/rh-haproxy</td>
-    <td>1.8</td>
-    <td>1.8</td>
-    <td>2.*</td>
-    <td>2.*</td>
-    <td>1.8</td>
-    <td>Required only if balancers are presented in the deployment scheme.</td>
-  </tr>
-  <tr>
-    <td>keepalived</td>
-    <td>1.3</td>
-    <td>2.1</td>
-    <td>2.*</td>
-    <td>2.*</td>
-    <td>1.3</td>
-    <td>Required only if VRRP is presented in the deployment scheme.</td>
-  </tr>
-  <tr>
-    <td rowspan="16">images</td>
-    <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="5" rowspan="4">v1.24.2</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/kube-controller-manager</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/kube-proxy</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/kube-scheduler</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/coredns</td>
-    <td colspan="5">1.8.6</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/pause</td>
-    <td colspan="5">3.7</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>k8s.gcr.io/etcd</td>
-    <td colspan="5">3.5.3-0</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>calico/typha</td>
-    <td colspan="5" rowspan="5">v3.24.1</td>
-    <td>Required only if Typha is enabled in Calico config.</td>
-  </tr>
-  <tr>
-    <td>calico/cni</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>calico/node</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>calico/kube-controllers</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>calico/pod2daemon-flexvol</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
-    <td colspan="5">v1.2.0</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td>kubernetesui/dashboard</td>
-    <td colspan="5">v2.5.1</td>
-    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
-  </tr>
-  <tr>
-    <td>kubernetesui/metrics-scraper</td>
-    <td colspan="5">v1.0.7</td>
-    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
-  </tr>
-  <tr>
-    <td>rancher/local-path-provisioner</td>
-    <td colspan="5">v0.0.22</td>
-    <td>Required only if local-path provisioner plugin is set to be installed.</td>
-  </tr>
-</tbody>
-</table>
-
-
-## Default Dependent Components Versions for Kubernetes Versions v1.25.2
-
-<table style="undefined;table-layout: fixed; width: 1167px">
-<colgroup>
-<col style="width: 60px">
-<col style="width: 389px">
-<col style="width: 128px">
-<col style="width: 119px">
-<col style="width: 99px">
-<col style="width: 100px">
-<col style="width: 272px">
-</colgroup>
-<thead>
-  <tr>
-    <th rowspan="2">Type</th>
-    <th rowspan="2">Name</th>
-    <th colspan="5">Versions</th>
-    <th rowspan="2">Note</th>
-  </tr>
-  <tr>
-    <th>CentOS RHEL<br>7.5+</th>
-    <th>CentOS RHEL<br>Oracle Linux 8.4</th>
-    <th>Ubuntu 20.04</th>
-    <th>Ubuntu 22.04</th>
-    <th>Oracle Linux 7.5+</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td rowspan="5">binaries</td>
-    <td>kubeadm</td>
-    <td colspan="5" rowspan="3">v1.25.2</td>
-    <td>SHA1: 72b87eedc9701c1143126f4aa7375b91fc9d46fc</td>
-  </tr>
-  <tr>
-    <td>kubelet</td>
-    <td>SHA1: afdc009cd59759626ecce007667f42bf42e7c1be</td>
-  </tr>
-  <tr>
-    <td>kubectl</td>
-    <td>SHA1: b12c0e102df89cd0579c8a3c769988aaf5dbe4ba</td>
+    <td>SHA1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655</td>
   </tr>
   <tr>
     <td>calicoctl</td>
@@ -6250,7 +6078,179 @@ The tables below shows the correspondence of versions that are supported and is 
   <tr>
     <td rowspan="16">images</td>
     <td>k8s.gcr.io/kube-apiserver</td>
-    <td colspan="5" rowspan="4">v1.25.2</td>
+    <td colspan="5" rowspan="4">v1.24.11</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-controller-manager</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-proxy</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-scheduler</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/coredns</td>
+    <td colspan="5">1.8.6</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/pause</td>
+    <td colspan="5">3.7</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/etcd</td>
+    <td colspan="5">3.5.6-0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/typha</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
+    <td>Required only if Typha is enabled in Calico config.</td>
+  </tr>
+  <tr>
+    <td>calico/cni</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/node</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/kube-controllers</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/pod2daemon-flexvol</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
+    <td colspan="5">v1.2.0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>kubernetesui/dashboard</td>
+    <td colspan="5">v2.5.1</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>kubernetesui/metrics-scraper</td>
+    <td colspan="5">v1.0.7</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>rancher/local-path-provisioner</td>
+    <td colspan="5">v0.0.22</td>
+    <td>Required only if local-path provisioner plugin is set to be installed.</td>
+  </tr>
+</tbody>
+</table>
+
+
+## Default Dependent Components Versions for Kubernetes Versions v1.25.7
+
+<table style="undefined;table-layout: fixed; width: 1167px">
+<colgroup>
+<col style="width: 60px">
+<col style="width: 389px">
+<col style="width: 128px">
+<col style="width: 119px">
+<col style="width: 99px">
+<col style="width: 100px">
+<col style="width: 272px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">Type</th>
+    <th rowspan="2">Name</th>
+    <th colspan="5">Versions</th>
+    <th rowspan="2">Note</th>
+  </tr>
+  <tr>
+    <th>CentOS RHEL<br>7.5+</th>
+    <th>CentOS RHEL<br>Oracle Linux 8.4</th>
+    <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
+    <th>Oracle Linux 7.5+</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td rowspan="5">binaries</td>
+    <td>kubeadm</td>
+    <td colspan="5" rowspan="3">v1.25.7</td>
+    <td>SHA1: 4efb3da49a50d137b728f0529bedee458e8c5f86</td>
+  </tr>
+  <tr>
+    <td>kubelet</td>
+    <td>SHA1: ace8ce244896aca5d38c8184c44226660a09269a</td>
+  </tr>
+  <tr>
+    <td>kubectl</td>
+    <td>SHA1: a5b32c173670ee6fa7710d7158ea4a0d198c8af5</td>
+  </tr>
+  <tr>
+    <td>calicoctl</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
+  </tr>
+  <tr>
+    <td>crictl</td>
+    <td colspan="5">v1.25.0</td>
+    <td>SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3<br>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td rowspan="5">rpms</td>
+    <td>docker-ce</td>
+    <td colspan="5">20.10</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>containerd.io</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
+    <td>1.5.*</td>
+    <td>1.5.*</td>				  
+    <td>1.6.*</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>podman</td>
+    <td>1.6.4</td>
+    <td>latest</td>
+    <td>latest</td>
+    <td>latest</td>				   
+    <td>1.4.4</td>
+    <td>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td>haproxy/rh-haproxy</td>
+    <td>1.8</td>
+    <td>1.8</td>
+    <td>2.*</td>
+    <td>2.*</td>
+    <td>1.8</td>
+    <td>Required only if balancers are presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td>keepalived</td>
+    <td>1.3</td>
+    <td>2.1</td>
+    <td>2.*</td>
+    <td>2.*</td>
+    <td>1.3</td>
+    <td>Required only if VRRP is presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td rowspan="16">images</td>
+    <td>k8s.gcr.io/kube-apiserver</td>
+    <td colspan="5" rowspan="4">v1.25.7</td>
     <td></td>
   </tr>
   <tr>
@@ -6277,7 +6277,7 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
   <tr>
     <td>k8s.gcr.io/etcd</td>
-    <td colspan="5">3.5.4-0</td>
+    <td colspan="5">3.5.6-0</td>
     <td></td>
   </tr>
   <tr>
