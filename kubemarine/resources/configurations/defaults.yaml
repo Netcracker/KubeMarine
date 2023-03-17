@@ -476,7 +476,6 @@ plugins:
     announceServices: false
     defaultAsNumber: 64512
     globalBgpPeers: []
-    prometheusMetrics: true
     typha:
       # enabled by default for envs with nodes > 3
       enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'

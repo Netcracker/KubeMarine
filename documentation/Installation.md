@@ -3601,12 +3601,8 @@ The plugin configuration supports the following parameters:
 
 ###### Calico metrics configuration
 
-By default, no additional settings are required for the metrics. However, you can change the default settings. To do this, in the plugins section of the config file, specify the calico plugin section and list all the necessary parameter and their value in it. For example:
-```yaml
-plugins:
-  calico:
-    prometheusMetrics: true
-```
+By default, no additional settings are required for metrics calico. It is enabled by default
+
 **Note:** By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
 
 **Note:** If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
@@ -3700,13 +3696,6 @@ plugins:
     install: true
 ```
 
-The following is an example to disable the plugin:
-
-```yaml
-plugins:
-  nginx-ingress-controller:
-    install: false
-```
 
 After applying the plugin configurations, the plugin installation procedure waits for the `nginx-ingress-controller` pod to be in the `Running` state.
 

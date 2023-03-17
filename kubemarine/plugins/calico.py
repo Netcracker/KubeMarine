@@ -327,10 +327,10 @@ def enrich_crd_felix_configuration(cluster, obj_list):
 
 
     key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
-    if cluster.inventory['plugins']['calico']['prometheusMetrics'] == True:
-        api_list = obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled']
-        api_list["default"] = felix_monitoring["default"]
-        obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled'] = api_list
+
+    api_list = obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled']
+    api_list["default"] = felix_monitoring["default"]
+    obj_list[key]['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties']['prometheusMetricsEnabled'] = api_list
     return obj_list
 
 
