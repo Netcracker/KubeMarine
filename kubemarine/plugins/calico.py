@@ -324,7 +324,11 @@ def enrich_clusterrole_calico_node(cluster, obj_list):
     return obj_list
 
 def enrich_crd_felix_configuration(cluster, obj_list):
-
+    """
+    The method implements the enrichment procedure for Calico CRD Felixconfigurations
+    :param cluster: Cluster object
+    :param obj_list: list of objects for enrichment
+    """
 
     key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
 
