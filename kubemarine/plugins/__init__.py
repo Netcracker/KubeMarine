@@ -528,7 +528,7 @@ def verify_python(cluster, step):
     module_filename = os.path.basename(module_path)
     spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
     module = importlib.util.module_from_spec(spec) 
-        if method_name != null:
+        if not method_name:
               print ("Method exist")
         else:
              raise Exception("Method is missing")
