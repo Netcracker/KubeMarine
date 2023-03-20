@@ -45,7 +45,7 @@ jobs:
         run: kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
-        run: rename 's/[:]/_/g' ./results/*/*
+        run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
@@ -97,7 +97,7 @@ jobs:
         run: kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
-        run: rename 's/[:]/_/g' ./results/*/*
+        run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3

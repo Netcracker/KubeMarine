@@ -5185,10 +5185,10 @@ During installation configurations, templates and other files are generated. For
 However, by default, all intermediate results are saved in the dump directory, which is automatically created at the beginning of work.
 It is not recommended but you can also disable this functionality.
 
-By default, the dump directory is located in the `dump` directory inside executable directory. However, the dump directory location path can be changed using the` --dump-location` argument. For example:
+The dumped files are put into the `dump` directory which is located by default in the executable directory. However, you can put the `dump` directory into any other folder instead of the executable directory using the `--dump-location` argument. For example:
 
 ```
-$ install --dump-location /var/data/dump/
+$ install --dump-location /var/data/
 ```
 
 **Note**: When creating a dump directory, the entire hierarchy of directories is created recursively in accordance with the specified path, even if a part of the path is missing.
