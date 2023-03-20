@@ -478,7 +478,10 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                                                % (python_executable, random_temp_path, repository_url,
                                                   cluster.inventory['timeout_download']))
 
-            for conn, url_results in exe.get_last_results().items():
+            results = exe.get_last_results()
+            if results is None:
+                results = NodeGroupResult(cluster)
+            for conn, url_results in results.items():
                 # Check if resolv.conf is actual
                 resolv_conf_actual = cluster.context['nodes'][conn.host]['resolv_conf_is_actual']
                 if not resolv_conf_actual:
