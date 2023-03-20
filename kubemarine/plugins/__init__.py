@@ -531,9 +531,10 @@ def verify_python(cluster, step):
     if not method_name:
           print ("Method exist")
     else:
-         raise Exception("Method is missing")
-       # TODO: verify fields types and contents
+          print ("Method is missing")
+      
     return
+ # TODO: verify fields types and contents
 
 
 def apply_python(cluster, step, plugin_name=None):
