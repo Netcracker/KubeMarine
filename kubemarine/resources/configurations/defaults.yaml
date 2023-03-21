@@ -7,6 +7,8 @@ globals:
       retries: 15
     boot:
      timeout: 600
+  timeout_download:
+    60
 
 node_defaults: {}
 
@@ -744,5 +746,3 @@ procedure_history:
   archive_threshold: 5
   delete_threshold: 10
 
-timeout_download:
-  60

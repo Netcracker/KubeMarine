@@ -6,6 +6,11 @@
   "properties": {
     "nodes": {
       "$ref": "#/definitions/Nodes"
+    },
+    "timeout_download": {
+      "type": "integer",
+      "default": 60,
+      "description": "Timeout for the thirdparties download on nodes."
     }
   },
   "definitions": {
