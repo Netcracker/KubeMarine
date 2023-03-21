@@ -116,6 +116,8 @@ class Manifest:
             source_yamls = yaml.load_all(stream)
             yaml_keys = set()
             for source_yaml in source_yamls:
+                if source_yaml is None:
+                    continue
                 yaml_key = self.obj_key(source_yaml)
                 # check if there is no duplication
                 if yaml_key in yaml_keys:

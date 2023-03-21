@@ -1,3 +1,5 @@
+# Source: https://github.com/projectcalico/calico/releases/download/v3.22.2/release-v3.22.2.tgz
+# manifests/calico-typha.yaml
 ---
 # Source: calico/templates/calico-config.yaml
 # This ConfigMap is used to configure a self-hosted Calico installation.
