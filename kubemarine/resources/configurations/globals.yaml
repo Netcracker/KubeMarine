@@ -322,7 +322,7 @@ compatibility_map:
       v1.26.3:
         version_rhel: 1.6*
         version_rhel8: 1.6*
-        version_debian: 1.5.*
+        version_debian: 1.6.*
     podman:
       v1.21.2:
         version_rhel: 1.6.4*
