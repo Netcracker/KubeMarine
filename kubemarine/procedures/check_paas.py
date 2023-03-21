@@ -385,8 +385,8 @@ def thirdparties_hashes(cluster):
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
-                arr = path.split(".") 
-                if len(arr) == 2: 
+                extension = path.split('.')[-1]
+                if extension == 'zip': 
                     res = group.sudo(' unzip -l %s | grep -v /$ | grep -vw -e Name -e "----" | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo unzip -p %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
