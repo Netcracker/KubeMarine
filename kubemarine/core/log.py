@@ -296,7 +296,7 @@ def get_dump_debug_filepath(context: dict) -> Optional[str]:
     if args.get('disable_dump', True):
         return None
 
-    return os.path.join(args['dump_location'], 'debug.log')
+    return os.path.join(args['dump_location'], 'dump', 'debug.log')
 
 
 def init_log_from_context_args(globals, context, raw_inventory) -> Log:

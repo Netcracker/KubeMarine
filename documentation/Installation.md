@@ -231,6 +231,14 @@ systemctl enable containerd
 ```
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
 
+**Unattended-upgrades** 
+
+`unattended-upgrades` is a native to Debian/Ubuntu automatic update mechanism. By default, it is included in the system and is configured to updating packages only from security-repository.
+
+**Warning**: Do not use unattended-upgrade to automatically update packages besides security updates.
+
+**Note**: Since this mechanism is launched once a day at a random time, it may coincide with the work of other package managers (apt, aptitude, dpkg, and so on), resulting in an error in these package managers. In this case, the simplest solution is to wait for the completion of the unattended-upgrades process and restart apt, aptitude, or dpkg.
+
 **Preconfigured**
 * SSHD running on each VM via port 22.
 * User with sudo and no-require-tty parameter in sudoers file.
@@ -5177,10 +5185,10 @@ During installation configurations, templates and other files are generated. For
 However, by default, all intermediate results are saved in the dump directory, which is automatically created at the beginning of work.
 It is not recommended but you can also disable this functionality.
 
-By default, the dump directory is located in the `dump` directory inside executable directory. However, the dump directory location path can be changed using the` --dump-location` argument. For example:
+The dumped files are put into the `dump` directory which is located by default in the executable directory. However, you can put the `dump` directory into any other folder instead of the executable directory using the `--dump-location` argument. For example:
 
 ```
-$ install --dump-location /var/data/dump/
+$ install --dump-location /var/data/
 ```
 
 **Note**: When creating a dump directory, the entire hierarchy of directories is created recursively in accordance with the specified path, even if a part of the path is missing.
