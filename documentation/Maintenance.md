@@ -13,7 +13,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
     - [Certificate Renew Procedure](#certificate-renew-procedure)
-    - [Migration Cri Procedure](#migration-cri-procedure)
+    - [Cri Migration Procedure](#cri-migration-procedure)
     - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
     - [Procedure Execution from CLI](#procedure-execution-from-cli)
@@ -900,7 +900,7 @@ from particular namespaces will be applied.
 **Warnings**:
 * Be careful with the `exemptions` section it may cause cluster instability.
 * Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
-* The PSS labels in namespaces for KubeMarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
+* The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
 'kubernetes-dashboard' etc) will be deleted during the procedure in case of using `pod-security: disabled`
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
@@ -1027,7 +1027,7 @@ The `cert_renew` procedure executes the following sequence of tasks:
 2. nginx_ingress_controller
 3. certs_overview
 
-## Migration Cri Procedure
+## Cri Migration Procedure
 
 The `migrate_cri` procedure allows you to migrate from Docker to Containerd.
 
@@ -1133,7 +1133,7 @@ thirdparties:
 ## Admission Migration Procedure
 
 Since Kubernetes v1.20 Pod Security Policy (PSP) has been deprecated and will be delete in Kubernetes 1.25 the migration procedure 
-from PSP to  another solution is very important. KubeMarine supports Pod Security Standards (PSS) by default as a replacement PSP.
+from PSP to  another solution is very important. Kubemarine supports Pod Security Standards (PSS) by default as a replacement PSP.
 The most important step in the procedure is to define the PSS profiles for particular namespace. PSS has only three feasible options:
 `privileged`, `baseline`, `restricted` that should be matched with PSP. It's better to use more restrictive the PSS profile 
 for namespace. For proper matching see the following articles:
@@ -1141,10 +1141,10 @@ for namespace. For proper matching see the following articles:
 * [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
 **Notes**: 
-* KubeMarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
+* Kubemarine predefined PSP such as 'oob-anyuid-psp', 'oob-host-network-psp', 'oob-privileged-psp' match with 'privileged' PSS profile and 'oob-default-psp' matches with 'restricted' PSS profile.
 * Before running the migration procedure, be sure that all applications in Kubernetes cluster match with prerequisites:
 [Application prerequisites](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#application-prerequisites)
-* One of the way to check if the pods in particular namespace are matched with the PSS profile is the following. The `pod-security.kubernetes.io/enforce` label in namespace should be set in `privileged` whereas the `pod-security.kubernetes.io/warn` and `pod-security.kubernetes.io/audit` labels should bet set in `restricted`(or `baseline` as well). When the pods are up and running in namespace one could check audit messages and namespace events. Any violation of `restricted` profile is reflected in these messages. The further step is to rework the Pods that violate the PSS profile and repeat the procedure.
+* One of the ways to check if the pods in a particular namespace are matched with the PSS profile is that the `pod-security.kubernetes.io/enforce` label in the namespace should be set to `privileged`, whereas the `pod-security.kubernetes.io/warn` and `pod-security.kubernetes.io/audit` labels should be set to `restricted` or `baseline`. When the pods are up and running in the namespace, the audit messages and namespace events can be checked. Any violation of the `restricted` profile is reflected in these messages. The next step is to rework the pods that violate the PSS profile and repeat the procedure.
 
 
 ### Procedure Execution Steps
@@ -1267,9 +1267,9 @@ dump/
 ```
 
 Description of the following files:
-* cluster.yaml - input cluster inventory
-* version -  Kubemarine version.
-* procedure_parameters - list of finished tasks.
+* cluster.yaml - Input cluster inventory
+* version -  Kubemarine version
+* procedure_parameters - List of finished tasks
 
 
 ## Additional Parameters
