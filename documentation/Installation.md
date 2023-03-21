@@ -165,7 +165,7 @@ For cluster machines, ensure the following requirements are met:
 * The following distributives and versions are supported:
 
   * Centos 7.5+, 8.4
-  * RHEL 7.5+, 8.4
+  * RHEL 7.5+, 8.4, 8.6, 8.7
   * Oracle Linux 7.5+, 8.4
   * Ubuntu 20.04
   * Ubuntu 22.04.1
