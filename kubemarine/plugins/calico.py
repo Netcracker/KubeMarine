@@ -126,7 +126,6 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "DaemonSet_calico-node"
-        cluster = self.cluster
         for container_name in ['upgrade-ipam', 'install-cni']:
             self.enrich_image_for_container(manifest, key,
                 plugin_service='cni', container_name=container_name, is_init_container=True)
@@ -139,39 +138,66 @@ class CalicoManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='node', container_name='calico-node', is_init_container=False)
 
-        num, container = self.find_container_for_patch(manifest, key,
+        container_pos, container = self.find_container_for_patch(manifest, key,
             container_name='calico-node', is_init_container=False)
 
-        ipv6_env = ['CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD', 'FELIX_IPV6SUPPORT',
-                    'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN']
-        env_list = []
-        for name, value in cluster.inventory['plugins']['calico']['env'].items():
-            ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-            if name not in ipv6_env and name != 'FELIX_TYPHAK8SSERVICENAME':
-                if type(value) is str:
-                    env_list.append({'name': name, 'value': value})
-                elif type(value) is dict:
-                    env_list.append({'name': name, 'valueFrom': value})
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-            elif name in ipv6_env and type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
-                if type(value) is str:
-                    env_list.append({'name': name, 'value': value})
-                elif type(value) is dict:
-                    env_list.append({'name': name, 'valueFrom': value})
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-            if utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled']) == "true" and \
-                    name == 'FELIX_TYPHAK8SSERVICENAME':
-                env_list.append({'name': name, 'valueFrom': value})
-                cluster.log.verbose(f"The {key} has been patched in "
-                                    f"'spec.template.spec.containers.[{num}].env.{name}' with '{value}'")
-        i = 0
+        self.enrich_daemonset_calico_node_container_env(container_pos, container)
+
+    def enrich_daemonset_calico_node_container_env(self, container_pos: int, container: dict) -> None:
+        """
+        The method implements the enrichment procedure for 'calico-node' container in Calico node DaemonSet.
+        The method attempts to preserve initial formatting.
+
+        :param container_pos: container position in spec
+        :param container: object describing a container
+        """
+        key = "DaemonSet_calico-node"
+        env_delete = []
+        ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+            env_delete.extend([
+                'CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD',
+                'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'
+            ])
+        if utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled']) == "false":
+            env_delete.append('FELIX_TYPHAK8SSERVICENAME')
+
+        for env in env_delete:
+            for i, e in enumerate(container['env']):
+                if e['name'] == env:
+                    del container['env'][i]
+                    self.log.verbose(f"The {env!r} env variable has been removed from "
+                                    f"'spec.template.spec.containers.[{container_pos}].env' in the {key}")
+                    break
+
+        env_update = {}
+        for name, value in self.inventory['plugins']['calico']['env'].items():
+            if name in env_delete:
+                continue
+            if type(value) is str:
+                env_update[name] = {'value': value}
+            elif type(value) is dict:
+                env_update[name] = {'valueFrom': value}
+            self.log.verbose(f"The {key} has been patched in "
+                            f"'spec.template.spec.containers.[{container_pos}].env.{name}' with '{value}'")
+
         for env in container['env']:
-            for item in env_list:
-                if env['name'] == item['name']:
-                    container['env'][i] = item
-            i += 1
+            name = env['name']
+            if name not in env_update:
+                continue
+
+            value = env_update.pop(name)
+            keys = list(env.keys())
+            for key in keys:
+                if key != 'name' and key not in value:
+                    del env[key]
+
+            env.update(value)
+
+        for name, env in env_update.items():
+            new_env = {'name' : name}
+            new_env.update(env)
+            container['env'].append(new_env)
 
     def enrich_deployment_calico_typha(self, manifest: Manifest) -> None:
         """
