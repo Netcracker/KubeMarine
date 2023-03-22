@@ -6323,3 +6323,175 @@ The tables below shows the correspondence of versions that are supported and is 
   </tr>
 </tbody>
 </table>
+
+
+## Default Dependent Components Versions for Kubernetes Versions v1.26.3
+
+<table style="undefined;table-layout: fixed; width: 1167px">
+<colgroup>
+<col style="width: 60px">
+<col style="width: 389px">
+<col style="width: 128px">
+<col style="width: 119px">
+<col style="width: 99px">
+<col style="width: 100px">
+<col style="width: 272px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">Type</th>
+    <th rowspan="2">Name</th>
+    <th colspan="5">Versions</th>
+    <th rowspan="2">Note</th>
+  </tr>
+  <tr>
+    <th>CentOS RHEL<br>7.5+</th>
+    <th>CentOS RHEL<br>Oracle Linux 8.4</th>
+    <th>Ubuntu 20.04</th>
+    <th>Ubuntu 22.04</th>
+    <th>Oracle Linux 7.5+</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td rowspan="5">binaries</td>
+    <td>kubeadm</td>
+    <td colspan="5" rowspan="3">v1.26.3</td>
+    <td>SHA1: 86e202f98d22c8fddcadda6656f6698d21eae6ca</td>
+  </tr>
+  <tr>
+    <td>kubelet</td>
+    <td>SHA1: 5fe320fedaabb91d3770da19135412b7454bb28b</td>
+  </tr>
+  <tr>
+    <td>kubectl</td>
+    <td>SHA1: 56916d87c3caef05489db932fd9e48d32ebdf634</td>
+  </tr>
+  <tr>
+    <td>calicoctl</td>
+    <td colspan="5">v3.24.2</td>
+    <td>SHA1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6<br>Required only if calico is installed.</td>
+  </tr>
+  <tr>
+    <td>crictl</td>
+    <td colspan="5">v1.25.0</td>
+    <td>SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3<br>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td rowspan="5">rpms</td>
+    <td>docker-ce</td>
+    <td colspan="5">20.10</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>containerd.io</td>
+    <td>1.6.*</td>
+    <td>1.6.*</td>
+    <td>1.5.*</td>
+    <td>1.5.*</td>				  
+    <td>1.6.*</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>podman</td>
+    <td>1.6.4</td>
+    <td>latest</td>
+    <td>latest</td>
+    <td>latest</td>				   
+    <td>1.4.4</td>
+    <td>Required only if containerd is used as a container runtime.</td>
+  </tr>
+  <tr>
+    <td>haproxy/rh-haproxy</td>
+    <td>1.8</td>
+    <td>1.8</td>
+    <td>2.*</td>
+    <td>2.*</td>
+    <td>1.8</td>
+    <td>Required only if balancers are presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td>keepalived</td>
+    <td>1.3</td>
+    <td>2.1</td>
+    <td>2.*</td>
+    <td>2.*</td>
+    <td>1.3</td>
+    <td>Required only if VRRP is presented in the deployment scheme.</td>
+  </tr>
+  <tr>
+    <td rowspan="16">images</td>
+    <td>k8s.gcr.io/kube-apiserver</td>
+    <td colspan="5" rowspan="4">v1.26.3</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-controller-manager</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-proxy</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/kube-scheduler</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/coredns</td>
+    <td colspan="5">v1.9.3</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/pause</td>
+    <td colspan="5">3.9</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>k8s.gcr.io/etcd</td>
+    <td colspan="5">3.5.6-0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/typha</td>
+    <td colspan="5" rowspan="5">v3.24.2</td>
+    <td>Required only if Typha is enabled in Calico config.</td>
+  </tr>
+  <tr>
+    <td>calico/cni</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/node</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/kube-controllers</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>calico/pod2daemon-flexvol</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>quay.io/kubernetes-ingress-controller/nginx-ingress-controller</td>
+    <td colspan="5">v1.4.0</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>kubernetesui/dashboard</td>
+    <td colspan="5">v2.7.0</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>kubernetesui/metrics-scraper</td>
+    <td colspan="5">v1.0.8</td>
+    <td>Required only if Kubernetes Dashboard plugin is set to be installed.</td>
+  </tr>
+  <tr>
+    <td>rancher/local-path-provisioner</td>
+    <td colspan="5">v0.0.23</td>
+    <td>Required only if local-path provisioner plugin is set to be installed.</td>
+  </tr>
+</tbody>
+</table>
