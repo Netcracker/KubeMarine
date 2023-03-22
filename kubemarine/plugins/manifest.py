@@ -194,13 +194,6 @@ class Processor(ABC):
                 self.log.verbose(f"The current version of original yaml does not include "
                                  f"the following object: {key}")
 
-    # TODO: implement method for validation after enrichment
-    def validate_result(self, manifest: Manifest):
-        """
-        Some validation inside the manifest objects.
-        """
-        return
-
     def apply(self):
         """
         The method implements full processing for the plugin main manifest.
@@ -236,7 +229,6 @@ class Processor(ABC):
         self.log.verbose(f"The total number of excluded objects is {len(manifest.excluded)} "
                          f"the objects are the following: {manifest.excluded}")
 
-        self.validate_result(manifest)
         enriched_manifest = manifest.dump()
         utils.dump_file(self.cluster, enriched_manifest, self.destination_name)
         config['source'] = io.StringIO(enriched_manifest)
