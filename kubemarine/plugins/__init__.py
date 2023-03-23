@@ -522,7 +522,7 @@ def apply_expect(cluster, config, plugin_name=None):
 # **** PYTHON ****
 
 def verify_python(cluster, step):
-  #  module_path, _ = utils.determine_resource_absolute_file(step['module'])
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
     module_filename = os.path.basename(module_path)
