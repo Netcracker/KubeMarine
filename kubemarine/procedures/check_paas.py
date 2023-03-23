@@ -131,11 +131,10 @@ def recommended_system_package_versions(cluster: KubernetesCluster, pckg_alias: 
         else:
             expected_system_packages["containerd"] = compatibility["containerd"][k8s_version][version_key]
     elif pckg_alias == "docker":
-        expected_system_packages = {"docker": compatibility["docker"][k8s_version][version_key]}
-        if version_key in ["version_rhel", "version_rhel8"]:
-            expected_system_packages["containerd.io"] = compatibility["containerdio"][k8s_version][version_key]
-        else:
-            expected_system_packages["containerd"] = compatibility["containerd"][k8s_version][version_key]
+        expected_system_packages = {
+            "docker": compatibility["docker"][k8s_version][version_key],
+            "containerd.io": compatibility["containerdio"][k8s_version][version_key]
+        }
     else:
         raise TestWarn(f"Package {pckg_alias} doesn't have recommended version")
 
