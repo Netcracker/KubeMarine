@@ -202,9 +202,9 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
             cluster.log.verbose('Unzip will be used for unpacking')
             remote_commands += ' && sudo unzip -o %s -d %s' % (destination, config['unpack'])
             
-            remote_commands += ' && sudo chmod -R %s %s/' \
+            remote_commands += ' && sudo chmod -R %s %s/*' \
                    % (config['mode'], config['unpack'])
-            remote_commands += ' && sudo chown -R %s %s/' \
+            remote_commands += ' && sudo chown -R %s %s/*' \
                    % (config['owner'], config['unpack'])
             remote_commands += ' && sudo ls -la %s' % (config['unpack'])
             
