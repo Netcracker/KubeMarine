@@ -387,7 +387,7 @@ def thirdparties_hashes(cluster):
                 unpack_dir = config['unpack']
                 extension = path.split('.')[-1]
                 if extension == 'zip': 
-                    res = group.sudo(' unzip -l %s | grep -v /$ | grep -vw -e Name -e "----" | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
+                    res = group.sudo(' unzip -qq -l %s | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo unzip -p %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
                                  '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
