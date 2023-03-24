@@ -2190,7 +2190,7 @@ This is configured in the `services.thirdparties` section. The contents of this 
 |**sha1**|no|`None`|SHA1 hash of the file. It is necessary in order to check with an existing file on the hosts and decide whether to download the file or not.|
 |**owner**|no|`root`|The owner who needs to be assigned to the file after downloading it.|
 |**mode**|no|`700`|The mode which needs to be assigned to the file after downloading it.|
-|**unpack**|no|`None`|Absolute path on hosts where to unpack the downloaded file. Unpacking is supported only for the following file extensions: `.tar`, `.gz` and `.zip`.|
+|**unpack**|no|`None`|Absolute path on hosts where to unpack the downloaded file. Unpacking is supported only for the following file extensions: `.tar.gz` and `.zip`.|
 |**group**|no|`None`|The name of the group to whose hosts the file should be uploaded.|
 |**groups**|no|`None`|The list of group names to whose hosts the file should be uploaded.|
 |**node**|no|`None`|The name of node where the file should be uploaded.|
