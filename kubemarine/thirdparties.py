@@ -206,7 +206,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
                    % (destination, config['mode'], config['unpack'])
             remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chown -R %s %s/FILE' \
                    % (destination, config['owner'], config['unpack'])
-            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }'\| xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
             
         else:
             cluster.log.verbose('Tar will be used for unpacking')
