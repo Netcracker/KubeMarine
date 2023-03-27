@@ -64,9 +64,10 @@ def get_elapsed_string(start, end):
 
 
 def prepare_dump_directory(location, reset_directory=True):
-    if reset_directory and os.path.exists(location) and os.path.isdir(location):
-        shutil.rmtree(location)
-    os.makedirs(location, exist_ok=True)
+    dumpdir = os.path.join(location, 'dump')
+    if reset_directory and os.path.exists(dumpdir) and os.path.isdir(dumpdir):
+        shutil.rmtree(dumpdir)
+    os.makedirs(dumpdir, exist_ok=True)
 
 
 def make_ansible_inventory(location, cluster):
@@ -214,7 +215,7 @@ def get_dump_filepath(context, filename):
     if context.get("dump_filename_prefix"):
         filename = f"{context['dump_filename_prefix']}_{filename}"
 
-    return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], filename))
+    return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
 def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
