@@ -863,7 +863,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
 def check_tcp_ports(cluster):
     with TestCase(cluster.context['testsuite'], '011', 'Network', 'TCPPorts', default_results='Connected'),\
             suspend_firewalld(cluster):
-        tcp_ports = ["80", "443", "6443", "2379", "2380", "10250", "10251", "10252", "30001", "30002"]
+        tcp_ports = ["80", "443", "179", "6443", "2379", "2380", "10250", "10251", "10252", "30001", "30002"]
         nodes = {node["connect_to"]: node
                  for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)}
         host_to_ip = {host: node['internal_address'] for host, node in nodes.items()}
