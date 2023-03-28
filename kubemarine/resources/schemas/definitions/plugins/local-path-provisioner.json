@@ -4,6 +4,9 @@
   "description": "Enable and/or change default settings for 'local-path-provisioner' plugin",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
+    "version": {
+      "type": "string"
+    },
     "image": {
       "type": "string"
     },
@@ -39,7 +42,7 @@
   "propertyNames": {
     "anyOf": [
       {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
-      {"enum": ["image", "storage-class", "volume-dir", "tolerations", "helper-pod-image"]}
+      {"enum": ["version", "image", "storage-class", "volume-dir", "tolerations", "helper-pod-image"]}
     ]
   }
 }
