@@ -34,7 +34,8 @@ from itertools import chain
 from typing import Dict, List, Tuple
 
 import yaml
-
+import inspect
+from kubemarine.plugins import PluginResult
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
 from kubemarine.core import utils, static
@@ -528,26 +529,31 @@ def verify_python(cluster, step):
     module_filename = os.path.basename(module_path)
     spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
     module = importlib.util.module_from_spec(spec) 
-    if not method_name:
-          print ("Method exist")
-    else:
-          print ("Method is missing")
-      
-    return
- # TODO: verify fields types and contents
+    if not hasattr(module, method_name):
+        return PluginResult(False, "Method {} not found in module {}".format(method_name, module_path))
+    return PluginResult(True, None)
 
 
 def apply_python(cluster, step, plugin_name=None):
-    module_path, _ = utils.determine_resource_absolute_file(step['module'])
-    method_name = step['method']
+    method_signature = inspect.signature(getattr(module, step['method']))
     method_arguments = step.get('arguments', {})
 
-    cluster.log.debug("Running method %s from %s module..." % (method_name, module_path))
+    # Validate the arguments against the method signature
+    try:
+        method_signature.bind(cluster, **method_arguments)
+    except TypeError as e:
+        return PluginResult(False, "Invalid arguments for method {}: {}".format(step['method'], e))
+
+    # Execute the method
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
     module_filename = os.path.basename(module_path)
     spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    getattr(module, method_name)(cluster, **method_arguments)
+    getattr(module, step['method'])(cluster, **method_arguments)
+
+    return PluginResult(True, None)
+
 
 
 # **** THIRDPARTIES ****
