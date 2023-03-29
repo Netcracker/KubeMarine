@@ -180,6 +180,7 @@ The actual information about the supported versions can be found at [global.yaml
   * Internal communication:
     * 22
     * 80
+    * 179
     * 443
     * 6443
     * 2379-2380
