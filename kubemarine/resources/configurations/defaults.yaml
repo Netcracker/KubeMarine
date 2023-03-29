@@ -7,6 +7,8 @@ globals:
       retries: 15
     boot:
      timeout: 600
+  timeout_download:
+    60
 
 node_defaults: {}
 
@@ -414,11 +416,10 @@ plugins:
       priority: 0
       procedures:
         - python:
-            module: plugins/calico.py
-            method: apply_calico_yaml
+            module: plugins/builtin.py
+            method: apply_yaml
             arguments:
-              calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
-              calico_yaml: 'calico-{{ plugins.calico.version }}.yaml'
+              plugin_name: calico
         - expect:
             daemonsets:
               - calico-node
@@ -505,30 +506,10 @@ plugins:
       FELIX_LOGSEVERITYSCREEN: info
       FELIX_HEALTHENABLED: 'true'
       FELIX_USAGEREPORTINGENABLED: 'false'
-      FELIX_TYPHAK8SSERVICENAME:
-          configMapKeyRef:
-            name: calico-config
-            key: typha_service_name
       NODENAME:
           fieldRef:
             apiVersion: v1
             fieldPath: spec.nodeName
-      CALICO_NETWORKING_BACKEND:
-          configMapKeyRef:
-            name: calico-config
-            key: calico_backend
-      FELIX_IPINIPMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
-      FELIX_VXLANMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
-      FELIX_WIREGUARDMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
     cni:
       image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
@@ -575,7 +556,11 @@ plugins:
         - python:
             module: plugins/nginx_ingress.py
             method: manage_custom_certificate
-        - template: 'templates/plugins/nginx-ingress-controller-{{ plugins["nginx-ingress-controller"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: nginx-ingress-controller
         - expect:
             daemonsets:
               - name: ingress-nginx-controller
@@ -637,7 +622,11 @@ plugins:
     installation:
       priority: 2
       procedures:
-        - template: 'templates/plugins/dashboard-{{ plugins["kubernetes-dashboard"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: kubernetes-dashboard
         - expect:
             deployments:
               - name: kubernetes-dashboard
@@ -666,6 +655,11 @@ plugins:
         namespace: kubernetes-dashboard
         annotations:
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/configuration-snippet: |   
+            add_header X-Frame-Options "sameorigin";
+            add_header X-Content-Type-Options "nosniff";
+            more_set_headers "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'self'; form-action 'self'";
+            more_set_headers "Cross-Origin-Resource-Policy: same-site"; 
       spec:
         ingressClassName: nginx
         tls:
@@ -686,11 +680,16 @@ plugins:
                         number: 443
 
   local-path-provisioner:
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: false
     installation:
       priority: 2
       procedures:
-      - template: 'templates/plugins/local-path-provisioner.yaml.j2'
+      - python:
+          module: plugins/builtin.py
+          method: apply_yaml
+          arguments:
+            plugin_name: local-path-provisioner
       - expect:
           pods:
             - local-path-provisioner
@@ -698,7 +697,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: 'rancher/local-path-provisioner:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
     helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version }}'
 
 rbac:
@@ -752,5 +751,3 @@ procedure_history:
   archive_threshold: 5
   delete_threshold: 10
 
-timeout_download:
-  60

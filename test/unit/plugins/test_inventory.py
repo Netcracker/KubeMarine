@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import unittest
 from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors
+from kubemarine.plugins import manifest
 
 
 class EnrichmentValidation(unittest.TestCase):
@@ -114,6 +114,23 @@ class EnrichmentValidation(unittest.TestCase):
         ]}}}
         with self.assertRaisesRegex(errors.FailException, r"'' is too short"):
             demo.new_cluster(inventory)
+
+    def test_verify_manifest_not_found(self):
+        for plugin_name in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
+            with self.subTest(plugin_name):
+                inventory = demo.generate_inventory(**demo.ALLINONE)
+                plugin_section = inventory.setdefault('plugins', {}).setdefault(plugin_name, {})
+                plugin_section['install'] = True
+                plugin_section['installation'] = {'procedures': [{'python': {
+                    'module': 'plugins/builtin.py',
+                    'method': 'apply_yaml',
+                    'arguments': {
+                        'plugin_name': plugin_name,
+                        'original_yaml_path': f"{__file__}/../test_templates/template.conf"
+                    }
+                }}]}
+                with self.assertRaisesRegex(Exception, manifest.ERROR_MANIFEST_NOT_FOUND % ('.*', plugin_name)):
+                    demo.new_cluster(inventory)
 
 
 if __name__ == '__main__':

@@ -288,7 +288,7 @@ def new_common_parser(cli_help):
                         help='auto-generated ansible-compatible inventory file location')
 
     parser.add_argument('--dump-location',
-                        default='./dump/',
+                        default='./',
                         help='dump directory for intermediate files')
 
     parser.add_argument('--disable-dump',
