@@ -65,44 +65,18 @@ class CalicoManifestProcessor(Processor):
             destination_name = f"calico-{version}.yaml"
         super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
 
-    patched_list = []
-    excluded_list = []
-
-    # list of objects for enrichment
-    objects_for_enrichment = [
-            "ConfigMap_calico-config",
-            "Deployment_calico-kube-controllers",
-            "DaemonSet_calico-node",
-            "Deployment_calico-typha",
-            "Service_calico-typha", 
-            "PodDisruptionBudget_calico-typha",
-            "ClusterRole_calico-kube-controllers",
-            "ClusterRole_calico-node"
-           ]
-
-    # enrich objects one by one
-    for key in objects_for_enrichment:
-        # enrich common Calico objects
-        if key not in ["Service_calico-typha", "PodDisruptionBudget_calico-typha", "Deployment_calico-typha"]:
-            if obj_list.get(key, ''):
-                patched_list.append(key)
-                obj_list = enrich_objects_fns[key](cluster, obj_list)
+    def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
+        # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+        # in other case those objects must be excluded
+        str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
+        if str_value == 'false':
+            for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
+                manifest.exclude(key)
+        elif str_value == 'true':
+            return
         else:
-            # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
-            # in other case those objects must be excluded
-            str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
-            if str_value == 'false':
-                obj_list.pop(key)
-                excluded_list.append(key)
-                cluster.log.verbose(f"The {key} has been excluded from result")
-            elif str_value == 'true':
-                patched_list.append(key)
-                if enrich_objects_fns[key]:
-                    obj_list = enrich_objects_fns[key](cluster, obj_list)
-            else:
-                raise Exception(f"The {key} can't be patched correctly "
-                                f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                                f"as string or boolean value")
+            raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                            f"as string or boolean value")
 
     def enrich_configmap_calico_config(self, manifest: Manifest) -> None:
         """
@@ -279,48 +253,61 @@ class CalicoManifestProcessor(Processor):
             api_list.append(psp_calico_node)
             cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
 
-    return obj_list
+    def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico CRD Felixconfigurations
+        :param cluster: Cluster object
+        :param obj_list: list of objects for enrichment
+        """
 
+        key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
+        source_yaml = manifest.get_obj(key, patch=True)
 
-def validate_original(cluster, obj_list):
-    """
-    The method implements some validations for Calico objects
-    :param cluster: Cluster object
-    :param obj_list: list of objects for validation
-    """
+        api_list = \
+        source_yaml['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties'][
+            'prometheusMetricsEnabled']
+        api_list["default"] = True
+        source_yaml['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties'][
+            'prometheusMetricsEnabled'] = api_list
 
-    known_objects = [
-        "ConfigMap_calico-config",
-        "CustomResourceDefinition_bgpconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_bgppeers.crd.projectcalico.org",
-        "CustomResourceDefinition_blockaffinities.crd.projectcalico.org",
-        "CustomResourceDefinition_caliconodestatuses.crd.projectcalico.org",
-        "CustomResourceDefinition_clusterinformations.crd.projectcalico.org",
-        "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_globalnetworkpolicies.crd.projectcalico.org",
-        "CustomResourceDefinition_globalnetworksets.crd.projectcalico.org",
-        "CustomResourceDefinition_hostendpoints.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamblocks.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamconfigs.crd.projectcalico.org",
-        "CustomResourceDefinition_ipamhandles.crd.projectcalico.org",
-        "CustomResourceDefinition_ippools.crd.projectcalico.org",
-        "CustomResourceDefinition_ipreservations.crd.projectcalico.org",
-        "CustomResourceDefinition_kubecontrollersconfigurations.crd.projectcalico.org",
-        "CustomResourceDefinition_networkpolicies.crd.projectcalico.org",
-        "CustomResourceDefinition_networksets.crd.projectcalico.org",
-        "ClusterRole_calico-kube-controllers",
-        "ClusterRoleBinding_calico-kube-controllers",
-        "ClusterRole_calico-node",
-        "ClusterRoleBinding_calico-node",
-        "DaemonSet_calico-node",
-        "ServiceAccount_calico-node",
-        "Deployment_calico-kube-controllers",
-        "ServiceAccount_calico-kube-controllers",
-        "PodDisruptionBudget_calico-kube-controllers",
-        "Deployment_calico-typha",
-        "Service_calico-typha", 
-        "PodDisruptionBudget_calico-typha"
-    ]
+        sz = len(manifest.all_obj_keys())
+        import ruamel.yaml
+        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+
+    def get_known_objects(self) -> List[str]:
+        return [
+            "ConfigMap_calico-config",
+            "CustomResourceDefinition_bgpconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_bgppeers.crd.projectcalico.org",
+            "CustomResourceDefinition_blockaffinities.crd.projectcalico.org",
+            "CustomResourceDefinition_caliconodestatuses.crd.projectcalico.org",
+            "CustomResourceDefinition_clusterinformations.crd.projectcalico.org",
+            "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_globalnetworkpolicies.crd.projectcalico.org",
+            "CustomResourceDefinition_globalnetworksets.crd.projectcalico.org",
+            "CustomResourceDefinition_hostendpoints.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamblocks.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamconfigs.crd.projectcalico.org",
+            "CustomResourceDefinition_ipamhandles.crd.projectcalico.org",
+            "CustomResourceDefinition_ippools.crd.projectcalico.org",
+            "CustomResourceDefinition_ipreservations.crd.projectcalico.org",
+            "CustomResourceDefinition_kubecontrollersconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_networkpolicies.crd.projectcalico.org",
+            "CustomResourceDefinition_networksets.crd.projectcalico.org",
+            "ClusterRole_calico-kube-controllers",
+            "ClusterRoleBinding_calico-kube-controllers",
+            "ClusterRole_calico-node",
+            "ClusterRoleBinding_calico-node",
+            "DaemonSet_calico-node",
+            "ServiceAccount_calico-node",
+            "Deployment_calico-kube-controllers",
+            "ServiceAccount_calico-kube-controllers",
+            "PodDisruptionBudget_calico-kube-controllers",
+            "Deployment_calico-typha",
+            "Service_calico-typha",
+            "PodDisruptionBudget_calico-typha"
+        ]
 
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
@@ -331,22 +318,9 @@ def validate_original(cluster, obj_list):
             self.enrich_deployment_calico_typha,
             self.enrich_clusterrole_calico_kube_controllers,
             self.enrich_clusterrole_calico_node,
+            self.enrich_crd_felix_configuration,
         ]
 
-    return image
-
-
-# name of objects and enrichment methods mapping
-enrich_objects_fns = {
-        "ConfigMap_calico-config": enrich_configmap_calico_config,
-        "Deployment_calico-kube-controllers": enrich_deployment_calico_kube_controllers,
-        "DaemonSet_calico-node": enrich_daemonset_calico_node,
-        "Deployment_calico-typha": enrich_deployment_calico_typha,
-        "ClusterRole_calico-kube-controllers": enrich_clusterRole_calico_kube_controllers,
-        "ClusterRole_calico-node": enrich_clusterrole_calico_node,
-        "Service_calico-typha": None, 
-        "PodDisruptionBudget_calico-typha": None
-}
 
 psp_calico_kube_controllers = {
         "apiGroups": ["policy"],
