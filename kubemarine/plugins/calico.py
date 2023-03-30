@@ -21,10 +21,6 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
-def enrich_inventory(inventory, cluster):
-    return inventory
-
-
 # DEPRECATED
 def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str):
     """
