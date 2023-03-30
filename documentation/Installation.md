@@ -225,7 +225,7 @@ installation on the same OS impossible. To avoid it one should implement those s
 ```
 2. Download containerd.io package of [proper version](#supported-versions) from Docker-CE repository and install it manually without dependencies, for example:
 ```
-# rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.4.13-3.1.el7.x86_64.rpm
+# rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.6.9-3.1.el8.x86_64.rpm
 # systemctl enable containerd
 ```
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
