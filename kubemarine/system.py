@@ -127,6 +127,16 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
 
     return inventory
 
+def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
+    """
+    The method enrich the list of kernel modules ('services.modprobe') according to OS family
+    """
+    os_family = cluster.get_os_family()
+    if os_family in ('unknown', 'unsupported', 'multiple'):
+        raise Exception("Kernel modules are not available for the current OS family")
+    inventory['services']['modprobe'] = cluster.inventory['services']['modprobe'][os_family]
+
+    return inventory
 
 def get_system_packages_for_upgrade(cluster):
     upgrade_ver = cluster.context["upgrade_version"]
