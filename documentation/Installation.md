@@ -3607,6 +3607,35 @@ The plugin configuration supports the following parameters:
 ```
 **Note:** The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by KubeMarine itself.
 
+###### Calico metrics configuration
+
+By default, no additional settings are required for metrics calico. It is enabled by default
+
+**Note:** By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
+
+**Note:** If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: monitoring
+  name: monitoring-calico-metrics
+  namespace: kube-system
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scrapeTimeout: 10s
+  jobLabel: node-exporter
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: calico
+```
+
 ###### Calico Environment Properties
 
 It is possible to change the default Calico environment properties. To do that, it is required to specify a key-value in the `env` section in the `calico` plugin definition. For example:

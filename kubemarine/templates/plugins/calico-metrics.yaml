@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: calico-metrics
+  namespace: kube-system
+  labels:
+    k8s-app: calico-node
+spec:
+  clusterIP: None
+  selector:
+    k8s-app: calico-node
+  ports:
+  - name: metrics
+    port: 9091
+    targetPort: 9091

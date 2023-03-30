@@ -253,6 +253,28 @@ class CalicoManifestProcessor(Processor):
             api_list.append(psp_calico_node)
             cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
 
+    def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
+        """
+        The method implements the enrichment procedure for Calico CRD Felixconfigurations
+        :param cluster: Cluster object
+        :param obj_list: list of objects for enrichment
+        """
+
+        key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"
+        source_yaml = manifest.get_obj(key, patch=True)
+
+        api_list = \
+        source_yaml['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties'][
+            'prometheusMetricsEnabled']
+        api_list["default"] = True
+        source_yaml['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties'][
+            'prometheusMetricsEnabled'] = api_list
+
+        sz = len(manifest.all_obj_keys())
+        import ruamel.yaml
+        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+
     def get_known_objects(self) -> List[str]:
         return [
             "ConfigMap_calico-config",
@@ -296,6 +318,7 @@ class CalicoManifestProcessor(Processor):
             self.enrich_deployment_calico_typha,
             self.enrich_clusterrole_calico_kube_controllers,
             self.enrich_clusterrole_calico_node,
+            self.enrich_crd_felix_configuration,
         ]
 
 
