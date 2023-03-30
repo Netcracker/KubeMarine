@@ -647,11 +647,10 @@ plugins:
         namespace: kubernetes-dashboard
         annotations:
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          nginx.ingress.kubernetes.io/configuration-snippet: |   
+          nginx.ingress.kubernetes.io/configuration-snippet: |
             add_header X-Frame-Options "sameorigin";
             add_header X-Content-Type-Options "nosniff";
-            more_set_headers "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'self'; form-action 'self'";
-            more_set_headers "Cross-Origin-Resource-Policy: same-site"; 
+            add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; form-action 'self' " ; 
       spec:
         ingressClassName: nginx
         tls:
