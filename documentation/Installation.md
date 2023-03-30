@@ -219,15 +219,14 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 
 **Warning**: RHEL version 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
 installation on the same OS impossible. To avoid it one should implement those steps before the installation procedure.
-1. Add Docker-CE repository.
-2. Run in cli:
+1. Install `podman` from standard RHEL repository:
 ```
-dnf -y module disable container-tools
-dnf -y install 'dnf-command(copr)'
-curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo
-dnf -y --refresh install containerd
-dnf -y --refresh install podman
-systemctl enable containerd
+# yum install podman
+```
+2. Download containerd.io package of [proper version](#supported-versions) from Docker-CE repository and install it manually without dependencies, for example:
+```
+# rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.6.9-3.1.el8.x86_64.rpm
+# systemctl enable containerd
 ```
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
 
