@@ -412,6 +412,7 @@ plugins:
 
   calico:
     version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    install: true
     installation:
       priority: 0
       procedures:
@@ -527,17 +528,6 @@ plugins:
     flexvol:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
-  flannel:
-    installation:
-      priority: 0
-      procedures:
-        - template: templates/plugins/flannel.yaml.j2
-        - expect:
-            pods:
-              - coredns
-              - kube-flannel-ds-amd64
-    image: quay.io/coreos/flannel:v0.11.0-amd64
-
   nginx-ingress-controller:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: true
@@ -582,31 +572,6 @@ plugins:
       - name: webhook
         containerPort: 8443
         protocol: TCP
-
-  # TODO: support hostPort for haproxy-ingress
-  haproxy-ingress-controller:
-    install: false
-    installation:
-      priority: 1
-      procedures:
-        - template: templates/plugins/haproxy-ingress-controller.yaml.j2
-        - expect:
-            pods:
-              - haproxy-ingress
-        - python:
-            module: plugins/haproxy_ingress.py
-            method: override_priviledged_ports
-            arguments:
-              service: haproxy-ingress
-              namespace: haproxy-controller
-    controller:
-      image: haproxytech/kubernetes-ingress:1.2.7
-      nodeSelector:
-        kubernetes.io/os: linux
-    backend:
-      image: k8s.gcr.io/defaultbackend:1.0
-      nodeSelector:
-        kubernetes.io/os: linux
 
   kubernetes-dashboard:
     version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion].version }}'

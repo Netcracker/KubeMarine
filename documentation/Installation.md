@@ -68,9 +68,7 @@ This section provides information about the inventory, features, and steps for i
     - [Plugins](#plugins)
       - [Predefined Plugins](#predefined-plugins)
         - [calico](#calico)
-        - [flannel](#flannel)
         - [nginx-ingress-controller](#nginx-ingress-controller)
-        - [haproxy-ingress-controller](#haproxy-ingress-controller)
         - [kubernetes-dashboard](#kubernetes-dashboard)
         - [local-path-provisioner](#local-path-provisioner)
       - [Plugins Features](#plugins-features)
@@ -468,7 +466,7 @@ services:
 
 #### Plugins Deployment with Node Taints 
 
-The plugins also require the tolerations section in case of node taints. The Calico and Flannel pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
+The plugins also require the tolerations section in case of node taints. The Calico pods already have tolerations to be assigned to all the cluster nodes. But for other plugins, it should be set in cluster.yaml. For more information, see [Tolerations](#tolerations).
 
 If you create your own plugins, the tolerations settings should be taken into account.
 
@@ -3347,7 +3345,7 @@ There are three parts of PSS configuration.
 * default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
 * `exemptions` describes exemptions from default rules
 
-The PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `haproxy-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
+The PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
 
 ```yaml
 apiVersion: v1
@@ -3462,10 +3460,8 @@ When you want to install a plugin, the installer includes pre-configured plug-in
 
 * Network plugins
   * [calico](#calico)
-  * [flannel](#flannel)
 * Ingress Controllers
   * [nginx-ingress-controller](#nginx-ingress-controller)
-  * [haproxy-ingress-controller](#haproxy-ingress-controller)
 * [kubernetes-dashboard](#kubernetes-dashboard)
 * [local-path-provisioner](#local-path-provisioner)
 
@@ -3651,44 +3647,6 @@ plugins:
 
 For more information about the supported Calico environment variables, refer to the official Calico documentation at [https://docs.projectcalico.org/reference/node/configuration](https://docs.projectcalico.org/reference/node/configuration).
 
-##### flannel
-
-Before proceeding, refer to the [Official Documentation of the Kubernetes Cluster Network](https://kubernetes.io/docs/concepts/cluster-administration/networking/).
-
-**Warning**: This plugin is experimental. It is not recommended to use it in production.
-
-Flannel plugin is not installed by default. However, it is possible to explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
-
-The following is an example to enable the plugin:
-
-```yaml
-plugins:
-  flannel:
-    install: true
-```
-
-If you explicitly enable Flannel plugin and do not enable Calico plugin, then only Flannel plugin is installed, and Calico plugin is not installed by default.
-
-After applying the plugin configurations, the plugin installation procedure waits for the following pods to be in the `Running` state:
-* coredns
-* kube-flannel-ds-amd64
-
-If the pods do not have time to start at a specific timeout, then the plugin configuration is incorrect. In this case, the installation is aborted.
-
-By default, no additional settings are required for the plugin. However, you can change the default settings. To do this, in the `plugins` section of the config file, specify the `flannel` plugin section and list all the necessary parameters and their values ​​in it.
-For example:
-
-```yaml
-plugins:
-  flannel:
-    install: true
-    image: quay.io/coreos/flannel:v0.11.0-amd64
-```
-
-An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
-
-The plugin configuration supports the `image` parameter. The `image` parameter specifies the string for the Flannel image. The default value is `quay.io/coreos/flannel:v0.11.0-amd64`.
-
 ##### nginx-ingress-controller
 
 Before proceeding, refer to the [Official Documentation of the Kubernetes Ingress Controllers](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/) and visit [official Nginx Ingress Controller repository](https://github.com/nginxinc/kubernetes-ingress).
@@ -3788,50 +3746,6 @@ For example:
 ```
 ###### monitoring
 By default 10254 port is opened and provides Prometheus metrics.
-
-##### haproxy-ingress-controller
-
-Before proceeding, refer to the [Official Documentation of the Kubernetes Ingress Controllers](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/) and visit [official HAProxy Ingress Controller repository](https://github.com/haproxytech/kubernetes-ingress).
-
-**Warning**: This plugin is experimental. It is not recommended to use it in production.
-
-HAProxy Ingress Controller plugin is not installed by default. However, you can explicitly enable or disable the installation of this plugin through the `install` plugin parameter.
-
-The following is an example to enable the plugin:
-
-```yaml
-plugins:
-  haproxy-ingress-controller:
-    install: true
-```
-
-If you explicitly enable HAProxy Ingress Controller plugin, but do not enable NGINX Ingress Controller plugin, then only HAProxy plugin is installed, and NGINX plugin is not installed by default.
-
-After applying the plugin configurations, the plugin installation procedure waits for `haproxy-ingress` pod to be in the `Running` state.
-
-If the pods do not have time to start at a specific timeout, then the plugin configuration is incorrect. In this case, the installation is aborted.
-
-By default, no additional settings are required for the plugin. However, you can change the default settings. To do this, in the `plugins` section of the config file, specify the `haproxy-ingress-controller` plugin section and list all the necessary parameters and their values ​​in it.
-For example:
-
-```yaml
-plugins:
-  flannel:
-    install: true
-    controller:
-      image: haproxytech/kubernetes-ingress:1.2.7
-    backend:
-      image: k8s.gcr.io/defaultbackend:1.0
-```
-
-An example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
-
-The plugin configuration supports the following parameters:
-
-|Name|Type|Default Value|Value Rules|Description|
-|---|---|---|---|---|
-|controller.image|string|`haproxytech/kubernetes-ingress:1.2.7`| |HAProxy Ingress Controller image|
-|backend.image|string|`k8s.gcr.io/defaultbackend:1.0`| |Default Backend image for HAProxy Ingress Controller|
 
 ##### kubernetes-dashboard
 
@@ -4064,10 +3978,9 @@ Plugins are installed in a strict sequential order. The installation sequence is
 |Plugin|Priority|
 |---|---|
 |calico|`0`|
-|flannel|`0`|
 |nginx-ingress-controller|`1`|
-|haproxy-ingress-controller|`1`|
 |kubernetes-dashboard|`2`|
+|local-path-provisioner|`2`|
 
 You can change the priorities of preinstalled plugins, as well as set your own priority for the custom plugins.
 The following is an example of how to prioritize a plugin:
@@ -4102,25 +4015,8 @@ The following table contains details about existing nodeSelector configuration o
         <td>nodeSelector applicable only for calico <b>typha</b> <br> and calico <b>kube-controllers</b> containers, <br> but not for ordinary calico containers, <br> which should be deployed on all nodes</td>
     </tr>
     <tr>
-        <td>flannel</td>
-        <td>-</td>
-        <td>-</td>
-        <td>It is not possible to configure nodeSelector for flannel <br> since flannel containers should run on all nodes</td>
-    </tr>
-    <tr>
         <td>nginx-ingress-controller</td>
         <td><code>controller.nodeSelector</code></td>
-        <td>
-            <code>kubernetes.io/os: linux</code><br>
-        </td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>haproxy-ingress-controller</td>
-        <td><ul>
-            <li><code>controller.nodeSelector</code></li>
-            <li><code>backend.nodeSelector</code></li>
-        </ul></td>
         <td>
             <code>kubernetes.io/os: linux</code><br>
         </td>
@@ -4178,27 +4074,9 @@ The following table contains details about existing tolerations configuration op
         <td>tolerations are not configurable for network plugins</td>
     </tr>
     <tr>
-        <td>flannel</td>
-        <td>-</td>
-        <td>
-            <code>- effect: NoSchedule</code><br>
-            <code>  operator: Exists</code>
-        </td>
-        <td>tolerations are not configurable for network plugins</td>
-    </tr>
-    <tr>
         <td>nginx-ingress-controller</td>
         <td><ul><li><code>controller.tolerations</code></li></ul></td>
         <td>none</td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>haproxy-ingress-controller</td>
-        <td><ul>
-            <li><code>controller.tolerations</code></li>
-            <li><code>backend.tolerations</code></li>
-        </ul></td>
-        <td>node</td>
         <td></td>
     </tr>
     <tr>
@@ -4502,15 +4380,15 @@ For example:
 
 ```yaml
 plugins:
-  haproxy-ingress-controller:
+  nginx-ingress-controller:
     installation:
       procedures:
         - python:
-            module: /var/data/plugins/ingress_controller.py
-            method: override_priviledged_ports
+            module: plugins/builtin.py
+            method: apply_yaml
             arguments:
-              service: haproxy-ingress
-              namespace: haproxy-controller
+              plugin_name: nginx-ingress-controller
+              original_yaml_path: plugins/yaml/nginx-ingress-controller-{{ plugins.nginx-ingress-controller.version }}-original.yaml
 ```
 
 ##### thirdparty

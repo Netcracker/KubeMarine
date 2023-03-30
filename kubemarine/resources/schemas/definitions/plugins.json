@@ -6,14 +6,8 @@
     "calico": {
       "$ref": "plugins/calico.json"
     },
-    "flannel": {
-      "$ref": "plugins/flannel.json"
-    },
     "nginx-ingress-controller": {
       "$ref": "plugins/nginx-ingress-controller.json"
-    },
-    "haproxy-ingress-controller": {
-      "$ref": "plugins/haproxy-ingress-controller.json"
     },
     "kubernetes-dashboard": {
       "$ref": "plugins/kubernetes-dashboard.json"
