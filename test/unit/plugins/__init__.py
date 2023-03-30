@@ -73,7 +73,7 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
             # }
             # plugins.apply_template(cluster, config)
             builtin.apply_yaml(cluster, plugin_name=self.plugin_name)
-            enriched_source: io.StringIO = apply_source.call_args.args[1]['source']
+            enriched_source: io.StringIO = apply_source.call_args[0][1]['source']
             return Manifest(cluster.log, enriched_source)
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:
