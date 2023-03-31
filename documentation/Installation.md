@@ -133,7 +133,7 @@ Ensure the following requirements are met:
 * Windows (See [Restrictions](#windows-deployer-restrictions))
 
 **Preinstalled Software**
-* python 3.7 (or higher version)
+* python 3.9 (or higher version)
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
