@@ -183,6 +183,7 @@ The actual information about the supported versions can be found at [global.yaml
     * 179
     * 443
     * 6443
+    * 8443
     * 2379-2380
     * 10250-10252
     * 10254 - Prometheus port
