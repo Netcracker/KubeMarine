@@ -20,6 +20,7 @@ import tarfile
 import time
 from collections import OrderedDict
 import yaml
+import shutil
 
 from kubemarine.core import utils, flow, defaults
 from kubemarine.core.action import Action
@@ -135,19 +136,25 @@ def restore_thirdparties(cluster):
 
     install.system_prepare_thirdparties(cluster)
 
-
+    
 def import_nodes(cluster):
     for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-        node['connection'].put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name']),
-                               '/tmp/kubemarine-backup.tar.gz')
-        cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
+        node_backup_file = os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name'])
+        if os.path.exists(node_backup_file):
+            node['connection'].put(node_backup_file, '/tmp/kubemarine-backup.tar.gz')
+            cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
 
-    cluster.log.debug('Unpacking backup...')
-    result = cluster.nodes['all'].sudo(
-        'chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf')
-    cluster.log.debug(result)
+            if not cluster.procedure_inventory.get('backup_plan', {}).get('nodes', {}).get('resolv.conf'):
+                restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz --exclude=/etc/resolv.conf -C / --overwrite'
+            else:
+                restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite'
 
+            result = node['connection'].sudo(restore_command)
+            cluster.log.debug(result)
+        else:
+            cluster.log.debug('Backup file for node \'%s\' not found, skipping...' % node['name'])
 
+            
 def import_etcd(cluster: KubernetesCluster):
     etcd_all_certificates = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('certificates', {})
     etcd_cert = etcd_all_certificates.get('cert', cluster.globals['etcd']['default_arguments']['cert'])
