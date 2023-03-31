@@ -37,7 +37,6 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
     keepalived_service = cluster.get_package_association('keepalived', 'service_name')
 
     backup_files_list = [
-        "/etc/resolv.conf",
         "/etc/hosts",
         "/etc/chrony.conf",
         "/etc/selinux/config",
@@ -54,6 +53,9 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
         "/etc/systemd/system/kubelet.service"
     ]
 
+    if cluster.inventory["services"].get("resolv.conf") is not None:
+        backup_files_list.append("/etc/resolv.conf")
+
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":
         backup_files_list.append("/etc/docker/daemon.json")
@@ -62,6 +64,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
         backup_files_list.append("/etc/crictl.yaml")
 
     return backup_files_list
+
 
 
 def prepare_backup_tmpdir(cluster):
