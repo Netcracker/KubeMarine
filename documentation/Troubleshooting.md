@@ -23,7 +23,8 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
   - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
-  - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
+  - [No Pod-to-Pod Traffic for Some Nodes with more than one network interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
+  - [No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
 - [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
@@ -546,7 +547,7 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 
 **Solution**: Upgrade Linux kernel to `5.4.0-135-generic`
 
-## No Pod-to-Pod Traffic for Some Nodes
+## No Pod-to-Pod Traffic for Some Nodes with more than one network interface
 
 **Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 permanent network interface at the nodes.
 
@@ -560,6 +561,37 @@ plugins:
       IP_AUTODETECTION_METHOD: interface=ens160
 ```
 More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+## No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation
+
+**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 ips on used network interface with different CIDR notations.
+
+**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on chosen ips for nodes.
+Typically, such situation can appear in minha scheme with vrrp, where balancer role is combined with other roles. In that case 
+calico can autodetect vrrp for some node instead of its internal ip.
+You can use `calicoctl` to check such situation, e.g. for [example minha cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
+```sh
+sudo calicoctl get nodes --output=wide
+NAME                  ASN       IPV4                IPV6
+k8s-control-plane-1   (64512)   192.168.0.250/32
+k8s-control-plane-2   (64512)   192.168.0.2/24
+k8s-control-plane-3   (64512)   192.168.0.3/24
+```
+
+**Solution**: By default, Calico uses a `first-found` network interface to route the traffic between nodes. This is fine  
+for nodes that don't have more than one different ips, but it can work improperly in case of multiple ips. 
+To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method,
+that is suitable in your situation:
+```
+plugins:
+  calico:
+    install: true
+    env:
+      IP_AUTODETECTION_METHOD: kubernetes-internal-ip
+```
+More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+
 
 # Troubleshooting KubeMarine
 
