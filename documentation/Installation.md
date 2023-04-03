@@ -178,16 +178,18 @@ The actual information about the supported versions can be found at [global.yaml
 
 * Opened TCP-ports:
   * Internal communication:
-    * 22
-    * 80
-    * 179
-    * 443
-    * 6443
-    * 8443
-    * 2379-2380
-    * 10250-10252
-    * 10254 - Prometheus port
-    * 30000-32767
+    * 22 : SSH port
+    * 80 : HTTP port
+    * 179 : Calico BGP port
+    * 443 : HTTPS port
+    * 6443 : Kubernetes API server
+    * 8443 : kubernetes dashboard
+    * 2379-2380 : ETCD server & client API
+    * 10250 : kubelet API
+    * 10257 : kube-scheduler
+    * 10259 : kube-controller-manager 
+    * 10254 : Prometheus port
+    * 30000-32767 : NodePort Services
   * External communication:
     * 80
     * 443
