@@ -51,6 +51,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
         f"/etc/systemd/system/{keepalived_service}.service.d/{keepalived_service}.conf",
         "/usr/local/bin/check_haproxy.sh",
         "/etc/kubernetes",
+        "/root/.kube/config",
         "/etc/systemd/system/kubelet.service"
     ]
 
