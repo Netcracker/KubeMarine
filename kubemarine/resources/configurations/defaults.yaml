@@ -343,9 +343,9 @@ services:
       debian:
         docker:
           package_name:
-            - 'docker-ce={% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}{% endif %}'
-            - 'docker-ce-cli={% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}{% endif %}'
-            - 'containerd.io={% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_debian }}{% endif %}'
+            - 'docker-ce={{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_debian }}'
+            - 'docker-ce-cli={{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_debian }}'
+            - 'containerd.io={{ globals.compatibility_map.software.containerdio.get(services.kubeadm.kubernetesVersion, {}).version_debian }}'
         containerd:
           package_name:
             - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
@@ -363,9 +363,9 @@ services:
       rhel:
         docker:
           package_name:
-            - 'docker-ce-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}{% endif %}'
-            - 'docker-ce-cli-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}{% endif %}'
-            - 'containerd.io-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}{% endif %}'
+            - 'docker-ce-{{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_rhel }}'
+            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_rhel }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio.get(services.kubeadm.kubernetesVersion, {}).version_rhel }}'
         containerd:
           package_name:
             - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}'
@@ -385,9 +385,9 @@ services:
       rhel8:
         docker:
           package_name:
-            - 'docker-ce-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}{% endif %}'
-            - 'docker-ce-cli-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}{% endif %}'
-            - 'containerd.io-{% if services.kubeadm.kubernetesVersion.split(".")[1] | int <= 24 %}{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}{% endif %}'
+            - 'docker-ce-{{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_rhel8 }}'
+            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker.get(services.kubeadm.kubernetesVersion, {}).version_rhel8 }}'
+            - 'containerd.io-{{ globals.compatibility_map.software.containerdio.get(services.kubeadm.kubernetesVersion, {}).version_rhel8 }}'
         containerd:
           package_name:
             - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
