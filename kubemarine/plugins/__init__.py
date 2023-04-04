@@ -597,13 +597,8 @@ def get_python_method_args(cluster, module_path, method_name, method_arguments):
 
 
 def verify_python(cluster, step):
-    module_path, _ = utils.determine_resource_absolute_file(step['module'])
-    method_name = step['method']
-    method_arguments = step.get('arguments', {})
-
-    method, method_arguments = get_python_method_args(cluster, module_path, method_name, method_arguments)
-
-    # Perform any additional verification if needed
+    # TODO: verify fields types and contents
+    return
 
 
 def apply_python(cluster, step, plugin_name=None):
