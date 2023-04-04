@@ -553,7 +553,8 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 
 **Root cause**: Not all Calico BGP sessions between nodes are established due to incorrect network interface choice.
 
-**Solution**: By default, Calico uses a `first-found` network interface to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
+**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
+to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
 ```
 plugins:
   calico:
@@ -578,8 +579,9 @@ k8s-control-plane-2   (64512)   192.168.0.2/24
 k8s-control-plane-3   (64512)   192.168.0.3/24
 ```
 
-**Solution**: By default, Calico uses a `first-found` network interface to route the traffic between nodes. This is fine  
-for nodes that don't have more than one different ips, but it can work improperly in case of multiple ips. 
+**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
+to route the traffic between nodes. This is fine for nodes that don't have more than one different ips, but it can work 
+improperly in case of multiple ips. 
 To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method,
 that is suitable in your situation:
 ```
