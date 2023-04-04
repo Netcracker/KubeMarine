@@ -4311,6 +4311,24 @@ plugins:
                 - calico-node
 ```
 
+Default values for plugins pods expect timeout and retries are:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next pod status check.|
+|retries|`150`|The number of attempts to check the status.|
+
+These values can be changed in a particular `expect` or globally:
+
+```
+globals:
+  expect:
+    pods:
+      plugins:
+        timeout: 10
+        retries: 25
+```
+
 ##### expect deployments/daemonsets/replicasets/statefulsets
 
 This procedure is similar to `expect pods`, but it is intended to wait for deployments/daemonsets/replicasets/statefulsets. For example:
@@ -4357,6 +4375,23 @@ plugins:
                - calico-kube-controllers
                retries: 60
 
+```
+
+Default values for deployments/daemonsets/replicasets/statefulsets expect timeout and retries are:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next status check.|
+|retries|`45`|The number of attempts to check the status.|
+
+These values can be changed in a particular `expect` or globally:
+
+```
+globals:
+  expect:
+    deployments:
+      timeout: 10
+      retries: 15
 ```
 
 
