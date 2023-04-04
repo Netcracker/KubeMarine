@@ -522,8 +522,22 @@ def apply_expect(cluster, config, plugin_name=None):
 # **** PYTHON ****
 
 def verify_python(cluster, step):
-    # TODO: verify fields types and contents
-    return
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
+    method_name = step['method']
+    method_arguments = step.get('arguments', {})
+    module_filename = os.path.basename(module_path)
+    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
+    module = importlib.util.module_from_spec(spec) 
+    if not hasattr(module, method_name):
+        return PluginResult(False, "Method {} not found in module {}".format(method_name, module_path))
+
+    method_signature = inspect.signature(getattr(module, method_name))
+    try:
+        method_signature.bind(cluster, **method_arguments)
+    except TypeError as e:
+        return PluginResult(False, "Invalid arguments for method {}: {}".format(method_name, e))
+
+    return PluginResult(True, None)
 
 
 def apply_python(cluster, step, plugin_name=None):
