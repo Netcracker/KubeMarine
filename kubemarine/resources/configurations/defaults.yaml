@@ -21,6 +21,7 @@ services:
     apiVersion: kubelet.config.k8s.io/v1beta1
     kind: KubeletConfiguration
     readOnlyPort: 0
+    enableDebuggingHandlers: false
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
