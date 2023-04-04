@@ -24,6 +24,7 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
   - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
   - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
+  - [Long Pulling of Images](#long-pulling-of-images)
 - [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
@@ -560,6 +561,20 @@ plugins:
       IP_AUTODETECTION_METHOD: interface=ens160
 ```
 More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+
+## Long Pulling of Images
+
+**Symptoms**: Pods stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took few minutes or more:
+
+```
+Successfully pulled image "<image_name>" in 12m37.752058078s
+```
+
+**Root cause**: By default kubelet pulls images one by one. One slow pulling may stuck all the pullings on the node.
+
+**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet for use of parallel image pulls.
+
+> **Note**: We recommend not changing the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend
 
 # Troubleshooting KubeMarine
 
