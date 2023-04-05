@@ -742,27 +742,27 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
 
 def process_chart_values(config, local_chart_path):
     config_values = config.get("values")
+    file_values = None
     config_values_file = config.get("values_file")
+    if config_values_file is not None:
+        with utils.open_external(config_values_file) as stream:
+            file_values = yaml.safe_load(stream)
 
-    if config_values is not None:
-        with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
-            original_values = yaml.safe_load(stream)
-            stream.seek(0)
-            merged_values = default_merger.merge(original_values, config_values)
-            stream.write(yaml.dump(merged_values))
-            stream.truncate()
-    else:
-        if config_values_file is not None:
-            with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
-                with utils.open_external(config_values_file, 'r+') as additional_stream:
-                    original_values = yaml.safe_load(stream)
-                    additional_values = yaml.safe_load(additional_stream)
-                    if additional_values is None:
-                        return
-                    stream.seek(0)
-                    merged_values = default_merger.merge(original_values, additional_values)
-                    stream.write(yaml.dump(merged_values))
-                    stream.truncate()
+    if config_values is None and file_values is None:
+        return
+
+    with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
+        merged_values = yaml.safe_load(stream)
+
+        if file_values is not None:
+            merged_values = default_merger.merge(merged_values, file_values)
+        # Values from 'values' section have priority over values in 'values_file' section
+        if config_values is not None:
+            merged_values = default_merger.merge(merged_values, config_values)
+
+        stream.seek(0)
+        stream.write(yaml.dump(merged_values))
+        stream.truncate()
 
 
 def get_local_chart_path(log, config):
