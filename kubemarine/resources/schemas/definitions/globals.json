@@ -51,24 +51,24 @@
                   "description": "Timeout for deployment kubernetes pods check in seconds"
                 }
               }
-            }
-          },
-          "plugins": {
-            "type": "object",
-            "description": "Timeouts for plugins pods",
-            "additionalProperties": false,
-            "properties": {
-              "retries": {
-                "type": "integer",
-                "minimal": 1,
-                "default": 45,
-                "description": "Number of retries for plugins pods expect check"
-              },
-              "timeout": {
-                "type": "integer",
-                "minimal": 1,
-                "default": 5,
-                "description": "Timeout for deployment plugins pods check in seconds"
+            },
+            "plugins": {
+              "type": "object",
+              "description": "Timeouts for plugins pods",
+              "additionalProperties": false,
+              "properties": {
+                "retries": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 150,
+                  "description": "Number of retries for plugins pods expect check"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 5,
+                  "description": "Timeout for deployment plugins pods check in seconds"
+                }
               }
             }
           }
