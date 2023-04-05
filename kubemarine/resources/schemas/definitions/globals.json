@@ -29,22 +29,27 @@
           }
         },
         "pods" :{
-          "kubernetes": {
-            "type": "object",
-            "description": "Timeouts for kubernetes pods",
-            "additionalProperties": false,
-            "properties": {
-              "retries": {
-                "type": "integer",
-                "minimal": 1,
-                "default": 30,
-                "description": "Number of retries for kubernetes pods expect check"
-              },
-              "timeout": {
-                "type": "integer",
-                "minimal": 1,
-                "default": 5,
-                "description": "Timeout for deployment kubernetes pods check in seconds"
+          "type": "object",
+          "description": "Timeouts for pods",
+          "additionalProperties": false,
+          "properties": {
+            "kubernetes": {
+              "type": "object",
+              "description": "Timeouts for kubernetes pods",
+              "additionalProperties": false,
+              "properties": {
+                "retries": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 30,
+                  "description": "Number of retries for kubernetes pods expect check"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 5,
+                  "description": "Timeout for deployment kubernetes pods check in seconds"
+                }
               }
             }
           },
