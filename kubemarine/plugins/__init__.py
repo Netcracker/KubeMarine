@@ -33,8 +33,9 @@ from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
 from typing import Dict, List, Tuple
-
 import yaml
+import inspect
+from inspect import signature
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
@@ -577,19 +578,42 @@ def verify_python(cluster, step):
     module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
-    module_filename = os.path.basename(module_path)
-    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
-    module = importlib.util.module_from_spec(spec) 
-    if not hasattr(module, method_name):
-        return PluginResult(False, "Method {} not found in module {}".format(method_name, module_path))
 
-    method_signature = inspect.signature(getattr(module, method_name))
+    # Try to import the module
     try:
-        method_signature.bind(cluster, **method_arguments)
-    except TypeError as e:
-        return PluginResult(False, "Invalid arguments for method {}: {}".format(method_name, e))
+        spec = importlib.util.spec_from_file_location('module', module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as e:
+        raise ValueError(f"Could not import module {module_path}: {e}")
 
-    return PluginResult(True, None)
+    # Check if the method exists
+    if not hasattr(module, method_name):
+        raise ValueError(f"Module {module_path} does not have method {method_name}")
+
+    # Get the method object
+    method = getattr(module, method_name)
+
+    # Get the signature of the method
+    signature = inspect.signature(method)
+
+    # ToDo - Check the signature of the method
+
+    # method = getattr(module, method_name)
+    # print(method)
+    # sig = inspect.signature(method)
+    # print(sig)
+    # for arg_name, arg_value in method_arguments.items():
+    #     if arg_name not in sig.parameters:
+    #         cluster.log.error(f"Invalid argument {arg_name} for method {method_name} in module {module_path}")
+    #         return False
+    #     param = sig.parameters[arg_name]
+    #     if param.annotation != inspect._empty and not isinstance(arg_value, param.annotation):
+    #         cluster.log.error(f"Invalid argument type for {arg_name} in method {method_name} in module {module_path}. "
+    #                           f"Expected {param.annotation}, got {type(arg_value)}")
+    #         return False
+
+    # return True
 
 
 def apply_python(cluster, step, plugin_name=None):
