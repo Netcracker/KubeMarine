@@ -181,6 +181,8 @@ The actual information about the supported versions can be found at [global.yaml
     * 443
     * 6443
     * 2379-2380
+    * 9091 - Calico metric port
+    * 9094 - Calico kube-controller metric port
     * 10250-10252
     * 10254 - Prometheus port
     * 30000-32767
