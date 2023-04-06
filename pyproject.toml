@@ -13,6 +13,8 @@ license = {text = "Apache-2.0"}
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -41,7 +43,7 @@ dependencies = [
     "paramiko==2.11.*",
     "jsonschema==4.17.*",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.7"
 
 [project.optional-dependencies]
 ansible = ["ansible==7.0.*"]
@@ -62,7 +64,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "0.15.0"
+current_version = "0.15.1"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true
