@@ -14,8 +14,20 @@
 
 from kubemarine.core import utils
 
-GLOBALS = utils.load_yaml(
-    utils.get_internal_resource_path('resources/configurations/globals.yaml'))
+def _load_globals() -> dict:
+    globals = utils.load_yaml(
+        utils.get_internal_resource_path('resources/configurations/globals.yaml'))
+
+    for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml', 'thirdparties.yaml'):
+        compatibility_software_config = utils.load_yaml(
+            utils.get_internal_resource_path(f'resources/configurations/compatibility/internal/{config_filename}'))
+
+        globals['compatibility_map']['software'].update(compatibility_software_config)
+
+    return globals
+
+
+GLOBALS = _load_globals()
 
 DEFAULTS = utils.load_yaml(
     utils.get_internal_resource_path('resources/configurations/defaults.yaml'))

@@ -32,15 +32,14 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         plugin_versions = list({plugin['version'] for k8s, plugin in self.compatibility_map().items()})
         for plugin_version in plugin_versions:
             latest_k8s = next(k8s for k8s in reversed(self.k8s_versions)
-                              if self.compatibility_map()[utils.minor_version(k8s)]['version'] == plugin_version)
+                              if self.compatibility_map()[k8s]['version'] == plugin_version)
             self.latest_k8s_supporting_specific_versions[plugin_version] = latest_k8s
 
     def compatibility_map(self) -> dict:
         return static.GLOBALS['compatibility_map']['software'][self.plugin_name]
 
     def expected_image_tag(self, k8s_version: str, image: str):
-        minor_k8s_version = utils.minor_version(k8s_version)
-        return self.compatibility_map()[minor_k8s_version].get(image)
+        return self.compatibility_map()[k8s_version].get(image)
 
     def get_latest_k8s(self, minor_k8s_version: Optional[str] = None) -> str:
         return next(k8s for k8s in reversed(self.k8s_versions)

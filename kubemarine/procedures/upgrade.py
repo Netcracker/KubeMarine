@@ -118,8 +118,6 @@ def upgrade_containerd(cluster: KubernetesCluster):
     if cri == 'containerd':
         path = 'plugins."io.containerd.grpc.v1.cri"'
         target_kubernetes_version = cluster.context["upgrade_version"]
-        index_pos = target_kubernetes_version.rfind(".")
-        target_kubernetes_version = target_kubernetes_version[:index_pos]
         pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
         if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
             return

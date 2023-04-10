@@ -40,24 +40,25 @@ def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
 
 
 def get_thirdparty_recommended_sha(destination, cluster):
+    if destination not in cluster.globals['thirdparties']:
+        # 3rd-party is not managed by Kubemarine
+        return None
+
     cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
     # Get kubeadm version
     kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    effective_kubernetes_version = ".".join(kubernetes_version.split('.')[0:2])
 
     # Get software versions map
-    software_name = cluster.globals['thirdparties'].get(destination, {}).get('software_name', None)
+    software_name = cluster.globals['thirdparties'][destination]['software_name']
     software_versions = cluster.globals['compatibility_map']['software'].get(software_name, {})
 
     # Return sha1 related to used kubernetes version
-    recommended_sha = software_versions[kubernetes_version].get('sha1', None) \
-        if kubernetes_version in software_versions else \
-        software_versions.get(effective_kubernetes_version, {}).get('sha1', None)
+    recommended_sha = software_versions.get(kubernetes_version, {}).get('sha1', None)
 
-    if recommended_sha is not None:
-        cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
-    else:
-        cluster.log.verbose(f"Recommended sha for thirdparty {destination} doesn't exist")
+    if recommended_sha is None:
+        raise Exception(f"Failed to calculate SHA1 for {destination}")
+
+    cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
 
     return recommended_sha
 

@@ -191,8 +191,8 @@ def apply_registry(inventory, cluster):
                 'endpoint': containerd_endpoints
             }
 
-        effective_kubernetes_version = ".".join(inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
-        pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]['version']
+        kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+        pause_version = cluster.globals['compatibility_map']['software']['pause'][kubernetes_version]['version']
         if not inventory['services']['cri']['containerdConfig'].get('plugins."io.containerd.grpc.v1.cri"'):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
         if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):

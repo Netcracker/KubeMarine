@@ -169,7 +169,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 22.04.1
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found at [global.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L335).
+The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L222).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**
@@ -3800,7 +3800,7 @@ If you enable the plugin, all other parameters are applied by default. The follo
   </tr>
   <tr>
     <td>metrics-scraper.image</td>
-    <td><pre>kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion]["metrics-scraper-version"] }}</pre></td>
+    <td><pre>kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion]["metrics-scraper-version"] }}</pre></td>
     <td>Kubernetes Dashboard Metrics Scraper image.</td>
   </tr>
   <tr>

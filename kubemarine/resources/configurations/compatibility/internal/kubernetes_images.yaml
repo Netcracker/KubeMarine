@@ -1,0 +1,29 @@
+# !!!Do not change the content of the file!!!
+# This configuration is automatically generated and maintained by "TODO"
+pause:
+  v1.21.2:
+    version: 3.4.1
+  v1.21.5:
+    version: 3.4.1
+  v1.21.12:
+    version: 3.4.1
+  v1.22.2:
+    version: 3.5
+  v1.22.9:
+    version: 3.5
+  v1.23.6:
+    version: 3.6
+  v1.23.11:
+    version: 3.6
+  v1.23.17:
+    version: 3.6
+  v1.24.2:
+    version: 3.7
+  v1.24.11:
+    version: 3.7
+  v1.25.2:
+    version: 3.8
+  v1.25.7:
+    version: 3.8
+  v1.26.3:
+    version: 3.9
