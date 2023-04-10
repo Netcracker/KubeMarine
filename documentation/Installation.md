@@ -182,6 +182,7 @@ The actual information about the supported versions can be found at [global.yaml
     * 80 : HTTP port
     * 179 : Calico BGP port
     * 443 : HTTPS port
+    * 5473 : Calico netowrking with Typha enabled
     * 6443 : Kubernetes API server
     * 8443 : kubernetes dashboard
     * 2379-2380 : ETCD server & client API
