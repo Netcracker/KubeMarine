@@ -2232,23 +2232,18 @@ By default, the installer installs the following thirdparties with the following
 services:
   thirdparties:
     /usr/bin/kubeadm:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
-      sha1: e5cdfcda337a5c8d59035da9db0c2b02913271d1
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubeadm'
     /usr/bin/kubelet:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
-      sha1: d6e92cdc09eab3e1c24c9c35fa79421a351f6ba8
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubelet'
     /usr/bin/kubectl:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
-      sha1: f684dd035bd44e0899ab43ce2ad4aea0baf86c2e
+      source: 'https://storage.googleapis.com/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubectl'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
-      sha1: bc6cc7869ebbb0e1799dfbe10795f680fba4321b
+      source: 'https://github.com/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
-      source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
-      sha1: '{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].sha1 }}'
+      source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
       group: control-plane
       unpack: /usr/bin/
 ```

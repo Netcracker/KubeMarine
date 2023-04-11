@@ -102,23 +102,20 @@ services:
         - container_t
         - keepalived_t
 
+  # Default "source" is enriched from "thirdparties" section of globals.yaml
+  # Default "sha1" is enriched from kubemarine/resources/configurations/compatibility/internal/thirdparties.yaml
   thirdparties:
     /usr/bin/etcdctl:
       source: 'resources/scripts/etcdctl.sh'
       group: control-plane
-    /usr/bin/kubeadm:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
-    /usr/bin/kubelet:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
+    /usr/bin/kubeadm: {}
+    /usr/bin/kubelet: {}
     /usr/bin/kubectl:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
-      source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
       unpack: /usr/bin/
 
   cri:

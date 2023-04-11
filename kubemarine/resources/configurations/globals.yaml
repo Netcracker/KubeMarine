@@ -95,17 +95,38 @@ workaround:
   retries: 10
   delay_period: 5
 
+# 'software_name' refers to kubemarine/resources/configurations/compatibility/internal/thirdparties.yaml
 thirdparties:
   /usr/bin/kubeadm:
     software_name: kubeadm
+    source_prefix:
+      public: https://storage.googleapis.com/kubernetes-release/release
+      private: '{registry}/kubernetes/kubeadm'
+    relative_path: '{version}/bin/linux/amd64/kubeadm'
   /usr/bin/kubelet:
     software_name: kubelet
+    source_prefix:
+      public: https://storage.googleapis.com/kubernetes-release/release
+      private: '{registry}/kubernetes/kubelet'
+    relative_path: '{version}/bin/linux/amd64/kubelet'
   /usr/bin/kubectl:
     software_name: kubectl
+    source_prefix:
+      public: https://storage.googleapis.com/kubernetes-release/release
+      private: '{registry}/kubernetes/kubectl'
+    relative_path: '{version}/bin/linux/amd64/kubectl'
   /usr/bin/calicoctl:
     software_name: calicoctl
+    source_prefix:
+      public: https://github.com/projectcalico/calico/releases/download
+      private: '{registry}/projectcalico/calico'
+    relative_path: '{version}/calicoctl-linux-amd64'
   /usr/bin/crictl.tar.gz:
     software_name: crictl
+    source_prefix:
+      public: https://github.com/kubernetes-sigs/cri-tools/releases/download
+      private: '{registry}/kubernetes-sigs/cri-tools'
+    relative_path: '{version}/crictl-{version}-linux-amd64.tar.gz'
 
 packages:
   common_associations:

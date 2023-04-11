@@ -199,35 +199,18 @@ def apply_registry(inventory, cluster):
             inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
                 f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
-    if inventory['services'].get('thirdparties', []) and thirdparties_address:
-        for destination, config in inventory['services']['thirdparties'].items():
+    from kubemarine import thirdparties
 
-            if isinstance(config, str):
-                new_source = inventory['services']['thirdparties'][destination]
-            elif config.get('source') is not None:
-                new_source = inventory['services']['thirdparties'][destination]['source']
-            else:
+    if thirdparties_address:
+        for destination, config in inventory['services']['thirdparties'].items():
+            if not thirdparties.is_default_thirdparty(destination) or isinstance(config, str) or 'source' in config:
                 continue
 
-            for binary in ['kubeadm', 'kubelet', 'kubectl']:
-                if destination == '/usr/bin/' + binary:
-                    new_source = new_source.replace('https://storage.googleapis.com/kubernetes-release/release',
-                                                    '%s/kubernetes/%s'
-                                                    % (thirdparties_address, binary))
-
-            if '/usr/bin/calicoctl' == destination:
-                new_source = new_source.replace('https://github.com/projectcalico/calico/releases/download',
-                                                '%s/projectcalico/calico'
-                                                % thirdparties_address)
-
-            if '/usr/bin/crictl.tar.gz' == destination:
-                new_source = new_source.replace('https://github.com/kubernetes-sigs/cri-tools/releases/download',
-                                                '%s/kubernetes-sigs/cri-tools'
-                                                % thirdparties_address)
-            if isinstance(config, str):
-                inventory['services']['thirdparties'][destination] = new_source
-            else:
-                inventory['services']['thirdparties'][destination]['source'] = new_source
+            source, sha1 = thirdparties.get_default_thirdparty_identity(cluster.inventory, destination, in_public=False)
+            source = source.format(registry=thirdparties_address)
+            config['source'] = source
+            if 'sha1' not in config:
+                config['sha1'] = sha1
 
     return inventory
 

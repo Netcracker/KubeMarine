@@ -13,10 +13,91 @@
 # limitations under the License.
 import io
 from copy import deepcopy
+from typing import Tuple, Optional, Dict
 
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroupResult, NodeGroup
+
+
+def is_default_thirdparty(destination: str):
+    return destination in static.GLOBALS['thirdparties']
+
+
+def get_default_thirdparty_version(kubernetes_version: str, destination: str) -> str:
+    """
+    :param kubernetes_version: Kubernetes version
+    :param destination: absolute path of default third-party
+    :return: version of third-party from compatibility map
+    """
+    software_settings = _get_software_settings_for_thirdparty(kubernetes_version, destination)
+
+    if 'version' in software_settings:
+        return software_settings['version']
+    else:
+        # kubeadm, kubelet, kubectl
+        return kubernetes_version
+
+
+def get_default_thirdparty_source(destination: str, version: str, in_public: bool):
+    """
+    :param destination: absolute path of default third-party
+    :param version: version of third-party
+    :param in_public: flag whether to return third-party URL in public resources.
+    :return: URL of the third-party source.
+    """
+    if not is_default_thirdparty(destination):
+        raise Exception(f"{destination} is not a default 3rd-party")
+
+    thirdparty_settings = static.GLOBALS['thirdparties'][destination]
+    if in_public:
+        source_prefix = thirdparty_settings['source_prefix']['public']
+    else:
+        source_prefix = thirdparty_settings['source_prefix']['private']
+
+    relative_path = thirdparty_settings['relative_path'].format(version=version)
+    return f"{source_prefix}/{relative_path}"
+
+
+def get_default_thirdparty_identity(inventory: dict,
+                                    destination: str, in_public: bool) -> Tuple[str, str]:
+    """
+    :param inventory: inventory of the cluster
+    :param destination: absolute path of default third-party
+    :param in_public: flag whether to return third-party URL in public resources.
+    :return: a pair of the third-party URL and sha1
+    """
+    kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+
+    software_settings = _get_software_settings_for_thirdparty(kubernetes_version, destination)
+    sha1 = software_settings['sha1']
+
+    version = get_default_thirdparty_version(kubernetes_version, destination)
+    source = get_default_thirdparty_source(destination, version, in_public)
+
+    return source, sha1
+
+
+def _get_software_settings_for_thirdparty(kubernetes_version: str, destination: str) -> dict:
+    if not is_default_thirdparty(destination):
+        raise Exception(f"{destination} is not a default 3rd-party")
+
+    thirdparty_settings = static.GLOBALS['thirdparties'][destination]
+    software_name = thirdparty_settings['software_name']
+    return static.GLOBALS['compatibility_map']['software'][software_name][kubernetes_version]
+
+
+def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster) -> Optional[str]:
+    if not is_default_thirdparty(destination):
+        # 3rd-party is not managed by Kubemarine
+        return None
+
+    cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
+    _, recommended_sha = get_default_thirdparty_identity(cluster.inventory,
+                                                         destination, in_public=True)
+    cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
+
+    return recommended_sha
 
 
 def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
@@ -39,37 +120,13 @@ def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
     return inventory
 
 
-def get_thirdparty_recommended_sha(destination, cluster):
-    if destination not in cluster.globals['thirdparties']:
-        # 3rd-party is not managed by Kubemarine
-        return None
-
-    cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
-    # Get kubeadm version
-    kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-
-    # Get software versions map
-    software_name = cluster.globals['thirdparties'][destination]['software_name']
-    software_versions = cluster.globals['compatibility_map']['software'].get(software_name, {})
-
-    # Return sha1 related to used kubernetes version
-    recommended_sha = software_versions.get(kubernetes_version, {}).get('sha1', None)
-
-    if recommended_sha is None:
-        raise Exception(f"Failed to calculate SHA1 for {destination}")
-
-    cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
-
-    return recommended_sha
-
-
-def enrich_inventory_apply_defaults(inventory, cluster):
+def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
+    thirdparties: Dict[str, dict] = inventory['services'].get('thirdparties', {})
     # if thirdparties is empty, then nothing to do
-    if not inventory['services'].get('thirdparties', {}):
+    if not thirdparties:
         return inventory
-    raw_inventory = cluster.raw_inventory
 
-    for destination, config in inventory['services']['thirdparties'].items():
+    for destination, config in thirdparties.items():
 
         if isinstance(config, str):
             config = {
@@ -101,20 +158,20 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                                     'Expected any of %s, but \'%s\' found.'
                                     % (destination, all_nodes_names, node_name))
 
-        raw_config = raw_inventory.get('services', {}).get('thirdparties', {}).get(destination, {})
-        recommended_sha = get_thirdparty_recommended_sha(destination, cluster)
-        if 'source' not in raw_config and 'sha1' not in raw_config and recommended_sha is not None:
-            config['sha1'] = get_thirdparty_recommended_sha(destination, cluster)
+        if is_default_thirdparty(destination) and 'source' not in config:
+            source, sha1 = get_default_thirdparty_identity(cluster.inventory, destination, in_public=True)
+            config['source'] = source
+            if 'sha1' not in config:
+                config['sha1'] = sha1
 
-        inventory['services']['thirdparties'][destination] = config
+        thirdparties[destination] = config
 
     # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly specified in cluster.yaml
     cri_name = inventory['services']['cri']['containerRuntime']
     crictl_key = '/usr/bin/crictl.tar.gz'
     if cri_name == "docker" and \
-            crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}) and \
-            crictl_key in inventory['services']['thirdparties']:
-        del(inventory['services']['thirdparties'][crictl_key])
+            crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}):
+        del(thirdparties[crictl_key])
 
     return inventory
 
