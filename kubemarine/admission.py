@@ -46,8 +46,7 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 
 baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard"} 
 privileged_plugins = {"nginx-ingress-controller": "ingress-nginx", 
-                      "local-path-provisioner": "local-path-storage", 
-                      "haproxy-ingress-controller": "haproxy-controller"}
+                      "local-path-provisioner": "local-path-storage"}
 
 loaded_oob_policies = {}
 

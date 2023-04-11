@@ -336,6 +336,20 @@ def get_version():
     return read_internal(get_version_filepath()).strip()
 
 
+def minor_version(version: str) -> str:
+    """
+    Converts vN.N.N to vN.N
+    """
+    return ".".join(version.split(".")[0:2])
+
+
+def version_key(version: str):
+    """
+    Converts vN.N.N to (N, N, N) that can be used in comparisons.
+    """
+    return tuple(map(int, version[1:].split('.')))
+
+
 class ClusterStorage:
     """
     File preservation:
@@ -430,17 +444,21 @@ class ClusterStorage:
         if new_control_planes.is_empty():
             return
 
+        archive_name = 'dump_log_cluster.tar.gz'
+        archive_dump_path = get_dump_filepath(self.cluster.context, archive_name)
+        archive_remote_path = f"/tmp/{archive_name}"
+        log = self.cluster.log
+
         node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member(provide_node_configs=True)
         control_plane = self.cluster.make_group([node['connect_to']])
-        data_copy_res = control_plane.sudo(f'tar -czvf /tmp/kubemarine-backup.tar.gz {self.dir_path}')
-        self.cluster.log.verbose('Backup created:\n%s' % data_copy_res)
-        control_plane.get('/tmp/kubemarine-backup.tar.gz',
-                          get_dump_filepath(self.cluster.context, "dump_log_cluster.tar.gz"), 'dump_log_cluster.tar.gz')
+        data_copy_res = control_plane.sudo(f'tar -czvf {archive_remote_path} {self.dir_path}')
+        log.verbose("Archive with procedures history is created:\n%s" % data_copy_res)
+        control_plane.get(archive_remote_path, archive_dump_path)
 
-        self.cluster.log.debug('Backup downloaded')
+        log.debug("Archive with procedures history is downloaded")
 
         for new_node in new_control_planes.get_ordered_members_list(provide_node_configs=True):
             group = self.cluster.make_group([new_node['connect_to']])
-            group.put(get_dump_filepath(self.cluster.context, "dump_log_cluster.tar.gz"),
-                      "/tmp/dump_log_cluster.tar.gz", sudo=True)
-            group.sudo(f'tar -C / -xzvf /tmp/dump_log_cluster.tar.gz')
+            group.put(archive_dump_path, archive_remote_path, sudo=True)
+            group.sudo(f'tar -C / -xzvf {archive_remote_path}')
+            log.debug(f"Archive with procedures history is uploaded to {new_node['name']!r}")

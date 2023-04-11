@@ -52,7 +52,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.enrich_inventory",
     "kubemarine.admission.enrich_inventory",
     "kubemarine.kubernetes_accounts.enrich_inventory",
-    "kubemarine.plugins.calico.enrich_inventory",
     "kubemarine.plugins.nginx_ingress.cert_renew_enrichment",
     "kubemarine.plugins.nginx_ingress.enrich_inventory",
     "kubemarine.core.defaults.calculate_nodegroups",
@@ -64,6 +63,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.audit.verify_inventory",
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
+    "kubemarine.plugins.builtin.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
     "kubemarine.k8s_certs.renew_verify",
     "kubemarine.cri.enrich_inventory"
