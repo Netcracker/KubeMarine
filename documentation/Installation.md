@@ -178,17 +178,17 @@ The actual information about the supported versions can be found at [global.yaml
 
 * Opened TCP-ports:
   * Internal communication:
-    * 22 : SSH port
-    * 80 : HTTP port
-    * 179 : Calico BGP port
-    * 443 : HTTPS port
+    * 22 : SSH 
+    * 80 : HTTP
+    * 179 : Calico BGP
+    * 443 : HTTPS
     * 5473 : Calico netowrking with Typha enabled
     * 6443 : Kubernetes API server
-    * 8443 : kubernetes dashboard
+    * 8443 : Kubernetes dashboard
     * 2379-2380 : ETCD server & client API
-    * 10250 : kubelet API
-    * 10257 : kube-scheduler
-    * 10259 : kube-controller-manager 
+    * 10250 : Kubelet API
+    * 10257 : Kube-scheduler
+    * 10259 : Kube-controller-manager 
     * 10254 : Prometheus port
     * 30000-32767 : NodePort Services
   * External communication:
