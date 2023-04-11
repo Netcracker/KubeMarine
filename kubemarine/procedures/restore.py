@@ -138,21 +138,26 @@ def restore_thirdparties(cluster):
 
     
 def import_nodes(cluster):
-    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+
+    # Get all nodes
+    nodes = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
+
+    # Upload and restore backups for each node
+    for node in nodes:
         node_backup_file = os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name'])
         if os.path.exists(node_backup_file):
             node['connection'].put(node_backup_file, '/tmp/kubemarine-backup.tar.gz')
             cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
 
-            if not cluster.procedure_inventory.get('backup_plan', {}).get('nodes', {}).get('resolv.conf'):
-                restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz --exclude=/etc/resolv.conf -C / --overwrite'
-            else:
-                restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite'
-
-            result = node['connection'].sudo(restore_command)
+            restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite'
+            
+            if 'resolv.conf' in tarfile.open(node_backup_file, 'r:gz').getnames():
+                restore_command = 'sudo chattr -i /etc/resolv.conf && ' + restore_command + ' && sudo chattr +i /etc/resolv.conf'
+                
+            result = cluster.nodes['all'].sudo(restore_command)
             cluster.log.debug(result)
         else:
-            cluster.log.debug('Backup file for node \'%s\' not found, skipping...' % node['name'])
+            raise Exception('Backup file for node \'%s\' not found' % node['name'])
 
             
 def import_etcd(cluster: KubernetesCluster):
