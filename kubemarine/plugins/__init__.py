@@ -167,9 +167,9 @@ def expect_daemonset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -219,9 +219,9 @@ def expect_replicaset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following ReplicaSets to be up to date: {replicasets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -271,9 +271,9 @@ def expect_statefulset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following StatefulSets to be up to date: {statefulsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -323,9 +323,9 @@ def expect_deployment(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following Deployments to be up to date: {deployments_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -364,9 +364,9 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
         cluster = cluster.cluster
 
     if timeout is None:
-        timeout = cluster.globals['pods']['expect']['plugins']['timeout']
+        timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
     if retries is None:
-        retries = cluster.globals['pods']['expect']['plugins']['retries']
+        retries = cluster.inventory['globals']['expect']['pods']['plugins']['retries']
 
     cluster.log.debug("Expecting the following pods to be ready: %s" % pods)
     cluster.log.verbose("Max expectation time: %ss" % (timeout * retries))

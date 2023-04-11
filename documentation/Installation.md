@@ -4316,6 +4316,24 @@ plugins:
                 - calico-node
 ```
 
+Default values for plugins pods expect timeout and retries are:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next pod status check.|
+|retries|`150`|The number of attempts to check the status.|
+
+These values can be changed in a particular `expect` or globally:
+
+```
+globals:
+  expect:
+    pods:
+      plugins:
+        timeout: 10
+        retries: 25
+```
+
 ##### expect deployments/daemonsets/replicasets/statefulsets
 
 This procedure is similar to `expect pods`, but it is intended to wait for deployments/daemonsets/replicasets/statefulsets. For example:
@@ -4362,6 +4380,23 @@ plugins:
                - calico-kube-controllers
                retries: 60
 
+```
+
+Default values for deployments/daemonsets/replicasets/statefulsets expect timeout and retries are:
+
+|Configuration|Value|Description|
+|---|---|---|
+|timeout|`5`|The number of seconds until the next status check.|
+|retries|`45`|The number of attempts to check the status.|
+
+These values can be changed in a particular `expect` or globally:
+
+```
+globals:
+  expect:
+    deployments:
+      timeout: 10
+      retries: 15
 ```
 
 
@@ -5528,7 +5563,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | rancher/local-path-provisioner                                 | v0.0.23          | v0.0.23                      |   v0.0.23    |   v0.0.23    | v0.0.23           |  v0.0.23  | Required only if local-path provisioner plugin is set to be installed.                                     |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.26.3
-
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|------------------------------------------------------------------------------------------------------------|
 |          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
