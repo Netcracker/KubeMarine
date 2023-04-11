@@ -165,7 +165,7 @@ For cluster machines, ensure the following requirements are met:
 * The following distributives and versions are supported:
 
   * Centos 7.5+, 8.4
-  * RHEL 7.5+, 8.4
+  * RHEL 7.5+, 8.4, 8.6, 8.7
   * Oracle Linux 7.5+, 8.4
   * Ubuntu 20.04
   * Ubuntu 22.04.1
@@ -5185,10 +5185,10 @@ During installation configurations, templates and other files are generated. For
 However, by default, all intermediate results are saved in the dump directory, which is automatically created at the beginning of work.
 It is not recommended but you can also disable this functionality.
 
-By default, the dump directory is located in the `dump` directory inside executable directory. However, the dump directory location path can be changed using the` --dump-location` argument. For example:
+The dumped files are put into the `dump` directory which is located by default in the executable directory. However, you can put the `dump` directory into any other folder instead of the executable directory using the `--dump-location` argument. For example:
 
 ```
-$ install --dump-location /var/data/dump/
+$ install --dump-location /var/data/
 ```
 
 **Note**: When creating a dump directory, the entire hierarchy of directories is created recursively in accordance with the specified path, even if a part of the path is missing.
@@ -5468,7 +5468,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.21.12
 |   Type   |                              Name                              |     Versions     |                              |              |              |                   |           |                                                    Note                                                    |
 |:--------:|:--------------------------------------------------------------:|:----------------:|:----------------------------:|:------------:|:------------:|:-----------------:|:---------:|:----------------------------------------------------------------------------------------------------------:|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.21.12         | v1.21.12                     |   v1.21.12   |   v1.21.12   | v1.21.12          | v1.21.12  | SHA1: b566840ac2bd50d9c83165ac61331ba7998bf7ce                                                             |
 |          | kubelet                                                        | v1.21.12         | v1.21.12                     |   v1.21.12   |   v1.21.12   | v1.21.12          | v1.21.12  | SHA1: 45a50b60122f35505ecd08479be1ae232b0ac524                                                             |
 |          | kubectl                                                        | v1.21.12         | v1.21.12                     |   v1.21.12   |   v1.21.12   | v1.21.12          | v1.21.12  | SHA1: 54a381297eb3a94ab968bb8bfff5f91e3d08805a                                                             |
@@ -5499,7 +5499,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.22.9
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           |                                                    Note                                                    |
 |:--------:|:--------------------------------------------------------------:|:----------------:|:----------------------------:|:------------:|:------------:|:-----------------:|:---------:|:----------------------------------------------------------------------------------------------------------:|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.22.9          | v1.22.9                      |   v1.22.9    |   v1.22.9    | v1.22.9           |  v1.22.9  |                               SHA1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d                               |
 |          | kubelet                                                        | v1.22.9          | v1.22.9                      |   v1.22.9    |   v1.22.9    | v1.22.9           |  v1.22.9  |                               SHA1: 21b4104937b65fdf0fdf9fbb57ff22a879b21e3f                               |
 |          | kubectl                                                        | v1.22.9          | v1.22.9                      |   v1.22.9    |   v1.22.9    | v1.22.9           |  v1.22.9  |                               SHA1: e4137d683b9f93211bb6d9fa155d0bb423e871c9                               |
@@ -5529,7 +5529,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.23.17
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |:--------:|:--------------------------------------------------------------:|:----------------:|:----------------------------:|:------------:|:------------:|:-----------------:|:---------:|:----------------------------------------------------------------------------------------------------------:|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | SHA1: 0e805ff79d4099747bdf67d71d8acdc690e07e14                                                             |
 |          | kubelet                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | SHA1: 42bce3cef79c9bf2c787e2bcb923ef2528834e96                                                             |
 |          | kubectl                                                        | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | SHA1: 7377f28047c9c468978199cf5b9e4e7cae0c4e78                                                             |
@@ -5559,7 +5559,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.24.11
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |:--------:|:--------------------------------------------------------------:|:----------------:|:----------------------------:|:------------:|:------------:|:-----------------:|:---------:|:----------------------------------------------------------------------------------------------------------:|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.24.11         | v1.24.11                     |   v1.24.11   |   v1.24.11   | v1.24.11          | v1.24.11  | SHA1: 7d44b41e36ff71f5f00671d518f2e59b4540653a                                                             |
 |          | kubelet                                                        | v1.24.11         | v1.24.11                     |   v1.24.11   |   v1.24.11   | v1.24.11          | v1.24.11  | SHA1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d                                                             |
 |          | kubectl                                                        | v1.24.11         | v1.24.11                     |   v1.24.11   |   v1.24.11   | v1.24.11          | v1.24.11  | SHA1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655                                                             |
@@ -5589,7 +5589,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.25.7
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |:--------:|:--------------------------------------------------------------:|:----------------:|:----------------------------:|:------------:|:------------:|:-----------------:|:---------:|:----------------------------------------------------------------------------------------------------------:|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.25.7          | v1.25.7                      |   v1.25.7    |   v1.25.7    | v1.25.7           |  v1.25.7  | SHA1: 4efb3da49a50d137b728f0529bedee458e8c5f86                                                             |
 |          | kubelet                                                        | v1.25.7          | v1.25.7                      |   v1.25.7    |   v1.25.7    | v1.25.7           |  v1.25.7  | SHA1: ace8ce244896aca5d38c8184c44226660a09269a                                                             |
 |          | kubectl                                                        | v1.25.7          | v1.25.7                      |   v1.25.7    |   v1.25.7    | v1.25.7           |  v1.25.7  | SHA1: a5b32c173670ee6fa7710d7158ea4a0d198c8af5                                                             |
@@ -5619,7 +5619,7 @@ The tables below shows the correspondence of versions that are supported and is 
 ## Default Dependent Components Versions for Kubernetes Versions v1.26.3
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|------------------------------------------------------------------------------------------------------------|
-|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | Rhel 8.6+ |                                                                                                            |
+|          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
 | binaries | kubeadm                                                        | v1.26.3          | v1.26.3                      | v1.26.3      | v1.26.3      | v1.26.3           | v1.26.3   | SHA1: 86e202f98d22c8fddcadda6656f6698d21eae6ca                                                             |
 |          | kubelet                                                        | v1.26.3          | v1.26.3                      | v1.26.3      | v1.26.3      | v1.26.3           | v1.26.3   | SHA1: 5fe320fedaabb91d3770da19135412b7454bb28b                                                             |
 |          | kubectl                                                        | v1.26.3          | v1.26.3                      | v1.26.3      | v1.26.3      | v1.26.3           | v1.26.3   | SHA1: 56916d87c3caef05489db932fd9e48d32ebdf634                                                             |
