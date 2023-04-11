@@ -13,7 +13,7 @@
 # limitations under the License.
 import io
 from copy import deepcopy
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, List
 
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
@@ -22,6 +22,10 @@ from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 def is_default_thirdparty(destination: str):
     return destination in static.GLOBALS['thirdparties']
+
+
+def get_default_thirdparties() -> List[str]:
+    return list(static.GLOBALS['thirdparties'])
 
 
 def get_default_thirdparty_version(kubernetes_version: str, destination: str) -> str:

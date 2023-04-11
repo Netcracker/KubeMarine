@@ -19,6 +19,8 @@ kubernetes-key.pem
 venv/
 build/
 dist/
+scripts/thirdparties/.synccache/*
+!scripts/thirdparties/.synccache/.gitkeep
 kubecheck
 kubecheck.zip
 report.*

@@ -1,5 +1,5 @@
 # !!!Do not change the content of the file!!!
-# This configuration is automatically generated and maintained by "TODO"
+# This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 
 # The plugin versions are duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.

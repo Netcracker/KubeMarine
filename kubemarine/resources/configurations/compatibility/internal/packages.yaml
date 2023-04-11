@@ -1,6 +1,6 @@
-# This configuration is partially generated and maintained by "TODO"
+# This configuration is partially generated and maintained by "scripts/thirdparties/sync.py"
 # If new Kubernetes version is added, the compatibility mapping is inserted with fake "x.x.x" versions.
-# The developer should manually choose the required packages versions.
+# The developer should manually choose the required package versions.
 docker:
   v1.21.2:
     version_rhel: 19.03*

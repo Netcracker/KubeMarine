@@ -1,5 +1,5 @@
 # !!!Do not change the content of the file!!!
-# This configuration is automatically generated and maintained by "TODO"
+# This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 pause:
   v1.21.2:
     version: 3.4.1

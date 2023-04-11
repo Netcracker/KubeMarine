@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
 import io
 import json
 import os
@@ -22,6 +23,7 @@ import tarfile
 from typing import Union, Tuple
 
 import yaml
+import ruamel.yaml
 from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
@@ -303,6 +305,27 @@ def determine_resource_absolute_dir(path: str) -> Tuple[str, bool]:
 
     raise Exception(
         'Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
+
+
+def get_local_file_sha1(filename: str) -> str:
+    sha1 = hashlib.sha1()
+
+    # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
+    with open(filename, 'rb') as f:
+        while True:
+            data = f.read(2 ** 16)
+            if not data:
+                break
+            sha1.update(data)
+
+    return sha1.hexdigest()
+
+
+def yaml_structure_preserver() -> ruamel.yaml.YAML:
+    """YAML loader and dumper which saves original structure"""
+    ruamel_yaml = ruamel.yaml.YAML()
+    ruamel_yaml.preserve_quotes = True
+    return ruamel_yaml
 
 
 def load_yaml(filepath) -> dict:

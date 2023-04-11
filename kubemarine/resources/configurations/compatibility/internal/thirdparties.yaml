@@ -1,5 +1,5 @@
 # !!!Do not change the content of the file!!!
-# This configuration is automatically generated and maintained by "TODO"
+# This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 
 kubeadm:
   v1.21.2:
@@ -50,7 +50,7 @@ kubelet:
   v1.24.11:
     sha1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d
   v1.25.2:
-    sha1: afdc009cd59759626ecce007667f42bf42e7c1be 
+    sha1: afdc009cd59759626ecce007667f42bf42e7c1be
   v1.25.7:
     sha1: ace8ce244896aca5d38c8184c44226660a09269a
   v1.26.3:
