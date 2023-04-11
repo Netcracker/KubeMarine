@@ -7,9 +7,11 @@ on:
 jobs:
   test-default-installation:
     runs-on: ubuntu-22.04
-    #strategy:
-    #  matrix:
-    #    python-version: [ "3.9" ]
+    env:
+      cluster_yaml_file: ./ci/default_cluster.yaml
+    strategy:
+      matrix:
+        kubernetes-version: [ "v1.21.5", "v1.24.11", "v1.26.3" ]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -34,15 +36,18 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
+         # TODO: change to kubemarine runtime values feature
+      - name: Set kubernetes version to cluster.yaml
+        run: sed -i "s/<KUBERNETES_VERSION>/${{ matrix.kubernetes-version }}/" ${{ env.cluster_yaml_file }}
       - name: Check Iaas
         id: test_check_iaas
-        run: kubemarine check_iaas -c ./ci/default_config.yaml  --dump-location ./results/check_iaas_dump/
+        run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }}  --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: kubemarine install -c ./ci/default_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
+        run: kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: kubemarine check_paas -c ./ci/default_config.yaml  --dump-location ./results/check_paas_dump/
+        run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
@@ -57,6 +62,8 @@ jobs:
 
   test-extended-installation:
     runs-on: ubuntu-22.04
+    env:
+      cluster_yaml_file: ./ci/extended_cluster.yaml
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -85,13 +92,13 @@ jobs:
         run: sudo apt install rename
       - name: Check Iaas
         id: test_check_iaas
-        run: kubemarine check_iaas -c ./ci/extended_config.yaml --dump-location ./results/check_iaas_dump/
+        run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: kubemarine install -c ./ci/extended_config.yaml --disable-cumulative-points --dump-location ./results/install_dump/
+        run: kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
       - name: Check paas
         id: test_check_paas
-        run: kubemarine check_paas -c ./ci/extended_config.yaml --dump-location ./results/check_paas_dump/
+        run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
