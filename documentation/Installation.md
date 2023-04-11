@@ -176,14 +176,19 @@ The actual information about the supported versions can be found at [global.yaml
 
 * Opened TCP-ports:
   * Internal communication:
-    * 22
-    * 80
-    * 443
-    * 6443
-    * 2379-2380
-    * 10250-10252
-    * 10254 - Prometheus port
-    * 30000-32767
+    * 22 : SSH 
+    * 80 : HTTP
+    * 179 : Calico BGP
+    * 443 : HTTPS
+    * 5473 : Calico netowrking with Typha enabled
+    * 6443 : Kubernetes API server
+    * 8443 : Kubernetes dashboard
+    * 2379-2380 : ETCD server & client API
+    * 10250 : Kubelet API
+    * 10257 : Kube-scheduler
+    * 10259 : Kube-controller-manager 
+    * 10254 : Prometheus port
+    * 30000-32767 : NodePort Services
   * External communication:
     * 80
     * 443
@@ -5523,6 +5528,7 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | rancher/local-path-provisioner                                 | v0.0.23          | v0.0.23                      |   v0.0.23    |   v0.0.23    | v0.0.23           |  v0.0.23  | Required only if local-path provisioner plugin is set to be installed.                                     |
 
 ## Default Dependent Components Versions for Kubernetes Versions v1.26.3
+
 | Type     | Name                                                           | Versions         |                              |              |              |                   |           | Note                                                                                                       |
 |----------|----------------------------------------------------------------|------------------|------------------------------|--------------|--------------|-------------------|-----------|------------------------------------------------------------------------------------------------------------|
 |          |                                                                | CentOS RHEL 7.5+ | CentOS RHEL Oracle Linux 8.4 | Ubuntu 20.04 | Ubuntu 22.04 | Oracle Linux 7.5+ | RHEL 8.6+ |                                                                                                            |
