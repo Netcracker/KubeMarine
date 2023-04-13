@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from ordered_set import OrderedSet
 from .shell import info
@@ -9,6 +9,7 @@ class ChangesTracker:
         self.new_k8s: OrderedSet[str] = OrderedSet()
         self.deleted_k8s: OrderedSet[str] = OrderedSet()
         self.updated_k8s: Dict[str, OrderedSet[str]] = {}
+        self.final_messages: List[str] = []
         self.unexpected_content = False
 
     def new(self, k8s_version: str):
@@ -22,6 +23,9 @@ class ChangesTracker:
         if k8s_version not in self.new_k8s:
             self.updated_k8s.setdefault(k8s_version, OrderedSet()).add(software_name)
 
+    def final_message(self, msg):
+        self.final_messages.append(msg)
+
     def print(self):
         if self.new_k8s:
             info(f"New Kubernetes versions: {', '.join(self.new_k8s)}")
@@ -33,8 +37,12 @@ class ChangesTracker:
                 info(f"\t{k8s_version}: {', '.join(software_list)}")
 
         if self.new_k8s or self.deleted_k8s or self.updated_k8s:
-            info("Please do not forget to update documentation/Installation.md")
-        elif self.unexpected_content:
-            info("Deleted unexpected content")
-        else:
-            info("Nothing has changed")
+            self.final_messages.insert(0, "Please do not forget to update documentation/Installation.md")
+        elif not self.unexpected_content:
+            self.final_messages.insert(0, "Nothing has changed")
+
+        if self.unexpected_content:
+            self.final_messages.insert(0, "Deleted unexpected content")
+
+        for msg in self.final_messages:
+            info(msg)

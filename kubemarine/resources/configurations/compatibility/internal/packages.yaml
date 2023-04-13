@@ -1,5 +1,5 @@
 # This configuration is partially generated and maintained by "scripts/thirdparties/sync.py"
-# If new Kubernetes version is added, the compatibility mapping is inserted with fake "x.x.x" versions.
+# If new Kubernetes version is added, the compatibility mapping is inserted with fake "0.0.0" versions.
 # The developer should manually choose the required package versions.
 docker:
   v1.21.2:
@@ -56,7 +56,7 @@ docker:
     version_debian: 5:20.10.*
 containerd:
   v1.21.2:
-    version_rhel: 1.4*
+    version_rhel8: 1.4*
     version_debian: 1.5.*
   v1.21.5:
     version_rhel8: 1.4*

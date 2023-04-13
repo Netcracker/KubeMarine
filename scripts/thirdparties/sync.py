@@ -12,6 +12,7 @@ import yaml
 from kubemarine.core import utils
 from src.tracker import ChangesTracker
 from src.shell import fatal
+from src.software import packages
 from src.software import thirdparties
 
 
@@ -43,5 +44,6 @@ with utils.open_internal("resources/configurations/compatibility/kubernetes_vers
 tracker = ChangesTracker()
 
 thirdparties.sync(tracker, kubernetes_versions)
+packages.sync(tracker, kubernetes_versions)
 
 tracker.print()
