@@ -56,7 +56,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v3
         with:
-          name: default_cluster_procedure_dumps
+          name: default_cluster_procedure_dumps-${{ matrix.kubernetes-version }}
           path: ./results/
           retention-days: 7
 

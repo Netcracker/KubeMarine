@@ -687,7 +687,7 @@ rbac:
           annotations: {}
         type: kubernetes.io/service-account-token
 
-  admission: psp
+  admission: '{% if services["kubeadm"]["kubernetesVersion"][1:].split(".") | map("int") | list < [1, 25, 0]  %}psp{% else %}pss{% endif %}'
   psp:
     pod-security: enabled
     oob-policies:

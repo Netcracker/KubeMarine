@@ -1232,7 +1232,10 @@ def images_prepull(group: NodeGroup):
     config = get_kubeadm_config(group.cluster.inventory)
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
-    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
+    cri_socket_arg = "--cri-socket=/var/run/containerd/containerd.sock" \
+        if group.cluster.inventory['services']['cri']['containerRuntime'] == 'containerd' \
+        else ""
+    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml %s" % cri_socket_arg)
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
