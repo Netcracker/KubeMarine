@@ -121,9 +121,9 @@ def recommended_system_package_versions(cluster: KubernetesCluster, pckg_alias: 
     # We assume that system packages have word "haproxy"/"keepalived"/"docker"/"containerd"/"podman" in their name,
     # if not - then we may miss such package
     if pckg_alias == "haproxy":
-        expected_system_packages = {"haproxy": compatibility["haproxy"][k8s_version][version_key]}
+        expected_system_packages = {"haproxy": compatibility["haproxy"][version_key]}
     elif pckg_alias == "keepalived":
-        expected_system_packages = {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
+        expected_system_packages = {"keepalived": compatibility["keepalived"][version_key]}
     elif pckg_alias == "containerd":
         expected_system_packages = {"podman": compatibility["podman"][k8s_version][version_key]}
         if version_key in ["version_rhel", "version_rhel8"]:
