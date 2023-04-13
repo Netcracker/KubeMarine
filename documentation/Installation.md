@@ -2386,7 +2386,7 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *Overwrite files*: Yes, only when a list of kernel modules changes, `/etc/modules-load.d/predefined.conf`, backup is created
 
-*OS specific*: No
+*OS specific*: Yes
 
 The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version):
 
@@ -2429,7 +2429,7 @@ services:
     - nf_defrag_ipv6
 ```
 
-If necessary, you can redefine or add [List Merge Strategy](#list-merge-strategy) to the standard list of Kernel modules to load. For example:
+If necessary, you can redefine or add [List Merge Strategy](#list-merge-strategy) to the standard list of Kernel modules to load. For example (Debian OS family):
 
 ```yaml
 services:
