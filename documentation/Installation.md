@@ -2388,24 +2388,55 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *OS specific*: No
 
-The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded:
+The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version):
 
-|Key|Note|
-|---|---|
-|br_netfilter| |
-|ip6table_filter|Only when IPv6 detected in node IP|
-|nf_conntrack_ipv6|Only when IPv6 detected in node IP|
-|nf_nat_masquerade_ipv6|Only when IPv6 detected in node IP|
-|nf_reject_ipv6|Only when IPv6 detected in node IP|
-|nf_defrag_ipv6|Only when IPv6 detected in node IP|
+IPv4:
+```yaml
+services:
+  modprobe:
+    rhel:
+    - br_netfilter
+    rhel8:
+    - br_netfilter
+    debian:
+    - br_netfilter
+```
+
+IPv6:
+```yaml
+services:
+  modprobe:
+    rhel:
+    - br_netfilter
+    - ip6table_filter
+    - nf_conntrack_ipv6
+    - nf_nat_masquerade_ipv6
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+    rhel8:
+    - br_netfilter
+    - ip6table_filter
+    - nf_conntrack
+    - nf_nat
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+    debian:
+    - br_netfilter
+    - ip6table_filter
+    - nf_conntrack
+    - nf_nat
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+```
 
 If necessary, you can redefine or add [List Merge Strategy](#list-merge-strategy) to the standard list of Kernel modules to load. For example:
 
 ```yaml
 services:
   modprobe:
-    - my_own_module1
-    - my_own_module2
+    debian:
+      - my_own_module1
+      - my_own_module2
 ```
 
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.

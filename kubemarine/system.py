@@ -34,6 +34,8 @@ from kubemarine.core.group import NodeGroupResult, NodeGroup
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.annotations import restrict_empty_group
 
+ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
+        "Kernel modules are not available for the current OS family"
 
 def verify_inventory(inventory, cluster):
 
@@ -131,10 +133,22 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
+    
     os_family = cluster.get_os_family()
-    if os_family in ('unknown', 'unsupported', 'multiple'):
-        raise Exception("Kernel modules are not available for the current OS family")
-    inventory['services']['modprobe'] = cluster.inventory['services']['modprobe'][os_family]
+    if os_family in ["unknown", "unsupported"]:
+        raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
+    elif os_family in ["debian", "rhel", "rhel8"]:
+        modprobe = {}
+        modprobe[os_family] = inventory["services"]["modprobe"][os_family]
+        inventory["services"]["modprobe"] = modprobe
+    elif os_family == "multiple":
+        modprobe = {}
+        os_families = set()
+        for node in cluster.nodes['all'].get_final_nodes().get_hosts():
+            os_families.add(cluster.get_os_family_for_node(node))
+        for item in os_families:
+            modprobe[item] = inventory["services"]["modprobe"][item]
+        inventory["services"]["modprobe"] = modprobe
 
     return inventory
 
@@ -565,6 +579,7 @@ def configure_timesyncd(group, retries=120):
 def setup_modprobe(group):
     log = group.cluster.log
 
+    os_family = group.cluster.get_os_family()
     if group.cluster.inventory['services'].get('modprobe') is None \
             or not group.cluster.inventory['services']['modprobe']:
         log.debug('Skipped - no modprobe configs in inventory')
@@ -578,7 +593,7 @@ def setup_modprobe(group):
 
     config = ''
     raw_config = ''
-    for module_name in group.cluster.inventory['services']['modprobe']:
+    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
         module_name = module_name.strip()
         if module_name is not None and module_name != '':
             config += module_name + "\n"
@@ -599,7 +614,8 @@ def is_modprobe_valid(group):
     verify_results = group.sudo("lsmod", warn=True)
     is_valid = True
 
-    for module_name in group.cluster.inventory['services']['modprobe']:
+    os_family = group.cluster.get_os_family()
+    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
         for conn, result in verify_results.items():
             if module_name not in result.stdout:
                 log.debug('Kernel module %s not found at %s' % (module_name, conn.host))
