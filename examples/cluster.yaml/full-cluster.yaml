@@ -179,6 +179,8 @@ services:
         - man_groff
 
   modprobe:
+    # For RHEL OS:
+    rhel:
     - br_netfilter
     - ip_vs
     - ip_vs_rr
@@ -187,6 +189,18 @@ services:
     - ip6table_filter
     - nf_conntrack_ipv6
     - nf_nat_masquerade_ipv6
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+    # For Debian OS:
+    debian:
+    - br_netfilter
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - ip6table_filter
+    - nf_conntrack
+    - nf_nat
     - nf_reject_ipv6
     - nf_defrag_ipv6
 
