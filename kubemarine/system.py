@@ -579,7 +579,7 @@ def configure_timesyncd(group, retries=120):
 def setup_modprobe(group):
     log = group.cluster.log
 
-    os_family = group.cluster.get_os_family()
+    os_family = group.get_nodes_os()
     if group.cluster.inventory['services'].get('modprobe') is None \
             or not group.cluster.inventory['services']['modprobe']:
         log.debug('Skipped - no modprobe configs in inventory')
@@ -614,7 +614,7 @@ def is_modprobe_valid(group):
     verify_results = group.sudo("lsmod", warn=True)
     is_valid = True
 
-    os_family = group.cluster.get_os_family()
+    os_family = group.get_nodes_os()
     for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
         for conn, result in verify_results.items():
             if module_name not in result.stdout:
