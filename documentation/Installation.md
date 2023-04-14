@@ -4623,9 +4623,12 @@ Specify the following parameters:
 
 The `chart_path` parameter specifies the absolute path on local host to the Helm chart. The URL link to chart archive is also supported.
 
-The `values` parameter specifies the YAML formatted values for the chart that override values from `values.yaml` file from the provided chart. This parameter is optional.
+The `values_file` parameter specifies the absolute path on local host to the file with YAML formatted values for the chart that override values from `values.yaml` file from the provided chart.
+This parameter is optional.
 
-The `values_file` parameter specifies the absolute path on local host to the file with YAML formatted values for the chart that override values from `values.yaml` file from the provided chart. Alternate for `values`. This parameter is optional.  
+The `values` parameter specifies the YAML formatted values for the chart that override values from `values.yaml` file from the provided chart.
+The values from this parameter also override the values from the `values_file` parameter.
+This parameter is optional.
 
 The `namespace` parameter specifies the cloud namespace where chart should be installed. This parameter is optional.
 
