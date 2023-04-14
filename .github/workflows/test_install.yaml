@@ -12,7 +12,7 @@ jobs:
     steps:
       - id: versions
         run: |
-          echo ::set-output name=kuber_versions::`[ "v1.21.5", "v1.24.11", "v1.26.3" ]`
+          echo 'kuber_versions=[ "v1.21.5", "v1.24.11", "v1.26.3" ]' >> $GITHUB_OUTPUT
 
   get_versions:
     runs-on: ubuntu-22.04
