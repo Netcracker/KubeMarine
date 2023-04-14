@@ -608,6 +608,14 @@ plugins:
 ```
 More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
+## IPv6 `services` are unreachable
+
+**Symptoms**: After the Kubernetes installation on IPv6 environment `services` are unreachable
+
+**Root cause**: IPv6 NAT rules don't work properly in case of IPv4 address existing in system
+
+**Solution**: Exclude IPv4 addresses and routes from network settings
+
 
 # Troubleshooting KubeMarine
 
