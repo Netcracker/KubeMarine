@@ -13,15 +13,21 @@ jobs:
       - id: versions
         run: echo 'kuber_versions=[ "v1.21.5", "v1.24.11", "v1.26.3" ]' >> "$GITHUB_OUTPUT"
 
+  get_versions:
+    runs-on: ubuntu-22.04
+    needs: collect_kubernetes_versions
+    steps:
+      - id: versions
+        run: echo ${{needs.collect_kubernetes_versions.outputs.kuber_versions}}
+
   test-default-installation:
     runs-on: ubuntu-22.04
-    needs: [collect_kubernetes_versions]
     env:
       cluster_yaml_file: ./ci/default_cluster.yaml
     strategy:
       fail-fast: false
       matrix:
-        kubernetes-version: ${{needs.collect_kubernetes_versions.outputs.kuber_versions}}
+        kubernetes-version: [ "v1.21.5", "v1.24.11", "v1.26.3" ]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
