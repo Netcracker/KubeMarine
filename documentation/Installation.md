@@ -508,6 +508,10 @@ In the `globals` section you can describe the global parameters that can be over
 
 ```
 globals:
+  expect:
+    pods:
+      plugins:
+        retries: 300
   nodes:
     ready:
       timeout: 10
@@ -518,11 +522,17 @@ globals:
 
 The following parameters are supported:
 
-|Name|Type|Mandatory|Default Value|Example|Description|
-|---|---|---|---|---|---|
-|`nodes.ready.timeout`|int|no|5|`10`|Timeout between `nodes.ready.retries` for cluster node readiness waiting|
-|`nodes.ready.retries`|int|no|15|`60`|Number of retries to check a cluster node readiness|
-|`nodes.boot.timeout`|int|no|600|`900`|Timeout for node reboot waiting|
+| Name                             | Type | Mandatory | Default Value | Example | Description                                                                                                        |
+|----------------------------------|------|-----------|---------------|---------|--------------------------------------------------------------------------------------------------------------------|
+| `expect.deployments.timeout`     | int  | no        | 5             | `10`    | Timeout between `expect.deployments.retries` for daemonsets/deployments/replicasets/statefulsets readiness waiting |
+| `expect.deployments.retries`     | int  | no        | 45            | `100`   | Number of retires to check daemonsets/deployments/replicasets/statefulsets readiness                               |
+| `expect.pods.kubernetes.timeout` | int  | no        | 5             | `10`    | Timeout between `expect.pods.kubernetes.retries` for control-plane pods readiness waiting                          |
+| `expect.pods.kubernetes.retries` | int  | no        | 30            | `50`    | Number of retires to check control-plane pods readiness                                                            |
+| `expect.pods.plugins.timeout`    | int  | no        | 5             | `10`    | Timeout between `expect.pods.plugins.retries` for pods readiness waiting in `plugins`                              |
+| `expect.pods.plugins.retries`    | int  | no        | 150           | `300`   | Number of retires to check pods readiness in `plugins`                                                             |
+| `nodes.ready.timeout`            | int  | no        | 5             | `10`    | Timeout between `nodes.ready.retries` for cluster node readiness waiting                                           |
+| `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
+| `nodes.boot.timeout`             | int  | no        | 600           | `900`   | Timeout for node reboot waiting                                                                                    |
 
 
 ### node_defaults
