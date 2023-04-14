@@ -107,7 +107,8 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if isinstance(include, list):
         include = ' '.join(include)
     command = DEBIAN_HEADERS + 'apt update && ' + \
-              DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include
+              DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include ';' + \
+              DEBIAN_HEADERS + '(($? != 0)) && sleep 666 && sudo apt install -y %s' % include
 
     if exclude is not None:
         if isinstance(exclude, list):
