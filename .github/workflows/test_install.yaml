@@ -19,7 +19,7 @@ jobs:
     needs: collect_kubernetes_versions
     steps:
       - name: echo versions
-        run: echo "${{ toJSON(needs.collect_kubernetes_versions.outputs) }}"
+        run: echo "${{ toJSON(needs.collect_kubernetes_versions.outputs.kuber_versions) }}"
 
   test-default-installation:
     runs-on: ubuntu-22.04
