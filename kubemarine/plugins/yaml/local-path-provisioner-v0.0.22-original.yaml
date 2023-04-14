@@ -1,5 +1,3 @@
-# Source: https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.22/deploy/local-path-storage.yaml
----
 apiVersion: v1
 kind: Namespace
 metadata:

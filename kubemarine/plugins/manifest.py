@@ -28,9 +28,13 @@ from kubemarine.core.cluster import KubernetesCluster
 ERROR_MANIFEST_NOT_FOUND = "Cannot find original manifest %s for '%s' plugin"
 
 
+def get_default_manifest_path(plugin_name: str, version: str):
+    resource = f"plugins/yaml/{plugin_name}-{version}-original.yaml"
+    return utils.get_internal_resource_path(resource)
+
+
 class Manifest:
-    def __init__(self, logger: log.EnhancedLogger, stream: IO):
-        self.logger = logger
+    def __init__(self, stream: IO):
         self._patched = OrderedSet()
         self._excluded = OrderedSet()
         self._included = OrderedSet()
@@ -75,12 +79,10 @@ class Manifest:
         self._obj_list.insert(index, obj)
         key = self.obj_key(obj)
         self._included.add(key)
-        self.logger.verbose(f"The {key} has been added")
 
     def exclude(self, key: str):
         del self._obj_list[self.key_index(key)]
         self._excluded.add(key)
-        self.logger.verbose(f"The {key} has been excluded from result")
 
     @property
     def patched(self) -> List[str]:
@@ -106,10 +108,23 @@ class Manifest:
 
         return result
 
+    def get_all_container_images(self) -> List[str]:
+        images = []
+        for key in self.all_obj_keys():
+            obj = self.get_obj(key, patch=False)
+            for spec_section in ('containers', 'initContainers'):
+                containers = obj.get('spec', {}).get('template', {}).get('spec', {}).get(spec_section, [])
+                for container in containers:
+                    image = container['image']
+                    if image not in images:
+                        images.append(image)
+
+        return images
+
     def _load(self, stream: IO) -> List[dict]:
         """
         The method implements the parse YAML file that includes several YAMLs inside
-        :param filepath: Path to file that should be parsed
+        :param stream: stream with manifest content that should be parsed
         :return: list of original objects to enrich in YAML format.
         """
         yaml = ruamel.yaml.YAML()
@@ -135,21 +150,21 @@ EnrichmentFunction = Callable[[Manifest], None]
 
 
 class Processor(ABC):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
-                 plugin_name: str, original_yaml_path: str, destination_name: str):
+    def __init__(self, cluster: KubernetesCluster, inventory: dict, plugin_name: str,
+                 original_yaml_path: Optional[str], destination_name: Optional[str]):
         """
         :param cluster: cluster object
         :param inventory: inventory of the cluster
         :param plugin_name: name of plugin-owner
-        :param original_yaml_path: path to original manifest
-        :param destination_name: destination manifest file name
+        :param original_yaml_path: path to custom manifest
+        :param destination_name: custom destination manifest file name
         """
         self.cluster = cluster
         self.log: log.EnhancedLogger = cluster.log
         self.inventory = inventory
         self.plugin_name = plugin_name
-        self.original_yaml_path = original_yaml_path
-        self.destination_name = destination_name
+        self.manifest_path = self._get_manifest_path(original_yaml_path)
+        self.destination_name = self._get_destination(destination_name)
 
     def get_known_objects(self) -> List[str]:
         """
@@ -164,16 +179,24 @@ class Processor(ABC):
         """
         pass
 
+    def get_version(self) -> str:
+        return self.inventory['plugins'][self.plugin_name]['version']
+
+    def include(self, manifest: Manifest, index: int, obj: dict):
+        key = manifest.obj_key(obj)
+        manifest.include(index, obj)
+        self.log.verbose(f"The {key} has been added")
+
+    def exclude(self, manifest: Manifest, key: str):
+        manifest.exclude(key)
+        self.log.verbose(f"The {key} has been excluded from result")
+
     def validate_inventory(self) -> None:
         """
         # Check if original YAML exists
         """
-        config = {
-            "source": self.original_yaml_path
-        }
-        original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
-        if not os.path.isfile(original_yaml_path):
-            raise Exception(ERROR_MANIFEST_NOT_FOUND % (original_yaml_path, self.plugin_name))
+        if not os.path.isfile(self.manifest_path):
+            raise Exception(ERROR_MANIFEST_NOT_FOUND % (self.manifest_path, self.plugin_name))
 
     def validate_original(self, manifest: Manifest) -> None:
         """
@@ -198,22 +221,13 @@ class Processor(ABC):
         """
         The method implements full processing for the plugin main manifest.
         """
-        destination = '/etc/kubernetes/%s' % self.destination_name
-
-        # create config for plugin module
-        config = {
-            "source": self.original_yaml_path,
-            "destination": destination,
-            "do_render": False
-        }
 
         # get original YAML and parse it into list of objects
-        original_yaml_path, _ = plugins.get_source_absolute_pattern(config)
         try:
-            with utils.open_utf8(original_yaml_path, 'r') as stream:
-                manifest = Manifest(self.log, stream)
+            with utils.open_utf8(self.manifest_path, 'r') as stream:
+                manifest = Manifest(stream)
         except Exception as exc:
-            raise Exception(f"Failed to load {original_yaml_path} for {self.plugin_name!r} plugin") from exc
+            raise Exception(f"Failed to load {self.manifest_path} for {self.plugin_name!r} plugin") from exc
 
         self.validate_original(manifest)
 
@@ -231,12 +245,35 @@ class Processor(ABC):
 
         enriched_manifest = manifest.dump()
         utils.dump_file(self.cluster, enriched_manifest, self.destination_name)
-        config['source'] = io.StringIO(enriched_manifest)
 
-        self.log.debug(f"Uploading manifest enriched from {original_yaml_path} for {self.plugin_name!r} plugin...")
+        destination = '/etc/kubernetes/%s' % self.destination_name
+
+        # create config for plugin module
+        config = {
+            "source": io.StringIO(enriched_manifest),
+            "destination": destination,
+            "do_render": False
+        }
+
+        self.log.debug(f"Uploading manifest enriched from {self.manifest_path} for {self.plugin_name!r} plugin...")
         self.log.debug("\tDestination: %s" % destination)
 
         plugins.apply_source(self.cluster, config)
+
+    def _get_manifest_path(self, custom_manifest_path: Optional[str]) -> str:
+        if custom_manifest_path is not None:
+            config = {"source": custom_manifest_path}
+            manifest_path, _ = plugins.get_source_absolute_pattern(config)
+        else:
+            manifest_path = get_default_manifest_path(self.plugin_name, self.get_version())
+
+        return manifest_path
+
+    def _get_destination(self, custom_destination_name) -> str:
+        if custom_destination_name is not None:
+            return custom_destination_name
+
+        return f'{self.plugin_name}-{self.get_version()}.yaml'
 
     def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str):
         source_yaml = manifest.get_obj(key, patch=True)

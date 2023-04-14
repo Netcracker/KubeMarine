@@ -1,11 +1,11 @@
 import os
 from typing import List, Tuple, Dict
-from urllib import request
 
 from kubemarine import thirdparties
 from kubemarine.core import utils
+from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
-from . import CompatibilityMap, TEMP_FILE, SYNC_CACHE
+from . import CompatibilityMap
 
 
 def get_version(kubernetes_versions: dict, k8s_version: str, thirdparty_name: str) -> str:
@@ -35,13 +35,9 @@ def resolve_local_path(destination: str, version: str) -> str:
         return target_file
 
     source = thirdparties.get_default_thirdparty_source(destination, version, in_public=True)
+
     print(f"Downloading thirdparty {destination} of version {version} from {source}")
-
-    if os.path.exists(TEMP_FILE):
-        os.remove(TEMP_FILE)
-
-    request.urlretrieve(source, TEMP_FILE)
-
+    curl(source, TEMP_FILE)
     os.rename(TEMP_FILE, target_file)
 
     return target_file

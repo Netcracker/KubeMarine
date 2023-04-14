@@ -19,10 +19,15 @@ def _load_globals() -> dict:
         utils.get_internal_resource_path('resources/configurations/globals.yaml'))
 
     for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml', 'thirdparties.yaml'):
-        compatibility_software_config = utils.load_yaml(
+        internal_compatibility = utils.load_yaml(
             utils.get_internal_resource_path(f'resources/configurations/compatibility/internal/{config_filename}'))
 
-        globals['compatibility_map']['software'].update(compatibility_software_config)
+        globals_compatibility = globals['compatibility_map']['software']
+        duplicates = set(internal_compatibility) & set(globals_compatibility)
+        if duplicates:
+            raise Exception(f"Duplicated software {', '.join(repr(s) for s in duplicates)}")
+
+        globals_compatibility.update(internal_compatibility)
 
     return globals
 

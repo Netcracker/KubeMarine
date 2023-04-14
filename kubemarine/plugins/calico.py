@@ -40,13 +40,7 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
 class CalicoManifestProcessor(Processor):
     def __init__(self, cluster: KubernetesCluster, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'calico'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/calico-{version}.yaml.original"
-        if destination_name is None:
-            destination_name = f"calico-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(cluster, inventory, 'calico', original_yaml_path, destination_name)
 
     def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
         # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
@@ -54,7 +48,7 @@ class CalicoManifestProcessor(Processor):
         str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
         if str_value == 'false':
             for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
-                manifest.exclude(key)
+                self.exclude(manifest, key)
         elif str_value == 'true':
             return
         else:
@@ -255,8 +249,8 @@ class CalicoManifestProcessor(Processor):
 
         sz = len(manifest.all_obj_keys())
         import ruamel.yaml
-        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
-        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
 
     def get_known_objects(self) -> List[str]:
         return [

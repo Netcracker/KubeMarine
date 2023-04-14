@@ -28,13 +28,7 @@ def schedule_summary_report(cluster: KubernetesCluster):
 class DashboardManifestProcessor(Processor):
     def __init__(self, cluster: KubernetesCluster, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'kubernetes-dashboard'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/dashboard-{version}-original.yaml"
-        if destination_name is None:
-            destination_name = f"dashboard-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(cluster, inventory, 'kubernetes-dashboard', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [

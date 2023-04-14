@@ -36,8 +36,9 @@ def sync(tracker: ChangesTracker, kubernetes_versions: dict):
         compatibility_map.prepare_software_mapping(image_name, list(k8s_image_versions))
 
         for k8s_version, image_version in k8s_image_versions.items():
-            if image_name in kubernetes_versions[k8s_version]:
-                image_version = kubernetes_versions[k8s_version][image_name]
+            k8s_settings = kubernetes_versions[k8s_version]
+            if image_name in k8s_settings:
+                image_version = k8s_settings[image_name]
             new_settings = {
                 'version': image_version
             }

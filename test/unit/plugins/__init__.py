@@ -73,21 +73,16 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
             # plugins.apply_template(cluster, config)
             builtin.apply_yaml(cluster, plugin_name=self.plugin_name)
             enriched_source: io.StringIO = apply_source.call_args[0][1]['source']
-            return Manifest(cluster.log, enriched_source)
+            return Manifest(enriched_source)
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:
         nginx = inventory.setdefault('plugins', {}).setdefault(self.plugin_name, {})
         nginx.setdefault('installation', {})['registry'] = 'example.registry'
         cluster = demo.new_cluster(inventory)
         manifest = self.enrich_yaml(cluster)
-        num_images = 0
-        for key in manifest.all_obj_keys():
-            obj = self.get_obj(manifest, key)
-            for spec_section in ('containers', 'initContainers'):
-                containers = obj.get('spec', {}).get('template', {}).get('spec', {}).get(spec_section, [])
-                for container in containers:
-                    num_images += 1
-                    self.assertTrue(container['image'].startswith('example.registry/'),
-                                    f"{container['image']} was not enriched with registry")
+        images = manifest.get_all_container_images()
+        for image in images:
+            self.assertTrue(image.startswith('example.registry/'),
+                            f"{image} was not enriched with registry")
 
-        return num_images
+        return len(images)

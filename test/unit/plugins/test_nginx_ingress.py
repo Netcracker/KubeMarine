@@ -232,7 +232,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def test_all_images_contain_registry(self):
         for k8s_version, expected_num_images in (
             (self.k8s_1_24_x, 1),
-            (self.k8s_latest, 3)
+            (self.k8s_latest, 2)
         ):
             with self.subTest(k8s_version):
                 num_images = self.check_all_images_contain_registry(self.inventory(k8s_version))

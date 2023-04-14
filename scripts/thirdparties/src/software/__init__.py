@@ -1,4 +1,3 @@
-import os
 from typing import Dict, List
 
 from ruamel.yaml import CommentedMap
@@ -6,8 +5,6 @@ from ruamel.yaml import CommentedMap
 from kubemarine.core import utils
 from ..tracker import ChangesTracker
 
-SYNC_CACHE = os.path.abspath(f"{__file__}/../../../.synccache")
-TEMP_FILE = os.path.join(SYNC_CACHE, "tempfile")
 YAML = utils.yaml_structure_preserver()
 
 
