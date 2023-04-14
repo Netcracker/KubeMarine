@@ -46,19 +46,8 @@ etcd:
 kubernetes:
   temporary_exceptions:
     - has prevented the request from succeeding
-deployments:
-  expect:
-    timeout: 5
-    retries: 45
 pods:
   allowed_failures: 10
-  expect:
-    kubernetes:
-      timeout: 5
-      retries: 30
-    plugins:
-      timeout: 5
-      retries: 45
   critical_states:
     - Error
     - ErrImagePull

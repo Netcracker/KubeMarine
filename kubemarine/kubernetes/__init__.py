@@ -601,8 +601,8 @@ def wait_for_any_pods(cluster, connection, apply_filter=None):
         'kube-scheduler',
         'etcd'
     ], node=connection, apply_filter=apply_filter,
-                        timeout=cluster.globals['pods']['expect']['kubernetes']['timeout'],
-                        retries=cluster.globals['pods']['expect']['kubernetes']['retries'])
+                        timeout=cluster.inventory['globals']['expect']['pods']['kubernetes']['timeout'],
+                        retries=cluster.inventory['globals']['expect']['pods']['kubernetes']['retries'])
 
 
 def wait_for_nodes(group: NodeGroup):

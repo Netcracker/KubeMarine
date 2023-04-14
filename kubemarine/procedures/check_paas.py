@@ -382,12 +382,20 @@ def thirdparties_hashes(cluster):
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
-                # TODO support zip
-                res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
+                extension = path.split('.')[-1]
+                if extension == 'zip': 
+                    res = group.sudo(' unzip -qq -l %s | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
+                                 '  echo ${file_name} '  # print   1) filename
+                                 '    $(sudo unzip -p %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
+                                 '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
+                                 'done' % (path, path, unpack_dir)) 
+                else :
+                    res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo tar xfO %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
                                  '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
                                  'done' % (path, path, unpack_dir))
+                
                 # for each file on each host, verify that SHA in archive is equal to SHA for unpacked
                 for host, result in res.items():
                     if result.failed:

@@ -20,7 +20,10 @@
           "shell": {"$ref": "installation/shell.json"},
           "ansible": {"$ref": "installation/ansible.json"},
           "helm": {"$ref": "installation/helm.json"},
-          "thirdparty": {"type": "string"},
+          "thirdparty": {
+            "type": "string",
+            "description": "Trigger specific thirdparty installation. This thirdparty must be configured in the thirdparties section."
+          },
           "<<": {"$ref": "../common/utils.json#/definitions/ListMergingDefinition"}
         },
         "minProperties": 1,

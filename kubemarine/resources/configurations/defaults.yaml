@@ -1,6 +1,17 @@
 vrrp_ips: []
 
 globals: 
+  expect:
+    deployments:
+      timeout: 5
+      retries: 45
+    pods:
+      kubernetes:
+        timeout: 5
+        retries: 30
+      plugins:
+        timeout: 5
+        retries: 150
   nodes:
     ready:
       timeout: 5
@@ -431,8 +442,6 @@ plugins:
                 - coredns
                 - calico-kube-controllers
                 - calico-node
-              timeout: 5
-              retries: 150
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico

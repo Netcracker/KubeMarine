@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
+  "description": "Directly execute Ansible playbooks. Can be either a local path to the playbook or a dictionary with the extra parameters.",
   "oneOf": [
     {"type": "string", "minLength": 1},
     {
@@ -7,20 +8,25 @@
       "properties": {
         "playbook": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "A local path to a playbook to be executed"
         },
         "vars": {
-          "type": "object"
+          "type": "object",
+          "description": "Additional variables, overriding variables from Ansible inventory. They are passed as --extra-vars in CLI."
         },
         "become": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "Privilege escalation switch. Enables -b argument."
         },
         "groups": {
-          "$ref": "../../common/node_ref.json#/definitions/Roles"
+          "$ref": "../../common/node_ref.json#/definitions/Roles",
+          "description": "Targeted list of groups, passed to Ansible as --limit argument"
         },
         "nodes": {
-          "$ref": "../../common/node_ref.json#/definitions/Names"
+          "$ref": "../../common/node_ref.json#/definitions/Names",
+          "description": "Targeted list of nodes, passed to Ansible as --limit argument"
         }
       },
       "required": ["playbook"],

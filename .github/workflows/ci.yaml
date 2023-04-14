@@ -41,6 +41,7 @@ jobs:
           - target: {os: windows-2022, arch: 'win64'}
             executable_path: 'dist\kubemarine.exe'
           - target: {os: ubuntu-latest, arch: 'linux-x86_64'}
+            # It is important to build on centos7 base image as long as we support running of the executable on Centos 7
             build_cmd: >
               docker run -t -v $(pwd):/opt/app-root/src centos/python-38-centos7 bash -c
               'python scripts/ci/build_binary.py'
