@@ -11,14 +11,15 @@ jobs:
       kuber_versions: ${{ steps.versions.outputs.kuber_versions }}
     steps:
       - id: versions
-        run: echo 'kuber_versions=[ "v1.21.5", "v1.24.11", "v1.26.3" ]' >> "$GITHUB_OUTPUT"
+        run: |
+          echo ::set-output name=kuber_versions::`[ "v1.21.5", "v1.24.11", "v1.26.3" ]`
 
   get_versions:
     runs-on: ubuntu-22.04
     needs: collect_kubernetes_versions
     steps:
-      - id: versions
-        run: echo ${{needs.collect_kubernetes_versions.outputs.kuber_versions}}
+      - id: echo versions
+        run: echo "${{ toJSON(needs.collect_kubernetes_versions.outputs) }}"
 
   test-default-installation:
     runs-on: ubuntu-22.04
@@ -28,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kubernetes-version: ${{needs.collect_kubernetes_versions.outputs.kuber_versions}}
+        kubernetes-version: ${{ fromJSON(needs.say_hello.outputs.kuber_versions) }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
