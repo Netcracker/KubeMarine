@@ -24,7 +24,7 @@ jobs:
           versions=$(cat ./kubemarine/resources/configurations/globals.yaml | \
             python3 -m yq -c '.compatibility_map.software.kubeadm | keys')
           echo Parsed versions: $versions
-          echo 'kuber_versions=$versions' >> $GITHUB_OUTPUT
+          echo "kuber_versions=$versions" >> $GITHUB_OUTPUT
 
   get_versions:
     runs-on: ubuntu-22.04
