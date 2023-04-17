@@ -14,6 +14,7 @@
 
 from kubemarine.core import utils
 
+
 def _load_globals() -> dict:
     globals = utils.load_yaml(
         utils.get_internal_resource_path('resources/configurations/globals.yaml'))
@@ -32,7 +33,16 @@ def _load_globals() -> dict:
     return globals
 
 
+def _load_supported_versions() -> dict:
+    kubernetes_versions = utils.load_yaml(
+        utils.get_internal_resource_path('resources/configurations/compatibility/kubernetes_versions.yaml'))
+
+    return kubernetes_versions['kubernetes_versions']
+
+
 GLOBALS = _load_globals()
 
 DEFAULTS = utils.load_yaml(
     utils.get_internal_resource_path('resources/configurations/defaults.yaml'))
+
+SUPPORTED_VERSIONS = _load_supported_versions()

@@ -62,11 +62,9 @@ class CompatibilityMap:
                 self.tracker.delete(key)
                 print(f"Deleted '{software_name}.{key}' from {self._map_filename}")
 
-        map_keys = list(software_mapping)
-        if not self._is_sorted(map_keys, key=utils.version_key):
-            software_mapping = CommentedMap(sorted(software_mapping.items(),
-                                                   key=lambda item: utils.version_key(item[0])))
-            self.compatibility_map[software_name] = software_mapping
+        sorted_map = utils.map_sorted(software_mapping, key=utils.version_key)
+        if not (sorted_map is software_mapping):
+            self.compatibility_map[software_name] = sorted_map
             print(f"Reordered {software_name!r} in {self._map_filename}")
 
     def reset_software_settings(self, software_name: str, k8s_version: str, new_settings: Dict[str, str],
@@ -83,15 +81,8 @@ class CompatibilityMap:
         if k8s_version in software_mapping:
             software_settings = software_mapping[k8s_version]
         else:
-            key = utils.version_key
-
-            # Find position to insert new mapping maintaining the order
-            pos = max((i + 1 for i, kv in enumerate(software_mapping)
-                       if key(kv) < key(k8s_version)),
-                      default=0)
-
             software_settings = CommentedMap()
-            software_mapping.insert(pos, k8s_version, software_settings)
+            utils.insert_map_sorted(software_mapping, k8s_version, software_settings, key=utils.version_key)
             self.tracker.new(k8s_version)
             print(f"Added '{software_name}.{k8s_version}' to {self._map_filename}")
 
@@ -115,7 +106,3 @@ class CompatibilityMap:
             YAML.dump(self.compatibility_map, stream)
 
         print(f"Updated {self._map_filename}")
-
-    @classmethod
-    def _is_sorted(cls, l: list, key):
-        return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))

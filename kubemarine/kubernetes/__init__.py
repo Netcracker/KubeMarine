@@ -983,10 +983,10 @@ def verify_target_version(target_version):
 
     pos = target_version.rfind(".")
     target_version = target_version[:pos]
-    globals_yml = static.GLOBALS
-    if target_version not in globals_yml["kubernetes_versions"]:
+    supported_versions = static.SUPPORTED_VERSIONS
+    if target_version not in supported_versions:
         raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-    if not globals_yml["kubernetes_versions"].get(target_version, {}).get("supported", False):
+    if not supported_versions.get(target_version, {}).get("supported", False):
         message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
         print(message)
         return message

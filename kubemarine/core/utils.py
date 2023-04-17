@@ -28,6 +28,8 @@ from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
+from ruamel.yaml import CommentedMap
+
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 
@@ -328,6 +330,59 @@ def yaml_structure_preserver() -> ruamel.yaml.YAML:
     return ruamel_yaml
 
 
+def is_sorted(l: list, key: callable = None) -> bool:
+    """
+    Check that the specified list is sorted.
+
+    :param l: list to check
+    :param key: custom key function to customize the sort order
+    :return: boolean flag if the list is sorted
+    """
+    if key is None:
+        key = lambda x: x
+    return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
+
+
+def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
+    """
+    Check that the specified CommentedMap is sorted, or create new sorted map from it otherwise.
+
+    :param map_: CommentedMap instance to check
+    :param key: custom key function to customize the sort order of the map keys
+    :return: the same or new sorted instance of the map
+    """
+    if key is None:
+        key = lambda x: x
+    map_keys = list(map_)
+    if not is_sorted(map_keys, key=key):
+        map_ = CommentedMap(sorted(map_.items(), key=lambda item: key(item[0])))
+
+    return map_
+
+def insert_map_sorted(map_: CommentedMap, k, v, key: callable = None) -> None:
+    """
+    Insert new item to the CommentedMap or update the value for the existing key.
+    The map should be already sorted.
+
+    :param map_: sorted CommentedMap instance
+    :param k: new key
+    :param v: new value
+    :param key: custom key function to customize the sort order of the map keys
+    """
+    if k in map_:
+        map_[k] = v
+        return
+
+    if key is None:
+        key = lambda x: x
+    # Find position to insert new item maintaining the order
+    pos = max((mi + 1 for mi, mv in enumerate(map_)
+               if key(mv) < key(k)),
+              default=0)
+
+    map_.insert(pos, k, v)
+
+
 def load_yaml(filepath) -> dict:
     try:
         with open_utf8(filepath, 'r') as stream:
@@ -368,7 +423,7 @@ def minor_version(version: str) -> str:
 
 def version_key(version: str):
     """
-    Converts vN.N.N to (N, N, N) that can be used in comparisons.
+    Converts vN.N.N to (N, N, N) or vN.N to (N, N) that can be used in comparisons.
     """
     return tuple(map(int, version[1:].split('.')))
 

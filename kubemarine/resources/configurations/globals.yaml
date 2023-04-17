@@ -1,17 +1,3 @@
-kubernetes_versions:
-  v1.21:
-    supported: true
-  v1.22:
-    supported: true
-  v1.23:
-    supported: true
-  v1.24:
-    supported: true
-  v1.25:
-    supported: true
-  v1.26:
-    supported: true
-
 connection:
   defaults:
     port: 22
