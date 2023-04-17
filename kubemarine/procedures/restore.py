@@ -138,24 +138,31 @@ def restore_thirdparties(cluster):
 
     
 def import_nodes(cluster):
-
-    # Get all nodes
-    nodes = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)
-
-    # Upload and restore backups for each node
-    for node in nodes:
+    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
         node_backup_file = os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name'])
         if os.path.exists(node_backup_file):
-            node['connection'].put(node_backup_file, '/tmp/kubemarine-backup.tar.gz')
-            cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
-
-            restore_command = 'sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite'
-            
-            if 'resolv.conf' in tarfile.open(node_backup_file, 'r:gz').getnames():
-                restore_command = 'sudo chattr -i /etc/resolv.conf && ' + restore_command + ' && sudo chattr +i /etc/resolv.conf'
+            with tarfile.open(node_backup_file, 'r:gz') as tar:
+                # check if resolv.conf was extracted separately
+                resolv_conf_extracted = False
+                for member in tar.getmembers():
+                    if member.name.endswith('resolv.conf'):
+                        if member.path != '/etc/resolv.conf':
+                            resolv_conf_extracted = True
+                        break
                 
-            result = cluster.nodes['all'].sudo(restore_command)
-            cluster.log.debug(result)
+                node['connection'].put(node_backup_file, '/tmp/kubemarine-backup.tar.gz')
+                cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
+
+                restore_command = 'sudo chattr -i /etc/resolv.conf && sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf'
+
+                if resolv_conf_extracted:
+                    restore_command = 'sudo chattr -i /etc/resolv.conf && ' + \
+                                      'sudo mv %s /etc/resolv.conf && ' % member.path + \
+                                      'sudo chattr +i /etc/resolv.conf && ' + \
+                                      restore_command
+
+                result = cluster.nodes['all'].sudo(restore_command)
+                cluster.log.debug(result)
         else:
             raise Exception('Backup file for node \'%s\' not found' % node['name'])
 
