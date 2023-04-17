@@ -26,13 +26,6 @@ jobs:
           echo Parsed versions: $versions
           echo "kuber_versions=$versions" >> $GITHUB_OUTPUT
 
-  get_versions:
-    runs-on: ubuntu-22.04
-    needs: collect_kubernetes_versions
-    steps:
-      - name: echo versions
-        run: echo "${{ toJSON(needs.collect_kubernetes_versions.outputs.kuber_versions) }}"
-
   test-default-installation:
     runs-on: ubuntu-22.04
     needs: collect_kubernetes_versions
@@ -88,7 +81,6 @@ jobs:
           name: default_cluster_procedure_dumps-${{ matrix.kubernetes-version }}
           path: ./results/
           retention-days: 7
-
 
   test-extended-installation:
     runs-on: ubuntu-22.04
