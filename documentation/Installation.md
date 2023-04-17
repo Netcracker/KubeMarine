@@ -2388,7 +2388,7 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *OS specific*: Yes
 
-The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version):
+The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version and OS family):
 
 IPv4:
 ```yaml
