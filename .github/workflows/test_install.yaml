@@ -10,9 +10,21 @@ jobs:
     outputs:
       kuber_versions: ${{ steps.versions.outputs.kuber_versions }}
     steps:
-      - id: versions
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Install software
+        run: pip3 install yq
+      - name: Parse kubernetes versions
+        id: versions
         run: |
-          echo 'kuber_versions=[ "v1.21.5", "v1.24.11", "v1.26.3" ]' >> $GITHUB_OUTPUT
+          versions=$(cat ./kubemarine/resources/configurations/globals.yaml | \
+            python3 -m yq -c '.compatibility_map.software.kubeadm | keys')
+          echo Parsed versions: $versions
+          echo 'kuber_versions=$versions' >> $GITHUB_OUTPUT
 
   get_versions:
     runs-on: ubuntu-22.04
