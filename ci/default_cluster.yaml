@@ -13,3 +13,17 @@ cluster_name: "test-local-k8s.com"
 services:
   kubeadm:
     kubernetesVersion: <KUBERNETES_VERSION>
+
+plugins:
+
+  calico:
+    install: true
+
+  nginx-ingress-controller:
+    install: true
+
+  kubernetes-dashboard:
+    install: true
+
+  local-path-provisioner:
+    install: true
