@@ -56,8 +56,8 @@ def _load_supported_versions() -> dict:
     return kubernetes_versions['kubernetes_versions']
 
 
-GLOBALS: dict = {}
-DEFAULTS: dict = {}
-SUPPORTED_VERSIONS: dict = {}
+GLOBALS = {}
+DEFAULTS = {}
+SUPPORTED_VERSIONS = {}
 
 reload()
