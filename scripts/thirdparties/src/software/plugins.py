@@ -3,11 +3,16 @@ import tarfile
 import tempfile
 from typing import List, Tuple, Dict
 
-from kubemarine.core import static, utils
+from kubemarine import demo
+from kubemarine.core import static, utils, log
+from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
 from . import CompatibilityMap
-from ..shell import curl, TEMP_FILE, SYNC_CACHE
+from ..shell import curl, info, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
+
+
+PLUGINS = ['calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner']
 
 
 def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
@@ -165,12 +170,11 @@ def sync(tracker: ChangesTracker, kubernetes_versions: dict,
     Download and save plugin manifests if necessary, and actualize compatibility_map of all plugins.
     # TODO if plugin versions are changed, it is necessary to write patch that will reinstall corresponding plugins.
     """
-    plugins = ['calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner']
     k8s_versions = list(kubernetes_versions)
-    plugin_manifests = resolve_plugin_manifests(kubernetes_versions, plugins, k8s_versions, refresh_manifests)
+    plugin_manifests = resolve_plugin_manifests(kubernetes_versions, PLUGINS, k8s_versions, refresh_manifests)
 
-    compatibility_map = CompatibilityMap(tracker, "plugins.yaml", plugins)
-    for plugin_name in plugins:
+    compatibility_map = CompatibilityMap(tracker, "plugins.yaml", PLUGINS)
+    for plugin_name in PLUGINS:
         compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
 
         for k8s_version in k8s_versions:
@@ -192,3 +196,27 @@ def sync(tracker: ChangesTracker, kubernetes_versions: dict,
             compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
 
     compatibility_map.flush()
+
+
+def try_manifest_enrichment(k8s_version: str, plugin_name: str):
+    # Generate fake cluster and run plugin manifest enrichment on it
+    info(f"Trying default enrichment of {plugin_name!r} manifest for Kubernetes {k8s_version}")
+
+    inventory = demo.generate_inventory(**demo.ALLINONE)
+
+    inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
+    # TODO in future we should enable suitable admission implementation by default
+    if utils.minor_version_key(k8s_version) >= (1, 25):
+        inventory.setdefault('rbac', {})['admission'] = 'pss'
+
+    context = demo.create_silent_context([
+        '--log', 'stdout;level=error;colorize=false;correct_newlines=true;format=%(levelname)s %(message)s'
+    ])
+    cluster = demo.new_cluster(inventory, context=context)
+
+    class ConsoleLogger(log.VerboseLogger):
+        def verbose(self, msg: str, *args, **kwargs):
+            print(msg)
+
+    processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, plugin_name)
+    processor.enrich()

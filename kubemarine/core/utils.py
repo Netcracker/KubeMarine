@@ -421,11 +421,18 @@ def minor_version(version: str) -> str:
     return ".".join(version.split(".")[0:2])
 
 
-def version_key(version: str):
+def version_key(version: str) -> tuple:
     """
     Converts vN.N.N to (N, N, N) or vN.N to (N, N) that can be used in comparisons.
     """
     return tuple(map(int, version[1:].split('.')))
+
+
+def minor_version_key(version: str) -> tuple:
+    """
+    Converts vN.N.N to (N, N) that can be used in comparisons.
+    """
+    return version_key(minor_version(version))
 
 
 class ClusterStorage:

@@ -15,6 +15,8 @@
 import logging
 import os
 import sys
+from abc import ABC, abstractmethod
+
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler
 
 from copy import deepcopy
@@ -78,7 +80,13 @@ LOGGING_NAMES_BY_LEVEL = {
 }
 
 
-class EnhancedLogger(logging.Logger):
+class VerboseLogger(ABC):
+    @abstractmethod
+    def verbose(self, msg: str, *args, **kwargs):
+        pass
+
+
+class EnhancedLogger(logging.Logger, VerboseLogger):
     def __init__(self, name, level=logging.NOTSET):
         super().__init__(name, level)
         logging.addLevelName(VERBOSE, 'VERBOSE')

@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
 import unittest
 from typing import Optional, List, Dict
-from unittest import mock
 
 from kubemarine import demo
 from kubemarine.core import static, utils
@@ -55,25 +53,23 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
         # TODO in future we should enable suitable admission implementation by default
-        if utils.version_key(k8s_version)[0:2] >= (1, 24):
+        if utils.minor_version_key(k8s_version) >= (1, 25):
             inventory.setdefault('rbac', {})['admission'] = 'pss'
 
         return inventory
 
     def enrich_yaml(self, cluster: demo.FakeKubernetesCluster) -> Manifest:
-        with mock.patch('kubemarine.plugins.apply_source') as apply_source:
-            # For regression testing with jinja templates, the following code can be used instead of builtin.apply_yaml
-            #
-            # from kubemarine import plugins
-            # version = cluster.inventory['plugins'][self.plugin_name]['version']
-            # version = utils.minor_version(version)
-            # config = {
-            #     "source": f"templates/plugins/<paste template filename>.yaml.j2"
-            # }
-            # plugins.apply_template(cluster, config)
-            builtin.apply_yaml(cluster, plugin_name=self.plugin_name)
-            enriched_source: io.StringIO = apply_source.call_args[0][1]['source']
-            return Manifest(enriched_source)
+        # For regression testing with jinja templates, the following code can be used instead of builtin.apply_yaml
+        # with mock.patch('kubemarine.plugins.apply_source') as apply_source:
+        #     from kubemarine import plugins
+        #     version = cluster.inventory['plugins'][self.plugin_name]['version']
+        #     version = utils.minor_version(version)
+        #     config = {
+        #         "source": f"templates/plugins/<paste template filename>.yaml.j2"
+        #     }
+        #     plugins.apply_template(cluster, config)
+        processor = builtin.get_manifest_processor(cluster.log, cluster.inventory, self.plugin_name)
+        return processor.enrich()
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:
         nginx = inventory.setdefault('plugins', {}).setdefault(self.plugin_name, {})

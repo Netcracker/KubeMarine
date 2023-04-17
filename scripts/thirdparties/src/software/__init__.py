@@ -3,6 +3,7 @@ from typing import Dict, List
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils
+from ..shell import info
 from ..tracker import ChangesTracker
 
 YAML = utils.yaml_structure_preserver()
@@ -105,4 +106,4 @@ class CompatibilityMap:
         with utils.open_internal(self._resource, 'w') as stream:
             YAML.dump(self.compatibility_map, stream)
 
-        print(f"Updated {self._map_filename}")
+        info(f"Updated {self._map_filename}")

@@ -3,7 +3,7 @@ from copy import deepcopy
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils
-from .shell import fatal
+from .shell import fatal, info
 
 YAML = utils.yaml_structure_preserver()
 RESOURCE = "resources/configurations/compatibility/kubernetes_versions.yaml"
@@ -39,7 +39,7 @@ class KubernetesVersions:
         with utils.open_internal(RESOURCE, 'w') as stream:
             YAML.dump(self._kubernetes_versions, stream)
 
-        print(f"Updated kubernetes_versions.yaml")
+        info(f"Updated kubernetes_versions.yaml")
 
     def _validate_mapping(self):
         mandatory_fields = {'calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner',

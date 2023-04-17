@@ -15,7 +15,7 @@
 import io
 from typing import Optional, List
 
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
@@ -135,9 +135,9 @@ def create_tls_secret(first_control_plane, crt_path, key_path, name, namespace):
 
 
 class IngressNginxManifestProcessor(Processor):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        super().__init__(cluster, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
+        super().__init__(logger, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -351,12 +351,12 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         self.log.verbose(f"The {key} has been patched in 'rules' with {psp_ingress_nginx}")
 
 
-def get_ingress_nginx_manifest_processor(cluster: KubernetesCluster, inventory: dict, **kwargs):
+def get_ingress_nginx_manifest_processor(logger: log.VerboseLogger, inventory: dict, **kwargs):
     version: str = inventory['plugins']['nginx-ingress-controller']['version']
     if utils.minor_version(version) == 'v1.2':
-        return V1_2_X_IngressNginxManifestProcessor(cluster, inventory, **kwargs)
+        return V1_2_X_IngressNginxManifestProcessor(logger, inventory, **kwargs)
 
-    return IngressNginxManifestProcessor(cluster, inventory, **kwargs)
+    return IngressNginxManifestProcessor(logger, inventory, **kwargs)
 
 
 CUSTOM_HEADERS_CM = {

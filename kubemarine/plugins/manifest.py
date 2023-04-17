@@ -150,17 +150,16 @@ EnrichmentFunction = Callable[[Manifest], None]
 
 
 class Processor(ABC):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict, plugin_name: str,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict, plugin_name: str,
                  original_yaml_path: Optional[str], destination_name: Optional[str]):
         """
-        :param cluster: cluster object
+        :param logger: VerboseLogger instance
         :param inventory: inventory of the cluster
         :param plugin_name: name of plugin-owner
         :param original_yaml_path: path to custom manifest
         :param destination_name: custom destination manifest file name
         """
-        self.cluster = cluster
-        self.log: log.EnhancedLogger = cluster.log
+        self.log: log.VerboseLogger = logger
         self.inventory = inventory
         self.plugin_name = plugin_name
         self.manifest_path = self._get_manifest_path(original_yaml_path)
@@ -217,7 +216,7 @@ class Processor(ABC):
                 self.log.verbose(f"The current version of original yaml does not include "
                                  f"the following object: {key}")
 
-    def apply(self):
+    def enrich(self) -> Manifest:
         """
         The method implements full processing for the plugin main manifest.
         """
@@ -243,8 +242,12 @@ class Processor(ABC):
         self.log.verbose(f"The total number of excluded objects is {len(manifest.excluded)} "
                          f"the objects are the following: {manifest.excluded}")
 
+        return manifest
+
+    def apply(self, cluster: KubernetesCluster, manifest: Manifest):
+        logger = cluster.log
         enriched_manifest = manifest.dump()
-        utils.dump_file(self.cluster, enriched_manifest, self.destination_name)
+        utils.dump_file(cluster, enriched_manifest, self.destination_name)
 
         destination = '/etc/kubernetes/%s' % self.destination_name
 
@@ -255,10 +258,10 @@ class Processor(ABC):
             "do_render": False
         }
 
-        self.log.debug(f"Uploading manifest enriched from {self.manifest_path} for {self.plugin_name!r} plugin...")
-        self.log.debug("\tDestination: %s" % destination)
+        logger.debug(f"Uploading manifest enriched from {self.manifest_path} for {self.plugin_name!r} plugin...")
+        logger.debug("\tDestination: %s" % destination)
 
-        plugins.apply_source(self.cluster, config)
+        plugins.apply_source(cluster, config)
 
     def _get_manifest_path(self, custom_manifest_path: Optional[str]) -> str:
         if custom_manifest_path is not None:
@@ -392,4 +395,4 @@ class Processor(ABC):
             self.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
 
 
-PROCESSOR_PROVIDER = Callable[[KubernetesCluster, dict, str, str], Processor]
+PROCESSOR_PROVIDER = Callable[[log.VerboseLogger, dict, str, str], Processor]
