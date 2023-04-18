@@ -31,7 +31,17 @@ def sync(args: argparse.Namespace) -> ChangesTracker:
 
     kubernetes_versions.sync()
 
+    static.reload()
+    try_manifest_enrichment(tracker, force=args.enrich_manifests)
+
     return tracker
+
+
+def try_manifest_enrichment(tracker: ChangesTracker, force: bool) -> None:
+    for k8s_version in tracker.all_k8s_versions:
+        for plugin_name in list(static.GLOBALS['plugins']):
+            if force or tracker.is_software_changed(k8s_version, plugin_name):
+                plugins.try_manifest_enrichment(k8s_version, plugin_name)
 
 
 if __name__ == '__main__':
@@ -44,12 +54,9 @@ if __name__ == '__main__':
                         action='store_true',
                         help='Always download and actualize plugin manifests')
 
+    parser.add_argument('--enrich-manifests',
+                        action='store_true',
+                        help='Run enrichment of all plugin manifests for all Kubernetes versions')
+
     tracker = sync(parser.parse_args())
-    static.reload()
-
-    for k8s_version in tracker.all_k8s_versions:
-        for plugin_name in list(static.GLOBALS['plugins']):
-            if tracker.is_software_changed(k8s_version, plugin_name):
-                plugins.try_manifest_enrichment(k8s_version, plugin_name)
-
     tracker.print()
