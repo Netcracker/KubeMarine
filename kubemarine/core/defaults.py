@@ -29,6 +29,7 @@ from kubemarine.core.yaml_merger import default_merger
 DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.core.schema.verify_inventory",
     "kubemarine.core.defaults.merge_defaults",
+    "kubemarine.admission.enrich_default_admission",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.controlplane.controlplane_node_enrichment",

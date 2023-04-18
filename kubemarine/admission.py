@@ -606,6 +606,13 @@ def manage_pss_enrichment(inventory, cluster):
     return inventory
 
 
+def enrich_default_admission(inventory, _):
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if not inventory["rbac"].get("admission"):
+        inventory["rbac"]["admission"] = "psp" if minor_version < 25 else "pss"
+    return inventory
+
+
 def manage_enrichment(inventory, cluster):
     admission_impl = inventory['rbac']['admission']
     if admission_impl == "psp":

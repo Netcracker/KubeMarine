@@ -688,7 +688,6 @@ rbac:
           annotations: {}
         type: kubernetes.io/service-account-token
 
-  admission: psp
   psp:
     pod-security: enabled
     oob-policies:
