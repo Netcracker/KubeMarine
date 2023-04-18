@@ -58,6 +58,10 @@ def clean(group, **kwargs) -> NodeGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean", **kwargs)
 
 
+def check_unattended_upgrade(group, **kwargs) -> NodeGroupResult:
+    return group.sudo(DEBIAN_HEADERS + "ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300", **kwargs)
+
+
 def get_install_cmd(include: str or list, exclude=None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
@@ -107,9 +111,8 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if isinstance(include, list):
         include = ' '.join(include)
     command = DEBIAN_HEADERS + 'apt update && ' + \
-              DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include ';' + \
-              DEBIAN_HEADERS + '(($? != 0)) && sleep 666 && sudo apt install -y %s' % include
-
+              DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include
+    
     if exclude is not None:
         if isinstance(exclude, list):
             exclude = ','.join(exclude)
