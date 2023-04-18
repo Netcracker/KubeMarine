@@ -3,7 +3,7 @@ from typing import Dict, List
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils
-from ..shell import info
+from ..shell import info, run
 from ..tracker import ChangesTracker
 
 YAML = utils.yaml_structure_preserver()
@@ -24,7 +24,7 @@ class CompatibilityMap:
         self._resource = f"resources/configurations/compatibility/internal/{map_filename}"
         self._software_names = software_names
 
-        with utils.open_internal(self._resource, 'r') as stream:
+        with utils.open_internal(self.resource_path, 'r') as stream:
             self.compatibility_map: CommentedMap = YAML.load(stream)
 
         # delete unexpected software
@@ -36,8 +36,8 @@ class CompatibilityMap:
                 print(f"Deleted {key!r} from {self._map_filename}")
 
     @property
-    def software_names(self) -> List[str]:
-        return list(self._software_names)
+    def resource_path(self) -> str:
+        return utils.get_internal_resource_path(self._resource)
 
     @property
     def resource(self) -> str:
@@ -103,7 +103,8 @@ class CompatibilityMap:
                 print(f"Changed '{software_name}.{k8s_version}.{k}={v}' in {self._map_filename}")
 
     def flush(self):
-        with utils.open_internal(self._resource, 'w') as stream:
+        with utils.open_internal(self.resource_path, 'w') as stream:
             YAML.dump(self.compatibility_map, stream)
 
+        run(['git', 'add', self.resource_path])
         info(f"Updated {self._map_filename}")

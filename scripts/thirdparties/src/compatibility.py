@@ -3,15 +3,15 @@ from copy import deepcopy
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils
-from .shell import fatal, info
+from .shell import fatal, info, run
 
 YAML = utils.yaml_structure_preserver()
-RESOURCE = "resources/configurations/compatibility/kubernetes_versions.yaml"
+RESOURCE_PATH = utils.get_internal_resource_path("resources/configurations/compatibility/kubernetes_versions.yaml")
 
 
 class KubernetesVersions:
     def __init__(self):
-        with utils.open_internal(RESOURCE) as stream:
+        with utils.open_internal(RESOURCE_PATH) as stream:
             self._kubernetes_versions = YAML.load(stream)
             self._validate_mapping()
 
@@ -36,9 +36,10 @@ class KubernetesVersions:
             if key not in minor_versions:
                 del k8s_versions[key]
 
-        with utils.open_internal(RESOURCE, 'w') as stream:
+        with utils.open_internal(RESOURCE_PATH, 'w') as stream:
             YAML.dump(self._kubernetes_versions, stream)
 
+        run(['git', 'add', RESOURCE_PATH])
         info(f"Updated kubernetes_versions.yaml")
 
     def _validate_mapping(self):

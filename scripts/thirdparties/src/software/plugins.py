@@ -8,7 +8,7 @@ from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
 from . import CompatibilityMap
-from ..shell import curl, info, TEMP_FILE, SYNC_CACHE
+from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 
 
@@ -59,6 +59,8 @@ def download_manifest_if_necessary(plugin_name: str, plugin_version: str, force:
         with utils.open_external(manifest_local_path, 'r') as source, \
                 utils.open_internal(manifest_path, 'w') as target:
             target.write(source.read())
+
+        run(['git', 'add', manifest_path])
 
     return manifest_path
 
