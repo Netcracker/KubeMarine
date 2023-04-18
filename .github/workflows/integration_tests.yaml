@@ -21,8 +21,8 @@ jobs:
       - name: Parse kubernetes versions
         id: versions
         run: |
-          versions=$(cat ./kubemarine/resources/configurations/globals.yaml | \
-            python3 -m yq -c '.compatibility_map.software.kubeadm | keys')
+          versions=$(cat ./kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml | \
+            python3 -m yq -c '.compatibility_map | keys')
           echo Parsed versions: $versions
           echo "kuber_versions=$versions" >> $GITHUB_OUTPUT
 

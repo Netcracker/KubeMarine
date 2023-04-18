@@ -203,11 +203,7 @@ def try_manifest_enrichment(k8s_version: str, plugin_name: str):
     info(f"Trying default enrichment of {plugin_name!r} manifest for Kubernetes {k8s_version}")
 
     inventory = demo.generate_inventory(**demo.ALLINONE)
-
     inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
-    # TODO in future we should enable suitable admission implementation by default
-    if utils.minor_version_key(k8s_version) >= (1, 25):
-        inventory.setdefault('rbac', {})['admission'] = 'pss'
 
     context = demo.create_silent_context([
         '--log', 'stdout;level=error;colorize=false;correct_newlines=true;format=%(levelname)s %(message)s'

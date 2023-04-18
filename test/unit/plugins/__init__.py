@@ -52,10 +52,6 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
     def inventory(self, k8s_version):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
-        # TODO in future we should enable suitable admission implementation by default
-        if utils.minor_version_key(k8s_version) >= (1, 25):
-            inventory.setdefault('rbac', {})['admission'] = 'pss'
-
         return inventory
 
     def enrich_yaml(self, cluster: demo.FakeKubernetesCluster) -> Manifest:
