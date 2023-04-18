@@ -849,8 +849,8 @@ def control_plane_configuration_status(cluster):
 
             for static_pod in static_pods_content:
                 result[static_pod['metadata']['name']] = dict()
-                if version in static_pod["spec"]["containers"][0].get("image", ""):
-                    result[static_pod['metadata']['name']]['correct_version'] = True
+                result[static_pod['metadata']['name']]['correct_version'] = \
+                    version in static_pod["spec"]["containers"][0].get("image", "")
                 result[static_pod['metadata']['name']]['correct_properties'] = \
                     check_extra_args(cluster, static_pod, control_plane)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
