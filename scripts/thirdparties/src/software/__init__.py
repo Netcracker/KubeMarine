@@ -68,15 +68,13 @@ class CompatibilityMap:
             self.compatibility_map[software_name] = sorted_map
             print(f"Reordered {software_name!r} in {self._map_filename}")
 
-    def reset_software_settings(self, software_name: str, k8s_version: str, new_settings: Dict[str, str],
-                                update=True) -> None:
+    def reset_software_settings(self, software_name: str, k8s_version: str, new_settings: Dict[str, str]) -> None:
         """
         Reset software mapping for the specified software name and Kubernetes version to the new provided settings.
 
         :param software_name: software key
         :param k8s_version: Kubernetes version
         :param new_settings: dictionary with new settings
-        :param update: if false, do not update the values for already present settings keys
         """
         software_mapping = self.compatibility_map[software_name]
         if k8s_version in software_mapping:
@@ -97,7 +95,7 @@ class CompatibilityMap:
 
         # update the settings only if they are not equal to the new.
         for k, v in new_settings.items():
-            if k not in software_settings or (software_settings[k] != v and update):
+            if k not in software_settings or software_settings[k] != v:
                 software_settings[k] = v
                 self.tracker.update(k8s_version, software_name)
                 print(f"Changed '{software_name}.{k8s_version}.{k}={v}' in {self._map_filename}")
