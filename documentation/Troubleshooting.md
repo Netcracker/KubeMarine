@@ -608,6 +608,7 @@ plugins:
 ```
 More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
+
 # Troubleshooting KubeMarine
 
 This section provides troubleshooting information for KubeMarine-specific or installation-specific issues.
