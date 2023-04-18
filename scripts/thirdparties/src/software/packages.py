@@ -2,13 +2,13 @@ from . import CompatibilityMap
 from ..tracker import ChangesTracker
 
 
-def sync(tracker: ChangesTracker, kubernetes_versions: dict):
+def sync(tracker: ChangesTracker):
     """
     Actualize compatibility_map of all packages.
     """
     package_names = ['docker', 'containerd', 'containerdio', 'podman',
                      'haproxy', 'keepalived']
-    k8s_versions = list(kubernetes_versions)
+    k8s_versions = tracker.all_k8s_versions
 
     compatibility_map = CompatibilityMap(tracker, "packages.yaml", package_names)
     for package_name in package_names:

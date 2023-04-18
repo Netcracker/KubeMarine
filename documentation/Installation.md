@@ -169,7 +169,7 @@ For cluster machines, ensure the following requirements are met:
   * Ubuntu 22.04.1
 
 <!-- #GFCFilterMarkerStart# -->
-The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L222).
+The actual information about the supported versions can be found in `compatibility_map.distributives` section of [globals.yaml configuration](../kubemarine/resources/configurations/globals.yaml#L256).
 <!-- #GFCFilterMarkerEnd# -->
 
 **Networking**

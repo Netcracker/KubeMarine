@@ -12,7 +12,6 @@ kubernetes_versions:
     supported: true
   v1.26:
     supported: true
-
 compatibility_map:
 # This section should be changed manually.
   v1.21.2:

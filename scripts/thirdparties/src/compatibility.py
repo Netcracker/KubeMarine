@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from .shell import fatal, info, run
 
 YAML = utils.yaml_structure_preserver()
@@ -43,8 +43,8 @@ class KubernetesVersions:
         info(f"Updated kubernetes_versions.yaml")
 
     def _validate_mapping(self):
-        mandatory_fields = {'calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner',
-                            'crictl'}
+        mandatory_fields = set(static.GLOBALS['plugins'])
+        mandatory_fields.update(['crictl'])
         optional_fields = {'pause', 'webhook', 'metrics-scraper', 'busybox'}
 
         compatibility_map = self._kubernetes_versions['compatibility_map']

@@ -60,13 +60,14 @@ def calculate_sha1(kubernetes_versions: dict, thirdparties: List[str], k8s_versi
     return thirdparties_sha1
 
 
-def sync(tracker: ChangesTracker, kubernetes_versions: dict):
+def sync(tracker: ChangesTracker):
     """
     Download, calculate sha1 and actualize compatibility_map of all third-parties.
     # TODO if crictl version is changed, it is necessary to write patch that will reinstall corresponding thirdparty.
     """
     thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl']
-    k8s_versions = list(kubernetes_versions)
+    kubernetes_versions = tracker.kubernetes_versions
+    k8s_versions = tracker.all_k8s_versions
     thirdparties_sha1 = calculate_sha1(kubernetes_versions, thirdparties, k8s_versions)
 
     compatibility_map = CompatibilityMap(tracker, "thirdparties.yaml", thirdparties)

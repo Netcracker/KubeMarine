@@ -22,12 +22,12 @@ from src.tracker import ChangesTracker
 def sync(args: argparse.Namespace) -> ChangesTracker:
     kubernetes_versions = KubernetesVersions()
     compatibility_map = kubernetes_versions.compatibility_map
-    tracker = ChangesTracker()
+    tracker = ChangesTracker(compatibility_map)
 
-    thirdparties.sync(tracker, compatibility_map)
-    packages.sync(tracker, compatibility_map)
-    kubernetes_images.sync(tracker, compatibility_map)
-    plugins.sync(tracker, compatibility_map, refresh_manifests=args.refresh_manifests)
+    thirdparties.sync(tracker)
+    packages.sync(tracker)
+    kubernetes_images.sync(tracker)
+    plugins.sync(tracker, refresh_manifests=args.refresh_manifests)
 
     kubernetes_versions.sync()
 
@@ -47,11 +47,9 @@ if __name__ == '__main__':
     tracker = sync(parser.parse_args())
     static.reload()
 
-    changed_k8s = list(tracker.new_k8s)
-    changed_k8s += list(tracker.updated_k8s)
-    for k8s_version in changed_k8s:
-        for plugin_name in plugins.PLUGINS:
-            if k8s_version in tracker.new_k8s or plugin_name in tracker.updated_k8s[k8s_version]:
+    for k8s_version in tracker.all_k8s_versions:
+        for plugin_name in list(static.GLOBALS['plugins']):
+            if tracker.is_software_changed(k8s_version, plugin_name):
                 plugins.try_manifest_enrichment(k8s_version, plugin_name)
 
     tracker.print()

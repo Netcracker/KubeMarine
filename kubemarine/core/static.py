@@ -17,13 +17,16 @@ from kubemarine.core import utils
 
 def reload():
     global GLOBALS
-    GLOBALS = _load_globals()
+    GLOBALS.clear()
+    GLOBALS.update(_load_globals())
 
     global DEFAULTS
-    DEFAULTS = _load_defaults()
+    DEFAULTS.clear()
+    DEFAULTS.update(_load_defaults())
 
     global SUPPORTED_VERSIONS
-    SUPPORTED_VERSIONS = _load_supported_versions()
+    SUPPORTED_VERSIONS.clear()
+    SUPPORTED_VERSIONS.update(_load_supported_versions())
 
 
 def _load_globals() -> dict:

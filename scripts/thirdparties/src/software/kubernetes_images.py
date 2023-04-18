@@ -21,12 +21,12 @@ def get_k8s_images_mapping(k8s_versions: List[str]) -> Dict[str, Dict[str, str]]
     return k8s_images_mapping
 
 
-def sync(tracker: ChangesTracker, kubernetes_versions: dict):
+def sync(tracker: ChangesTracker):
     """
     Fetch all kubernetes images from 'kubeadm' executable and actualize the compatibility_map.
     # TODO if pause version is changed, it is necessary to write patch that will reconfigure containerd.
     """
-    k8s_versions = list(kubernetes_versions)
+    k8s_versions = tracker.all_k8s_versions
     k8s_images_mapping = get_k8s_images_mapping(k8s_versions)
     image_names = list(k8s_images_mapping)
 
@@ -36,7 +36,7 @@ def sync(tracker: ChangesTracker, kubernetes_versions: dict):
         compatibility_map.prepare_software_mapping(image_name, list(k8s_image_versions))
 
         for k8s_version, image_version in k8s_image_versions.items():
-            k8s_settings = kubernetes_versions[k8s_version]
+            k8s_settings = tracker.kubernetes_versions[k8s_version]
             if image_name in k8s_settings:
                 image_version = k8s_settings[image_name]
             new_settings = {

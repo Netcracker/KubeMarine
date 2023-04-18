@@ -12,9 +12,6 @@ from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 
 
-PLUGINS = ['calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner']
-
-
 def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
     filename = f"{plugin_name}-{plugin_version}"
     target_file = os.path.join(SYNC_CACHE, filename)
@@ -166,17 +163,18 @@ def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) 
         raise Exception(f"Unsupported plugin {plugin_name!r}")
 
 
-def sync(tracker: ChangesTracker, kubernetes_versions: dict,
-         refresh_manifests=False):
+def sync(tracker: ChangesTracker, refresh_manifests=False):
     """
     Download and save plugin manifests if necessary, and actualize compatibility_map of all plugins.
     # TODO if plugin versions are changed, it is necessary to write patch that will reinstall corresponding plugins.
     """
-    k8s_versions = list(kubernetes_versions)
-    plugin_manifests = resolve_plugin_manifests(kubernetes_versions, PLUGINS, k8s_versions, refresh_manifests)
+    kubernetes_versions = tracker.kubernetes_versions
+    k8s_versions = tracker.all_k8s_versions
+    plugins = list(static.GLOBALS['plugins'])
+    plugin_manifests = resolve_plugin_manifests(kubernetes_versions, plugins, k8s_versions, refresh_manifests)
 
-    compatibility_map = CompatibilityMap(tracker, "plugins.yaml", PLUGINS)
-    for plugin_name in PLUGINS:
+    compatibility_map = CompatibilityMap(tracker, "plugins.yaml", plugins)
+    for plugin_name in plugins:
         compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
 
         for k8s_version in k8s_versions:
