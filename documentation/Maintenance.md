@@ -1150,7 +1150,7 @@ pss:
   namespaces:
     - namespace_1
     - namespace_2:
-      enforce: "baseline"
+        enforce: "baseline"
     - namespace_3
   namespaces_defaults:
     enforce: "privileged"
