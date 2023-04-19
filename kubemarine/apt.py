@@ -79,7 +79,9 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
 def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
-
+    else:
+        group.sudo(check_unattended_upgrade)
+                
     command = get_install_cmd(include, exclude)
 
     return group.sudo(command, **kwargs)
