@@ -16,7 +16,7 @@ class ChangesTracker:
         self.unexpected_content = False
 
     @property
-    def all_k8s_versions(self):
+    def all_k8s_versions(self) -> List[str]:
         return list(self.kubernetes_versions)
 
     def new(self, k8s_version: str):
@@ -30,7 +30,7 @@ class ChangesTracker:
         if k8s_version not in self.new_k8s:
             self.updated_k8s.setdefault(k8s_version, OrderedSet()).add(software_name)
 
-    def is_software_changed(self, k8s_version: str, software_name: str):
+    def is_software_changed(self, k8s_version: str, software_name: str) -> bool:
         return k8s_version in self.new_k8s or software_name in self.updated_k8s.get(k8s_version, set())
 
     def final_message(self, msg):
@@ -84,10 +84,10 @@ class ChangesTracker:
 
         info("Please check software compatibility and requirements.")
 
-        for k8s_version, plugin_requirements in requirements.items():
+        for k8s_version, software_requirements in requirements.items():
             info(f"Kubernetes {k8s_version}:")
-            for plugin_name, req in plugin_requirements:
-                key = plugin_name + ': ' + (' ' * (max_length - len(plugin_name)))
+            for software_name, req in software_requirements:
+                key = software_name + ': ' + (' ' * (max_length - len(software_name)))
                 info(f"\t{key}{req}")
 
     def _get_software_requirements_link(self, settings_settings: dict, version: Optional[str]):

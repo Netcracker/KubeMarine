@@ -1,3 +1,5 @@
+import os.path
+from abc import ABC, abstractmethod
 from typing import Dict, List
 
 from ruamel.yaml import CommentedMap
@@ -10,8 +12,7 @@ YAML = utils.yaml_structure_preserver()
 
 
 class CompatibilityMap:
-    def __init__(self, tracker: ChangesTracker,
-                 map_filename: str, software_names: List[str]):
+    def __init__(self, tracker: ChangesTracker, filename: str, software_names: List[str]):
         """
         Constructs a holder of originally formatted compatibility map.
 
@@ -20,9 +21,7 @@ class CompatibilityMap:
         :param software_names: list of software names to keep
         """
         self.tracker = tracker
-        self._map_filename = map_filename
-        self._resource = f"resources/configurations/compatibility/internal/{map_filename}"
-        self._software_names = software_names
+        self._resource = f"resources/configurations/compatibility/internal/{filename}"
 
         with utils.open_internal(self.resource_path, 'r') as stream:
             self.compatibility_map: CommentedMap = YAML.load(stream)
@@ -33,7 +32,7 @@ class CompatibilityMap:
             if key not in software_names:
                 del self.compatibility_map[key]
                 self.tracker.unexpected_content = True
-                print(f"Deleted {key!r} from {self._map_filename}")
+                print(f"Deleted {key!r} from {self.name}")
 
     @property
     def resource_path(self) -> str:
@@ -42,6 +41,10 @@ class CompatibilityMap:
     @property
     def resource(self) -> str:
         return self._resource
+
+    @property
+    def name(self) -> str:
+        return os.path.basename(self._resource)
 
     def prepare_software_mapping(self, software_name: str, k8s_versions: List[str]) -> None:
         """
@@ -61,12 +64,12 @@ class CompatibilityMap:
             if key not in k8s_versions:
                 del software_mapping[key]
                 self.tracker.delete(key)
-                print(f"Deleted '{software_name}.{key}' from {self._map_filename}")
+                print(f"Deleted '{software_name}.{key}' from {self.name}")
 
         sorted_map = utils.map_sorted(software_mapping, key=utils.version_key)
         if not (sorted_map is software_mapping):
             self.compatibility_map[software_name] = sorted_map
-            print(f"Reordered {software_name!r} in {self._map_filename}")
+            print(f"Reordered {software_name!r} in {self.name}")
 
     def reset_software_settings(self, software_name: str, k8s_version: str, new_settings: Dict[str, str]) -> None:
         """
@@ -83,7 +86,7 @@ class CompatibilityMap:
             software_settings = CommentedMap()
             utils.insert_map_sorted(software_mapping, k8s_version, software_settings, key=utils.version_key)
             self.tracker.new(k8s_version)
-            print(f"Added '{software_name}.{k8s_version}' to {self._map_filename}")
+            print(f"Added '{software_name}.{k8s_version}' to {self.name}")
 
         # delete unexpected settings
         map_keys = list(software_settings)
@@ -91,18 +94,32 @@ class CompatibilityMap:
             if key not in new_settings:
                 del software_settings[key]
                 self.tracker.update(k8s_version, software_name)
-                print(f"Deleted '{software_name}.{k8s_version}.{key}' from {self._map_filename}")
+                print(f"Deleted '{software_name}.{k8s_version}.{key}' from {self.name}")
 
         # update the settings only if they are not equal to the new.
         for k, v in new_settings.items():
             if k not in software_settings or software_settings[k] != v:
                 software_settings[k] = v
                 self.tracker.update(k8s_version, software_name)
-                print(f"Changed '{software_name}.{k8s_version}.{k}={v}' in {self._map_filename}")
+                print(f"Changed '{software_name}.{k8s_version}.{k}={v}' in {self.name}")
 
-    def flush(self):
-        with utils.open_internal(self.resource_path, 'w') as stream:
-            YAML.dump(self.compatibility_map, stream)
 
-        run(['git', 'add', self.resource_path])
-        info(f"Updated {self._map_filename}")
+class InternalCompatibility:
+    def load(self, tracker: ChangesTracker, filename: str, software_names: List[str]) -> CompatibilityMap:
+        return CompatibilityMap(tracker, filename, software_names)
+
+    def store(self, compatibility_map: CompatibilityMap):
+        with utils.open_internal(compatibility_map.resource_path, 'w') as stream:
+            YAML.dump(compatibility_map.compatibility_map, stream)
+
+        run(['git', 'add', compatibility_map.resource_path])
+        info(f"Updated {compatibility_map.name}")
+
+
+class SoftwareType(ABC):
+    def __init__(self, compatibility: InternalCompatibility):
+        self.compatibility = compatibility
+
+    @abstractmethod
+    def sync(self, tracker: ChangesTracker):
+        pass

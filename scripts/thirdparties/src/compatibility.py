@@ -3,7 +3,7 @@ from copy import deepcopy
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, static
-from .shell import fatal, info, run
+from .shell import info, run
 
 YAML = utils.yaml_structure_preserver()
 RESOURCE_PATH = utils.get_internal_resource_path("resources/configurations/compatibility/kubernetes_versions.yaml")
@@ -13,7 +13,8 @@ class KubernetesVersions:
     def __init__(self):
         with utils.open_internal(RESOURCE_PATH) as stream:
             self._kubernetes_versions = YAML.load(stream)
-            self._validate_mapping()
+
+        self._validate_mapping()
 
     @property
     def compatibility_map(self) -> dict:
@@ -36,6 +37,9 @@ class KubernetesVersions:
             if key not in minor_versions:
                 del k8s_versions[key]
 
+        self.store()
+
+    def store(self) -> None:
         with utils.open_internal(RESOURCE_PATH, 'w') as stream:
             YAML.dump(self._kubernetes_versions, stream)
 
@@ -51,11 +55,11 @@ class KubernetesVersions:
         for k8s_version, software in compatibility_map.items():
             missing_mandatory = mandatory_fields - set(software)
             if missing_mandatory:
-                fatal(f"Missing {', '.join(repr(s) for s in missing_mandatory)} software "
-                      f"for Kubernetes {k8s_version} in kubernetes_versions.yaml")
+                raise Exception(f"Missing {', '.join(map(repr, missing_mandatory))} software "
+                                f"for Kubernetes {k8s_version} in kubernetes_versions.yaml")
 
             unexpected_optional = set(software) - mandatory_fields - optional_fields
             if unexpected_optional:
-                fatal(f"Unexpected {', '.join(repr(s) for s in unexpected_optional)} software "
-                      f"for Kubernetes {k8s_version} in kubernetes_versions.yaml. "
-                      f"Allowed optional software: {', '.join(repr(s) for s in optional_fields)}.")
+                raise Exception(f"Unexpected {', '.join(map(repr, unexpected_optional))} software "
+                                f"for Kubernetes {k8s_version} in kubernetes_versions.yaml. "
+                                f"Allowed optional software: {', '.join(map(repr, optional_fields))}.")

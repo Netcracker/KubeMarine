@@ -9,7 +9,9 @@ TEMP_FILE = os.path.join(SYNC_CACHE, "tempfile")
 
 
 def info(message: str):
-    print(f'\033[1;32m{message}\033[0m')
+    if os.name != 'nt':
+        message = f'\033[1;32m{message}\033[0m'
+    print(message)
 
 
 def fatal(message: str):

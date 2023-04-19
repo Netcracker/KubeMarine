@@ -7,9 +7,79 @@ from kubemarine import demo
 from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
-from . import CompatibilityMap
+from . import SoftwareType, InternalCompatibility
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
+
+
+class ManifestResolver:
+    def __init__(self, refresh=False):
+        self.refresh = refresh
+
+    def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
+        manifest_path = get_default_manifest_path(plugin_name, plugin_version)
+        if not os.path.exists(manifest_path) or self.refresh:
+            manifest_local_path = resolve_local_path(plugin_name, plugin_version)
+            print(f"Copying {os.path.basename(manifest_local_path)} to {manifest_path}")
+            with utils.open_external(manifest_local_path, 'r') as source, \
+                    utils.open_internal(manifest_path, 'w') as target:
+                target.write(source.read())
+
+            run(['git', 'add', manifest_path])
+
+        with utils.open_internal(manifest_path, 'r') as stream:
+            return Manifest(stream)
+
+
+class ManifestsEnrichment:
+    def __init__(self, enrich_all=False):
+        self.enrich_all = enrich_all
+
+    def run(self, tracker: ChangesTracker):
+        for k8s_version in tracker.all_k8s_versions:
+            for plugin_name in list(static.GLOBALS['plugins']):
+                if self.enrich_all or tracker.is_software_changed(k8s_version, plugin_name):
+                    try_manifest_enrichment(k8s_version, plugin_name)
+
+
+class Plugins(SoftwareType):
+    def __init__(self, compatibility: InternalCompatibility, manifest_resolver: ManifestResolver):
+        super().__init__(compatibility)
+        self.manifest_resolver = manifest_resolver
+
+    def sync(self, tracker: ChangesTracker):
+        """
+        Download and save plugin manifests if necessary, and actualize compatibility_map of all plugins.
+        # TODO if plugin versions are changed, it is necessary to write patch that will reinstall corresponding plugins.
+        """
+        kubernetes_versions = tracker.kubernetes_versions
+        k8s_versions = tracker.all_k8s_versions
+        plugins = list(static.GLOBALS['plugins'])
+        plugin_manifests = resolve_plugin_manifests(self.manifest_resolver, kubernetes_versions)
+
+        compatibility_map = self.compatibility.load(tracker, "plugins.yaml", plugins)
+        for plugin_name in plugins:
+            compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
+
+            for k8s_version in k8s_versions:
+                k8s_settings = kubernetes_versions[k8s_version]
+                plugin_version = k8s_settings[plugin_name]
+                plugin_identity = (plugin_name, plugin_version)
+                manifest = plugin_manifests[plugin_identity]
+
+                new_settings = {
+                    'version': plugin_version
+                }
+                extra_images = get_extra_images(manifest, plugin_name, plugin_version)
+                for image_name, image_version in extra_images.items():
+                    if image_name in k8s_settings:
+                        image_version = k8s_settings[image_name]
+
+                    new_settings[f"{image_name}-version"] = image_version
+
+                compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
+
+        self.compatibility.store(compatibility_map)
 
 
 def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
@@ -48,33 +118,17 @@ def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
     return target_file
 
 
-def download_manifest_if_necessary(plugin_name: str, plugin_version: str, force: bool) -> str:
-    manifest_path = get_default_manifest_path(plugin_name, plugin_version)
-    if not os.path.exists(manifest_path) or force:
-        manifest_local_path = resolve_local_path(plugin_name, plugin_version)
-        print(f"Copying {os.path.basename(manifest_local_path)} to {manifest_path}")
-        with utils.open_external(manifest_local_path, 'r') as source, \
-                utils.open_internal(manifest_path, 'w') as target:
-            target.write(source.read())
-
-        run(['git', 'add', manifest_path])
-
-    return manifest_path
-
-
-def resolve_plugin_manifests(kubernetes_versions: dict, plugins: List[str], k8s_versions: List[str],
-                             refresh_manifests=False) -> Dict[Tuple[str, str], Manifest]:
+def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_versions: dict) \
+        -> Dict[Tuple[str, str], Manifest]:
     plugin_manifests = {}
-    for plugin_name in plugins:
-        for k8s_version in k8s_versions:
+    for plugin_name in static.GLOBALS['plugins']:
+        for k8s_version in kubernetes_versions:
             plugin_version = kubernetes_versions[k8s_version][plugin_name]
             plugin_identity = (plugin_name, plugin_version)
             if plugin_identity in plugin_manifests:
                 continue
 
-            manifest_path = download_manifest_if_necessary(plugin_name, plugin_version, force=refresh_manifests)
-            with utils.open_internal(manifest_path, 'r') as stream:
-                plugin_manifests[plugin_identity] = Manifest(stream)
+            plugin_manifests[plugin_identity] = manifest_resolver.resolve(plugin_name, plugin_version)
 
     return plugin_manifests
 
@@ -92,6 +146,7 @@ def calico_extract_images(images: List[str], plugin_version: str) -> Dict[str, s
 
     return {}
 
+
 def nginx_ingress_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
     expected_images = ['ingress-nginx/controller']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
@@ -106,6 +161,7 @@ def nginx_ingress_extract_images(images: List[str], plugin_version: str) -> Dict
             raise Exception(f"Image {image!r} of 'nginx-ingress-controller' is not expected")
 
     return extra_images
+
 
 def dashboard_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
     expected_images = ['kubernetesui/dashboard']
@@ -161,41 +217,6 @@ def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) 
         return local_path_provisioner_extract_images(images, plugin_version)
     else:
         raise Exception(f"Unsupported plugin {plugin_name!r}")
-
-
-def sync(tracker: ChangesTracker, refresh_manifests=False):
-    """
-    Download and save plugin manifests if necessary, and actualize compatibility_map of all plugins.
-    # TODO if plugin versions are changed, it is necessary to write patch that will reinstall corresponding plugins.
-    """
-    kubernetes_versions = tracker.kubernetes_versions
-    k8s_versions = tracker.all_k8s_versions
-    plugins = list(static.GLOBALS['plugins'])
-    plugin_manifests = resolve_plugin_manifests(kubernetes_versions, plugins, k8s_versions, refresh_manifests)
-
-    compatibility_map = CompatibilityMap(tracker, "plugins.yaml", plugins)
-    for plugin_name in plugins:
-        compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
-
-        for k8s_version in k8s_versions:
-            k8s_settings = kubernetes_versions[k8s_version]
-            plugin_version = k8s_settings[plugin_name]
-            plugin_identity = (plugin_name, plugin_version)
-            manifest = plugin_manifests[plugin_identity]
-
-            new_settings = {
-                'version': plugin_version
-            }
-            extra_images = get_extra_images(manifest, plugin_name, plugin_version)
-            for image_name, image_version in extra_images.items():
-                if image_name in k8s_settings:
-                    image_version = k8s_settings[image_name]
-
-                new_settings[f"{image_name}-version"] = image_version
-
-            compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
-
-    compatibility_map.flush()
 
 
 def try_manifest_enrichment(k8s_version: str, plugin_name: str):
