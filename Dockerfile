@@ -17,7 +17,7 @@ RUN apt update && \
     if [ "$BUILD_TYPE" = "test" ]; then \
       # Install from wheel with ansible to simulate real environment.
       pip3 install --no-cache-dir $(ls dist/*.whl)[ansible]; \
-      find -not -path "./test*" -not -path "./examples*" -delete; \
+      find -not -path "./test*" -not -path "./examples*" -not -path "./scripts*" -delete; \
     elif [ "$BUILD_TYPE" = "package" ]; then \
       find -not -path "./dist*" -delete; \
     else \

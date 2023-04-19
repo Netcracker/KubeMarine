@@ -29,13 +29,17 @@ def reload():
     SUPPORTED_VERSIONS.update(_load_supported_versions())
 
 
+def load_compatibility_map(filename: str) -> dict:
+    return utils.load_yaml(utils.get_internal_resource_path(
+        f"resources/configurations/compatibility/internal/{filename}"))
+
+
 def _load_globals() -> dict:
     globals = utils.load_yaml(
         utils.get_internal_resource_path('resources/configurations/globals.yaml'))
 
     for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml', 'thirdparties.yaml'):
-        internal_compatibility = utils.load_yaml(
-            utils.get_internal_resource_path(f'resources/configurations/compatibility/internal/{config_filename}'))
+        internal_compatibility = load_compatibility_map(config_filename)
 
         globals_compatibility = globals['compatibility_map']['software']
         duplicates = set(internal_compatibility) & set(globals_compatibility)

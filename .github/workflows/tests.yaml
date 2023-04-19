@@ -44,7 +44,7 @@ jobs:
       # Install pylint and kubemarine with all dependencies except ansible.
       # Then uninstall only kubemarine to avoid ambiguity and to surely run pylint on sources.
       - run: pip install pylint . && pip uninstall -y kubemarine
-      - run: pylint kubemarine test --disable fixme || exit 0
+      - run: pylint kubemarine scripts test --disable fixme || exit 0
   radon:
     runs-on: ubuntu-latest
     steps:

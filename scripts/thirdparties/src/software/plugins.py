@@ -12,6 +12,9 @@ from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 
 
+ERROR_UNEXPECTED_IMAGE = "Image '{image}' of '{plugin}' is not expected"
+
+
 class ManifestResolver:
     def __init__(self, refresh=False):
         self.refresh = refresh
@@ -142,7 +145,7 @@ def calico_extract_images(images: List[str], plugin_version: str) -> Dict[str, s
     for image in images:
         if image in expected_images:
             continue
-        raise Exception(f"Image {image!r} of 'calico' is not expected")
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='calico'))
 
     return {}
 
@@ -158,7 +161,7 @@ def nginx_ingress_extract_images(images: List[str], plugin_version: str) -> Dict
         if image_name == 'ingress-nginx/kube-webhook-certgen':
             extra_images['webhook'] = version
         else:
-            raise Exception(f"Image {image!r} of 'nginx-ingress-controller' is not expected")
+            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='nginx-ingress-controller'))
 
     return extra_images
 
@@ -174,7 +177,7 @@ def dashboard_extract_images(images: List[str], plugin_version: str) -> Dict[str
         if image_name == 'kubernetesui/metrics-scraper':
             extra_images['metrics-scraper'] = version
         else:
-            raise Exception(f"Image {image!r} of 'kubernetes-dashboard' is not expected")
+            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='kubernetes-dashboard'))
 
     return extra_images
 
@@ -185,7 +188,7 @@ def local_path_provisioner_extract_images(images: List[str], plugin_version: str
     for image in images:
         if image in expected_images:
             continue
-        raise Exception(f"Image {image!r} of 'local-path-provisioner' is not expected")
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='local-path-provisioner'))
 
     return {'busybox': '1.34.1'}
 

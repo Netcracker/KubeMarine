@@ -1,4 +1,5 @@
-from typing import Dict, List, Tuple, Optional
+import collections
+from typing import Dict, List, Tuple, Optional, OrderedDict
 
 from ordered_set import OrderedSet
 
@@ -46,7 +47,17 @@ class ChangesTracker:
             for k8s_version, software_list in self.updated_k8s.items():
                 info(f"\t{k8s_version}: {', '.join(software_list)}")
 
-        self._print_software_requirements()
+        requirements = self.get_changed_software_requirements()
+        if requirements:
+            info("Please check software compatibility and requirements.")
+
+            max_length = max(map(len, (name for software in requirements.values() for name, _ in software)))
+
+            for k8s_version, software_requirements in requirements.items():
+                info(f"Kubernetes {k8s_version}:")
+                for software_name, req in software_requirements:
+                    key = software_name + ': ' + (' ' * (max_length - len(software_name)))
+                    info(f"\t{key}{req}")
 
         if self.unexpected_content:
             info("Deleted unexpected content")
@@ -59,12 +70,11 @@ class ChangesTracker:
         for msg in self.final_messages:
             info(msg)
 
-    def _print_software_requirements(self):
+    def get_changed_software_requirements(self) -> OrderedDict[str, List[Tuple[str, str]]]:
         software = dict(static.GLOBALS['plugins'])
         software.update(static.GLOBALS['software'])
 
-        requirements: Dict[str, List[Tuple[str, str]]] = {}
-        max_length = 0
+        requirements: OrderedDict[str, List[Tuple[str, str]]] = collections.OrderedDict()
         for k8s_version in self.all_k8s_versions:
             for software_name, settings_settings in software.items():
                 related_software = [software_name]
@@ -76,19 +86,9 @@ class ChangesTracker:
 
                 version = self.kubernetes_versions[k8s_version].get(software_name)
                 req = self._get_software_requirements_link(settings_settings, version)
-                max_length = max(max_length, len(software_name))
                 requirements.setdefault(k8s_version, []).append((software_name, req))
 
-        if not requirements:
-            return
-
-        info("Please check software compatibility and requirements.")
-
-        for k8s_version, software_requirements in requirements.items():
-            info(f"Kubernetes {k8s_version}:")
-            for software_name, req in software_requirements:
-                key = software_name + ': ' + (' ' * (max_length - len(software_name)))
-                info(f"\t{key}{req}")
+        return requirements
 
     def _get_software_requirements_link(self, settings_settings: dict, version: Optional[str]):
         minor_version = None if version is None else utils.minor_version(version)

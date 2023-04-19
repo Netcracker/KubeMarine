@@ -24,7 +24,7 @@ class Synchronization:
         self.thirdparty_resolver = thirdparty_resolver
         self.manifests_enrichment = manifests_enrichment
 
-    def run(self) -> None:
+    def run(self) -> ChangesTracker:
         compatibility_map = self.kubernetes_versions.compatibility_map
         tracker = ChangesTracker(compatibility_map)
 
@@ -43,3 +43,4 @@ class Synchronization:
         self.manifests_enrichment.run(tracker)
 
         tracker.print()
+        return tracker
