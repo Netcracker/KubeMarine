@@ -35,13 +35,10 @@ class ManifestResolver:
 
 
 class ManifestsEnrichment:
-    def __init__(self, enrich_all=False):
-        self.enrich_all = enrich_all
-
     def run(self, tracker: ChangesTracker):
         for k8s_version in tracker.all_k8s_versions:
             for plugin_name in list(static.GLOBALS['plugins']):
-                if self.enrich_all or tracker.is_software_changed(k8s_version, plugin_name):
+                if tracker.is_software_changed(k8s_version, plugin_name):
                     try_manifest_enrichment(k8s_version, plugin_name)
 
 

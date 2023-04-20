@@ -27,10 +27,6 @@ if __name__ == '__main__':
                         action='store_true',
                         help='Always download and actualize plugin manifests')
 
-    parser.add_argument('--enrich-manifests',
-                        action='store_true',
-                        help='Run enrichment of all plugin manifests for all Kubernetes versions')
-
     args = parser.parse_args()
     Synchronization(
         InternalCompatibility(),
@@ -38,5 +34,5 @@ if __name__ == '__main__':
         KubernetesImagesResolver(),
         ManifestResolver(refresh=args.refresh_manifests),
         ThirdpartyResolver(),
-        ManifestsEnrichment(enrich_all=args.enrich_manifests),
+        ManifestsEnrichment(),
     ).run()
