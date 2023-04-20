@@ -474,6 +474,8 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
     # Replace cluster FQDN with ip
     public_cluster_ip = cluster.inventory.get('public_cluster_ip')
     if public_cluster_ip:
+        if type(ipaddress.ip_address(public_cluster_ip)) is ipaddress.IPv6Address:
+            public_cluster_ip = f"[{public_cluster_ip}]"
         cluster_name = cluster.inventory['cluster_name']
         kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)
 
