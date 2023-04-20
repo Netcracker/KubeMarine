@@ -1,15 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "Directly call the Python 3 code",
   "properties": {
     "module": {
-      "type": "string"
+      "type": "string",
+      "description": "The absolute path on local host to the Python 3 module to be loaded"
     },
     "method": {
-      "type": "string"
+      "type": "string",
+      "description": "The name of the method to call"
     },
     "arguments": {
-      "type": "object"
+      "type": "object",
+      "description": "Key-value map, which should be applied as kwargs to the requested method"
     }
   },
   "required": ["module", "method"],

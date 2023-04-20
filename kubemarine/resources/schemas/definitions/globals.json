@@ -4,6 +4,77 @@
   "description": "Section to hold the parameters which override global settings",
   "additionalProperties": false,
   "properties": {
+    "expect": {
+      "type": "object",
+      "description": "Section to define expect timeouts",
+      "additionalProperties": false,
+      "properties": {
+        "deployments": {
+          "type": "object",
+          "description": "Timeouts for daemonsets, deployments, replicasets, statefulsets",
+          "additionalProperties": false,
+          "properties": {
+            "retries": {
+              "type": "integer",
+              "minimal": 1,
+              "default": 45,
+              "description": "Number of retries for deployment expect check"
+            },
+            "timeout": {
+              "type": "integer",
+              "minimal": 1,
+              "default": 5,
+              "description": "Timeout for deployment expect check in seconds"
+            }
+          }
+        },
+        "pods" :{
+          "type": "object",
+          "description": "Timeouts for pods",
+          "additionalProperties": false,
+          "properties": {
+            "kubernetes": {
+              "type": "object",
+              "description": "Timeouts for kubernetes pods",
+              "additionalProperties": false,
+              "properties": {
+                "retries": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 30,
+                  "description": "Number of retries for kubernetes pods expect check"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 5,
+                  "description": "Timeout for deployment kubernetes pods check in seconds"
+                }
+              }
+            },
+            "plugins": {
+              "type": "object",
+              "description": "Timeouts for plugins pods",
+              "additionalProperties": false,
+              "properties": {
+                "retries": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 150,
+                  "description": "Number of retries for plugins pods expect check"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimal": 1,
+                  "default": 5,
+                  "description": "Timeout for deployment plugins pods check in seconds"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "nodes": {
       "$ref": "#/definitions/Nodes"
     },

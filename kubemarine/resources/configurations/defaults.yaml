@@ -1,6 +1,17 @@
 vrrp_ips: []
 
 globals: 
+  expect:
+    deployments:
+      timeout: 5
+      retries: 45
+    pods:
+      kubernetes:
+        timeout: 5
+        retries: 30
+      plugins:
+        timeout: 5
+        retries: 150
   nodes:
     ready:
       timeout: 5
@@ -21,6 +32,7 @@ services:
     apiVersion: kubelet.config.k8s.io/v1beta1
     kind: KubeletConfiguration
     readOnlyPort: 0
+    enableDebuggingHandlers: false
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
@@ -431,8 +443,6 @@ plugins:
                 - coredns
                 - calico-kube-controllers
                 - calico-node
-              timeout: 5
-              retries: 150
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico
@@ -678,7 +688,6 @@ rbac:
           annotations: {}
         type: kubernetes.io/service-account-token
 
-  admission: psp
   psp:
     pod-security: enabled
     oob-policies:

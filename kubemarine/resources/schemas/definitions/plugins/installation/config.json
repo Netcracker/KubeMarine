@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
+  "description": "An alias for template that allows you not to render the contents of the files",
   "oneOf": [
     {"type": "string"},
     {
@@ -8,7 +9,8 @@
       "properties": {
         "do_render": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Allows you not to render the contents of the file"
         }
       },
       "required": ["source"],
