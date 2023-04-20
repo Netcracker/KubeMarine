@@ -184,6 +184,8 @@ The actual information about the supported versions can be found at [global.yaml
     * 6443 : Kubernetes API server
     * 8443 : Kubernetes dashboard
     * 2379-2380 : ETCD server & client API
+    * 9091 - Calico metric port
+    * 9094 - Calico kube-controller metric port
     * 10250 : Kubelet API
     * 10257 : Kube-scheduler
     * 10259 : Kube-controller-manager 
