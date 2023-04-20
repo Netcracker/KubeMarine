@@ -179,6 +179,8 @@ services:
         - man_groff
 
   modprobe:
+    # For RHEL OS:
+    rhel:
     - br_netfilter
     - ip_vs
     - ip_vs_rr
@@ -187,6 +189,18 @@ services:
     - ip6table_filter
     - nf_conntrack_ipv6
     - nf_nat_masquerade_ipv6
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+    # For Debian OS:
+    debian:
+    - br_netfilter
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - ip6table_filter
+    - nf_conntrack
+    - nf_nat
     - nf_reject_ipv6
     - nf_defrag_ipv6
 
@@ -382,12 +396,6 @@ plugins:
     flexvol:
       image: calico/pod2daemon-flexvol:v3.10.1
 
-  flannel:
-    install: false
-    installation:
-      priority: 0
-    image: quay.io/coreos/flannel:v0.11.0-amd64
-
   nginx-ingress-controller:
     install: true
     installation:
@@ -400,19 +408,6 @@ plugins:
           paths:
             cert: /path/to/cert
             key: /path/to/key
-      nodeSelector:
-        kubernetes.io/os: linux
-
-  haproxy-ingress-controller:
-    install: false
-    installation:
-      priority: 1
-    controller:
-      image: haproxytech/kubernetes-ingress:1.2.7
-      nodeSelector:
-        kubernetes.io/os: linux
-    backend:
-      image: k8s.gcr.io/defaultbackend:1.0
       nodeSelector:
         kubernetes.io/os: linux
 

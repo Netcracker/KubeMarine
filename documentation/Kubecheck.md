@@ -37,7 +37,6 @@ This section provides information about the Kubecheck functionality.
       - [201 Kubelet Status](#201-kubelet-status)
         - [202 Nodes pid_max](#202-nodes-pid_max)
         - [203 Kubelet Version](#203-kubelet-version)
-    - [204 Recommended packages versions](#204-recommended-packages-version)
     - [205 System packages versions](#205-system-packages-version)
       - [205 CRI Versions](#205-cri-versions)
       - [205 HAproxy Version](#205-haproxy-version)
@@ -441,51 +440,52 @@ This test checks that kubelet `maxPods` and `podPidsLimit` are correctly alligne
 
 This test checks the Kubelet version on all hosts in a cluster.
 
-##### 204 Recommended Packages Version
-
-*Task*: `services.packages.system.recommended_versions`
-
-This test checks that system package versions in the inventory are recommended.
-
 ##### 205 System Packages Version
 
-Tests of this type check that the system packages are installed and have equal versions.
+Tests of this type check that the system packages are installed, have equal versions and those versions are 
+recommended and correspond with cluster.yaml.
 
 ###### 205 CRI Versions
 
 *Task*: `services.packages.system.cri_version`
 
-This test checks that the configured CRI package is installed on all nodes and has an equal version.
+This test checks that the configured CRI package is installed on all nodes, has equal version and this version is 
+recommended and corresponds with cluster.yaml.
 
 ###### 205 HAproxy Version
 
 *Task*: `services.packages.system.haproxy_version`
 
-This test checks that the configured HAproxy package is installed on all nodes and has an equal version.
+This test checks that the configured HAproxy package is installed on all nodes, has equal version and this version is 
+recommended and corresponds with cluster.yaml.
 
 ###### 205 Keepalived Version
 
 *Task*: `services.packages.system.keepalived_version`
 
-This test checks that the configured Keepalived package is installed on all nodes and has an equal version.
+This test checks that the configured Keepalived package is installed on all nodes, has equal version and this version is 
+recommended and corresponds with cluster.yaml.
 
 ###### 205 Audit Version
 
 *Task*: `services.packages.system.audit_version`
 
-This test checks that the configured Audit package is installed on all nodes and has an equal version.
+This test checks that the configured Audit package is installed on all nodes, has equal version and this version is 
+recommended and corresponds with cluster.yaml.
 
 ###### 205 Mandatory Package Versions
 
 *Task*: `services.packages.system.mandatory_versions`
 
-This test checks that the configured mandatory packages are installed on all nodes and have equal versions.
+This test checks that the configured mandatory packages are installed on all nodes, has equal version and this version 
+corresponds with cluster.yaml.
 
 ##### 206 Generic Packages Version
 
 *Task*: `services.packages.generic.version`
 
-This test checks that the configured generic packages are installed on all nodes and have equal versions.
+This test checks that the configured generic packages are installed on all nodes, has equal version and this version 
+corresponds with cluster.yaml.
 
 ##### 212 Thirdparties hashes
 

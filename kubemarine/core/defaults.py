@@ -29,6 +29,7 @@ from kubemarine.core.yaml_merger import default_merger
 DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.core.schema.verify_inventory",
     "kubemarine.core.defaults.merge_defaults",
+    "kubemarine.admission.enrich_default_admission",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.controlplane.controlplane_node_enrichment",
@@ -52,7 +53,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.enrich_inventory",
     "kubemarine.admission.enrich_inventory",
     "kubemarine.kubernetes_accounts.enrich_inventory",
-    "kubemarine.plugins.calico.enrich_inventory",
     "kubemarine.plugins.nginx_ingress.cert_renew_enrichment",
     "kubemarine.plugins.nginx_ingress.enrich_inventory",
     "kubemarine.core.defaults.calculate_nodegroups",
@@ -64,9 +64,11 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.audit.verify_inventory",
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
+    "kubemarine.plugins.builtin.verify_inventory",
     "kubemarine.coredns.enrich_add_hosts_config",
     "kubemarine.k8s_certs.renew_verify",
-    "kubemarine.cri.enrich_inventory"
+    "kubemarine.cri.enrich_inventory",
+    "kubemarine.system.enrich_kernel_modules"
 ]
 
 supported_defaults = {

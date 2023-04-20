@@ -103,76 +103,64 @@ def _check_same_os(cluster: KubernetesCluster):
         raise TestFailure(f"Nodes have different OS families or versions")
 
 
-def recommended_system_packages_versions(cluster: KubernetesCluster):
+def recommended_system_package_versions(cluster: KubernetesCluster, pckg_alias: str):
     """
-    Task that checks if configured "system" packages versions are compatible with the configured k8s version and OS.
-    Fails if unable to detect the OS family.
-    Warns if configured not recommended k8s version or if configured not recommended system packages versions.
+    Function that checks if defined package are compatible with the configured k8s version and OS.
+    Raise Warn if unable to detect the OS family, configured not recommended k8s version or
+    if configured not recommended system packages versions.
     """
-    with TestCase(cluster.context['testsuite'], '204', "Services", f"Recommended packages version") as tc:
-        version_key = system.get_compatibility_version_key(cluster)
-        if not version_key:
-            raise TestFailure("OS is unknown or multiple OS present")
-        k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-        compatibility = cluster.globals["compatibility_map"]["software"]
-        if k8s_version not in compatibility["kubeadm"]:
-            raise TestWarn(f"Using not recommended k8s version: {k8s_version}")
+    version_key = system.get_compatibility_version_key(cluster)
+    if not version_key:
+        raise TestFailure("OS is unknown or multiple OS present")
+    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    compatibility = cluster.globals["compatibility_map"]["software"]
+    if k8s_version not in compatibility["kubeadm"]:
+        raise TestWarn(f"Using not recommended k8s version: {k8s_version}")
 
-        # Mapping "system_package_alias -> expected_packages_names -> expected_versions"
-        # We assume that system packages have word "haproxy"/"keepalived"/"docker"/"containerd"/"podman" in their name,
-        # if not - then we may miss such package
+    # Mapping "system_package_alias -> expected_packages_names -> expected_versions"
+    # We assume that system packages have word "haproxy"/"keepalived"/"docker"/"containerd"/"podman" in their name,
+    # if not - then we may miss such package
+    if pckg_alias == "haproxy":
+        expected_system_packages = {"haproxy": compatibility["haproxy"][k8s_version][version_key]}
+    elif pckg_alias == "keepalived":
+        expected_system_packages = {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
+    elif pckg_alias == "containerd":
+        expected_system_packages = {"podman": compatibility["podman"][k8s_version][version_key]}
+        if version_key in ["version_rhel", "version_rhel8"]:
+            expected_system_packages["containerd.io"] = compatibility["containerdio"][k8s_version][version_key]
+        else:
+            expected_system_packages["containerd"] = compatibility["containerd"][k8s_version][version_key]
+    elif pckg_alias == "docker":
         expected_system_packages = {
-            "haproxy": {"haproxy": compatibility["haproxy"][k8s_version][version_key]},
-            "keepalived": {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
+            "docker": compatibility["docker"][k8s_version][version_key],
+            "containerd.io": compatibility["containerdio"][k8s_version][version_key]
         }
-        containerd_name = "containerd"
-        containerd_name_last = "containerd"
-        if "docker" in cluster.inventory['services']['cri']['containerRuntime']:
-            if version_key == "version_rhel":
-                containerd_name = "containerd.io"
-                containerd_name_last = "containerdio"
+    else:
+        raise TestWarn(f"Package {pckg_alias} doesn't have recommended version")
 
-            expected_system_packages["docker"] = {
-                "docker": compatibility["docker"][k8s_version][version_key],
-                containerd_name: compatibility[containerd_name_last][k8s_version][version_key]
-                }
-        elif "containerd" in cluster.inventory["services"]["cri"]["containerRuntime"]:
-            if version_key in ["version_rhel", "version_rhel8"]:
-                containerd_name = "containerd.io"
-                containerd_name_last = "containerdio"
+    good_results = set()
+    bad_results = []
+    actual_packages = cluster.get_package_association(pckg_alias, "package_name")
+    if not isinstance(actual_packages, list):
+        actual_packages = [actual_packages]
+    for expected_pckg, version in expected_system_packages.items():
+        version = version.replace("*", "")
+        is_found = False
+        for actual_pckg in actual_packages:
+            if expected_pckg in actual_pckg:
+                is_found = True
+                if f"-{version}" in actual_pckg or f"={version}" in actual_pckg:
+                    good_results.add(actual_pckg)
+                else:
+                    cluster.log.debug(f"Package {actual_pckg} is not recommended, recommended version is {version}")
+                    bad_results.append(actual_pckg)
+        if not is_found:
+            cluster.log.debug(f"Package {expected_pckg} is not found in inventory")
+            bad_results.append(expected_pckg)
 
-            expected_system_packages["containerd"] = {
-                containerd_name: compatibility[containerd_name_last][k8s_version][version_key],
-                "podman": compatibility["podman"][k8s_version][version_key]
-            }
-
-        good_results = set()
-        bad_results = []
-        for package_alias, expected_packages in expected_system_packages.items():
-            actual_packages = cluster.get_package_association(package_alias, "package_name")
-            if not isinstance(actual_packages, list):
-                actual_packages = [actual_packages]
-            for expected_pckg, version in expected_packages.items():
-                version = version.replace("*", "")
-                is_found = False
-                for actual_pckg in actual_packages:
-                    if expected_pckg in actual_pckg:
-                        is_found = True
-                        if f"-{version}" in actual_pckg or f"={version}" in actual_pckg:
-                            good_results.add(actual_pckg)
-                        else:
-                            cluster.log.debug(f"Package {actual_pckg} is not recommended, recommended version is {version}")
-                            bad_results.append(actual_pckg)
-                if not is_found:
-                    cluster.log.debug(f"Package {expected_pckg} is not found in inventory")
-                    bad_results.append(expected_pckg)
-
-        if bad_results:
-            raise TestWarn("detected not recommended packages versions",
-                           hint=f'Check the list of recommended packages and what is listed in the inventory and fix '
-                                f'the inconsistencies of the following packages on the system: {bad_results}')
-        cluster.log.debug(f"found packages: {good_results}")
-        tc.success("all packages have recommended versions")
+    if bad_results:
+        raise TestWarn(f"Detected not recommended packages versions: {bad_results}")
+    cluster.log.debug(f"Detected packages with recommended versions: {good_results}")
 
 
 def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
@@ -187,8 +175,11 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
         hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
         if not hosts_to_packages:
             raise TestWarn(f"No nodes to check {pckg_alias!r} version")
+        check_packages_versions(cluster, tc, hosts_to_packages, raise_successful=False)
 
-        return check_packages_versions(cluster, tc, hosts_to_packages)
+        if pckg_alias in ["haproxy", "keepalived", "containerd", "docker"]:
+            recommended_system_package_versions(cluster, pckg_alias)
+        tc.success("all packages have correct versions")
 
 
 def mandatory_packages_versions(cluster: KubernetesCluster):
@@ -225,7 +216,8 @@ def generic_packages_versions(cluster: KubernetesCluster):
         return check_packages_versions(cluster, tc, hosts_to_packages, warn_on_bad_result=True)
 
 
-def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]], warn_on_bad_result=False):
+def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]],
+                            warn_on_bad_result=False, raise_successful=True):
     """
     Verifies that all packages are installed on required nodes and have equal versions
     :param cluster: main cluster object
@@ -249,7 +241,11 @@ def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]]
             cluster.log.debug(version_map[version])
             bad_results.append(package)
         else:
-            good_results.append(version)
+            package_name = package.replace("*", "")
+            if package_name in version:
+                good_results.append(version)
+            else:
+                bad_results.append(version)
 
     if bad_results:
         hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
@@ -258,7 +254,8 @@ def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]]
             raise TestWarn("detected incorrect packages versions", hint=hint_message)
         raise TestFailure("detected incorrect packages versions", hint=hint_message)
     cluster.log.debug(f"installed packages: {good_results}")
-    tc.success("all packages have correct versions")
+    if raise_successful:
+        tc.success("all packages have correct versions")
 
 
 def get_nodes_description(cluster):
@@ -385,12 +382,20 @@ def thirdparties_hashes(cluster):
             # SHA is correct, now check if it is an archive and if it does, then also check SHA for archive content
             if 'unpack' in config:
                 unpack_dir = config['unpack']
-                # TODO support zip
-                res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
+                extension = path.split('.')[-1]
+                if extension == 'zip': 
+                    res = group.sudo(' unzip -qq -l %s | awk \'NF > 3 { print $4 }\' | while read file_name; do '  # for each file in archive
+                                 '  echo ${file_name} '  # print   1) filename
+                                 '    $(sudo unzip -p %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
+                                 '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
+                                 'done' % (path, path, unpack_dir)) 
+                else :
+                    res = group.sudo('tar tf %s | grep -vw "./" | while read file_name; do '  # for each file in archive
                                  '  echo ${file_name} '  # print   1) filename
                                  '    $(sudo tar xfO %s ${file_name} | openssl sha1 | cut -d\\  -f2) '  # 2) sha archive
                                  '    $(sudo openssl sha1 %s/${file_name} | cut -d\\  -f2); '  # 3) sha unpacked
                                  'done' % (path, path, unpack_dir))
+                
                 # for each file on each host, verify that SHA in archive is equal to SHA for unpacked
                 for host, result in res.items():
                     if result.failed:
@@ -844,8 +849,8 @@ def control_plane_configuration_status(cluster):
 
             for static_pod in static_pods_content:
                 result[static_pod['metadata']['name']] = dict()
-                if version in static_pod["spec"]["containers"][0].get("image", ""):
-                    result[static_pod['metadata']['name']]['correct_version'] = True
+                result[static_pod['metadata']['name']]['correct_version'] = \
+                    version in static_pod["spec"]["containers"][0].get("image", "")
                 result[static_pod['metadata']['name']]['correct_properties'] = \
                     check_extra_args(cluster, static_pod, control_plane)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
@@ -1079,6 +1084,7 @@ def calico_config_check(cluster):
             raise TestFailure('invalid', hint=message)
         else:
             tc.success(results='valid')
+
 
 def kubernetes_admission_status(cluster):
     """
@@ -1321,7 +1327,6 @@ tasks = OrderedDict({
         },
         'packages': {
             'system': {
-                'recommended_versions': recommended_system_packages_versions,
                 'cri_version': lambda cluster:
                     system_packages_versions(cluster, cluster.inventory['services']['cri'][ 'containerRuntime']),
                 'haproxy_version': lambda cluster: system_packages_versions(cluster, 'haproxy'),

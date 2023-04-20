@@ -1,6 +1,17 @@
 vrrp_ips: []
 
 globals: 
+  expect:
+    deployments:
+      timeout: 5
+      retries: 45
+    pods:
+      kubernetes:
+        timeout: 5
+        retries: 30
+      plugins:
+        timeout: 5
+        retries: 150
   nodes:
     ready:
       timeout: 5
@@ -21,6 +32,7 @@ services:
     apiVersion: kubelet.config.k8s.io/v1beta1
     kind: KubeletConfiguration
     readOnlyPort: 0
+    enableDebuggingHandlers: false
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
@@ -130,12 +142,27 @@ services:
       userland-proxy: False
 
   modprobe:
-    - br_netfilter
-    - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
-    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack_ipv6{% endif %}'
-    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat_masquerade_ipv6{% endif %}'
-    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
-    - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
+    rhel:
+      - br_netfilter
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat_masquerade_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
+    rhel8:
+      - br_netfilter
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
+    debian:
+      - br_netfilter
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
 
   sysctl:
     net.bridge.bridge-nf-call-iptables: 1
@@ -412,15 +439,15 @@ plugins:
 
   calico:
     version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    install: true
     installation:
       priority: 0
       procedures:
         - python:
-            module: plugins/calico.py
-            method: apply_calico_yaml
+            module: plugins/builtin.py
+            method: apply_yaml
             arguments:
-              calico_original_yaml: 'plugins/yaml/calico-{{ plugins.calico.version }}.yaml.original'
-              calico_yaml: 'calico-{{ plugins.calico.version }}.yaml'
+              plugin_name: calico
         - expect:
             daemonsets:
               - calico-node
@@ -431,8 +458,6 @@ plugins:
                 - coredns
                 - calico-kube-controllers
                 - calico-node
-              timeout: 5
-              retries: 150
         - thirdparty: /usr/bin/calicoctl
         - shell:
             command: mkdir -p /etc/calico
@@ -499,30 +524,10 @@ plugins:
       FELIX_LOGSEVERITYSCREEN: info
       FELIX_HEALTHENABLED: 'true'
       FELIX_USAGEREPORTINGENABLED: 'false'
-      FELIX_TYPHAK8SSERVICENAME:
-          configMapKeyRef:
-            name: calico-config
-            key: typha_service_name
       NODENAME:
           fieldRef:
             apiVersion: v1
             fieldPath: spec.nodeName
-      CALICO_NETWORKING_BACKEND:
-          configMapKeyRef:
-            name: calico-config
-            key: calico_backend
-      FELIX_IPINIPMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
-      FELIX_VXLANMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
-      FELIX_WIREGUARDMTU:
-          configMapKeyRef:
-            name: calico-config
-            key: veth_mtu
     cni:
       image: 'calico/cni:{{ plugins.calico.version }}'
       ipam:
@@ -548,17 +553,6 @@ plugins:
     flexvol:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
-  flannel:
-    installation:
-      priority: 0
-      procedures:
-        - template: templates/plugins/flannel.yaml.j2
-        - expect:
-            pods:
-              - coredns
-              - kube-flannel-ds-amd64
-    image: quay.io/coreos/flannel:v0.11.0-amd64
-
   nginx-ingress-controller:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: true
@@ -569,7 +563,11 @@ plugins:
         - python:
             module: plugins/nginx_ingress.py
             method: manage_custom_certificate
-        - template: 'templates/plugins/nginx-ingress-controller-{{ plugins["nginx-ingress-controller"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: nginx-ingress-controller
         - expect:
             daemonsets:
               - name: ingress-nginx-controller
@@ -600,38 +598,17 @@ plugins:
         containerPort: 8443
         protocol: TCP
 
-  # TODO: support hostPort for haproxy-ingress
-  haproxy-ingress-controller:
-    install: false
-    installation:
-      priority: 1
-      procedures:
-        - template: templates/plugins/haproxy-ingress-controller.yaml.j2
-        - expect:
-            pods:
-              - haproxy-ingress
-        - python:
-            module: plugins/haproxy_ingress.py
-            method: override_priviledged_ports
-            arguments:
-              service: haproxy-ingress
-              namespace: haproxy-controller
-    controller:
-      image: haproxytech/kubernetes-ingress:1.2.7
-      nodeSelector:
-        kubernetes.io/os: linux
-    backend:
-      image: k8s.gcr.io/defaultbackend:1.0
-      nodeSelector:
-        kubernetes.io/os: linux
-
   kubernetes-dashboard:
     version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: false
     installation:
       priority: 2
       procedures:
-        - template: 'templates/plugins/dashboard-{{ plugins["kubernetes-dashboard"].version|minorversion }}.yaml.j2'
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: kubernetes-dashboard
         - expect:
             deployments:
               - name: kubernetes-dashboard
@@ -660,6 +637,10 @@ plugins:
         namespace: kubernetes-dashboard
         annotations:
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/configuration-snippet: |
+            add_header X-Frame-Options "sameorigin";
+            add_header X-Content-Type-Options "nosniff";
+            add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; form-action 'self' " ; 
       spec:
         ingressClassName: nginx
         tls:
@@ -680,11 +661,16 @@ plugins:
                         number: 443
 
   local-path-provisioner:
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
     install: false
     installation:
       priority: 2
       procedures:
-      - template: 'templates/plugins/local-path-provisioner.yaml.j2'
+      - python:
+          module: plugins/builtin.py
+          method: apply_yaml
+          arguments:
+            plugin_name: local-path-provisioner
       - expect:
           pods:
             - local-path-provisioner
@@ -692,7 +678,7 @@ plugins:
       name: local-path
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
-    image: 'rancher/local-path-provisioner:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
     helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version }}'
 
 rbac:
@@ -717,7 +703,6 @@ rbac:
           annotations: {}
         type: kubernetes.io/service-account-token
 
-  admission: psp
   psp:
     pod-security: enabled
     oob-policies:

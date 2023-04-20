@@ -46,8 +46,7 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 
 baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard"} 
 privileged_plugins = {"nginx-ingress-controller": "ingress-nginx", 
-                      "local-path-provisioner": "local-path-storage", 
-                      "haproxy-ingress-controller": "haproxy-controller"}
+                      "local-path-provisioner": "local-path-storage"}
 
 loaded_oob_policies = {}
 
@@ -604,6 +603,13 @@ def manage_pss_enrichment(inventory, cluster):
             if item.endswith("version"):
                 verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
 
+    return inventory
+
+
+def enrich_default_admission(inventory, _):
+    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if not inventory["rbac"].get("admission"):
+        inventory["rbac"]["admission"] = "psp" if minor_version < 25 else "pss"
     return inventory
 
 
