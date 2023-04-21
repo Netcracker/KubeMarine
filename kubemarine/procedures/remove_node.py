@@ -119,8 +119,6 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
             if node.get('address') is not None and inventory_to_finalize['services']['etc_hosts'].get(node['address']):
                 del inventory_to_finalize['services']['etc_hosts'][node['address']]
 
-        coredns.enrich_add_hosts_config(inventory_to_finalize, cluster)
-
     return inventory_to_finalize
 
 
