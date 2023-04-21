@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+import ipaddress
 from typing import Optional, List
 
 from kubemarine.core import utils, log
@@ -185,6 +186,7 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_ingressclass_nginx,
             self.enrich_job_ingress_nginx_admission_create,
             self.enrich_job_ingress_nginx_admission_patch,
+            self.enrich_service_ingress_nginx_controller,
         ]
 
     def enrich_namespace_ingress_nginx(self, manifest: Manifest):
@@ -287,6 +289,14 @@ class IngressNginxManifestProcessor(Processor):
         key = "Job_ingress-nginx-admission-patch"
         self.enrich_image_for_container(manifest, key,
             plugin_service='webhook', container_name='patch', is_init_container=False)
+
+    def enrich_service_ingress_nginx_controller(self, manifest: Manifest):
+        key = "Service_ingress-nginx-controller"
+        ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
+        if type(ipaddress.ip_address(ip)) is ipaddress.IPv6Address:
+            source_yaml = manifest.get_obj(key, patch=True)
+            source_yaml['spec']['ipFamilies'] = ['IPv6']
+            self.log.verbose(f"The {key} has been patched in 'spec.ipFamilies' with 'IPv6'")
 
 
 class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
