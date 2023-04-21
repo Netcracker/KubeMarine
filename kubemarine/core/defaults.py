@@ -183,20 +183,26 @@ def apply_registry(inventory, cluster):
     elif cri_impl == "containerd":
         registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
 
-        if not inventory['services']['cri']['containerdConfig'].get(registry_section):
+        containerd_config = inventory['services']['cri']['containerdConfig']
+        if not containerd_config.get(registry_section):
             if not containerd_endpoints:
                 containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
 
-            inventory['services']['cri']['containerdConfig'][registry_section] = {
+            containerd_config[registry_section] = {
                 'endpoint': containerd_endpoints
             }
 
-        kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
-        pause_version = cluster.globals['compatibility_map']['software']['pause'][kubernetes_version]['version']
-        if not inventory['services']['cri']['containerdConfig'].get('plugins."io.containerd.grpc.v1.cri"'):
-            inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
-        if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):
-            inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
+        path = 'plugins."io.containerd.grpc.v1.cri"'
+        if not containerd_config.get(path):
+            containerd_config[path] = {}
+        if not containerd_config[path].get('sandbox_image'):
+            kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+            pause_mapping = cluster.globals['compatibility_map']['software']['pause']
+            if kubernetes_version not in pause_mapping:
+                raise Exception(f"Failed to detect pause version for Kubernetes {kubernetes_version}. "
+                                f"Please explicitly specify services.cri.containerdConfig.{path}.sandbox_image section.")
+            pause_version = pause_mapping[kubernetes_version]['version']
+            containerd_config[path]['sandbox_image'] = \
                 f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
     from kubemarine import thirdparties
