@@ -4680,7 +4680,6 @@ The `release` parameter specifies target Helm release. The parameter is optional
 **Note**:
 
 * Helm 3 is only supported.
-* If the `values` parameter is specified, the `values_file` parameter is ignored.
 
 For example:
 
