@@ -31,7 +31,7 @@ from kubemarine.core import flow, utils, summary
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
-from kubemarine import kubernetes
+
 
 def _applicable_for_new_nodes_with_roles(*roles):
     """
@@ -681,7 +681,7 @@ def main(cli_arguments=None):
     flow.run_actions(context, [install])
 
     if install.verification_version_result:
-        print(install.verification_version_result)
+        utils.warning(install.verification_version_result)
 
 
 if __name__ == '__main__':

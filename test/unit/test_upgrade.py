@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import random
+import re
 import unittest
 from copy import deepcopy
+from typing import List
 
 from kubemarine import kubernetes
-from kubemarine.core import errors
+from kubemarine.core import errors, utils as kutils, static
 from kubemarine.procedures import upgrade
 from kubemarine import demo
 from test.unit import utils
@@ -27,63 +28,37 @@ from test.unit import utils
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_valid_upgrade_plan(self):
-        upgrade.verify_upgrade_plan([
-            'v1.17.1',
-            'v1.18.2'
-        ])
+        upgrade.verify_upgrade_plan(self.k8s_versions())
 
     def test_invalid_upgrade_plan(self):
-        with self.assertRaises(Exception):
+        k8s_oldest = self.k8s_versions()[0]
+        k8s_latest = self.k8s_versions()[-1]
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
+                                               % (re.escape(k8s_oldest), re.escape(k8s_latest))):
             upgrade.verify_upgrade_plan([
-                'v1.17.1',
-                'v1.19.3'
+                k8s_oldest,
+                k8s_latest
             ])
 
-    def test_upgrade_plan_bad_symbols(self):
-        with self.assertRaises(Exception):
+    def test_upgrade_plan_not_supported_version(self):
+        k8s_latest = self.k8s_versions()[-1]
+        not_allowed_version = utils.increment_version(k8s_latest)
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_ALLOWED
+                                               % (re.escape(not_allowed_version), '.*')):
             upgrade.verify_upgrade_plan([
-                'v1.17 .1',
-                'v1.18.2'
-            ])
-
-    def test_upgrade_plan_invalid_version(self):
-        with self.assertRaises(Exception):
-            upgrade.verify_upgrade_plan([
-                'v1.17',
-                'v1.18.2'
-            ])
-
-    def test_upgrade_plan_invalid_version2(self):
-        with self.assertRaises(Exception):
-            upgrade.verify_upgrade_plan([
-                '1.17.1',
-                '1.18.2'
+                k8s_latest,
+                not_allowed_version
             ])
 
     def test_upgrade_plan_sort(self):
-        result = upgrade.verify_upgrade_plan([
-            'v2.1.1',
-            'v1.13.2',
-            'v1.15.0',
-            'v1.18.2',
-            'v1.16.2',
-            'v1.14.4',
-            'v2.0.3',
-            'v1.17.1',
-            'v1.13.1',
-        ])
+        k8s_versions = list(self.k8s_versions())
+        random.shuffle(k8s_versions)
+        result = upgrade.verify_upgrade_plan(k8s_versions)
 
-        self.assertEqual([
-            'v1.13.1',
-            'v1.13.2',
-            'v1.14.4',
-            'v1.15.0',
-            'v1.16.2',
-            'v1.17.1',
-            'v1.18.2',
-            'v2.0.3',
-            'v2.1.1',
-        ], result)
+        self.assertEqual(self.k8s_versions(), result)
+
+    def k8s_versions(self) -> List[str]:
+        return sorted(list(static.KUBERNETES_VERSIONS['compatibility_map']), key=kutils.version_key)
 
 
 def generate_upgrade_environment(old, new) -> (dict, dict):

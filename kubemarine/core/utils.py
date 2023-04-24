@@ -33,6 +33,16 @@ from ruamel.yaml import CommentedMap
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 
+ERROR_VERSION_V_FORMAT= 'Version \"%s\" do not have \"v\" as first symbol, expected version pattern is \"%s\"'
+ERROR_VERSION_NUMBERS_AMOUNT='Version \"%s\" has invalid amount of numbers, expected version pattern is \"%s\"'
+ERROR_VERSION_INVALID_SYMBOLS='Version \"%s\" contains invalid symbols, expected version pattern is \"%s\"'
+
+
+def warning(message: str):
+    if os.name != 'nt':
+        message = f"\033[91m{message}\033[0m"
+    print(message)
+
 
 def do_fail(message='', reason: Union[str, Exception] = '', hint='', log=None):
 
@@ -418,21 +428,46 @@ def minor_version(version: str) -> str:
     """
     Converts vN.N.N to vN.N
     """
-    return ".".join(version.split(".")[0:2])
+    return 'v' + '.'.join(map(str, _test_version(version, 3)[0:2]))
 
 
-def version_key(version: str) -> tuple:
+def version_key(version: str) -> Tuple[int, int, int]:
     """
-    Converts vN.N.N to (N, N, N) or vN.N to (N, N) that can be used in comparisons.
+    Converts vN.N.N to (N, N, N) that can be used in comparisons.
     """
-    return tuple(map(int, version[1:].split('.')))
+    return tuple(_test_version(version, 3))
 
 
-def minor_version_key(version: str) -> tuple:
+def minor_version_key(version: str) -> Tuple[int, int]:
     """
-    Converts vN.N.N to (N, N) that can be used in comparisons.
+    Converts vN.N to (N, N) that can be used in comparisons.
     """
-    return version_key(minor_version(version))
+    return tuple(_test_version(version, 2))
+
+
+def _test_version(version: str, numbers_amount: int) -> list:
+    # catch version without "v" at the first symbol
+    if not version.startswith('v'):
+        raise Exception(_format_version_error(ERROR_VERSION_V_FORMAT, version, numbers_amount))
+
+    version_list: list = version[1:].split('.')
+    # catch invalid version 'v1.16'
+    if len(version_list) != numbers_amount:
+        raise Exception(_format_version_error(ERROR_VERSION_NUMBERS_AMOUNT, version, numbers_amount))
+
+    # parse str to int and catch invalid symbols in version number
+    for i, value in enumerate(version_list):
+        try:
+            # whitespace required because python's int() ignores them
+            version_list[i] = int(value.replace(' ', '.'))
+        except ValueError:
+            raise Exception(_format_version_error(ERROR_VERSION_INVALID_SYMBOLS, version, numbers_amount)) from None
+
+    return version_list
+
+
+def _format_version_error(msg: str, version: str, numbers_amount):
+    return msg % (version, 'v' + '.'.join('N+' for _ in range(numbers_amount)))
 
 
 class ClusterStorage:

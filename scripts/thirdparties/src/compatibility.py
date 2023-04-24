@@ -36,7 +36,7 @@ class KubernetesVersions:
 
     def sync(self):
         k8s_versions = self._kubernetes_versions['kubernetes_versions']
-        k8s_versions = utils.map_sorted(k8s_versions, key=utils.version_key)
+        k8s_versions = utils.map_sorted(k8s_versions, key=utils.minor_version_key)
         self._kubernetes_versions['kubernetes_versions'] = k8s_versions
 
         minor_versions = set()
@@ -45,7 +45,7 @@ class KubernetesVersions:
             minor_versions.add(minor_version)
             if minor_version not in k8s_versions:
                 utils.insert_map_sorted(k8s_versions, minor_version, CommentedMap({'supported': True}),
-                                        key=utils.version_key)
+                                        key=utils.minor_version_key)
 
         for key in list(k8s_versions):
             if key not in minor_versions:

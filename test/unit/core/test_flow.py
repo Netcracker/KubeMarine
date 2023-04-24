@@ -14,6 +14,7 @@
 # limitations under the License.
 import os
 import random
+import re
 import socket
 import unittest
 import ast
@@ -22,8 +23,10 @@ from typing import Optional
 
 import invoke
 
-from kubemarine.core import flow, static, errors
-from kubemarine import demo
+from kubemarine.core import flow, static, errors, utils
+from kubemarine import demo, kubernetes
+from test.unit import utils as test_utils
+
 
 test_msg = "test_function_return_result"
 
@@ -354,6 +357,26 @@ class FlowTest(unittest.TestCase):
 
         # no exception should occur
         flow.run_tasks(res, tasks)
+
+    def test_kubernetes_version_not_allowed(self):
+        k8s_versions = list(sorted(static.KUBERNETES_VERSIONS["compatibility_map"], key=utils.version_key))
+        k8s_latest = k8s_versions[-1]
+        not_allowed_version =  test_utils.increment_version(k8s_latest)
+
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = not_allowed_version
+
+        hosts = [node["address"] for node in inventory["nodes"]]
+        self._stub_detect_nodes_context(inventory, hosts, hosts)
+        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
+
+        with self.assertRaisesRegex(Exception,
+                                    kubernetes.ERROR_NOT_ALLOWED % (re.escape(not_allowed_version), ".*")):
+            try:
+                flow.run_tasks(res, tasks)
+            except errors.FailException as e:
+                raise e.reason
 
     def _stub_detect_nodes_context(self, inventory: dict, online_nodes: list, sudoer_nodes: list):
         hosts = [node["address"] for node in inventory["nodes"]]

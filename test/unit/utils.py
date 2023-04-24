@@ -54,3 +54,12 @@ def stub_associations_packages(cluster: demo.FakeKubernetesCluster, packages_hos
         packages_hosts_stub.setdefault(package, {})
 
     stub_detect_packages(cluster, packages_hosts_stub)
+
+
+def increment_version(version: str, minor=False):
+    new_version = list(utils.version_key(version))
+    if minor:
+        new_version[1] += 1
+    else:
+        new_version[2] += 1
+    return f"v{'.'.join(map(str, new_version))}"

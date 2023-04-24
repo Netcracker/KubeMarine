@@ -17,7 +17,7 @@ import math
 import os
 import time
 from copy import deepcopy
-from typing import List, Dict, Union
+from typing import List, Dict, Tuple
 
 import ruamel.yaml
 import yaml
@@ -33,6 +33,7 @@ from kubemarine.core.errors import KME
 
 version_coredns_path_breakage = "v1.21.2"
 
+ERROR_NOT_ALLOWED="Specified Kubernetes version \"%s\" - cannot be used! Allowed versions are: %s."
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
 ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
@@ -78,6 +79,7 @@ def enrich_upgrade_inventory(inventory, cluster):
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
         inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
+        verify_allowed_version(cluster.context['upgrade_version'])
         test_version_upgrade_possible(cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version'])
         cluster.log.info(
             '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
@@ -997,17 +999,27 @@ def verify_upgrade_versions(cluster):
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 
-def verify_target_version(target_version):
-    test_version(target_version)
+def verify_initial_version(inventory: dict, _):
+    version = inventory["services"]["kubeadm"]["kubernetesVersion"]
+    verify_allowed_version(version)
+    return inventory
 
-    pos = target_version.rfind(".")
-    target_version = target_version[:pos]
-    supported_versions = static.SUPPORTED_VERSIONS
-    if target_version not in supported_versions:
-        raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-    if not supported_versions.get(target_version, {}).get("supported", False):
-        message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
-        print(message)
+
+def verify_allowed_version(version: str) -> None:
+    if version not in static.KUBERNETES_VERSIONS['compatibility_map']:
+        raise Exception(ERROR_NOT_ALLOWED % (
+            version,
+            ', '.join(map(repr, static.KUBERNETES_VERSIONS['compatibility_map']))
+        ))
+
+
+def verify_target_version(target_version: str) -> str:
+    verify_allowed_version(target_version)
+    minor_version = utils.minor_version(target_version)
+    supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
+    if not supported_versions.get(minor_version, {}).get("supported", False):
+        message = f"Warning! Specified Kubernetes version {target_version!r} - is not supported!"
+        utils.warning(message)
         return message
     return ""
 
@@ -1052,46 +1064,22 @@ def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node
     raise Exception('In the expected time, the nodes did not receive correct Kubernetes version')
 
 
-def test_version(version: Union[list, str]):
-    version_list: list = version
-    # catch version without "v" at the first symbol
-    if isinstance(version, str):
-        if not version.startswith('v'):
-            raise Exception('Version \"%s\" do not have \"v\" as first symbol, '
-                            'expected version pattern is \"v1.NN.NN\"' % version)
-        version_list = version.replace('v', '').split('.')
-    # catch invalid version 'v1.16'
-    if len(version_list) != 3:
-        raise Exception('Version \"%s\" has invalid amount of numbers, '
-                        'expected version pattern is \"v1.NN.NN\"' % version)
-
-    # parse str to int and catch invalid symbols in version number
-    for i, value in enumerate(version_list):
-        try:
-            # whitespace required because python's int() ignores them
-            version_list[i] = int(value.replace(' ', '.'))
-        except ValueError:
-            raise Exception('Version \"%s\" contains invalid symbols, '
-                            'expected version pattern is \"v1.NN.NN\"' % version) from None
-    return version_list
-
-
-def test_version_upgrade_possible(old, new, skip_equal=False):
+def test_version_upgrade_possible(old: str, new: str, skip_equal=False):
     versions_unchanged = {
         'old': old.strip(),
         'new': new.strip()
     }
-    versions: Dict[str, List[int]] = {}
+    versions: Dict[str, Tuple[int, int, int]] = {}
 
     for v_type, version in versions_unchanged.items():
-        versions[v_type] = test_version(version)
+        versions[v_type] = utils.version_key(version)
 
     # test new is greater than old
-    if tuple(versions['old']) > tuple(versions['new']):
+    if versions['old'] > versions['new']:
         raise Exception(ERROR_DOWNGRADE % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test new is the same as old
-    if tuple(versions['old']) == tuple(versions['new']) and not skip_equal:
+    if versions['old'] == versions['new'] and not skip_equal:
         raise Exception(ERROR_SAME % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test major step is not greater than 1

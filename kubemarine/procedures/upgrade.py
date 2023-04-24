@@ -19,6 +19,7 @@ from copy import deepcopy
 from distutils.util import strtobool
 from io import StringIO
 from itertools import chain
+from typing import List
 
 import toml
 
@@ -252,17 +253,13 @@ def main(cli_arguments=None):
         print(verification_version_result)
 
 
-def verify_upgrade_plan(upgrade_plan):
-    if not upgrade_plan:
-        raise Exception('Upgrade plan is not specified or empty')
-
-    upgrade_plan.sort()
+def verify_upgrade_plan(upgrade_plan: List[str]):
+    for version in upgrade_plan:
+        kubernetes.verify_allowed_version(version)
+    upgrade_plan.sort(key=utils.version_key)
 
     previous_version = None
-    for i in range(0, len(upgrade_plan)):
-        version = upgrade_plan[i]
-        if version == 'v1.24.0':
-            raise Exception('Attempt to upgrade to an unstable version of kubernetes')
+    for version in upgrade_plan:
         if previous_version is not None:
             kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version

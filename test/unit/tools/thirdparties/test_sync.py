@@ -20,6 +20,7 @@ from typing import List, Dict, ContextManager
 from unittest import mock
 
 import yaml
+from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, static
 from kubemarine.plugins.manifest import Manifest, Processor
@@ -27,6 +28,7 @@ from scripts.thirdparties.src.software.plugins import (
     ManifestResolver, ERROR_UNEXPECTED_IMAGE, ManifestsEnrichment
 )
 from scripts.thirdparties.src.tracker import ChangesTracker
+from test.unit import utils as test_utils
 from test.unit.tools.thirdparties.stub import (
     FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
     FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment
@@ -54,7 +56,7 @@ class SynchronizationTest(unittest.TestCase):
 
     def test_kubernetes_versions_add_minor_version(self):
         k8s_latest = self.k8s_versions()[-1]
-        new_version = self.increment_version(k8s_latest, minor=True)
+        new_version = test_utils.increment_version(k8s_latest, minor=True)
         self.compatibility_map()[new_version] = deepcopy(self.compatibility_map()[k8s_latest])
 
         self.run_sync()
@@ -77,7 +79,7 @@ class SynchronizationTest(unittest.TestCase):
         new_versions = list(from_versions)
         for i, ver in enumerate(new_versions):
             while ver in k8s_versions or ver in new_versions[:i]:
-                new_versions[i] = ver = self.increment_version(ver)
+                new_versions[i] = ver = test_utils.increment_version(ver)
 
             self.compatibility_map()[ver] = deepcopy(self.compatibility_map()[from_versions[i]])
 
@@ -191,7 +193,7 @@ class SynchronizationTest(unittest.TestCase):
         for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
             new_version = mapping[plugin]
             while any(new_version == v[plugin] for v in self.compatibility_map().values()):
-                new_version = self.increment_version(new_version)
+                new_version = test_utils.increment_version(new_version)
 
             mapping[plugin] = new_version
             expected_mapping[plugin] = {'version': new_version}
@@ -220,7 +222,7 @@ class SynchronizationTest(unittest.TestCase):
         for software in ('crictl', 'pause', 'webhook', 'metrics-scraper', 'busybox'):
             new_version = mapping.get(software, '1.2.3')
             while any(new_version == v.get(software) for v in self.compatibility_map().values()):
-                new_version = self.increment_version(new_version)
+                new_version = test_utils.increment_version(new_version)
 
             mapping[software] = new_version
             expected_versions[software] = new_version
@@ -288,12 +290,12 @@ class SynchronizationTest(unittest.TestCase):
 
     def test_manifests_enrichment_add_new_version(self):
         k8s_latest = self.k8s_versions()[-1]
-        new_version = self.increment_version(k8s_latest)
+        new_version = test_utils.increment_version(k8s_latest)
         self.compatibility_map()[new_version] = deepcopy(self.compatibility_map()[k8s_latest])
 
         self.manifests_enrichment = ManifestsEnrichment()
 
-        with self._mock_globals_reload_compatibility_map(), \
+        with self._mock_globals_load_compatibility_map(), self._mock_globals_load_kubernetes_versions(), \
                 self._mock_manifest_processor_enrich() as enrich_called:
             self.run_sync()
             for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
@@ -321,7 +323,7 @@ class SynchronizationTest(unittest.TestCase):
 
         self.manifests_enrichment = ManifestsEnrichment()
 
-        with self._mock_globals_reload_compatibility_map(), \
+        with self._mock_globals_load_compatibility_map(), self._mock_globals_load_kubernetes_versions(), \
                 self._mock_manifest_processor_enrich() as enrich_called:
             self.run_sync()
             self.assertEqual([plugin], list(enrich_called.keys()),
@@ -343,12 +345,23 @@ class SynchronizationTest(unittest.TestCase):
             yield enrich_called
 
     @contextmanager
-    def _mock_globals_reload_compatibility_map(self):
+    def _mock_globals_load_kubernetes_versions(self):
+        backup = deepcopy(static.KUBERNETES_VERSIONS)
+        def load_kubernetes_versions_mocked() -> dict:
+            return self._convert_ruamel_pyyaml(self.kubernetes_versions.stored)
+
+        try:
+            with mock.patch.object(static, static.load_kubernetes_versions.__name__,
+                                   side_effect=load_kubernetes_versions_mocked):
+                yield
+        finally:
+            static.KUBERNETES_VERSIONS = backup
+
+    @contextmanager
+    def _mock_globals_load_compatibility_map(self):
         backup = deepcopy(static.GLOBALS)
         def load_compatibility_map_mocked(filename: str) -> dict:
-            stream = io.StringIO()
-            utils.yaml_structure_preserver().dump(self.compatibility.stored[filename], stream)
-            return yaml.safe_load(io.StringIO(stream.getvalue()))
+            return self._convert_ruamel_pyyaml(self.compatibility.stored[filename])
 
         try:
             with mock.patch.object(static, static.load_compatibility_map.__name__,
@@ -356,6 +369,11 @@ class SynchronizationTest(unittest.TestCase):
                 yield
         finally:
             static.GLOBALS = backup
+
+    def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
+        stream = io.StringIO()
+        utils.yaml_structure_preserver().dump(source, stream)
+        return yaml.safe_load(io.StringIO(stream.getvalue()))
 
     def run_sync(self) -> ChangesTracker:
         return FakeSynchronization(
@@ -369,12 +387,8 @@ class SynchronizationTest(unittest.TestCase):
         return self.kubernetes_versions.kubernetes_versions['compatibility_map']
 
     def k8s_versions(self) -> List[str]:
-        return list(sorted(self.compatibility_map(), key=utils.version_key))
+        return sorted(self.compatibility_map(), key=utils.version_key)
 
-    def increment_version(self, version: str, minor=False):
-        new_version = list(utils.version_key(version))
-        if minor:
-            new_version[1] += 1
-        else:
-            new_version[2] += 1
-        return f"v{'.'.join(map(str, new_version))}"
+
+if __name__ == '__main__':
+    unittest.main()
