@@ -58,8 +58,8 @@ def clean(group, **kwargs) -> NodeGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean", **kwargs)
 
 
-def check_unattended_upgrade(group, **kwargs) -> NodeGroupResult:
-    return group.sudo(DEBIAN_HEADERS + "ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300", **kwargs)
+#def check_unattended_upgrade(group, **kwargs) -> NodeGroupResult:
+#    return group.sudo(DEBIAN_HEADERS + "ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300", **kwargs)
 
 
 def get_install_cmd(include: str or list, exclude=None) -> str:
@@ -79,10 +79,8 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
 def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
-        
-    check_unattended_upgrade(group, **kwargs)
                 
-    command = get_install_cmd(include, exclude)
+    command = DEBIAN_HEADERS + "ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300 ;" + get_install_cmd(include, exclude)
 
     return group.sudo(command, **kwargs)
     
