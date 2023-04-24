@@ -148,7 +148,7 @@ class RemoteExecutor:
                 if action[0] == 'sudo':
                     precommand = 'sudo '
                 previous_action = merged_actions[-1][0]
-                merged_action_command = str(previous_action[1][0] + separator + precommand + action[1][0])
+                merged_action_command = previous_action[1][0] + separator + precommand + action[1][0]
                 merged_actions[-1][0] = (previous_action[0], tuple([merged_action_command]), previous_action[2])
                 merged_actions[-1][1].append(callback)
                 merged_actions[-1][2].append(token)
