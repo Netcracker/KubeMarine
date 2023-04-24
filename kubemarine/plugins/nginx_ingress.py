@@ -291,6 +291,7 @@ class IngressNginxManifestProcessor(Processor):
             plugin_service='webhook', container_name='patch', is_init_container=False)
 
     def enrich_service_ingress_nginx_controller(self, manifest: Manifest):
+        # The method needs some rework in case of dual stack support
         key = "Service_ingress-nginx-controller"
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
         if type(ipaddress.ip_address(ip)) is ipaddress.IPv6Address:
