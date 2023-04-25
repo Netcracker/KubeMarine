@@ -66,7 +66,7 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = DEBIAN_HEADERS + 'ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300 ;' + \
-              DEBIAN_HEADERS + 'apt update && ' + \
+              DEBIAN_HEADERS + 'sudo apt update && ' + \
               DEBIAN_HEADERS + 'sudo apt install -y %s' % include
 
     if exclude is not None:
