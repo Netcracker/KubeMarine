@@ -14,6 +14,7 @@
 
 from typing import Dict
 
+from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins import manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor
@@ -55,7 +56,7 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
                 raise Exception(f"Unexpected python method arguments {list(declared_args.difference(expected_args))} "
                                 f"in {plugin_name!r} installation step {i}.")
 
-            processor_provider(cluster, inventory, **arguments).validate_inventory()
+            processor_provider(cluster.log, inventory, **arguments).validate_inventory()
             break
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml is not found for {plugin_name!r} plugin. "
@@ -64,12 +65,19 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_yaml(cluster: KubernetesCluster, **arguments):
-    arguments = dict(arguments)
-    plugin_name = arguments.pop('plugin_name')
+def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, plugin_name: str, **arguments):
     if plugin_name not in MANIFEST_PROCESSOR_PROVIDERS:
         raise Exception(f"Manifest processor is not registered for {plugin_name!r} plugin.")
 
     processor_provider = MANIFEST_PROCESSOR_PROVIDERS[plugin_name]
-    processor = processor_provider(cluster, cluster.inventory, **arguments)
-    processor.apply()
+    return processor_provider(logger, inventory, **arguments)
+
+
+def apply_yaml(cluster: KubernetesCluster, **arguments):
+    arguments = dict(arguments)
+    plugin_name = arguments.pop('plugin_name')
+
+    processor = get_manifest_processor(cluster.log, cluster.inventory, plugin_name, **arguments)
+
+    manifest = processor.enrich()
+    processor.apply(cluster, manifest)

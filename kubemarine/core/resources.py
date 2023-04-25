@@ -91,7 +91,7 @@ class DynamicResources:
             data = utils.read_external(self.inventory_filepath)
             self._raw_inventory = yaml.safe_load(data)
             # load inventory as ruamel.yaml to save original structure
-            self._formatted_inventory = _yaml_structure_preserver().load(data)
+            self._formatted_inventory = utils.yaml_structure_preserver().load(data)
         except (yaml.YAMLError, ruamel.yaml.YAMLError) as exc:
             utils.do_fail("Failed to load inventory file", exc, log=logger)
 
@@ -110,7 +110,7 @@ class DynamicResources:
 
         # replace initial inventory file with changed inventory
         with utils.open_external(self.inventory_filepath, "w+") as stream:
-            _yaml_structure_preserver().dump(self.formatted_inventory(), stream)
+            utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)
 
         self._raw_inventory = None
         self._formatted_inventory = None
@@ -193,13 +193,6 @@ class DynamicResources:
 
     def _create_logger(self):
         return log.init_log_from_context_args(static.GLOBALS, self.context, self.raw_inventory()).logger
-
-
-def _yaml_structure_preserver():
-    """YAML loader and dumper which saves original structure"""
-    ruamel_yaml = ruamel.yaml.YAML()
-    ruamel_yaml.preserve_quotes = True
-    return ruamel_yaml
 
 
 def _provide_cluster(*args, **kw):

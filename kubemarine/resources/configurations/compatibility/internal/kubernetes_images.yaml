@@ -1,0 +1,191 @@
+# !!!Do not change the content of the file!!!
+# This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
+kube-apiserver:
+  v1.21.2:
+    version: v1.21.2
+  v1.21.5:
+    version: v1.21.5
+  v1.21.12:
+    version: v1.21.12
+  v1.22.2:
+    version: v1.22.2
+  v1.22.9:
+    version: v1.22.9
+  v1.23.6:
+    version: v1.23.6
+  v1.23.11:
+    version: v1.23.11
+  v1.23.17:
+    version: v1.23.17
+  v1.24.2:
+    version: v1.24.2
+  v1.24.11:
+    version: v1.24.11
+  v1.25.2:
+    version: v1.25.2
+  v1.25.7:
+    version: v1.25.7
+  v1.26.3:
+    version: v1.26.3
+kube-controller-manager:
+  v1.21.2:
+    version: v1.21.2
+  v1.21.5:
+    version: v1.21.5
+  v1.21.12:
+    version: v1.21.12
+  v1.22.2:
+    version: v1.22.2
+  v1.22.9:
+    version: v1.22.9
+  v1.23.6:
+    version: v1.23.6
+  v1.23.11:
+    version: v1.23.11
+  v1.23.17:
+    version: v1.23.17
+  v1.24.2:
+    version: v1.24.2
+  v1.24.11:
+    version: v1.24.11
+  v1.25.2:
+    version: v1.25.2
+  v1.25.7:
+    version: v1.25.7
+  v1.26.3:
+    version: v1.26.3
+kube-scheduler:
+  v1.21.2:
+    version: v1.21.2
+  v1.21.5:
+    version: v1.21.5
+  v1.21.12:
+    version: v1.21.12
+  v1.22.2:
+    version: v1.22.2
+  v1.22.9:
+    version: v1.22.9
+  v1.23.6:
+    version: v1.23.6
+  v1.23.11:
+    version: v1.23.11
+  v1.23.17:
+    version: v1.23.17
+  v1.24.2:
+    version: v1.24.2
+  v1.24.11:
+    version: v1.24.11
+  v1.25.2:
+    version: v1.25.2
+  v1.25.7:
+    version: v1.25.7
+  v1.26.3:
+    version: v1.26.3
+kube-proxy:
+  v1.21.2:
+    version: v1.21.2
+  v1.21.5:
+    version: v1.21.5
+  v1.21.12:
+    version: v1.21.12
+  v1.22.2:
+    version: v1.22.2
+  v1.22.9:
+    version: v1.22.9
+  v1.23.6:
+    version: v1.23.6
+  v1.23.11:
+    version: v1.23.11
+  v1.23.17:
+    version: v1.23.17
+  v1.24.2:
+    version: v1.24.2
+  v1.24.11:
+    version: v1.24.11
+  v1.25.2:
+    version: v1.25.2
+  v1.25.7:
+    version: v1.25.7
+  v1.26.3:
+    version: v1.26.3
+pause:
+  v1.21.2:
+    version: 3.4.1
+  v1.21.5:
+    version: 3.4.1
+  v1.21.12:
+    version: 3.4.1
+  v1.22.2:
+    version: '3.5'
+  v1.22.9:
+    version: '3.5'
+  v1.23.6:
+    version: '3.6'
+  v1.23.11:
+    version: '3.6'
+  v1.23.17:
+    version: '3.6'
+  v1.24.2:
+    version: '3.7'
+  v1.24.11:
+    version: '3.7'
+  v1.25.2:
+    version: '3.8'
+  v1.25.7:
+    version: '3.8'
+  v1.26.3:
+    version: '3.9'
+etcd:
+  v1.21.2:
+    version: 3.4.13-0
+  v1.21.5:
+    version: 3.4.13-0
+  v1.21.12:
+    version: 3.4.13-0
+  v1.22.2:
+    version: 3.5.0-0
+  v1.22.9:
+    version: 3.5.0-0
+  v1.23.6:
+    version: 3.5.1-0
+  v1.23.11:
+    version: 3.5.1-0
+  v1.23.17:
+    version: 3.5.6-0
+  v1.24.2:
+    version: 3.5.3-0
+  v1.24.11:
+    version: 3.5.6-0
+  v1.25.2:
+    version: 3.5.4-0
+  v1.25.7:
+    version: 3.5.6-0
+  v1.26.3:
+    version: 3.5.6-0
+coredns/coredns:
+  v1.21.2:
+    version: v1.8.0
+  v1.21.5:
+    version: v1.8.0
+  v1.21.12:
+    version: v1.8.0
+  v1.22.2:
+    version: v1.8.4
+  v1.22.9:
+    version: v1.8.4
+  v1.23.6:
+    version: v1.8.6
+  v1.23.11:
+    version: v1.8.6
+  v1.23.17:
+    version: v1.8.6
+  v1.24.2:
+    version: v1.8.6
+  v1.24.11:
+    version: v1.8.6
+  v1.25.2:
+    version: v1.9.3
+  v1.25.7:
+    version: v1.9.3
+  v1.26.3:
+    version: v1.9.3

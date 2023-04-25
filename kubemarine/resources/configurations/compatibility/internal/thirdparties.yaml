@@ -1,0 +1,168 @@
+# !!!Do not change the content of the file!!!
+# This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
+
+kubeadm:
+  v1.21.2:
+    sha1: cbb07d380de4ef73d43d594a1055839fa9753138
+  v1.21.5:
+    sha1: 2ee056ac1d0b9c2289bdb03cb7bb0cd21ee29a8b
+  v1.21.12:
+    sha1: b566840ac2bd50d9c83165ac61331ba7998bf7ce
+  v1.22.2:
+    sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
+  v1.22.9:
+    sha1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d
+  v1.23.6:
+    sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
+  v1.23.11:
+    sha1: b93ff384df125429dcbeb18c2ea648168ae10c56
+  v1.23.17:
+    sha1: 0e805ff79d4099747bdf67d71d8acdc690e07e14
+  v1.24.2:
+    sha1: 65c3e96dc54e7f703bf1ea9c6e5573dca067f726
+  v1.24.11:
+    sha1: 7d44b41e36ff71f5f00671d518f2e59b4540653a
+  v1.25.2:
+    sha1: 72b87eedc9701c1143126f4aa7375b91fc9d46fc
+  v1.25.7:
+    sha1: 4efb3da49a50d137b728f0529bedee458e8c5f86
+  v1.26.3:
+    sha1: 86e202f98d22c8fddcadda6656f6698d21eae6ca
+kubelet:
+  v1.21.2:
+    sha1: 024e458aa0f74cba6b773401b779590437812fc6
+  v1.21.5:
+    sha1: 61da22475b977cb678cca8cf7249bf727d72ee89
+  v1.21.12:
+    sha1: 45a50b60122f35505ecd08479be1ae232b0ac524
+  v1.22.2:
+    sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
+  v1.22.9:
+    sha1: 21b4104937b65fdf0fdf9fbb57ff22a879b21e3f
+  v1.23.6:
+    sha1: 326110dcb62b66e69490d039b170682fb71c5560
+  v1.23.11:
+    sha1: 07769c846e4a83d59f9f34370c33be5cc163120b
+  v1.23.17:
+    sha1: 42bce3cef79c9bf2c787e2bcb923ef2528834e96
+  v1.24.2:
+    sha1: 35c3d20f92c8159b4f65aaafe6e9fc57c9f9e308
+  v1.24.11:
+    sha1: 3f332cbeed2f09b5275d56872bb8adcf54c9c98d
+  v1.25.2:
+    sha1: afdc009cd59759626ecce007667f42bf42e7c1be
+  v1.25.7:
+    sha1: ace8ce244896aca5d38c8184c44226660a09269a
+  v1.26.3:
+    sha1: 5fe320fedaabb91d3770da19135412b7454bb28b
+kubectl:
+  v1.21.2:
+    sha1: 2c7a7de9fff41ac49f7c2546a9b1aff2c1d9c468
+  v1.21.5:
+    sha1: c4648e31ca16fb00e3826f8ab7c653da81eff367
+  v1.21.12:
+    sha1: 54a381297eb3a94ab968bb8bfff5f91e3d08805a
+  v1.22.2:
+    sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
+  v1.22.9:
+    sha1: e4137d683b9f93211bb6d9fa155d0bb423e871c9
+  v1.23.6:
+    sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
+  v1.23.11:
+    sha1: 81643da0b975102cede136d39767cdc54f2b0aef
+  v1.23.17:
+    sha1: 7377f28047c9c468978199cf5b9e4e7cae0c4e78
+  v1.24.2:
+    sha1: d2a8e78bcdc992addd6faccb27b0af5d533443fa
+  v1.24.11:
+    sha1: 3f5d977d9ec38937ecf1dc9ccc3d0f0e48b88655
+  v1.25.2:
+    sha1: b12c0e102df89cd0579c8a3c769988aaf5dbe4ba
+  v1.25.7:
+    sha1: a5b32c173670ee6fa7710d7158ea4a0d198c8af5
+  v1.26.3:
+    sha1: 56916d87c3caef05489db932fd9e48d32ebdf634
+calicoctl:
+# calicoctl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
+# It also corresponds to the plugin version in kubemarine/resources/configurations/compatibility/internal/plugins.yaml
+  v1.21.2:
+    version: v3.22.2
+    sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+  v1.21.5:
+    version: v3.22.2
+    sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+  v1.21.12:
+    version: v3.22.2
+    sha1: b1e2c550480afe4250a34b0e4529eb38ae06973f
+  v1.22.2:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.22.9:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.23.6:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.23.11:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.23.17:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.24.2:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.24.11:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.25.2:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.25.7:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.26.3:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+crictl:
+# crictl version is duplicated from kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml
+# for backward compatibility with clusters in a private environment.
+  v1.21.2:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.21.5:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.21.12:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.22.2:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.22.9:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.23.6:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.23.11:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.23.17:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.24.2:
+    version: v1.25.0
+    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
+  v1.24.11:
+    version: v1.25.0
+    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
+  v1.25.2:
+    version: v1.25.0
+    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
+  v1.25.7:
+    version: v1.25.0
+    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3
+  v1.26.3:
+    version: v1.25.0
+    sha1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3

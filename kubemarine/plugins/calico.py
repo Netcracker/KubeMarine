@@ -16,7 +16,7 @@ from typing import Optional, List
 
 import os
 
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
@@ -31,22 +31,17 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
     """
 
     calico_yaml = os.path.basename(calico_yaml)
-    processor = CalicoManifestProcessor(cluster, cluster.inventory,
+    processor = CalicoManifestProcessor(cluster.log, cluster.inventory,
                                         original_yaml_path=calico_original_yaml,
                                         destination_name=calico_yaml)
-    processor.apply()
+    manifest = processor.enrich()
+    processor.apply(cluster, manifest)
 
 
 class CalicoManifestProcessor(Processor):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'calico'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/calico-{version}.yaml.original"
-        if destination_name is None:
-            destination_name = f"calico-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(logger, inventory, 'calico', original_yaml_path, destination_name)
 
     def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
         # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
@@ -54,7 +49,7 @@ class CalicoManifestProcessor(Processor):
         str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
         if str_value == 'false':
             for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
-                manifest.exclude(key)
+                self.exclude(manifest, key)
         elif str_value == 'true':
             return
         else:
@@ -69,27 +64,26 @@ class CalicoManifestProcessor(Processor):
 
         key = "ConfigMap_calico-config"
         source_yaml = manifest.get_obj(key, patch=True)
-        cluster = self.cluster
-        val = cluster.inventory['plugins']['calico']['mtu']
+        val = self.inventory['plugins']['calico']['mtu']
         source_yaml['data']['veth_mtu'] = str(val)
-        cluster.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-        str_value = utils.true_or_false(cluster.inventory['plugins']['calico']['typha']['enabled'])
+        self.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
+        str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
         if str_value == "true":
             val = "calico-typha"
         elif str_value == "false":
             val = "none"
         source_yaml['data']['typha_service_name'] = val
-        cluster.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
+        self.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
         string_part = source_yaml['data']['cni_network_config']
-        ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+        ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
         if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
-            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv4']
+            val = self.inventory['plugins']['calico']['cni']['ipam']['ipv4']
         else:
-            val = cluster.inventory['plugins']['calico']['cni']['ipam']['ipv6']
+            val = self.inventory['plugins']['calico']['cni']['ipam']['ipv6']
         new_string_part = string_part.replace('"type": "calico-ipam"', str(val)[:-1][1:].replace("'", "\""))
         source_yaml['data']['cni_network_config'] = new_string_part
         log_str = new_string_part.replace("\n", "")
-        cluster.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
+        self.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
 
     def enrich_deployment_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
@@ -190,16 +184,15 @@ class CalicoManifestProcessor(Processor):
 
         key = "Deployment_calico-typha"
         source_yaml = manifest.get_obj(key, patch=True, allow_absent=True)
-        cluster = self.cluster
         if source_yaml is None:
             return
 
         default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                                {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
 
-        val = cluster.inventory['plugins']['calico']['typha']['replicas']
+        val = self.inventory['plugins']['calico']['typha']['replicas']
         source_yaml['spec']['replicas'] = int(val)
-        cluster.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
+        self.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
 
         self.enrich_node_selector(manifest, key, plugin_service='typha')
         self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
@@ -213,13 +206,12 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "ClusterRole_calico-kube-controllers"
-        cluster = self.cluster
-        if cluster.inventory['rbac']['admission'] == "psp" and \
-                cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+        if self.inventory['rbac']['admission'] == "psp" and \
+                self.inventory['rbac']['psp']['pod-security'] == "enabled":
             source_yaml = manifest.get_obj(key, patch=True)
             api_list = source_yaml['rules']
             api_list.append(psp_calico_kube_controllers)
-            cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
+            self.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
 
     def enrich_clusterrole_calico_node(self, manifest: Manifest) -> None:
         """
@@ -228,13 +220,12 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "ClusterRole_calico-node"
-        cluster = self.cluster
-        if cluster.inventory['rbac']['admission'] == "psp" and \
-                cluster.inventory['rbac']['psp']['pod-security'] == "enabled":
+        if self.inventory['rbac']['admission'] == "psp" and \
+                self.inventory['rbac']['psp']['pod-security'] == "enabled":
             source_yaml = manifest.get_obj(key, patch=True)
             api_list = source_yaml['rules']
             api_list.append(psp_calico_node)
-            cluster.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
+            self.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
 
     def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
         """
@@ -255,8 +246,8 @@ class CalicoManifestProcessor(Processor):
 
         sz = len(manifest.all_obj_keys())
         import ruamel.yaml
-        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
-        manifest.include(sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
 
     def get_known_objects(self) -> List[str]:
         return [

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
 import io
 import json
 import os
@@ -22,9 +23,12 @@ import tarfile
 from typing import Union, Tuple
 
 import yaml
+import ruamel.yaml
 from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
+
+from ruamel.yaml import CommentedMap
 
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
@@ -305,6 +309,80 @@ def determine_resource_absolute_dir(path: str) -> Tuple[str, bool]:
         'Requested resource directory %s is not exists at %s or %s' % (path, initial_definition, patched_definition))
 
 
+def get_local_file_sha1(filename: str) -> str:
+    sha1 = hashlib.sha1()
+
+    # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
+    with open(filename, 'rb') as f:
+        while True:
+            data = f.read(2 ** 16)
+            if not data:
+                break
+            sha1.update(data)
+
+    return sha1.hexdigest()
+
+
+def yaml_structure_preserver() -> ruamel.yaml.YAML:
+    """YAML loader and dumper which saves original structure"""
+    ruamel_yaml = ruamel.yaml.YAML()
+    ruamel_yaml.preserve_quotes = True
+    return ruamel_yaml
+
+
+def is_sorted(l: list, key: callable = None) -> bool:
+    """
+    Check that the specified list is sorted.
+
+    :param l: list to check
+    :param key: custom key function to customize the sort order
+    :return: boolean flag if the list is sorted
+    """
+    if key is None:
+        key = lambda x: x
+    return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
+
+
+def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
+    """
+    Check that the specified CommentedMap is sorted, or create new sorted map from it otherwise.
+
+    :param map_: CommentedMap instance to check
+    :param key: custom key function to customize the sort order of the map keys
+    :return: the same or new sorted instance of the map
+    """
+    if key is None:
+        key = lambda x: x
+    map_keys = list(map_)
+    if not is_sorted(map_keys, key=key):
+        map_ = CommentedMap(sorted(map_.items(), key=lambda item: key(item[0])))
+
+    return map_
+
+def insert_map_sorted(map_: CommentedMap, k, v, key: callable = None) -> None:
+    """
+    Insert new item to the CommentedMap or update the value for the existing key.
+    The map should be already sorted.
+
+    :param map_: sorted CommentedMap instance
+    :param k: new key
+    :param v: new value
+    :param key: custom key function to customize the sort order of the map keys
+    """
+    if k in map_:
+        map_[k] = v
+        return
+
+    if key is None:
+        key = lambda x: x
+    # Find position to insert new item maintaining the order
+    pos = max((mi + 1 for mi, mv in enumerate(map_)
+               if key(mv) < key(k)),
+              default=0)
+
+    map_.insert(pos, k, v)
+
+
 def load_yaml(filepath) -> dict:
     try:
         with open_utf8(filepath, 'r') as stream:
@@ -343,11 +421,18 @@ def minor_version(version: str) -> str:
     return ".".join(version.split(".")[0:2])
 
 
-def version_key(version: str):
+def version_key(version: str) -> tuple:
     """
-    Converts vN.N.N to (N, N, N) that can be used in comparisons.
+    Converts vN.N.N to (N, N, N) or vN.N to (N, N) that can be used in comparisons.
     """
     return tuple(map(int, version[1:].split('.')))
+
+
+def minor_version_key(version: str) -> tuple:
+    """
+    Converts vN.N.N to (N, N) that can be used in comparisons.
+    """
+    return version_key(minor_version(version))
 
 
 class ClusterStorage:

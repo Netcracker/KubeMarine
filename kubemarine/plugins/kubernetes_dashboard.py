@@ -13,7 +13,7 @@
 # limitations under the License.
 from typing import List, Optional
 
-from kubemarine.core import summary, utils
+from kubemarine.core import summary, utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
@@ -26,15 +26,9 @@ def schedule_summary_report(cluster: KubernetesCluster):
 
 
 class DashboardManifestProcessor(Processor):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'kubernetes-dashboard'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/dashboard-{version}-original.yaml"
-        if destination_name is None:
-            destination_name = f"dashboard-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(logger, inventory, 'kubernetes-dashboard', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -98,9 +92,9 @@ class V2_5_X_DashboardManifestProcessor(DashboardManifestProcessor):
         super().enrich_deployment_dashboard_metrics_scraper(manifest)
 
 
-def get_dashboard_manifest_processor(cluster: KubernetesCluster, inventory: dict, **kwargs):
+def get_dashboard_manifest_processor(logger: log.VerboseLogger, inventory: dict, **kwargs):
     version: str = inventory['plugins']['kubernetes-dashboard']['version']
     if utils.minor_version(version) == 'v2.5':
-        return V2_5_X_DashboardManifestProcessor(cluster, inventory, **kwargs)
+        return V2_5_X_DashboardManifestProcessor(logger, inventory, **kwargs)
 
-    return DashboardManifestProcessor(cluster, inventory, **kwargs)
+    return DashboardManifestProcessor(logger, inventory, **kwargs)

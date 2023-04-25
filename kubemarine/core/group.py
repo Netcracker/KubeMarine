@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import io
 import os
 import random
@@ -28,6 +27,7 @@ import fabric
 import invoke
 from invoke import UnexpectedExit
 
+from kubemarine.core import utils
 from kubemarine.core.connections import Connections
 from kubemarine.core.executor import RemoteExecutor
 
@@ -734,20 +734,10 @@ class NodeGroup:
 
         return False
 
-    def get_local_file_sha1(self, filename):
-        sha1 = hashlib.sha1()
+    def get_local_file_sha1(self, filename: str) -> str:
+        return utils.get_local_file_sha1(filename)
 
-        # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(2 ** 16)
-                if not data:
-                    break
-                sha1.update(data)
-
-        return sha1.hexdigest()
-
-    def get_remote_file_sha1(self, filename):
+    def get_remote_file_sha1(self, filename: str) -> Dict[str, str]:
         results = self._do_with_wa("sudo", "openssl sha1 %s" % filename, warn=True)
         self._make_result_or_fail(results, lambda h, r: isinstance(r, Exception))
 

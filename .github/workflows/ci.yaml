@@ -95,10 +95,10 @@ jobs:
           - "3.11"
         include:
           - wheel: 'dist/*.whl'
-            remove_files_script: 'find . -not -path "./test*" -not -path "./examples*" -delete'
+            remove_files_script: 'find . -not -path "./test*" -not -path "./examples*" -not -path "./scripts*" -delete'
           - os: windows-latest
             wheel: '(get-item dist\*.whl).FullName'
-            remove_files_script: 'Get-ChildItem -Exclude test,examples | Remove-Item -Recurse -Force'
+            remove_files_script: 'Get-ChildItem -Exclude test,examples,scripts | Remove-Item -Recurse -Force'
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3

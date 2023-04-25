@@ -102,23 +102,20 @@ services:
         - container_t
         - keepalived_t
 
+  # Default "source" is enriched from "thirdparties" section of globals.yaml
+  # Default "sha1" is enriched from kubemarine/resources/configurations/compatibility/internal/thirdparties.yaml
   thirdparties:
     /usr/bin/etcdctl:
       source: 'resources/scripts/etcdctl.sh'
       group: control-plane
-    /usr/bin/kubeadm:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubeadm'
-    /usr/bin/kubelet:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubelet'
+    /usr/bin/kubeadm: {}
+    /usr/bin/kubelet: {}
     /usr/bin/kubectl:
-      source: 'https://storage.googleapis.com/kubernetes-release/release/{{ services.kubeadm.kubernetesVersion }}/bin/linux/amd64/kubectl'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://github.com/projectcalico/calico/releases/download/{{ plugins.calico.version }}/calicoctl-linux-amd64'
       group: control-plane
     # "crictl" is installed by default ONLY if "containerRuntime != docker", otherwise it is removed programmatically
     /usr/bin/crictl.tar.gz:
-      source: 'https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}/crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}-linux-amd64.tar.gz'
       unpack: /usr/bin/
 
   cri:
@@ -379,10 +376,10 @@ services:
             - 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
         haproxy:
           executable_name: 'haproxy'
-          package_name: 'haproxy={{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_debian }}'
+          package_name: 'haproxy={{ globals.compatibility_map.software.haproxy.version_debian }}'
           service_name: 'haproxy'
         keepalived:
-          package_name: 'keepalived={{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_debian }}'
+          package_name: 'keepalived={{ globals.compatibility_map.software.keepalived.version_debian }}'
         audit:
           package_name: 'auditd'
         conntrack:
@@ -399,10 +396,10 @@ services:
             - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel }}'
         haproxy:
           executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
-          package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel }}'
+          package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy.version_rhel }}'
           service_name: 'rh-haproxy18-haproxy'
         keepalived:
-          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel }}'
+          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived.version_rhel }}'
         audit:
           package_name: 'audit'
         conntrack:
@@ -421,10 +418,10 @@ services:
             - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
         haproxy:
           executable_name: '/usr/sbin/haproxy'
-          package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy.version_rhel8 }}'
           service_name: 'haproxy'
         keepalived:
-          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived.version_rhel8 }}'
         audit:
           package_name: 'audit'
         conntrack:
@@ -438,7 +435,7 @@ plugin_defaults:
 plugins:
 
   calico:
-    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion].version }}'
     install: true
     installation:
       priority: 0
@@ -554,7 +551,7 @@ plugins:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
   nginx-ingress-controller:
-    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'
     install: true
     installation:
       registry: k8s.gcr.io
@@ -573,11 +570,11 @@ plugins:
               - name: ingress-nginx-controller
                 namespace: ingress-nginx
             pods:
-              - '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["pod-name"] }}'
+              - ingress-nginx-controller
     webhook:
-      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-image-name"] }}:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["webhook-version"] }}'
+      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
     controller:
-      image: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|minorversion]["image-name"] }}:{{ plugins["nginx-ingress-controller"].version }}'
+      image: 'ingress-nginx/controller:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
         enableSslPassthrough: false
       nodeSelector:
@@ -599,7 +596,7 @@ plugins:
         protocol: TCP
 
   kubernetes-dashboard:
-    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
       priority: 2
@@ -628,7 +625,7 @@ plugins:
       nodeSelector:
         kubernetes.io/os: linux
     metrics-scraper:
-      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|minorversion]["metrics-scraper-version"] }}'
+      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion]["metrics-scraper-version"] }}'
       nodeSelector:
         kubernetes.io/os: linux
     ingress:
@@ -661,7 +658,7 @@ plugins:
                         number: 443
 
   local-path-provisioner:
-    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion].version }}'
     install: false
     installation:
       priority: 2
@@ -679,7 +676,7 @@ plugins:
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
     image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
-    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["busybox"][services.kubeadm.kubernetesVersion|minorversion].version }}'
+    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["busybox-version"] }}'
 
 rbac:
   account_defaults:

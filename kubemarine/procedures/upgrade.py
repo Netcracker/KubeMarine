@@ -118,13 +118,14 @@ def upgrade_containerd(cluster: KubernetesCluster):
     if cri == 'containerd':
         path = 'plugins."io.containerd.grpc.v1.cri"'
         target_kubernetes_version = cluster.context["upgrade_version"]
-        index_pos = target_kubernetes_version.rfind(".")
-        target_kubernetes_version = target_kubernetes_version[:index_pos]
-        pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
+        pause_mapping = cluster.globals['compatibility_map']['software']['pause']
+        if target_kubernetes_version not in pause_mapping:
+            raise Exception(f"Upgrade to {target_kubernetes_version} is not supported")
+        pause_version = pause_mapping[target_kubernetes_version]['version']
         if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
             return
         last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
-        if last_pause_version != pause_version:
+        if True:
             sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
             param_begin_pos = sandbox.rfind(":")
             sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)

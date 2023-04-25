@@ -121,9 +121,9 @@ def recommended_system_package_versions(cluster: KubernetesCluster, pckg_alias: 
     # We assume that system packages have word "haproxy"/"keepalived"/"docker"/"containerd"/"podman" in their name,
     # if not - then we may miss such package
     if pckg_alias == "haproxy":
-        expected_system_packages = {"haproxy": compatibility["haproxy"][k8s_version][version_key]}
+        expected_system_packages = {"haproxy": compatibility["haproxy"][version_key]}
     elif pckg_alias == "keepalived":
-        expected_system_packages = {"keepalived": compatibility["keepalived"][k8s_version][version_key]}
+        expected_system_packages = {"keepalived": compatibility["keepalived"][version_key]}
     elif pckg_alias == "containerd":
         expected_system_packages = {"podman": compatibility["podman"][k8s_version][version_key]}
         if version_key in ["version_rhel", "version_rhel8"]:
@@ -973,7 +973,7 @@ def default_services_configuration_status(cluster):
             message += f"CoreDNS config is outdated: \n {coredns_result} \n"
 
         coredns_version = first_control_plane.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
-        version = ".".join(cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
+        version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
         entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
                                                             {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
                                              {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
