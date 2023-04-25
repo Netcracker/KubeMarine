@@ -21,9 +21,10 @@ from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 from . import SoftwareType, InternalCompatibility
 
-ERROR_ASCENDING_VERSIONS = "Third-parties should have non-decreasing versions. " \
-                           "Third-party '{thirdparty}' has version {older_version} for Kubernetes {older_k8s_version}, " \
-                           "and has lower version {newer_version} for newer Kubernetes {newer_k8s_version}"
+ERROR_ASCENDING_VERSIONS = \
+    "Third-parties should have non-decreasing versions. " \
+    "Third-party '{thirdparty}' has version {older_version} for Kubernetes {older_k8s_version}, " \
+    "and has lower version {newer_version} for newer Kubernetes {newer_k8s_version}"
 
 
 class ThirdpartyResolver:
