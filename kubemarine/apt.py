@@ -77,7 +77,7 @@ def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
                 
-    command = DEBIAN_HEADERS + get_install_cmd(include, exclude)
+    command = get_install_cmd(include, exclude)
 
     return group.sudo(command, **kwargs)
     
