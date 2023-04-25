@@ -21,12 +21,20 @@ from kubemarine import demo
 from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
-from . import SoftwareType, InternalCompatibility
+from . import SoftwareType, InternalCompatibility, CompatibilityMap
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 
-
 ERROR_UNEXPECTED_IMAGE = "Image '{image}' of '{plugin}' is not expected"
+ERROR_ASCENDING_VERSIONS = \
+    "Plugins should have non-decreasing versions. " \
+    "Plugin '{plugin}' has version {older_version} for Kubernetes {older_k8s_version}, " \
+    "and has lower version {newer_version} for newer Kubernetes {newer_k8s_version}."
+ERROR_SUSPICIOUS_ABA_VERSIONS = \
+    "Detected suspicious versions of extra plugin images. " \
+    "Image '{image}' for plugin '{plugin}' has version {version_A} for Kubernetes {older_k8s_version}, " \
+    "version {version_B} for Kubernetes {k8s_version}, " \
+    "and again version {version_A} for Kubernetes {newer_k8s_version}."
 
 
 class ManifestResolver:
@@ -73,6 +81,7 @@ class Plugins(SoftwareType):
 
         compatibility_map = self.compatibility.load(tracker, "plugins.yaml", plugins)
         for plugin_name in plugins:
+            validate_plugin_versions(kubernetes_versions, plugin_name)
             compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
 
             for k8s_version in k8s_versions:
@@ -93,7 +102,55 @@ class Plugins(SoftwareType):
 
                 compatibility_map.reset_software_settings(plugin_name, k8s_version, new_settings)
 
+            validate_compatibility_map(compatibility_map, plugin_name)
+
         self.compatibility.store(compatibility_map)
+
+
+def validate_plugin_versions(kubernetes_versions: dict, plugin_name: str):
+    key = utils.version_key
+    k8s_versions = sorted(kubernetes_versions.keys(), key=key)
+
+    for i, older_k8s_version in enumerate(k8s_versions):
+        for j in range(i + 1, len(k8s_versions)):
+            newer_k8s_version = k8s_versions[j]
+            older_version = kubernetes_versions[older_k8s_version][plugin_name]
+            newer_version = kubernetes_versions[newer_k8s_version][plugin_name]
+            if key(newer_version) < key(older_version):
+                raise Exception(ERROR_ASCENDING_VERSIONS.format(
+                    plugin=plugin_name,
+                    older_k8s_version=older_k8s_version, newer_k8s_version=newer_k8s_version,
+                    older_version=older_version, newer_version=newer_version
+                ))
+
+
+def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name):
+    plugin_mapping: dict = compatibility_map.compatibility_map[plugin_name]
+    k8s_versions = list(plugin_mapping)
+
+    extra_images = []
+    if plugin_name == 'nginx-ingress-controller':
+        extra_images.append('webhook')
+    elif plugin_name == 'kubernetes-dashboard':
+        extra_images.append('metrics-scraper')
+    elif plugin_name == 'local-path-provisioner':
+        extra_images.append('busybox')
+
+    for extra_image in extra_images:
+        version_key = f"{extra_image}-version"
+        for i, newer_k8s_version in enumerate(k8s_versions):
+            for j in range(i - 1):
+                k8s_version = k8s_versions[i - 1]
+                older_k8s_version = k8s_versions[j]
+                version_A = plugin_mapping[older_k8s_version][version_key]
+                version_B = plugin_mapping[k8s_version][version_key]
+                version_A1 = plugin_mapping[newer_k8s_version][version_key]
+                if version_A == version_A1 and version_A != version_B:
+                    raise Exception(ERROR_SUSPICIOUS_ABA_VERSIONS.format(
+                        image=extra_image, plugin=plugin_name,
+                        older_k8s_version=older_k8s_version, k8s_version=k8s_version, newer_k8s_version=newer_k8s_version,
+                        version_A=version_A, version_B=version_B
+                    ))
 
 
 def resolve_local_path(plugin_name: str, plugin_version: str) -> str:

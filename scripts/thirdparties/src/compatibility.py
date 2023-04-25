@@ -63,7 +63,10 @@ class KubernetesVersions:
     def _validate_mapping(self):
         mandatory_fields = set(static.GLOBALS['plugins'])
         mandatory_fields.update(['crictl'])
-        optional_fields = {'pause', 'webhook', 'metrics-scraper', 'busybox'}
+        optional_fields = {
+            'webhook', 'metrics-scraper', 'busybox',
+            # 'pause',
+        }
 
         compatibility_map = self._kubernetes_versions['compatibility_map']
         for k8s_version, software in compatibility_map.items():

@@ -36,7 +36,6 @@ class KubernetesImages(SoftwareType):
     def sync(self, tracker: ChangesTracker):
         """
         Fetch all kubernetes images from 'kubeadm' executable and actualize the compatibility_map.
-        # TODO if pause version is changed, it is necessary to write patch that will reconfigure containerd.
         """
         k8s_versions = tracker.all_k8s_versions
         k8s_images_mapping = get_k8s_images_mapping(self.images_resolver, k8s_versions)

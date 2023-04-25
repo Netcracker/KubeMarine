@@ -109,3 +109,9 @@ compatibility_map:
 
 
 # After any change, please run scripts/thirdparties/sync.py
+
+# The following optional keys are supported in addition to the 5 required software keys:
+#<Kubernetes version>:
+#  webhook: <version>
+#  metrics-scraper: <version>
+#  busybox: <version>

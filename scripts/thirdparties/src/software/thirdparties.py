@@ -21,6 +21,10 @@ from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import ChangesTracker
 from . import SoftwareType, InternalCompatibility
 
+ERROR_ASCENDING_VERSIONS = "Third-parties should have non-decreasing versions. " \
+                           "Third-party '{thirdparty}' has version {older_version} for Kubernetes {older_k8s_version}, " \
+                           "and has lower version {newer_version} for newer Kubernetes {newer_k8s_version}"
+
 
 class ThirdpartyResolver:
     def resolve_sha1(self, thirdparty_name: str, version: str) -> str:
@@ -48,6 +52,7 @@ class Thirdparties(SoftwareType):
 
         compatibility_map = self.compatibility.load(tracker, "thirdparties.yaml", thirdparties)
         for thirdparty_name in thirdparties:
+            validate_thirdparty_versions(kubernetes_versions, thirdparty_name)
             compatibility_map.prepare_software_mapping(thirdparty_name, k8s_versions)
 
             for k8s_version in k8s_versions:
@@ -62,6 +67,26 @@ class Thirdparties(SoftwareType):
                 compatibility_map.reset_software_settings(thirdparty_name, k8s_version, new_settings)
 
         self.compatibility.store(compatibility_map)
+
+
+def validate_thirdparty_versions(kubernetes_versions: dict, thirdparty_name: str):
+    if thirdparty_name != 'crictl':
+        return
+
+    key = utils.version_key
+    k8s_versions = sorted(kubernetes_versions.keys(), key=key)
+
+    for i, older_k8s_version in enumerate(k8s_versions):
+        for j in range(i + 1, len(k8s_versions)):
+            newer_k8s_version = k8s_versions[j]
+            older_version = kubernetes_versions[older_k8s_version][thirdparty_name]
+            newer_version = kubernetes_versions[newer_k8s_version][thirdparty_name]
+            if key(newer_version) < key(older_version):
+                raise Exception(ERROR_ASCENDING_VERSIONS.format(
+                    thirdparty=thirdparty_name,
+                    older_k8s_version=older_k8s_version, newer_k8s_version=newer_k8s_version,
+                    older_version=older_version, newer_version=newer_version
+                ))
 
 
 def get_version(kubernetes_versions: dict, k8s_version: str, thirdparty_name: str) -> str:
