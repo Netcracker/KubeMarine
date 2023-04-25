@@ -43,8 +43,9 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
     def test_upgrade_plan_not_supported_version(self):
         k8s_latest = self.k8s_versions()[-1]
         not_allowed_version = utils.increment_version(k8s_latest)
-        with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_ALLOWED
-                                               % (re.escape(not_allowed_version), '.*')):
+        with utils.assert_raises_kme(self, "KME0008",
+                                     version=re.escape(not_allowed_version),
+                                     allowed_versions='.*'):
             upgrade.verify_upgrade_plan([
                 k8s_latest,
                 not_allowed_version

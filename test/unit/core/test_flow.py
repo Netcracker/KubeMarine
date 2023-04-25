@@ -202,7 +202,7 @@ class FlowTest(unittest.TestCase):
         flow.init_tasks_flow(cluster)
         final_task_names = ["deploy.loadbalancer.haproxy", "deploy.loadbalancer.keepalived",
                             "deploy.accounts", "overview"]
-        flow.run_flow(tasks, final_task_names, cluster, {}, [])
+        flow.run_tasks_recursive(tasks, final_task_names, cluster, {}, [])
 
         self.assertEqual(4, cluster.context["test_info"], f"Here should be 4 calls of test_func for: {final_task_names}")
 
@@ -371,12 +371,10 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
-        with self.assertRaisesRegex(Exception,
-                                    kubernetes.ERROR_NOT_ALLOWED % (re.escape(not_allowed_version), ".*")):
-            try:
-                flow.run_tasks(res, tasks)
-            except errors.FailException as e:
-                raise e.reason
+        with test_utils.assert_raises_kme(self, "KME0008",
+                                          version=re.escape(not_allowed_version),
+                                          allowed_versions='.*'):
+            flow.run_tasks(res, tasks)
 
     def _stub_detect_nodes_context(self, inventory: dict, online_nodes: list, sudoer_nodes: list):
         hosts = [node["address"] for node in inventory["nodes"]]

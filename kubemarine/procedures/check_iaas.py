@@ -877,11 +877,11 @@ def check_tcp_ports(cluster):
                                        f"Ports that should be opened: {tcp_ports}")
 
 
-def make_reports(cluster):
-    if not cluster.context['execution_arguments'].get('disable_csv_report', False):
-        cluster.context['testsuite'].save_csv(cluster.context['execution_arguments']['csv_report'], cluster.context['execution_arguments']['csv_report_delimiter'])
-    if not cluster.context['execution_arguments'].get('disable_html_report', False):
-        cluster.context['testsuite'].save_html(cluster.context['execution_arguments']['html_report'], cluster.context['initial_procedure'].upper())
+def make_reports(context: dict):
+    if not context['execution_arguments'].get('disable_csv_report', False):
+        context['testsuite'].save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
+    if not context['execution_arguments'].get('disable_html_report', False):
+        context['testsuite'].save_html(context['execution_arguments']['html_report'], context['initial_procedure'].upper())
 
 
 tasks = OrderedDict({
@@ -978,17 +978,20 @@ def main(cli_arguments=None):
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 
-    cluster = flow.run_actions(context, [IaasAction()], print_summary=False)
+    flow_ = flow.ActionsFlow([IaasAction()])
+    result = flow_.run_flow(context, print_summary=False)
+
+    context = result.context
+    testsuite: TestSuite = context['testsuite']
 
     # Final summary should be printed only to stdout with custom formatting
     # If test results are required for parsing, they can be found in the test results files
-    print(cluster.context['testsuite'].get_final_summary())
-    cluster.context['testsuite'].print_final_status(cluster.log)
-    make_reports(cluster)
-    return cluster.context['testsuite']
+    print(testsuite.get_final_summary())
+    testsuite.print_final_status(result.logger)
+    make_reports(context)
+    if testsuite.is_any_test_failed():
+        sys.exit(1)
 
 
 if __name__ == '__main__':
-    testsuite = main()
-    if testsuite.is_any_test_failed():
-        sys.exit(1)
+    main()

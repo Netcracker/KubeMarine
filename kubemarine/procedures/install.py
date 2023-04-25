@@ -661,7 +661,7 @@ class InstallAction(Action):
                 and cluster_yml["services"].get("kubeadm", {})
                 and cluster_yml["services"]["kubeadm"].get("kubernetesVersion")):
             target_version = cluster_yml["services"]["kubeadm"].get("kubernetesVersion")
-            self.verification_version_result = kubernetes.verify_target_version(target_version)
+            self.verification_version_result = kubernetes.verify_target_version(target_version, res.logger())
 
         flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
 
@@ -678,10 +678,11 @@ def main(cli_arguments=None):
     context = flow.create_context(parser, cli_arguments, procedure='install')
 
     install = InstallAction()
-    flow.run_actions(context, [install])
+    flow_ = flow.ActionsFlow([install])
+    result = flow_.run_flow(context)
 
     if install.verification_version_result:
-        utils.warning(install.verification_version_result)
+        result.logger.warning(install.verification_version_result)
 
 
 if __name__ == '__main__':

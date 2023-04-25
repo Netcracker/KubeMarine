@@ -211,6 +211,25 @@ def upgrade_finalize_inventory(cluster, inventory):
     return inventory
 
 
+class UpgradeFlow(flow.Flow):
+    def __init__(self):
+        self.verification_version_result = ""
+
+    def _run(self, resources: DynamicResources):
+        logger = resources.logger()
+        upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
+        logger.debug(f"Loaded upgrade plan: current ⭢ {' ⭢ '.join(upgrade_plan)}")
+        self.verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1], logger)
+
+        args = resources.context['execution_arguments']
+        if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
+            raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
+
+        # todo inventory is preserved few times, probably need to preserve it once instead.
+        actions = [UpgradeAction(version) for version in upgrade_plan]
+        flow.run_actions(resources, actions)
+
+
 class UpgradeAction(Action):
     def __init__(self, upgrade_version: str):
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
@@ -236,21 +255,11 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
-    args = context['execution_arguments']
-    resources = DynamicResources(context)
+    flow_ = UpgradeFlow()
+    result = flow_.run_flow(context)
 
-    upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
-    verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
-
-    if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
-        raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
-
-    # todo inventory is preserved few times, probably need to preserve it once instead.
-    actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(resources, actions)
-
-    if verification_version_result:
-        print(verification_version_result)
+    if flow_.verification_version_result:
+        result.logger.warning(flow_.verification_version_result)
 
 
 def verify_upgrade_plan(upgrade_plan: List[str]):
@@ -263,8 +272,6 @@ def verify_upgrade_plan(upgrade_plan: List[str]):
         if previous_version is not None:
             kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
-
-    print('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
 
     return upgrade_plan
 

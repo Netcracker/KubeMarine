@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import unittest
+from contextlib import contextmanager
 from typing import Dict
 
 from kubemarine import demo, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, errors
 
 
 def make_finalized_inventory(cluster: demo.FakeKubernetesCluster):
@@ -63,3 +64,13 @@ def increment_version(version: str, minor=False):
     else:
         new_version[2] += 1
     return f"v{'.'.join(map(str, new_version))}"
+
+
+@contextmanager
+def assert_raises_kme(test: unittest.TestCase, code: str, **kwargs):
+    expected = errors.KME(code, **kwargs)
+    with test.assertRaisesRegex(errors.KME, str(expected)):
+        try:
+            yield
+        except errors.FailException as e:
+            raise e.reason

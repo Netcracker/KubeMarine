@@ -25,7 +25,7 @@ from jinja2 import Template
 import ipaddress
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static, summary
+from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
@@ -33,7 +33,6 @@ from kubemarine.core.errors import KME
 
 version_coredns_path_breakage = "v1.21.2"
 
-ERROR_NOT_ALLOWED="Specified Kubernetes version \"%s\" - cannot be used! Allowed versions are: %s."
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
 ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
@@ -1006,20 +1005,20 @@ def verify_initial_version(inventory: dict, _):
 
 
 def verify_allowed_version(version: str) -> None:
-    if version not in static.KUBERNETES_VERSIONS['compatibility_map']:
-        raise Exception(ERROR_NOT_ALLOWED % (
-            version,
-            ', '.join(map(repr, static.KUBERNETES_VERSIONS['compatibility_map']))
-        ))
+    allowed_versions = static.KUBERNETES_VERSIONS['compatibility_map'].keys()
+    if version not in allowed_versions:
+        raise errors.KME('KME0008',
+                         version=version,
+                         allowed_versions=', '.join(map(repr, allowed_versions)))
 
 
-def verify_target_version(target_version: str) -> str:
+def verify_target_version(target_version: str, logger: log.EnhancedLogger) -> str:
     verify_allowed_version(target_version)
     minor_version = utils.minor_version(target_version)
     supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
     if not supported_versions.get(minor_version, {}).get("supported", False):
-        message = f"Warning! Specified Kubernetes version {target_version!r} - is not supported!"
-        utils.warning(message)
+        message = f"Specified target Kubernetes version {target_version!r} - is not supported!"
+        logger.warning(message)
         return message
     return ""
 
