@@ -65,7 +65,8 @@ def clean(group, **kwargs) -> NodeGroupResult:
 def get_install_cmd(include: str or list, exclude=None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt update && ' + \
+    command = DEBIAN_HEADERS + 'ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300 ;' + \
+              DEBIAN_HEADERS + 'apt update && ' + \
               DEBIAN_HEADERS + 'sudo apt install -y %s' % include
 
     if exclude is not None:
@@ -80,7 +81,7 @@ def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
                 
-    command = DEBIAN_HEADERS + "ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300; " + get_install_cmd(include, exclude)
+    command = DEBIAN_HEADERS + get_install_cmd(include, exclude)
 
     return group.sudo(command, **kwargs)
     
