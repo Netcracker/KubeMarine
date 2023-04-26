@@ -91,7 +91,8 @@ def remove(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt purge -y %s' % include
+    command = DEBIAN_HEADERS + 'ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300; ' + \
+              DEBIAN_HEADERS + 'apt purge -y %s' % include
 
     if exclude is not None:
         if isinstance(exclude, list):
@@ -107,7 +108,8 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
 
     if isinstance(include, list):
         include = ' '.join(include)
-    command = DEBIAN_HEADERS + 'apt update && ' + \
+    command = DEBIAN_HEADERS + 'ps aux | grep -v grep | grep -v unattended-upgrade-shutdown | grep unattended-upgrade && sleep 300; ' + \
+              DEBIAN_HEADERS + 'apt update && ' + \
               DEBIAN_HEADERS + 'sudo apt upgrade -y %s' % include
     
     if exclude is not None:
