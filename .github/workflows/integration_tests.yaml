@@ -117,17 +117,17 @@ jobs:
         run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_iaas_dump/
       - name: Install
         id: test_install
-        run: |
-          kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
-          systemctl status kubelet
-          journalctl -xeu kubelet 
-          journalctl -xeu kubelet > ./results/install_dump/kubelet.log
-      - name: Check paas
+        run: kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
+     - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
-        run: rename 's/[:]/_/g' ./results/*/dump/*
+        run: |
+          systemctl status kubelet
+          journalctl -xeu kubelet
+          journalctl -xeu kubelet > ./results/install_dump/kubelet.log
+          rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
