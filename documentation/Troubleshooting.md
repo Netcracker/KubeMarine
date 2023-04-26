@@ -551,16 +551,16 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 
 ## Long Pulling of Images
 
-**Symptoms**: Pods stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took few minutes or more:
+**Symptoms**: Pods are stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took a few minutes or more.
 
 ```
 Successfully pulled image "<image_name>" in 12m37.752058078s
 ```
 
-**Root cause**: By default kubelet pulls images one by one. One slow pulling may stuck all the pullings on the node.
+**Root cause**: By default, kubelet pulls images one by one. One slow pulling may trap all the pullings on the node.
 
-**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet for use of parallel image pulls.
-**Note**: We recommend not changing the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend
+**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet to use parallel image pulls.
+**Note**: It is recommended not to change the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend.
 
 ## No Pod-to-Pod Traffic for Some Nodes with more than one network interface
 
