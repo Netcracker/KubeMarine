@@ -51,8 +51,6 @@ class KubernetesVersions:
             if key not in minor_versions:
                 del k8s_versions[key]
 
-        self.store()
-
     def store(self) -> None:
         with utils.open_internal(RESOURCE_PATH, 'w') as stream:
             YAML.dump(self._kubernetes_versions, stream)

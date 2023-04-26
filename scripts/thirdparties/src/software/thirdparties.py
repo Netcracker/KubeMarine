@@ -18,8 +18,8 @@ from typing import List, Tuple, Dict
 from kubemarine import thirdparties
 from kubemarine.core import utils
 from ..shell import curl, TEMP_FILE, SYNC_CACHE
-from ..tracker import ChangesTracker
-from . import SoftwareType, InternalCompatibility
+from ..tracker import SummaryTracker, ComposedTracker
+from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
 
 ERROR_ASCENDING_VERSIONS = \
     "Third-parties should have non-decreasing versions. " \
@@ -37,21 +37,31 @@ class ThirdpartyResolver:
 
 
 class Thirdparties(SoftwareType):
-    def __init__(self, compatibility: InternalCompatibility, thirdparty_resolver: ThirdpartyResolver):
-        super().__init__(compatibility)
+    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig,
+                 thirdparty_resolver: ThirdpartyResolver):
+        super().__init__(compatibility, upgrade_config)
         self.thirdparty_resolver = thirdparty_resolver
 
-    def sync(self, tracker: ChangesTracker):
+    @property
+    def name(self) -> str:
+        return 'thirdparties'
+
+    def sync(self, summary_tracker: SummaryTracker) -> CompatibilityMap:
         """
         Download, calculate sha1 and actualize compatibility_map of all third-parties.
-        # TODO if crictl version is changed, it is necessary to write patch that will reinstall corresponding thirdparty.
         """
         thirdparties = ['kubeadm', 'kubelet', 'kubectl', 'calicoctl', 'crictl']
-        kubernetes_versions = tracker.kubernetes_versions
-        k8s_versions = tracker.all_k8s_versions
+        kubernetes_versions = summary_tracker.kubernetes_versions
+        k8s_versions = summary_tracker.all_k8s_versions
         thirdparties_sha1 = calculate_sha1(self.thirdparty_resolver, kubernetes_versions, thirdparties)
 
-        compatibility_map = self.compatibility.load(tracker, "thirdparties.yaml", thirdparties)
+        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, ['calicoctl', 'crictl'])
+        upgrade_software.prepare(summary_tracker)
+
+        tracker = ComposedTracker(summary_tracker, upgrade_software)
+        compatibility_map = self.compatibility.load(tracker, "thirdparties.yaml")
+        compatibility_map.prepare(summary_tracker, thirdparties)
+
         for thirdparty_name in thirdparties:
             validate_thirdparty_versions(kubernetes_versions, thirdparty_name)
             compatibility_map.prepare_software_mapping(thirdparty_name, k8s_versions)
@@ -67,7 +77,7 @@ class Thirdparties(SoftwareType):
                 new_settings['sha1'] = sha1
                 compatibility_map.reset_software_settings(thirdparty_name, k8s_version, new_settings)
 
-        self.compatibility.store(compatibility_map)
+        return compatibility_map
 
 
 def validate_thirdparty_versions(kubernetes_versions: dict, thirdparty_name: str):

@@ -11,12 +11,205 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
+from abc import ABC, abstractmethod
+from textwrap import dedent
+from typing import List
+
+import yaml
 
 import kubemarine.patches
-from kubemarine.core import flow
+from kubemarine.core import flow, static, utils
+from kubemarine.core.action import Action
+from kubemarine.core.patch import Patch, _SoftwareUpgradePatch
+from kubemarine.core.resources import DynamicResources
 
 
-def main(cli_arguments=None):
+class SoftwareUpgradeAction(Action, ABC):
+    def __init__(self, software_name: str, k8s_versions: List[str]):
+        super().__init__(f'Upgrade {software_name}')
+        self.software_name = software_name
+        self.k8s_versions = k8s_versions
+
+    def run(self, res: DynamicResources):
+        cluster = res.cluster()
+        version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        if version not in self.k8s_versions:
+            cluster.log.info(f"Patch is not relevant for kubernetes {version}")
+            return
+
+        self.specific_run(res)
+
+    @abstractmethod
+    def specific_run(self, res: DynamicResources):
+        pass
+
+
+class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
+    def specific_run(self, res: DynamicResources):
+        # TODO implement
+        pass
+
+
+class CriUpgradeAction(Action):
+    def __init__(self, upgrade_config: dict):
+        super().__init__(f'Upgrade CRI')
+        self.upgrade_config = upgrade_config
+
+    def run(self, res: DynamicResources):
+        cluster = res.cluster()
+        # TODO implement
+
+
+class BalancerUpgradeAction(Action):
+    def __init__(self, software_name: str):
+        super().__init__(f'Upgrade {software_name}')
+        self.software_name = software_name
+
+    def run(self, res: DynamicResources):
+        cluster = res.cluster()
+        # TODO implement
+
+
+class PluginUpgradeAction(SoftwareUpgradeAction):
+    def specific_run(self, res: DynamicResources):
+        # TODO implement
+        pass
+
+
+class ThirdpartyUpgradePatch(_SoftwareUpgradePatch):
+    def __init__(self, thirdparty_name: str, k8s_versions: List[str]):
+        super().__init__(f"upgrade_{thirdparty_name}")
+        self.thirdparty_name = thirdparty_name
+        self.k8s_versions = k8s_versions
+
+    @property
+    def action(self) -> Action:
+        return ThirdpartyUpgradeAction(self.thirdparty_name, self.k8s_versions)
+
+    @property
+    def description(self) -> str:
+        versions_list = '\n'.join(f" - {ver}" for ver in self.k8s_versions)
+
+        return dedent(
+            f"""\
+            Upgrade {self.thirdparty_name!r} for the following Kubernetes versions:
+            {{versions_list}}
+            Roughly equivalent to 'kubemarine install --tasks=prepare.thirdparties'
+            provided that all third-parties except the {self.thirdparty_name!r} are already actual.
+            """.rstrip()
+        ).format(versions_list=versions_list)
+
+
+class CriUpgradePatch(_SoftwareUpgradePatch):
+    def __init__(self, upgrade_config: dict):
+        super().__init__(f"upgrade_cri")
+        self.upgrade_config = upgrade_config
+
+    @property
+    def action(self) -> Action:
+        return CriUpgradeAction(self.upgrade_config)
+
+    @property
+    def description(self) -> str:
+        return dedent(
+            f"""\
+            Upgrade CRI for necessary Kubernetes versions with particular CRI and particular OS family.
+            Exact configuration for what versions the upgrade is necessary, can be seen in
+            {SOFTWARE_UPGRADE_PATH}.
+            Upgrade procedure is similar to 'kubemarine upgrade --tasks=kubernetes', but without the Kubernetes upgrade.
+            """.rstrip()
+        )
+
+
+class BalancerUpgradePatch(_SoftwareUpgradePatch):
+    def __init__(self, software_name: str):
+        super().__init__(f"upgrade_{software_name}")
+        self.software_name = software_name
+
+    @property
+    def action(self) -> Action:
+        return BalancerUpgradeAction(self.software_name)
+
+    @property
+    def description(self) -> str:
+        return dedent(
+            f"""\
+            Upgrade {self.software_name!r} on balancers:
+            Roughly equivalent to 'kubemarine install --tasks=deploy.loadbalancer.{self.software_name}'.
+            """.rstrip()
+        )
+
+
+class PluginUpgradePatch(_SoftwareUpgradePatch):
+    def __init__(self, plugin_name: str, k8s_versions: List[str]):
+        super().__init__(f"upgrade_{re.sub(r'-', '_', plugin_name)}")
+        self.plugin_name = plugin_name
+        self.k8s_versions = k8s_versions
+
+    @property
+    def action(self) -> Action:
+        return PluginUpgradeAction(self.plugin_name, self.k8s_versions)
+
+    @property
+    def description(self) -> str:
+        versions_list = '\n'.join(f" - {ver}" for ver in self.k8s_versions)
+
+        return dedent(
+            f"""\
+            Upgrade {self.plugin_name!r} for the following Kubernetes versions:
+            {{versions_list}}
+            Roughly equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins disabled except the {self.plugin_name!r}.
+            """.rstrip()
+        ).format(versions_list=versions_list)
+
+
+def load_upgrade_config() -> dict:
+    with utils.open_internal(SOFTWARE_UPGRADE_PATH) as stream:
+        return yaml.safe_load(stream)
+
+
+def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
+    upgrade_config = load_upgrade_config()
+
+    upgrade_patches: List[_SoftwareUpgradePatch] = []
+
+    # The order of upgrade is determined by the implementation below
+
+    for thirdparty_name in ['crictl']:
+        k8s_versions = upgrade_config['thirdparties'][thirdparty_name]
+        if k8s_versions:
+            upgrade_patches.append(ThirdpartyUpgradePatch(thirdparty_name, k8s_versions))
+
+    if any(upgrade_config['packages'][pkg].get(v_key)
+           for pkg in ('docker', 'containerd', 'containerdio', 'podman')
+           for v_key in ('version_rhel', 'version_rhel8', 'version_debian')):
+        upgrade_patches.append(CriUpgradePatch(upgrade_config))
+
+    for software_name in ['haproxy', 'keepalived']:
+        if any(upgrade_config['packages'][software_name].get(v_key)
+               for v_key in ('version_rhel', 'version_rhel8', 'version_debian')):
+            upgrade_patches.append(BalancerUpgradePatch(software_name))
+
+    default_plugins = static.DEFAULTS['plugins']
+    plugins = list(default_plugins)
+    plugins.sort(key=lambda p: default_plugins[p]['installation']['priority'])
+    for plugin_name in plugins:
+        k8s_versions = upgrade_config['plugins'][plugin_name]
+        if k8s_versions:
+            upgrade_patches.append(PluginUpgradePatch(plugin_name, k8s_versions))
+
+    return upgrade_patches
+
+
+def load_patches() -> List[Patch]:
+    patches = list(kubemarine.patches.patches)
+    patches.extend(resolve_upgrade_patches())
+    patches.sort(key=lambda p: p.priority())
+    return patches
+
+
+def new_parser():
     cli_help = '''
     Script for automated update of the environment for the current version of Kubemarine.
 
@@ -40,10 +233,13 @@ def main(cli_arguments=None):
     parser.add_argument('--describe', metavar='PATCH',
                         help='describe the specified patch')
 
-    context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
+    return parser
+
+
+def run(context: dict):
     args = context['execution_arguments']
 
-    patches = kubemarine.patches.patches
+    patches = load_patches()
     patch_ids = [patch.identifier for patch in patches]
 
     if args['list']:
@@ -94,8 +290,17 @@ def main(cli_arguments=None):
     if not actions:
         print("No patches to apply")
         exit(0)
+
     flow.ActionsFlow(actions).run_flow(context)
 
+
+def main(cli_arguments=None):
+    parser = new_parser()
+    context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
+    run(context)
+
+
+SOFTWARE_UPGRADE_PATH = utils.get_internal_resource_path("patches/software_upgrade.yaml")
 
 if __name__ == '__main__':
     main()

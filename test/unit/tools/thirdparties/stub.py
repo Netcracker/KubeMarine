@@ -24,11 +24,11 @@ from kubemarine.core import static, utils
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
 from scripts.thirdparties.src.compatibility import KubernetesVersions
 from scripts.thirdparties.src.run import Synchronization
-from scripts.thirdparties.src.software import InternalCompatibility, CompatibilityMap
+from scripts.thirdparties.src.software import InternalCompatibility, CompatibilityMap, UpgradeConfig
 from scripts.thirdparties.src.software.kubernetes_images import KubernetesImagesResolver
 from scripts.thirdparties.src.software.plugins import ManifestResolver, ManifestsEnrichment
 from scripts.thirdparties.src.software.thirdparties import ThirdpartyResolver
-from scripts.thirdparties.src.tracker import ChangesTracker
+from scripts.thirdparties.src.tracker import SummaryTracker
 
 
 class FakeInternalCompatibility(InternalCompatibility):
@@ -139,8 +139,17 @@ class NoneManifestsEnrichment(ManifestsEnrichment):
     def __init__(self):
         super().__init__()
 
-    def run(self, tracker: ChangesTracker):
+    def run(self, tracker: SummaryTracker):
         return
+
+
+class FakeUpgradeConfig(UpgradeConfig):
+    def __init__(self):
+        super().__init__()
+        self.stored: Optional[CommentedMap] = None
+
+    def store(self):
+        self.stored = deepcopy(self.config)
 
 
 class FakeSynchronization(Synchronization):
@@ -149,6 +158,7 @@ class FakeSynchronization(Synchronization):
                  kubernetes_versions: FakeKubernetesVersions,
                  manifest_resolver=FAKE_CACHED_MANIFEST_RESOLVER,
                  manifests_enrichment=NoneManifestsEnrichment(),
+                 upgrade_config=FakeUpgradeConfig(),
                  ):
         super().__init__(
             compatibility,
@@ -157,4 +167,5 @@ class FakeSynchronization(Synchronization):
             manifest_resolver,
             FakeThirdpartyResolver(),
             manifests_enrichment,
+            upgrade_config,
         )

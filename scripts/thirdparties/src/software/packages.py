@@ -11,26 +11,62 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from copy import deepcopy
+from typing import List
 
 from kubemarine.core import utils
-from . import SoftwareType, InternalCompatibility, CompatibilityMap
-from ..tracker import ChangesTracker
+from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
+from ..tracker import SummaryTracker, ComposedTracker
+
+
+class UpgradePackages(UpgradeSoftware):
+    def prepare(self, summary_tracker: SummaryTracker) -> None:
+        for software_name in self.software_names:
+            if software_name not in self.config:
+                self.config[software_name] = {}
+
+        super().prepare(summary_tracker)
+
+    def delete(self, k8s_version: str, software_name: str):
+        if software_name not in self.software_names:
+            return
+
+        os_mapping: dict = self.config[software_name]
+        for k8s_versions in os_mapping.values():
+            if isinstance(k8s_versions, list) and k8s_version in k8s_versions:
+                k8s_versions.remove(k8s_version)
+
+    def update(self, k8s_version: str, software_name: str):
+        # The management tool is not able to update packages compatibility map.
+        return
 
 
 class Packages(SoftwareType):
-    def __init__(self, compatibility: InternalCompatibility):
-        super().__init__(compatibility)
+    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig):
+        super().__init__(compatibility, upgrade_config)
 
-    def sync(self, tracker: ChangesTracker):
+    @property
+    def name(self) -> str:
+        return 'packages'
+
+    def sync(self, summary_tracker: SummaryTracker) -> CompatibilityMap:
         """
         Actualize compatibility_map of all packages.
         """
         package_names = ['docker', 'containerd', 'containerdio', 'podman',
                          'haproxy', 'keepalived']
-        k8s_versions = tracker.all_k8s_versions
+        k8s_versions = summary_tracker.all_k8s_versions
 
-        compatibility_map = self.compatibility.load(tracker, "packages.yaml", package_names)
+        upgrade_packages = UpgradePackages(self.upgrade_config, self.name, package_names)
+        upgrade_packages.prepare(summary_tracker)
+
+        tracker = ComposedTracker(summary_tracker, upgrade_packages)
+        compatibility_map = self.compatibility.load(tracker, "packages.yaml")
+        compatibility_map.prepare(summary_tracker, package_names)
+
         for package_name in package_names:
+            prepare_upgrade_config_stub(upgrade_packages, package_name)
+
             if package_name in ('haproxy', 'keepalived'):
                 continue
 
@@ -40,19 +76,44 @@ class Packages(SoftwareType):
                 new_settings = resolve_new_settings(compatibility_map, package_name, k8s_version)
                 compatibility_map.reset_software_settings(package_name, k8s_version, new_settings)
 
-        self.compatibility.store(compatibility_map)
-        if tracker.new_k8s:
-            tracker.final_message(f"Please check package versions in {compatibility_map.resource}")
+        if summary_tracker.new_k8s:
+            summary_tracker.final_message(f"Please check package versions in {compatibility_map.resource}")
+
+        return compatibility_map
+
+
+def get_compatibility_version_keys(package_name: str) -> List[str]:
+    keys = [
+        'version_rhel',
+        'version_rhel8',
+        'version_debian',
+    ]
+    if package_name == 'containerd':
+        keys.remove('version_rhel')
+
+    return keys
+
+
+def prepare_upgrade_config_stub(upgrade_software: UpgradePackages, package_name: str):
+    stub = False if package_name in ('haproxy', 'keepalived') else []
+    version_keys = get_compatibility_version_keys(package_name)
+
+    os_mapping: dict = upgrade_software.config[package_name]
+
+    for version_key in version_keys:
+        if version_key not in os_mapping:
+            os_mapping[version_key] = deepcopy(stub)
+
+    map_keys = list(os_mapping)
+    for key in map_keys:
+        if key not in version_keys:
+            del os_mapping[key]
+            print(f"Deleted {upgrade_software.software_type}.{package_name}.{key} "
+                  f"from {upgrade_software.upgrade_config.name}")
 
 
 def resolve_new_settings(compatibility_map: CompatibilityMap, package_name: str, k8s_version: str) -> dict:
-    new_settings = {
-        'version_rhel': '0.0.0',
-        'version_rhel8': '0.0.0',
-        'version_debian': '0.0.0',
-    }
-    if package_name == 'containerd':
-        del new_settings['version_rhel']
+    new_settings = {key: '0.0.0' for key in get_compatibility_version_keys(package_name)}
 
     package_mapping = compatibility_map.compatibility_map[package_name]
     if k8s_version in package_mapping:

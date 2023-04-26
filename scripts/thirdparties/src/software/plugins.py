@@ -21,9 +21,9 @@ from kubemarine import demo
 from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
-from . import SoftwareType, InternalCompatibility, CompatibilityMap
+from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoftware, UpgradeConfig
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
-from ..tracker import ChangesTracker
+from ..tracker import SummaryTracker, ComposedTracker
 
 ERROR_UNEXPECTED_IMAGE = "Image '{image}' of '{plugin}' is not expected"
 ERROR_ASCENDING_VERSIONS = \
@@ -57,7 +57,7 @@ class ManifestResolver:
 
 
 class ManifestsEnrichment:
-    def run(self, tracker: ChangesTracker):
+    def run(self, tracker: SummaryTracker):
         for k8s_version in tracker.all_k8s_versions:
             for plugin_name in list(static.GLOBALS['plugins']):
                 if tracker.is_software_changed(k8s_version, plugin_name):
@@ -65,21 +65,31 @@ class ManifestsEnrichment:
 
 
 class Plugins(SoftwareType):
-    def __init__(self, compatibility: InternalCompatibility, manifest_resolver: ManifestResolver):
-        super().__init__(compatibility)
+    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig,
+                 manifest_resolver: ManifestResolver):
+        super().__init__(compatibility, upgrade_config)
         self.manifest_resolver = manifest_resolver
 
-    def sync(self, tracker: ChangesTracker):
+    @property
+    def name(self) -> str:
+        return 'plugins'
+
+    def sync(self, summary_tracker: SummaryTracker) -> CompatibilityMap:
         """
         Download and save plugin manifests if necessary, and actualize compatibility_map of all plugins.
-        # TODO if plugin versions are changed, it is necessary to write patch that will reinstall corresponding plugins.
         """
-        kubernetes_versions = tracker.kubernetes_versions
-        k8s_versions = tracker.all_k8s_versions
+        kubernetes_versions = summary_tracker.kubernetes_versions
+        k8s_versions = summary_tracker.all_k8s_versions
         plugins = list(static.GLOBALS['plugins'])
         plugin_manifests = resolve_plugin_manifests(self.manifest_resolver, kubernetes_versions)
 
-        compatibility_map = self.compatibility.load(tracker, "plugins.yaml", plugins)
+        upgrade_software = UpgradeSoftware(self.upgrade_config, self.name, plugins)
+        upgrade_software.prepare(summary_tracker)
+
+        tracker = ComposedTracker(summary_tracker, upgrade_software)
+        compatibility_map = self.compatibility.load(tracker, "plugins.yaml")
+        compatibility_map.prepare(summary_tracker, plugins)
+
         for plugin_name in plugins:
             validate_plugin_versions(kubernetes_versions, plugin_name)
             compatibility_map.prepare_software_mapping(plugin_name, k8s_versions)
@@ -104,7 +114,7 @@ class Plugins(SoftwareType):
 
             validate_compatibility_map(compatibility_map, plugin_name)
 
-        self.compatibility.store(compatibility_map)
+        return compatibility_map
 
 
 def validate_plugin_versions(kubernetes_versions: dict, plugin_name: str):

@@ -2,6 +2,8 @@
 #
 # If new Kubernetes version is added, the compatibility mapping is taken from the previous Kubernetes versions.
 # The developer should manually change the required package versions if necessary.
+#
+# After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 docker:
   v1.21.2:
     version_rhel: 19.03*
