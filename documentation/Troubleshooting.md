@@ -25,8 +25,8 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
   - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
   - [Long Pulling of Images](#long-pulling-of-images)
-  - [No Pod-to-Pod Traffic for Some Nodes with more than one network interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
-  - [No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
+  - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
+  - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
 - [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
@@ -562,13 +562,13 @@ Successfully pulled image "<image_name>" in 12m37.752058078s
 **Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet to use parallel image pulls.
 **Note**: It is recommended not to change the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend.
 
-## No Pod-to-Pod Traffic for Some Nodes with more than one network interface
+## No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface
 
 **Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 permanent network interface at the nodes.
 
 **Root cause**: Not all Calico BGP sessions between nodes are established due to incorrect network interface choice.
 
-**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
+**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
 to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
 ```
 plugins:
@@ -576,16 +576,16 @@ plugins:
     env:
       IP_AUTODETECTION_METHOD: interface=ens160
 ```
-More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
-## No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation
+## No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation
 
-**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 ips on used network interface with different CIDR notations.
+**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 IPs on used network interface with different CIDR notations.
 
-**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on chosen ips for nodes.
-Typically, such situation can appear in minha scheme with vrrp, where balancer role is combined with other roles. In that case 
-calico can autodetect vrrp for some node instead of its internal ip.
-You can use `calicoctl` to check such situation, e.g. for [example minha cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
+**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on the chosen IPs for nodes.
+Typically, such situation can appear in minha scheme with vrrp, where the balancer role is combined with other roles. In that case, 
+Calico can autodetect vrrp for some node instead of its internal IP.
+You can use `calicoctl` to check such a situation. For example, in [example minha cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
 ```sh
 sudo calicoctl get nodes --output=wide
 NAME                  ASN       IPV4                IPV6
@@ -594,10 +594,10 @@ k8s-control-plane-2   (64512)   192.168.0.2/24
 k8s-control-plane-3   (64512)   192.168.0.3/24
 ```
 
-**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
-to route the traffic between nodes. This is fine for nodes that don't have more than one different ips, but it can work 
-improperly in case of multiple ips. 
-To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method,
+**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
+to route the traffic between nodes. This is fine for nodes that do not have more than one different IPs, but it can work 
+improperly in case of multiple IPs. 
+To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method
 that is suitable in your situation:
 ```
 plugins:
@@ -606,7 +606,7 @@ plugins:
     env:
       IP_AUTODETECTION_METHOD: kubernetes-internal-ip
 ```
-More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
 
 # Troubleshooting KubeMarine
