@@ -12,8 +12,6 @@ kubernetes_versions:
     supported: true
   v1.26:
     supported: true
-  v1.27:
-    supported: true
 compatibility_map:
 # This section should be changed manually.
   v1.21.2:
@@ -94,11 +92,11 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.23
     crictl: v1.25.0
-  v1.27.1:
+  v1.26.4:
     calico: v3.24.2
-    nginx-ingress-controller: v1.7.0
+    nginx-ingress-controller: v1.4.0
     kubernetes-dashboard: v2.7.0
-    local-path-provisioner: v0.0.24
+    local-path-provisioner: v0.0.23
     crictl: v1.25.0
 
 

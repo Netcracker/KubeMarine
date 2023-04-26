@@ -54,7 +54,7 @@ docker:
     version_rhel: 19.03*
     version_rhel8: 19.03*
     version_debian: 5:20.10.*
-  v1.27.1:
+  v1.26.4:
     version_rhel: 19.03*
     version_rhel8: 19.03*
     version_debian: 5:20.10.*
@@ -98,7 +98,7 @@ containerd:
   v1.26.3:
     version_rhel8: 1.4*
     version_debian: 1.6.*
-  v1.27.1:
+  v1.26.4:
     version_rhel8: 1.4*
     version_debian: 1.6.*
 containerdio:
@@ -154,7 +154,7 @@ containerdio:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_debian: 1.6.*
-  v1.27.1:
+  v1.26.4:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_debian: 1.6.*
@@ -211,7 +211,7 @@ podman:
     version_rhel: 1.6.4*
     version_rhel8: "*"
     version_debian: "*"
-  v1.27.1:
+  v1.26.4:
     version_rhel: 1.6.4*
     version_rhel8: "*"
     version_debian: "*"
