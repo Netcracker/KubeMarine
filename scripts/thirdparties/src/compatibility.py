@@ -65,6 +65,8 @@ class KubernetesVersions:
         mandatory_fields.update(['crictl'])
         optional_fields = {
             'webhook', 'metrics-scraper', 'busybox',
+            # Although we are able to operate with pause image, custom version is not fully supported,
+            # because pause image version is not enriched when installing in public.
             # 'pause',
         }
 
