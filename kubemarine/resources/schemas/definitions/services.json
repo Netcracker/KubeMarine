@@ -54,6 +54,9 @@
     "etc_hosts": {
       "$ref": "services/etc_hosts.json"
     },
+    "etc_hosts_generated": {
+      "$ref": "services/etc_hosts.json"
+    },
     "coredns": {
       "$ref": "services/coredns.json"
     },

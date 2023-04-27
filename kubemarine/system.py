@@ -48,30 +48,33 @@ def verify_inventory(inventory, cluster):
 
 
 def enrich_etc_hosts(inventory, cluster):
+# enrich only etc_hosts_generated object, etc_hosts remains as it is
+
     control_plain = inventory['control_plain']['internal']
 
+    # take custom name of control_plain from etc_hosts, if any
     control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
     control_plain_names.append(cluster.inventory['cluster_name'])
     control_plain_names.append('control-plain')
     control_plain_names = list(OrderedSet(control_plain_names))
-    inventory['services']['etc_hosts'][control_plain] = control_plain_names
+    inventory['services']['etc_hosts_generated'][control_plain] = control_plain_names
 
     for node in cluster.inventory['nodes']:
         if 'remove_node' in node['roles']:
             continue
 
-        internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
+        internal_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
         internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
-        inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
+        inventory['services']['etc_hosts_generated'][node['internal_address']] = internal_node_ip_names
 
         if node.get('address'):
-            external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
+            external_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['address'], [])
             external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
             external_node_ip_names.append(node['name'] + "-external")
             external_node_ip_names = list(OrderedSet(external_node_ip_names))
-            inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
+            inventory['services']['etc_hosts_generated'][node['address']] = external_node_ip_names
 
     return inventory
 
@@ -282,6 +285,31 @@ def get_resolv_conf_buffer(config):
 
 
 def generate_etc_hosts_config(inventory, cluster=None):
+# generate records for /etc/hosts from services.etc_hosts
+
+    result = ""
+
+    max_len_ip = 0
+
+    for ip in list(inventory['services']['etc_hosts'].keys()):
+        if len(ip) > max_len_ip:
+            max_len_ip = len(ip)
+
+    for ip, names in inventory['services']['etc_hosts'].items():
+        if isinstance(names, list):
+            # remove records with empty values from list
+            names = list(filter(len, names))
+            # if list is empty, then skip
+            if not names:
+                continue
+            names = " ".join(names)
+        result += "%s%s  %s\n" % (ip, " " * (max_len_ip - len(ip)), names)
+
+    return result
+
+def generate_etc_hosts_generated_config(inventory, cluster=None):
+# generate records for /etc/hosts from services.etc_hosts_generated
+
     result = ""
 
     max_len_ip = 0
@@ -299,11 +327,11 @@ def generate_etc_hosts_config(inventory, cluster=None):
 
     ignore_ips = list(set(ignore_ips))
 
-    for ip in list(inventory['services']['etc_hosts'].keys()):
+    for ip in list(inventory['services']['etc_hosts_generated'].keys()):
         if len(ip) > max_len_ip:
             max_len_ip = len(ip)
 
-    for ip, names in inventory['services']['etc_hosts'].items():
+    for ip, names in inventory['services']['etc_hosts_generated'].items():
         if isinstance(names, list):
             # remove records with empty values from list
             names = list(filter(len, names))

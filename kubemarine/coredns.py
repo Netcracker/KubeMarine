@@ -21,8 +21,16 @@ import io
 
 
 def enrich_add_hosts_config(inventory, cluster):
-    if not inventory['services']['coredns']['configmap'].get('Hosts'):
-        inventory['services']['coredns']['configmap']['Hosts'] = system.generate_etc_hosts_config(inventory, cluster)
+    if inventory['services']['coredns']['add_etc_hosts_generated']:
+        if not inventory['services']['coredns']['configmap'].get('Hosts'):
+            inventory['services']['coredns']['configmap']['Hosts'] = system.generate_etc_hosts_generated_config(cluster.inventory, cluster)
+        else:
+            inventory['services']['coredns']['configmap']['Hosts'] += system.generate_etc_hosts_generated_config(cluster.inventory, cluster)
+    else:
+        if not inventory['services']['coredns']['configmap'].get('Hosts'):
+            # Hosts must exist even if it's empty
+            inventory['services']['coredns']['configmap']['Hosts'] = ""
+
     return inventory
 
 

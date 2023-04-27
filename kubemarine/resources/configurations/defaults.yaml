@@ -184,6 +184,8 @@ services:
       - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost{% endif %}'
       - '{% if not nodes[0]["internal_address"]|isipv4 %}localhost.localdomain{% endif %}'
 
+  etc_hosts_generated: {}
+
   audit:
     cluster_policy:
       apiVersion: audit.k8s.io/v1
@@ -264,6 +266,7 @@ services:
       - '-w /usr/bin/containerd -k docker'
 
   coredns:
+    add_etc_hosts_generated: true
     deployment:
       spec:
         template:
