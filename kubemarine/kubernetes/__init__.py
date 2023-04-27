@@ -1100,7 +1100,11 @@ def configure_container_runtime(cluster, kubeadm_config):
             kubeadm_config['nodeRegistration']['kubeletExtraArgs'] = {}
 
         kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
-        kubeadm_config['nodeRegistration']['kubeletExtraArgs']['container-runtime'] = 'remote'
+
+        minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+        if minor_version < 27:
+            kubeadm_config['nodeRegistration']['kubeletExtraArgs']['container-runtime'] = 'remote'
+
         kubeadm_config['nodeRegistration']['kubeletExtraArgs']['container-runtime-endpoint'] = \
             'unix:///run/containerd/containerd.sock'
 
