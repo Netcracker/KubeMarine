@@ -136,6 +136,28 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
                                                % (old_kubernetes_version, new_kubernetes_version)):
             self._new_cluster()
 
+    def test_upgrade_with_default_admission(self):
+        # Upgrade PSP->PSP kuber version
+        old_kubernetes_version = 'v1.24.2'
+        new_kubernetes_version = 'v1.24.11'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
+        cluster = self._new_cluster()
+        self.assertEqual("psp", cluster.inventory['rbac']['admission'])
+
+        # Upgrade PSS->PSS kuber version
+        old_kubernetes_version = 'v1.25.2'
+        new_kubernetes_version = 'v1.25.7'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
+        cluster = self._new_cluster()
+        self.assertEqual("pss", cluster.inventory['rbac']['admission'])
+
+        # Upgrade PSP->PSS kuber version
+        old_kubernetes_version = 'v1.24.11'
+        new_kubernetes_version = 'v1.25.2'
+        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
+        with self.assertRaisesRegex(Exception, "PSP is not supported in Kubernetes version higher than v1.24"):
+            self._new_cluster()
+
     def test_incorrect_disable_eviction(self):
         old_kubernetes_version = 'v1.24.2'
         new_kubernetes_version = 'v1.24.11'
