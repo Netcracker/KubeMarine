@@ -36,6 +36,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
                 }
             }
         }
+        inventory['services']['coredns']['add_etc_hosts_generated'] = False
         cluster = demo.new_cluster(inventory)
         self.assertEquals('1.2.3.4 example.org', cluster.inventory['services']['coredns']['configmap']['Hosts'])
 
