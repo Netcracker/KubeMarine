@@ -3135,7 +3135,8 @@ services:
 
 *Installation task*: `deploy.admission`
 
-There are two options for admissions: `psp` and `pss`. PodSecurityPolicy (PSP) is being deprecated in Kubernetes 1.21 and will be removed in Kubernetes 1.25. Kubernetes 1.23 supports Pod Security Standards (PSS) that are implemented as a feature gate of `kube-apiserver`. Since Kubernetes v1.25 doesn't support PSP, installation and maintenance procedures assume the `cluster.yaml` includes `admission: pss` explicitly.
+There are two options for admissions: `psp` and `pss`. PodSecurityPolicy (PSP) is being deprecated in Kubernetes 1.21 and will be removed in Kubernetes 1.25. Kubernetes 1.23 supports Pod Security Standards (PSS) that are implemented as a feature gate of `kube-apiserver`. Since Kubernetes v1.25 doesn't support PSP, installation and maintenance procedures assume the `cluster.yaml` includes `admission: pss` explicitly.  
+By default, kubemarine uses `psp`rbac admission value for kubernetes version 1.24 or lower and `pss` value for version 1.25+.
 
 ```yaml
 rbac:
