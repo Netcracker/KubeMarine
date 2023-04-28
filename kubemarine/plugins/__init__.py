@@ -545,23 +545,11 @@ def verify_python(cluster, step):
     # Get the signature of the method
     signature = inspect.signature(method)
 
-    # ToDo - Check the signature of the method
-
-    # method = getattr(module, method_name)
-    # print(method)
-    # sig = inspect.signature(method)
-    # print(sig)
-    # for arg_name, arg_value in method_arguments.items():
-    #     if arg_name not in sig.parameters:
-    #         cluster.log.error(f"Invalid argument {arg_name} for method {method_name} in module {module_path}")
-    #         return False
-    #     param = sig.parameters[arg_name]
-    #     if param.annotation != inspect._empty and not isinstance(arg_value, param.annotation):
-    #         cluster.log.error(f"Invalid argument type for {arg_name} in method {method_name} in module {module_path}. "
-    #                           f"Expected {param.annotation}, got {type(arg_value)}")
-    #         return False
-
-    # return True
+    # Check if the passed arguments match the signature
+    try:
+        signature.bind(cluster=cluster, **method_arguments)
+    except TypeError as e:
+        raise ValueError(f"Invalid arguments for method {method_name}: {e}")
 
 
 def apply_python(cluster, step, plugin_name=None):
