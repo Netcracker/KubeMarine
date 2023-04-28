@@ -123,11 +123,7 @@ jobs:
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
       - name: Change not-recommended symbols in dump files
         if: failure()
-        run: |
-          systemctl status kubelet
-          journalctl -xeu kubelet
-          journalctl -xeu kubelet > ./results/install_dump/kubelet.log
-          rename 's/[:]/_/g' ./results/*/dump/*
+        run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
