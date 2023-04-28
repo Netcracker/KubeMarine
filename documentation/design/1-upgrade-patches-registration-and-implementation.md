@@ -31,10 +31,10 @@ The file is automatically cleared after new Kubemarine release / iteration.
 ### Procedure
 
 There should be separate patch for each instance of software. The order of upgrade is the following:
-* Upgrade crictl
-* Upgrade CRI
-* Upgrade haproxy
-* Upgrade keepalived
+* crictl
+* CRI
+* haproxy
+* keepalived
 * Separate upgrade patch for each plugin according to their default priority.
 
 If there is nothing to upgrade for the particular instance of software,
@@ -49,7 +49,7 @@ New concept of patches priority. Patches with higher priority are always execute
 
 1. **Inventory-only patches**. Can only patch initial inventory.
    Instantiation of KubernetesCluster is not allowed, and connectio to nodes is not allowed.
-2. **Software upgrade patches**. See MANOPD-87826
+2. **Software upgrade patches**.
 3. **Other patches**. Should not affect software upgrade.
    May patch initial inventory and operate with cluster.
 
@@ -65,7 +65,7 @@ The new source is moved to the cluster inventory, and the third party is re-inst
 
 #### CRI
 
-If packages associations are redefined in the initial inventory file,
+If package associations are redefined in the initial inventory file,
 new associations must be specified in the procedure inventory.
 
 Configuration from the procedure inventory is merged with the cluster inventory,
@@ -77,7 +77,10 @@ and the upgrade is started with the following steps for each node one by one:
 
 #### Balancers
 
-Reinstall haproxy / keepalived if custom package associations are not provided in the initial inventory file.
+If package associations are redefined in the initial inventory file,
+new associations must be specified in the procedure inventory.
+
+Configuration from the procedure inventory is merged with the cluster inventory, and haproxy / keepalived is reinstalled.
 
 #### Plugins
 
