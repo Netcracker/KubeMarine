@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "upgrade": {
+      "type": "object",
+      "description": "Configure the parameters to upgrade different types of software",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/UpgradePlugins"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "UpgradePlugins": {
+      "type": "object",
+      "description": "Configure the parameters of the default plugins",
+      "properties": {
+        "calico": {
+          "$ref": "definitions/plugins/calico.json"
+        },
+        "nginx-ingress-controller": {
+          "$ref": "definitions/plugins/nginx-ingress-controller.json"
+        },
+        "kubernetes-dashboard": {
+          "$ref": "definitions/plugins/kubernetes-dashboard.json"
+        },
+        "local-path-provisioner": {
+          "$ref": "definitions/plugins/local-path-provisioner.json"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

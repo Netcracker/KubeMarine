@@ -181,10 +181,6 @@ def upgrade_finalize_inventory(cluster, inventory):
     if cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties'):
         inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
 
-    if cluster.procedure_inventory.get(upgrade_version, {}).get("plugins"):
-        inventory.setdefault("plugins", {})
-        default_merger.merge(inventory["plugins"], cluster.procedure_inventory[upgrade_version]["plugins"])
-
     if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
         inventory['services'].setdefault("packages", {})
         packages_section = deepcopy(cluster.procedure_inventory[upgrade_version]["packages"])
@@ -241,7 +237,7 @@ class UpgradeAction(Action):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
-    def prepare_context(self, context: dict):
+    def prepare_context(self, context: dict) -> None:
         context['upgrade_version'] = self.upgrade_version
         context['dump_filename_prefix'] = self.upgrade_version
 

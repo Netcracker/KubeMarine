@@ -38,6 +38,11 @@ KME_DICTIONARY = {
     },
     "KME0008": {
         "name": "Specified Kubernetes version '{version}' - cannot be used! Allowed versions are: {allowed_versions}."
+    },
+    "KME0009": {
+        "name": "Key {key!r} is redefined for {plugin_name!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required plugin configuration explicitly in procedure inventory."
     }
 }
 

@@ -13,10 +13,11 @@
 # limitations under the License.
 import unittest
 from contextlib import contextmanager
+from copy import deepcopy
 from typing import Dict
 
 from kubemarine import demo, packages
-from kubemarine.core import utils, errors
+from kubemarine.core import utils, errors, static
 
 
 def make_finalized_inventory(cluster: demo.FakeKubernetesCluster):
@@ -74,3 +75,11 @@ def assert_raises_kme(test: unittest.TestCase, code: str, **kwargs):
             yield
         except errors.FailException as e:
             raise e.reason
+
+@contextmanager
+def backup_globals():
+    backup = deepcopy(static.GLOBALS)
+    try:
+        yield
+    finally:
+        static.GLOBALS = backup

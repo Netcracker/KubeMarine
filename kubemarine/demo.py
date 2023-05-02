@@ -193,19 +193,26 @@ class FakeKubernetesCluster(KubernetesCluster):
 
 class FakeResources(DynamicResources):
     def __init__(self, context, raw_inventory: dict, procedure_inventory: dict = None,
-                 cluster: KubernetesCluster = None,
+                 cluster: KubernetesCluster = None, nodes_context: dict = None,
                  fake_shell: FakeShell = None, fake_fs: FakeFS = None):
         super().__init__(context, True)
         self.inventory_filepath = None
         self.procedure_inventory_filepath = None
-        self._raw_inventory = raw_inventory
-        self._formatted_inventory = raw_inventory
+        self.stored_inventory = raw_inventory
+        self._nodes_context = nodes_context
         self._procedure_inventory = procedure_inventory
         self._cluster = cluster
         if cluster:
             self._logger = cluster.log
         self._fake_shell = fake_shell if fake_shell else FakeShell()
         self._fake_fs = fake_fs if fake_fs else FakeFS()
+
+    def _load_inventory(self):
+        self._raw_inventory = deepcopy(self.stored_inventory)
+        self._formatted_inventory = deepcopy(self.stored_inventory)
+
+    def _store_inventory(self):
+        self.stored_inventory = deepcopy(self._formatted_inventory)
 
     def _new_cluster_instance(self, context: dict):
         return FakeKubernetesCluster(self.raw_inventory(), context,

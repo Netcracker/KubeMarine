@@ -20,15 +20,6 @@ from kubemarine.core.action import Action
 from kubemarine.core.resources import DynamicResources
 
 
-class FakeResources(demo.FakeResources):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.recreated_inventory = None
-
-    def recreate_inventory(self):
-        self.recreated_inventory = self._formatted_inventory
-
-
 class RunActionsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.context = demo.create_silent_context()
@@ -44,9 +35,9 @@ class RunActionsTest(unittest.TestCase):
             def __init__(self):
                 super().__init__('test', recreate_inventory=True)
 
-        res = FakeResources(self.context, {"p1": "v1"})
+        res = demo.FakeResources(self.context, {"p1": "v1"})
         flow.ActionsFlow([TheAction()]).run_flow(res, print_summary=False)
-        self.assertEqual(res.recreated_inventory, {"p1": "v1", "p2": "v2"})
+        self.assertEqual(res.stored_inventory, {"p1": "v1", "p2": "v2"})
 
     def test_patch_cluster(self):
         class TheAction(Action):
@@ -63,7 +54,7 @@ class RunActionsTest(unittest.TestCase):
 
         self.assertFalse('successfully_performed' in self.cluster.context)
 
-        res = FakeResources(self.context, self.inventory, cluster=self.cluster)
+        res = demo.FakeResources(self.context, self.inventory, cluster=self.cluster)
         flow.ActionsFlow([TheAction()]).run_flow(res, print_summary=False)
         for host in nodes.get_hosts():
             history = fake_shell.history_find(host, 'sudo', ['whoami'])

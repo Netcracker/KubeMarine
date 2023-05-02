@@ -16,10 +16,10 @@ import random
 import re
 import unittest
 from copy import deepcopy
-from typing import List
+from typing import List, Optional, Tuple
 
 from kubemarine import kubernetes
-from kubemarine.core import errors, utils as kutils, static
+from kubemarine.core import errors, utils as kutils, static, flow
 from kubemarine.procedures import upgrade
 from kubemarine import demo
 from test.unit import utils
@@ -78,20 +78,21 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
         return sorted(list(static.KUBERNETES_VERSIONS['compatibility_map']), key=kutils.version_key)
 
 
-def generate_upgrade_environment(old, new) -> (dict, dict):
+def generate_upgrade_environment(old) -> Tuple[dict, dict]:
     inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
     inventory['services']['kubeadm'] = {
         'kubernetesVersion': old
     }
-    context = demo.create_silent_context(procedure='upgrade')
-    context['upgrade_version'] = new
+    context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='upgrade',
+                                         parser=flow.new_procedure_parser("Help text"))
     return inventory, context
 
 
 class UpgradeDefaultsEnrichment(unittest.TestCase):
 
     def prepare_inventory(self, old, new):
-        self.inventory, self.context = generate_upgrade_environment(old, new)
+        self.inventory, self.context = generate_upgrade_environment(old)
+        self.context['upgrade_version'] = new
         self.upgrade: dict = {'upgrade_plan': [new]}
 
     def _new_cluster(self):
@@ -139,7 +140,8 @@ class UpgradePackagesEnrichment(unittest.TestCase):
     def setUp(self):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
-        self.inventory, self.context = generate_upgrade_environment(self.old, self.new)
+        self.inventory, self.context = generate_upgrade_environment(self.old)
+        self.context['upgrade_version'] = self.new
         self.inventory['services']['packages'] = {}
         self.upgrade: dict = {
             'upgrade_plan': [self.new],
@@ -199,6 +201,101 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         self.assertEqual(['unzip', 'curl'], final_inventory['services']['packages']['install']['include'])
         self.assertEqual(['conntrack', 'socat'], final_inventory['services']['packages']['upgrade']['exclude'])
         self.assertIsNone(final_inventory['services']['packages']['upgrade'].get('include'))
+
+
+class UpgradePluginsEnrichment(unittest.TestCase):
+    def setUp(self):
+        self.old = 'v1.24.2'
+        self.new = 'v1.24.11'
+        self.inventory, self.context = generate_upgrade_environment(self.old)
+        self.context['upgrade_version'] = self.new
+        self.inventory['plugins'] = {}
+        self.upgrade: dict = {
+            'upgrade_plan': [self.new],
+            self.new: {
+                'plugins': {}
+            }
+        }
+
+    def _new_cluster(self):
+        return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
+                                context=self.context)
+
+    def _patch_globals(self, plugin: str, *, equal=False):
+        fake_version = 'v1.2.3'
+        package_compatibility = static.GLOBALS['compatibility_map']['software'][plugin]
+        package_compatibility[self.old]["version"] = fake_version
+        if equal:
+            package_compatibility[self.new]["version"] = fake_version
+        else:
+            package_compatibility[self.new]["version"] = utils.increment_version(fake_version)
+
+    def test_redefine_image_recursive(self):
+        self.inventory['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'A'
+        self.upgrade[self.new]['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'B'
+
+        cluster = self._new_cluster()
+        self.assertEqual('B',
+                         cluster.inventory['plugins']['kubernetes-dashboard']['dashboard']['image'],
+                         "Image was not enriched from procedure inventory")
+
+    def test_require_image_redefinition_recursive(self):
+        self.inventory['plugins'].setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
+        with (utils.backup_globals(),
+              utils.assert_raises_kme(self, "KME0009",
+                                      key='image', plugin_name='calico',
+                                      previous_version_spec='.*', next_version_spec='.*')):
+            self._patch_globals('calico', equal=True)
+            self._new_cluster()
+
+    def test_require_helper_pod_image_redefinition(self):
+        self.inventory['plugins'].setdefault('local-path-provisioner', {})['helper-pod-image'] = 'A'
+        with (utils.backup_globals(),
+              utils.assert_raises_kme(self, "KME0009",
+                                      key='helper-pod-image', plugin_name='local-path-provisioner',
+                                      previous_version_spec='.*', next_version_spec='.*')):
+            self._patch_globals('local-path-provisioner', equal=True)
+            self._new_cluster()
+
+    def test_require_version_redefinition(self):
+        self.inventory['plugins'].setdefault('nginx-ingress-controller', {})['version'] = 'fake version'
+        with (utils.backup_globals(),
+              utils.assert_raises_kme(self, "KME0009",
+                                      key='version', plugin_name='nginx-ingress-controller',
+                                      previous_version_spec='.*', next_version_spec='.*')):
+            self._patch_globals('nginx-ingress-controller', equal=True)
+            self._new_cluster()
+
+
+class InventoryRecreation(unittest.TestCase):
+    def prepare_inventory(self, upgrade_plan: List[str]):
+        self.old = 'v1.24.2'
+        self.inventory, self.context = generate_upgrade_environment(self.old)
+        self.inventory.setdefault('rbac', {})['admission'] = 'pss'
+        self.nodes_context = demo.generate_nodes_context(self.inventory)
+        self.upgrade: dict = {'upgrade_plan': upgrade_plan}
+        self.actions = []
+        for ver in upgrade_plan:
+            self.upgrade[ver] = {}
+            self.actions.append(upgrade.UpgradeAction(ver))
+
+        self.resources: Optional[demo.FakeResources] = None
+
+    def run_actions(self):
+        self.resources = demo.FakeResources(self.context, self.inventory,
+                                            procedure_inventory=self.upgrade, nodes_context=self.nodes_context)
+        flow.run_actions(self.resources, self.actions)
+
+    def test_plugins_iterative_image_redefinition(self):
+        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        self.upgrade['v1.25.2'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
+        self.upgrade['v1.25.7'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'B'
+
+        self.run_actions()
+
+        actual_image = self.resources.stored_inventory['plugins']['calico']['cni']['image']
+        self.assertEqual('B', actual_image,
+                         "Plugin image was not redefined in recreated inventory.")
 
 
 if __name__ == '__main__':

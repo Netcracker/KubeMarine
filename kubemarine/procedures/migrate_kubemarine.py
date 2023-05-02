@@ -19,10 +19,13 @@ from typing import List
 import yaml
 
 import kubemarine.patches
+from kubemarine import kubernetes, plugins
 from kubemarine.core import flow, static, utils
 from kubemarine.core.action import Action
 from kubemarine.core.patch import Patch, _SoftwareUpgradePatch
 from kubemarine.core.resources import DynamicResources
+
+SOFTWARE_UPGRADE_PATH = utils.get_internal_resource_path("patches/software_upgrade.yaml")
 
 
 class SoftwareUpgradeAction(Action, ABC):
@@ -32,13 +35,15 @@ class SoftwareUpgradeAction(Action, ABC):
         self.k8s_versions = k8s_versions
 
     def run(self, res: DynamicResources):
-        cluster = res.cluster()
-        version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        # We should not call DynamicResources.cluster() and should only access the raw inventory,
+        # because otherwise enrichment will start with probably not relevant validation.
+        version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
         if version not in self.k8s_versions:
-            cluster.log.info(f"Patch is not relevant for kubernetes {version}")
+            res.logger().info(f"Patch is not relevant for kubernetes {version}")
             return
 
         self.specific_run(res)
+        res.make_final_inventory()
 
     @abstractmethod
     def specific_run(self, res: DynamicResources):
@@ -57,8 +62,8 @@ class CriUpgradeAction(Action):
         self.upgrade_config = upgrade_config
 
     def run(self, res: DynamicResources):
-        cluster = res.cluster()
         # TODO implement
+        res.make_final_inventory()
 
 
 class BalancerUpgradeAction(Action):
@@ -67,14 +72,27 @@ class BalancerUpgradeAction(Action):
         self.software_name = software_name
 
     def run(self, res: DynamicResources):
-        cluster = res.cluster()
         # TODO implement
+        res.make_final_inventory()
 
 
 class PluginUpgradeAction(SoftwareUpgradeAction):
     def specific_run(self, res: DynamicResources):
-        # TODO implement
-        pass
+        self.recreate_inventory = True
+
+        cluster = res.cluster()
+        upgrade_candidates = {
+            self.software_name: cluster.inventory['plugins'][self.software_name]
+        }
+        # TODO despite that we are sure that the recommended version has changed,
+        #  upgrade might still be not required if the effective configuration did not change.
+        plugins.install(cluster, upgrade_candidates)
+
+    def prepare_context(self, context: dict) -> None:
+        context['upgrading_plugin'] = self.software_name
+
+    def reset_context(self, context: dict) -> None:
+        del context['upgrading_plugin']
 
 
 class ThirdpartyUpgradePatch(_SoftwareUpgradePatch):
@@ -233,6 +251,9 @@ def new_parser():
     parser.add_argument('--describe', metavar='PATCH',
                         help='describe the specified patch')
 
+    parser.add_argument('procedure_config', metavar='procedure_config',
+                        type=str, help='config file for the procedure', nargs='?')
+
     return parser
 
 
@@ -299,8 +320,6 @@ def main(cli_arguments=None):
     context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
     run(context)
 
-
-SOFTWARE_UPGRADE_PATH = utils.get_internal_resource_path("patches/software_upgrade.yaml")
 
 if __name__ == '__main__':
     main()

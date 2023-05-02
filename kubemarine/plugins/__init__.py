@@ -37,7 +37,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, errors
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -68,49 +68,103 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory, cluster):
-    if cluster.context.get("initial_procedure") != "upgrade":
+def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        upgrade_version = context["upgrade_version"]
+        upgrade_plan = []
+        for version in cluster.procedure_inventory.get('upgrade_plan'):
+            if utils.version_key(version) < utils.version_key(upgrade_version):
+                continue
+
+            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("plugins", {})))
+
+    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_plugin' in context:
+        upgrade_plugins = cluster.procedure_inventory.get('upgrade', {}).get("plugins", {})
+        upgrade_plugins = dict(item for item in upgrade_plugins.items()
+                               if item[0] == context['upgrading_plugin'])
+        upgrade_plan = [("", upgrade_plugins)]
+    else:
+        upgrade_plan = []
+
+    return upgrade_plan
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
         return inventory
 
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        previous_version = context['initial_kubernetes_version']
+        plugins_verify = oob_plugins
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+        plugins_verify = [context['upgrading_plugin']]
+
+    _verify_upgrade_plan(inventory, previous_version, plugins_verify, upgrade_plan)
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def _verify_upgrade_plan(inventory: dict, previous_version: str,
+                         plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
     base_plugins = static.DEFAULTS["plugins"]
     current_plugins = deepcopy(inventory["plugins"])
 
     # validate all plugin sections in procedure inventory
-    upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
-    previous_version = cluster.context['initial_kubernetes_version']
-    for version in upgrade_plan:
-        upgrade_plugins = cluster.procedure_inventory.get(version, {}).get("plugins", {})
-        for oob_plugin in oob_plugins:
-            verify_image_redefined(oob_plugin,
+    for version, upgrade_plugins in upgrade_plan:
+        for plugin_name in plugins_verify:
+            verify_image_redefined(plugin_name,
                                    previous_version,
-                                   base_plugins[oob_plugin],
-                                   current_plugins[oob_plugin],
-                                   upgrade_plugins.get(oob_plugin, {}))
+                                   version,
+                                   base_plugins[plugin_name],
+                                   current_plugins[plugin_name],
+                                   upgrade_plugins.get(plugin_name, {}))
         default_merger.merge(current_plugins, upgrade_plugins)
         previous_version = version
 
-    upgrade_plugins = cluster.procedure_inventory.get(cluster.context["upgrade_version"], {}).get("plugins", {})
-    default_merger.merge(inventory["plugins"], upgrade_plugins)
-    return inventory
 
-
-def verify_image_redefined(plugin_name, previous_version, base_plugin, cluster_plugin, upgrade_plugin):
+def verify_image_redefined(plugin_name, previous_version, next_version, base_plugin, cluster_plugin, upgrade_plugin):
     """
     If some image in "cluster_plugin" is different from image in "base_plugin",
     i.e. redefined, then "upgrade_plugin" should have this image explicitly
     redefined too.
     """
+    sensitive_keys = ['image', 'helper-pod-image', 'version']
     for key, value in base_plugin.items():
         if isinstance(value, dict):
             verify_image_redefined(plugin_name,
                                    previous_version,
+                                   next_version,
                                    base_plugin[key],
                                    cluster_plugin[key],
                                    upgrade_plugin.get(key, {}))
-        elif key == "image" and base_plugin["image"] != cluster_plugin["image"] and not upgrade_plugin.get("image"):
-            raise Exception(f"Image is redefined for {plugin_name} in cluster.yaml for version {previous_version}, "
-                            f"but not present in procedure inventory for next version(s). "
-                            f"Please, specify required plugin version explicitly in procedure inventory.")
+        elif key not in sensitive_keys:
+            continue
+        elif base_plugin[key] != cluster_plugin[key] and not upgrade_plugin.get(key):
+            raise errors.KME("KME0009",
+                             key=key, plugin_name=plugin_name,
+                             previous_version_spec=f" for version {previous_version}" if previous_version else "",
+                             next_version_spec=f" for next version {next_version}" if next_version else ""
+            )
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
+        return inventory
+
+    _, upgrade_plugins = upgrade_plan[0]
+    if upgrade_plugins:
+        default_merger.merge(inventory.setdefault("plugins", {}), upgrade_plugins)
+
+    return inventory
 
 
 def install(cluster, plugins=None):

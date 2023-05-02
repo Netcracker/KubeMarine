@@ -111,15 +111,18 @@ class DynamicResources:
         if self._formatted_inventory is None:
             return
 
-        # replace initial inventory file with changed inventory
-        with utils.open_external(self.inventory_filepath, "w+") as stream:
-            utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)
+        self._store_inventory()
 
         self._raw_inventory = None
         self._formatted_inventory = None
         # no need to clear _nodes_context as it should not change after cluster is reinitialized.
         # should not clear working_context as it can be inspected after execution.
         self._cluster = None
+
+    def _store_inventory(self):
+        # replace initial inventory file with changed inventory
+        with utils.open_external(self.inventory_filepath, "w+") as stream:
+            utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)
 
     def cluster_if_initialized(self) -> Optional[c.KubernetesCluster]:
         return self._cluster

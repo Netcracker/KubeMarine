@@ -500,16 +500,13 @@ class SynchronizationTest(unittest.TestCase):
 
     @contextmanager
     def _mock_globals_load_compatibility_map(self):
-        backup = deepcopy(static.GLOBALS)
         def load_compatibility_map_mocked(filename: str) -> dict:
             return self._convert_ruamel_pyyaml(self.compatibility.stored[filename])
 
-        try:
-            with mock.patch.object(static, static.load_compatibility_map.__name__,
-                                   side_effect=load_compatibility_map_mocked):
+        with test_utils.backup_globals(), \
+                mock.patch.object(static, static.load_compatibility_map.__name__,
+                                  side_effect=load_compatibility_map_mocked):
                 yield
-        finally:
-            static.GLOBALS = backup
 
     def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
         stream = io.StringIO()
