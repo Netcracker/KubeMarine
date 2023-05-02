@@ -31,8 +31,6 @@ from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
 
-version_coredns_path_breakage = "v1.21.2"
-
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
 ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
@@ -78,37 +76,17 @@ def enrich_upgrade_inventory(inventory, cluster):
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
         inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
-        verify_allowed_version(cluster.context['upgrade_version'])
-        test_version_upgrade_possible(cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version'])
         cluster.log.info(
             '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
             cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
     return inventory
 
 
-def version_higher_or_equal(version, compared_version):
-    '''
-    The method checks target Kubernetes version, is it more/equal than compared_version.
-    '''
-    compared_version_list = compared_version.replace('v', '').split('.')
-    version_list = version.replace('v', '').split('.')
-    if int(version_list[0]) > int(compared_version_list[0]):
-        return True
-    if int(version_list[0]) == int(compared_version_list[0]):
-        if int(version_list[1]) > int(compared_version_list[1]):
-            return True
-        if int(version_list[1]) == int(compared_version_list[1]):
-            if int(version_list[2]) >= int(compared_version_list[2]):
-                return True
-    return False
-
-
 def enrich_inventory(inventory, cluster):
-    if version_higher_or_equal(inventory['services']['kubeadm']['kubernetesVersion'], version_coredns_path_breakage):
-        repository = inventory['services']['kubeadm'].get('imageRepository', "")
-        if repository:
-            inventory['services']['kubeadm']['dns'] = {}
-            inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
+    repository = inventory['services']['kubeadm'].get('imageRepository', "")
+    if repository:
+        inventory['services']['kubeadm']['dns'] = {}
+        inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
     # if user redefined apiServer as, string, for example?
     if not isinstance(inventory["services"]["kubeadm"].get('apiServer'), dict):
         inventory["services"]["kubeadm"]['apiServer'] = {}
@@ -896,8 +874,7 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
         cluster_config["imageRepository"] = cluster_config["imageRepository"].replace(old_image_repo_port,
                                                                                       new_image_repo_port)
 
-    if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
-        cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
+    cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
     kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
@@ -958,7 +935,7 @@ def prepare_drain_command(node, version: str, globals, disable_eviction: bool, n
         grace_period = drain_globals['grace_period']
     drain_cmd = f"kubectl drain {node['name']} --force --ignore-daemonsets --delete-emptydir-data " \
                 f"--timeout={drain_timeout}s --grace-period={grace_period}"
-    if version and version >= "v1.18" and disable_eviction:
+    if version and disable_eviction:
         drain_cmd += " --disable-eviction=true"
     return drain_cmd
 
@@ -998,8 +975,16 @@ def verify_upgrade_versions(cluster):
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 
-def verify_initial_version(inventory: dict, _):
-    version = inventory["services"]["kubeadm"]["kubernetesVersion"]
+def get_initial_kubernetes_version(inventory: dict) -> str:
+    kubernetes_version = inventory.get("services", {}).get("kubeadm", {}).get("kubernetesVersion")
+    if kubernetes_version is None:
+        kubernetes_version = static.DEFAULTS['services']['kubeadm']['kubernetesVersion']
+
+    return kubernetes_version
+
+
+def verify_initial_version(inventory: dict, _) -> dict:
+    version = get_initial_kubernetes_version(inventory)
     verify_allowed_version(version)
     return inventory
 
@@ -1012,15 +997,12 @@ def verify_allowed_version(version: str) -> None:
                          allowed_versions=', '.join(map(repr, allowed_versions)))
 
 
-def verify_target_version(target_version: str, logger: log.EnhancedLogger) -> str:
+def verify_supported_version(target_version: str, logger: log.EnhancedLogger) -> None:
     verify_allowed_version(target_version)
     minor_version = utils.minor_version(target_version)
     supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
     if not supported_versions.get(minor_version, {}).get("supported", False):
-        message = f"Specified target Kubernetes version {target_version!r} - is not supported!"
-        logger.warning(message)
-        return message
-    return ""
+        logger.warning(f"Specified target Kubernetes version {target_version!r} - is not supported!")
 
 
 def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node=None, apply_filter=None):

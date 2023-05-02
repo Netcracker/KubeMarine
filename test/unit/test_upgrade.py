@@ -28,17 +28,14 @@ from test.unit import utils
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_valid_upgrade_plan(self):
-        upgrade.verify_upgrade_plan(self.k8s_versions())
+        upgrade.verify_upgrade_plan(self.k8s_versions()[0], self.k8s_versions()[1:])
 
     def test_invalid_upgrade_plan(self):
         k8s_oldest = self.k8s_versions()[0]
         k8s_latest = self.k8s_versions()[-1]
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(k8s_oldest), re.escape(k8s_latest))):
-            upgrade.verify_upgrade_plan([
-                k8s_oldest,
-                k8s_latest
-            ])
+            upgrade.verify_upgrade_plan(k8s_oldest, [k8s_latest])
 
     def test_upgrade_plan_not_supported_version(self):
         k8s_latest = self.k8s_versions()[-1]
@@ -46,17 +43,36 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
         with utils.assert_raises_kme(self, "KME0008",
                                      version=re.escape(not_allowed_version),
                                      allowed_versions='.*'):
-            upgrade.verify_upgrade_plan([
-                k8s_latest,
-                not_allowed_version
-            ])
+            upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version])
+
+    def test_incorrect_inventory_high_range(self):
+        old_kubernetes_version = 'v1.22.9'
+        new_kubernetes_version = 'v1.24.2'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
+                                               % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+
+    def test_incorrect_inventory_downgrade(self):
+        old_kubernetes_version = 'v1.24.2'
+        new_kubernetes_version = 'v1.22.9'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
+                                               % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+
+    def test_incorrect_inventory_same_version(self):
+        old_kubernetes_version = 'v1.24.2'
+        new_kubernetes_version = 'v1.24.2'
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
+                                               % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
 
     def test_upgrade_plan_sort(self):
-        k8s_versions = list(self.k8s_versions())
+        k8s_oldest = self.k8s_versions()[0]
+        k8s_versions = list(self.k8s_versions())[1:]
         random.shuffle(k8s_versions)
-        result = upgrade.verify_upgrade_plan(k8s_versions)
+        result = upgrade.verify_upgrade_plan(k8s_oldest, k8s_versions)
 
-        self.assertEqual(self.k8s_versions(), result)
+        self.assertEqual(self.k8s_versions()[1:], result)
 
     def k8s_versions(self) -> List[str]:
         return sorted(list(static.KUBERNETES_VERSIONS['compatibility_map']), key=kutils.version_key)
@@ -87,30 +103,6 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
         self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         cluster = self._new_cluster()
         self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
-
-    def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.22.9'
-        new_kubernetes_version = 'v1.24.2'
-        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
-                                               % (old_kubernetes_version, new_kubernetes_version)):
-            self._new_cluster()
-
-    def test_incorrect_inventory_downgrade(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.22.9'
-        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
-                                               % (old_kubernetes_version, new_kubernetes_version)):
-            self._new_cluster()
-
-    def test_incorrect_inventory_same_version(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.2'
-        self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
-                                               % (old_kubernetes_version, new_kubernetes_version)):
-            self._new_cluster()
 
     def test_upgrade_with_default_admission(self):
         # Upgrade PSP->PSP kuber version

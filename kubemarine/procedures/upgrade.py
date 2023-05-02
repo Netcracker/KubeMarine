@@ -213,13 +213,18 @@ def upgrade_finalize_inventory(cluster, inventory):
 
 class UpgradeFlow(flow.Flow):
     def __init__(self):
-        self.verification_version_result = ""
+        self.target_version = None
 
     def _run(self, resources: DynamicResources):
         logger = resources.logger()
-        upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
-        logger.debug(f"Loaded upgrade plan: current ⭢ {' ⭢ '.join(upgrade_plan)}")
-        self.verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1], logger)
+
+        previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
+        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
+        logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
+
+        self.target_version = upgrade_plan[-1]
+        kubernetes.verify_supported_version(self.target_version, logger)
 
         args = resources.context['execution_arguments']
         if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
@@ -258,19 +263,18 @@ def main(cli_arguments=None):
     flow_ = UpgradeFlow()
     result = flow_.run_flow(context)
 
-    if flow_.verification_version_result:
-        result.logger.warning(flow_.verification_version_result)
+    kubernetes.verify_supported_version(flow_.target_version, result.logger)
 
 
-def verify_upgrade_plan(upgrade_plan: List[str]):
+def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
+    kubernetes.verify_allowed_version(previous_version)
     for version in upgrade_plan:
         kubernetes.verify_allowed_version(version)
+
     upgrade_plan.sort(key=utils.version_key)
 
-    previous_version = None
     for version in upgrade_plan:
-        if previous_version is not None:
-            kubernetes.test_version_upgrade_possible(previous_version, version)
+        kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
 
     return upgrade_plan
