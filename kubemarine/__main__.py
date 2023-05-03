@@ -103,6 +103,10 @@ procedures = OrderedDict({
         'description': "Check environment for compliance with IAAS requirements",
         'group': 'checks'
     },
+    'haproxy_mntc': {
+        'description': "Switch maintenance mode for HAProxy loadbalancer (Enable/Disable)",
+        'group': 'maintenance'
+    },
     'check_paas': {
         'description': "Check environment for compliance with PAAS requirements",
         'group': 'checks'
