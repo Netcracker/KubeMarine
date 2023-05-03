@@ -2859,8 +2859,17 @@ This section contains the Configmap parameters that are applied to the Coredns s
 
 * Corefile - The main Coredns config, which is converted into a template in accordance with the specified parameters.
 * Hosts - IP addresses and names in the format of `/etc/hosts` file. Can be customized with any desired IP addresses and names. 
-Default value is `""`. 
+Default value is 
+
+```
+127.0.0.1 localhost localhost.localdomain
+::1 localhost localhost.localdomain
+'
+``` 
+
 If `services.coredns.add_etc_hosts_generated` is set to `true`, `Hosts` is enriched with generated list of IP addresses and names of the cluster nodes.
+
+If `Hosts` is redefined in the `cluster.yaml` its default value is overridden. 
 
 Before working with the Corefile, refer to the official Coredns plugins documentation at [https://coredns.io/plugins/](https://coredns.io/plugins/).
 

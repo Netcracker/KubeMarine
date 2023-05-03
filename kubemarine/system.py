@@ -50,6 +50,9 @@ def verify_inventory(inventory, cluster):
 def enrich_etc_hosts(inventory, cluster):
 # enrich only etc_hosts_generated object, etc_hosts remains as it is
 
+    # if by chance cluster.yaml contains non empty etc_hosts_generated we have to reset it
+    inventory['services']['etc_hosts_generated'] = {}
+
     control_plain = inventory['control_plain']['internal']
 
     # take custom name of control_plain from etc_hosts, if any
