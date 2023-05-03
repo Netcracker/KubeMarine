@@ -66,7 +66,8 @@ class EnrichmentValidation(unittest.TestCase):
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
             {'python': {'module': 'm', 'method': 'f'}}
         ]}}}
-        demo.new_cluster(inventory)
+        with self.assertRaisesRegex(Exception, r"Requested resource m is not exists"):
+            demo.new_cluster(inventory)
 
     def test_verify_shell_empty_command(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
