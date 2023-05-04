@@ -43,7 +43,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         }
         self.assertEquals(configmap_hosts, cluster.inventory['services']['coredns'].get('configmap').get('Hosts') + '\n' + generated_hosts)
 
-    def test_already_defined_hosts_config(self):
+    def test_already_defined_hosts_config_and_not_add_etc_hosts_generated(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['services'] = {
             'coredns': {
@@ -102,10 +102,19 @@ class CorednsGenerator(unittest.TestCase):
                     },
                     'Hosts': '127.0.0.1 localhost localhost.localdomain'
                 }
+            },
+            'etc_hosts_generated': {
+                '10.101.2.1': ['k8s.fake.local', 'control-plain'],
+                '192.168.0.1': ['master-1.k8s.fake.local', 'master-1'],
+                '10.101.1.1': ['master-1-external.k8s.fake.local', 'master-1-external'],
+                '192.168.0.2':  ['master-2.k8s.fake.local', 'master-2'],
+                '10.101.1.2':   ['master-2-external.k8s.fake.local', 'master-2-external'],
+                '192.168.0.3':  ['master-3.k8s.fake.local', 'master-3'],
+                '10.101.1.3':   ['master-3-external.k8s.fake.local', 'master-3-external']
             }
         }
 
-        inventory['services']['coredns']['add_etc_hosts_generated'] = False
+        inventory['services']['coredns']['add_etc_hosts_generated'] = True
         config = coredns.generate_configmap(inventory)
         self.assertEqual('''apiVersion: v1
 
@@ -132,11 +141,20 @@ data:
     }
   Hosts: |
     127.0.0.1 localhost localhost.localdomain
+    10.101.2.1   k8s.fake.local control-plain
+    192.168.0.1  master-1.k8s.fake.local master-1
+    10.101.1.1   master-1-external.k8s.fake.local master-1-external
+    192.168.0.2  master-2.k8s.fake.local master-2
+    10.101.1.2   master-2-external.k8s.fake.local master-2-external
+    192.168.0.3  master-3.k8s.fake.local master-3
+    10.101.1.3   master-3-external.k8s.fake.local master-3-external
+    
 ''', config)
 
     def test_configmap_generation_with_hosts(self):
         inventory = demo.generate_inventory(**demo.MINIHA)
         cluster = demo.new_cluster(inventory)
+        cluster.inventory['services']['coredns']['add_etc_hosts_generated'] = True
         config = coredns.generate_configmap(cluster.inventory)
         self.assertIn('Hosts: |', config)
         self.assertIn('192.168.0.2  master-1.k8s.fake.local', config)
