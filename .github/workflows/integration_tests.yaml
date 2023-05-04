@@ -59,6 +59,15 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt-get update && sudo apt-get install -y systemd
+          sudo systemctl start systemd-journald.service	
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io systemd-journal-remote jq			
          # TODO: change to kubemarine runtime values feature
       - name: Set kubernetes version to cluster.yaml
         run: sed -i "s/<KUBERNETES_VERSION>/${{ matrix.kubernetes-version }}/" ${{ env.cluster_yaml_file }}
@@ -71,11 +80,50 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
-      - name: Collect kubelet logs
+      - name: Collect Kubernetes logs
         run: |
-          journalctl -u kubelet --no-pager > ./results/kubelet.log
-          journalctl -u kubelet.service --no-pager > ./results/kubelet_service.log
-          journalctl -u kubelet.service --no-pager -o json > ./results/kubelet_service.json
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/kube-logs.txt
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler -o json > ./results/kube-logs.json
+          sudo journalctl -u etcd > ./results/etcd-logs.txt
+          sudo journalctl -u etcd -o json > ./results/etcd-logs.json
+          sudo journalctl -u coredns > ./results/coredns-logs.txt
+          sudo journalctl -u coredns -o json > ./results/coredns-logs.json
+          sudo journalctl > ./results/all-logs.txt
+          sudo journalctl -o json > ./results/all-logs.json
+          sudo cp /var/log/syslog ./results/syslog.txt
+
+      - name: Collect Docker logs
+        run: |
+          sudo journalctl -u docker > ./results/docker-logs.txt
+          sudo journalctl -u docker -o json > ./results/docker-logs.json
+          sudo cp /var/log/docker.log ./results/docker.log.txt
+
+      - name: Collect network logs
+        run: |
+          sudo tcpdump -i any -w tcpdump.pcap &
+          sudo timeout 30s ping 8.8.8.8
+          sudo killall tcpdump
+          sudo cp tcpdump.pcap ./results/tcpdump.pcap
+
+      - name: Collect system information
+        run: |
+          uname -a > ./results/system-info.txt
+          sudo apt list --installed > ./results/installed-packages.txt
+          sudo df -h > ./results/disk-usage.txt
+          sudo free -m > ./results/memory-usage.txt
+          sudo cp /var/log/messages ./results/messages.txt
+          sudo cp /var/log/auth.log ./results/auth.log.txt
+          sudo systemctl status kubelet > ./results/kubelet-status.txt
+          sudo systemctl status kube-proxy > ./results/kube-proxy-status.txt
+          sudo systemctl status kube-apiserver > ./results/kube-apiserver-status.txt
+          sudo systemctl status kube-controller-manager > ./results/kube-controller-manager-status.txt
+          sudo systemctl status kube-scheduler > ./results/kube-scheduler-status.txt
+          sudo systemctl status etcd > ./results/etcd-status.txt
+          sudo systemctl status coredns > ./results/coredns-status.txt
+          sudo systemctl status docker > ./results/docker-status.txt
+          sudo systemctl status systemd-journald > ./results/journald-status.txt
+          sudo cp /var/log/audit/audit.log ./results/audit.log.txt
+  
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
