@@ -125,6 +125,9 @@ def install(cluster, plugins=None):
                     and plugin_item['installation']['priority'] > max_priority:
                 max_priority = plugin_item['installation']['priority']
 
+    if 'nginx-ingress-controller' in plugins_queue:
+        check_job_for_nginx(cluster)
+
     plugins_queue.sort(key=lambda name: plugins[name].get("installation", {}).get('priority', max_priority + 1))
 
     cluster.log.debug('The following plugins will be installed:')
@@ -138,6 +141,15 @@ def install(cluster, plugins=None):
 
     for plugin_name in plugins_queue:
         install_plugin(cluster, plugin_name, plugins[plugin_name]["installation"]['procedures'])
+
+def check_job_for_nginx(cluster):
+
+    #Checking jobs nginx for deletion
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+
+    check_jobs = first_control_plane['connection'].sudo(f"kubectl get jobs -n ingress-nginx", is_async=False)
+    if list(check_jobs.values())[0].stderr == "":
+        first_control_plane['connection'].sudo(f"sudo kubectl delete job --all -n ingress-nginx", is_async=False)
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):

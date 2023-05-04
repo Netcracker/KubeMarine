@@ -55,18 +55,6 @@ def kubernetes_upgrade(cluster):
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
 
-    # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-    minor_version = int(version.split('.')[1])
-
-    if minor_version == 27:
-        kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
-        for node in upgrade_group.get_ordered_members_list(provide_node_configs=True):
-            kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}", is_async=False).get_simple_out()
-            if kubeadm_flags.find('--container-runtime=remote') != -1:
-                kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-                node['connection'].put(StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-                node['connection'].sudo("systemctl restart kubelet")
-
     kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster,
                                            drain_timeout=drain_timeout, grace_period=grace_period)
 
@@ -103,14 +91,6 @@ def upgrade_packages(cluster: KubernetesCluster):
 
 def upgrade_plugins(cluster):
     upgrade_version = cluster.context["upgrade_version"]
-
-    # Procedure for removing outdated jobs for nginx version 1.4.0 and older
-    version_nginx = cluster.inventory['plugins']['nginx-ingress-controller']['version']
-    minor_version = int(version_nginx.split('.')[1])
-    if minor_version >= 7:
-        first_control_plane = cluster.nodes["control-plane"].get_first_member()
-        first_control_plane.sudo(f"sudo kubectl delete job ingress-nginx-admission-create -n ingress-nginx && "
-                                 f"sudo kubectl delete job ingress-nginx-admission-patch -n ingress-nginx")
 
     # upgrade_candidates is a source of upgradeable plugins, not list of plugins to upgrade.
     # Some plugins from upgrade_candidates will not be upgraded, because they have "install: false"
