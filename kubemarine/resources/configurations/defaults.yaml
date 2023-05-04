@@ -558,6 +558,9 @@ plugins:
       priority: 1
       procedures:
         - python:
+            module: plugins/clear_old_job_nginx.py
+            method: check_job_for_nginx
+        - python:
             module: plugins/nginx_ingress.py
             method: manage_custom_certificate
         - python:
@@ -565,9 +568,6 @@ plugins:
             method: apply_yaml
             arguments:
               plugin_name: nginx-ingress-controller
-        - python:
-            module: plugins/clear_old_job_nginx.py
-            method: check_job_for_nginx
         - expect:
             daemonsets:
               - name: ingress-nginx-controller
