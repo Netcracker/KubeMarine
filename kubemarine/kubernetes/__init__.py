@@ -800,11 +800,9 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_file,
     upgrade_cri_if_required(first_control_plane['connection'])
 
     # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
+
     if minor_version == 27:
-        kubeadm_flags = first_control_plane['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
-        if kubeadm_flags.find('--container-runtime=remote') != -1:
-            kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-            first_control_plane['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
+        fix_flag_kubelet(first_control_plane, kubeadm_file)
 
     first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
                                     f"sudo kubectl uncordon {first_control_plane['name']} && "
@@ -842,12 +840,7 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_file,
 
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
             if minor_version == 27:
-                kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}",
-                                                        is_async=False).get_simple_out()
-                if kubeadm_flags.find('--container-runtime=remote') != -1:
-                    kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-                    node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
-
+                fix_flag_kubelet(node, kubeadm_file)
 
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
             # and only "else" branch remains
@@ -935,11 +928,7 @@ def upgrade_workers(version, upgrade_group, cluster, kubeadm_file, minor_version
 
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
         if minor_version == 27:
-            kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
-            if kubeadm_flags.find('--container-runtime=remote') != -1:
-                kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-                node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
-
+            fix_flag_kubelet(node, kubeadm_file)
 
         # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
         # and only "else" branch remains
@@ -1392,4 +1381,10 @@ def create_kubeadm_patches_for_node(cluster, node):
 
     return
 
+def fix_flag_kubelet(node, kubeadm_file):
 
+    #Deprecated flag removal function for kubelet
+    kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
+    if kubeadm_flags.find('--container-runtime=remote') != -1:
+        kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
+        node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
