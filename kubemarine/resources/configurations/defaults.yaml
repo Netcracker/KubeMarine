@@ -558,7 +558,7 @@ plugins:
       priority: 1
       procedures:
         - python:
-            module: plugins/clear_old_job_nginx.py
+            module: plugins/nginx_ingress.py
             method: check_job_for_nginx
         - python:
             module: plugins/nginx_ingress.py

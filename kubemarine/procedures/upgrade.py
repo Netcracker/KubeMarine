@@ -50,22 +50,25 @@ def prepull_images(cluster):
 
 def kubernetes_upgrade(cluster):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    minor_version = int(version.split('.')[1])
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
 
-    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster,
+    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
                                            drain_timeout=drain_timeout, grace_period=grace_period)
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster,
+    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
                                             drain_timeout=drain_timeout, grace_period=grace_period)
     if cluster.nodes.get('worker', []):
-        kubernetes.upgrade_workers(version, upgrade_group, cluster,
+        kubernetes.upgrade_workers(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
                                    drain_timeout=drain_timeout, grace_period=grace_period)
 
     cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
@@ -143,7 +146,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
             with RemoteExecutor(cluster) as exe:
                 for node in cluster.nodes['control-plane'].include_group(
                         cluster.nodes.get('worker')).get_ordered_members_list(
-                    provide_node_configs=True):
+                        provide_node_configs=True):
                     os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
                                            backup=True,

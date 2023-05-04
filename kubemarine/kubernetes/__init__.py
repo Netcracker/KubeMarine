@@ -769,12 +769,9 @@ def get_kubeadm_config(inventory):
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
-def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
+def upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_file,
+                                minor_version, drain_timeout=None, grace_period=None):
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
-
-    minor_version = int(version.split('.')[1])
-
-    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
 
     if not upgrade_group.has_node(first_control_plane['name']):
         cluster.log.debug("First control-plane \"%s\" upgrade is not required" % first_control_plane['name'])
@@ -804,10 +801,10 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=N
 
     # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
     if minor_version == 27:
-        kubeadm_flags = first_control_plane['connection'].sudo(f"cat {kubeadm_flags_file}", is_async=False).get_simple_out()
+        kubeadm_flags = first_control_plane['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
         if kubeadm_flags.find('--container-runtime=remote') != -1:
             kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-            first_control_plane['connection'].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+            first_control_plane['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
 
     first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
                                     f"sudo kubectl uncordon {first_control_plane['name']} && "
@@ -820,12 +817,9 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, drain_timeout=N
     exclude_node_from_upgrade_list(first_control_plane['connection'], first_control_plane['name'])
 
 
-def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
+def upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_file,
+                                 minor_version, drain_timeout=None, grace_period=None):
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
-
-    minor_version = int(version.split('.')[1])
-
-    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
 
     for node in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
         if node['name'] != first_control_plane['name']:
@@ -848,11 +842,11 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, drain_timeout=
 
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
             if minor_version == 27:
-                kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}",
+                kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}",
                                                         is_async=False).get_simple_out()
                 if kubeadm_flags.find('--container-runtime=remote') != -1:
                     kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-                    node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+                    node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
 
 
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
@@ -917,12 +911,8 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
     return True
 
 
-def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_period=None):
+def upgrade_workers(version, upgrade_group, cluster, kubeadm_file, minor_version, drain_timeout=None, grace_period=None):
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
-
-    minor_version = int(version.split('.')[1])
-
-    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
 
     for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['control-plane']).get_ordered_members_list(
             provide_node_configs=True):
@@ -945,11 +935,11 @@ def upgrade_workers(version, upgrade_group, cluster, drain_timeout=None, grace_p
 
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
         if minor_version == 27:
-            kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}", is_async=False).get_simple_out()
+            kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
             if kubeadm_flags.find('--container-runtime=remote') != -1:
                 kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-                node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-                node['connection'].sudo("systemctl restart kubelet")
+                node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
+
 
         # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
         # and only "else" branch remains
