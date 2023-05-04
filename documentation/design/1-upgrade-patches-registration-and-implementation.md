@@ -48,7 +48,7 @@ Kubernetes [upgrade](../Maintenance.md#upgrade-procedure) procedure.
 New concept of patches priority. Patches with higher priority are always executed after patches with lower priority.
 
 1. **Inventory-only patches**. Can only patch initial inventory.
-   Instantiation of KubernetesCluster is not allowed, and connectio to nodes is not allowed.
+   Instantiation of KubernetesCluster is not allowed, and connection to nodes is not allowed.
 2. **Software upgrade patches**.
 3. **Other patches**. Should not affect software upgrade.
    May patch initial inventory and operate with cluster.
