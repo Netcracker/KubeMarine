@@ -199,11 +199,7 @@ def apply_registry(inventory, cluster):
             containerd_config[path] = {}
         if not containerd_config[path].get('sandbox_image'):
             kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
-            pause_mapping = cluster.globals['compatibility_map']['software']['pause']
-            if kubernetes_version not in pause_mapping:
-                raise Exception(f"Failed to detect pause version for Kubernetes {kubernetes_version}. "
-                                f"Please explicitly specify services.cri.containerdConfig.{path}.sandbox_image section.")
-            pause_version = pause_mapping[kubernetes_version]['version']
+            pause_version = cluster.globals['compatibility_map']['software']['pause'][kubernetes_version]['version']
             containerd_config[path]['sandbox_image'] = \
                 f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
