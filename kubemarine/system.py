@@ -202,7 +202,7 @@ def detect_os_family(cluster):
 
         version_regex = re.compile("\\s\\d*\\.\\d*", re.M)
         for line in stdout.split("\n"):
-            if 'centos' in line or 'rhel' in line:
+            if 'centos' in line or 'rhel' or 'rocky' in line:
                 # CentOS and Red Hat have a major version in VERSION_ID string
                 matches = re.findall(version_regex, line)
                 if matches:

@@ -278,6 +278,11 @@ compatibility_map:
           - '8.4'
           - '8.6'
           - '8.7'
+    rocky:
+      - os_family: 'rhel8'
+        versions:
+          - '8.6'
+          - '8.7'
     ubuntu:
       - os_family: 'debian'
         versions:
