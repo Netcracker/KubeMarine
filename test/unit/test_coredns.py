@@ -25,6 +25,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
         configmap_hosts = '''127.0.0.1 localhost localhost.localdomain
+10.101.2.1   k8s.fake.local control-plain
 192.168.0.1  master-1.k8s.fake.local master-1
 10.101.1.1   master-1-external.k8s.fake.local master-1-external
 192.168.0.2  master-2.k8s.fake.local master-2
@@ -40,6 +41,9 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
                 }
             }
         }
+        print("qqq")
+        print(generated_hosts)
+        print("qqq")
         self.assertEquals(configmap_hosts, cluster.inventory['services']['coredns'].get('configmap').get('Hosts') + '\n' + generated_hosts)
 
     def test_already_defined_hosts_config_and_not_add_etc_hosts_generated(self):
