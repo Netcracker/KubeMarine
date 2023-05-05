@@ -344,9 +344,9 @@ services:
           forward:
             - .
             - /etc/resolv.conf
-      Hosts: '127.0.0.1 localhost localhost.localdomain
+      Hosts: |
+        127.0.0.1 localhost localhost.localdomain
         {% if not nodes[0]["internal_address"]|isipv4 %}::1 localhost localhost.localdomain{% endif %}
-        '
 
   loadbalancer:
     haproxy:

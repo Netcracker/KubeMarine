@@ -55,6 +55,7 @@
       "$ref": "services/etc_hosts.json"
     },
     "etc_hosts_generated": {
+      "description": "Describes auto-generated records about nodes for /etc/hosts and coredns configmap. The key is an IP-address, the value is either a DNS name or an array of names.",
       "$ref": "services/etc_hosts.json"
     },
     "coredns": {

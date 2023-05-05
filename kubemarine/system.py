@@ -55,8 +55,7 @@ def enrich_etc_hosts(inventory, cluster):
 
     control_plain = inventory['control_plain']['internal']
 
-    # take custom name of control_plain from etc_hosts, if any
-    control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
+    control_plain_names = []
     control_plain_names.append(cluster.inventory['cluster_name'])
     control_plain_names.append('control-plain')
     control_plain_names = list(OrderedSet(control_plain_names))
@@ -66,14 +65,14 @@ def enrich_etc_hosts(inventory, cluster):
         if 'remove_node' in node['roles']:
             continue
 
-        internal_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])
+        internal_node_ip_names = []
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
         internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
         inventory['services']['etc_hosts_generated'][node['internal_address']] = internal_node_ip_names
 
         if node.get('address'):
-            external_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['address'], [])
+            external_node_ip_names = []
             external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
             external_node_ip_names.append(node['name'] + "-external")
             external_node_ip_names = list(OrderedSet(external_node_ip_names))
