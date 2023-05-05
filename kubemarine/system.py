@@ -68,7 +68,10 @@ def enrich_etc_hosts(inventory, cluster):
         inventory['services']['etc_hosts_generated'][node['internal_address']] = internal_node_ip_names
 
         if node.get('address'):
-            external_node_ip_names = []
+            if node['internal_address'] != node['address']:
+                external_node_ip_names = []
+            else:
+                external_node_ip_names = internal_node_ip_names.copy()
             external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
             external_node_ip_names.append(node['name'] + "-external")
             external_node_ip_names = list(OrderedSet(external_node_ip_names))
