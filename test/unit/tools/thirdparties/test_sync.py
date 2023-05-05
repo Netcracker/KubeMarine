@@ -384,7 +384,7 @@ class SynchronizationTest(unittest.TestCase):
 
     def test_manifests_enrichment_update_plugin_versions(self):
         plugin = None
-        plugin_versions = []
+        plugin_versions = set()
         for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
             plugin_versions = set(v[plugin] for v in self.compatibility_map().values())
             if len(plugin_versions) > 1:
@@ -395,6 +395,7 @@ class SynchronizationTest(unittest.TestCase):
 
         k8s_oldest = self.k8s_versions()[0]
         plugin_oldest = self.compatibility_map()[k8s_oldest][plugin]
+        plugin_versions = sorted(plugin_versions, key=utils.version_key)
         plugin_versions.remove(plugin_oldest)
         new_plugin_version = list(plugin_versions)[0]
 
