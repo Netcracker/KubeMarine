@@ -21,6 +21,20 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
+def check_job_for_nginx(cluster: KubernetesCluster):
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    version = cluster.inventory['plugins']['nginx-ingress-controller']['version'].replace('v', '.').split('.')
+
+    major_version = int(version[1])
+    minor_version = int(version[2])
+
+    check_jobs = first_control_plane['connection'].sudo(f"kubectl get jobs -n ingress-nginx")
+    if list(check_jobs.values())[0].stderr == "" and major_version >= 1 and minor_version >= 4:
+        cluster.log.debug('Delete old jobs for nginx')
+        first_control_plane['connection'].sudo(f"sudo kubectl delete job --all -n ingress-nginx", is_async=False)
+    else:
+        cluster.log.debug('There are no jobs to delete')
+
 def enrich_inventory(inventory, _):
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory

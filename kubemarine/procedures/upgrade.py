@@ -16,26 +16,21 @@
 
 from collections import OrderedDict
 from copy import deepcopy
+from distutils.util import strtobool
 from io import StringIO
+from itertools import chain
 
 import toml
 
-from distutils.util import strtobool
-
+from kubemarine import kubernetes, plugins
+from kubemarine.core import flow
+from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core import flow
 from kubemarine.procedures import install
-from kubemarine import kubernetes, plugins
-from itertools import chain
-from kubemarine.core import utils
-from kubemarine.core.executor import RemoteExecutor
-
-
-
-
 
 
 def system_prepare_thirdparties(cluster):
@@ -55,22 +50,25 @@ def prepull_images(cluster):
 
 def kubernetes_upgrade(cluster):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    minor_version = int(version.split('.')[1])
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
 
-    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster,
-                                    drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
+                                           drain_timeout=drain_timeout, grace_period=grace_period)
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster,
-                                     drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
+                                            drain_timeout=drain_timeout, grace_period=grace_period)
     if cluster.nodes.get('worker', []):
-        kubernetes.upgrade_workers(version, upgrade_group, cluster,
+        kubernetes.upgrade_workers(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
                                    drain_timeout=drain_timeout, grace_period=grace_period)
 
     cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
@@ -113,7 +111,6 @@ def upgrade_containerd(cluster: KubernetesCluster):
         This function fixes the incorrect version of pause during the cluster update procedure
     """
 
-
     cri = cluster.inventory["services"]["cri"]['containerRuntime']
     if cri == 'containerd':
         path = 'plugins."io.containerd.grpc.v1.cri"'
@@ -124,7 +121,8 @@ def upgrade_containerd(cluster: KubernetesCluster):
         pause_version = pause_mapping[target_kubernetes_version]['version']
         if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
             return
-        last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
+        last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[
+            2]
         if True:
             sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
             param_begin_pos = sandbox.rfind(":")
@@ -146,7 +144,8 @@ def upgrade_containerd(cluster: KubernetesCluster):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
             with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
+                for node in cluster.nodes['control-plane'].include_group(
+                        cluster.nodes.get('worker')).get_ordered_members_list(
                         provide_node_configs=True):
                     os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
@@ -283,14 +282,16 @@ def fix_cri_socket(cluster):
         control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
         control_plane["connection"].sudo(f"sudo kubectl annotate nodes --all \
                                      --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
-                                     , is_async=False, hide=True)
+                                         , is_async=False, hide=True)
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
+
 
 def kubernetes_apply_taints(cluster):
     # Apply taints after upgrade
     group = cluster.nodes['control-plane']
     kubernetes.apply_taints(group)
+
 
 if __name__ == '__main__':
     main()

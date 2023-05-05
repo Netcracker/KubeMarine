@@ -559,6 +559,9 @@ plugins:
       procedures:
         - python:
             module: plugins/nginx_ingress.py
+            method: check_job_for_nginx
+        - python:
+            module: plugins/nginx_ingress.py
             method: manage_custom_certificate
         - python:
             module: plugins/builtin.py
