@@ -85,13 +85,11 @@ jobs:
           sudo journalctl -u coredns -o json > ./results/coredns-logs.json
           sudo journalctl > ./results/all-logs.txt
           sudo journalctl -o json > ./results/all-logs.json
-          sudo cp /var/log/syslog ./results/syslog.txt
 
       - name: Collect Docker logs
         run: |
           sudo journalctl -u docker > ./results/docker-logs.txt
           sudo journalctl -u docker -o json > ./results/docker-logs.json
-          sudo cp /var/log/docker.log ./results/docker.log.txt
 
       - name: Collect network logs
         run: |
