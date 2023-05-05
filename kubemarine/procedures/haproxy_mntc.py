@@ -18,12 +18,13 @@ import time
 from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.resources import DynamicResources
-from kubemarine.haproxy import is_maintenance_mode 
+from kubemarine.haproxy import is_maintenance_mode
 
 def haproxy_mntc(cluster):
     # cluster = group.cluster
+    
     if not is_maintenance_mode(cluster):
-      cluster.log.debug(f"Skiping running maintenance procedure as cluster is not supported for HAProxy Maintenance mode.")
+      cluster.log.debug(f"Skiping haproxy maintenance procedure as cluster is not supported for HAProxy Maintenance mode.")
       exit(1)
     
     nodes = []
