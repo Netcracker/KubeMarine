@@ -63,7 +63,6 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y systemd
           sudo systemctl start systemd-journald.service	
-		
          # TODO: change to kubemarine runtime values feature
       - name: Set kubernetes version to cluster.yaml
         run: sed -i "s/<KUBERNETES_VERSION>/${{ matrix.kubernetes-version }}/" ${{ env.cluster_yaml_file }}
