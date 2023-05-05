@@ -91,21 +91,12 @@ jobs:
           sudo journalctl -u docker > ./results/docker-logs.txt
           sudo journalctl -u docker -o json > ./results/docker-logs.json
 
-      - name: Collect network logs
-        run: |
-          sudo tcpdump -i any -w tcpdump.pcap &
-          sudo timeout 30s ping 8.8.8.8
-          sudo killall tcpdump
-          sudo cp tcpdump.pcap ./results/tcpdump.pcap
-
       - name: Collect system information
         run: |
           uname -a > ./results/system-info.txt
           sudo apt list --installed > ./results/installed-packages.txt
           sudo df -h > ./results/disk-usage.txt
           sudo free -m > ./results/memory-usage.txt
-          sudo cp /var/log/messages ./results/messages.txt
-          sudo cp /var/log/auth.log ./results/auth.log.txt
           sudo systemctl status kubelet > ./results/kubelet-status.txt
           sudo systemctl status kube-proxy > ./results/kube-proxy-status.txt
           sudo systemctl status kube-apiserver > ./results/kube-apiserver-status.txt
@@ -115,7 +106,6 @@ jobs:
           sudo systemctl status coredns > ./results/coredns-status.txt
           sudo systemctl status docker > ./results/docker-status.txt
           sudo systemctl status systemd-journald > ./results/journald-status.txt
-          sudo cp /var/log/audit/audit.log ./results/audit.log.txt
   
       - name: Change not-recommended symbols in dump files
         if: failure()
