@@ -53,19 +53,15 @@ def enrich_etc_hosts(inventory, cluster):
     # if by chance cluster.yaml contains non empty etc_hosts_generated we have to reset it
     inventory['services']['etc_hosts_generated'] = {}
 
-    control_plain = inventory['control_plain']['internal']
-
-    control_plain_names = []
-    control_plain_names.append(cluster.inventory['cluster_name'])
-    control_plain_names.append('control-plain')
-    control_plain_names = list(OrderedSet(control_plain_names))
-    inventory['services']['etc_hosts_generated'][control_plain] = control_plain_names
-
     for node in cluster.inventory['nodes']:
         if 'remove_node' in node['roles']:
             continue
 
         internal_node_ip_names = []
+        if node['internal_address'] == inventory['control_plain']['internal']:
+            internal_node_ip_names.append(cluster.inventory['cluster_name'])
+            internal_node_ip_names.append('control-plain')
+
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
         internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
