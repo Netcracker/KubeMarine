@@ -36,7 +36,7 @@ class KubernetesVersions:
 
     def sync(self):
         k8s_versions = self._kubernetes_versions['kubernetes_versions']
-        k8s_versions = utils.map_sorted(k8s_versions, key=utils.version_key)
+        k8s_versions = utils.map_sorted(k8s_versions, key=utils.minor_version_key)
         self._kubernetes_versions['kubernetes_versions'] = k8s_versions
 
         minor_versions = set()
@@ -45,7 +45,7 @@ class KubernetesVersions:
             minor_versions.add(minor_version)
             if minor_version not in k8s_versions:
                 utils.insert_map_sorted(k8s_versions, minor_version, CommentedMap({'supported': True}),
-                                        key=utils.version_key)
+                                        key=utils.minor_version_key)
 
         for key in list(k8s_versions):
             if key not in minor_versions:
@@ -63,7 +63,12 @@ class KubernetesVersions:
     def _validate_mapping(self):
         mandatory_fields = set(static.GLOBALS['plugins'])
         mandatory_fields.update(['crictl'])
-        optional_fields = {'pause', 'webhook', 'metrics-scraper', 'busybox'}
+        optional_fields = {
+            'webhook', 'metrics-scraper', 'busybox',
+            # Although we are able to operate with pause image, custom version is not fully supported,
+            # because pause image version is not enriched when installing in public.
+            # 'pause',
+        }
 
         compatibility_map = self._kubernetes_versions['compatibility_map']
         for k8s_version, software in compatibility_map.items():

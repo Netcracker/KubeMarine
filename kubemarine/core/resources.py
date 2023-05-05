@@ -53,6 +53,9 @@ class DynamicResources:
         self.inventory_filepath = args['config']
         self.procedure_inventory_filepath = args.get('procedure_config')
 
+    def logger_if_initialized(self):
+        return self._logger
+
     def logger(self):
         if self._logger is None:
             self._logger = self._create_logger()

@@ -147,6 +147,7 @@ class KubernetesCluster(Environment):
         return [
             "kubemarine.core.schema.verify_inventory",
             "kubemarine.core.defaults.merge_defaults",
+            "kubemarine.kubernetes.verify_initial_version",
             "kubemarine.kubernetes.add_node_enrichment",
             "kubemarine.kubernetes.remove_node_enrichment",
             "kubemarine.controlplane.controlplane_node_enrichment",

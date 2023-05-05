@@ -1420,17 +1420,20 @@ def main(cli_arguments=None):
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 
-    cluster = flow.run_actions(context, [PaasAction()], print_summary=False)
+    flow_ = flow.ActionsFlow([PaasAction()])
+    result = flow_.run_flow(context, print_summary=False)
+
+    context = result.context
+    testsuite: TestSuite = context['testsuite']
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files
-    print(cluster.context['testsuite'].get_final_summary(show_minimal=False, show_recommended=False))
-    cluster.context['testsuite'].print_final_status(cluster.log)
-    check_iaas.make_reports(cluster)
-    return cluster.context['testsuite']
+    print(testsuite.get_final_summary(show_minimal=False, show_recommended=False))
+    testsuite.print_final_status(result.logger)
+    check_iaas.make_reports(context)
+    if testsuite.is_any_test_failed():
+        sys.exit(1)
 
 
 if __name__ == '__main__':
-    testsuite = main()
-    if testsuite.is_any_test_failed():
-        sys.exit(1)
+    main()

@@ -159,11 +159,7 @@ Usage: kubemarine <procedure> <arguments>
 ''' % '\n'.join(descriptions_print_list))
         sys.exit(1)
 
-    result = import_procedure(arguments[0]).main(arguments[1:])
-    if result is not None:
-        from kubemarine.testsuite import TestSuite
-        if isinstance(result, TestSuite) and result.is_any_test_failed():
-            sys.exit(1)
+    import_procedure(arguments[0]).main(arguments[1:])
 
 
 def import_procedure(name):

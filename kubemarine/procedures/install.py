@@ -31,7 +31,7 @@ from kubemarine.core import flow, utils, summary
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
-from kubemarine import kubernetes
+
 
 def _applicable_for_new_nodes_with_roles(*roles):
     """
@@ -653,15 +653,11 @@ cumulative_points = {
 class InstallAction(Action):
     def __init__(self):
         super().__init__('install')
-        self.verification_version_result = ""
+        self.target_version = None
 
     def run(self, res: DynamicResources):
-        cluster_yml = res.raw_inventory()
-        if (cluster_yml.get("services", {})
-                and cluster_yml["services"].get("kubeadm", {})
-                and cluster_yml["services"]["kubeadm"].get("kubernetesVersion")):
-            target_version = cluster_yml["services"]["kubeadm"].get("kubernetesVersion")
-            self.verification_version_result = kubernetes.verify_target_version(target_version)
+        self.target_version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
+        kubernetes.verify_supported_version(self.target_version, res.logger())
 
         flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
 
@@ -678,10 +674,10 @@ def main(cli_arguments=None):
     context = flow.create_context(parser, cli_arguments, procedure='install')
 
     install = InstallAction()
-    flow.run_actions(context, [install])
+    flow_ = flow.ActionsFlow([install])
+    result = flow_.run_flow(context)
 
-    if install.verification_version_result:
-        print(install.verification_version_result)
+    kubernetes.verify_supported_version(install.target_version, result.logger)
 
 
 if __name__ == '__main__':

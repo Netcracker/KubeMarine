@@ -17,7 +17,7 @@ import math
 import os
 import time
 from copy import deepcopy
-from typing import List, Dict, Union
+from typing import List, Dict, Tuple
 
 import ruamel.yaml
 import yaml
@@ -25,13 +25,11 @@ from jinja2 import Template
 import ipaddress
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static, summary
+from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.errors import KME
-
-version_coredns_path_breakage = "v1.21.2"
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
@@ -78,36 +76,17 @@ def enrich_upgrade_inventory(inventory, cluster):
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
         inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
-        test_version_upgrade_possible(cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version'])
         cluster.log.info(
             '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
             cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
     return inventory
 
 
-def version_higher_or_equal(version, compared_version):
-    '''
-    The method checks target Kubernetes version, is it more/equal than compared_version.
-    '''
-    compared_version_list = compared_version.replace('v', '').split('.')
-    version_list = version.replace('v', '').split('.')
-    if int(version_list[0]) > int(compared_version_list[0]):
-        return True
-    if int(version_list[0]) == int(compared_version_list[0]):
-        if int(version_list[1]) > int(compared_version_list[1]):
-            return True
-        if int(version_list[1]) == int(compared_version_list[1]):
-            if int(version_list[2]) >= int(compared_version_list[2]):
-                return True
-    return False
-
-
 def enrich_inventory(inventory, cluster):
-    if version_higher_or_equal(inventory['services']['kubeadm']['kubernetesVersion'], version_coredns_path_breakage):
-        repository = inventory['services']['kubeadm'].get('imageRepository', "")
-        if repository:
-            inventory['services']['kubeadm']['dns'] = {}
-            inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
+    repository = inventory['services']['kubeadm'].get('imageRepository', "")
+    if repository:
+        inventory['services']['kubeadm']['dns'] = {}
+        inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
     # if user redefined apiServer as, string, for example?
     if not isinstance(inventory["services"]["kubeadm"].get('apiServer'), dict):
         inventory["services"]["kubeadm"]['apiServer'] = {}
@@ -895,8 +874,7 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
         cluster_config["imageRepository"] = cluster_config["imageRepository"].replace(old_image_repo_port,
                                                                                       new_image_repo_port)
 
-    if version_higher_or_equal(current_kubernetes_version, version_coredns_path_breakage):
-        cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
+    cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
     kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
@@ -957,7 +935,7 @@ def prepare_drain_command(node, version: str, globals, disable_eviction: bool, n
         grace_period = drain_globals['grace_period']
     drain_cmd = f"kubectl drain {node['name']} --force --ignore-daemonsets --delete-emptydir-data " \
                 f"--timeout={drain_timeout}s --grace-period={grace_period}"
-    if version and version >= "v1.18" and disable_eviction:
+    if version and disable_eviction:
         drain_cmd += " --disable-eviction=true"
     return drain_cmd
 
@@ -997,19 +975,34 @@ def verify_upgrade_versions(cluster):
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 
-def verify_target_version(target_version):
-    test_version(target_version)
+def get_initial_kubernetes_version(inventory: dict) -> str:
+    kubernetes_version = inventory.get("services", {}).get("kubeadm", {}).get("kubernetesVersion")
+    if kubernetes_version is None:
+        kubernetes_version = static.DEFAULTS['services']['kubeadm']['kubernetesVersion']
 
-    pos = target_version.rfind(".")
-    target_version = target_version[:pos]
-    supported_versions = static.SUPPORTED_VERSIONS
-    if target_version not in supported_versions:
-        raise Exception("ERROR! Specified target Kubernetes version '%s' - cannot be installed!" % target_version)
-    if not supported_versions.get(target_version, {}).get("supported", False):
-        message = "\033[91mWarning! Specified target Kubernetes version '%s' - is not supported!\033[0m" % target_version
-        print(message)
-        return message
-    return ""
+    return kubernetes_version
+
+
+def verify_initial_version(inventory: dict, _) -> dict:
+    version = get_initial_kubernetes_version(inventory)
+    verify_allowed_version(version)
+    return inventory
+
+
+def verify_allowed_version(version: str) -> None:
+    allowed_versions = static.KUBERNETES_VERSIONS['compatibility_map'].keys()
+    if version not in allowed_versions:
+        raise errors.KME('KME0008',
+                         version=version,
+                         allowed_versions=', '.join(map(repr, allowed_versions)))
+
+
+def verify_supported_version(target_version: str, logger: log.EnhancedLogger) -> None:
+    verify_allowed_version(target_version)
+    minor_version = utils.minor_version(target_version)
+    supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
+    if not supported_versions.get(minor_version, {}).get("supported", False):
+        logger.warning(f"Specified target Kubernetes version {target_version!r} - is not supported!")
 
 
 def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node=None, apply_filter=None):
@@ -1052,46 +1045,22 @@ def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node
     raise Exception('In the expected time, the nodes did not receive correct Kubernetes version')
 
 
-def test_version(version: Union[list, str]):
-    version_list: list = version
-    # catch version without "v" at the first symbol
-    if isinstance(version, str):
-        if not version.startswith('v'):
-            raise Exception('Version \"%s\" do not have \"v\" as first symbol, '
-                            'expected version pattern is \"v1.NN.NN\"' % version)
-        version_list = version.replace('v', '').split('.')
-    # catch invalid version 'v1.16'
-    if len(version_list) != 3:
-        raise Exception('Version \"%s\" has invalid amount of numbers, '
-                        'expected version pattern is \"v1.NN.NN\"' % version)
-
-    # parse str to int and catch invalid symbols in version number
-    for i, value in enumerate(version_list):
-        try:
-            # whitespace required because python's int() ignores them
-            version_list[i] = int(value.replace(' ', '.'))
-        except ValueError:
-            raise Exception('Version \"%s\" contains invalid symbols, '
-                            'expected version pattern is \"v1.NN.NN\"' % version) from None
-    return version_list
-
-
-def test_version_upgrade_possible(old, new, skip_equal=False):
+def test_version_upgrade_possible(old: str, new: str, skip_equal=False):
     versions_unchanged = {
         'old': old.strip(),
         'new': new.strip()
     }
-    versions: Dict[str, List[int]] = {}
+    versions: Dict[str, Tuple[int, int, int]] = {}
 
     for v_type, version in versions_unchanged.items():
-        versions[v_type] = test_version(version)
+        versions[v_type] = utils.version_key(version)
 
     # test new is greater than old
-    if tuple(versions['old']) > tuple(versions['new']):
+    if versions['old'] > versions['new']:
         raise Exception(ERROR_DOWNGRADE % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test new is the same as old
-    if tuple(versions['old']) == tuple(versions['new']) and not skip_equal:
+    if versions['old'] == versions['new'] and not skip_equal:
         raise Exception(ERROR_SAME % (versions_unchanged['old'], versions_unchanged['new']))
 
     # test major step is not greater than 1

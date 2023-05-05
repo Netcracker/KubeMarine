@@ -327,7 +327,7 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure="migrate_cri")
 
-    flow.run_actions(context, [MigrateCRIAction()])
+    flow.ActionsFlow([MigrateCRIAction()]).run_flow(context)
 
 
 if __name__ == '__main__':

@@ -42,7 +42,7 @@ class FakeInternalCompatibility(InternalCompatibility):
 class FakeKubernetesVersions(KubernetesVersions):
     def __init__(self):
         super().__init__()
-        self.stored: Optional[dict] = None
+        self.stored: Optional[CommentedMap] = None
 
     @property
     def kubernetes_versions(self) -> CommentedMap:

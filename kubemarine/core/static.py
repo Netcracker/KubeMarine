@@ -24,14 +24,21 @@ def reload():
     DEFAULTS.clear()
     DEFAULTS.update(_load_defaults())
 
-    global SUPPORTED_VERSIONS
-    SUPPORTED_VERSIONS.clear()
-    SUPPORTED_VERSIONS.update(_load_supported_versions())
+    global KUBERNETES_VERSIONS
+    KUBERNETES_VERSIONS.clear()
+    KUBERNETES_VERSIONS.update(load_kubernetes_versions())
 
 
 def load_compatibility_map(filename: str) -> dict:
     return utils.load_yaml(utils.get_internal_resource_path(
         f"resources/configurations/compatibility/internal/{filename}"))
+
+
+def load_kubernetes_versions() -> dict:
+    kubernetes_versions = utils.load_yaml(
+        utils.get_internal_resource_path('resources/configurations/compatibility/kubernetes_versions.yaml'))
+
+    return kubernetes_versions
 
 
 def _load_globals() -> dict:
@@ -56,15 +63,8 @@ def _load_defaults() -> dict:
         utils.get_internal_resource_path('resources/configurations/defaults.yaml'))
 
 
-def _load_supported_versions() -> dict:
-    kubernetes_versions = utils.load_yaml(
-        utils.get_internal_resource_path('resources/configurations/compatibility/kubernetes_versions.yaml'))
-
-    return kubernetes_versions['kubernetes_versions']
-
-
 GLOBALS = {}
 DEFAULTS = {}
-SUPPORTED_VERSIONS = {}
+KUBERNETES_VERSIONS = {}
 
 reload()

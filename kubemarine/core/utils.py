@@ -418,21 +418,41 @@ def minor_version(version: str) -> str:
     """
     Converts vN.N.N to vN.N
     """
-    return ".".join(version.split(".")[0:2])
+    return 'v' + '.'.join(map(str, _test_version(version, 3)[0:2]))
 
 
-def version_key(version: str) -> tuple:
+def version_key(version: str) -> Tuple[int, int, int]:
     """
-    Converts vN.N.N to (N, N, N) or vN.N to (N, N) that can be used in comparisons.
+    Converts vN.N.N to (N, N, N) that can be used in comparisons.
     """
-    return tuple(map(int, version[1:].split('.')))
+    return tuple(_test_version(version, 3))
 
 
-def minor_version_key(version: str) -> tuple:
+def minor_version_key(version: str) -> Tuple[int, int]:
     """
-    Converts vN.N.N to (N, N) that can be used in comparisons.
+    Converts vN.N to (N, N) that can be used in comparisons.
     """
-    return version_key(minor_version(version))
+    return tuple(_test_version(version, 2))
+
+
+def _test_version(version: str, numbers_amount: int) -> list:
+    # catch version without "v" at the first symbol
+    if version.startswith('v'):
+        version_list: list = version[1:].split('.')
+        # catch invalid version 'v1.16'
+        if len(version_list) == numbers_amount:
+            # parse str to int and catch invalid symbols in version number
+            try:
+                for i, value in enumerate(version_list):
+                    # whitespace required because python's int() ignores them
+                    version_list[i] = int(value.replace(' ', '.'))
+            except ValueError:
+                pass
+            else:
+                return version_list
+
+    expected_pattern = 'v' + '.'.join('N+' for _ in range(numbers_amount))
+    raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
 
 
 class ClusterStorage:

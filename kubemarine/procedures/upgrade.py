@@ -19,6 +19,7 @@ from copy import deepcopy
 from distutils.util import strtobool
 from io import StringIO
 from itertools import chain
+from typing import List
 
 import toml
 
@@ -115,10 +116,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
     if cri == 'containerd':
         path = 'plugins."io.containerd.grpc.v1.cri"'
         target_kubernetes_version = cluster.context["upgrade_version"]
-        pause_mapping = cluster.globals['compatibility_map']['software']['pause']
-        if target_kubernetes_version not in pause_mapping:
-            raise Exception(f"Upgrade to {target_kubernetes_version} is not supported")
-        pause_version = pause_mapping[target_kubernetes_version]['version']
+        pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
         if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
             return
         last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[
@@ -210,6 +208,30 @@ def upgrade_finalize_inventory(cluster, inventory):
     return inventory
 
 
+class UpgradeFlow(flow.Flow):
+    def __init__(self):
+        self.target_version = None
+
+    def _run(self, resources: DynamicResources):
+        logger = resources.logger()
+
+        previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
+        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
+        logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
+
+        self.target_version = upgrade_plan[-1]
+        kubernetes.verify_supported_version(self.target_version, logger)
+
+        args = resources.context['execution_arguments']
+        if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
+            raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
+
+        # todo inventory is preserved few times, probably need to preserve it once instead.
+        actions = [UpgradeAction(version) for version in upgrade_plan]
+        flow.run_actions(resources, actions)
+
+
 class UpgradeAction(Action):
     def __init__(self, upgrade_version: str):
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
@@ -235,39 +257,22 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
-    args = context['execution_arguments']
-    resources = DynamicResources(context)
+    flow_ = UpgradeFlow()
+    result = flow_.run_flow(context)
 
-    upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
-    verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
-
-    if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
-        raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
-
-    # todo inventory is preserved few times, probably need to preserve it once instead.
-    actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(resources, actions)
-
-    if verification_version_result:
-        print(verification_version_result)
+    kubernetes.verify_supported_version(flow_.target_version, result.logger)
 
 
-def verify_upgrade_plan(upgrade_plan):
-    if not upgrade_plan:
-        raise Exception('Upgrade plan is not specified or empty')
+def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
+    kubernetes.verify_allowed_version(previous_version)
+    for version in upgrade_plan:
+        kubernetes.verify_allowed_version(version)
 
-    upgrade_plan.sort()
+    upgrade_plan.sort(key=utils.version_key)
 
-    previous_version = None
-    for i in range(0, len(upgrade_plan)):
-        version = upgrade_plan[i]
-        if version == 'v1.24.0':
-            raise Exception('Attempt to upgrade to an unstable version of kubernetes')
-        if previous_version is not None:
-            kubernetes.test_version_upgrade_possible(previous_version, version)
+    for version in upgrade_plan:
+        kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
-
-    print('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
 
     return upgrade_plan
 

@@ -21,6 +21,11 @@ from kubemarine.core import static, utils
 from .shell import info
 
 
+ERROR_PREVIOUS_MINOR = "Kubernetes version '{version}' is deleted. " \
+                       "Need to delete all versions having the same or lower minor version. " \
+                       "Not deleted versions: {previous_versions}."
+
+
 class ChangesTracker:
     def __init__(self, kubernetes_versions: dict):
         self.kubernetes_versions = kubernetes_versions
@@ -39,6 +44,7 @@ class ChangesTracker:
         self.updated_k8s.pop(k8s_version, None)
 
     def delete(self, k8s_version: str):
+        self._check_delete_all_previous_minor(k8s_version)
         self.deleted_k8s.add(k8s_version)
 
     def update(self, k8s_version: str, software_name: str):
@@ -116,3 +122,13 @@ class ChangesTracker:
             req = requirements['default']
 
         return req.format(version=version, minor_version=minor_version)
+
+    def _check_delete_all_previous_minor(self, k8s_version):
+        def key(ver: str):
+            return utils.version_key(ver)[0:2]
+        previous_versions = [ver for ver in self.all_k8s_versions if key(ver) <= key(k8s_version)]
+        if previous_versions:
+            raise Exception(ERROR_PREVIOUS_MINOR.format(
+                version=k8s_version,
+                previous_versions=', '.join(map(repr, previous_versions))
+            ))
