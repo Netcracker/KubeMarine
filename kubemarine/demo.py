@@ -21,6 +21,7 @@ from typing import List, Dict, Union, Any, IO
 import fabric
 from invoke import UnexpectedExit
 
+from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core import group, flow, connections
 from kubemarine.core.connections import Connections
@@ -404,12 +405,7 @@ def new_cluster(inventory, procedure_inventory=None, context: dict = None,
 
 
 def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', net_interface='eth0') -> dict:
-    os_family = None
-
-    if os_name in ['centos', 'rhel']:
-        os_family = 'rhel'
-    elif os_name in ['ubuntu', 'debian']:
-        os_family = 'debian'
+    os_family = system.detect_of_family_by_name_version(os_name, os_version)
 
     context = {}
     for node in inventory['nodes']:

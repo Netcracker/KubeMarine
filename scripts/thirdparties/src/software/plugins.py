@@ -313,7 +313,7 @@ def try_manifest_enrichment(k8s_version: str, plugin_name: str):
     cluster = demo.new_cluster(inventory, context=context)
 
     class ConsoleLogger(log.VerboseLogger):
-        def verbose(self, msg: str, *args, **kwargs):
+        def verbose(self, msg, *args, **kwargs):
             print(msg)
 
     processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, plugin_name)

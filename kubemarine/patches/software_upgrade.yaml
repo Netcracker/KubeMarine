@@ -16,7 +16,6 @@ packages:
     version_rhel8: []
     version_debian: []
   containerd:
-    version_rhel8: []
     version_debian: []
   containerdio:
     version_rhel: []

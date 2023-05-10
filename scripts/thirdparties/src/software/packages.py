@@ -90,6 +90,7 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
     ]
     if package_name == 'containerd':
         keys.remove('version_rhel')
+        keys.remove('version_rhel8')
 
     return keys
 

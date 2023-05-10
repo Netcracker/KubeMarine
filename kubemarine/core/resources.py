@@ -164,7 +164,7 @@ class DynamicResources:
 
     def _create_cluster(self, context):
         log = self.logger()
-        context['nodes'] = deepcopy(self._get_nodes_context())
+        context['nodes'] = deepcopy(self.get_nodes_context())
         with self._handle_enrichment_error():
             cluster = self._new_cluster_instance(context)
             cluster.enrich()
@@ -182,7 +182,7 @@ class DynamicResources:
 
         return cluster
 
-    def _get_nodes_context(self):
+    def get_nodes_context(self):
         if self._nodes_context is None:
             with self._handle_enrichment_error():
                 # temporary cluster instance to detect initial nodes context.

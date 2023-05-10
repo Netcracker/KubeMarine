@@ -88,6 +88,10 @@ def generate_upgrade_environment(old) -> Tuple[dict, dict]:
     return inventory, context
 
 
+def set_cri(inventory: dict, cri: str):
+    inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = cri
+
+
 class UpgradeDefaultsEnrichment(unittest.TestCase):
 
     def prepare_inventory(self, old, new):
@@ -142,13 +146,20 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         self.new = 'v1.24.11'
         self.inventory, self.context = generate_upgrade_environment(self.old)
         self.context['upgrade_version'] = self.new
-        self.inventory['services']['packages'] = {}
+        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
+                                                            os_name='ubuntu', os_version='20.04')
+        self.inventory['services'].update({'packages': {'associations': {
+            'docker': {},
+            'containerd': {},
+        }}})
+        set_cri(self.inventory, 'containerd')
         self.upgrade: dict = {
             'upgrade_plan': [self.new],
             self.new: {
                 'packages': {
                     'associations': {
-                        'docker': {}
+                        'docker': {},
+                        'containerd': {}
                     }
                 }
             }
@@ -158,24 +169,113 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
                                 context=self.context)
 
+    def _patch_globals(self, package: str, os_family: str, *, equal=False):
+        package_compatibility = static.GLOBALS['compatibility_map']['software'][package]
+        package_compatibility[self.old][f"version_{os_family}"] = f'{package}-initial'
+        if equal:
+            package_compatibility[self.new][f"version_{os_family}"] = f'{package}-initial'
+        else:
+            package_compatibility[self.new][f"version_{os_family}"] = f'{package}-new'
+
     def test_enrich_packages_propagate_associations(self):
+        set_cri(self.inventory, 'docker')
         self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
         self.upgrade[self.new]['packages']['install'] = ['curl']
         cluster = self._new_cluster()
         self.assertEqual(['curl'], cluster.inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
-        self.assertEqual('docker-ce', cluster.inventory['services']['packages']['associations']['rhel']['docker']['package_name'],
+        self.assertEqual('docker-ce', cluster.inventory['services']['packages']['associations']['debian']['docker']['package_name'],
                          "Associations packages are enriched incorrectly")
 
     def test_final_inventory_enrich_global(self):
+        set_cri(self.inventory, 'docker')
         self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
         self.upgrade[self.new]['packages']['install'] = ['curl']
         cluster = self._new_cluster()
         final_inventory = utils.get_final_inventory(cluster, self.inventory)
-        expected_final_packages = deepcopy(self.upgrade[self.new]['packages'])
-        expected_final_packages['install'] = {'include': expected_final_packages['install']}
-        self.assertEqual(expected_final_packages, final_inventory['services']['packages'],
-                         "Final inventory is recreated incorrectly")
+        self.assertEqual(['curl'], final_inventory['services']['packages']['install']['include'],
+                         "Custom packages are enriched incorrectly")
+        self.assertEqual('docker-ce', final_inventory['services']['packages']['associations']['docker']['package_name'],
+                         "Associations packages are enriched incorrectly")
+
+    def test_require_package_redefinition(self):
+        self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
+        with (utils.backup_globals(),
+              utils.assert_raises_kme(self, "KME0010", package='containerd',
+                                      previous_version_spec='.*', next_version_spec='.*')):
+            self._patch_globals('containerd', 'debian', equal=True)
+            self._new_cluster()
+
+    def test_compatibility_upgrade_required(self):
+        for os_name, os_family, os_version in (
+                ('ubuntu', 'debian', '20.04'),
+                ('centos', 'rhel', '7.9'),
+                ('rhel', 'rhel8', '8.7')
+        ):
+            for cri in ('docker', 'containerd'):
+                for package_vary in ('docker', 'containerd', 'containerdio', 'podman'):
+                    expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
+
+                    with self.subTest(f"{os_family}, {cri}, {package_vary}"), utils.backup_globals():
+                        self._patch_globals(package_vary, os_family, equal=False)
+
+                        self.setUp()
+                        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
+                                                                            os_name=os_name, os_version=os_version)
+                        set_cri(self.inventory, cri)
+
+                        cluster = self._new_cluster()
+                        self.assertEqual(expected_upgrade_required,
+                                         cri in cluster.context['packages']['upgrade_required'],
+                                         f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
+
+    def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
+        if cri == 'containerd':
+            package_names = ['podman']
+            if os_family in ('rhel', 'rhel8'):
+                package_names.append('containerdio')
+            else:
+                package_names.append('containerd')
+        else:
+            package_names = ['docker', 'containerdio']
+
+        return package_names
+
+    def test_procedure_inventory_upgrade_required_inventory_default(self):
+        for procedure_associations, expected_upgrade_required in (
+                (['containerd=containerd-initial', 'podman=podman-initial'], False),
+                (['containerd=containerd-new', 'podman=podman-new'], True),
+                ('containerd-custom', True)
+        ):
+            with self.subTest(f"upgrade: {expected_upgrade_required}"), utils.backup_globals():
+                self._patch_globals('containerd', 'debian', equal=False)
+                self._patch_globals('podman', 'debian', equal=False)
+
+                self.setUp()
+                self.upgrade[self.new]['packages']['associations']['containerd']['package_name'] = procedure_associations
+
+                cluster = self._new_cluster()
+                self.assertEqual(expected_upgrade_required,
+                                 'containerd' in cluster.context['packages']['upgrade_required'],
+                                 f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
+
+    def test_procedure_inventory_upgrade_required_inventory_redefined(self):
+        for procedure_associations, expected_upgrade_required in (
+                ('containerd-inventory', False),
+                ('containerd-redefined', True)
+        ):
+            with self.subTest(f"upgrade: {expected_upgrade_required}"), utils.backup_globals():
+                self._patch_globals('containerd', 'debian', equal=True)
+                self._patch_globals('podman', 'debian', equal=True)
+
+                self.setUp()
+                self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-inventory'
+                self.upgrade[self.new]['packages']['associations']['containerd']['package_name'] = procedure_associations
+
+                cluster = self._new_cluster()
+                self.assertEqual(expected_upgrade_required,
+                                 'containerd' in cluster.context['packages']['upgrade_required'],
+                                 f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def test_final_inventory_merge_packages(self):
         self.inventory['services']['packages'].setdefault('install', {})['include'] = ['curl']
@@ -281,6 +381,10 @@ class InventoryRecreation(unittest.TestCase):
 
         self.resources: Optional[demo.FakeResources] = None
 
+    def package_names(self, services: dict, package: str, package_names) -> None:
+        services.setdefault('packages', {}).setdefault('associations', {}) \
+            .setdefault(package, {})['package_name'] = package_names
+
     def run_actions(self):
         self.resources = demo.FakeResources(self.context, self.inventory,
                                             procedure_inventory=self.upgrade, nodes_context=self.nodes_context)
@@ -296,6 +400,18 @@ class InventoryRecreation(unittest.TestCase):
         actual_image = self.resources.stored_inventory['plugins']['calico']['cni']['image']
         self.assertEqual('B', actual_image,
                          "Plugin image was not redefined in recreated inventory.")
+
+    def test_packages_iterative_package_names_redefinition(self):
+        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        set_cri(self.inventory, 'containerd')
+        self.package_names(self.upgrade['v1.25.2'], 'containerd', 'A')
+        self.package_names(self.upgrade['v1.25.7'], 'containerd', 'B')
+
+        self.run_actions()
+
+        actual_package = self.resources.stored_inventory['services']['packages']['associations']['containerd']['package_name']
+        self.assertEqual('B', actual_package,
+                         "Containerd packages associations were not redefined in recreated inventory.")
 
 
 if __name__ == '__main__':

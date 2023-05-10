@@ -166,7 +166,7 @@ def get_final_inventory(cluster, initial_inventory=None):
     else:
         inventory = deepcopy(initial_inventory)
 
-    from kubemarine import admission, plugins
+    from kubemarine import admission, packages, plugins
     from kubemarine.plugins import nginx_ingress
     from kubemarine.procedures import add_node, remove_node, upgrade, migrate_cri
 
@@ -175,6 +175,7 @@ def get_final_inventory(cluster, initial_inventory=None):
         remove_node.remove_node_finalize_inventory,
         upgrade.upgrade_finalize_inventory,
         plugins.upgrade_finalize_inventory,
+        packages.upgrade_finalize_inventory,
         admission.finalize_inventory,
         nginx_ingress.finalize_inventory,
         migrate_cri.migrate_cri_finalize_inventory
@@ -223,12 +224,12 @@ def get_dump_filepath(context, filename):
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
+def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False, is_async=True):
     log = group.cluster.log
 
     while retries > 0:
         log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide)
+        result = group.sudo(command, warn=warn, hide=hide, is_async=is_async)
         exit_code = list(result.values())[0].exited
         if exit_code == 0:
             log.debug("Command succeeded")

@@ -43,6 +43,14 @@ KME_DICTIONARY = {
         "name": "Key {key!r} is redefined for {plugin_name!r} in cluster.yaml{previous_version_spec}, "
                 "but not present in procedure inventory{next_version_spec}. "
                 "Please, specify required plugin configuration explicitly in procedure inventory."
+    },
+    "KME0010": {
+        "name": "Associations are redefined for {package!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required associations explicitly in procedure inventory."
+    },
+    "KME0012": {
+        "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
     }
 }
 

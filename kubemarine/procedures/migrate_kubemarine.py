@@ -19,9 +19,10 @@ from typing import List
 import yaml
 
 import kubemarine.patches
-from kubemarine import kubernetes, plugins
-from kubemarine.core import flow, static, utils
+from kubemarine import kubernetes, plugins, cri, packages, etcd
+from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
+from kubemarine.core.group import NodeGroup
 from kubemarine.core.patch import Patch, _SoftwareUpgradePatch
 from kubemarine.core.resources import DynamicResources
 
@@ -39,7 +40,7 @@ class SoftwareUpgradeAction(Action, ABC):
         # because otherwise enrichment will start with probably not relevant validation.
         version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
         if version not in self.k8s_versions:
-            res.logger().info(f"Patch is not relevant for kubernetes {version}")
+            res.logger().info(f"Patch is not relevant for Kubernetes {version}")
             return
 
         self.specific_run(res)
@@ -62,8 +63,91 @@ class CriUpgradeAction(Action):
         self.upgrade_config = upgrade_config
 
     def run(self, res: DynamicResources):
-        # TODO implement
+        # Access only to raw inventory to prepare context
+        cri_impl = cri.get_initial_cri_impl(res.raw_inventory())
+        res.context['upgrading_package'] = cri_impl
+
+        if not self.associations_changed(res):
+            return
+
+        # Only now the cluster is initialized and full enrichment is run.
+        cluster = res.cluster()
+        if cri_impl not in cluster.context['packages']['upgrade_required']:
+            res.logger().info(f"Nothing has changed in associations of {cri_impl!r}. Upgrade is not required.")
+            return
+
+        self.recreate_inventory = True
+
+        if 'worker' in cluster.nodes:
+            self.upgrade_cri(cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"]), workers=True)
+        self.upgrade_cri(cluster.nodes["control-plane"], workers=False)
+
         res.make_final_inventory()
+
+    def reset_context(self, context: dict) -> None:
+        del context['upgrading_package']
+
+    def upgrade_cri(self, group: NodeGroup, workers: bool):
+        cluster = group.cluster
+
+        drain_timeout = cluster.procedure_inventory.get('drain_timeout')
+        grace_period = cluster.procedure_inventory.get('grace_period')
+        disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
+
+        for node in group.get_ordered_members_list():
+            node_name = node.get_node_name()
+            control_plane = node
+            if workers:
+                control_plane = cluster.nodes["control-plane"].get_first_member()
+
+            drain_cmd = kubernetes.prepare_drain_command(
+                cluster, node_name,
+                disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
+            control_plane.sudo(drain_cmd, is_async=False, hide=False)
+            # `kubectl drain` ignores system pods, delete them explicitly
+            if not workers:
+                kubernetes.delete_system_pods(cluster, node)
+
+            kubernetes.upgrade_cri_if_required(node)
+
+            node.sudo('systemctl restart kubelet')
+
+            if workers:
+                control_plane.sudo(f"kubectl uncordon {node_name}", is_async=False, hide=False)
+            else:
+                kubernetes.wait_uncordon(node)
+
+            if not workers:
+                kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
+                etcd.wait_for_health(cluster, node)
+
+    def associations_changed(self, res: DynamicResources) -> bool:
+        """
+        Detects if upgrade is required for the given Kubernetes version, OS family and CRI implementation.
+        The method should not run full enrichment, and run only light enrichment to detect OS family.
+        """
+        version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
+        cri_impl = cri.get_initial_cri_impl(res.raw_inventory())
+
+        nodes_context = res.get_nodes_context()
+        os_families = list({ctx['os']['family'] for ctx in nodes_context.values()})
+        if len(os_families) != 1 or os_families[0] not in packages.get_associations_os_family_keys():
+            raise errors.KME("KME0012")
+        os_family = os_families[0]
+        version_key = packages.get_compatibility_version_key(os_family)
+
+        changes_detected = False
+        packages_names = static.GLOBALS['packages'][os_family][cri_impl]['package_name']
+        for kv in packages_names:
+            software_name = list(kv.values())[0]
+            kubernetes_upgrade_list = self.upgrade_config['packages'][software_name][version_key]
+            changes_detected = changes_detected or version in kubernetes_upgrade_list
+
+        if not changes_detected:
+            res.logger().info(f"Patch is not relevant for Kubernetes {version}, "
+                              f"based on {cri_impl} and {os_family!r} OS family")
+
+        return changes_detected
 
 
 class BalancerUpgradeAction(Action):
@@ -197,11 +281,15 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
     for thirdparty_name in ['crictl']:
         k8s_versions = upgrade_config['thirdparties'][thirdparty_name]
         if k8s_versions:
+            verify_allowed_kubernetes_versions(k8s_versions)
             upgrade_patches.append(ThirdpartyUpgradePatch(thirdparty_name, k8s_versions))
 
-    if any(upgrade_config['packages'][pkg].get(v_key)
-           for pkg in ('docker', 'containerd', 'containerdio', 'podman')
-           for v_key in ('version_rhel', 'version_rhel8', 'version_debian')):
+    k8s_versions = [version
+                    for pkg in ('docker', 'containerd', 'containerdio', 'podman')
+                    for v_key in ('version_rhel', 'version_rhel8', 'version_debian')
+                    for version in upgrade_config['packages'][pkg].get(v_key, [])]
+    if k8s_versions:
+        verify_allowed_kubernetes_versions(k8s_versions)
         upgrade_patches.append(CriUpgradePatch(upgrade_config))
 
     for software_name in ['haproxy', 'keepalived']:
@@ -215,9 +303,16 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
     for plugin_name in plugins:
         k8s_versions = upgrade_config['plugins'][plugin_name]
         if k8s_versions:
+            verify_allowed_kubernetes_versions(k8s_versions)
             upgrade_patches.append(PluginUpgradePatch(plugin_name, k8s_versions))
 
     return upgrade_patches
+
+
+def verify_allowed_kubernetes_versions(kubernetes_versions: List[str]):
+    not_allowed_versions = set(kubernetes_versions) - set(static.KUBERNETES_VERSIONS['compatibility_map'])
+    if not_allowed_versions:
+        raise Exception(f"Kubernetes versions {', '.join(map(repr, not_allowed_versions))} are not allowed.")
 
 
 def load_patches() -> List[Patch]:

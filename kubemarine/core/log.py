@@ -82,7 +82,7 @@ LOGGING_NAMES_BY_LEVEL = {
 
 class VerboseLogger(ABC):
     @abstractmethod
-    def verbose(self, msg: str, *args, **kwargs):
+    def verbose(self, msg, *args, **kwargs):
         pass
 
 

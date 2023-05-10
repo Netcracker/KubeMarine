@@ -8,10 +8,16 @@
       "properties": {
         "plugins": {
           "$ref": "#/definitions/UpgradePlugins"
+        },
+        "packages": {
+          "$ref": "#/definitions/UpgradePackages"
         }
       },
       "additionalProperties": false
-    }
+    },
+    "disable-eviction": {"$ref": "definitions/procedures.json#/definitions/DisableEviction"},
+    "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
+    "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
   },
   "additionalProperties": false,
   "definitions": {
@@ -30,6 +36,22 @@
         },
         "local-path-provisioner": {
           "$ref": "definitions/plugins/local-path-provisioner.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpgradePackages": {
+      "type": "object",
+      "description": "Section for packages and their management during upgrade",
+      "properties": {
+        "associations": {
+          "type": "object",
+          "description": "Configure associations of package objects to be used during upgrade",
+          "properties": {
+            "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
+            "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"}
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

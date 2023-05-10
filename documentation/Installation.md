@@ -4894,7 +4894,6 @@ Application of the list merge strategy is allowed in the following sections:
 * `services.audit.cluster_policy.rules`
 * `services.audit.rules`
 * `services.coredns.deployment.spec.template.spec.volumes`
-* `services.packages.associations.package_name`
 * `services.packages.install`
 * `services.packages.upgrade`
 * `services.packages.remove`

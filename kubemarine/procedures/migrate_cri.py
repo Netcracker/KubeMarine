@@ -20,7 +20,7 @@ import io
 import uuid
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow
+from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -157,18 +157,11 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
 
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
         cluster.log.debug("Migrating \"%s\"..." % node["name"])
-        disable_eviction = True
-        drain_cmd = kubernetes.prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes)
+        drain_cmd = kubernetes.prepare_drain_command(cluster, node['name'], disable_eviction=True)
         control_plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
         # `kubectl drain` ignores system pods, delete them explicitly
         if "control-plane" in node["roles"]:
-            node["connection"].sudo(f"kubectl -n kube-system delete pod etcd-{node['name']} "
-                                    f"kube-apiserver-{node['name']} "
-                                    f"kube-controller-manager-{node['name']} "
-                                    f"kube-scheduler-{node['name']} "
-                                    f"$(sudo kubectl describe node {node['name']} | "
-                                    "grep -E 'kube-system\\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')",
-                                    is_async=False, hide=False).get_simple_out()
+            kubernetes.delete_system_pods(cluster, node["connection"])
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
@@ -216,7 +209,12 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
                                 "sudo systemctl restart containerd && "
                                 # start kubelet
                                 "sudo systemctl restart kubelet")
-        control_plane["connection"].sudo(f"sudo kubectl uncordon {node['name']}", is_async=False, hide=False)
+
+        if "control-plane" in node["roles"]:
+            kubernetes.wait_uncordon(node["connection"])
+        else:
+            control_plane["connection"].sudo(f"kubectl uncordon {node['name']}", is_async=False, hide=False)
+
         if "control-plane" in node["roles"]:
             # hotfix for Ubuntu 22.04 and Kubernetes v1.21.2
             if version == "v1.21.2":

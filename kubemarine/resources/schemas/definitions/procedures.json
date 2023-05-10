@@ -14,6 +14,11 @@
     "DrainTimeout": {
       "type": "integer",
       "description": "Time to wait for the pods' killing"
+    },
+    "DisableEviction": {
+      "type": "boolean",
+      "default": true,
+      "description": "If specified to false, enforces PDB rules during the upgrade"
     }
   }
 }

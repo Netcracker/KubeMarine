@@ -320,7 +320,7 @@ def reconfigure_plugin_task(cluster):
     cluster.nodes["control-plane"].call(update_kubeapi_config, options_list=final_admission_plugins_list)
 
 
-def restart_pods_task(cluster, disable_eviction=False):
+def restart_pods_task(cluster):
     if cluster.context.get('initial_procedure') == 'manage_pss':
         # check if pods restart is enabled
         is_restart = cluster.procedure_inventory.get("restart-pods", False)
@@ -334,8 +334,8 @@ def restart_pods_task(cluster, disable_eviction=False):
     kube_nodes = cluster.nodes["control-plane"].include_group(cluster.nodes["worker"])
     for node in kube_nodes.get_ordered_members_list(provide_node_configs=True):
         first_control_plane.sudo(
-            kubernetes.prepare_drain_command(node, cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                             cluster.globals, disable_eviction, cluster.nodes), hide=False)
+            kubernetes.prepare_drain_command(cluster, node["name"], disable_eviction=False),
+            hide=False)
         first_control_plane.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")

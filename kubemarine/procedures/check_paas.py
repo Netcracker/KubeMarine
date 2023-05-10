@@ -29,7 +29,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
-from kubemarine.core import flow
+from kubemarine.core import flow, static
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
@@ -109,54 +109,37 @@ def recommended_system_package_versions(cluster: KubernetesCluster, pckg_alias: 
     Raise Warn if unable to detect the OS family, configured not recommended k8s version or
     if configured not recommended system packages versions.
     """
-    version_key = system.get_compatibility_version_key(cluster)
-    if not version_key:
+    os_family = cluster.get_os_family()
+    if os_family not in pckgs.get_associations_os_family_keys():
         raise TestFailure("OS is unknown or multiple OS present")
-    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    compatibility = cluster.globals["compatibility_map"]["software"]
-    if k8s_version not in compatibility["kubeadm"]:
-        raise TestWarn(f"Using not recommended k8s version: {k8s_version}")
 
-    # Mapping "system_package_alias -> expected_packages_names -> expected_versions"
-    # We assume that system packages have word "haproxy"/"keepalived"/"docker"/"containerd"/"podman" in their name,
-    # if not - then we may miss such package
-    if pckg_alias == "haproxy":
-        expected_system_packages = {"haproxy": compatibility["haproxy"][version_key]}
-    elif pckg_alias == "keepalived":
-        expected_system_packages = {"keepalived": compatibility["keepalived"][version_key]}
-    elif pckg_alias == "containerd":
-        expected_system_packages = {"podman": compatibility["podman"][k8s_version][version_key]}
-        if version_key in ["version_rhel", "version_rhel8"]:
-            expected_system_packages["containerd.io"] = compatibility["containerdio"][k8s_version][version_key]
-        else:
-            expected_system_packages["containerd"] = compatibility["containerd"][k8s_version][version_key]
-    elif pckg_alias == "docker":
-        expected_system_packages = {
-            "docker": compatibility["docker"][k8s_version][version_key],
-            "containerd.io": compatibility["containerdio"][k8s_version][version_key]
-        }
-    else:
+    recommended_packages = list(static.GLOBALS['packages'][os_family])
+    if pckg_alias not in recommended_packages:
         raise TestWarn(f"Package {pckg_alias} doesn't have recommended version")
+
+    k8s_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+    expected_system_packages = pckgs.get_default_package_names(os_family, pckg_alias, k8s_version)
 
     good_results = set()
     bad_results = []
     actual_packages = cluster.get_package_association(pckg_alias, "package_name")
     if not isinstance(actual_packages, list):
         actual_packages = [actual_packages]
-    for expected_pckg, version in expected_system_packages.items():
-        version = version.replace("*", "")
-        is_found = False
+    for expected_pckg in expected_system_packages:
+        expected_pckg_name = pckgs.get_package_name(os_family, expected_pckg)
         for actual_pckg in actual_packages:
-            if expected_pckg in actual_pckg:
-                is_found = True
-                if f"-{version}" in actual_pckg or f"={version}" in actual_pckg:
+            actual_pckg_name = pckgs.get_package_name(os_family, actual_pckg)
+            if expected_pckg_name == actual_pckg_name:
+                if actual_pckg.startswith(expected_pckg.replace("*", "")):
                     good_results.add(actual_pckg)
                 else:
-                    cluster.log.debug(f"Package {actual_pckg} is not recommended, recommended version is {version}")
+                    cluster.log.debug(f"Package {actual_pckg} is not recommended, recommended is {expected_pckg}")
                     bad_results.append(actual_pckg)
-        if not is_found:
-            cluster.log.debug(f"Package {expected_pckg} is not found in inventory")
-            bad_results.append(expected_pckg)
+
+                break
+        else:
+            cluster.log.debug(f"Package {expected_pckg_name} is not found in inventory")
+            bad_results.append(expected_pckg_name)
 
     if bad_results:
         raise TestWarn(f"Detected not recommended packages versions: {bad_results}")
@@ -242,7 +225,7 @@ def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]]
             bad_results.append(package)
         else:
             package_name = package.replace("*", "")
-            if package_name in version:
+            if version.startswith(package_name):
                 good_results.append(version)
             else:
                 bad_results.append(version)
