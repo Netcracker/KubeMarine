@@ -103,15 +103,14 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
         previous_version = ""
         plugins_verify = [context['upgrading_plugin']]
 
-    _verify_upgrade_plan(inventory, previous_version, plugins_verify, upgrade_plan)
+    _verify_upgrade_plan(cluster.raw_inventory, previous_version, plugins_verify, upgrade_plan)
 
     return generic_upgrade_inventory(cluster, inventory)
 
 
-def _verify_upgrade_plan(inventory: dict, previous_version: str,
+def _verify_upgrade_plan(raw_inventory: dict, previous_version: str,
                          plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
-    base_plugins = static.DEFAULTS["plugins"]
-    current_plugins = deepcopy(inventory["plugins"])
+    raw_plugins = deepcopy(raw_inventory.get('plugins', {}))
 
     # validate all plugin sections in procedure inventory
     for version, upgrade_plugins in upgrade_plan:
@@ -119,31 +118,29 @@ def _verify_upgrade_plan(inventory: dict, previous_version: str,
             verify_image_redefined(plugin_name,
                                    previous_version,
                                    version,
-                                   base_plugins[plugin_name],
-                                   current_plugins[plugin_name],
+                                   raw_plugins.get(plugin_name, {}),
                                    upgrade_plugins.get(plugin_name, {}))
-        default_merger.merge(current_plugins, upgrade_plugins)
+        default_merger.merge(raw_plugins, upgrade_plugins)
         previous_version = version
 
 
-def verify_image_redefined(plugin_name, previous_version, next_version, base_plugin, cluster_plugin, upgrade_plugin):
+def verify_image_redefined(plugin_name, previous_version, next_version, raw_plugins, upgrade_plugin):
     """
     If some image in "cluster_plugin" is different from image in "base_plugin",
     i.e. redefined, then "upgrade_plugin" should have this image explicitly
     redefined too.
     """
     sensitive_keys = ['image', 'helper-pod-image', 'version']
-    for key, value in base_plugin.items():
+    for key, value in raw_plugins.items():
         if isinstance(value, dict):
             verify_image_redefined(plugin_name,
                                    previous_version,
                                    next_version,
-                                   base_plugin[key],
-                                   cluster_plugin[key],
+                                   value,
                                    upgrade_plugin.get(key, {}))
         elif key not in sensitive_keys:
             continue
-        elif base_plugin[key] != cluster_plugin[key] and not upgrade_plugin.get(key):
+        elif value and not upgrade_plugin.get(key):
             raise errors.KME("KME0009",
                              key=key, plugin_name=plugin_name,
                              previous_version_spec=f" for version {previous_version}" if previous_version else "",
