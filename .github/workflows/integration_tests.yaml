@@ -98,12 +98,6 @@ jobs:
           sudo df -h > ./results/disk-usage.txt
           sudo free -m > ./results/memory-usage.txt
           sudo systemctl status kubelet > ./results/kubelet-status.txt
-          sudo systemctl status kube-proxy > ./results/kube-proxy-status.txt
-          sudo systemctl status kube-apiserver > ./results/kube-apiserver-status.txt
-          sudo systemctl status kube-controller-manager > ./results/kube-controller-manager-status.txt
-          sudo systemctl status kube-scheduler > ./results/kube-scheduler-status.txt
-          sudo systemctl status etcd > ./results/etcd-status.txt
-          sudo systemctl status coredns > ./results/coredns-status.txt
           sudo systemctl status docker > ./results/docker-status.txt
           sudo systemctl status systemd-journald > ./results/journald-status.txt
   
