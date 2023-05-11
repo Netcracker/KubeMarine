@@ -292,18 +292,18 @@ def get_resolv_conf_buffer(config):
     return buffer
 
 
-def generate_etc_hosts_config(inventory, cluster=None):
-# generate records for /etc/hosts from services.etc_hosts
+def generate_etc_hosts_config(inventory, cluster=None, etc_hosts_part='etc_hosts_generated'):
+# generate records for /etc/hosts from services.etc_hosts or services.etc_hosts_generated
 
     result = ""
 
     max_len_ip = 0
 
-    for ip in list(inventory['services']['etc_hosts'].keys()):
+    for ip in list(inventory['services'][etc_hosts_part].keys()):
         if len(ip) > max_len_ip:
             max_len_ip = len(ip)
 
-    for ip, names in inventory['services']['etc_hosts'].items():
+    for ip, names in inventory['services'][etc_hosts_part].items():
         if isinstance(names, list):
             # remove records with empty values from list
             names = list(filter(len, names))
@@ -312,43 +312,6 @@ def generate_etc_hosts_config(inventory, cluster=None):
                 continue
             names = " ".join(names)
         result += "%s%s  %s\n" % (ip, " " * (max_len_ip - len(ip)), names)
-
-    return result
-
-def generate_etc_hosts_generated_config(inventory, cluster=None):
-# generate records for /etc/hosts from services.etc_hosts_generated
-
-    result = ""
-
-    max_len_ip = 0
-
-    ignore_ips = []
-    if cluster and cluster.context['initial_procedure'] == 'remove_node':
-        for removal_node in cluster.procedure_inventory.get("nodes"):
-            removal_node_name = removal_node['name']
-            for node in inventory['nodes']:
-                if node['name'] == removal_node_name:
-                    if node.get('address'):
-                        ignore_ips.append(node['address'])
-                    if node.get('internal_address'):
-                        ignore_ips.append(node['internal_address'])
-
-    ignore_ips = list(set(ignore_ips))
-
-    for ip in list(inventory['services']['etc_hosts_generated'].keys()):
-        if len(ip) > max_len_ip:
-            max_len_ip = len(ip)
-
-    for ip, names in inventory['services']['etc_hosts_generated'].items():
-        if isinstance(names, list):
-            # remove records with empty values from list
-            names = list(filter(len, names))
-            # if list is empty, then skip
-            if not names:
-                continue
-            names = " ".join(names)
-        if ip not in ignore_ips:
-            result += "%s%s  %s\n" % (ip, " " * (max_len_ip - len(ip)), names)
 
     return result
 

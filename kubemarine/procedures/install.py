@@ -268,8 +268,8 @@ def system_prepare_dns_resolv_conf(group: NodeGroup):
 
 
 def system_prepare_dns_etc_hosts(cluster):
-    config = system.generate_etc_hosts_config(cluster.inventory, cluster)
-    config += system.generate_etc_hosts_generated_config(cluster.inventory, cluster)
+    config = system.generate_etc_hosts_config(cluster.inventory, cluster, 'etc_hosts')
+    config += system.generate_etc_hosts_config(cluster.inventory, cluster, 'etc_hosts_generated')
 
     utils.dump_file(cluster, config, 'etc_hosts')
     cluster.log.debug("\nUploading...")
