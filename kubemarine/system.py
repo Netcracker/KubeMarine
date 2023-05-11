@@ -65,9 +65,7 @@ def enrich_etc_hosts(inventory, cluster):
         if 'remove_node' in node['roles']:
             continue
 
-        internal_node_ip_names = []
-        if node['internal_address'] == inventory['control_plain']['internal']:
-            internal_node_ip_names = control_plain_names.copy()
+        internal_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])  
 
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
