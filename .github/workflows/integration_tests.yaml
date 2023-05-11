@@ -71,6 +71,11 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect kubelet logs
+        run: |
+          journalctl -u kubelet --no-pager > ./results/kubelet.log
+          journalctl -u kubelet.service --no-pager > ./results/kubelet_service.log
+          journalctl -u kubelet.service --no-pager -o json > ./results/kubelet_service.json
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
