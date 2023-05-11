@@ -11,6 +11,9 @@
         },
         "packages": {
           "$ref": "#/definitions/UpgradePackages"
+        },
+        "thirdparties": {
+          "$ref": "definitions/services/thirdparties.json"
         }
       },
       "additionalProperties": false

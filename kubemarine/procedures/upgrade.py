@@ -165,21 +165,6 @@ tasks = OrderedDict({
 })
 
 
-def upgrade_finalize_inventory(cluster, inventory):
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-    upgrade_version = cluster.context.get("upgrade_version")
-
-    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
-
-    # if thirdparties was not defined in procedure.yaml,
-    # then no need to forcibly place them: user may want to use default
-    if cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties'):
-        inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
-
-    return inventory
-
-
 class UpgradeFlow(flow.Flow):
     def __init__(self):
         self.target_version = None

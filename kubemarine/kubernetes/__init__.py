@@ -69,18 +69,27 @@ def remove_node_enrichment(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory, cluster):
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get('initial_procedure') == 'upgrade':
-        if not inventory.get('services'):
-            inventory['services'] = {}
-        if not inventory['services'].get('kubeadm'):
-            inventory['services']['kubeadm'] = {}
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
-        inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
         cluster.log.info(
             '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
             cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    upgrade_version = cluster.context.get("upgrade_version")
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
     return inventory
 
 

@@ -15,9 +15,10 @@ import io
 from copy import deepcopy
 from typing import Tuple, Optional, Dict, List
 
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.yaml_merger import default_merger
 
 
 def is_default_thirdparty(destination: str):
@@ -104,23 +105,106 @@ def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster)
     return recommended_sha
 
 
-def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
-    if cluster.context.get('initial_procedure') == 'upgrade':
-        upgrade_version = cluster.context["upgrade_version"]
-        upgrade_thirdparties = cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties')
-        if upgrade_thirdparties:
-            upgrade_thirdparties = deepcopy(upgrade_thirdparties)
-            default_thirdparties = static.DEFAULTS['services']['thirdparties']
+def _convert_thirdparty(thirdparties: dict, destination: str) -> dict:
+    config = thirdparties.setdefault(destination, {})
+    if isinstance(config, str):
+        thirdparties[destination] = config = {
+            'source': config
+        }
 
-            # keep some configurations (unpack) from default thirdparties, if they are not re-defined
-            for destination, config in upgrade_thirdparties.items():
-                if destination in default_thirdparties and 'unpack' in default_thirdparties[destination]\
-                        and 'unpack' not in config:
-                    config['unpack'] = deepcopy(default_thirdparties[destination]['unpack'])
+    return config
 
-            inventory['services']['thirdparties'] = upgrade_thirdparties
-        else:
-            cluster.log.warning('New thirdparties for upgrade procedure is not set in procedure config - default will be used')
+
+def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        upgrade_version = context["upgrade_version"]
+        upgrade_plan = []
+        for version in cluster.procedure_inventory.get('upgrade_plan'):
+            if utils.version_key(version) < utils.version_key(upgrade_version):
+                continue
+
+            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("thirdparties", {})))
+
+    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_thirdparty' in context:
+        upgrade_thirdparties = cluster.procedure_inventory.get('upgrade', {}).get("thirdparties", {})
+        upgrade_thirdparties = dict(item for item in upgrade_thirdparties.items()
+                                    if item[0] == context['upgrading_thirdparty'])
+        upgrade_plan = [("", upgrade_thirdparties)]
+    else:
+        upgrade_plan = []
+
+    return upgrade_plan
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
+        return inventory
+
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        previous_version = context['initial_kubernetes_version']
+        # Validation is currently turned off for backward compatibility.
+        # It is possible to redefine all thirdparties with templates depending on Kubernetes version and the compatibility map.
+        # This technically allows to not supply new thirdparties during upgrade.
+        # The validation is turned on for new functionality of thirdparty upgrade during Kubemarine migration.
+        #
+        # thirdparties_verify = get_default_thirdparties()
+        thirdparties_verify = []
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+        thirdparties_verify = [context['upgrading_thirdparty']]
+
+    _verify_upgrade_plan(inventory, previous_version, thirdparties_verify, upgrade_plan)
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def _verify_upgrade_plan(inventory: dict, previous_version: str,
+                         thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+
+    thirdparties = deepcopy(inventory["services"]['thirdparties'])
+    sensitive_keys = ['source', 'sha1']
+
+    for version, upgrade_thirdparties in upgrade_plan:
+        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
+
+        for destination in thirdparties_verify:
+            config = _convert_thirdparty(thirdparties, destination)
+            upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
+
+            for key in sensitive_keys:
+                if config.get(key) and not upgrade_config.get(key):
+                    raise errors.KME("KME0011",
+                                     key=key, thirdparty=destination,
+                                     previous_version_spec=f" for version {previous_version}" if previous_version else "",
+                                     next_version_spec=f" for next version {version}" if version else "")
+
+            default_merger.merge(config, upgrade_config)
+
+        previous_version = version
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
+        return inventory
+
+    _, upgrade_thirdparties = upgrade_plan[0]
+    if upgrade_thirdparties:
+        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
+        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
+
+        for destination in upgrade_thirdparties:
+            config = _convert_thirdparty(thirdparties, destination)
+            upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
+            default_merger.merge(config, upgrade_config)
+
     return inventory
 
 
@@ -130,12 +214,9 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     if not thirdparties:
         return inventory
 
-    for destination, config in thirdparties.items():
+    for destination in thirdparties:
 
-        if isinstance(config, str):
-            config = {
-                'source': config
-            }
+        config = _convert_thirdparty(thirdparties, destination)
 
         if config.get('mode') is None:
             config['mode'] = 700
@@ -167,8 +248,6 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
             config['source'] = source
             if 'sha1' not in config:
                 config['sha1'] = sha1
-
-        thirdparties[destination] = config
 
     # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly specified in cluster.yaml
     cri_name = inventory['services']['cri']['containerRuntime']

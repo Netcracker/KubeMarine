@@ -166,14 +166,15 @@ def get_final_inventory(cluster, initial_inventory=None):
     else:
         inventory = deepcopy(initial_inventory)
 
-    from kubemarine import admission, packages, plugins
+    from kubemarine import admission, kubernetes, packages, plugins, thirdparties
     from kubemarine.plugins import nginx_ingress
-    from kubemarine.procedures import add_node, remove_node, upgrade, migrate_cri
+    from kubemarine.procedures import add_node, remove_node, migrate_cri
 
     inventory_finalize_functions = {
         add_node.add_node_finalize_inventory,
         remove_node.remove_node_finalize_inventory,
-        upgrade.upgrade_finalize_inventory,
+        kubernetes.upgrade_finalize_inventory,
+        thirdparties.upgrade_finalize_inventory,
         plugins.upgrade_finalize_inventory,
         packages.upgrade_finalize_inventory,
         admission.finalize_inventory,

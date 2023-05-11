@@ -49,6 +49,11 @@ KME_DICTIONARY = {
                 "but not present in procedure inventory{next_version_spec}. "
                 "Please, specify required associations explicitly in procedure inventory."
     },
+    "KME0011": {
+        "name": "Key {key!r} is redefined for third-party {thirdparty!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required third-party configuration explicitly in procedure inventory."
+    },
     "KME0012": {
         "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
     }

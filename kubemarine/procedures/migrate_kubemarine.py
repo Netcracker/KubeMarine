@@ -19,7 +19,7 @@ from typing import List
 import yaml
 
 import kubemarine.patches
-from kubemarine import kubernetes, plugins, cri, packages, etcd
+from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties
 from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
 from kubemarine.core.group import NodeGroup
@@ -52,9 +52,35 @@ class SoftwareUpgradeAction(Action, ABC):
 
 
 class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
+    def __init__(self, software_name: str, k8s_versions: List[str]):
+        super().__init__(software_name, k8s_versions)
+        self._destination = self._get_destination()
+
     def specific_run(self, res: DynamicResources):
-        # TODO implement
-        pass
+        logger = res.logger()
+        cluster = res.cluster()
+        if self._destination not in cluster.inventory['services']['thirdparties']:
+            version = kubernetes.get_initial_kubernetes_version(cluster.inventory)
+            cri_impl = cri.get_initial_cri_impl(cluster.inventory)
+            logger.info(f"Patch is not relevant for Kubernetes {version}, based on {cri_impl}")
+            return
+
+        self.recreate_inventory = True
+        logger.info(f"Reinstalling third-party {self._destination!r}")
+        thirdparties.install_thirdparty(cluster.nodes['all'], self._destination)
+
+    def prepare_context(self, context: dict) -> None:
+        context['upgrading_thirdparty'] = self._destination
+
+    def reset_context(self, context: dict) -> None:
+        del context['upgrading_thirdparty']
+
+    def _get_destination(self) -> str:
+        for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
+            if thirdparty_settings['software_name'] == self.software_name:
+                return destination
+        else:
+            raise Exception(f"Failed to find third-party destination for {self.software_name!r}")
 
 
 class CriUpgradeAction(Action):

@@ -367,6 +367,109 @@ class UpgradePluginsEnrichment(unittest.TestCase):
             self._new_cluster()
 
 
+class ThirdpartiesEnrichment(unittest.TestCase):
+    def setUp(self):
+        self.old = 'v1.24.2'
+        self.new = 'v1.24.11'
+        self.inventory, self.context = generate_upgrade_environment(self.old)
+        self.context['upgrade_version'] = self.new
+        self.inventory['services']['thirdparties'] = {}
+        self.upgrade: dict = {
+            'upgrade_plan': [self.new],
+            self.new: {
+                'thirdparties': {}
+            }
+        }
+
+    def _new_cluster(self):
+        return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
+                                context=self.context)
+
+    def test_final_inventory(self):
+        self.inventory['services']['thirdparties']['/usr/bin/kubeadm'] = {
+            'source': 'kubeadm-redefined',
+            'sha1': 'fake-sha1'
+        }
+        self.inventory['services']['thirdparties']['/usr/bin/kubelet'] = 'kubelet-redefined'
+        self.inventory['services']['thirdparties']['/custom1'] = 'custom1-initial'
+        self.inventory['services']['thirdparties']['/custom2'] = {'source': 'custom2-initial', 'group': 'control-plane'}
+        self.inventory['services']['thirdparties']['/custom3'] = 'custom3-initial'
+        all_thirdparties = set(static.DEFAULTS['services']['thirdparties']) | {'/custom1', '/custom2', '/custom3'}
+
+        self.upgrade[self.new]['thirdparties']['/usr/bin/kubeadm'] = {
+            'source': 'kubeadm-new',
+            'sha1': 'fake-sha1-new'
+        }
+        self.upgrade[self.new]['thirdparties']['/usr/bin/kubelet'] = {'source': 'kubelet-new'}
+        self.upgrade[self.new]['thirdparties']['/custom1'] = 'custom1-new'
+        self.upgrade[self.new]['thirdparties']['/custom2'] = 'custom2-new'
+
+        cluster = self._new_cluster()
+        thirdparties_section = cluster.inventory['services']['thirdparties']
+
+        self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
+        self.assertEqual('kubeadm-new', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertEqual('fake-sha1-new', thirdparties_section['/usr/bin/kubeadm']['sha1'])
+        self.assertEqual('custom1-new', thirdparties_section['/custom1']['source'])
+        self.assertEqual('custom2-new', thirdparties_section['/custom2']['source'])
+        self.assertEqual(['control-plane'], thirdparties_section['/custom2']['groups'])
+        self.assertEqual('custom3-initial', thirdparties_section['/custom3']['source'])
+
+        utils.stub_associations_packages(cluster, {})
+        finalized_inventory = utils.make_finalized_inventory(cluster)
+        thirdparties_section = finalized_inventory['services']['thirdparties']
+
+        self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
+        self.assertEqual('kubeadm-new', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertEqual('fake-sha1-new', thirdparties_section['/usr/bin/kubeadm']['sha1'])
+        self.assertEqual('custom1-new', thirdparties_section['/custom1']['source'])
+        self.assertEqual('custom2-new', thirdparties_section['/custom2']['source'])
+        self.assertEqual(['control-plane'], thirdparties_section['/custom2']['groups'])
+        self.assertEqual('custom3-initial', thirdparties_section['/custom3']['source'])
+
+        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        thirdparties_section = final_inventory['services']['thirdparties']
+
+        self.assertEqual({'/usr/bin/kubeadm', '/usr/bin/kubelet', '/custom1', '/custom2', '/custom3'},
+                         set(thirdparties_section.keys()))
+        self.assertEqual('kubeadm-new', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertEqual('fake-sha1-new', thirdparties_section['/usr/bin/kubeadm']['sha1'])
+        self.assertEqual('custom1-new', thirdparties_section['/custom1']['source'])
+        self.assertEqual('custom2-new', thirdparties_section['/custom2']['source'])
+        self.assertEqual('control-plane', thirdparties_section['/custom2']['group'])
+        self.assertEqual('custom3-initial', thirdparties_section['/custom3'])
+
+    def test_enrich_upgrade_unpack(self):
+        set_cri(self.inventory, 'containerd')
+        self.upgrade[self.new]['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-new'
+
+        cluster = self._new_cluster()
+        thirdparties_section = cluster.inventory['services']['thirdparties']
+        self.assertEqual('crictl-new', thirdparties_section['/usr/bin/crictl.tar.gz']['source'])
+        self.assertEqual('/usr/bin/', thirdparties_section['/usr/bin/crictl.tar.gz']['unpack'])
+
+    def test_require_source_redefinition(self):
+        self.inventory['services']['thirdparties']['/usr/bin/kubelet'] = 'kubelet-redefined'
+        self._new_cluster()
+        # with utils.assert_raises_kme(self, "KME0011",
+        #                              key='source', thirdparty='/usr/bin/kubelet',
+        #                              previous_version_spec='.*', next_version_spec='.*'):
+        #     self._new_cluster()
+
+    def test_require_sha1_redefinition(self):
+        self.inventory['services']['thirdparties']['/usr/bin/kubectl'] = {
+            'source': 'kubectl-redefined',
+            'sha1': 'fake-sha1'
+        }
+        self.upgrade[self.new]['thirdparties']['/usr/bin/kubectl'] = 'kubectl-new'
+
+        self._new_cluster()
+        # with utils.assert_raises_kme(self, "KME0011",
+        #                              key='sha1', thirdparty='/usr/bin/kubectl',
+        #                              previous_version_spec='.*', next_version_spec='.*'):
+        #     self._new_cluster()
+
+
 class InventoryRecreation(unittest.TestCase):
     def prepare_inventory(self, upgrade_plan: List[str]):
         self.old = 'v1.24.2'
@@ -412,6 +515,23 @@ class InventoryRecreation(unittest.TestCase):
         actual_package = self.resources.stored_inventory['services']['packages']['associations']['containerd']['package_name']
         self.assertEqual('B', actual_package,
                          "Containerd packages associations were not redefined in recreated inventory.")
+
+    def test_thirdparties_iterative_source_redefinition(self):
+        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        set_cri(self.inventory, 'containerd')
+        self.upgrade['v1.25.2'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = 'A'
+        self.upgrade['v1.25.7'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = {
+            'source': 'B',
+            'sha1': 'fake-sha1'
+        }
+
+        self.run_actions()
+
+        actual_thirdparty = self.resources.stored_inventory['services']['thirdparties']['/usr/bin/calicoctl']
+        self.assertEqual('B', actual_thirdparty['source'],
+                         "Source of /usr/bin/calicoctl was not redefined in recreated inventory.")
+        self.assertEqual('fake-sha1', actual_thirdparty['sha1'],
+                         "sha1 of /usr/bin/calicoctl was not redefined in recreated inventory.")
 
 
 if __name__ == '__main__':

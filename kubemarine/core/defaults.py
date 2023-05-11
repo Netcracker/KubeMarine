@@ -43,7 +43,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.core.defaults.compile_inventory",
     "kubemarine.core.defaults.manage_true_false_values",
     "kubemarine.admission.manage_enrichment",
-    "kubemarine.thirdparties.enrich_inventory_apply_upgrade_defaults",
+    "kubemarine.thirdparties.enrich_upgrade_inventory",
     "kubemarine.procedures.migrate_cri.enrich_inventory",
     "kubemarine.core.defaults.apply_registry",
     "kubemarine.core.defaults.calculate_node_names",
