@@ -23,13 +23,12 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
   - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
-  - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
   - [Long Pulling of Images](#long-pulling-of-images)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
 - [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
-  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
+  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system-)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
@@ -263,7 +262,7 @@ To find out all the available `etcdctl` options and features, use the original E
 To execute the command, the script tries to launch the container using the following algorithm:
 
 1. Detect already running ETCD in Kubernetes cluster, parse its parameters, and launch the ETCD container with the same parameters on the current node.
-1. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
+2. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
 
 Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
 
@@ -477,7 +476,6 @@ Failed to defragment etcd member
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-...
   annotations:
     nginx.ingress.kubernetes.io/ssl-ciphers: "AES128-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
 ...
@@ -641,19 +639,19 @@ In this case, if the upgrade fails on version `1.18.8`, but is completed for ver
 services:
   kubeadm:
     apiServer:
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+      audit-log-path: /var/log/kubernetes/audit/audit.log
+      audit-policy-file: /etc/kubernetes/audit-policy.yaml
       extraVolumes:
-        - name: audit
-          hostPath: /etc/kubernetes/audit-policy.yaml
-          mountPath: /etc/kubernetes/audit-policy.yaml
-          readOnly: True
-          pathType: File
-        - name: audit-log
-          hostPath: /var/log/kubernetes/audit/
-          mountPath: /var/log/kubernetes/audit/
-          readOnly: False
-          pathType: DirectoryOrCreate
+      - name: audit
+        hostPath: /etc/kubernetes/audit-policy.yaml
+        mountPath: /etc/kubernetes/audit-policy.yaml
+        readOnly: True
+        pathType: File
+      - name: audit-log
+        hostPath: /var/log/kubernetes/audit/
+        mountPath: /var/log/kubernetes/audit/
+        readOnly: False
+        pathType: DirectoryOrCreate
 
   audit:
     cluster_policy:
