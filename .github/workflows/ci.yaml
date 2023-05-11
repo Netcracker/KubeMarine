@@ -49,7 +49,7 @@ jobs:
             build_cmd: python scripts/ci/build_binary.py
           - target: {os: macos-11, arch: 'macos11-x86_64'}
             build_cmd: python scripts/ci/build_binary.py x86_64
-          - target: {os: macos-12, arch: 'macos12-arm64'}
+          - target: {os: macos-11, arch: 'macos11-arm64'}
             build_cmd: python scripts/ci/build_binary.py arm64
     steps:
       - name: Checkout Repo
