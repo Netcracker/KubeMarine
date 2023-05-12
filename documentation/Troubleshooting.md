@@ -785,7 +785,7 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
-## Numerous Generation of `Auditd` System 
+## Numerous Generation of `Auditd` System
 
 **Symptoms**: Generation of numerous system messages on nodes and their processing in graylog:
 
