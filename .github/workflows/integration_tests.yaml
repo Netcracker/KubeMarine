@@ -90,16 +90,6 @@ jobs:
         run: |
           sudo journalctl -u docker > ./results/docker-logs.txt
           sudo journalctl -u docker -o json > ./results/docker-logs.json
-          
-      - name: Collect system information
-        run: |
-          uname -a > ./results/system-info.txt
-          sudo apt list --installed > ./results/installed-packages.txt
-          sudo df -h > ./results/disk-usage.txt
-          sudo free -m > ./results/memory-usage.txt
-          sudo systemctl status kubelet > ./results/kubelet-status.txt
-          sudo systemctl status docker > ./results/docker-status.txt
-          sudo systemctl status systemd-journald > ./results/journald-status.txt
   
       - name: Change not-recommended symbols in dump files
         if: failure()
