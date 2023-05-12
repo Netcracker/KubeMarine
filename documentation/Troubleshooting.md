@@ -1,6 +1,6 @@
-This section provides troubleshooting information for KubeMarine and Kubernetes solutions.
+This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
 
-- [KubeMarine Errors](#kubemarine-errors)
+- [Kubemarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
   - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
@@ -26,14 +26,14 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Long Pulling of Images](#long-pulling-of-images)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
-- [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
+- [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
-  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
+  - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
 
-# KubeMarine Errors
+# Kubemarine Errors
 
 This section lists all known errors with explanations and recommendations for their fixing. If an 
 error occurs during the execution of any of these procedures, you can find it here.
@@ -236,7 +236,7 @@ in the end of `/etc/sudoers` file, where `username` is a name of the connection 
 
 # Troubleshooting Tools
 
-This section describes the additional tools that KubeMarine provides for convenient troubleshooting of various issues.
+This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
 
 ## Etcdctl Script
 
@@ -271,7 +271,7 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 # Troubleshooting Kubernetes Generic Issues
 
-This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to KubeMarine installation.
+This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubemarine installation.
 
 ## CoreDNS Responds With High Latency
 
@@ -607,9 +607,9 @@ plugins:
 For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
 
-# Troubleshooting KubeMarine
+# Troubleshooting Kubemarine
 
-This section provides troubleshooting information for KubeMarine-specific or installation-specific issues.
+This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
 
 ## Failures During Kubernetes Upgrade Procedure
 
@@ -799,7 +799,7 @@ KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-c
 ```
 
 
-**Root cause**: The reason for generating numerous messages is to add new rules to`audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
+**Root cause**: The reason for generating numerous messages is to add new rules to `audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
 ```
 -w /var/lib/docker -k docker 
 -w /etc/docker -k docker 
@@ -850,7 +850,7 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
     ```
 ## Troubleshooting an Installation That Ended Incorrectly
 
-* Sometimes the installation of KubeMarine may not complete correctly, and for further analysis of the situation, KubeMarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
+* Sometimes the installation of Kubemarine may not complete correctly, and for further analysis of the situation, Kubemarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
 
 ### Analysis of the Situation
 
@@ -867,7 +867,7 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
       cluster.yaml
       procedure_parameters
   ```
-The user can analyze these files and try to find the reason for the failed installation of KubeMarine
+The user can analyze these files and try to find the reason for the failed installation of Kubemarine.
 
 
 ## Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status
