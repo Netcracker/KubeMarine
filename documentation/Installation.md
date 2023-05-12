@@ -115,7 +115,7 @@ This section provides information about the inventory, features, and steps for i
 
 # Prerequisites
 
-The technical requirements for all types of host VMs for KubeMarine installation are specified in this section.
+The technical requirements for all types of host VMs for Kubemarine installation are specified in this section.
 
 ## Prerequisites for Deployment Node
 
@@ -135,7 +135,7 @@ Ensure the following requirements are met:
 * pip3
 * Helm 3 (optional, only if Helm plugins required to be installed)
 
-For more information about the different types of KubeMarine installation, refer to [README](../README.md).
+For more information about the different types of Kubemarine installation, refer to [README](../README.md).
 
 **System Clock**
 
@@ -145,7 +145,7 @@ System clock should be synchronized the same way as for Cluster nodes system clo
 
 There are the following restrictions when deploying from Windows:
 * [ansible](#ansible) plugin procedures are not supported.
-* All KubeMarine input text files must be in utf-8 encoding.
+* All Kubemarine input text files must be in utf-8 encoding.
 
 ## Prerequisites for Cluster Nodes
 
@@ -201,7 +201,7 @@ The actual information about the supported versions can be found in `compatibili
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
-**Warning**: `KubeMarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
+**Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
 
 **Preinstalled software**
@@ -328,7 +328,7 @@ Mount point:
 
 ### SSH key Recommendation 
 
-Before working with the cluster, you need to generate an ssh key. KubeMarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
+Before working with the cluster, you need to generate an ssh key. Kubemarine supports following types of keys: *RSA, DSS, ECDSA, Ed25519*.
 
 Example:
 ```
@@ -368,7 +368,7 @@ There are two major deployment schemes as follows:
 
 ### Non-HA Deployment Schemes
 
-This deployment provides a single KubeMarine control-plane.
+This deployment provides a single Kubemarine control-plane.
 
 #### All-in-one Scheme
 
@@ -496,7 +496,7 @@ JSON schema for inventory file can be used by [URL](../kubemarine/resources/sche
 Do not try to copy the schema content.
 
 Make sure to use a raw URL (at raw.githubusercontent.com) without any query parameters.
-The JSON schema is naturally versioned by a KubeMarine version, specifically, by GitHub tag or branch that you are currently checking.
+The JSON schema is naturally versioned by a Kubemarine version, specifically, by GitHub tag or branch that you are currently checking.
 
 Note that the inventory file is validated against the same schema at runtime.
 
@@ -593,7 +593,7 @@ The following options are supported:
 |---|---|---|---|---|---|
 |keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
-|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, KubeMarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
+|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
 |address|ip address|no| |`10.101.0.1`|External node's IP-address|
 |internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
 |connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
@@ -1117,11 +1117,11 @@ services:
 **Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
 **Warning**: These kubeadm parameters are configurable only during installation, currently. 
-KubeMarine currently do not provide special procedure to change these parameters after installation.
+Kubemarine currently do not provide special procedure to change these parameters after installation.
 
 During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
-KubeMarine allows to configure kubeadm preflight errors to be ignored.
+Kubemarine allows to configure kubeadm preflight errors to be ignored.
 
 Example:
 
@@ -1154,7 +1154,7 @@ services:
 
 Before proceeding further, it is recommended to read the official Kubernetes Guide about the CPP deployment in the cluster at [https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/](https://kubernetes.io/blog/2020/02/07/deploying-external-openstack-cloud-provider-with-kubeadm/).
 
-**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break KubeMarine procedures for adding and removing nodes.
+**Warning**: Manual CPP installation on a deployed cluster can cause Kubernetes out-of-service denial and break Kubemarine procedures for adding and removing nodes.
 
 It is possible to specify a plugin at the installation stage, if it is required. To enable the CPP support, just specify the `external-cloud-volume-plugin` parameter of `controllerManager` in the `kubeadm` cluster configuration. For example:
 
@@ -1172,7 +1172,7 @@ services:
         pathType: File
 ```
 
-In this case, KubeMarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -1192,7 +1192,7 @@ In this case, KubeMarine automatically initializes and joins new cluster nodes w
    /etc/kubernetes/cloud-config
    ```
 
-   It is recommended to use KubeMarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
+   It is recommended to use Kubemarine functionality of plugins or thirdparties for automatic uploading. For example, it is possible to upload the cloud config on all nodes using thirdparties before starting the cluster installation:
 
    ```yaml
    services:
@@ -1201,7 +1201,7 @@ In this case, KubeMarine automatically initializes and joins new cluster nodes w
          source: ./example/cloud-config.txt
    ```
 
-1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first KubeMarine plugin, for example:
+1. Before running any plugins, it is necessary to create a secret RBAC resource and cloud controller manager DaemonSet for CPP. This can be specified as the very first Kubemarine plugin, for example:
 
    Create a file `./openstack-cloud-controller-manager-ds.yaml` on deploy node with the following content:
 
@@ -1672,7 +1672,7 @@ services:
         - man_groff 
 ```
 
-If you need to disable AppArmor, you cannot do this using KubeMarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
+If you need to disable AppArmor, you cannot do this using Kubemarine. If you absolutely need it, you can uninstall AppArmor from the system through the package manager.
 
 **Note**: After the installation of new repositories, the repodata is reloaded.
 
@@ -2143,7 +2143,7 @@ The following associations are used by default:
   </tr>
 </table>
 
-**Notes**: 
+**Note**: 
 * By default, the packages' versions are installed according to the Kubernetes version specified in the [Supported versions](#supported-versions) section.
 * In the procedure for adding nodes, the package versions are taken from the current nodes to match the nodes in the cluster.
   For example, if `containerd.io-1.6.4-1` is installed on the nodes of the cluster, this version is installed on the new node.
@@ -2474,7 +2474,7 @@ Constant value equal to `2048` means the maximum number of processes that the sy
 
 **Warning**: Also, in both the cases of calculation and manual setting of the `pid_max` value, the system displays a warning if the specified value is less than the system default value equal to `32768`. If the `pid_max` value exceeds the maximum allowable value of `4194304`, the installation is interrupted.
 
-**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by KubeMarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
+**Note**: Before Kubernetes 1.21 `sysctl` property `net.ipv4.conf.all.route_localnet` have been set automatically to `1` by Kubernetes, but now it setting by Kubemarine defaults. [Kubernetes 1.21 Urgent Upgrade Notes](https://github.com/kubernetes/kubernetes/blob/control-plane/CHANGELOG/CHANGELOG-1.21.md#no-really-you-must-read-this-before-you-upgrade-6).
 
 You can specify your own parameters instead of the standard parameters. You need to specify the parameter key and its value. If the value is empty, the key is ignored. For example:
 
@@ -3141,7 +3141,7 @@ As an example of a template, you can look at [default template](/kubemarine/temp
 
 #### maintenance mode
 
-The `KubeMarine` supports maintenance mode for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
+Kubemarine supports maintenance mode for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
 
 ```yaml
 services:
@@ -3426,7 +3426,7 @@ metadata:
 
 In case of enabling predefined plugins the labels will be set during the installation procedure automatically.
 
-**Warnings:** 
+**Warnings**: 
 Pay attention to the fact that for Kubernetes versions higher than v1.23 the PSS option implicitly enabled by default in 
 `kube-apiserver` [Feature Gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/).
 Therefor PSS labels on namespaces shouldn't be set even if you Kubernetes cluster is deployed without PSS enabled.
@@ -3664,15 +3664,15 @@ The plugin configuration supports the following parameters:
 - key: node.kubernetes.io/network-unavailable
   effect: NoExecute
 ```
-**Note:** The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by KubeMarine itself.
+**Note**: The `CriticalAddonsOnly` toleration key inherits from `Calico` manifest YAML, whereas the rest of toleration keys are represented by Kubemarine itself.
 
 ###### Calico metrics configuration
 
 By default, no additional settings are required for metrics calico. It is enabled by default
 
-**Note:** By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
+**Note**: By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
 
-**Note:** If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
+**Note**: If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -4324,7 +4324,7 @@ All the parameters match with [template](#template).
 |---|---|---|---|
 |**do_render**|**no**|**True**| Allows you not to render the contents of the file.|
 
-**Note**: If `do_render: false` is specified, KubeMarine uploads the file without any transformation.
+**Note**: If `do_render: false` is specified, Kubemarine uploads the file without any transformation.
 It is desirable for such files to have LF line endings.
 This is especially relevant for Windows deployers
 and is important if the files are aimed for services that are sensitive to line endings.
@@ -4410,7 +4410,7 @@ plugins:
 
 ```
 
-*Note*: You can specify some part of the resource name instead of its full name.
+**Note**: You can specify some part of the resource name instead of its full name.
 
 The procedure tries once every few seconds to find the necessary resources and detect their status. If you use the standard format of this procedure, then the resources are expected in accordance with the following configurations:
 
@@ -4634,7 +4634,7 @@ For this procedure you must specify the following parameters:
 
 **Note**: An [Ansible Inventory](#ansible-inventory) is provided to the playbook, so it should not be disabled.
 
-**Note**: When calling ansible plugin from KubeMarine container, note that KubeMarine container is shipped with `ansible-2.9.*`.
+**Note**: When calling ansible plugin from Kubemarine container, note that Kubemarine container is shipped with `ansible-2.9.*`.
 Exact patch version is not fixed.
 
 For example:
@@ -4682,10 +4682,10 @@ Specify the following parameters:
 
 The `chart_path` parameter specifies the absolute path on local host to the Helm chart. The URL link to chart archive is also supported.
 
-The `values_file` parameter specifies the absolute path on local host to the file with YAML formatted values for the chart that override values from `values.yaml` file from the provided chart.
+The `values_file` parameter specifies the absolute path on the local host to the file with YAML formatted values for the chart that override values from the `values.yaml` file from the provided chart.
 This parameter is optional.
 
-The `values` parameter specifies the YAML formatted values for the chart that override values from `values.yaml` file from the provided chart.
+The `values` parameter specifies the YAML formatted values for the chart that override values from the `values.yaml` file from the provided chart.
 The values from this parameter also override the values from the `values_file` parameter.
 This parameter is optional.
 
@@ -4969,7 +4969,7 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
-* All variables should be either valid variables that KubeMarine understands,
+* All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
   values:
@@ -5020,7 +5020,7 @@ Be careful with the following parameters:
 
 # Installation Procedure
 
-The installation information for KubeMarine is specified below.
+The installation information for Kubemarine is specified below.
 
 **Warning**: Running the installation on an already running cluster redeploys the cluster from scratch.
 
@@ -5183,8 +5183,8 @@ not need to consider the sequence for listing the tasks. You can do it in any se
 
 ## Logging
 
-KubeMarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
-For more information, refer to the [Configuring KubeMarine Logging](Logging.md) section.
+Kubemarine has the ability to customize the output of logs, as well as customize the output to a separate file or graylog.
+For more information, refer to the [Configuring Kubemarine Logging](Logging.md) section.
 
 ## Dump Files
 
@@ -5217,10 +5217,10 @@ $ install --disable-dump-cleanup
 
 After any procedure is completed, a final inventory with all the missing variable values is needed, which is pulled from the finished cluster environment.
 This inventory can be found in the `cluster_finalized.yaml` file in the working directory,
-and can be passed as a source inventory in future runs of KubeMarine procedures.
+and can be passed as a source inventory in future runs of Kubemarine procedures.
 
-**Note**: The `cluster_finalized.yaml` inventory file is aimed to reflect the current cluster state together with the KubeMarine version using which it is created.
-This in particular means that the file cannot be directly used with a different KubeMarine version.
+**Note**: The `cluster_finalized.yaml` inventory file is aimed to reflect the current cluster state together with the Kubemarine version using which it is created.
+This in particular means that the file cannot be directly used with a different Kubemarine version.
 Though, it still can be migrated together with the managed cluster using the [Kubemarine Migration Procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
 
 In the file, you can see not only the compiled inventory, but also some converted values depending on what is installed on the cluster.
@@ -5303,7 +5303,7 @@ vrrp_ips:
 
 ## Configurations Backup
 
-During perform of KubeMarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
+During perform of Kubemarine, all configuration files on the nodes are copied to their backup copies before being overwritten. Also, all versions of the file, that are different from each other, are saved, and new copies are incremented in the file name. This protects from losing important versions of configuration files and allows to restore the desired file from a necessary backup version. After several installations, you can find the file and all its backups as in the following example:
 
 ```bash
 $ ls -la /etc/resolv.conf*

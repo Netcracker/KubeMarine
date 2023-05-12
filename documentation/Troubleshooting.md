@@ -1,6 +1,6 @@
-This section provides troubleshooting information for KubeMarine and Kubernetes solutions.
+This section provides troubleshooting information for Kubemarine and Kubernetes solutions.
 
-- [KubeMarine Errors](#kubemarine-errors)
+- [Kubemarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
   - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
@@ -23,18 +23,17 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
   - [Random 504 Error on Ingresses](#random-504-error-on-ingresses)
   - [Nodes Have `NotReady` Status Periodically](#nodes-have-notready-status-periodically)
-  - [No Pod-to-Pod Traffic for Some Nodes](#no-pod-to-pod-traffic-for-some-nodes)
   - [Long Pulling of Images](#long-pulling-of-images)
-  - [No Pod-to-Pod Traffic for Some Nodes with more than one network interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
-  - [No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
-- [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
+  - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
+  - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
+- [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
-  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
+  - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
 
-# KubeMarine Errors
+# Kubemarine Errors
 
 This section lists all known errors with explanations and recommendations for their fixing. If an 
 error occurs during the execution of any of these procedures, you can find it here.
@@ -237,7 +236,7 @@ in the end of `/etc/sudoers` file, where `username` is a name of the connection 
 
 # Troubleshooting Tools
 
-This section describes the additional tools that KubeMarine provides for convenient troubleshooting of various issues.
+This section describes the additional tools that Kubemarine provides for convenient troubleshooting of various issues.
 
 ## Etcdctl Script
 
@@ -263,7 +262,7 @@ To find out all the available `etcdctl` options and features, use the original E
 To execute the command, the script tries to launch the container using the following algorithm:
 
 1. Detect already running ETCD in Kubernetes cluster, parse its parameters, and launch the ETCD container with the same parameters on the current node.
-1. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
+2. If the Kubernetes cluster is dead, then try to parse the `/etc/kubernetes/manifests/etcd.yaml` file and launch the ETCD container.
 
 Since the command is run from a container, this imposes certain restrictions. For example, only certain volumes are mounted to the container. Which one it is, depends directly on the version and type of installation of ETCD and Kubernetes, but as a rule it is:
 
@@ -272,7 +271,7 @@ Since the command is run from a container, this imposes certain restrictions. Fo
 
 # Troubleshooting Kubernetes Generic Issues
 
-This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to KubeMarine installation.
+This section provides troubleshooting information for generic Kubernetes solution issues, which are not specific to Kubemarine installation.
 
 ## CoreDNS Responds With High Latency
 
@@ -477,7 +476,6 @@ Failed to defragment etcd member
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-...
   annotations:
     nginx.ingress.kubernetes.io/ssl-ciphers: "AES128-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
 ...
@@ -551,24 +549,24 @@ Nov 28 14:02:06 node01 kubelet[308309]: E1128 14:02:06.631719  308309 kubelet.go
 
 ## Long Pulling of Images
 
-**Symptoms**: Pods stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took few minutes or more:
+**Symptoms**: Pods are stuck in the ContainerCreating status for a long time. There are messages in the events that the pulling took a few minutes or more.
 
 ```
 Successfully pulled image "<image_name>" in 12m37.752058078s
 ```
 
-**Root cause**: By default kubelet pulls images one by one. One slow pulling may stuck all the pullings on the node.
+**Root cause**: By default, kubelet pulls images one by one. One slow pulling may trap all the pullings on the node.
 
-**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet for use of parallel image pulls.
-**Note**: We recommend not changing the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend
+**Solution**: Add the `--serialize-image-pulls=false` parameter to kubelet to use parallel image pulls.
+**Note**: It is recommended not to change the default value (--serialize-image-pulls=true) on nodes that run docker daemon with version < 1.9 or an aufs storage backend.
 
-## No Pod-to-Pod Traffic for Some Nodes with more than one network interface
+## No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface
 
 **Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 permanent network interface at the nodes.
 
 **Root cause**: Not all Calico BGP sessions between nodes are established due to incorrect network interface choice.
 
-**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
+**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
 to route the traffic between nodes. This is fine for nodes with only one Ethernet interface, but it can work improperly in case of multiple interfaces. To avoid issues with routing between different network segments, it is necessary to set a proper interface in Calico's `IP_AUTODETECTION_METHOD` variable, for example:
 ```
 plugins:
@@ -576,16 +574,16 @@ plugins:
     env:
       IP_AUTODETECTION_METHOD: interface=ens160
 ```
-More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
-## No Pod-to-Pod Traffic for Some Nodes with more than one ips with different CIDR notation
+## No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation
 
-**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 ips on used network interface with different CIDR notations.
+**Symptoms**: There is no traffic between pods located at different nodes. There is more than 1 IPs on used network interface with different CIDR notations.
 
-**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on chosen ips for nodes.
-Typically, such situation can appear in minha scheme with vrrp, where balancer role is combined with other roles. In that case 
-calico can autodetect vrrp for some node instead of its internal ip.
-You can use `calicoctl` to check such situation, e.g. for [example minha cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
+**Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on the chosen IPs for nodes.
+Typically, such situation can appear in minha scheme with vrrp, where the balancer role is combined with other roles. In that case, 
+Calico can autodetect vrrp for some node instead of its internal IP.
+You can use `calicoctl` to check such a situation. For example, in [example Mini-HA cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
 ```sh
 sudo calicoctl get nodes --output=wide
 NAME                  ASN       IPV4                IPV6
@@ -594,10 +592,10 @@ k8s-control-plane-2   (64512)   192.168.0.2/24
 k8s-control-plane-3   (64512)   192.168.0.3/24
 ```
 
-**Solution**: By default, Calico uses a `first-found` method, that takes the first valid IP address on the first interface 
-to route the traffic between nodes. This is fine for nodes that don't have more than one different ips, but it can work 
-improperly in case of multiple ips. 
-To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method,
+**Solution**: By default, Calico uses a `first-found` method that takes the first valid IP address on the first interface 
+to route the traffic between nodes. This is fine for nodes that do not have more than one different IPs, but it can work 
+improperly in case of multiple IPs. 
+To avoid such issues, you should change Calico's `IP_AUTODETECTION_METHOD` variable on `kubernetes-internal-ip` or another method
 that is suitable in your situation:
 ```
 plugins:
@@ -606,12 +604,12 @@ plugins:
     env:
       IP_AUTODETECTION_METHOD: kubernetes-internal-ip
 ```
-More details on IP autodetection methods are [here](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
+For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
 
-# Troubleshooting KubeMarine
+# Troubleshooting Kubemarine
 
-This section provides troubleshooting information for KubeMarine-specific or installation-specific issues.
+This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
 
 ## Failures During Kubernetes Upgrade Procedure
 
@@ -641,19 +639,19 @@ In this case, if the upgrade fails on version `1.18.8`, but is completed for ver
 services:
   kubeadm:
     apiServer:
-        audit-log-path: /var/log/kubernetes/audit/audit.log
-        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+      audit-log-path: /var/log/kubernetes/audit/audit.log
+      audit-policy-file: /etc/kubernetes/audit-policy.yaml
       extraVolumes:
-        - name: audit
-          hostPath: /etc/kubernetes/audit-policy.yaml
-          mountPath: /etc/kubernetes/audit-policy.yaml
-          readOnly: True
-          pathType: File
-        - name: audit-log
-          hostPath: /var/log/kubernetes/audit/
-          mountPath: /var/log/kubernetes/audit/
-          readOnly: False
-          pathType: DirectoryOrCreate
+      - name: audit
+        hostPath: /etc/kubernetes/audit-policy.yaml
+        mountPath: /etc/kubernetes/audit-policy.yaml
+        readOnly: True
+        pathType: File
+      - name: audit-log
+        hostPath: /var/log/kubernetes/audit/
+        mountPath: /var/log/kubernetes/audit/
+        readOnly: False
+        pathType: DirectoryOrCreate
 
   audit:
     cluster_policy:
@@ -787,7 +785,7 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
-## Numerous Generation of `Auditd` System 
+## Numerous Generation of `Auditd` System
 
 **Symptoms**: Generation of numerous system messages on nodes and their processing in graylog:
 
@@ -801,7 +799,7 @@ KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-c
 ```
 
 
-**Root cause**: The reason for generating numerous messages is to add new rules to`audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
+**Root cause**: The reason for generating numerous messages is to add new rules to `audit.rules`. This is due to the update of the default.yaml configuration file. The default audit settings on Linux operating systems are two files: audit.d.conf and audit.rules
 ```
 -w /var/lib/docker -k docker 
 -w /etc/docker -k docker 
@@ -852,7 +850,7 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
     ```
 ## Troubleshooting an Installation That Ended Incorrectly
 
-* Sometimes the installation of KubeMarine may not complete correctly, and for further analysis of the situation, KubeMarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
+* Sometimes the installation of Kubemarine may not complete correctly, and for further analysis of the situation, Kubemarine has a functionality that, before each procedure, collects information about installing a cluster on a node.
 
 ### Analysis of the Situation
 
@@ -869,7 +867,7 @@ Rules are deleted in predefined.rules, which is located on this path /etc/audit/
       cluster.yaml
       procedure_parameters
   ```
-The user can analyze these files and try to find the reason for the failed installation of KubeMarine
+The user can analyze these files and try to find the reason for the failed installation of Kubemarine.
 
 
 ## Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status
