@@ -2816,19 +2816,23 @@ This generates the following result:
 ...
 ```
 
-Records can be merged with defaults. You can specify additional names to the required addresses in the usual way, for example:
+It is possible to define custom names for internal and external ip addresses of the cluster nodes. In this case /etc/hosts file at the nodes will contain 2 lines about the same IP address.
+For example, setting the following in the `cluster.yaml`:
 
-```yaml
+```
 services:
   etc_hosts:
-    127.0.0.1:
-      - example.com
+    100.100.100.102:  another-name-for-control-plane-1
 ```
 
-This produces the following result:
+will lead to the following content of /etc/hosts:
 
 ```
-127.0.0.1        localhost localhost.localdomain localhost4 localhost.localdomain4 example.com
+...
+100.100.100.102  another-name-for-control-plane-1
+...
+
+100.100.100.102  control-plane-1.k8s-stack.example.com control-plane-1
 ...
 ```
 
@@ -2836,12 +2840,28 @@ This produces the following result:
 
 `coredns` parameter configures the Coredns service and its DNS rules in the Kubernetes cluster. It is divided into the following sections:
 
+##### add_etc_hosts_generated
+
+This is a boolean parameter defining whether IP addresses of the cluster nodes and their generated domain names should be added to `coredns.configmap.Hosts`.
+Default is `true`.
+
 ##### configmap
 
 This section contains the Configmap parameters that are applied to the Coredns service. By default the following configs are used:
 
 * Corefile - The main Coredns config, which is converted into a template in accordance with the specified parameters.
-* Hosts - Hosts file obtained in accordance with [etc_hosts](#etc_hosts) inventory parameter. The contents of this file are automatically added to the inventory, if not specified manually.
+* Hosts - IP addresses and names in the format of `/etc/hosts` file. Can be customized with any desired IP addresses and names. 
+Default value is 
+
+```
+127.0.0.1 localhost localhost.localdomain
+::1 localhost localhost.localdomain
+'
+``` 
+
+If `services.coredns.add_etc_hosts_generated` is set to `true`, `Hosts` is enriched with generated list of IP addresses and names of the cluster nodes.
+
+If `Hosts` is redefined in the `cluster.yaml` its default value is overridden. 
 
 Before working with the Corefile, refer to the official Coredns plugins documentation at [https://coredns.io/plugins/](https://coredns.io/plugins/).
 
