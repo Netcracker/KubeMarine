@@ -28,7 +28,7 @@ This section provides troubleshooting information for KubeMarine and Kubernetes 
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
 - [Troubleshooting KubeMarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
-  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system-)
+  - [Numerous Generation of Auditd System Messages ](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
@@ -583,7 +583,7 @@ For more information on IP autodetection methods, refer to the [official documen
 **Root cause**: Not all Calico BGP sessions between nodes are established due to different CIDR notations on the chosen IPs for nodes.
 Typically, such situation can appear in minha scheme with vrrp, where the balancer role is combined with other roles. In that case, 
 Calico can autodetect vrrp for some node instead of its internal IP.
-You can use `calicoctl` to check such a situation. For example, in [example minha cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
+You can use `calicoctl` to check such a situation. For example, in [example Mini-HA cluster.yaml](../examples/cluster.yaml/miniha-cluster.yaml):
 ```sh
 sudo calicoctl get nodes --output=wide
 NAME                  ASN       IPV4                IPV6
