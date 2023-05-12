@@ -19,7 +19,7 @@ from typing import List
 import yaml
 
 import kubemarine.patches
-from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties
+from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties, haproxy, keepalived
 from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
 from kubemarine.core.group import NodeGroup
@@ -177,13 +177,62 @@ class CriUpgradeAction(Action):
 
 
 class BalancerUpgradeAction(Action):
-    def __init__(self, software_name: str):
-        super().__init__(f'Upgrade {software_name}')
-        self.software_name = software_name
+    def __init__(self, upgrade_config: dict, package_name: str):
+        super().__init__(f'Upgrade {package_name}')
+        self.upgrade_config = upgrade_config
+        self.package_name = package_name
 
     def run(self, res: DynamicResources):
-        # TODO implement
+        if not self.associations_changed(res):
+            return
+
+        # Only now the cluster is initialized and full enrichment is run.
+        cluster = res.cluster()
+        logger = res.logger()
+        if self.package_name not in cluster.context['packages']['upgrade_required']:
+            logger.info(f"Nothing has changed in associations of {self.package_name!r}. Upgrade is not required.")
+            return
+
+        role = 'balancer' if self.package_name == 'haproxy' else 'keepalived'
+        group = cluster.create_group_from_groups_nodes_names([role], [])
+        if group.is_empty():
+            logger.info(f"No nodes to install {self.package_name!r}.")
+            return
+
+        logger.info(f"Reinstalling {self.package_name} on nodes: {group.get_nodes_names()}")
+        self.recreate_inventory = True
+
+        packages.install(group, cluster.get_package_association(self.package_name, 'package_name'))
+        if self.package_name == 'haproxy':
+            haproxy.restart(group)
+        else:
+            keepalived.restart(group)
+
         res.make_final_inventory()
+
+    def associations_changed(self, res: DynamicResources) -> bool:
+        """
+        Detects if upgrade is required for the given OS family.
+        The method should not run full enrichment, and run only light enrichment to detect OS family.
+        """
+        nodes_context = res.get_nodes_context()
+        os_families = list({ctx['os']['family'] for ctx in nodes_context.values()})
+        if len(os_families) != 1 or os_families[0] not in packages.get_associations_os_family_keys():
+            raise errors.KME("KME0012")
+        os_family = os_families[0]
+        version_key = packages.get_compatibility_version_key(os_family)
+
+        changes_detected = self.upgrade_config['packages'][self.package_name][version_key]
+        if not changes_detected:
+            res.logger().info(f"Patch is not relevant for {os_family!r} OS family")
+
+        return changes_detected
+
+    def prepare_context(self, context: dict) -> None:
+        context['upgrading_package'] = self.package_name
+
+    def reset_context(self, context: dict) -> None:
+        del context['upgrading_package']
 
 
 class PluginUpgradeAction(SoftwareUpgradeAction):
@@ -251,20 +300,22 @@ class CriUpgradePatch(_SoftwareUpgradePatch):
 
 
 class BalancerUpgradePatch(_SoftwareUpgradePatch):
-    def __init__(self, software_name: str):
-        super().__init__(f"upgrade_{software_name}")
-        self.software_name = software_name
+    def __init__(self, upgrade_config: dict, package_name: str):
+        super().__init__(f"upgrade_{package_name}")
+        self.upgrade_config = upgrade_config
+        self.package_name = package_name
 
     @property
     def action(self) -> Action:
-        return BalancerUpgradeAction(self.software_name)
+        return BalancerUpgradeAction(self.upgrade_config, self.package_name)
 
     @property
     def description(self) -> str:
         return dedent(
             f"""\
-            Upgrade {self.software_name!r} on balancers:
-            Roughly equivalent to 'kubemarine install --tasks=deploy.loadbalancer.{self.software_name}'.
+            Upgrade {self.package_name!r} on balancers:
+            Roughly equivalent to 'kubemarine install --tasks=deploy.loadbalancer.{self.package_name}.install',
+            as if it is run in a clean environment.
             """.rstrip()
         )
 
@@ -318,10 +369,10 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
         verify_allowed_kubernetes_versions(k8s_versions)
         upgrade_patches.append(CriUpgradePatch(upgrade_config))
 
-    for software_name in ['haproxy', 'keepalived']:
-        if any(upgrade_config['packages'][software_name].get(v_key)
+    for package_name in ['haproxy', 'keepalived']:
+        if any(upgrade_config['packages'][package_name].get(v_key)
                for v_key in ('version_rhel', 'version_rhel8', 'version_debian')):
-            upgrade_patches.append(BalancerUpgradePatch(software_name))
+            upgrade_patches.append(BalancerUpgradePatch(upgrade_config, package_name))
 
     default_plugins = static.DEFAULTS['plugins']
     plugins = list(default_plugins)

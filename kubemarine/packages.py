@@ -268,7 +268,7 @@ def get_system_packages_for_upgrade(cluster: KubernetesCluster, inventory: dict)
 
 
 def _get_system_packages_support_upgrade(inventory: dict):
-    return [inventory['services']['cri']['containerRuntime']]
+    return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
 
 
 def enrich_inventory_include_all(inventory: dict, _):

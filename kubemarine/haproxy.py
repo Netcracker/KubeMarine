@@ -18,7 +18,7 @@ import time
 from jinja2 import Template
 
 from kubemarine import system, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
@@ -154,14 +154,16 @@ def uninstall(group):
     return packages.remove(group, include=['haproxy', 'rh-haproxy18'])
 
 
-def restart(group):
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        service_name = _get_associations_for_node(node)['service_name']
-        system.restart_service(node['connection'], name=service_name)
-    RemoteExecutor(group.cluster).flush()
-    group.cluster.log.debug("Sleep while haproxy comes-up...")
-    time.sleep(group.cluster.globals['haproxy']['restart_wait'])
-    return
+def restart(group: NodeGroup):
+    cluster = group.cluster
+    cluster.log.debug("Restarting haproxy in all group...")
+    with RemoteExecutor(cluster):
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            service_name = _get_associations_for_node(node)['service_name']
+            system.restart_service(node['connection'], name=service_name)
+
+    cluster.log.debug("Sleep while haproxy comes-up...")
+    time.sleep(static.GLOBALS['haproxy']['restart_wait'])
 
 
 def disable(group):
