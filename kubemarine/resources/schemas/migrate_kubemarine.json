@@ -13,7 +13,7 @@
           "$ref": "#/definitions/UpgradePackages"
         },
         "thirdparties": {
-          "$ref": "definitions/services/thirdparties.json"
+          "$ref": "#/definitions/UpgradeThirdparties"
         }
       },
       "additionalProperties": false
@@ -58,6 +58,15 @@
           },
           "additionalProperties": false
         }
+      },
+      "additionalProperties": false
+    },
+    "UpgradeThirdparties": {
+      "type": "object",
+      "description": "Deliver files from third party sources and install them in the system",
+      "properties": {
+        "/usr/bin/calicoctl": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"},
+        "/usr/bin/crictl.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"}
       },
       "additionalProperties": false
     }

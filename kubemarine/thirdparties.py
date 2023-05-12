@@ -92,6 +92,14 @@ def _get_software_settings_for_thirdparty(kubernetes_version: str, destination: 
     return static.GLOBALS['compatibility_map']['software'][software_name][kubernetes_version]
 
 
+def get_thirdparty_destination(software_name: str) -> str:
+    for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
+        if thirdparty_settings['software_name'] == software_name:
+            return destination
+    else:
+        raise Exception(f"Failed to find third-party destination for {software_name!r}")
+
+
 def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster) -> Optional[str]:
     if not is_default_thirdparty(destination):
         # 3rd-party is not managed by Kubemarine

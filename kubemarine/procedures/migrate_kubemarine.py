@@ -54,7 +54,7 @@ class SoftwareUpgradeAction(Action, ABC):
 class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
     def __init__(self, software_name: str, k8s_versions: List[str]):
         super().__init__(software_name, k8s_versions)
-        self._destination = self._get_destination()
+        self._destination = thirdparties.get_thirdparty_destination(self.software_name)
 
     def specific_run(self, res: DynamicResources):
         logger = res.logger()
@@ -74,13 +74,6 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
 
     def reset_context(self, context: dict) -> None:
         del context['upgrading_thirdparty']
-
-    def _get_destination(self) -> str:
-        for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
-            if thirdparty_settings['software_name'] == self.software_name:
-                return destination
-        else:
-            raise Exception(f"Failed to find third-party destination for {self.software_name!r}")
 
 
 class CriUpgradeAction(Action):
@@ -249,9 +242,13 @@ class PluginUpgradeAction(SoftwareUpgradeAction):
 
     def prepare_context(self, context: dict) -> None:
         context['upgrading_plugin'] = self.software_name
+        if self.software_name == 'calico':
+            context['upgrading_thirdparty'] = thirdparties.get_thirdparty_destination('calicoctl')
 
     def reset_context(self, context: dict) -> None:
         del context['upgrading_plugin']
+        if self.software_name == 'calico':
+            del context['upgrading_thirdparty']
 
 
 class ThirdpartyUpgradePatch(_SoftwareUpgradePatch):
