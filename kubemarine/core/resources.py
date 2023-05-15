@@ -192,7 +192,7 @@ class DynamicResources:
 
         return self._nodes_context
 
-    def _new_cluster_instance(self, context: dict):
+    def _new_cluster_instance(self, context: dict) -> c.KubernetesCluster:
         return _provide_cluster(self.raw_inventory(), context,
                                 procedure_inventory=self.procedure_inventory(),
                                 logger=self.logger())

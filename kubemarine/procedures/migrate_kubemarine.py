@@ -22,6 +22,7 @@ import kubemarine.patches
 from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties, haproxy, keepalived
 from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.patch import Patch, _SoftwareUpgradePatch
 from kubemarine.core.resources import DynamicResources
@@ -67,6 +68,9 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
 
         self.recreate_inventory = True
         logger.info(f"Reinstalling third-party {self._destination!r}")
+        self._run(cluster)
+
+    def _run(self, cluster: KubernetesCluster):
         thirdparties.install_thirdparty(cluster.nodes['all'], self._destination)
 
     def prepare_context(self, context: dict) -> None:
@@ -96,15 +100,17 @@ class CriUpgradeAction(Action):
             return
 
         self.recreate_inventory = True
-
-        if 'worker' in cluster.nodes:
-            self.upgrade_cri(cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"]), workers=True)
-        self.upgrade_cri(cluster.nodes["control-plane"], workers=False)
+        self._run(cluster)
 
         res.make_final_inventory()
 
     def reset_context(self, context: dict) -> None:
         del context['upgrading_package']
+
+    def _run(self, cluster: KubernetesCluster):
+        if 'worker' in cluster.nodes:
+            self.upgrade_cri(cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"]), workers=True)
+        self.upgrade_cri(cluster.nodes["control-plane"], workers=False)
 
     def upgrade_cri(self, group: NodeGroup, workers: bool):
         cluster = group.cluster
@@ -195,13 +201,16 @@ class BalancerUpgradeAction(Action):
         logger.info(f"Reinstalling {self.package_name} on nodes: {group.get_nodes_names()}")
         self.recreate_inventory = True
 
+        self._run(group)
+        res.make_final_inventory()
+
+    def _run(self, group: NodeGroup):
+        cluster = group.cluster
         packages.install(group, cluster.get_package_association(self.package_name, 'package_name'))
         if self.package_name == 'haproxy':
             haproxy.restart(group)
         else:
             keepalived.restart(group)
-
-        res.make_final_inventory()
 
     def associations_changed(self, res: DynamicResources) -> bool:
         """
@@ -233,11 +242,14 @@ class PluginUpgradeAction(SoftwareUpgradeAction):
         self.recreate_inventory = True
 
         cluster = res.cluster()
+        # TODO despite that we are sure that the recommended version has changed,
+        #  upgrade might still be not required if the effective configuration did not change.
         upgrade_candidates = {
             self.software_name: cluster.inventory['plugins'][self.software_name]
         }
-        # TODO despite that we are sure that the recommended version has changed,
-        #  upgrade might still be not required if the effective configuration did not change.
+        self._run(cluster, upgrade_candidates)
+
+    def _run(self, cluster: KubernetesCluster, upgrade_candidates: dict):
         plugins.install(cluster, upgrade_candidates)
 
     def prepare_context(self, context: dict) -> None:
