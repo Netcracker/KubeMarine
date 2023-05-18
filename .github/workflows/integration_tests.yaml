@@ -78,8 +78,8 @@ jobs:
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: |
-          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/kube-logs.txt
-          sudo journalctl > ./results/all-logs.txt 
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+          sudo journalctl > ./results/journald-logs.txt 
           rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
