@@ -80,33 +80,33 @@ where, `<patches>` are the patch identifiers separated by comma.
 
 ### Software Upgrade Patches
 
-New Kubemarine version might have new recommended versions of different types of software in comparison to the old version.
-To make new Kubemarine and the installed cluster consistent to each other, it will be necessary to upgrade the corresponding software.
+The new Kubemarine version may have new recommended versions of different types of software in comparison to the old version.
+To make the new Kubemarine and installed cluster consistent to each other, it is necessary to upgrade the corresponding software.
 
 For each software, it is possible to supply additional parameters in the procedure configuration.
 After each upgrade, the `cluster.yaml` is regenerated to reflect the actual cluster state.
 Use the latest updated `cluster.yaml` configuration to further work with the cluster.
 
 **Note**: The upgrade procedure is as much fine-grained as possible.
-It will not affect the cluster, if the upgrade is not relevant for the currently used Kubernetes version, OS family, container runtime, etc.
+The cluster is unaffected if the upgrade is not relevant for the currently used Kubernetes version, OS family, container runtime, and so on.
 
 #### Upgrade CRI Patch
 
-Container runtime is upgraded by `upgrade_cri` patch.
+The container runtime is upgraded by the `upgrade_cri` patch.
 For more information, refer to [Packages Upgrade Patches](#packages-upgrade-patches).
 
-The upgrade is performed node-by-node. The process for each node is roughly the following:
+The upgrade is performed node-by-node. The process for each node is as follows:
 1. All the pods are drained from the node.
 2. The docker or containerd is upgraded.
 3. All containers on the node are deleted.
-4. The node returned to the cluster for scheduling.
+4. The node is returned to the cluster for scheduling.
 
 By default, node drain is performed using `disable-eviction=True` to ignore the PodDisruptionBudget (PDB) rules.
-For more information, refer to the [Kubernetes Upgrade Task](#kubernetes-upgrade-task) of Kubernetes upgrade procedure.
+For more information, refer to the [Kubernetes Upgrade Task](#kubernetes-upgrade-task) section of the Kubernetes upgrade procedure.
 
 The upgrade procedure is always risky, so you should plan a maintenance window for this procedure.
-You may encounter the similar issues as during the [Kubernetes Upgrade Task](#kubernetes-upgrade-task) of Kubernetes upgrade procedure.
-In such a case, refer to the corresponding section from the [Troubleshooting guide](Troubleshooting.md#failures-during-kubernetes-upgrade-procedure).
+You may encounter issues that are similar to that of the [Kubernetes Upgrade Task](#kubernetes-upgrade-task) of the Kubernetes upgrade procedure.
+In such a case, refer to the corresponding section in the [Troubleshooting Guide](Troubleshooting.md#failures-during-kubernetes-upgrade-procedure).
 
 **Note**: All containers on the node are deleted after the upgrade.
 Kubernetes re-creates all the pod containers.
@@ -116,12 +116,12 @@ However, your custom containers may be deleted, and you need to start them manua
 
 #### Thirdparties Upgrade Patches
 
-Patches that upgrade thirdparties, have the following identifiers:
-* `upgrade_crictl` - upgrades `/usr/bin/crictl` third-party, if necessary.
-* `upgrade_calico` - upgrades `/usr/bin/calicoctl` third-party as part of the Calico plugin upgrade.
+Patches that upgrade thirdparties have the following identifiers:
+* `upgrade_crictl` - It upgrades the `/usr/bin/crictl` third-party, if necessary.
+* `upgrade_calico` - It upgrades the `/usr/bin/calicoctl` third-party as part of the Calico plugin upgrade.
 
 If the cluster is located in an isolated environment,
-it is possible to specify the custom paths to new thirdparties with the similar syntax as in the `cluster.yaml`
+it is possible to specify the custom paths to new thirdparties with a similar syntax as in the `cluster.yaml`
 as shown in the following snippet:
 ```yaml
 upgrade:
@@ -137,18 +137,18 @@ This configuration replaces the configuration contained in the current `cluster.
 By default, it is not required to provide information about thirdparties.
 They are upgraded automatically as required.
 You can provide this information if you want to have better control over their versions.
-Also, you have to explicitly provide thirdparties `source`, if you have specified this information in the `cluster.yaml`.
-It is because in this case, you take full control over the thirdparties versions and the defaults do not apply.
+Also, you have to explicitly provide thirdparties `source` if you have specified this information in the `cluster.yaml`.
+It is because in this case, you take full control over the thirdparties' versions and the defaults do not apply.
 
 #### Packages Upgrade Patches
 
-Patches that upgrade system packages, have the following identifiers:
-* `upgrade_cri` - upgrades packages participating in the container runtime.
-   For more information, refer to [Upgrade CRI Patch](#upgrade-cri-patch)
-* `upgrade_haproxy` - upgrades Haproxy service on all balancers.
-* `upgrade_keepalived` - upgrades Keepalived service on all balancers.
+Patches that upgrade system packages have the following identifiers:
+* `upgrade_cri` - It upgrades packages participating in the container runtime.
+   For more information, refer to [Upgrade CRI Patch](#upgrade-cri-patch).
+* `upgrade_haproxy` - It upgrades the Haproxy service on all balancers.
+* `upgrade_keepalived` - It upgrades the Keepalived service on all balancers.
 
-System packages, such as docker, containerd, podman, haproxy, and keepalived, are upgraded automatically as required.
+System packages such as docker, containerd, podman, haproxy, and keepalived are upgraded automatically as required.
 You can influence the system packages' upgrade using the `packages` section as follows:
 
 ```yaml
@@ -161,7 +161,7 @@ upgrade:
           - docker-ce-19.03*
 ```
 
-The configuration from the procedure inventory is merged with configuration in the `cluster.yaml`.
+The configuration from the procedure inventory is merged with the configuration in the `cluster.yaml`.
 
 By default, it is not required to provide information about system packages through associations.
 You can provide this information if you want to have better control over system packages' versions.
@@ -172,11 +172,11 @@ It is because in this case, you take full control over the system packages and t
 
 #### Plugins Upgrade Patches
 
-Patches that upgrade the OOB plugins, have the following identifiers:
-* `upgrade_calico` - upgrades Calico plugin.
-* `upgrade_nginx_ingress_controller` - upgrades NGINX Ingress Controller plugin.
-* `upgrade_kubernetes_dashboard` - upgrades Kubernetes dashboard plugin.
-* `upgrade_local_path_provisioner` - upgrades Local Path Provisioner plugin.
+Patches that upgrade the OOB plugins have the following identifiers:
+* `upgrade_calico` - It upgrades the Calico plugin.
+* `upgrade_nginx_ingress_controller` - It upgrades the NGINX Ingress Controller plugin.
+* `upgrade_kubernetes_dashboard` - It upgrades the Kubernetes dashboard plugin.
+* `upgrade_local_path_provisioner` - It upgrades the Local Path Provisioner plugin.
 
 The plugins are upgraded automatically,
 but you can influence their upgrade using the `plugins` section as follows:
@@ -192,7 +192,7 @@ upgrade:
 After applying, this configuration is merged with the plugins' configuration contained in the current `cluster.yaml`.
 
 **Note**: If you have changed images for any of the plugins in the `cluster.yaml`,
-it is required to explicitly specify new images in the procedure inventory for that plugins.
+it is required to explicitly specify new images in the procedure inventory for those plugins.
 The configuration format for the plugins is the same.
 
 ## Upgrade Procedure
@@ -1396,7 +1396,7 @@ The Kubernetes cluster has the following additional parameters.
 
 ### Grace Period and Drain Timeout
 
-The `remove_node`, `upgrade` and `migrate_kubemarine` (in some cases) procedures perform pods' draining before next actions. The pods' draining gracefully waits for the pods' migration to other nodes, before killing them. It is possible to modify the time to kill using the `grace_period` parameter in the **procedure.yaml** as follows (time in seconds):
+The `remove_node`, `upgrade`, and `migrate_kubemarine` (in some cases) procedures perform pods' draining before next actions. The pods' draining gracefully waits for the pods' migration to other nodes, before killing them. It is possible to modify the time to kill using the `grace_period` parameter in the **procedure.yaml** as follows (time in seconds):
 
 ```yaml
 grace_period: 180
