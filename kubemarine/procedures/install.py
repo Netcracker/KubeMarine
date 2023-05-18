@@ -509,7 +509,7 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
         kubernetes.join_other_control_planes
     ])
 
-    if false:
+    if 'worker' in cluster.nodes:
         cluster.nodes.get('worker').new_group(
             apply_filter=lambda node: 'control-plane' not in node['roles']) \
             .call(kubernetes.init_workers)
