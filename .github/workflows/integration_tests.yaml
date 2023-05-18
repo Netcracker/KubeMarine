@@ -61,7 +61,7 @@ jobs:
         run: sudo apt install rename
       - name: Install and start journald
         run: |
-          sudo apt-get update && sudo apt-get install -y systemd
+          sudo apt update && sudo apt install -y systemd
           sudo systemctl start systemd-journald.service	
          # TODO: change to kubemarine runtime values feature
       - name: Set kubernetes version to cluster.yaml
