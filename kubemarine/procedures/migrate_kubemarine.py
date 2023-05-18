@@ -129,12 +129,8 @@ class CriUpgradeAction(Action):
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
             control_plane.sudo(drain_cmd, is_async=False, hide=False)
-            # `kubectl drain` ignores system pods, delete them explicitly
-            if not workers:
-                kubernetes.delete_system_pods(cluster, node)
 
             kubernetes.upgrade_cri_if_required(node)
-
             node.sudo('systemctl restart kubelet')
 
             if workers:

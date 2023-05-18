@@ -159,9 +159,6 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
         cluster.log.debug("Migrating \"%s\"..." % node["name"])
         drain_cmd = kubernetes.prepare_drain_command(cluster, node['name'], disable_eviction=True)
         control_plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
-        # `kubectl drain` ignores system pods, delete them explicitly
-        if "control-plane" in node["roles"]:
-            kubernetes.delete_system_pods(cluster, node["connection"])
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",

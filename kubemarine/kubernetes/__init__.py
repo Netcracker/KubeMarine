@@ -975,18 +975,6 @@ def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
     return drain_cmd
 
 
-def delete_system_pods(cluster: KubernetesCluster, control_plain: NodeGroup):
-    node_name = control_plain.get_node_name()
-    cluster.log.debug(f"Deleting system pods on node: {node_name}")
-    control_plain.sudo(f"kubectl -n kube-system delete pod etcd-{node_name} "
-                       f"kube-apiserver-{node_name} "
-                       f"kube-controller-manager-{node_name} "
-                       f"kube-scheduler-{node_name} "
-                       f"$(sudo kubectl describe node {node_name} | "
-                       f"grep -E 'kube-system\\s+kube-proxy-[a-z,0-9]{{5}}' | awk '{{print $2}}')",
-                       is_async=False, hide=False)
-
-
 def upgrade_cri_if_required(group: NodeGroup):
     # currently it is invoked only for single node
     cluster = group.cluster
