@@ -23,6 +23,8 @@ import invoke
 from fabric.connection import Connection
 from concurrent.futures.thread import ThreadPoolExecutor
 
+from kubemarine.core import log
+
 GRE = ContextVar('KubemarineGlobalRemoteExecutor', default=None)
 
 
@@ -187,9 +189,17 @@ class RemoteExecutor:
         executor._last_token = token = executor._last_token + 1
 
         if isinstance(target, Connection):
-            target = [Connection]
+            target = [target]
         if isinstance(target, dict):
             target = list(target.values())
+
+        kwargs = action[2]
+        if 'out_stream' in kwargs or 'err_stream' in kwargs:
+            if executor.lazy:
+                raise ValueError("Custom out/err streams are supported only for non-lazy execution")
+
+            if len(target) != 1:
+                raise ValueError("Custom out/err streams are supported only for the single node")
 
         if not target:
             executor.cluster.log.verbose('Connections list is empty, nothing to queue')
@@ -370,6 +380,8 @@ class RemoteExecutor:
                 for host, future in futures.items():
                     safe_exec(results, host, lambda: future.result(timeout=executor.timeout))
 
+                self._flush_logger_writers(batch)
+
                 parsed_results = executor.reparse_results(results, batch)
                 for host, tokenized_results in parsed_results.items():
                     if not batch_results.get(host):
@@ -382,3 +394,12 @@ class RemoteExecutor:
         executor.results.append(batch_results)
 
         return batch_results
+
+    def _flush_logger_writers(self, batch):
+        for cxn, payload in batch.items():
+            action, _, _ = payload
+            _, _, kwargs = action
+            if isinstance(kwargs.get('out_stream'), log.LoggerWriter):
+                kwargs.get('out_stream').flush(remainder=True)
+            if isinstance(kwargs.get('err_stream'), log.LoggerWriter):
+                kwargs.get('err_stream').flush(remainder=True)
