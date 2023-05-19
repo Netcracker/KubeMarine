@@ -16,6 +16,7 @@
 import glob
 import importlib.util
 import io
+import logging
 import os
 import re
 import shutil
@@ -991,7 +992,7 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
         if use_sudo:
             method = apply_common_group.sudo
         cluster.log.debug("Applying yaml...")
-        method(apply_command, hide=False)
+        method(apply_command, logging_stream_level=logging.DEBUG)
     else:
         cluster.log.debug('Apply is not required')
 

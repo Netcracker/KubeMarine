@@ -95,8 +95,28 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
         if self.isEnabledFor(VERBOSE):
             self._log(VERBOSE, msg, args, **kwargs)
 
+    def makeRecord(self, name: str, level: int, fn: str, lno: int, msg: object, args,
+                   exc_info, func=None, extra=None,
+                   sinfo=None) -> logging.LogRecord:
+        record = super().makeRecord(name, level, fn, lno, msg, args, exc_info, func, extra, sinfo)
+        caller = record.__dict__.get('real_caller')
+        if caller is not None:
+            record.__dict__.update(record.__dict__.pop('real_caller'))
+
+        return record
+
+
+class EnhancedLogRecord(logging.LogRecord):
+    def getMessage(self) -> str:
+        message = super().getMessage()
+        prefix = self.__dict__.get('prefix')
+        if prefix is not None:
+            message = prefix + message
+        return message
+
 
 logging.setLoggerClass(EnhancedLogger)
+logging.setLogRecordFactory(EnhancedLogRecord)
 
 
 class LogFormatter(logging.Formatter):
@@ -108,27 +128,28 @@ class LogFormatter(logging.Formatter):
     def _format(self, record):
         s = super().format(record)
         if self.colorize and record.levelname in COLORS_SCHEME:
-            s = '$__COLOR_' + COLORS_SCHEME[record.levelname] + s + '$__COLOR_RESET'
-        for color_name, color_code in COLORS.items():
-            if self.colorize:
-                s = s.replace('$__COLOR_' + color_name, color_code)
-            else:
-                s = s.replace('$__COLOR_' + color_name, '')
+            s = COLORS[COLORS_SCHEME[record.levelname]] + s + COLORS['RESET']
         return s
 
     def format(self, record):
-        messages = str(record.msg).split('\n')
-        if self.correct_newlines and len(messages):
-            subrecord = logging.makeLogRecord(record.__dict__)
+        if self.correct_newlines:
+            messages = str(record.msg).split('\n')
+            if len(messages) == 1:
+                return self._format(record)
+        else:
+            return self._format(record)
+
+        orig_msg = record.msg
+        try:
             s = ''
             for message in messages:
                 if s != '':
                     s += '\n'
-                subrecord.msg = message
-                s += self._format(subrecord)
+                record.msg = message
+                s += self._format(record)
             return s
-        else:
-            return self._format(record)
+        finally:
+            record.msg = orig_msg
 
 
 class StdoutHandler(logging.StreamHandler):
@@ -136,7 +157,7 @@ class StdoutHandler(logging.StreamHandler):
         super().__init__(sys.stdout)
 
     def emit(self, record):
-        if hasattr(record, 'ignore_stdout') and getattr(record, 'ignore_stdout'):
+        if 'ignore_stdout' in record.__dict__:
             return
         super().emit(record)
         # TODO: if output stuck, then add here self.flush()
@@ -274,6 +295,30 @@ class Log:
         return self._logger
 
 
+class LoggerWriter:
+    def __init__(self, logger: EnhancedLogger, level, caller: dict, prefix: str):
+        self.logger = logger
+        self.level = level
+        self.caller = caller
+        self.prefix = prefix
+        self.buf = ""
+
+    def write(self, message):
+        lines = message.split('\n')
+        for line in lines[:-1]:
+            self.buf = self.buf + line
+            self._log()
+        self.buf = self.buf + lines[-1]
+
+    def flush(self, remainder=False):
+        if remainder and self.buf:
+            self._log()
+
+    def _log(self):
+        self.logger.log(self.level, self.buf, extra={'real_caller': self.caller, 'prefix': self.prefix})
+        self.buf = ""
+
+
 def parse_log_argument(argument: str) -> LogHandler:
     """
     Parse raw CLI arguments and verify for required parameters
@@ -344,3 +389,18 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
     log.logger.verbose('Using the following loggers: \n\t%s' % "\n\t".join("- " + str(x) for x in handlers))
 
     return log
+
+
+def caller_info(logger: EnhancedLogger) -> dict:
+    """
+    Catches and returns invocation metadata of the method that calls caller_info()
+    """
+    fn, lno, func, sinfo = logger.findCaller()
+    record: logging.LogRecord = logger.makeRecord(None, None, fn, lno, "", (), None, func=func, extra=None, sinfo=sinfo)
+    return dict(item for item in record.__dict__.items()
+                if item[0] in (
+                    # record's fields describing invocation origin
+                    'pathname', 'filename', 'module', 'lineno', 'funcName', 'stack_info',
+                    # record's fields describing initial process and thread context
+                    'thread', 'threadName', 'process', 'processName'
+                ))
