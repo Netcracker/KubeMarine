@@ -2878,7 +2878,6 @@ services:
           rewrite: # Not used by default, intended for GEO distributed scheme
             default:
               priority: 1
-              type: stop
               data:
                 name:
                 - regex
@@ -2949,10 +2948,10 @@ The following settings are supported:
     <td>The loadbalance acts as a round-robin DNS load balancer by randomizing the order of A, AAAA, and MX records in the answer.</td>
   </tr>
   <tr>
-    <td>rewrite</td>
+    <td>rewrite [continue|stop]</td>
     <td>dict</td>
     <td>Not provided</td>
-    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. </td>
+    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. It is possible to use `rewrite continue` or `rewrite stop` to define the `rewrite` plugin behaviour in case of multiple rules. Refer to the [official documentation](https://coredns.io/plugins/rewrite/) for more details. </td>
   </tr>
   <tr>
     <td>hosts</td>
@@ -2983,7 +2982,29 @@ The following settings are supported:
 
 **Note**: 
 
-* All settings have their own priority. They are generated in the priority they are in the above table. Their priority cannot be changed.
+* Some settings allow multiple entries. For example, `template`. If necessary, different priority can be set for different template sections. For example:
+```
+          template:
+            test-example-com:
+              enabled: true
+              priority: 1
+              class: IN
+              type: A
+              zone: 'test.example.com'
+              data:
+                answer: '{% raw %}{{ .Name }}{% endraw %} 100 IN A 1.1.1.1'
+            example-com:
+              priority: 2
+              enabled: true
+              class: IN
+              type: A
+              zone: 'example.com'
+              data:
+                answer: '{% raw %}{{ .Name }}{% endraw %} 100 IN A 2.2.2.2'
+
+```
+The lesser the priority value, the earlier in `Corefile` config this entry appears. Default priority is `1`.
+
 * DNS resolving is done according to the [hardcoded plugin chain](https://github.com/coredns/coredns/blob/v1.8.0/plugin.cfg). This specifies that a query goes through `template`, then through `hosts`, then through `kubernetes`, and then through `forward`. By default, Corefile contains the `template` setting, which resolves all names like `*.{{ cluster_name }}` in the vIP address. Hence despite entries in `Hosts`, such names are resolved in the vIP address.
 * You can set any setting parameter to `False` to disable it, no matter what type it is.
 * It is possible to specify other Corefile settings in an inventory-like format. However, this is risky since the settings have not been tested with the generator. All non-supported settings have a lower priority.
