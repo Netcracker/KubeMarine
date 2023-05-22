@@ -3808,6 +3808,16 @@ For example:
       X-Request-Start: t=${msec}
       X-Using-Nginx-Controller: "true"
 ```
+
+* The `args` parameter is used to add cli arguments to ingress-nginx-controller. Before proceeding, refer to the official NGINX Ingress Controller documentation at [https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/](https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/).
+
+For example:
+```yaml
+  nginx-ingress-controller:
+    controller:
+      args: ['--disable-full-test', '--disable-catch-all']
+```
+
 ###### monitoring
 By default 10254 port is opened and provides Prometheus metrics.
 
