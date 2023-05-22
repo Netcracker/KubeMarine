@@ -610,11 +610,15 @@ def is_modprobe_valid(group):
     is_valid = True
 
     os_family = group.get_nodes_os()
-    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        for conn, result in verify_results.items():
-            if module_name not in result.stdout:
-                log.debug('Kernel module %s not found at %s' % (module_name, conn.host))
-                is_valid = False
+    if os_family != 'multiple':
+        for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
+            for conn, result in verify_results.items():
+                if module_name not in result.stdout:
+                    log.debug('Kernel module %s not found at %s' % (module_name, conn.host))
+                    is_valid = False
+    else:
+        log.debug('Several different operating systems have been found')
+        is_valid = False
 
     return is_valid, verify_results
 
