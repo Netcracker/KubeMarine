@@ -249,6 +249,20 @@ class IngressNginxManifestProcessor(Processor):
             ('--watch-ingress-without-class=', 'true')
         ]
         ssl_options = self.inventory['plugins']['nginx-ingress-controller']['controller']['ssl']
+        additional_args = self.inventory['plugins']['nginx-ingress-controller']['controller'].get('args')
+
+        if additional_args:
+            for arg in additional_args:
+                pars_arg = arg.split('=')
+                for i, container_arg in enumerate(container_args):
+                    if container_arg.startswith(pars_arg[0]):
+                       raise Exception(
+                           f"{pars_arg[0]!r} argument is already defined in ingress-nginx-controller container specification.")
+                else:
+                    container_args.append(arg)
+                    self.log.verbose(f"The {arg!r} argument has been added to "
+                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
         if ssl_options['enableSslPassthrough']:
             extra_args.append(('--enable-ssl-passthrough',))
         if ssl_options.get('default-certificate'):
