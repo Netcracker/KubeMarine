@@ -75,12 +75,14 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+          run: |
+            sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+            sudo journalctl > ./results/journald-logs.txt 
       - name: Change not-recommended symbols in dump files
         if: failure()
-        run: |
-          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
-          sudo journalctl > ./results/journald-logs.txt 
-          rename 's/[:]/_/g' ./results/*/dump/*
+        run: rename 's/[:]/_/g' ./results/*/dump/*
       - name: Collect dump artifacts
         if: failure()
         uses: actions/upload-artifact@v3
@@ -128,6 +130,11 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+          run: |
+            sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+            sudo journalctl > ./results/journald-logs.txt
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
