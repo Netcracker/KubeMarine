@@ -38,7 +38,7 @@ from deepdiff import DeepDiff
 
 
 def services_status(cluster: KubernetesCluster, service_type: str):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '201', "Services", "%s Status" % service_type.capitalize(),
+    with TestCase(cluster, '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
         service_name = service_type
 
@@ -170,7 +170,7 @@ def system_packages_versions(cluster: KubernetesCluster, pckg_alias: str):
     :param cluster: main cluster object.
     :param pckg_alias: system package alias to retrieve "package_name" association.
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '205', "Services", f"{pckg_alias} version") as tc:
+    with TestCase(cluster, '205', "Services", f"{pckg_alias} version") as tc:
         _check_same_os(cluster)
         hosts_to_packages = pckgs.get_association_hosts_to_packages(cluster.nodes['all'], cluster.inventory, pckg_alias)
         if not hosts_to_packages:
@@ -188,7 +188,7 @@ def mandatory_packages_versions(cluster: KubernetesCluster):
     Failure is shown if check is not successful.
     :param cluster: main cluster object.
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '205', "Services", "Mandatory package versions") as tc:
+    with TestCase(cluster, '205', "Services", "Mandatory package versions") as tc:
         _check_same_os(cluster)
         hosts_to_packages = {}
         group = cluster.nodes['all']
@@ -209,7 +209,7 @@ def generic_packages_versions(cluster: KubernetesCluster):
     Verifies that user-provided packages are installed on required nodes and have equal versions.
     Warning is shown if check is not successful.
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '206', "Services", f"Generic packages version") as tc:
+    with TestCase(cluster, '206', "Services", f"Generic packages version") as tc:
         _check_same_os(cluster)
         packages = cluster.inventory['services']['packages'].get('install', {}).get('include', [])
         hosts_to_packages = {host: packages for host in cluster.nodes['all'].get_hosts()}
@@ -263,7 +263,7 @@ def get_nodes_description(cluster):
 
 
 def kubelet_version(cluster):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '203', "Services", "Kubelet Version",
+    with TestCase(cluster, '203', "Services", "Kubelet Version",
                   default_results=cluster.inventory['services']['kubeadm']['kubernetesVersion']):
         nodes_description = get_nodes_description(cluster)
         bad_versions = []
@@ -288,7 +288,7 @@ def thirdparties_hashes(cluster):
     If hash is not specified, then thirdparty is skipped.
     If there is no thirdparties with hashes, then warning is shown.
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '212', "Thirdparties", "Hashes") as tc:
+    with TestCase(cluster, '212', "Thirdparties", "Hashes") as tc:
         successful = []
         warnings = []
         broken = []
@@ -437,7 +437,7 @@ def find_hosts_missing_thirdparty(group, path) -> List[str]:
 
 
 def kubernetes_nodes_existence(cluster):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '209', "Kubernetes", "Nodes Existence",
+    with TestCase(cluster, '209', "Kubernetes", "Nodes Existence",
                   default_results="All nodes presented"):
         nodes_description = get_nodes_description(cluster)
         nodes_names = kubernetes.get_actual_roles(nodes_description).keys()
@@ -457,7 +457,7 @@ def kubernetes_nodes_existence(cluster):
 
 
 def kubernetes_nodes_roles(cluster: KubernetesCluster):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '210', "Kubernetes", "Nodes Roles",
+    with TestCase(cluster, '210', "Kubernetes", "Nodes Roles",
                   default_results="All nodes have the correct roles"):
         nodes_description = get_nodes_description(cluster)
         nodes_roles = kubernetes.get_actual_roles(nodes_description)
@@ -484,7 +484,7 @@ def kubernetes_nodes_roles(cluster: KubernetesCluster):
 
 
 def kubernetes_nodes_condition(cluster, condition_type):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '211', "Kubernetes", "Nodes Condition - %s" % condition_type) as tc:
+    with TestCase(cluster, '211', "Kubernetes", "Nodes Condition - %s" % condition_type) as tc:
         nodes_description = get_nodes_description(cluster)
         expected_status = 'False'
         if condition_type == 'Ready':
@@ -526,7 +526,7 @@ def get_not_running_pods(cluster):
 def kubernetes_pods_condition(cluster):
     system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default"]
     critical_states = cluster.globals['pods']['critical_states']
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '207', "Kubernetes", "Pods Condition") as tc:
+    with TestCase(cluster, '207', "Kubernetes", "Pods Condition") as tc:
         pods_description = get_not_running_pods(cluster)
         total_failed_amount = len(pods_description.split('\n')[1:])
         critical_system_failed_amount = 0
@@ -556,7 +556,7 @@ def kubernetes_pods_condition(cluster):
 
 
 def kubernetes_dashboard_status(cluster):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '208', "Plugins", "Dashboard Availability") as tc:
+    with TestCase(cluster, '208', "Plugins", "Dashboard Availability") as tc:
         retries = 10
         test_succeeded = False
         i = 0
@@ -590,7 +590,7 @@ def kubernetes_dashboard_status(cluster):
 
 
 def nodes_pid_max(cluster):
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '202', "Nodes", "Nodes pid_max correctly installed") as tc:
+    with TestCase(cluster, '202', "Nodes", "Nodes pid_max correctly installed") as tc:
         control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
@@ -639,7 +639,7 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() not in ('rhel', 'rhel8'):
         return
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '213', "Security", "Selinux security policy") as tc:
+    with TestCase(cluster, '213', "Security", "Selinux security policy") as tc:
         group = cluster.nodes['all']
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
@@ -698,7 +698,7 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() not in ('rhel', 'rhel8'):
         return
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '214', "Security", "Selinux configuration") as tc:
+    with TestCase(cluster, '214', "Security", "Selinux configuration") as tc:
         group = cluster.nodes['all']
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
@@ -721,7 +721,7 @@ def verify_firewalld_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '215', "Security", "Firewalld status") as tc:
+    with TestCase(cluster, '215', "Security", "Firewalld status") as tc:
         group = cluster.nodes['all']
         firewalld_disabled, firewalld_result = system.is_firewalld_disabled(group)
         cluster.log.debug(firewalld_result)
@@ -740,7 +740,7 @@ def verify_time_sync(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '218', "System", "Time difference") as tc:
+    with TestCase(cluster, '218', "System", "Time difference") as tc:
         group = cluster.nodes['all']
         current_node_time, nodes_timestamp, time_diff = system.get_nodes_time(group)
         cluster.log.verbose('Current node time: %s' % current_node_time)
@@ -766,7 +766,7 @@ def verify_swap_state(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '216', "System", "Swap state") as tc:
+    with TestCase(cluster, '216', "System", "Swap state") as tc:
         group = cluster.nodes['all']
         swap_disabled, swap_result = system.is_swap_disabled(group)
         cluster.log.debug(swap_result)
@@ -786,7 +786,7 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '217', "System", "Modprobe rules") as tc:
+    with TestCase(cluster, '217', "System", "Modprobe rules") as tc:
         group = cluster.nodes['all']
         modprobe_valid, modprobe_result = system.is_modprobe_valid(group)
         cluster.log.debug(modprobe_result)
@@ -804,7 +804,7 @@ def etcd_health_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '219', "ETCD", "Health status ETCD") as tc:
+    with TestCase(cluster, '219', "ETCD", "Health status ETCD") as tc:
         try:
             etcd_health_status = etcd.wait_for_health(cluster, cluster.nodes['control-plane'].get_any_member())
         except Exception as e:
@@ -822,7 +822,7 @@ def control_plane_configuration_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '220', "Control plane", "configuration status") as tc:
+    with TestCase(cluster, '220', "Control plane", "configuration status") as tc:
         results = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
@@ -927,7 +927,7 @@ def control_plane_health_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '221', "Control plane", "health status") as tc:
+    with TestCase(cluster, '221', "Control plane", "health status") as tc:
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
@@ -959,7 +959,7 @@ def default_services_configuration_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '222', "Default services", "configuration status") as tc:
+    with TestCase(cluster, '222', "Default services", "configuration status") as tc:
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         original_coredns_cm = generate_configmap(cluster.inventory)
         original_coredns_cm = yaml.safe_load(original_coredns_cm)
@@ -1011,7 +1011,7 @@ def default_services_health_status(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '223', "Default services", "health status") as tc:
+    with TestCase(cluster, '223', "Default services", "health status") as tc:
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
@@ -1048,7 +1048,7 @@ def calico_config_check(cluster):
     :param cluster: KubernetesCluster object
     :return: None
     '''
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '224', "Calico", "configuration check") as tc:
+    with TestCase(cluster, '224', "Calico", "configuration check") as tc:
         message = ""
         correct_config = True
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -1091,7 +1091,7 @@ def kubernetes_admission_status(cluster):
     The method checks status of Pod Security Admissions, default Pod Security Profile,
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '225', "Kubernetes", "Pod Security Admissions") as tc:
+    with TestCase(cluster, '225', "Kubernetes", "Pod Security Admissions") as tc:
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         profile_inv = ""
         if cluster.inventory["rbac"]["admission"] == "pss" and \
@@ -1162,7 +1162,7 @@ def geo_check(cluster):
 
     # Here we actually collect information about all statuses, but report information about DNS only.
     # Other statuses are reported in other TestCases below. This is done for better UX.
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
         namespace = geo_monitor_inventory["namespace"]
         service = geo_monitor_inventory["service"]
@@ -1210,7 +1210,7 @@ def geo_check(cluster):
             raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(collected_results["dnsStatus"]["failed"]))
         tc_dns.success("all peer names resolved")
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
         if not collected_results["statusCollected"]:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1221,7 +1221,7 @@ def geo_check(cluster):
             raise TestWarn("found skipped peer services", hint=yaml.safe_dump(collected_results["svcStatus"]["skipped"]))
         tc_svc.success("all peer services available")
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
         if not collected_results["statusCollected"]:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1243,7 +1243,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '227', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
         group = cluster.nodes['all'].get_accessible_nodes()
         results = group.sudo("aa-enabled")
         enabled_nodes = []
@@ -1271,7 +1271,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster.context['testsuite'], cluster.context['execution_arguments'], '228', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:

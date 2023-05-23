@@ -16,7 +16,7 @@ import textwrap
 from traceback import *
 import csv
 from datetime import datetime
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 import fabric
 
 TC_UNKNOWN = -1
@@ -56,8 +56,8 @@ class TestCase:
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, ts, args, id, category, name, default_results=None, minimal=None, recommended=None):
-        self.include_in_ts(ts)
+    def __init__(self, cluster, id, category, name, default_results=None, minimal=None, recommended=None):
+        self.include_in_ts(cluster.context['testsuite'])
         self.category = category
         self.id = str(id)
         self.name = name
@@ -65,7 +65,7 @@ class TestCase:
         self.results = default_results
         self.minimal = minimal
         self.recommended = recommended
-        self.args = args
+        self.cluster = cluster
 
     def include_in_ts(self, ts):
         ts.register_tc(self)
@@ -155,16 +155,10 @@ class TestCase:
         return output
 
     def check_color(self):
-        if self.args.get('log') is not None:
-            for argsgroup in self.args.get('log'):
-                if argsgroup[0].split(";")[0] != 'stdout':
-                    continue
-                for argument in argsgroup[0].split(";"):
-                    if argument == 'colorize=false':
-                        return False
-            return True
-        else:
-            return True
+        for handler in self.cluster.log.handlers:
+            if isinstance(handler, log.StdoutHandler) and handler.formatter.colorize:
+                return True
+        return False
                 
     def get_readable_status(self):
         if self.is_succeeded():

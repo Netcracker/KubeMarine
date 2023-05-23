@@ -337,10 +337,6 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
 
     if not stdout_specified:
         stdout_settings = deepcopy(globals['logging']['default_targets']['stdout'])
-        # Globals lacks of colorize property, so calculated value for Windows is "false".
-        # But it is still convenient to specify the value explicitly even for Windows for debugging purpose.
-        if 'colorize' not in stdout_settings:
-            stdout_settings['colorize'] = True
         handlers.append(LogHandler(target='stdout', **stdout_settings))
 
     log = Log(raw_inventory, handlers)
