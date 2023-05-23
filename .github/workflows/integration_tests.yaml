@@ -121,6 +121,10 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt update && sudo apt install -y systemd
+          sudo systemctl start systemd-journald.service	
       - name: Check Iaas
         id: test_check_iaas
         run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_iaas_dump/
