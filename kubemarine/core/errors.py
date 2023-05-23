@@ -56,6 +56,12 @@ KME_DICTIONARY = {
     },
     "KME0012": {
         "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
+    },
+    "KME0013": {
+        "name": "Masked environment variable {name!r} contains illegal symbols"
+    },
+    "KME0014": {
+        "name": "Masked environment variable {name!r} should be declared and be {num} characters or longer"
     }
 }
 
