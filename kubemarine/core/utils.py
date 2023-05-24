@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Union, Tuple
+from typing import Tuple
 
 import yaml
 import ruamel.yaml
@@ -30,11 +30,15 @@ from collections import OrderedDict
 
 from ruamel.yaml import CommentedMap
 
+from kubemarine.core import os as kos
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 
 
-def do_fail(message='', reason: Union[str, Exception] = '', hint='', log=None):
+def do_fail(message='', reason: Exception = None, hint='', log=None):
+
+    # In general, if logging system was not initialized, we have no chance to fetch secrets from anywhere.
+    # Printing to stderr is safe in this case.
 
     if log:
         log.critical('FAILURE!')
@@ -152,8 +156,7 @@ def make_ansible_inventory(location, cluster):
             config_compiled += '\n' + string
         config_compiled += '\n\n'
 
-    with open_external(location, 'w') as configfile:
-        configfile.write(config_compiled)
+    dump_file({}, config_compiled, location, dump_location=False)
 
 
 def get_current_timestamp_formatted():
@@ -198,24 +201,34 @@ def merge_vrrp_ips(procedure_inventory, inventory):
         inventory.move_to_end("vrrp_ips", last=False)
 
 
-def dump_file(context, data, filename):
-    if not isinstance(context, dict):
-        # cluster is passed instead of the context directly
-        cluster = context
-        context = cluster.context
+def dump_file(context, data: object, filename: str,
+              *, dump_location=True, mask_secrets=True):
+    if dump_location:
+        if not isinstance(context, dict):
+            # cluster is passed instead of the context directly
+            cluster = context
+            context = cluster.context
+
+        args = context['execution_arguments']
+        if args.get('disable_dump', True) \
+                and not (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
+            return
+
+        prepare_dump_directory(args.get('dump_location'), reset_directory=False)
+        target_path = get_dump_filepath(context, filename)
+    else:
+        target_path = get_external_resource_path(filename)
 
     if isinstance(data, io.StringIO):
         data = data.getvalue()
     if isinstance(data, io.TextIOWrapper):
         data = data.read()
 
-    args = context['execution_arguments']
-    if not args.get('disable_dump', True) \
-            or (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
+    if mask_secrets:
+        data = kos.mask_secrets(data)
 
-        prepare_dump_directory(args.get('dump_location'), reset_directory=False)
-        with open_utf8(get_dump_filepath(context, filename), 'w') as file:
-            file.write(data)
+    with open_utf8(target_path, 'w') as file:
+        file.write(data)
 
 
 def get_dump_filepath(context, filename):

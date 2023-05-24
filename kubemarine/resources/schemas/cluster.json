@@ -89,6 +89,17 @@
     "values": {
       "type": "object",
       "description": "Section to hold custom variables to be used in Jinja2 templates."
+    },
+    "runtime_values": {
+      "type": "object",
+      "description": "Section to configure different properties of the values supplied at runtime",
+      "properties": {
+        "masked": {
+          "$ref": "definitions/common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Define which environment variables should be masked if printed in logs or files on the deployer"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["nodes", "cluster_name"],

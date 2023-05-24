@@ -22,6 +22,8 @@ from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHtt
 from copy import deepcopy
 from typing import List, Optional
 
+from kubemarine.core import os as kos
+
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
 
@@ -109,6 +111,7 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
 class EnhancedLogRecord(logging.LogRecord):
     def getMessage(self) -> str:
         message = super().getMessage()
+        message = kos.mask_secrets(message)
         prefix = self.__dict__.get('prefix')
         if prefix is not None:
             message = prefix + message
@@ -117,6 +120,8 @@ class EnhancedLogRecord(logging.LogRecord):
 
 logging.setLoggerClass(EnhancedLogger)
 logging.setLogRecordFactory(EnhancedLogRecord)
+# Suppress the errors in logging system to ensure masked variables to be not revealed
+logging.raiseExceptions = False
 
 
 class LogFormatter(logging.Formatter):
@@ -150,6 +155,10 @@ class LogFormatter(logging.Formatter):
             return s
         finally:
             record.msg = orig_msg
+
+    def formatException(self, ei: tuple) -> str:
+        s = super().formatException(ei)
+        return kos.mask_secrets(s)
 
 
 class StdoutHandler(logging.StreamHandler):
@@ -384,11 +393,7 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
         stdout_settings = deepcopy(globals['logging']['default_targets']['stdout'])
         handlers.append(LogHandler(target='stdout', **stdout_settings))
 
-    log = Log(raw_inventory, handlers)
-
-    log.logger.verbose('Using the following loggers: \n\t%s' % "\n\t".join("- " + str(x) for x in handlers))
-
-    return log
+    return Log(raw_inventory, handlers)
 
 
 def caller_info(logger: EnhancedLogger) -> dict:

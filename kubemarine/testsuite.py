@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import io
 import textwrap
 from traceback import *
 import csv
 from datetime import datetime
-from kubemarine.core import utils, log
+from kubemarine.core import utils, log, os
 import fabric
 
 TC_UNKNOWN = -1
@@ -106,7 +106,7 @@ class TestCase:
             else:
                 output += "    OK     "
         if self.is_failed():
-            if self.check_color():    
+            if self.check_color():
                 color = "\x1b[38;5;196m"
                 output += " \x1b[48;5;196m\x1b[38;5;231m  FAIL  \x1b[49m\x1b[39m  "
             else:
@@ -127,7 +127,7 @@ class TestCase:
         output += self.id + "  "
         output += self.name + " "
 
-        results = " " + str(self.results)
+        results = os.mask_secrets(" " + str(self.results))
 
         output += "." * (146 - len(output) - len(results))
         if self.check_color():
@@ -150,7 +150,8 @@ class TestCase:
                 output += ' ' * (14-len(recommended)) + recommended
 
         if show_hint and (isinstance(self.results, TestFailure) or isinstance(self.results, TestWarn)) and self.results.hint is not None:
-            output += "\n                  HINT:\n" + textwrap.indent(str(self.results.hint), "                       ")
+            hint = os.mask_secrets(str(self.results.hint))
+            output += "\n                  HINT:\n" + textwrap.indent(hint, "                       ")
 
         return output
 
@@ -159,7 +160,7 @@ class TestCase:
             if isinstance(handler, log.StdoutHandler) and handler.formatter.colorize:
                 return True
         return False
-                
+
     def get_readable_status(self):
         if self.is_succeeded():
             return 'ok'
@@ -284,47 +285,53 @@ class TestSuite:
         return results
 
     def save_csv(self, destination_file_path, delimiter=';'):
-        with utils.open_external(destination_file_path, mode='w') as stream:
-            csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
-            for tc in self.tcs:
-                csv_writer.writerow([
-                    tc.category.lower(),
-                    tc.get_readable_status(),
-                    tc.id,
-                    tc.name,
-                    tc.results,
-                    tc.minimal,
-                    tc.recommended
-                ])
+        stream = io.StringIO()
+
+        csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
+        for tc in self.tcs:
+            csv_writer.writerow([
+                tc.category.lower(),
+                tc.get_readable_status(),
+                tc.id,
+                tc.name,
+                tc.results,
+                tc.minimal,
+                tc.recommended
+            ])
+
+        utils.dump_file({}, stream, destination_file_path, dump_location=False)
 
     def save_html(self, destination_file_path, check_type, append_styles=True):
-        with utils.open_external(destination_file_path, mode='w') as stream:
-            stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
-            for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
-                stream.write('<div class="%s">%s %s</div>' % (key, value, key))
-            stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
-            stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
-            for tc in self.tcs:
-                minimal = tc.minimal
-                if minimal is None:
-                    minimal = ''
-                recommended = tc.recommended
-                if recommended is None:
-                    recommended = ''
-                stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
-                             (tc.get_readable_status(),
-                              tc.category.lower(),
-                              tc.get_readable_status(),
-                              tc.id,
-                              tc.name,
-                              tc.results,
-                              minimal,
-                              recommended
-                              ))
-            stream.write('</tbody></table>')
-            if append_styles:
-                css = utils.read_internal('resources/reports/check_report.css')
-                stream.write('<style>\n%s\n</style>' % css)
+        stream = io.StringIO()
 
-            stream.write('</body></html>')
+        stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
+        for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
+            stream.write('<div class="%s">%s %s</div>' % (key, value, key))
+        stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
+        stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
+        for tc in self.tcs:
+            minimal = tc.minimal
+            if minimal is None:
+                minimal = ''
+            recommended = tc.recommended
+            if recommended is None:
+                recommended = ''
+            stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
+                         (tc.get_readable_status(),
+                          tc.category.lower(),
+                          tc.get_readable_status(),
+                          tc.id,
+                          tc.name,
+                          tc.results,
+                          minimal,
+                          recommended
+                          ))
+        stream.write('</tbody></table>')
+        if append_styles:
+            css = utils.read_internal('resources/reports/check_report.css')
+            stream.write('<style>\n%s\n</style>' % css)
+
+        stream.write('</body></html>')
+
+        utils.dump_file({}, stream, destination_file_path, dump_location=False)

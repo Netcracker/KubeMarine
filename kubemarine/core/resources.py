@@ -18,7 +18,7 @@ from typing import Optional
 import yaml
 import ruamel.yaml
 
-from kubemarine.core import utils, cluster as c, log, errors, static
+from kubemarine.core import utils, cluster as c, log, errors, static, os
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -198,7 +198,18 @@ class DynamicResources:
                                 logger=self.logger())
 
     def _create_logger(self):
-        return log.init_log_from_context_args(static.GLOBALS, self.context, self.raw_inventory()).logger
+        # Logging system should be initialized at the earliest point to mask all secrets automatically.
+        raw_inventory = self.raw_inventory()
+        logger = log.init_log_from_context_args(static.GLOBALS, self.context, raw_inventory).logger
+
+        # Initialize and verify os.Environ with masked variables before the logging framework can be used.
+        masked_vars = raw_inventory.get('runtime_values', {}).get('masked', [])
+        os.Environ(masked_vars)
+
+        logger.verbose('Using the following loggers: \n\t%s'
+                             % "\n\t".join("- " + str(x) for x in logger.handlers))
+
+        return logger
 
 
 def _provide_cluster(*args, **kw):

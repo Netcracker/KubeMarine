@@ -284,8 +284,7 @@ def download_resources(log, resources, location, control_plane: NodeGroup, names
         result = result.strip()
         if result and result != '':
             actual_resources.append(resource)
-            with utils.open_external(resource_file_path, 'w') as resource_file_stream:
-                resource_file_stream.write(result)
+            utils.dump_file({}, result, resource_file_path, dump_location=False, mask_secrets=False)
 
     return actual_resources
 

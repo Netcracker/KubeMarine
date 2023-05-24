@@ -487,9 +487,7 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
         kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)
 
     kubeconfig_filename = os.path.abspath("kubeconfig")
-    with utils.open_external(kubeconfig_filename, 'w') as f:
-        f.write(kubeconfig)
-
+    utils.dump_file(cluster.context, kubeconfig, kubeconfig_filename, dump_location=False, mask_secrets=False)
     cluster.log.debug(f"Kubeconfig saved to {kubeconfig_filename}")
 
     return kubeconfig_filename
