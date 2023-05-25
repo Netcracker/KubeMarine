@@ -34,11 +34,9 @@ from distutils.dir_util import mkpath
 from itertools import chain
 from typing import Dict, List, Tuple
 
-import yaml
-
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static, errors, os as kos
+from kubemarine.core import utils, static, errors, os as kos, yaml
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet

@@ -15,14 +15,13 @@
 import io
 from typing import Callable, Optional, List, IO
 
-import ruamel.yaml
 import os
 from abc import ABC, abstractmethod
 
 from ordered_set import OrderedSet
 
 from kubemarine import plugins
-from kubemarine.core import utils, log
+from kubemarine.core import utils, log, yaml
 from kubemarine.core.cluster import KubernetesCluster
 
 ERROR_MANIFEST_NOT_FOUND = "Cannot find original manifest %s for '%s' plugin"
@@ -100,10 +99,8 @@ class Manifest:
         """
         The method implements the dumping of the list of objects to the string that includes several YAMLs inside
         """
-        yaml = ruamel.yaml.YAML()
-
         with io.StringIO() as stream:
-            yaml.dump_all(self._obj_list, stream)
+            yaml.structure_preserver().dump_all(self._obj_list, stream)
             result = stream.getvalue()
 
         return result
@@ -127,9 +124,8 @@ class Manifest:
         :param stream: stream with manifest content that should be parsed
         :return: list of original objects to enrich in YAML format.
         """
-        yaml = ruamel.yaml.YAML()
         obj_list = []
-        source_yamls = yaml.load_all(stream)
+        source_yamls = yaml.structure_preserver().load_all(stream)
         yaml_keys = set()
         for source_yaml in source_yamls:
             if source_yaml is None:

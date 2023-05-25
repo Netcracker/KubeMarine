@@ -16,11 +16,9 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import List
 
-import yaml
-
 import kubemarine.patches
 from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties, haproxy, keepalived
-from kubemarine.core import flow, static, utils, errors
+from kubemarine.core import flow, static, utils, errors, yaml
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup

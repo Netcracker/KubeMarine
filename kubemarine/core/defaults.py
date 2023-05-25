@@ -16,12 +16,10 @@ from importlib import import_module
 from copy import deepcopy
 from typing import Optional, Union
 
-import yaml
-
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import jinja
-from kubemarine.core import utils, static, log, os, errors
+from kubemarine.core import utils, static, log, os, errors, yaml
 from kubemarine.core.yaml_merger import default_merger
 
 # All enrichment procedures should not connect to any node.
@@ -407,7 +405,7 @@ def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=Tru
     if make_dumps:
         from kubemarine import controlplane
         inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
-        utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
+        utils.dump_file(cluster, yaml.dump(inventory_for_dump), "cluster.yaml")
 
     return inventory
 

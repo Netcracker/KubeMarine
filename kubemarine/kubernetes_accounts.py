@@ -13,11 +13,8 @@
 # limitations under the License.
 
 import io
-import os
 
-import yaml
-
-from kubemarine.core import utils, summary
+from kubemarine.core import utils, summary, yaml
 from kubemarine.core.cluster import KubernetesCluster
 
 
@@ -77,7 +74,7 @@ def install(cluster: KubernetesCluster):
 
         dump = ''
         for config in account['configs']:
-            dump += '---\n'+yaml.dump(config, default_flow_style=False)
+            dump += '---\n' + yaml.dump(config)
 
         filename = 'account_%s_%s_%s.yaml' % (account['name'], account['role'], account['namespace'])
         destination_path = '/etc/kubernetes/%s' % filename

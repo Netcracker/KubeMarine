@@ -13,10 +13,9 @@
 # limitations under the License.
 from typing import Union
 
-import yaml
 import jinja2
 
-from kubemarine.core import defaults, log, os, errors
+from kubemarine.core import defaults, log, os, errors, yaml
 
 
 def new(logger: log.EnhancedLogger, recursive_compile=False, root: dict = None, path: list = None):
@@ -40,7 +39,7 @@ def new(logger: log.EnhancedLogger, recursive_compile=False, root: dict = None, 
 
 
     env = jinja2.Environment()
-    env.filters['toyaml'] = lambda data: yaml.dump(data, default_flow_style=False)
+    env.filters['toyaml'] = lambda data: yaml.dump(data)
     env.filters['isipv4'] = lambda ip: ":" not in _precompile('isipv4', ip)
     env.filters['minorversion'] = lambda version: ".".join(_precompile('minorversion', version).split('.')[0:2])
     env.filters['majorversion'] = lambda version: _precompile('majorversion', version).split('.')[0]

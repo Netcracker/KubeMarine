@@ -20,10 +20,9 @@ from copy import deepcopy
 from typing import List, Dict, ContextManager
 from unittest import mock
 
-import yaml
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, yaml
 from kubemarine.plugins.manifest import Manifest, Processor
 from scripts.thirdparties.src.software import thirdparties, plugins
 from scripts.thirdparties.src.software.plugins import (
@@ -510,7 +509,7 @@ class SynchronizationTest(unittest.TestCase):
 
     def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
         stream = io.StringIO()
-        utils.yaml_structure_preserver().dump(source, stream)
+        yaml.structure_preserver().dump(source, stream)
         return yaml.safe_load(io.StringIO(stream.getvalue()))
 
     def run_sync(self) -> SummaryTracker:

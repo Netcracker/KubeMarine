@@ -17,9 +17,8 @@ from copy import deepcopy
 from typing import Dict, List, Union, Iterable, Tuple, Optional
 
 import fabric
-import yaml
 
-from kubemarine.core import log, utils
+from kubemarine.core import log, utils, yaml, os
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup
@@ -339,7 +338,8 @@ class KubernetesCluster(Environment):
 
     def dump_finalized_inventory(self):
         inventory_for_dump = self.make_finalized_inventory()
-        data = yaml.dump(inventory_for_dump)
+        with os.expand_template('env'):
+            data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
         utils.dump_file(self, data, finalized_filename, dump_location=False)

@@ -15,9 +15,7 @@
 from textwrap import dedent
 from typing import List, Optional
 
-import yaml
-
-from kubemarine.core import log
+from kubemarine.core import log, yaml
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 class LocalPathProvisionerManifestProcessor(Processor):

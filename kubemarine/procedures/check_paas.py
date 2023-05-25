@@ -19,8 +19,6 @@ from collections import OrderedDict
 import re
 from typing import List, Dict
 
-import yaml
-import ruamel.yaml
 import ipaddress
 import uuid
 
@@ -29,7 +27,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
-from kubemarine.core import flow, static
+from kubemarine.core import flow, static, yaml
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
@@ -575,16 +573,15 @@ def kubernetes_dashboard_status(cluster):
 def nodes_pid_max(cluster):
     with TestCase(cluster, '202', "Nodes", "Nodes pid_max correctly installed") as tc:
         control_plane = cluster.nodes['control-plane'].get_any_member()
-        yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
         for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
 
             node_info = control_plane.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
-            config = yaml.load(node_info)
+            config = yaml.safe_load(node_info)
             max_pods = int(config['status']['capacity']['pods'])
 
             kubelet_config = node["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
-            config = yaml.load(kubelet_config)
+            config = yaml.safe_load(kubelet_config)
             pod_pids_limit = int(config['podPidsLimit'])
 
             pid_max = int(node["connection"].sudo("cat /proc/sys/kernel/pid_max").get_simple_out())

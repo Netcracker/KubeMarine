@@ -15,9 +15,8 @@
 import io
 import unittest
 
-import yaml
-
 from kubemarine import demo
+from kubemarine.core import yaml
 from kubemarine.plugins.manifest import Manifest
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 

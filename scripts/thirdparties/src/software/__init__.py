@@ -18,12 +18,12 @@ from typing import Dict, List
 
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import utils
+from kubemarine.core import utils, yaml
 from kubemarine.procedures import migrate_kubemarine
 from ..shell import info, run
 from ..tracker import SummaryTracker, ChangesTracker
 
-YAML = utils.yaml_structure_preserver()
+YAML = yaml.structure_preserver()
 SOFTWARE_UPGRADE_PATH = migrate_kubemarine.SOFTWARE_UPGRADE_PATH
 
 

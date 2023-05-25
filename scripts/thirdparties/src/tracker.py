@@ -18,14 +18,14 @@ from typing import Dict, List, Tuple, Optional, OrderedDict
 
 from ordered_set import OrderedSet
 
-from kubemarine.core import static, utils
+from kubemarine.core import static, utils, yaml
 from .shell import info
 
 ERROR_PREVIOUS_MINOR = "Kubernetes version '{version}' is deleted. " \
                        "Need to delete all versions having the same or lower minor version. " \
                        "Not deleted versions: {previous_versions}."
 
-YAML = utils.yaml_structure_preserver()
+YAML = yaml.structure_preserver()
 
 
 class ChangesTracker(ABC):

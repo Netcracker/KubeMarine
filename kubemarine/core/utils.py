@@ -22,15 +22,14 @@ import tarfile
 
 from typing import Tuple
 
-import yaml
-import ruamel.yaml
+import yaml as pyyaml
 from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import os as kos
+from kubemarine.core import os as kos, yaml
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 
@@ -339,13 +338,6 @@ def get_local_file_sha1(filename: str) -> str:
     return sha1.hexdigest()
 
 
-def yaml_structure_preserver() -> ruamel.yaml.YAML:
-    """YAML loader and dumper which saves original structure"""
-    ruamel_yaml = ruamel.yaml.YAML()
-    ruamel_yaml.preserve_quotes = True
-    return ruamel_yaml
-
-
 def is_sorted(l: list, key: callable = None) -> bool:
     """
     Check that the specified list is sorted.
@@ -403,7 +395,7 @@ def load_yaml(filepath) -> dict:
     try:
         with open_utf8(filepath, 'r') as stream:
             return yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
+    except pyyaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
 
 

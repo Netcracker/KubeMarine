@@ -24,9 +24,8 @@ import time
 from contextlib import contextmanager
 
 import fabric
-import yaml
 
-from kubemarine.core import flow, utils
+from kubemarine.core import flow, utils, yaml
 from kubemarine import system, packages
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster

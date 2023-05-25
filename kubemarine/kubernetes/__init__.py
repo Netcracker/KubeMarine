@@ -21,13 +21,11 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Dict, Tuple, ContextManager
 
-import ruamel.yaml
-import yaml
 from jinja2 import Template
 import ipaddress
 
 from kubemarine import system, plugins, admission, etcd, packages
-from kubemarine.core import utils, static, summary, log, errors
+from kubemarine.core import utils, static, summary, log, errors, yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
@@ -401,7 +399,7 @@ def join_control_plane(group, node, join_dict):
 
     configure_container_runtime(group.cluster, join_config)
 
-    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(join_config, default_flow_style=False)
+    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(join_config)
 
     utils.dump_file(group.cluster, config, 'join-config_%s.yaml' % node['name'])
 
@@ -542,7 +540,7 @@ def init_first_control_plane(group):
 
     configure_container_runtime(group.cluster, init_config)
 
-    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(init_config, default_flow_style=False)
+    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(init_config)
 
     utils.dump_file(group.cluster, config, 'init-config_%s.yaml' % first_control_plane['name'])
 
@@ -701,7 +699,7 @@ def init_workers(group):
 
     configure_container_runtime(group.cluster, join_config)
 
-    config = yaml.dump(join_config, default_flow_style=False)
+    config = yaml.dump(join_config)
 
     utils.dump_file(group.cluster, config, 'join-config-workers.yaml')
 
@@ -783,8 +781,8 @@ def is_cluster_installed(cluster):
 
 
 def get_kubeadm_config(inventory):
-    kubeadm_kubelet = yaml.dump(inventory["services"]["kubeadm_kubelet"], default_flow_style=False)
-    kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
+    kubeadm_kubelet = yaml.dump(inventory["services"]["kubeadm_kubelet"])
+    kubeadm = yaml.dump(inventory["services"]["kubeadm"])
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
 
@@ -882,15 +880,12 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
     current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
     kubeadm_config_map = first_control_plane["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
-    ryaml = ruamel.yaml.YAML()
-    config_map = ryaml.load(kubeadm_config_map)
+    config_map = yaml.safe_load(kubeadm_config_map)
     cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
-    cluster_config = ryaml.load(cluster_configuration_yaml)
+    cluster_config = yaml.safe_load(cluster_configuration_yaml)
 
     if not cluster_config.get("dns"):
         cluster_config["dns"] = {}
-
-    updated_config = io.StringIO()
 
     cluster_config["apiServer"]["extraArgs"]["audit-log-path"] = \
         cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
@@ -908,8 +903,8 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
     cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
     kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
-    ryaml.dump(cluster_config, updated_config)
-    result_config = kubelet_config + "---\n" + updated_config.getvalue()
+    updated_config = yaml.dump(cluster_config)
+    result_config = kubelet_config + "---\n" + updated_config
     first_control_plane["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
 
     return True
@@ -1261,7 +1256,7 @@ def images_prepull(group: NodeGroup):
     }
 
     configure_container_runtime(group.cluster, kubeadm_init)
-    config = f'{config}---\n{yaml.dump(kubeadm_init, default_flow_style=False)}'
+    config = f'{config}---\n{yaml.dump(kubeadm_init)}'
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 

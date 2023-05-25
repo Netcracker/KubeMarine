@@ -17,10 +17,9 @@ import os
 from copy import deepcopy
 from typing import List, Dict, Tuple, Optional
 
-import yaml
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import static, utils
+from kubemarine.core import static, utils, yaml
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
 from scripts.thirdparties.src.compatibility import KubernetesVersions
 from scripts.thirdparties.src.run import Synchronization

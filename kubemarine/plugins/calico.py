@@ -16,7 +16,7 @@ from typing import Optional, List
 
 import os
 
-from kubemarine.core import utils, log
+from kubemarine.core import utils, log, yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
@@ -245,9 +245,8 @@ class CalicoManifestProcessor(Processor):
             'prometheusMetricsEnabled'] = api_list
 
         sz = len(manifest.all_obj_keys())
-        import ruamel.yaml
-        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
-        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+        self.include(manifest, sz, yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        self.include(manifest, sz, yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
 
     def get_known_objects(self) -> List[str]:
         return [

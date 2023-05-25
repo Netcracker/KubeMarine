@@ -16,10 +16,8 @@ import os
 import unittest
 from unittest import mock
 
-import yaml
-
 from kubemarine import demo, coredns, __main__
-from kubemarine.core import errors, schema
+from kubemarine.core import errors, schema, yaml
 from kubemarine.procedures import install
 from test.unit import utils as test_utils
 

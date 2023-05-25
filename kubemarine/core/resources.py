@@ -15,10 +15,10 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import Optional
 
-import yaml
+import yaml as pyyaml
 import ruamel.yaml
 
-from kubemarine.core import utils, cluster as c, log, errors, static, os
+from kubemarine.core import utils, cluster as c, log, errors, static, os, yaml
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -94,8 +94,8 @@ class DynamicResources:
             data = utils.read_external(self.inventory_filepath)
             self._raw_inventory = yaml.safe_load(data)
             # load inventory as ruamel.yaml to save original structure
-            self._formatted_inventory = utils.yaml_structure_preserver().load(data)
-        except (yaml.YAMLError, ruamel.yaml.YAMLError) as exc:
+            self._formatted_inventory = yaml.structure_preserver().load(data)
+        except (pyyaml.YAMLError, ruamel.yaml.YAMLError) as exc:
             utils.do_fail("Failed to load inventory file", exc, log=logger)
 
     def make_final_inventory(self):
@@ -122,7 +122,7 @@ class DynamicResources:
     def _store_inventory(self):
         # replace initial inventory file with changed inventory
         with utils.open_external(self.inventory_filepath, "w+") as stream:
-            utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)
+            yaml.structure_preserver().dump(self.formatted_inventory(), stream)
 
     def cluster_if_initialized(self) -> Optional[c.KubernetesCluster]:
         return self._cluster

@@ -17,12 +17,10 @@ import os
 import uuid
 import re
 
-import ruamel.yaml
-import yaml
 from jinja2 import Template
 
 from kubemarine import kubernetes
-from kubemarine.core import utils
+from kubemarine.core import utils, yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.yaml_merger import default_merger
@@ -339,7 +337,7 @@ def restart_pods_task(cluster):
         first_control_plane.sudo("kubectl uncordon %s" % node["name"], hide=False)
 
     cluster.log.debug("Restarting daemon-sets...")
-    daemon_sets = ruamel.yaml.YAML().load(list(first_control_plane.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
+    daemon_sets = yaml.safe_load(list(first_control_plane.sudo("kubectl get ds -A -o yaml").values())[0].stdout)
     for ds in daemon_sets["items"]:
         first_control_plane.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
 
@@ -349,25 +347,20 @@ def restart_pods_task(cluster):
 
 
 def update_kubeadm_configmap_psp(first_control_plane, target_state):
-    yaml = ruamel.yaml.YAML()
-
     # load kubeadm config map and retrieve cluster config
     result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
-    kubeadm_cm = yaml.load(list(result.values())[0].stdout)
-    cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+    kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
+    cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
 
     # resolve resulting admission plugins list
     final_plugins_string = resolve_final_plugins_list(cluster_config, target_state)
 
     # update kubeadm config map with updated plugins list
     cluster_config["apiServer"]["extraArgs"]["enable-admission-plugins"] = final_plugins_string
-    buf = io.StringIO()
-    yaml.dump(cluster_config, buf)
-    kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
+    kubeadm_cm["data"]["ClusterConfiguration"] = yaml.dump(cluster_config)
 
     # apply updated kubeadm config map
-    buf = io.StringIO()
-    yaml.dump(kubeadm_cm, buf)
+    buf = io.StringIO(yaml.dump(kubeadm_cm))
     filename = uuid.uuid4().hex
     first_control_plane.put(buf, "/tmp/%s.yaml" % filename)
     first_control_plane.sudo("kubectl apply -f /tmp/%s.yaml" % filename)
@@ -385,20 +378,17 @@ def update_kubeadm_configmap(first_control_plane, target_state):
 
 
 def update_kubeapi_config_psp(control_planes, plugins_list):
-    yaml = ruamel.yaml.YAML()
-
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
 
         # update kube-apiserver config with updated plugins list
-        conf = yaml.load(list(result.values())[0].stdout)
+        conf = yaml.safe_load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"] if "enable-admission-plugins" not in cmd]
         new_command.append("--enable-admission-plugins=%s" % plugins_list)
         conf["spec"]["containers"][0]["command"] = new_command
 
         # place updated config on control-plane
-        buf = io.StringIO()
-        yaml.dump(conf, buf)
+        buf = io.StringIO(yaml.dump(conf))
         control_plane.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
     # force kube-apiserver pod restart, then wait for api to become available
@@ -524,8 +514,6 @@ def manage_policies(group, manage_type, manage_scope):
 
 
 def collect_policies_template(psp_list, roles_list, bindings_list):
-    yaml = ruamel.yaml.YAML()
-
     buf = io.StringIO()
     if psp_list:
         for psp in psp_list:
@@ -679,13 +667,11 @@ def manage_pss(cluster, manage_type):
 
 
 def update_kubeapi_config_pss(control_planes, features_list):
-    yaml = ruamel.yaml.YAML()
-
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
 
         # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
-        conf = yaml.load(list(result.values())[0].stdout)
+        conf = yaml.safe_load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
         if len(features_list) != 0:
             if 'PodSecurity=true' in features_list:
@@ -705,8 +691,7 @@ def update_kubeapi_config_pss(control_planes, features_list):
         conf["spec"]["containers"][0]["command"] = new_command
 
         # place updated config on control-plane
-        buf = io.StringIO()
-        yaml.dump(conf, buf)
+        buf = io.StringIO(yaml.dump(conf))
         control_plane.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
         # force kube-apiserver pod restart, then wait for api to become available
@@ -721,14 +706,12 @@ def update_kubeapi_config_pss(control_planes, features_list):
 
 
 def update_kubeadm_configmap_pss(first_control_plane, target_state):
-    yaml = ruamel.yaml.YAML()
-
     final_feature_list = ""
 
     # load kubeadm config map and retrieve cluster config
     result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
-    kubeadm_cm = yaml.load(list(result.values())[0].stdout)
-    cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+    kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
+    cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
     
     # update kubeadm config map with feature list
     if target_state == "enabled":
@@ -756,13 +739,10 @@ def update_kubeadm_configmap_pss(first_control_plane, target_state):
             cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_feature_list
             del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
 
-    buf = io.StringIO()
-    yaml.dump(cluster_config, buf)
-    kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
+    kubeadm_cm["data"]["ClusterConfiguration"] = yaml.dump(cluster_config)
 
     # apply updated kubeadm config map
-    buf = io.StringIO()
-    yaml.dump(kubeadm_cm, buf)
+    buf = io.StringIO(yaml.dump(kubeadm_cm))
     filename = uuid.uuid4().hex
     first_control_plane.put(buf, "/tmp/%s.yaml" % filename)
     first_control_plane.sudo("kubectl apply -f /tmp/%s.yaml" % filename)

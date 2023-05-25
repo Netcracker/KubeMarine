@@ -15,12 +15,11 @@
 from io import StringIO
 
 import toml
-import yaml
 import json
 
 from distutils.util import strtobool
 from kubemarine import system, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, yaml
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup
 

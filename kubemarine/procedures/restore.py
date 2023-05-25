@@ -19,9 +19,8 @@ import re
 import tarfile
 import time
 from collections import OrderedDict
-import yaml
 
-from kubemarine.core import utils, flow, defaults
+from kubemarine.core import utils, flow, defaults, yaml
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup

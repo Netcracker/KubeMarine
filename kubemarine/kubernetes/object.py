@@ -19,8 +19,7 @@ import json
 import uuid
 import time
 
-import yaml
-
+from kubemarine.core import yaml
 from kubemarine.core.cluster import KubernetesCluster
 
 

@@ -16,9 +16,8 @@ import os.path
 import tempfile
 import unittest
 
-import yaml
-
 from kubemarine import demo, plugins
+from kubemarine.core import yaml
 
 
 class TestHelmProcessChartValues(unittest.TestCase):

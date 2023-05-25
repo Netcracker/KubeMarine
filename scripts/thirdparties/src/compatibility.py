@@ -16,10 +16,10 @@ from copy import deepcopy
 
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, yaml
 from .shell import info, run
 
-YAML = utils.yaml_structure_preserver()
+YAML = yaml.structure_preserver()
 RESOURCE_PATH = utils.get_internal_resource_path("resources/configurations/compatibility/kubernetes_versions.yaml")
 
 

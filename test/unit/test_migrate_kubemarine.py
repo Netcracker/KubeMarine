@@ -17,10 +17,8 @@ from contextlib import contextmanager
 from typing import List, ContextManager, Tuple
 from unittest import mock
 
-import yaml
-
 from kubemarine import patches, demo
-from kubemarine.core import static, utils, flow
+from kubemarine.core import static, utils, flow, yaml
 from kubemarine.core.action import Action
 from kubemarine.core.patch import Patch, InventoryOnlyPatch, RegularPatch
 from kubemarine.core.resources import DynamicResources

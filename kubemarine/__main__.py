@@ -16,8 +16,6 @@
 
 import sys
 from collections import OrderedDict
-import ruamel.yaml.resolver
-import yaml
 
 # Don't remove this line. The idna encoding
 # is used by getaddrinfo when dealing with unicode hostnames,
@@ -34,23 +32,6 @@ u''.encode('idna')
 # In Kubemarine stdout messages writes only to stdout - no stderr messaging at all,
 # but Fabric2 writes to stderr if hide=false used and remote console has stderr messages.
 sys.stderr = sys.stdout
-
-
-# Take pattern to resolve float used by ruamel instead of that is used by pyyaml.
-# https://sourceforge.net/p/ruamel-yaml/code/ci/0.17.21/tree/resolver.py#l43
-# Initially introduced for keepalived that generates random password string.
-# The generated string might be also a valid exponential float, and should be dumped with quotes.
-# See also:
-# https://stackoverflow.com/questions/30458977/yaml-loads-5e-6-as-string-and-not-a-number
-# https://github.com/yaml/pyyaml/issues/173
-for ir in ruamel.yaml.resolver.implicit_resolvers:
-    # YAML 1.1 and float implicit resolver
-    if (1, 1) in ir[0] and 'tag:yaml.org,2002:float' in ir[1]:
-        float_patched_resolver = (ir[1], ir[2], ir[3])
-        # Globally change behaviour of yaml.safe_load and yaml.dump
-        yaml.Dumper.add_implicit_resolver(*float_patched_resolver)
-        yaml.SafeLoader.add_implicit_resolver(*float_patched_resolver)
-        break
 
 
 procedures = OrderedDict({
