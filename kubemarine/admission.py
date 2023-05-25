@@ -793,6 +793,8 @@ def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: di
         default_merger.merge(current_config.setdefault("defaults", {}), procedure_config["defaults"])
     if "exemptions" in procedure_config:
         default_merger.merge(current_config.setdefault("exemptions", {}), procedure_config["exemptions"])
+        # we have to remove duplicates keeping the items order
+        current_config["exemptions"]["namespaces"] = list(dict.fromkeys(current_config["exemptions"]["namespaces"]))
 
     return inventory_to_finalize
 
