@@ -61,6 +61,13 @@ KME_DICTIONARY: dict = {
     },
     "KME0014": {
         "name": "Masked environment variable {name!r} should be declared and be {num} characters or longer"
+    },
+    "KME0015": {
+        "name": "It is not allowed to use masked environment variable {name!r} in inventory{path}"
+    },
+    "KME0016": {
+        "name": "Masked environment variables were not resolved to the single secret "
+                "during Jinja2 compilation in inventory{path}"
     }
 }
 

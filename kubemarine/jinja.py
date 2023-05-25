@@ -11,21 +11,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Union
 
 import yaml
 import jinja2
 
-from kubemarine.core import defaults
+from kubemarine.core import defaults, log, os, errors
 
 
-def new(log, root=None):
-    if root is None:
-        root = {}
+def new(logger: log.EnhancedLogger, recursive_compile=False, root: dict = None, path: list = None):
+    if recursive_compile and (root is None or path is None):
+        raise Exception(
+            "If recursive compilation is enabled, "
+            "'root' and 'path' parameters should also be specified to provide compilation context.")
+
+    def _precompile(filter_: str, struct: str):
+        if not isinstance(struct, str):
+            raise ValueError(f"Filter {filter_!r} can be applied only on string")
+
+        if not recursive_compile:
+            return struct
+
+        struct = precompile(logger, struct, root, path)
+        if isinstance(struct, os.MaskedVar):
+            raise ValueError(f"Jinja2 filter {filter_!r} cannot be applied to masked environment variable {struct.name!r}")
+
+        return struct
+
+
     env = jinja2.Environment()
     env.filters['toyaml'] = lambda data: yaml.dump(data, default_flow_style=False)
-    env.filters['isipv4'] = lambda ip: ":" not in precompile(log, ip, root)
-    env.filters['minorversion'] = lambda version: ".".join(precompile(log, version, root).split('.')[0:2])
-    env.filters['majorversion'] = lambda version: precompile(log, version, root).split('.')[0]
+    env.filters['isipv4'] = lambda ip: ":" not in _precompile('isipv4', ip)
+    env.filters['minorversion'] = lambda version: ".".join(_precompile('minorversion', version).split('.')[0:2])
+    env.filters['majorversion'] = lambda version: _precompile('majorversion', version).split('.')[0]
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'
     env.filters['is_true'] = lambda v: v in ['true', 'True', 'TRUE', True]
@@ -33,8 +51,9 @@ def new(log, root=None):
     return env
 
 
-def precompile(log, struct, root):
+def precompile(logger: log.EnhancedLogger, struct: str, root: dict, path: list) -> Union[str, os.MaskedVar]:
     # maybe we have non compiled string like templates/plugins/calico-{{ globals.compatibility_map }} ?
     if '{{' in struct or '{%' in struct:
-        struct = defaults.compile_object(log, struct, root)
+        struct = defaults.compile_string(logger, struct, root, path)
+
     return struct

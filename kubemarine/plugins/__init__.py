@@ -38,7 +38,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static, errors
+from kubemarine.core import utils, static, errors, os as kos
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -786,10 +786,19 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
         deployment_mode = "install"
 
     command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
-    output = subprocess.check_output(command, shell=True)
-    cluster.log.debug(output.decode('utf-8'))
 
-    return output
+    values_stdin = config.get("values_stdin")
+    secrets = None
+    if values_stdin is not None:
+        with kos.execute_unsafe():
+            secrets = yaml.dump(values_stdin).encode('utf-8')
+
+        command = command + ' -f -'
+
+    result = subprocess.run(command, shell=True, check=True, capture_output=True,
+                            input=secrets)
+    cluster.log.debug(result.stderr.decode('utf-8'))
+    cluster.log.debug(result.stdout.decode('utf-8'))
 
 
 def process_chart_values(config, local_chart_path):
@@ -938,9 +947,10 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
             if split_extension[1] == ".j2":
                 source_filename = split_extension[0]
 
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
-            with utils.open_utf8(file, 'r') as template_stream:
-                generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars'], 'env': kos.environ()}
+            template = utils.read_external(file)
+            with kos.execute_unsafe():
+                generated_data = jinja.new(log).from_string(template).render(**render_vars)
 
             utils.dump_file(cluster, generated_data, source_filename)
             source = io.StringIO(generated_data)

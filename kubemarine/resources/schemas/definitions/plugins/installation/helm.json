@@ -8,6 +8,10 @@
       "minLength": 1,
       "description": "The path on local host to the Helm chart. The URL link to chart archive is also supported."
     },
+    "values_stdin": {
+      "type": "object",
+      "description": "YAML formatted values for the chart that are passed to the \"helm\" executable via stdin. The values from this parameter have the highest priority."
+    },
     "values": {
       "type": "object",
       "description": "YAML formatted values for the chart that override values from the values.yaml file from the provided chart. The values from this parameter also override the values from the 'values_file' parameter."
