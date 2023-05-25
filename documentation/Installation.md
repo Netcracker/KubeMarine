@@ -223,7 +223,7 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 * You can install a version other than the recommended version, but it is not supported and can cause unpredictable consequences.
 * rh-haproxy18 (build provided by RedHat) is supported only for now.
 
-**Warning**: RHEL version 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
+**Warning**: RHEL version 8 and RockyLinux 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
 installation on the same OS impossible. To avoid it one should implement those steps before the installation procedure.
 1. Install `podman` from standard RHEL repository:
 ```
