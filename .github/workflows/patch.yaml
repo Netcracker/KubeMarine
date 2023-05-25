@@ -15,7 +15,7 @@ jobs:
           ref: ${{ github.event.release.target_commitish }}
       - run: |
          find kubemarine/patches/ -not -path "kubemarine/patches/__init__.py" -not -path "kubemarine/patches/" -delete
-         cp kubemarine/resources/etalons/patches/__init__.py kubemarine/patches/__init__.py
+         cp kubemarine/resources/etalons/patches/* kubemarine/patches/
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: Delete all patches after release

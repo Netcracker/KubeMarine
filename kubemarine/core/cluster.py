@@ -292,7 +292,7 @@ class KubernetesCluster(Environment):
 
         return association_value
 
-    def get_package_association(self, package: str, association_key: str) -> str or list:
+    def get_package_association(self, package: str, association_key: str) -> Union[str, List[str]]:
         """
         Returns the specified association for the specified package from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.

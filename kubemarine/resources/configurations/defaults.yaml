@@ -369,43 +369,28 @@ services:
       kmod: true
     package_manager:
       replace-repositories: false
+    # Associations for each OS family are merged with 'package.common_associations' section of globals.yaml.
+    # Packages for docker, containerd, haproxy, and keepalived are calculated based on
+    # 'package.<OS family>' sections of globals.yaml, target Kubernetes version, and the compatibility map.
     associations:
       debian:
-        docker:
-          package_name:
-            - 'docker-ce={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
-            - 'docker-ce-cli={{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_debian }}'
-            - 'containerd.io={{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_debian }}'
-        containerd:
-          package_name:
-            - 'containerd={{ globals.compatibility_map.software.containerd[services.kubeadm.kubernetesVersion].version_debian }}'
-            - 'podman={{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_debian }}'
+        docker: {}
+        containerd: {}
         haproxy:
           executable_name: 'haproxy'
-          package_name: 'haproxy={{ globals.compatibility_map.software.haproxy.version_debian }}'
           service_name: 'haproxy'
-        keepalived:
-          package_name: 'keepalived={{ globals.compatibility_map.software.keepalived.version_debian }}'
+        keepalived: {}
         audit:
           package_name: 'auditd'
         conntrack:
           package_name: 'conntrack'
       rhel:
-        docker:
-          package_name:
-            - 'docker-ce-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}'
-            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel }}'
-            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}'
-        containerd:
-          package_name:
-            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel }}'
-            - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel }}'
+        docker: {}
+        containerd: {}
         haproxy:
           executable_name: '/opt/rh/rh-haproxy18/root/usr/sbin/haproxy'
-          package_name: 'rh-haproxy18-haproxy-{{ globals.compatibility_map.software.haproxy.version_rhel }}'
           service_name: 'rh-haproxy18-haproxy'
-        keepalived:
-          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived.version_rhel }}'
+        keepalived: {}
         audit:
           package_name: 'audit'
         conntrack:
@@ -413,21 +398,12 @@ services:
         semanage:
           package_name: 'policycoreutils-python'
       rhel8:
-        docker:
-          package_name:
-            - 'docker-ce-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-            - 'docker-ce-cli-{{ globals.compatibility_map.software.docker[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-        containerd:
-          package_name:
-            - 'containerd.io-{{ globals.compatibility_map.software.containerdio[services.kubeadm.kubernetesVersion].version_rhel8 }}'
-            - 'podman-{{ globals.compatibility_map.software.podman[services.kubeadm.kubernetesVersion].version_rhel8 }}'
+        docker: {}
+        containerd: {}
         haproxy:
           executable_name: '/usr/sbin/haproxy'
-          package_name: 'haproxy-{{ globals.compatibility_map.software.haproxy.version_rhel8 }}'
           service_name: 'haproxy'
-        keepalived:
-          package_name: 'keepalived-{{ globals.compatibility_map.software.keepalived.version_rhel8 }}'
+        keepalived: {}
         audit:
           package_name: 'audit'
         conntrack:

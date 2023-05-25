@@ -18,12 +18,10 @@ import paramiko
 import re
 import socket
 import time
-from copy import deepcopy
 from typing import Dict
 
 from dateutil.parser import parse
 import fabric
-import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
@@ -31,7 +29,6 @@ from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
-from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.annotations import restrict_empty_group
 
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
@@ -83,59 +80,6 @@ def enrich_etc_hosts(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-
-    os_family = cluster.get_os_family()
-    if os_family in ('unknown', 'unsupported', 'multiple'):
-        raise Exception("Upgrade is possible only for cluster "
-                        "with all nodes having the same and supported OS family")
-
-    # validate all packages sections in procedure inventory
-    base_associations = static.DEFAULTS["services"]["packages"]["associations"][os_family]
-
-    cluster_associations = deepcopy(inventory["services"]["packages"]["associations"][os_family])
-    previous_ver = cluster.context["initial_kubernetes_version"]
-    upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
-    for version in upgrade_plan:
-        upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
-        for package in get_system_packages(cluster):
-            if base_associations[package]["package_name"] != cluster_associations[package]["package_name"] \
-                    and not upgrade_associations.get(package, {}).get("package_name"):
-                raise Exception(f"Associations are redefined for {package} in cluster.yaml for version {previous_ver}, "
-                                f"but not present in procedure inventory for version {version}. "
-                                f"Please, specify required associations explicitly in procedure inventory "
-                                f"for all versions since {previous_ver}.")
-            if upgrade_associations.get(package, {}).get("package_name"):
-                cluster_associations[package]["package_name"] = upgrade_associations[package]["package_name"]
-        previous_ver = version
-
-    upgrade_required = get_system_packages_for_upgrade(cluster)
-    cluster.context["packages"] = {"upgrade_required": upgrade_required}
-
-    upgrade_ver = cluster.context["upgrade_version"]
-    packages_section = deepcopy(cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}))
-    # Move associations to the OS family specific section, and then merge with associations from procedure.
-    # This effectively allows to specify only global section but not for specific OS family.
-    # This restriction is because system.enrich_upgrade_inventory goes after packages.enrich_inventory_associations,
-    # but in future the restriction can be eliminated.
-    associations = packages_section.pop("associations", {})
-    default_merger.merge(inventory["services"]["packages"]["associations"][os_family], associations)
-
-    for _type in ['install', 'upgrade', 'remove']:
-        packages = packages_section.pop(_type, None)
-        if packages is None:
-            continue
-        if isinstance(packages, list):
-            packages = {'include': packages}
-        default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
-
-    # merge remained packages section
-    default_merger.merge(inventory["services"]["packages"], packages_section)
-
-    return inventory
-
 def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
@@ -158,33 +102,6 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
         inventory["services"]["modprobe"] = modprobe
 
     return inventory
-
-def get_system_packages_for_upgrade(cluster):
-    upgrade_ver = cluster.context["upgrade_version"]
-    previous_ver = cluster.context["initial_kubernetes_version"]
-    compatibility = cluster.globals["compatibility_map"]["software"]
-
-    # handle special cases in which upgrade is not required for particular package
-    cluster_associations = cluster.inventory["services"]["packages"]["associations"][cluster.get_os_family()]
-    upgrade_associations = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}).get("associations", {})
-    system_packages = get_system_packages(cluster)
-    upgrade_required = list(system_packages)
-    for package in system_packages:
-        defined_association = upgrade_associations.get(package, {}).get("package_name")
-        if defined_association and defined_association == cluster_associations[package]['package_name']:
-            # case 1: package_name is defined in upgrade inventory but is equal to one already defined in cluster.yaml
-            upgrade_required.remove(package)
-        elif compatibility.get(package) and compatibility[package][upgrade_ver] == compatibility[package][previous_ver] \
-                and not defined_association:
-            # case 2: package_name is not defined in upgrade inventory and default versions are equal
-            upgrade_required.remove(package)
-
-    # all other packages should be updated
-    return upgrade_required
-
-
-def get_system_packages(cluster):
-    return [cluster.inventory['services']['cri']['containerRuntime']]
 
 
 def fetch_os_versions(cluster: KubernetesCluster):
@@ -229,14 +146,7 @@ def detect_os_family(cluster):
 
         cluster.log.debug("Distribution: %s; Version: %s" % (name, version))
 
-        os_family = 'unsupported'
-        if name in cluster.globals["compatibility_map"]["distributives"]:
-            os_family = 'unknown'
-            os_family_list = cluster.globals["compatibility_map"]["distributives"][name]
-            for os_family_item in os_family_list:
-                if version in os_family_item["versions"]:
-                    os_family = os_family_item["os_family"]
-                    break
+        os_family = detect_of_family_by_name_version(name, version)
 
         cluster.log.debug("OS family: %s" % os_family)
 
@@ -247,25 +157,17 @@ def detect_os_family(cluster):
         }
 
 
-def get_compatibility_version_key(cluster: KubernetesCluster) -> str or None:
-    """
-    Get os-specific version key to be used in software compatibility map.
-    :param cluster: Cluster object for which to resolve compatibility version key.
-    :return: String to use as version key. None if OS is unknown or multiple OS present.
-    """
-    """
-    Return os-specific version compatibility key.
-    If OS is unknown or multiple OS, then returns None.
-    """
-    os = cluster.get_os_family()
-    if os == "rhel":
-        return "version_rhel"
-    elif os == "rhel8":
-        return "version_rhel8"
-    elif os == "debian":
-        return "version_debian"
-    else:
-        return None
+def detect_of_family_by_name_version(name: str, version: str) -> str:
+    os_family = 'unsupported'
+    if name in static.GLOBALS["compatibility_map"]["distributives"]:
+        os_family = 'unknown'
+        os_family_list = static.GLOBALS["compatibility_map"]["distributives"][name]
+        for os_family_item in os_family_list:
+            if version in os_family_item["versions"]:
+                os_family = os_family_item["os_family"]
+                break
+
+    return os_family
 
 
 def update_resolv_conf(group, config=None):
@@ -451,8 +353,8 @@ def reboot_group(group: NodeGroup, try_graceful=None):
         cordon_required = 'control-plane' in node['roles'] or 'worker' in node['roles']
         if cordon_required:
             res = first_control_plane.sudo(
-                kubernetes.prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                                 group.cluster.globals, False, group.cluster.nodes), warn=True)
+                kubernetes.prepare_drain_command(group.cluster, node["name"], disable_eviction=False),
+                warn=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node["name"]}"')
         raw_results = perform_group_reboot(node['connection'])

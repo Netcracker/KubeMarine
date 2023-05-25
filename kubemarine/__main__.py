@@ -221,8 +221,8 @@ def selftest():
 
     print('\nValidating patch duplicates ...')
 
-    from kubemarine import patches
-    patches = patches.patches
+    module = import_procedure('migrate_kubemarine')
+    patches = module.load_patches()
     patch_ids = [patch.identifier for patch in patches]
     unique = set()
     duplicates = [p_id for p_id in patch_ids if p_id in unique or unique.add(p_id)]
