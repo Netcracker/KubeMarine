@@ -179,8 +179,8 @@ class UpgradeCRI(unittest.TestCase):
 
         self.changed_config['thirdparties'] = {'crictl': [self.kubernetes_version]}
         res = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run:
             action = get_patch_by_id('upgrade_crictl').action
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
@@ -276,8 +276,8 @@ class UpgradeCRI(unittest.TestCase):
 
         self.changed_config['plugins'] = {'calico': [self.kubernetes_version]}
         res = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run:
             action = get_patch_by_id('upgrade_calico').action
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
@@ -288,8 +288,8 @@ class UpgradeCRI(unittest.TestCase):
 
     def _run_and_check(self, called: bool) -> demo.FakeResources:
         resources = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__) as run:
             action = get_patch_by_id('upgrade_cri').action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
@@ -403,8 +403,8 @@ class UpgradePlugins(unittest.TestCase):
 
     def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
         resources = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
@@ -459,8 +459,8 @@ class UpgradeThirdparties(unittest.TestCase):
 
         self.changed_config['plugins'] = {'calico': [self.kubernetes_version]}
         res = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run:
             action = get_patch_by_id('upgrade_calico').action
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
@@ -523,8 +523,8 @@ class UpgradeThirdparties(unittest.TestCase):
 
         self.changed_config['packages'] = {'haproxy': {'version_debian': True}}
         res = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run:
             action = get_patch_by_id('upgrade_haproxy').action
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
@@ -535,8 +535,8 @@ class UpgradeThirdparties(unittest.TestCase):
 
     def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
         resources = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
@@ -675,8 +675,8 @@ class UpgradeBalancers(unittest.TestCase):
 
     def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
         resources = self._new_resources()
-        with (mock_load_upgrade_config(self.changed_config),
-              mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run):
+        with mock_load_upgrade_config(self.changed_config), \
+                mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")

@@ -200,9 +200,9 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
     def test_require_package_redefinition(self):
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
-        with (utils.backup_globals(),
-              utils.assert_raises_kme(self, "KME0010", package='containerd',
-                                      previous_version_spec='.*', next_version_spec='.*')):
+        with utils.backup_globals(), \
+                utils.assert_raises_kme(self, "KME0010", package='containerd',
+                                        previous_version_spec='.*', next_version_spec='.*'):
             self._patch_globals('containerd', 'debian', equal=True)
             self._new_cluster()
 
@@ -341,28 +341,28 @@ class UpgradePluginsEnrichment(unittest.TestCase):
 
     def test_require_image_redefinition_recursive(self):
         self.inventory['plugins'].setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
-        with (utils.backup_globals(),
-              utils.assert_raises_kme(self, "KME0009",
-                                      key='image', plugin_name='calico',
-                                      previous_version_spec='.*', next_version_spec='.*')):
+        with utils.backup_globals(), \
+                utils.assert_raises_kme(self, "KME0009",
+                                        key='image', plugin_name='calico',
+                                        previous_version_spec='.*', next_version_spec='.*'):
             self._patch_globals('calico', equal=True)
             self._new_cluster()
 
     def test_require_helper_pod_image_redefinition(self):
         self.inventory['plugins'].setdefault('local-path-provisioner', {})['helper-pod-image'] = 'A'
-        with (utils.backup_globals(),
-              utils.assert_raises_kme(self, "KME0009",
-                                      key='helper-pod-image', plugin_name='local-path-provisioner',
-                                      previous_version_spec='.*', next_version_spec='.*')):
+        with utils.backup_globals(), \
+                utils.assert_raises_kme(self, "KME0009",
+                                        key='helper-pod-image', plugin_name='local-path-provisioner',
+                                        previous_version_spec='.*', next_version_spec='.*'):
             self._patch_globals('local-path-provisioner', equal=True)
             self._new_cluster()
 
     def test_require_version_redefinition(self):
         self.inventory['plugins'].setdefault('nginx-ingress-controller', {})['version'] = 'fake version'
-        with (utils.backup_globals(),
-              utils.assert_raises_kme(self, "KME0009",
-                                      key='version', plugin_name='nginx-ingress-controller',
-                                      previous_version_spec='.*', next_version_spec='.*')):
+        with utils.backup_globals(), \
+                utils.assert_raises_kme(self, "KME0009",
+                                        key='version', plugin_name='nginx-ingress-controller',
+                                        previous_version_spec='.*', next_version_spec='.*'):
             self._patch_globals('nginx-ingress-controller', equal=True)
             self._new_cluster()
 
