@@ -326,7 +326,7 @@ class KubernetesCluster(Environment):
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
             remove_node.remove_node_finalize_inventory,
-            admission.finalize_inventory,
+            admission.update_finalized_inventory,
             defaults.escape_jinja_characters_for_inventory,
             controlplane.controlplane_finalize_inventory,
         }
