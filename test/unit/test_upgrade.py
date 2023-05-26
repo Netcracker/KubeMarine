@@ -22,7 +22,7 @@ from kubemarine import kubernetes
 from kubemarine.core import errors, utils as kutils, static, flow
 from kubemarine.procedures import upgrade
 from kubemarine import demo
-from test.unit import utils
+from test.unit import utils, EnvSetup
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
@@ -92,7 +92,7 @@ def set_cri(inventory: dict, cri: str):
     inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = cri
 
 
-class UpgradeDefaultsEnrichment(unittest.TestCase):
+class UpgradeDefaultsEnrichment(EnvSetup):
 
     def prepare_inventory(self, old, new):
         self.inventory, self.context = generate_upgrade_environment(old)
@@ -140,7 +140,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
             self._new_cluster()
 
 
-class UpgradePackagesEnrichment(unittest.TestCase):
+class UpgradePackagesEnrichment(EnvSetup):
     def setUp(self):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
@@ -303,7 +303,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         self.assertIsNone(final_inventory['services']['packages']['upgrade'].get('include'))
 
 
-class UpgradePluginsEnrichment(unittest.TestCase):
+class UpgradePluginsEnrichment(EnvSetup):
     def setUp(self):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
@@ -367,7 +367,7 @@ class UpgradePluginsEnrichment(unittest.TestCase):
             self._new_cluster()
 
 
-class ThirdpartiesEnrichment(unittest.TestCase):
+class ThirdpartiesEnrichment(EnvSetup):
     def setUp(self):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'

@@ -18,9 +18,10 @@ from kubemarine import demo
 from kubemarine.core import static, utils
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest
+from test.unit import EnvSetup
 
 
-class _AbstractManifestEnrichmentTest(unittest.TestCase):
+class _AbstractManifestEnrichmentTest(EnvSetup):
     def commonSetUp(self, plugin_name):
         self.plugin_name = plugin_name
         self.k8s_versions = list(static.GLOBALS['compatibility_map']['software']['kubeadm'].keys())

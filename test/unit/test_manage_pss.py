@@ -17,10 +17,10 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors
-from test.unit import utils
+from test.unit import utils, EnvSetup
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.inventory['rbac'] = {
@@ -76,7 +76,7 @@ class EnrichmentValidation(unittest.TestCase):
             self._create_cluster()
 
 
-class EnrichmentAndFinalization(unittest.TestCase):
+class EnrichmentAndFinalization(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.MINIHA)
         self.inventory['rbac'] = {

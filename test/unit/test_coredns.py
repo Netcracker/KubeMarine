@@ -17,9 +17,10 @@
 import unittest
 
 from kubemarine import coredns, system, demo
+from test.unit import EnvSetup
 
 
-class CorednsDefaultsEnrichment(unittest.TestCase):
+class CorednsDefaultsEnrichment(EnvSetup):
 
     def test_add_hosts_config(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -60,7 +61,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         self.assertEquals('1.2.3.4 example.org', cluster.inventory['services']['coredns']['configmap']['Hosts'])
 
 
-class CorednsGenerator(unittest.TestCase):
+class CorednsGenerator(EnvSetup):
 
     def test_configmap_generation(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)

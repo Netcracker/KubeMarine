@@ -17,9 +17,10 @@ import unittest
 from kubemarine import demo
 from kubemarine.core import errors
 from kubemarine.plugins import verify_template, apply_template
+from test.unit import EnvSetup
 
 
-class TestTemplate(unittest.TestCase):
+class TestTemplate(EnvSetup):
 
     def test_verify_missed_source(self):
         for procedure_type in ('template', 'config'):
@@ -120,3 +121,7 @@ class TestTemplate(unittest.TestCase):
                         if len(history) == 1 and history[0]["used_times"] == 1:
                             cnt += 1
                     self.assertEqual(1, cnt)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -17,9 +17,10 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors
+from test.unit import EnvSetup
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def _inventory(self, admission):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.inventory['rbac'] = {

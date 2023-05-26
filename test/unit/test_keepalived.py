@@ -18,13 +18,12 @@ import unittest
 
 from kubemarine import demo, keepalived, yum
 from kubemarine.core import yaml
-from test.unit import utils
+from test.unit import utils, EnvSetup
 
 
-class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
+class TestKeepalivedDefaultsEnrichment(EnvSetup):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.cluster = demo.new_cluster(self.inventory)
         self.cluster2 = demo.new_cluster(self.inventory)
@@ -154,7 +153,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertEqual('952184e0', cluster.inventory['vrrp_ips'][0]['password'])
 
 
-class TestKeepalivedInstallation(unittest.TestCase):
+class TestKeepalivedInstallation(EnvSetup):
 
     def test_keepalived_installation_when_already_installed(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
@@ -246,7 +245,7 @@ class TestKeepalivedConfigGeneration(unittest.TestCase):
         pass
 
 
-class TestKeepalivedConfigApply(unittest.TestCase):
+class TestKeepalivedConfigApply(EnvSetup):
 
     def test_config_apply(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)

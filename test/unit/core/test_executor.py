@@ -22,11 +22,11 @@ from invoke import UnexpectedExit
 
 from kubemarine import demo
 from kubemarine.core.executor import RemoteExecutor
+from test.unit import EnvSetup
 
 
-class RemoteExecutorTest(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class RemoteExecutorTest(EnvSetup):
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_get_merged_results_all_success(self):
@@ -148,3 +148,7 @@ class RemoteExecutorTest(unittest.TestCase):
             exe.flush()
             with self.assertRaises(GroupException):
                 exe.get_merged_result()
+
+
+if __name__ == '__main__':
+    unittest.main()

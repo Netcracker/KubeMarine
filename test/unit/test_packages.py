@@ -21,7 +21,7 @@ from kubemarine.core import static, errors
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
-from test.unit import utils
+from test.unit import utils, EnvSetup
 
 
 def new_debian_cluster(inventory: dict) -> FakeKubernetesCluster:
@@ -95,7 +95,7 @@ def cache_installed_packages(cluster: FakeKubernetesCluster):
     add_node.cache_installed_packages(cluster)
 
 
-class PackagesEnrichment(unittest.TestCase):
+class PackagesEnrichment(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.inventory['services']['packages'] = {}
@@ -146,7 +146,7 @@ class PackagesEnrichment(unittest.TestCase):
             self.assertEqual(['*'], packages_section[type_]['include'])
 
 
-class AssociationsEnrichment(unittest.TestCase):
+class AssociationsEnrichment(EnvSetup):
     def test_simple_enrich_defaults(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         cluster = new_debian_cluster(inventory)
@@ -250,7 +250,7 @@ class AssociationsEnrichment(unittest.TestCase):
         return nodes_context
 
 
-class PackagesUtilities(unittest.TestCase):
+class PackagesUtilities(EnvSetup):
     def test_get_package_name_rhel(self):
         self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03.15-3.el7.x86_64'))
         self.assertEqual('docker-ce', get_package_name('rhel', 'docker-ce-19.03*'))
@@ -310,7 +310,7 @@ class PackagesUtilities(unittest.TestCase):
                          "Incorrect set of hosts with detected package version")
 
 
-class CacheVersions(unittest.TestCase):
+class CacheVersions(EnvSetup):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.context = demo.create_silent_context(procedure='add_node')

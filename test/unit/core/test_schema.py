@@ -19,10 +19,10 @@ from unittest import mock
 from kubemarine import demo, coredns, __main__
 from kubemarine.core import errors, schema, yaml
 from kubemarine.procedures import install
-from test.unit import utils as test_utils
+from test.unit import utils as test_utils, EnvSetup
 
 
-class FinalizedInventoryValidation(unittest.TestCase):
+class FinalizedInventoryValidation(EnvSetup):
     def _check_finalized_validation(self, inventory: dict):
         try:
             return demo.new_cluster(inventory)
@@ -69,7 +69,7 @@ class FinalizedInventoryValidation(unittest.TestCase):
         self._check_finalized_validation(finalized_inventory)
 
 
-class TestValidExamples(unittest.TestCase):
+class TestValidExamples(EnvSetup):
     def test_cluster_examples_valid(self):
         inventories_dir = os.path.abspath(f"{__file__}/../../../../examples/cluster.yaml")
         self.assertTrue(os.path.isdir(inventories_dir), "Examples not found")
@@ -114,7 +114,7 @@ class TestValidExamples(unittest.TestCase):
                 self.fail(f"Enrichment of {relpath} failed: {e}")
 
 
-class TestErrorHeuristics(unittest.TestCase):
+class TestErrorHeuristics(EnvSetup):
     def test_not_of_types(self):
         """
         'vrrp_ips' section is an example where each item can be either string or object.

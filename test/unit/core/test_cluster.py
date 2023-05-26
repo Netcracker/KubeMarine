@@ -18,18 +18,17 @@ import unittest
 
 from kubemarine import demo
 from kubemarine.demo import FakeKubernetesCluster
+from test.unit import EnvSetup
 
 
 def get_os_family(cluster: FakeKubernetesCluster):
     return cluster.get_os_family()
 
 
-class KubernetesClusterTest(unittest.TestCase):
-
+class KubernetesClusterTest(EnvSetup):
     # TODO: add more tests
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_make_group_from_strs(self):
@@ -108,3 +107,7 @@ class KubernetesClusterTest(unittest.TestCase):
             'version': '7.9'
         }
         return nodes_context
+
+
+if __name__ == '__main__':
+    unittest.main()

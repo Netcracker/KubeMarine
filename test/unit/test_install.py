@@ -17,9 +17,10 @@ import unittest
 from kubemarine import demo, packages
 from kubemarine.core import static
 from kubemarine.procedures import install
+from test.unit import EnvSetup
 
 
-class ManageMandatoryPackages(unittest.TestCase):
+class ManageMandatoryPackages(EnvSetup):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.context = demo.create_silent_context()

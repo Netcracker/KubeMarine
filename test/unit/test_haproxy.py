@@ -18,9 +18,10 @@ import unittest
 
 from kubemarine import haproxy, yum
 from kubemarine import demo
+from test.unit import EnvSetup
 
 
-class HAProxyDefaultsEnrichment(unittest.TestCase):
+class HAProxyDefaultsEnrichment(EnvSetup):
 
     def test_correct_inventories(self):
         correct_schemes = [
@@ -62,7 +63,7 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
                                      "Invalid exception message")
 
 
-class TestHaproxyInstallation(unittest.TestCase):
+class TestHaproxyInstallation(EnvSetup):
 
     def test_haproxy_installation_when_already_installed(self):
         inventory = demo.generate_inventory(**demo.FULLHA)

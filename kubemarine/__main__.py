@@ -197,7 +197,9 @@ def selftest():
     print("\nTrying fake cluster...")
 
     from kubemarine import demo
+    from kubemarine.core import os
 
+    os.Environ([])
     demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     print('\nValidating patch duplicates ...')

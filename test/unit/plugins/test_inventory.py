@@ -17,9 +17,10 @@ from copy import deepcopy
 from kubemarine import demo
 from kubemarine.core import errors
 from kubemarine.plugins import manifest
+from test.unit import EnvSetup
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def test_unsupported_procedure_type(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['plugins'] = {'custom': {'installation': {'procedures': [

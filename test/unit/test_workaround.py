@@ -19,10 +19,12 @@ import unittest
 from kubemarine import demo
 from paramiko.ssh_exception import SSHException
 
+from test.unit import EnvSetup
+
 ETCD_LEADER_CHANGED_MESSAGE = 'Error from server: rpc error: code = Unavailable desc = etcdserver: leader changed'
 
 
-class TestUnexpectedErrors(unittest.TestCase):
+class TestUnexpectedErrors(EnvSetup):
 
     def test_etcd_leader_changed_workaround(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))

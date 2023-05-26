@@ -16,9 +16,10 @@ import unittest
 
 from kubemarine import demo
 from kubemarine.core import errors
+from test.unit import EnvSetup
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.MINIHA)
         self.context = demo.create_silent_context(procedure='check_paas')

@@ -23,7 +23,7 @@ from invoke import UnexpectedExit
 
 from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core import group, flow, connections
+from kubemarine.core import group, flow, connections, os
 from kubemarine.core.connections import Connections
 from kubemarine.core.group import NodeGroup, NodeGroupResult, _GenericResult, _HostToResult
 from kubemarine.core.resources import DynamicResources
@@ -220,6 +220,10 @@ class FakeResources(DynamicResources):
             fake_shell=self.fake_shell, fake_fs=self.fake_fs
         )
         return self.last_cluster
+
+    def _create_logger(self):
+        os._environ = None
+        return super()._create_logger()
 
 
 class FakeConnection(fabric.connection.Connection):

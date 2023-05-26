@@ -18,6 +18,7 @@ import io
 import unittest
 
 from kubemarine import demo, system
+from test.unit import EnvSetup
 
 
 class TestInventoryGenerator(unittest.TestCase):
@@ -27,17 +28,16 @@ class TestInventoryGenerator(unittest.TestCase):
         self.assertEqual(7, len(inventory['nodes']), msg="The received number of nodes does not match the expected")
 
 
-class TestNewCluster(unittest.TestCase):
+class TestNewCluster(EnvSetup):
 
     def test_created_cluster_groups(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         self.assertEqual(1, len(cluster.nodes['balancer'].nodes), msg="Incorrect number of balancers for a full scheme")
 
 
-class TestFakeShell(unittest.TestCase):
+class TestFakeShell(EnvSetup):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_run(self):
@@ -72,10 +72,9 @@ class TestFakeShell(unittest.TestCase):
                              msg="Wrong number of reboots in history")
 
 
-class TestFakeFS(unittest.TestCase):
+class TestFakeFS(EnvSetup):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_put_string(self):

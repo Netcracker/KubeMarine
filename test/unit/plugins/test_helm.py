@@ -18,9 +18,10 @@ import unittest
 
 from kubemarine import demo, plugins
 from kubemarine.core import yaml
+from test.unit import EnvSetup
 
 
-class TestHelmProcessChartValues(unittest.TestCase):
+class TestHelmProcessChartValues(EnvSetup):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
         self.chart_path = os.path.join(self.tmpdir.name, 'chart')

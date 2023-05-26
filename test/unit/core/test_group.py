@@ -20,12 +20,12 @@ import fabric
 
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine import demo
+from test.unit import EnvSetup
 
 
-class NodeGroupResultsTest(unittest.TestCase):
+class NodeGroupResultsTest(EnvSetup):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_nodegroup_result_to_str(self):
@@ -205,3 +205,7 @@ class NodeGroupResultsTest(unittest.TestCase):
         results = NodeGroupResult(self.cluster, host_to_result)
         actual_group = results.get_nonzero_nodes_group()
         self.assertEqual(expected_nonzero_group, actual_group, msg="Actual group contains different nodes than expected")
+
+
+if __name__ == '__main__':
+    unittest.main()

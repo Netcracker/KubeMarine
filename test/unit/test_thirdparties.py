@@ -17,9 +17,10 @@
 import unittest
 from kubemarine import demo, thirdparties
 from kubemarine.core import errors
+from test.unit import EnvSetup
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def test_missed_source(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'] = {'thirdparties': {
@@ -29,7 +30,7 @@ class EnrichmentValidation(unittest.TestCase):
             demo.new_cluster(inventory)
 
 
-class SHACalculationTest(unittest.TestCase):
+class SHACalculationTest(EnvSetup):
 
     customized_services = {
         'kubeadm': {

@@ -24,8 +24,7 @@ import invoke
 
 from kubemarine.core import flow, static, errors, utils
 from kubemarine import demo
-from test.unit import utils as test_utils
-
+from test.unit import utils as test_utils, EnvSetup
 
 test_msg = "test_function_return_result"
 
@@ -58,7 +57,7 @@ def replace_a_func_in_dict(test_res):
     return ast.literal_eval(test_res_str)
 
 
-class FlowTest(unittest.TestCase):
+class FlowTest(EnvSetup):
     def setUp(self) -> None:
         self.light_fake_shell = demo.FakeShell()
 

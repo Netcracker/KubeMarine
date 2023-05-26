@@ -17,7 +17,7 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors
-from test.unit import utils
+from test.unit import utils, EnvSetup
 
 
 def generate_migrate_cri_environment() -> (dict, dict):
@@ -29,7 +29,7 @@ def generate_migrate_cri_environment() -> (dict, dict):
     return inventory, context
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context(procedure='migrate_cri')
@@ -53,7 +53,7 @@ class EnrichmentValidation(unittest.TestCase):
             self._new_cluster()
 
 
-class MigrateCriPackagesEnrichment(unittest.TestCase):
+class MigrateCriPackagesEnrichment(EnvSetup):
     def prepare_procedure_inventory(self):
         return {
             'cri': {

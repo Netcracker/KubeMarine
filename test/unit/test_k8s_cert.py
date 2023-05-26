@@ -16,6 +16,7 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import demo
+from test.unit import EnvSetup
 
 supported_k8s_certs = ["apiserver", "apiserver-etcd-client", "apiserver-kubelet-client",
                        "etcd-healthcheck-client", "etcd-peer", "etcd-server",
@@ -23,11 +24,11 @@ supported_k8s_certs = ["apiserver", "apiserver-etcd-client", "apiserver-kubelet-
                        "front-proxy-client"]
 
 
-class K8sCertTest(unittest.TestCase):
+class K8sCertTest(EnvSetup):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context(procedure='cert_renew')
-        self.cert_renew = {
+        self.cert_renew: dict = {
             'kubernetes': {
                 'cert-list': []
             }
@@ -72,3 +73,7 @@ class K8sCertTest(unittest.TestCase):
         self.cert_renew['kubernetes']['cert-list'] = []
         with self.assertRaisesRegex(Exception, "Number of items equal to 0 is less than the minimum of 1"):
             self._new_cluster()
+
+
+if __name__ == '__main__':
+    unittest.main()

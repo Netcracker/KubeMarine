@@ -21,9 +21,10 @@ import fabric
 
 from kubemarine import demo
 from kubemarine.demo import FakeKubernetesCluster
+from test.unit import EnvSetup
 
 
-class TestGroupCreation(unittest.TestCase):
+class TestGroupCreation(EnvSetup):
 
     # Test should from the following cluster:
     # master-1 roles: [master, worker]
@@ -64,11 +65,12 @@ class TestGroupCreation(unittest.TestCase):
         self.assertDictEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
 
 
-class TestGroupCall(unittest.TestCase):
+class TestGroupCall(EnvSetup):
     cluster: FakeKubernetesCluster = None
 
     @classmethod
     def setUpClass(cls):
+        EnvSetup.setUpClass()
         cls.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def tearDown(self):

@@ -18,9 +18,10 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors, utils
+from test.unit import EnvSetup
 
 
-class TestInventoryValidation(unittest.TestCase):
+class TestInventoryValidation(EnvSetup):
 
     def test_labels_check(self):
         inventory = demo.generate_inventory(master=0, balancer=1, worker=0)

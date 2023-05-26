@@ -11,4 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import unittest
 
+from kubemarine.core import os
+
+
+class EnvSetup(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Some tests do not reset Environ after run.
+        os._environ = None
+        os.Environ([])
+
+    @classmethod
+    def tearDownClass(cls):
+        os._environ = None

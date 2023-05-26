@@ -16,10 +16,11 @@ import unittest
 from kubemarine import demo
 from kubemarine.core import errors
 from kubemarine.plugins.manifest import Manifest
+from test.unit import EnvSetup
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 
-class EnrichmentValidation(unittest.TestCase):
+class EnrichmentValidation(EnvSetup):
     def install(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context()

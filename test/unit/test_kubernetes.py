@@ -17,9 +17,10 @@ from textwrap import dedent
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import summary
+from test.unit import EnvSetup
 
 
-class TestInventoryValidation(unittest.TestCase):
+class TestInventoryValidation(EnvSetup):
     def test_schedule_running_nodes_report(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.ALLINONE))
         stdout = dedent(

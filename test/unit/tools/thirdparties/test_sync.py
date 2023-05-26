@@ -32,7 +32,7 @@ from scripts.thirdparties.src.software.plugins import (
 from scripts.thirdparties.src.tracker import (
     SummaryTracker, ERROR_PREVIOUS_MINOR
 )
-from test.unit import utils as test_utils
+from test.unit import utils as test_utils, EnvSetup
 from test.unit.tools.thirdparties.stub import (
     FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
     FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig
@@ -45,7 +45,7 @@ for config_filename in ('kubernetes_images.yaml', 'packages.yaml', 'plugins.yaml
     ORIGINAL_COMPATIBILITY_MAPS[config_filename] = static.load_compatibility_map(config_filename)
 
 
-class SynchronizationTest(unittest.TestCase):
+class SynchronizationTest(EnvSetup):
     def setUp(self) -> None:
         self.compatibility = FakeInternalCompatibility()
         self.kubernetes_versions = FakeKubernetesVersions()
