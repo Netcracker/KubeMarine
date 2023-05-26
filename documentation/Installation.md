@@ -94,6 +94,8 @@ This section provides information about the inventory, features, and steps for i
     - [Dynamic Variables](#dynamic-variables)
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
+    - [Environment Variables](#environment-variables)
+      - [Masked Variables](#masked-variables)
   - [Installation without Internet Resources](#installation-without-internet-resources)
 - [Installation Procedure](#installation-procedure)
   - [Installation Tasks Description](#installation-tasks-description)
@@ -4689,6 +4691,10 @@ The `values` parameter specifies the YAML formatted values for the chart that ov
 The values from this parameter also override the values from the `values_file` parameter.
 This parameter is optional.
 
+The `values_stdin` parameter specifies the YAML formatted values for the chart that are passed to the "helm" executable via stdin.
+The values from this parameter have the highest priority.
+This parameter is optional.
+
 The `namespace` parameter specifies the cloud namespace where chart should be installed. This parameter is optional.
 
 The `release` parameter specifies target Helm release. The parameter is optional and is equal to chart name by default.
@@ -4723,10 +4729,11 @@ is further used throughout the entire installation.
 
 **Note**: If [Dump Files](#dump-files) is enabled, then you can see merged **cluster.yaml** file version in the dump directory.
 
-To make sure that the information in the configuration file is not duplicated, the following advanced functionality appears in the yaml file:
+To simplify maintenance of the configuration file, the following advanced functionality appears in the yaml file:
 
 * List merge strategy
 * Dynamic variables
+* Environment Variables
 
 ### List Merge Strategy
 
@@ -4968,6 +4975,7 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
+* Dynamic variables are not supported in inventory files of maintenance procedures (e. g. upgrade).
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
@@ -4999,10 +5007,98 @@ Dynamic variables have some limitations that should be considered when working w
 
 Inventory strings can have strings containing characters that Jinja2 considers as their expressions. For example, if you specify a golang template. To avoid rendering errors for such expressions, it is possible to wrap them in exceptions `{% raw %}``{% endraw %}`. 
 For example:
-
 ```yaml
 authority: '{% raw %}{{ .Name }}{% endraw %} 3600 IN SOA'
 ```
+
+### Environment Variables
+
+Kubemarine supports environment variables inside the following places:
+* The configuration file **cluster.yaml**.
+* Jinja2 template files for plugins. For more information, refer to [template](#template).
+
+Environment variables are available through the predefined `env` Jinja2 variable.
+Refer to them inside the configuration file in the following way:
+
+```yaml
+section:
+  variable: '{{ env.ENV_VARIABLE_NAME }}'
+```
+
+Environment variables inherit all features and limitations of the [Dynamic Variables](#dynamic-variables) including but not limited to:
+* Ability to participate in full-fledged Jinja2 templates.
+* Recursive pointing to other variables pointing to environment variables.
+
+Consider the following more complex example:
+
+```yaml
+values:
+  variable: '{{ env["ENV_VARIABLE_NAME"] | default("nothing") }}'
+
+plugins:
+  my_plugin:
+    variable: '{{ values.variable }}'
+```
+
+The above configuration generates the following result provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
+
+```yaml
+values:
+  variable: ENV_VARIABLE_VALUE
+
+plugins:
+  my_plugin:
+    variable: ENV_VARIABLE_VALUE
+```
+
+#### Masked Variables
+
+It is possible to hold secrets in the environment variables.
+To hide value of an environment variable `PASSWORD`, define the following section in the inventory:
+
+```yaml
+runtime_values:
+  masked:
+    - PASSWORD
+```
+
+If the enviroment variable is to be masked, it is allowed for use only in the following sections of the inventory:
+* `values`
+* `plugins.*.installation.procedures.*.helm.values_stdin`
+
+It is still allowed for use in Jinja2 [template](#template) files for plugins, in particular through recursive reference to the `values` section. 
+
+The value of the variable must:
+* Be a single line.
+* Be 6 characters or longer
+* Consist of Base64 alphabet (RFC4648) and any of `@`, `:`, `.`, and `~` characters.
+
+The values of the secrets are masked with `******` in all logs of the deployer.
+They are also masked in the files that are produced on the deployer with the following exceptions:
+* kubeconfig
+* account-tokens.yaml
+* Backup file. For more information, refer to [backup_location](/documentation/Maintenance.md#backup_location-parameter) parameter of the `backup` procedure.
+* Files inside `dump/backup/` directory.
+  These files are normally deleted after the `backup` procedure is finished, but may still remain in case of abnormal exiting.
+
+It is the user responsibility to not share these files with those who have no access to the secrets.
+
+Besides, there are the following assumptions about the masked variables:
+* The secrets are not guaranteed to be masked if custom [python](#python) or [ansible](#ansible) plugin installation procedures are used.
+* If any input file initially contains secrets in plain text, they may be revealed.
+* After masking is applied to the content of files, the structure of the files may be broken.
+  For example, `*` is a special character in .yaml and may broke its resolving by external tools.
+
+Other recommendations to work with the secrets and the masked variables:
+* Use as much unique values of the secrets as possible.
+  More common values increase a chance that other unrelated data will also be masked.
+  In turn, this makes it possible to guess the secret value from the context.
+* Avoid any operation with the values of secrets inside Jinja2 expressions.
+  It is advisable to just refer to the variable via `'{{ env.SECRET }}'` and that's all.
+  Recursive reference is still possible.
+* Avoid unnecessary changing of the secret value inside the environment variable.
+  Once the secret is changed, previous value of the secret is no longer a secret to Kubemarine.
+
 ## Installation without Internet Resources
 
 If you want to install Kubernetes in a private environment, without access to the internet, then you need to redefine the addresses of remote resources.
