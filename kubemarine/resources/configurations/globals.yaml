@@ -383,6 +383,7 @@ logging:
     stdout:
       level: debug
       correct_newlines: True
+      colorize: true
     dump:
       level: verbose
       format: "%(asctime)s %(process)s %(thread)s %(name)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"

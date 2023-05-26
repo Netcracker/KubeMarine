@@ -36,7 +36,7 @@ from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.core.group import NodeGroupResult
 
 def connection_ssh_connectivity(cluster):
-    with TestCase(cluster.context['testsuite'], '001', 'SSH', 'Connectivity', default_results='Connected'):
+    with TestCase(cluster, '001', 'SSH', 'Connectivity', default_results='Connected'):
         failed_nodes = []
         for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
             try:
@@ -54,7 +54,7 @@ def connection_ssh_connectivity(cluster):
 
 
 def connection_ssh_latency_single(cluster):
-    with TestCase(cluster.context['testsuite'], '002',  'SSH', 'Latency - Single Thread',
+    with TestCase(cluster, '002',  'SSH', 'Latency - Single Thread',
                   minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical'],
                   recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended']) as tc:
         i = 0
@@ -82,7 +82,7 @@ def connection_ssh_latency_single(cluster):
 
 
 def connection_ssh_latency_multiple(cluster):
-    with TestCase(cluster.context['testsuite'], '003',  'SSH', 'Latency - Multi Thread',
+    with TestCase(cluster, '003',  'SSH', 'Latency - Multi Thread',
                   minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical'],
                   recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended']) as tc:
         i = 0
@@ -109,7 +109,7 @@ def connection_ssh_latency_multiple(cluster):
 
 
 def connection_sudoer_access(cluster):
-    with TestCase(cluster.context['testsuite'], '004', 'SSH', 'Sudoer Access', default_results='Access provided'):
+    with TestCase(cluster, '004', 'SSH', 'Sudoer Access', default_results='Access provided'):
         non_root = []
         for host, node_context in cluster.context['nodes'].items():
             access_info = node_context['access']
@@ -130,7 +130,7 @@ def hardware_members_amount(cluster, group_name):
     if group_name == 'all':
         beauty_name = 'Total Node'
 
-    with TestCase(cluster.context['testsuite'], '005',  'Hardware', '%ss Amount' % beauty_name,
+    with TestCase(cluster, '005',  'Hardware', '%ss Amount' % beauty_name,
                   minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['amount'],
                   recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['amount']) as tc:
         amount = 0
@@ -168,7 +168,7 @@ def hardware_cpu(cluster, group_name):
     minimal_cpu = cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'] \
         if group_name == 'balancer' or cluster.nodes.get('all').nodes_amount() > 1 \
         else cluster.globals['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
-    with TestCase(cluster.context['testsuite'], '006',  'Hardware', 'VCPUs Amount - %ss' % group_name.capitalize(),
+    with TestCase(cluster, '006',  'Hardware', 'VCPUs Amount - %ss' % group_name.capitalize(),
                   minimal=minimal_cpu,
                   recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['vcpu']) as tc:
         if cluster.nodes.get(group_name) is None or cluster.nodes[group_name].is_empty():
@@ -205,7 +205,7 @@ def hardware_cpu(cluster, group_name):
 
 
 def hardware_ram(cluster, group_name):
-    with TestCase(cluster.context['testsuite'], '007',  'Hardware', 'RAM Amount - %ss' % group_name.capitalize(),
+    with TestCase(cluster, '007',  'Hardware', 'RAM Amount - %ss' % group_name.capitalize(),
                   minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'],
                   recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']) as tc:
         if cluster.nodes.get(group_name) is None or cluster.nodes[group_name].is_empty():
@@ -237,7 +237,7 @@ def hardware_ram(cluster, group_name):
 
 
 def system_distributive(cluster):
-    with TestCase(cluster.context['testsuite'], '008', 'System', 'Distibutive') as tc:
+    with TestCase(cluster, '008', 'System', 'Distibutive') as tc:
         supported_distributives = cluster.globals['compatibility_map']['distributives'].keys()
 
         cluster.log.debug(system.fetch_os_versions(cluster))
@@ -292,7 +292,7 @@ def check_kernel_version(cluster):
     """
     This method compares the linux kernel version with the bad version
     """
-    with TestCase(cluster.context['testsuite'], '015', "Software", "Kernel version") as tc:
+    with TestCase(cluster, '015', "Software", "Kernel version") as tc:
         bad_results = {}
         unstable_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('unstable_kernel')
         unstable_kernel_centos = []
@@ -318,7 +318,7 @@ def check_kernel_version(cluster):
 
 
 def check_access_to_thirdparties(cluster: KubernetesCluster):
-    with TestCase(cluster.context['testsuite'], '012', 'Software', 'Thirdparties Availability') as tc:
+    with TestCase(cluster, '012', 'Software', 'Thirdparties Availability') as tc:
         detect_preinstalled_python(cluster)
         broken = []
         nodes_without_python = set()
@@ -414,7 +414,7 @@ def check_package_repositories(cluster: KubernetesCluster):
 
 
 def check_access_to_package_repositories(cluster: KubernetesCluster):
-    with TestCase(cluster.context['testsuite'], '013', 'Software', 'Package Repositories') as tc:
+    with TestCase(cluster, '013', 'Software', 'Package Repositories') as tc:
         detect_preinstalled_python(cluster)
         check_resolv_conf(cluster)
         broken = []
@@ -507,7 +507,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 
 
 def check_access_to_packages(cluster: KubernetesCluster):
-    with TestCase(cluster.context['testsuite'], '014', 'Software', 'Package Availability') as tc:
+    with TestCase(cluster, '014', 'Software', 'Package Availability') as tc:
         check_package_repositories(cluster)
         broken = []
         warnings = []
@@ -673,7 +673,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: dict, subnet):
 
 
 def pod_subnet_connectivity(cluster):
-    with TestCase(cluster.context['testsuite'], '009', 'Network', 'PodSubnet', default_results='Connected'),\
+    with TestCase(cluster, '009', 'Network', 'PodSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
         nodes = _get_not_balancers(cluster)
@@ -689,7 +689,7 @@ def pod_subnet_connectivity(cluster):
 
 
 def service_subnet_connectivity(cluster):
-    with TestCase(cluster.context['testsuite'], '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
+    with TestCase(cluster, '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
         nodes = _get_not_balancers(cluster)
@@ -861,7 +861,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: dict, tcp_ports):
 
 
 def check_tcp_ports(cluster):
-    with TestCase(cluster.context['testsuite'], '011', 'Network', 'TCPPorts', default_results='Connected'),\
+    with TestCase(cluster, '011', 'Network', 'TCPPorts', default_results='Connected'),\
             suspend_firewalld(cluster):
         tcp_ports = ["80", "443", "179", "5473", "6443", "8443", "2379", "2380", "9091", "9094", "10250", "10254",
                      "10257", "10259", "30001", "30002"]
