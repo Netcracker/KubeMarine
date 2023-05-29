@@ -796,6 +796,16 @@ def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: di
 
     return inventory_to_finalize
 
+# update PSP/PSS fields in the inventory dumped to cluster_finalized.yaml
+def update_finalized_inventory(cluster, inventory_to_finalize):
+    if cluster.context.get('initial_procedure') == 'manage_pss':
+        current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("pss", {})
+        current_config["pod-security"] = cluster.procedure_inventory["pss"].get("pod-security", current_config.get("pod-security", "enabled"))
+    elif cluster.context.get('initial_procedure') == 'manage_psp':
+        current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("psp", {})
+        current_config["pod-security"] = cluster.procedure_inventory["psp"].get("pod-security", current_config.get("pod-security", "enabled"))
+
+    return inventory_to_finalize
 
 def copy_pss(group):
     if  group.cluster.inventory['rbac']['admission'] !=  "pss":

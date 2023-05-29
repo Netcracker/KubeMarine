@@ -319,13 +319,14 @@ class KubernetesCluster(Environment):
     def make_finalized_inventory(self):
         from kubemarine.core import defaults
         from kubemarine.procedures import remove_node
-        from kubemarine import controlplane, cri, packages
+        from kubemarine import admission, controlplane, cri, packages
 
         cluster_finalized_functions = {
             packages.cache_package_versions,
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
             remove_node.remove_node_finalize_inventory,
+            admission.update_finalized_inventory,
             defaults.escape_jinja_characters_for_inventory,
             controlplane.controlplane_finalize_inventory,
         }
