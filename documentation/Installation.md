@@ -237,8 +237,8 @@ installation on the same OS impossible. To avoid it one should implement those s
 
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
 
-**Warning**: RHEL 8 does not have python preinstalled. For `check_iaas` to work correctly, need to install python on the nodes. Should follow these steps before the installation procedure
-1. Install `python 3.9` from standard RHEL repository:
+**Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
+* Install `python 3.9` from the standard RHEL repository:
 ```
 # dnf install python3.9 -y
 ```
