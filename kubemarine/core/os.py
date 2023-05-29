@@ -152,11 +152,11 @@ class _MaskedNames:
 
         self._masked.add(self._encode_name(name))
 
-    def __contains__(self, name):
+    def __contains__(self, name: str):
         return self._encode_name(name) in self._masked
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._masked)
+        return iter(os.environ.decodekey(name) for name in self._masked)
 
     def __len__(self):
         return len(self._masked)
