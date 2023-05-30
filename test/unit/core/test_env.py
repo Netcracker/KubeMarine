@@ -168,15 +168,20 @@ class TestEnvironmentVariables(unittest.TestCase):
         }
         self.inventory['runtime_values'] = {'masked': ['SECRET']}
         resources = self._new_resources()
-        with mock.patch.dict(os.environ, {'SECRET': 'secret_value'}):
-            resources.logger().debug("Secret secret_value in text.")
-            resources.logger().debug("%s in another text.", "secret_value")
+        secret = 'AZaz09-=+/@_.:~'
+        base64_secret = 'QVphejA5LT0rL0BfLjp+'
+        with mock.patch.dict(os.environ, {'SECRET': secret}):
+            resources.logger().debug(f"Secret {secret} in text.")
+            resources.logger().debug(f"{base64_secret} is a base64-encoded text.")
+            resources.logger().debug("%s in another text.", secret)
 
         log_output = utils.read_external(os.path.join(self.tmpdir.name, 'dump', 'debug.log'))
 
         self.assertTrue('Secret ****** in text.' in log_output, "Secret was not masked")
+        self.assertTrue('****** is a base64-encoded text.' in log_output, "Secret was not masked")
         self.assertTrue('****** in another text.' in log_output, "Secret was not masked")
-        self.assertFalse('secret_value' in log_output, "Secret was not masked")
+        self.assertFalse(secret in log_output, "Secret was not masked")
+        self.assertFalse(base64_secret in log_output, "Secret was not masked")
 
     def test_masked_log_exception(self):
         self.inventory['values'] = {

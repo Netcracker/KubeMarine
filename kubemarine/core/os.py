@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import re
@@ -132,6 +133,9 @@ def mask_secrets(text: str) -> str:
     for name in _masked_names:
         secret = os.environ[name]
         text = text.replace(secret, DEFAULT_MASK)
+        # Kubernetes encodes data sometimes, for example in Secrets.
+        base64_secret = base64.b64encode(secret.encode('ascii')).decode('ascii')
+        text = text.replace(base64_secret, DEFAULT_MASK)
 
     return text
 
