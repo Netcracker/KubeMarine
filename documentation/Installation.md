@@ -4717,6 +4717,9 @@ plugins:
             values:
               serviceAccount:
                 create: false
+            values_stdin:
+              image:
+                tag: '1.2.3'
             namespace: elastic-search
             release: elastic-search-1
             values_file: /tmp/custom_values.yaml
