@@ -21,7 +21,7 @@ import yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import jinja
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, log, os
 from kubemarine.core.yaml_merger import default_merger
 
 # All enrichment procedures should not connect to any node.
@@ -412,12 +412,13 @@ def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=Tru
     return inventory
 
 
-def compile_inventory(inventory, cluster):
+def compile_inventory(inventory: dict, cluster: KubernetesCluster):
 
     # convert references in yaml to normal values
     iterations = 100
     root = deepcopy(inventory)
     root['globals'] = static.GLOBALS
+    root['env'] = os.Environ()
 
     while iterations > 0:
 
@@ -446,38 +447,41 @@ def compile_inventory(inventory, cluster):
     return inventory
 
 
-def compile_object(log, struct, root, ignore_jinja_escapes=True):
+def compile_object(logger: log.EnhancedLogger, struct: object, root: dict, ignore_jinja_escapes=True) -> object:
     if isinstance(struct, list):
         new_struct = []
         for i, v in enumerate(struct):
-            struct[i] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            struct[i] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
             # delete empty list entries, which can appear after jinja compilation
             if struct[i] != '':
                 new_struct.append(struct[i])
         struct = new_struct
     elif isinstance(struct, dict):
         for k, v in struct.items():
-            struct[k] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            struct[k] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
     elif isinstance(struct, str) and ('{{' in struct or '{%' in struct):
-        struct = compile_string(log, struct, root, ignore_jinja_escapes=ignore_jinja_escapes)
+        struct = compile_string(logger, struct, root, ignore_jinja_escapes=ignore_jinja_escapes)
+
     return struct
 
 
-def compile_string(log, struct, root, ignore_jinja_escapes=True):
-    log.verbose("Rendering \"%s\"" % struct)
+def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
+                   ignore_jinja_escapes=True) -> str:
+    logger.verbose("Rendering \"%s\"" % struct)
 
     if ignore_jinja_escapes:
         iterator = escaped_expression_regex.finditer(struct)
         struct = re.sub(escaped_expression_regex, '', struct)
-        struct = jinja.new(log, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
 
+        # TODO this does not work for {raw}{jinja}{raw}{jinja}
         for match in iterator:
             span = match.span()
             struct = struct[:span[0]] + match.group() + struct[span[0]:]
     else:
-        struct = jinja.new(log, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
 
-    log.verbose("\tRendered as \"%s\"" % struct)
+    logger.verbose("\tRendered as \"%s\"" % struct)
     return struct
 
 

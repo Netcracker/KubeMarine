@@ -18,7 +18,3 @@ class Environ(Mapping[str, str]):
         return iter(os.environ)
 
     __slots__ = []
-
-
-def environ() -> Environ:
-    return Environ()

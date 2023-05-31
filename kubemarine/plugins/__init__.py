@@ -38,7 +38,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static, errors
+from kubemarine.core import utils, static, errors, os as kos
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -938,7 +938,7 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
             if split_extension[1] == ".j2":
                 source_filename = split_extension[0]
 
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars'], 'env': kos.Environ()}
             with utils.open_utf8(file, 'r') as template_stream:
                 generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
 
