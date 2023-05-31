@@ -4691,7 +4691,7 @@ The `values` parameter specifies the YAML formatted values for the chart that ov
 The values from this parameter also override the values from the `values_file` parameter.
 This parameter is optional.
 
-The `values_stdin` parameter specifies the YAML formatted values for the chart that are passed to the "helm" executable via stdin.
+The `values_stdin` parameter specifies the YAML formatted values for the chart that are passed to the "helm" executable through stdin.
 The values from this parameter have the highest priority.
 This parameter is optional.
 
@@ -4978,7 +4978,7 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
-* Dynamic variables are not supported in inventory files of maintenance procedures (e. g. upgrade).
+* Dynamic variables are not supported in inventory files of maintenance procedures like upgrade.
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
@@ -5043,7 +5043,7 @@ plugins:
     variable: '{{ values.variable }}'
 ```
 
-The above configuration generates the following result provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
+The above configuration generates the following result, provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
 
 ```yaml
 values:
@@ -5056,8 +5056,8 @@ plugins:
 
 #### Masked Variables
 
-It is possible to hold secrets in the environment variables.
-To hide value of an environment variable `PASSWORD`, define the following section in the inventory:
+It is possible to hold secrets in environment variables.
+To hide a value of an environment variable `PASSWORD`, define the following section in the inventory:
 
 ```yaml
 runtime_values:
@@ -5065,23 +5065,23 @@ runtime_values:
     - PASSWORD
 ```
 
-If the enviroment variable is to be masked, it is allowed for use only in the following sections of the inventory:
+If the enviroment variable is to be masked, it is allowed to be used only in the following sections of the inventory:
 * `values`
 * `plugins.*.installation.procedures.*.helm.values_stdin`
 
-It is still allowed for use in Jinja2 [template](#template) files for plugins, in particular through recursive reference to the `values` section. 
+It is still allowed to be used in Jinja2 [template](#template) files for plugins, in particular through recursive reference to the `values` section. 
 
-The value of the variable must:
-* Be a single line.
-* Be 6 characters or longer
-* Consist of Base64 alphabet (RFC4648) and any of `@`, `:`, `.`, and `~` characters.
+The value of the variable must have the following features:
+* It should be a single line.
+* It should be 6 characters or longer.
+* It should consist of Base64 alphabet (RFC4648) and any of `@`, `:`, `.`, and `~` characters.
 
 The values of the secrets are masked with `******` in all logs of the deployer.
 They are also masked in the files that are produced on the deployer with the following exceptions:
 * kubeconfig
 * account-tokens.yaml
 * Backup file. For more information, refer to [backup_location](/documentation/Maintenance.md#backup_location-parameter) parameter of the `backup` procedure.
-* Files inside `dump/backup/` directory.
+* Files inside the `dump/backup/` directory.
   These files are normally deleted after the `backup` procedure is finished, but may still remain in case of abnormal exiting.
 
 It is the user responsibility to not share these files with those who have no access to the secrets.
