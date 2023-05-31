@@ -14,24 +14,29 @@
     ]
   },
   "definitions": {
+    "PackageName": {
+      "description": "Packages with versions to install if the associated service is required for the cluster",
+      "oneOf": [
+        {"type": "string"},
+        {
+          "$ref": "../../common/utils.json#/definitions/NonEmptySetOfStrings"
+        }
+      ]
+    },
+    "PackageNameOnlyAssociations": {
+      "type": "object",
+      "description": "Associations related to specific package",
+      "properties": {
+        "package_name": {
+          "$ref": "#/definitions/PackageName"
+        }
+      },
+      "additionalProperties": false
+    },
     "PackageAssociationsProperties": {
       "properties": {
         "package_name": {
-          "description": "Packages with versions to install if the associated service is required for the cluster",
-          "oneOf": [
-            {"type": "string"},
-            {
-              "type": "array",
-              "items": {
-                "oneOf": [
-                  {"type": "string"},
-                  {"$ref": "../../common/utils.json#/definitions/ListMergingSymbol"}
-                ]
-              },
-              "uniqueItems": true,
-              "minItems": 1
-            }
-          ]
+          "$ref": "#/definitions/PackageName"
         },
         "cache_versions": {
           "type": "boolean",

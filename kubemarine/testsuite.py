@@ -16,7 +16,7 @@ import textwrap
 from traceback import *
 import csv
 from datetime import datetime
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 import fabric
 
 TC_UNKNOWN = -1
@@ -56,8 +56,8 @@ class TestCase:
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, ts, id, category, name, default_results=None, minimal=None, recommended=None):
-        self.include_in_ts(ts)
+    def __init__(self, cluster, id, category, name, default_results=None, minimal=None, recommended=None):
+        self.include_in_ts(cluster.context['testsuite'])
         self.category = category
         self.id = str(id)
         self.name = name
@@ -65,6 +65,7 @@ class TestCase:
         self.results = default_results
         self.minimal = minimal
         self.recommended = recommended
+        self.cluster = cluster
 
     def include_in_ts(self, ts):
         ts.register_tc(self)
@@ -99,17 +100,29 @@ class TestCase:
 
         color = ""
         if self.is_succeeded():
-            color = "\x1b[38;5;041m"
-            output += " \x1b[48;5;041m\x1b[38;5;232m   OK   \x1b[49m\x1b[39m  "
+            if self.check_color():
+                color = "\x1b[38;5;041m"
+                output += " \x1b[48;5;041m\x1b[38;5;232m   OK   \x1b[49m\x1b[39m  "
+            else:
+                output += "    OK     "
         if self.is_failed():
-            color = "\x1b[38;5;196m"
-            output += " \x1b[48;5;196m\x1b[38;5;231m  FAIL  \x1b[49m\x1b[39m  "
+            if self.check_color():    
+                color = "\x1b[38;5;196m"
+                output += " \x1b[48;5;196m\x1b[38;5;231m  FAIL  \x1b[49m\x1b[39m  "
+            else:
+                output += "   FAIL    "
         if self.is_warned():
-            color = "\x1b[38;5;208m"
-            output += " \x1b[48;5;208m\x1b[38;5;231m  WARN  \x1b[49m\x1b[39m  "
+            if self.check_color():
+                color = "\x1b[38;5;208m"
+                output += " \x1b[48;5;208m\x1b[38;5;231m  WARN  \x1b[49m\x1b[39m  "
+            else:
+                output += "   WARN    "
         if self.is_excepted():
-            color = "\x1b[31m"
-            output += " \x1b[41m ERROR? \x1b[49m  "
+            if self.check_color():
+                color = "\x1b[31m"
+                output += " \x1b[41m ERROR? \x1b[49m  "
+            else:
+                output += "  ERROR?   "
 
         output += self.id + "  "
         output += self.name + " "
@@ -117,7 +130,10 @@ class TestCase:
         results = " " + str(self.results)
 
         output += "." * (146 - len(output) - len(results))
-        output += "%s%s\x1b[39m" % (color, results)
+        if self.check_color():
+            output += "%s%s\x1b[39m" % (color, results)
+        else:
+            output += "%s" % (results)
 
         if show_minimal:
             if self.minimal is None:
@@ -138,6 +154,12 @@ class TestCase:
 
         return output
 
+    def check_color(self):
+        for handler in self.cluster.log.handlers:
+            if isinstance(handler, log.StdoutHandler) and handler.formatter.colorize:
+                return True
+        return False
+                
     def get_readable_status(self):
         if self.is_succeeded():
             return 'ok'
@@ -217,15 +239,18 @@ class TestSuite:
 
         for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
             colors = ''
-            if key == 'succeeded':
-                colors = "\x1b[48;5;041m\x1b[38;5;232m"
-            if key == 'failed':
-                colors = "\x1b[48;5;196m\x1b[38;5;231m"
-            if key == 'warned':
-                colors = "\x1b[48;5;208m\x1b[38;5;231m"
-            if key == 'excepted':
-                colors = "\x1b[41m"
-            result += "%s %s %s \x1b[49m\x1b[39m " % (colors, value ,key.upper())
+            if tc.check_color():
+                if key == 'succeeded':
+                    colors = "\x1b[48;5;041m\x1b[38;5;232m"
+                if key == 'failed':
+                    colors = "\x1b[48;5;196m\x1b[38;5;231m"
+                if key == 'warned':
+                    colors = "\x1b[48;5;208m\x1b[38;5;231m"
+                if key == 'excepted':
+                    colors = "\x1b[41m"
+                result += "%s %s %s \x1b[49m\x1b[39m " % (colors, value ,key.upper())
+            else:
+                result += "%s %s  " % (value ,key.upper())
 
         result += "\n"
 

@@ -114,6 +114,7 @@ def run_actions(resources: res.DynamicResources, actions: List[action.Action]) -
         try:
             logger.info(f"Running action '{act.identifier}'")
             act.run(resources)
+            act.reset_context(context)
             successfully_performed.append(act.identifier)
         except Exception:
             if successfully_performed:

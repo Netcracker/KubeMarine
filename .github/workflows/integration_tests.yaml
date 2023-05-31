@@ -59,6 +59,10 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt update && sudo apt install -y systemd
+          sudo systemctl start systemd-journald.service	
          # TODO: change to kubemarine runtime values feature
       - name: Set kubernetes version to cluster.yaml
         run: sed -i "s/<KUBERNETES_VERSION>/${{ matrix.kubernetes-version }}/" ${{ env.cluster_yaml_file }}
@@ -71,6 +75,11 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+        run: |
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+          sudo journalctl > ./results/journald-logs.txt 
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*
@@ -112,6 +121,10 @@ jobs:
         run: sudo apt remove moby-runc
       - name: Install rename
         run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt update && sudo apt install -y systemd
+          sudo systemctl start systemd-journald.service	
       - name: Check Iaas
         id: test_check_iaas
         run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_iaas_dump/
@@ -121,6 +134,11 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+        run: |
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+          sudo journalctl > ./results/journald-logs.txt
       - name: Change not-recommended symbols in dump files
         if: failure()
         run: rename 's/[:]/_/g' ./results/*/dump/*

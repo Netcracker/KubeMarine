@@ -33,6 +33,7 @@ a = Analysis(['./kubemarine/__main__.py'],
              pathex=[],
              binaries=[],
              datas=[
+                ('./kubemarine/patches',        './kubemarine/patches'),
                 ('./kubemarine/plugins',        './kubemarine/plugins'),
                 ('./kubemarine/version',        './kubemarine/'),
                 ('./kubemarine/resources',      './kubemarine/resources'),

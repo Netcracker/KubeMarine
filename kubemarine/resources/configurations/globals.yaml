@@ -153,6 +153,54 @@ thirdparties:
     relative_path: '{version}/crictl-{version}-linux-amd64.tar.gz'
 
 packages:
+  debian:
+    docker:
+      package_name:
+        - docker-ce: docker
+        - docker-ce-cli: docker
+        - containerd.io: containerdio
+    containerd:
+      package_name:
+        - containerd: containerd
+        - podman: podman
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
+  rhel:
+    docker:
+      package_name:
+        - docker-ce: docker
+        - docker-ce-cli: docker
+        - containerd.io: containerdio
+    containerd:
+      package_name:
+        - containerd.io: containerdio
+        - podman: podman
+    haproxy:
+      package_name:
+        - rh-haproxy18-haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
+  rhel8:
+    docker:
+      package_name:
+        - docker-ce: docker
+        - docker-ce-cli: docker
+        - containerd.io: containerdio
+    containerd:
+      package_name:
+        - containerd.io: containerdio
+        - podman: podman
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
   common_associations:
     docker:
       executable_name: 'docker'
@@ -278,6 +326,7 @@ compatibility_map:
           - '8.4'
           - '8.6'
           - '8.7'
+          - '8.8'
     rocky:
       - os_family: 'rhel8'
         versions:
@@ -335,6 +384,7 @@ logging:
     stdout:
       level: debug
       correct_newlines: True
+      colorize: true
     dump:
       level: verbose
       format: "%(asctime)s %(process)s %(thread)s %(name)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"

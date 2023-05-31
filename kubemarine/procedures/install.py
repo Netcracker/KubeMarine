@@ -437,8 +437,9 @@ def deploy_loadbalancer_haproxy_configure(cluster):
         group.call_batch([
             haproxy.configure,
             haproxy.override_haproxy18,
-            haproxy.restart
         ])
+
+    haproxy.restart(group)
 
 
 def deploy_loadbalancer_keepalived_install(cluster):

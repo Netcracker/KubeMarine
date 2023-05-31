@@ -16,8 +16,10 @@ import io
 import math
 import os
 import time
+import uuid
+from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, ContextManager
 
 import ruamel.yaml
 import yaml
@@ -67,18 +69,27 @@ def remove_node_enrichment(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory, cluster):
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get('initial_procedure') == 'upgrade':
-        if not inventory.get('services'):
-            inventory['services'] = {}
-        if not inventory['services'].get('kubeadm'):
-            inventory['services']['kubeadm'] = {}
         cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
-        inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['upgrade_version']
 
         cluster.log.info(
             '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
             cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    upgrade_version = cluster.context.get("upgrade_version")
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
     return inventory
 
 
@@ -276,10 +287,10 @@ def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=
     for node in group.get_ordered_members_list(provide_node_configs=True):
         if node["name"] in stdout:
             log.debug("Draining node %s..." % node["name"])
-            control_plane.sudo(prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                              group.cluster.globals, disable_eviction, group.cluster.nodes,
-                                              drain_timeout, grace_period),
-                        hide=False)
+            drain_cmd = prepare_drain_command(
+                group.cluster, node["name"],
+                disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
+            control_plane.sudo(drain_cmd, hide=False)
         else:
             log.warning("Node %s is not found in cluster and can't be drained" % node["name"])
 
@@ -437,6 +448,23 @@ def join_control_plane(group, node, join_dict):
     wait_for_any_pods(group.cluster, node['connection'], apply_filter=node['name'])
 
 
+@contextmanager
+def local_admin_config(node: NodeGroup) -> ContextManager[str]:
+    temp_filepath = "/tmp/%s" % uuid.uuid4().hex
+
+    cluster_name = node.cluster.inventory['cluster_name']
+    internal_address = node.get_first_member(provide_node_configs=True)['internal_address']
+    if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
+        internal_address = f"[{internal_address}]"
+
+    try:
+        node.sudo(f"cp /root/.kube/config {temp_filepath} "
+                  f"&& sudo sed -i 's/{cluster_name}/{internal_address}/' {temp_filepath}")
+        yield temp_filepath
+    finally:
+        node.sudo(f'rm -f {temp_filepath}')
+
+
 def copy_admin_config(log, nodes):
     log.debug("Setting up admin-config...")
     nodes.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
@@ -584,6 +612,17 @@ def wait_for_any_pods(cluster, connection, apply_filter=None):
     ], node=connection, apply_filter=apply_filter,
                         timeout=cluster.inventory['globals']['expect']['pods']['kubernetes']['timeout'],
                         retries=cluster.inventory['globals']['expect']['pods']['kubernetes']['retries'])
+
+
+def wait_uncordon(node: NodeGroup):
+    cluster = node.cluster
+    timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+    # This forces to use local API server and waits till it is up.
+    with local_admin_config(node) as kubeconfig:
+        utils.wait_command_successful(node, f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()}",
+                                      is_async=False, hide=False,
+                                      timeout=timeout_config['timeout'],
+                                      retries=timeout_config['retries'])
 
 
 def wait_for_nodes(group: NodeGroup):
@@ -750,8 +789,9 @@ def get_kubeadm_config(inventory):
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
-def upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_file,
-                                minor_version, drain_timeout=None, grace_period=None):
+
+def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
     if not upgrade_group.has_node(first_control_plane['name']):
@@ -773,17 +813,13 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_file,
     if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"
 
-    disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
-    drain_cmd = prepare_drain_command(first_control_plane, version, cluster.globals, disable_eviction, cluster.nodes,
-                                      drain_timeout, grace_period)
+    drain_cmd = prepare_drain_command(cluster, first_control_plane['name'], **drain_kwargs)
     first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
 
     upgrade_cri_if_required(first_control_plane['connection'])
 
     # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-
-    if minor_version == 27:
-        fix_flag_kubelet(first_control_plane, kubeadm_file)
+    fix_flag_kubelet(cluster, first_control_plane)
 
     first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
                                     f"sudo kubectl uncordon {first_control_plane['name']} && "
@@ -796,8 +832,8 @@ def upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_file,
     exclude_node_from_upgrade_list(first_control_plane['connection'], first_control_plane['name'])
 
 
-def upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_file,
-                                 minor_version, drain_timeout=None, grace_period=None):
+def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
     for node in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
@@ -812,16 +848,13 @@ def upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_file,
             # put control-plane patches
             create_kubeadm_patches_for_node(cluster, node)
 
-            disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
-            drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
-                                              drain_timeout, grace_period)
+            drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
             node['connection'].sudo(drain_cmd, is_async=False, hide=False)
 
             upgrade_cri_if_required(node['connection'])
 
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-            if minor_version == 27:
-                fix_flag_kubelet(node, kubeadm_file)
+            fix_flag_kubelet(cluster, node)
 
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
             # and only "else" branch remains
@@ -884,7 +917,8 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
     return True
 
 
-def upgrade_workers(version, upgrade_group, cluster, kubeadm_file, minor_version, drain_timeout=None, grace_period=None):
+def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
     for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['control-plane']).get_ordered_members_list(
@@ -899,16 +933,13 @@ def upgrade_workers(version, upgrade_group, cluster, kubeadm_file, minor_version
         # put control-plane patches
         create_kubeadm_patches_for_node(cluster, node)
 
-        disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
-        drain_cmd = prepare_drain_command(node, version, cluster.globals, disable_eviction, cluster.nodes,
-                                          drain_timeout, grace_period)
+        drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
         first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
 
         upgrade_cri_if_required(node['connection'])
 
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-        if minor_version == 27:
-            fix_flag_kubelet(node, kubeadm_file)
+        fix_flag_kubelet(cluster, node)
 
         # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
         # and only "else" branch remains
@@ -926,21 +957,25 @@ def upgrade_workers(version, upgrade_group, cluster, kubeadm_file, minor_version
         exclude_node_from_upgrade_list(first_control_plane, node['name'])
 
 
-def prepare_drain_command(node, version: str, globals, disable_eviction: bool, nodes,
+def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
+                          *,
+                          disable_eviction=False,
                           drain_timeout: int = None, grace_period: int = None):
-    drain_globals = globals['nodes']['drain']
+    drain_globals = static.GLOBALS['nodes']['drain']
     if drain_timeout is None:
-        drain_timeout = recalculate_proper_timeout(nodes, drain_globals['timeout'])
+        drain_timeout = recalculate_proper_timeout(cluster.nodes, drain_globals['timeout'])
+
     if grace_period is None:
         grace_period = drain_globals['grace_period']
-    drain_cmd = f"kubectl drain {node['name']} --force --ignore-daemonsets --delete-emptydir-data " \
+
+    drain_cmd = f"kubectl drain {node_name} --force --ignore-daemonsets --delete-emptydir-data " \
                 f"--timeout={drain_timeout}s --grace-period={grace_period}"
-    if version and disable_eviction:
+    if disable_eviction:
         drain_cmd += " --disable-eviction=true"
     return drain_cmd
 
 
-def upgrade_cri_if_required(group):
+def upgrade_cri_if_required(group: NodeGroup):
     # currently it is invoked only for single node
     cluster = group.cluster
     log = cluster.log
@@ -949,9 +984,9 @@ def upgrade_cri_if_required(group):
     if cri_impl in cluster.context["packages"]["upgrade_required"]:
         cri_packages = cluster.get_package_association_for_node(group.get_host(), cri_impl, 'package_name')
 
-        log.debug(f"Installing {cri_packages}")
+        log.debug(f"Installing {cri_packages} on node: {group.get_node_name()}")
         packages.install(group, include=cri_packages)
-        log.debug(f"Restarting all containers on nodes: {group.get_nodes_names()}")
+        log.debug(f"Restarting all containers on node: {group.get_node_name()}")
         if cri_impl == "docker":
             group.sudo("docker container rm -f $(sudo docker container ls -q)", warn=True)
         else:
@@ -1352,9 +1387,15 @@ def create_kubeadm_patches_for_node(cluster, node):
 
     return
 
-def fix_flag_kubelet(node, kubeadm_file):
-
+def fix_flag_kubelet(cluster: KubernetesCluster, node: dict):
     #Deprecated flag removal function for kubelet
+    kubeadm_file = "/var/lib/kubelet/kubeadm-flags.env"
+    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+
+    if utils.version_key(version) < utils.version_key("v1.27.0"):
+        # Target version is lower than v1.27.0. Flag is actual and should not be removed.
+        return
+
     kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')

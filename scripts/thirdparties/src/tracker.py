@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Optional, OrderedDict
 
 from ordered_set import OrderedSet
@@ -20,20 +21,52 @@ from ordered_set import OrderedSet
 from kubemarine.core import static, utils
 from .shell import info
 
-
 ERROR_PREVIOUS_MINOR = "Kubernetes version '{version}' is deleted. " \
                        "Need to delete all versions having the same or lower minor version. " \
                        "Not deleted versions: {previous_versions}."
 
+YAML = utils.yaml_structure_preserver()
 
-class ChangesTracker:
+
+class ChangesTracker(ABC):
+    @abstractmethod
+    def new(self, k8s_version: str):
+        pass
+
+    @abstractmethod
+    def delete(self, k8s_version: str, software_name: str):
+        pass
+
+    @abstractmethod
+    def update(self, k8s_version: str, software_name: str):
+        pass
+
+
+class ComposedTracker(ChangesTracker):
+    def __init__(self, *trackers: ChangesTracker):
+        self.trackers = trackers
+
+    def new(self, k8s_version: str):
+        for tracker in self.trackers:
+            tracker.new(k8s_version)
+
+    def delete(self, k8s_version: str, software_name: str):
+        for tracker in self.trackers:
+            tracker.delete(k8s_version, software_name)
+
+    def update(self, k8s_version: str, software_name: str):
+        for tracker in self.trackers:
+            tracker.update(k8s_version, software_name)
+
+
+class SummaryTracker(ChangesTracker):
     def __init__(self, kubernetes_versions: dict):
         self.kubernetes_versions = kubernetes_versions
         self.new_k8s: OrderedSet[str] = OrderedSet()
         self.deleted_k8s: OrderedSet[str] = OrderedSet()
         self.updated_k8s: Dict[str, OrderedSet[str]] = {}
         self.final_messages: List[str] = []
-        self.unexpected_content = False
+        self.deleted_unexpected_content = False
 
     @property
     def all_k8s_versions(self) -> List[str]:
@@ -41,9 +74,8 @@ class ChangesTracker:
 
     def new(self, k8s_version: str):
         self.new_k8s.add(k8s_version)
-        self.updated_k8s.pop(k8s_version, None)
 
-    def delete(self, k8s_version: str):
+    def delete(self, k8s_version: str, _):
         self._check_delete_all_previous_minor(k8s_version)
         self.deleted_k8s.add(k8s_version)
 
@@ -79,12 +111,12 @@ class ChangesTracker:
                     key = software_name + ': ' + (' ' * (max_length - len(software_name)))
                     info(f"\t{key}{req}")
 
-        if self.unexpected_content:
+        if self.deleted_unexpected_content:
             info("Deleted unexpected content")
 
         if self.new_k8s or self.deleted_k8s or self.updated_k8s:
             info("Please do not forget to update documentation/Installation.md")
-        elif not self.unexpected_content:
+        elif not self.deleted_unexpected_content:
             info("Nothing has changed")
 
         for msg in self.final_messages:
@@ -126,6 +158,7 @@ class ChangesTracker:
     def _check_delete_all_previous_minor(self, k8s_version):
         def key(ver: str):
             return utils.version_key(ver)[0:2]
+
         previous_versions = [ver for ver in self.all_k8s_versions if key(ver) <= key(k8s_version)]
         if previous_versions:
             raise Exception(ERROR_PREVIOUS_MINOR.format(

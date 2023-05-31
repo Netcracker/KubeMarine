@@ -33,9 +33,9 @@ class Action(ABC):
         self.recreate_inventory = recreate_inventory
 
     @abstractmethod
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         """
-        Do some work based on provided DynamicResources.
+        Do some work based on provided DynamicResources. If any action fails, further actions are not run.
 
         Avoid direct exiting in case of exceptions (for example using utils.do_fail),
         unless it is the only action being executed.
@@ -43,6 +43,21 @@ class Action(ABC):
         """
         pass
 
-    def prepare_context(self, context: dict):
-        """Called first before any work with the action"""
+    def prepare_context(self, context: dict) -> None:
+        """
+        Enrich context if necessary before the action is run.
+        The changes are remained after action is executed, and will be visible to further actions.
+        To revert the changes, implement Action.reset_context().
+
+        :param context: mutable context instance.
+        """
+        return
+
+    def reset_context(self, context: dict) -> None:
+        """
+        Reset changes in the context if necessary.
+        The method is called only if the action is executed successfully.
+
+        :param context: mutable context instance.
+        """
         return

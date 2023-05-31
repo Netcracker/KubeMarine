@@ -1,5 +1,6 @@
 include kubemarine/plugins/yaml/*
 include kubemarine/version
 
+recursive-include kubemarine/patches *
 recursive-include kubemarine/resources *
 recursive-include kubemarine/templates *

@@ -223,7 +223,7 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 * You can install a version other than the recommended version, but it is not supported and can cause unpredictable consequences.
 * rh-haproxy18 (build provided by RedHat) is supported only for now.
 
-**Warning**: RHEL version 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
+**Warning**: RHEL version 8 and RockyLinux 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
 installation on the same OS impossible. To avoid it one should implement those steps before the installation procedure.
 1. Install `podman` from standard RHEL repository:
 ```
@@ -234,7 +234,14 @@ installation on the same OS impossible. To avoid it one should implement those s
 # rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.6.9-3.1.el8.x86_64.rpm
 # systemctl enable containerd
 ```
+
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
+
+**Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
+* Install `python 3.9` from the standard RHEL repository:
+```
+# dnf install python3.9 -y
+```
 
 **Unattended-upgrades** 
 
@@ -4894,7 +4901,6 @@ Application of the list merge strategy is allowed in the following sections:
 * `services.audit.cluster_policy.rules`
 * `services.audit.rules`
 * `services.coredns.deployment.spec.template.spec.volumes`
-* `services.packages.associations.package_name`
 * `services.packages.install`
 * `services.packages.upgrade`
 * `services.packages.remove`

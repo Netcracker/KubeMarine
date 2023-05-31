@@ -31,12 +31,12 @@ from scripts.thirdparties.src.software.plugins import (
     ERROR_UNEXPECTED_IMAGE, ERROR_SUSPICIOUS_ABA_VERSIONS
 )
 from scripts.thirdparties.src.tracker import (
-    ChangesTracker, ERROR_PREVIOUS_MINOR
+    SummaryTracker, ERROR_PREVIOUS_MINOR
 )
 from test.unit import utils as test_utils
 from test.unit.tools.thirdparties.stub import (
     FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
-    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment
+    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig
 )
 
 
@@ -52,6 +52,7 @@ class SynchronizationTest(unittest.TestCase):
         self.kubernetes_versions = FakeKubernetesVersions()
         self.manifest_resolver = FAKE_CACHED_MANIFEST_RESOLVER
         self.manifests_enrichment = NoneManifestsEnrichment()
+        self.upgrade_config = FakeUpgradeConfig()
 
     def test_clean_run_changes_nothing(self):
         self.run_sync()
@@ -416,6 +417,62 @@ class SynchronizationTest(unittest.TestCase):
                              set(enrich_called[plugin]),
                              f"Enrichment of {plugin!r} was not called with version {new_plugin_version}")
 
+    def test_upgrade_config_update_software(self):
+        k8s_update = []
+        if len(self.k8s_versions()) > 1:
+            k8s_update.append(self.k8s_versions()[-2])
+        k8s_update.append(self.k8s_versions()[-1])
+        k8s_update.sort(key=utils.version_key)
+
+        for software in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner',
+                         'crictl'):
+            if software == 'crictl':
+                self.upgrade_config.config['thirdparties'][software] = []
+            else:
+                self.upgrade_config.config['plugins'][software] = []
+
+            for k8s_version in k8s_update:
+                mapping = self.compatibility_map()[k8s_version]
+                new_version = mapping[software]
+                while any(new_version == v[software] for v in self.compatibility_map().values()):
+                    new_version = test_utils.increment_version(new_version)
+                mapping[software] = new_version
+
+        self.run_sync()
+
+        for software in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner',
+                         'crictl'):
+            if software == 'crictl':
+                list_for_upgrade = self.upgrade_config.config['thirdparties'][software]
+            else:
+                list_for_upgrade = self.upgrade_config.config['plugins'][software]
+
+            self.assertEqual(k8s_update, list_for_upgrade,
+                             f"Some kubernetes versions for {software!r} were not scheduled for upgrade.")
+
+    def test_upgrade_config_update_plugin_extra_images(self):
+        k8s_latest = self.k8s_versions()[-1]
+
+        mapping = self.compatibility_map()[k8s_latest]
+        for image_name in ('webhook', 'metrics-scraper', 'busybox'):
+            new_version = mapping.get(image_name, 'v1.2.3')
+            while any(new_version == v.get(image_name) for v in self.compatibility_map().values()):
+                new_version = test_utils.increment_version(new_version)
+            mapping[image_name] = new_version
+
+        for plugin_name in self.upgrade_config.config['plugins']:
+            self.upgrade_config.config['plugins'][plugin_name] = []
+
+        self.run_sync()
+
+        for plugin_name in ('nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
+            list_for_upgrade = self.upgrade_config.config['plugins'][plugin_name]
+            self.assertEqual([k8s_latest], list_for_upgrade,
+                             f"Some kubernetes versions for {plugin_name!r} were not scheduled for upgrade.")
+
+        self.assertEqual([], self.upgrade_config.config['plugins']['calico'],
+                         f"Unexpected upgrade of 'calico'")
+
     @contextmanager
     def _mock_manifest_processor_enrich(self) -> ContextManager[Dict[str, List[str]]]:
         processor_enrich_orig = Processor.enrich
@@ -443,28 +500,26 @@ class SynchronizationTest(unittest.TestCase):
 
     @contextmanager
     def _mock_globals_load_compatibility_map(self):
-        backup = deepcopy(static.GLOBALS)
         def load_compatibility_map_mocked(filename: str) -> dict:
             return self._convert_ruamel_pyyaml(self.compatibility.stored[filename])
 
-        try:
-            with mock.patch.object(static, static.load_compatibility_map.__name__,
-                                   side_effect=load_compatibility_map_mocked):
+        with test_utils.backup_globals(), \
+                mock.patch.object(static, static.load_compatibility_map.__name__,
+                                  side_effect=load_compatibility_map_mocked):
                 yield
-        finally:
-            static.GLOBALS = backup
 
     def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
         stream = io.StringIO()
         utils.yaml_structure_preserver().dump(source, stream)
         return yaml.safe_load(io.StringIO(stream.getvalue()))
 
-    def run_sync(self) -> ChangesTracker:
+    def run_sync(self) -> SummaryTracker:
         return FakeSynchronization(
             self.compatibility,
             self.kubernetes_versions,
             self.manifest_resolver,
-            self.manifests_enrichment
+            self.manifests_enrichment,
+            self.upgrade_config,
         ).run()
 
     def compatibility_map(self) -> dict:

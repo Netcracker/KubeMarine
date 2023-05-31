@@ -38,6 +38,24 @@ KME_DICTIONARY = {
     },
     "KME0008": {
         "name": "Specified Kubernetes version '{version}' - cannot be used! Allowed versions are: {allowed_versions}."
+    },
+    "KME0009": {
+        "name": "Key {key!r} is redefined for {plugin_name!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required plugin configuration explicitly in procedure inventory."
+    },
+    "KME0010": {
+        "name": "Associations are redefined for {package!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required associations explicitly in procedure inventory."
+    },
+    "KME0011": {
+        "name": "Key {key!r} is redefined for third-party {thirdparty!r} in cluster.yaml{previous_version_spec}, "
+                "but not present in procedure inventory{next_version_spec}. "
+                "Please, specify required third-party configuration explicitly in procedure inventory."
+    },
+    "KME0012": {
+        "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
     }
 }
 

@@ -25,4 +25,7 @@ from kubemarine.core.patch import Patch
 
 patches: List[Patch] = [
 ]
-"""List of patches which can be executed strictly in the declared order"""
+"""
+List of patches that is sorted according to the Patch.priority() before execution.
+Patches that have the same priority, are executed in the declared order.
+"""

@@ -15,7 +15,6 @@
 
 
 from collections import OrderedDict
-from copy import deepcopy
 from distutils.util import strtobool
 from io import StringIO
 from itertools import chain
@@ -30,7 +29,6 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
-from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import install
 
 
@@ -50,27 +48,25 @@ def prepull_images(cluster):
 
 
 def kubernetes_upgrade(cluster):
-    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    minor_version = int(version.split('.')[1])
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
-
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
+    disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
+    drain_kwargs = {
+        'disable_eviction': disable_eviction, 'drain_timeout': drain_timeout, 'grace_period': grace_period
+    }
 
-    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
-                                           drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_first_control_plane(upgrade_group, cluster, **drain_kwargs)
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
-                                            drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_other_control_planes(upgrade_group, cluster, **drain_kwargs)
+
     if cluster.nodes.get('worker', []):
-        kubernetes.upgrade_workers(version, upgrade_group, cluster, kubeadm_flags_file, minor_version,
-                                   drain_timeout=drain_timeout, grace_period=grace_period)
+        kubernetes.upgrade_workers(upgrade_group, cluster, **drain_kwargs)
 
     cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     cluster.context['cached_nodes_versions_cleaned'] = True
@@ -169,45 +165,6 @@ tasks = OrderedDict({
 })
 
 
-def upgrade_finalize_inventory(cluster, inventory):
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-    upgrade_version = cluster.context.get("upgrade_version")
-
-    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
-
-    # if thirdparties was not defined in procedure.yaml,
-    # then no need to forcibly place them: user may want to use default
-    if cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties'):
-        inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
-
-    if cluster.procedure_inventory.get(upgrade_version, {}).get("plugins"):
-        inventory.setdefault("plugins", {})
-        default_merger.merge(inventory["plugins"], cluster.procedure_inventory[upgrade_version]["plugins"])
-
-    if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
-        inventory['services'].setdefault("packages", {})
-        packages_section = deepcopy(cluster.procedure_inventory[upgrade_version]["packages"])
-        for _type in ['install', 'upgrade', 'remove']:
-            packages = packages_section.pop(_type, None)
-            if packages is None:
-                continue
-            if isinstance(packages, list):
-                packages = {'include': packages}
-
-            packages_list = inventory['services']['packages'].get(_type)
-            if isinstance(packages_list, list):
-                inventory['services']['packages'][_type] = {
-                    'include': packages_list
-                }
-            default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
-        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
-        # we still merge global associations section because it has priority during enrichment.
-        default_merger.merge(inventory["services"]["packages"], packages_section)
-
-    return inventory
-
-
 class UpgradeFlow(flow.Flow):
     def __init__(self):
         self.target_version = None
@@ -241,7 +198,7 @@ class UpgradeAction(Action):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
-    def prepare_context(self, context: dict):
+    def prepare_context(self, context: dict) -> None:
         context['upgrade_version'] = self.upgrade_version
         context['dump_filename_prefix'] = self.upgrade_version
 

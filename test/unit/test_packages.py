@@ -16,8 +16,8 @@ import unittest
 from copy import deepcopy
 from typing import Optional
 
-from kubemarine import demo, packages
-from kubemarine.core import static, defaults, log, errors
+from kubemarine import demo, packages, kubernetes
+from kubemarine.core import static, errors
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
@@ -30,33 +30,32 @@ def new_debian_cluster(inventory: dict) -> FakeKubernetesCluster:
     return demo.new_cluster(inventory, context=context)
 
 
-def prepare_compiled_associations_defaults() -> dict:
-    defs = deepcopy(static.DEFAULTS)
-    defs['cluster_name'] = 'k8s.fake.local'
-    context = demo.create_silent_context()
-    logger = log.init_log_from_context_args(static.GLOBALS, context, defs).logger
+def prepare_enriched_associations_defaults() -> dict:
+    default_associations = deepcopy(static.DEFAULTS['services']['packages']['associations'])
+    kubernetes_version = kubernetes.get_initial_kubernetes_version({})
 
-    root = deepcopy(defs)
-    root['globals'] = static.GLOBALS
-    compiled_defaults = defaults.compile_object(logger, defs['services']['packages']['associations'], root)
-
-    for association_name in packages.get_associations_os_family_keys():
+    for os_family in packages.get_associations_os_family_keys():
         os_associations: dict = deepcopy(static.GLOBALS['packages']['common_associations'])
-        if association_name == 'debian':
+        if os_family == 'debian':
             del os_associations['semanage']
         for association_params in os_associations.values():
             del association_params['groups']
-        default_merger.merge(os_associations, compiled_defaults[association_name])
-        compiled_defaults[association_name] = os_associations
+        default_merger.merge(os_associations, default_associations[os_family])
 
-    return compiled_defaults
+        for package in static.GLOBALS['packages'][os_family]:
+            os_associations[package]['package_name'] = \
+                packages.get_default_package_names(os_family, package, kubernetes_version)
+
+        default_associations[os_family] = os_associations
+
+    return default_associations
 
 
-COMPILED_ASSOCIATIONS_DEFAULTS = prepare_compiled_associations_defaults()
+ASSOCIATIONS_DEFAULTS = prepare_enriched_associations_defaults()
 
 
 def get_compiled_defaults():
-    return deepcopy(COMPILED_ASSOCIATIONS_DEFAULTS)
+    return deepcopy(ASSOCIATIONS_DEFAULTS)
 
 
 def global_associations(inventory: dict) -> dict:

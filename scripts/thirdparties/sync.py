@@ -26,7 +26,7 @@ import platform
 from src.compatibility import KubernetesVersions
 from src.run import Synchronization
 from src.shell import fatal
-from src.software import InternalCompatibility
+from src.software import InternalCompatibility, UpgradeConfig
 from src.software.kubernetes_images import KubernetesImagesResolver
 from src.software.plugins import ManifestResolver, ManifestsEnrichment
 from src.software.thirdparties import ThirdpartyResolver
@@ -49,4 +49,5 @@ if __name__ == '__main__':
         ManifestResolver(refresh=args.refresh_manifests),
         ThirdpartyResolver(),
         ManifestsEnrichment(),
+        UpgradeConfig(),
     ).run()

@@ -19,20 +19,21 @@ from typing import Dict, List
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils
+from kubemarine.procedures import migrate_kubemarine
 from ..shell import info, run
-from ..tracker import ChangesTracker
+from ..tracker import SummaryTracker, ChangesTracker
 
 YAML = utils.yaml_structure_preserver()
+SOFTWARE_UPGRADE_PATH = migrate_kubemarine.SOFTWARE_UPGRADE_PATH
 
 
 class CompatibilityMap:
-    def __init__(self, tracker: ChangesTracker, filename: str, software_names: List[str]):
+    def __init__(self, tracker: ChangesTracker, filename: str):
         """
         Constructs a holder of originally formatted compatibility map.
 
         :param tracker: ChangesTracker instance
-        :param map_filename: file name of internal compatibility map managed by the tool.
-        :param software_names: list of software names to keep
+        :param filename: file name of internal compatibility map managed by the tool.
         """
         self.tracker = tracker
         self._resource = f"resources/configurations/compatibility/internal/{filename}"
@@ -40,12 +41,18 @@ class CompatibilityMap:
         with utils.open_internal(self.resource_path, 'r') as stream:
             self.compatibility_map: CommentedMap = YAML.load(stream)
 
-        # delete unexpected software
+    def prepare(self, summary_tracker: SummaryTracker, software_names: List[str]) -> None:
+        """
+        Delete unexpected software.
+
+        :param summary_tracker: SummaryTracker instance
+        :param software_names: list of software names to keep
+        """
         map_keys = list(self.compatibility_map)
         for key in map_keys:
             if key not in software_names:
                 del self.compatibility_map[key]
-                self.tracker.unexpected_content = True
+                summary_tracker.deleted_unexpected_content = True
                 print(f"Deleted {key!r} from {self.name}")
 
     @property
@@ -77,7 +84,7 @@ class CompatibilityMap:
         for key in map_keys:
             if key not in k8s_versions:
                 del software_mapping[key]
-                self.tracker.delete(key)
+                self.tracker.delete(key, software_name)
                 print(f"Deleted '{software_name}.{key}' from {self.name}")
 
         sorted_map = utils.map_sorted(software_mapping, key=utils.version_key)
@@ -119,8 +126,8 @@ class CompatibilityMap:
 
 
 class InternalCompatibility:
-    def load(self, tracker: ChangesTracker, filename: str, software_names: List[str]) -> CompatibilityMap:
-        return CompatibilityMap(tracker, filename, software_names)
+    def load(self, tracker: ChangesTracker, filename: str) -> CompatibilityMap:
+        return CompatibilityMap(tracker, filename)
 
     def store(self, compatibility_map: CompatibilityMap):
         with utils.open_internal(compatibility_map.resource_path, 'w') as stream:
@@ -130,10 +137,101 @@ class InternalCompatibility:
         info(f"Updated {compatibility_map.name}")
 
 
+class UpgradeConfig:
+    def __init__(self):
+        with utils.open_internal(SOFTWARE_UPGRADE_PATH) as stream:
+            self.config: CommentedMap = YAML.load(stream)
+
+    @property
+    def name(self) -> str:
+        return os.path.basename(SOFTWARE_UPGRADE_PATH)
+
+    def prepare(self, tracker: SummaryTracker, software_types: List[str]):
+        """
+        Create stubs for known software types and delete unexpected software types.
+
+        :param tracker: SummaryTracker instance
+        :param software_types: list of software types to keep
+        """
+        for software_type in software_types:
+            if software_type not in self.config:
+                self.config[software_type] = CommentedMap()
+
+        map_keys = list(self.config)
+        for key in map_keys:
+            if key not in software_types:
+                del self.config[key]
+                tracker.deleted_unexpected_content = True
+                print(f"Deleted {key!r} from {self.name}")
+
+    def store(self):
+        with utils.open_internal(SOFTWARE_UPGRADE_PATH, 'w') as stream:
+            YAML.dump(self.config, stream)
+
+        run(['git', 'add', SOFTWARE_UPGRADE_PATH])
+        info(f"Updated {os.path.basename(SOFTWARE_UPGRADE_PATH)}")
+
+
+class UpgradeSoftware(ChangesTracker):
+    def __init__(self, upgrade_config: UpgradeConfig, software_type: str, software_names: List[str]):
+        self.upgrade_config = upgrade_config
+        self.software_type = software_type
+        self.software_names = software_names
+        if software_names:
+            self.config: CommentedMap = upgrade_config.config[software_type]
+        else:
+            self.config: CommentedMap = upgrade_config.config.pop(software_type)
+        self._new_k8s = set()
+
+    def prepare(self, summary_tracker: SummaryTracker) -> None:
+        """
+        Create stubs for known software and delete unexpected software.
+
+        :param summary_tracker: SummaryTracker instance
+        """
+        for software_name in self.software_names:
+            if software_name not in self.config:
+                self.config[software_name] = []
+
+        map_keys = list(self.config)
+        for key in map_keys:
+            if key not in self.software_names:
+                del self.config[key]
+                summary_tracker.deleted_unexpected_content = True
+                print(f"Deleted {self.software_type}.{key} from {self.upgrade_config.name}")
+
+    def new(self, k8s_version: str):
+        self._new_k8s.add(k8s_version)
+
+    def delete(self, k8s_version: str, software_name: str):
+        if software_name not in self.software_names:
+            return
+        k8s_versions: list = self.config[software_name]
+        if k8s_version in k8s_versions:
+            k8s_versions.remove(k8s_version)
+
+    def update(self, k8s_version: str, software_name: str):
+        if k8s_version in self._new_k8s:
+            return
+        if software_name not in self.software_names:
+            raise Exception(f"Unsupported upgrade of software {software_name!r}.")
+        k8s_versions: list = self.config[software_name]
+        if k8s_version not in k8s_versions:
+            k8s_versions.append(k8s_version)
+            k8s_versions.sort(key=utils.version_key)
+            info(f'Software {software_name!r} is scheduled for upgrade for Kubernetes {k8s_version}')
+
+
 class SoftwareType(ABC):
-    def __init__(self, compatibility: InternalCompatibility):
+    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig):
         self.compatibility = compatibility
+        self.upgrade_config = upgrade_config
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
 
     @abstractmethod
-    def sync(self, tracker: ChangesTracker):
+    def sync(self, summary_tracker: SummaryTracker) -> CompatibilityMap:
         pass

@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "upgrade": {
+      "type": "object",
+      "description": "Configure the parameters to upgrade different types of software",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/UpgradePlugins"
+        },
+        "packages": {
+          "$ref": "#/definitions/UpgradePackages"
+        },
+        "thirdparties": {
+          "$ref": "#/definitions/UpgradeThirdparties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "disable-eviction": {"$ref": "definitions/procedures.json#/definitions/DisableEviction"},
+    "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
+    "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "UpgradePlugins": {
+      "type": "object",
+      "description": "Configure the parameters of the default plugins",
+      "properties": {
+        "calico": {
+          "$ref": "definitions/plugins/calico.json"
+        },
+        "nginx-ingress-controller": {
+          "$ref": "definitions/plugins/nginx-ingress-controller.json"
+        },
+        "kubernetes-dashboard": {
+          "$ref": "definitions/plugins/kubernetes-dashboard.json"
+        },
+        "local-path-provisioner": {
+          "$ref": "definitions/plugins/local-path-provisioner.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpgradePackages": {
+      "type": "object",
+      "description": "Section for packages and their management during upgrade",
+      "properties": {
+        "associations": {
+          "type": "object",
+          "description": "Configure associations of package objects to be used during upgrade",
+          "properties": {
+            "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
+            "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
+            "haproxy": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
+            "keepalived": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpgradeThirdparties": {
+      "type": "object",
+      "description": "Deliver files from third party sources and install them in the system",
+      "properties": {
+        "/usr/bin/calicoctl": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"},
+        "/usr/bin/crictl.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

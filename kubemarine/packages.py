@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import fabric
 
 from kubemarine import yum, apt
+from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
@@ -34,6 +35,13 @@ ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED = \
     "Alternatively, specify cache_versions=false for corresponding association."
 
 ERROR_SEMANAGE_NOT_MANAGED_DEBIAN = "semanage is not managed for debian OS family by KubeMarine"
+
+
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    enrich_inventory_associations(inventory, cluster)
+    enrich_inventory_packages(inventory, cluster)
+
+    return inventory
 
 
 def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
@@ -64,8 +72,6 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
 
     inventory['services']['packages']['associations'] = enriched_associations
 
-    return inventory
-
 
 def enrich_inventory_packages(inventory: dict, _):
     for _type in ['install', 'upgrade', 'remove']:
@@ -75,7 +81,194 @@ def enrich_inventory_packages(inventory: dict, _):
                 'include': packages_list
             }
 
+
+def enrich_inventory_apply_defaults(inventory: dict, _) -> dict:
+    kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+
+    for os_family in get_associations_os_family_keys():
+        cluster_associations = inventory["services"]["packages"]["associations"][os_family]
+        for package in static.GLOBALS['packages'][os_family]:
+            if cluster_associations[package].get('package_name') is None:
+                cluster_associations[package]['package_name'] = \
+                    get_default_package_names(os_family, package, kubernetes_version)
+
     return inventory
+
+
+def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict) -> List[Tuple[str, dict]]:
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        upgrade_version = context["upgrade_version"]
+        upgrade_plan = []
+        for version in cluster.procedure_inventory.get('upgrade_plan'):
+            if utils.version_key(version) < utils.version_key(upgrade_version):
+                continue
+
+            upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
+            upgrade_associations = dict(item for item in upgrade_associations.items()
+                                        if item[0] in _get_system_packages_support_upgrade(inventory))
+            upgrade_plan.append((version, upgrade_associations))
+
+    elif context.get("initial_procedure") == "migrate_kubemarine" and "upgrading_package" in context:
+        upgrade_associations = cluster.procedure_inventory.get('upgrade', {}).get("packages", {}).get("associations", {})
+        upgrade_associations = dict(item for item in upgrade_associations.items()
+                                    if item[0] == context["upgrading_package"])
+        upgrade_plan = [("", upgrade_associations)]
+    else:
+        upgrade_plan = []
+
+    return upgrade_plan
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    upgrade_plan = _get_associations_upgrade_plan(cluster, inventory)
+    if not upgrade_plan:
+        return inventory
+
+    os_family = cluster.get_os_family()
+    if os_family not in get_associations_os_family_keys():
+        raise errors.KME("KME0012")
+
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        previous_version = context["initial_kubernetes_version"]
+        packages_verify = _get_system_packages_support_upgrade(inventory)
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+        packages_verify = [context["upgrading_package"]]
+
+    cluster_associations = inventory["services"]["packages"]["associations"][os_family]
+    _verify_upgrade_plan(cluster_associations, previous_version, packages_verify, upgrade_plan)
+
+    upgrade_required = get_system_packages_for_upgrade(cluster, inventory)
+    context["packages"] = {"upgrade_required": upgrade_required}
+
+    # Merge procedure associations with the OS family specific section of associations in the inventory.
+    upgrade_inventory_associations(cluster, inventory, enrich_global=False)
+    upgrade_inventory_packages(cluster, inventory)
+
+    return inventory
+
+
+def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
+                                   *, enrich_global: bool):
+    # pass enriched 'cluster.inventory' instead of 'inventory' that is being finalized
+    upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory)
+    if not upgrade_plan:
+        return
+
+    _, upgrade_associations = upgrade_plan[0]
+    if upgrade_associations:
+        cluster_associations = inventory.setdefault("services", {}).setdefault("packages", {}) \
+            .setdefault("associations", {})
+        if not enrich_global:
+            cluster_associations = cluster_associations.setdefault(cluster.get_os_family(), {})
+        default_merger.merge(cluster_associations, upgrade_associations)
+
+
+def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict):
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return
+
+    upgrade_version = cluster.context["upgrade_version"]
+    for _type in ['install', 'upgrade', 'remove']:
+        packages_section = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
+        upgrade_packages = packages_section.get(_type)
+        if upgrade_packages is None:
+            continue
+        if isinstance(upgrade_packages, list):
+            upgrade_packages = {'include': upgrade_packages}
+
+        packages_section = inventory.setdefault("services", {}).setdefault("packages", {})
+        inventory_packages = packages_section.setdefault(_type, {})
+        if isinstance(inventory_packages, list):
+            packages_section[_type] = inventory_packages = {
+                'include': inventory_packages
+            }
+
+        default_merger.merge(inventory_packages, upgrade_packages)
+
+
+def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
+                         packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+    cluster_associations = deepcopy(cluster_associations)
+
+    # validate all packages sections in procedure inventory
+    for version, upgrade_associations in upgrade_plan:
+        for package in packages_verify:
+            upgrade_package_name = upgrade_associations.get(package, {}).get('package_name')
+            # Here default package names are not yet enriched and thus hold the custom supplied package names.
+            if cluster_associations[package].get('package_name') and not upgrade_package_name:
+                raise errors.KME("KME0010", package=package,
+                                 previous_version_spec=f' for version {previous_version}' if previous_version else "",
+                                 next_version_spec=f' for version {version}' if version else "")
+            if upgrade_package_name:
+                cluster_associations[package]['package_name'] = upgrade_package_name
+        previous_version = version
+
+
+def get_default_package_names(os_family: str, package: str, kubernetes_version: str) -> List[str]:
+    version_key = get_compatibility_version_key(os_family)
+    compatibility = static.GLOBALS['compatibility_map']['software']
+    packages_names = static.GLOBALS['packages'][os_family][package]['package_name']
+
+    package_versions = []
+    for kv in packages_names:
+        package_name, software_name = list(kv.items())[0]
+        if software_name in ('haproxy', 'keepalived'):
+            version = compatibility[software_name][version_key]
+        else:
+            version = compatibility[software_name][kubernetes_version][version_key]
+
+        package_versions.append(f"{package_name}{get_package_version_separator(os_family)}{version}")
+
+    return package_versions
+
+
+def get_system_packages_for_upgrade(cluster: KubernetesCluster, inventory: dict) -> List[str]:
+    undefined_package_name = object()
+
+    context = cluster.context
+    os_family = cluster.get_os_family()
+
+    cluster_associations = inventory['services']['packages']['associations'][os_family]
+    _, upgrade_associations = _get_associations_upgrade_plan(cluster, inventory)[0]
+
+    # Resolve old and new packages with versions and schedule for upgrade if they are not equal.
+    system_packages = _get_system_packages_support_upgrade(inventory)
+    upgrade_required = []
+    for package in system_packages:
+        # Here default package names are not yet enriched and thus hold the custom supplied package names.
+        old_package_name = cluster_associations[package].get('package_name')
+        if old_package_name is None:
+            # Trying enrichment before upgrade
+            if context.get("initial_procedure") == "migrate_kubemarine":
+                # Recommended versions have changed, and we forgot about what versions were previously recommended.
+                old_package_name = undefined_package_name
+            else:
+                # upgrade procedure
+                previous_ver = context["initial_kubernetes_version"]
+                old_package_name = get_default_package_names(os_family, package, previous_ver)
+
+        new_package_name = cluster_associations[package].get('package_name')
+        # associations from procedure inventory have priority
+        upgrade_package_name = upgrade_associations.get(package, {}).get('package_name')
+        if upgrade_package_name:
+            new_package_name = upgrade_package_name
+        if new_package_name is None:
+            # For upgrade procedure, services.kubeadm.kubernetesVersion is equal to 'upgrade_version',
+            # because the version was already enriched.
+            upgrade_ver = inventory['services']['kubeadm']['kubernetesVersion']
+            new_package_name = get_default_package_names(os_family, package, upgrade_ver)
+
+        if old_package_name is undefined_package_name or old_package_name != new_package_name:
+            upgrade_required.append(package)
+
+    return upgrade_required
+
+
+def _get_system_packages_support_upgrade(inventory: dict):
+    return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
 
 
 def enrich_inventory_include_all(inventory: dict, _):
@@ -83,6 +276,15 @@ def enrich_inventory_include_all(inventory: dict, _):
         packages: dict = inventory['services']['packages'].get(_type)
         if packages is not None:
             packages.setdefault('include', ['*'])
+
+    return inventory
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    # Despite we enrich OS specific section inside enrich_upgrade_inventory(),
+    # we still merge global associations section because it has priority during enrichment.
+    upgrade_inventory_associations(cluster, inventory, enrich_global=True)
+    upgrade_inventory_packages(cluster, inventory)
 
     return inventory
 
@@ -287,6 +489,18 @@ def get_associations_os_family_keys():
     return {'debian', 'rhel', 'rhel8'}
 
 
+def get_compatibility_version_key(os_family: str) -> str:
+    """
+    Get os-specific version key to be used in software compatibility map.
+    :param os_family: one of supported OS families
+    :return: String to use as version key.
+    """
+    if os_family in get_associations_os_family_keys():
+        return f"version_{os_family}"
+    else:
+        raise ValueError(f"Unsupported {os_family!r} OS family")
+
+
 def get_package_manager(group: NodeGroup) -> apt or yum:
     os_family = group.get_nodes_os()
 
@@ -419,6 +633,10 @@ def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to
     return results
 
 
+def get_package_version_separator(os_family: str) -> str:
+    return '=' if os_family == 'debian' else '-'
+
+
 def get_package_name(os_family: str, package: str) -> str:
     """
     Return the pure package name, without any part of version
@@ -427,7 +645,7 @@ def get_package_name(os_family: str, package: str) -> str:
     import re
 
     package_name = ""
-    
+
     if package:
         if os_family in ["rhel", "rhel8"]:
             # regexp is needed to split package and its version, the pattern start with '-' then should be number or '*'
