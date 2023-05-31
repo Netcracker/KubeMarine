@@ -234,7 +234,14 @@ installation on the same OS impossible. To avoid it one should implement those s
 # rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.6.9-3.1.el8.x86_64.rpm
 # systemctl enable containerd
 ```
+
 After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
+
+**Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
+* Install `python 3.9` from the standard RHEL repository:
+```
+# dnf install python3.9 -y
+```
 
 **Unattended-upgrades** 
 
