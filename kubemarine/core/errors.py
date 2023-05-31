@@ -11,15 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import io
 import sys
-from traceback import print_exc
-from typing import Union
+import traceback
 
 from fabric.exceptions import GroupException
 from concurrent.futures import TimeoutError
 
-KME_DICTIONARY = {
+KME_DICTIONARY: dict = {
     "KME0000": {
         "name": "Test exception"
     },
@@ -75,24 +74,23 @@ class KME(RuntimeError):
 
 
 class FailException(Exception):
-    def __init__(self, message='', reason: Union[str, Exception] = '', hint=''):
+    def __init__(self, message='', reason: Exception = None, hint=''):
         super().__init__(message)
         self.message = message
         self.reason = reason
         self.hint = hint
 
 
-def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
+def pretty_print_error(reason: Exception, log=None) -> None:
     """
     Parses the passed error and nicely displays its name and structure depending on what was passed.
     The method outputs to stdout by default, but will use the logger if one is specified.
-    :param reason: an object containing an exception or other error (must be able to be represented
-    as a string)
+    :param reason: an exception that caused the failure.
     :param log: logger object, if you need to write a log there
     :return: None
     """
 
-    if reason == "":
+    if reason is None:
         return
 
     if isinstance(reason, KME):
@@ -149,14 +147,11 @@ def pretty_print_error(reason: Union[str, Exception], log=None) -> None:
 
         return
 
-    if isinstance(reason, Exception):
-        if log:
-            log.critical('KME0001: Unexpected exception', exc_info=reason)
-        else:
-            sys.stderr.write("KME0001: Unexpected exception\n\n")
-            print_exc()
+    if log:
+        log.critical('KME0001: Unexpected exception', exc_info=reason)
     else:
-        if log:
-            log.critical(reason)
-        else:
-            sys.stderr.write(reason + "\n")
+        sys.stderr.write("KME0001: Unexpected exception\n")
+        exc_info = (type(reason), reason, reason.__traceback__)
+        sio = io.StringIO()
+        traceback.print_exception(*exc_info, limit=None, file=sio)
+        sys.stderr.write(sio.getvalue())

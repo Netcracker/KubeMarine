@@ -803,18 +803,17 @@ def process_chart_values(config, local_chart_path):
     if config_values is None and file_values is None:
         return
 
-    with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
+    chart_values = os.path.join(local_chart_path, 'values.yaml')
+    with utils.open_external(chart_values, 'r') as stream:
         merged_values = yaml.safe_load(stream)
 
-        if file_values is not None:
-            merged_values = default_merger.merge(merged_values, file_values)
-        # Values from 'values' section have priority over values in 'values_file' section
-        if config_values is not None:
-            merged_values = default_merger.merge(merged_values, config_values)
+    if file_values is not None:
+        merged_values = default_merger.merge(merged_values, file_values)
+    # Values from 'values' section have priority over values in 'values_file' section
+    if config_values is not None:
+        merged_values = default_merger.merge(merged_values, config_values)
 
-        stream.seek(0)
-        stream.write(yaml.dump(merged_values))
-        stream.truncate()
+    utils.dump_file({}, yaml.dump(merged_values), chart_values, dump_location=False)
 
 
 def get_local_chart_path(log, config):
