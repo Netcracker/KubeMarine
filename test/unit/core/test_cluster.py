@@ -28,8 +28,7 @@ class KubernetesClusterTest(unittest.TestCase):
 
     # TODO: add more tests
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_make_group_from_strs(self):
@@ -108,3 +107,7 @@ class KubernetesClusterTest(unittest.TestCase):
             'version': '7.9'
         }
         return nodes_context
+
+
+if __name__ == '__main__':
+    unittest.main()

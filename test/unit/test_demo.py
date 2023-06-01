@@ -36,8 +36,7 @@ class TestNewCluster(unittest.TestCase):
 
 class TestFakeShell(unittest.TestCase):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_run(self):
@@ -74,8 +73,7 @@ class TestFakeShell(unittest.TestCase):
 
 class TestFakeFS(unittest.TestCase):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_put_string(self):

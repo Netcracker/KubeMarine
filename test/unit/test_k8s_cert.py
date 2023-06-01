@@ -27,7 +27,7 @@ class K8sCertTest(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context(procedure='cert_renew')
-        self.cert_renew = {
+        self.cert_renew: dict = {
             'kubernetes': {
                 'cert-list': []
             }
@@ -72,3 +72,7 @@ class K8sCertTest(unittest.TestCase):
         self.cert_renew['kubernetes']['cert-list'] = []
         with self.assertRaisesRegex(Exception, "Number of items equal to 0 is less than the minimum of 1"):
             self._new_cluster()
+
+
+if __name__ == '__main__':
+    unittest.main()
