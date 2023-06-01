@@ -4977,7 +4977,7 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
-* Dynamic variables are not supported in inventory files of maintenance procedures (e. g. upgrade).
+* Dynamic variables are not supported in inventory files of maintenance procedures like upgrade.
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
@@ -5029,8 +5029,8 @@ section:
 ```
 
 Environment variables inherit all features and limitations of the [Dynamic Variables](#dynamic-variables) including but not limited to:
-* Ability to participate in full-fledged Jinja2 templates.
-* Recursive pointing to other variables pointing to environment variables.
+* The ability to participate in full-fledged Jinja2 templates.
+* The recursive pointing to other variables pointing to environment variables.
 
 Consider the following more complex example:
 
@@ -5043,7 +5043,7 @@ plugins:
     variable: '{{ values.variable }}'
 ```
 
-The above configuration generates the following result provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
+The above configuration generates the following result, provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
 
 ```yaml
 values:
