@@ -333,7 +333,7 @@ services:
                 answer: '{% raw %}{{ .Name }}{% endraw %} 3600 IN A {{ control_plain["internal"] }}'
             reject-aaaa:
               enabled: '{{ nodes[0]["internal_address"]|isipv4 }}'
-              priority: 999
+              priority: 1
               class: IN
               type: AAAA
               data:
