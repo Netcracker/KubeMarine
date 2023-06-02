@@ -26,6 +26,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Long Pulling of Images](#long-pulling-of-images)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
+  - [Ingress Cannot Be Created or Updated](#ingress-cannot-be-created-or-updated)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
@@ -606,6 +607,31 @@ plugins:
 ```
 For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
+## Ingress Cannot Be Created or Updated
+
+**Symptoms**: Ingress cannot be created or updated with following error:
+```
+Internal error occurred: failed calling webhook "validate.nginx.ingress.kubernetes.io": failed to call webhook: Post "https://ingress-nginx-controller-admission.ingress-nginx.svc:443/networking/v1/ingresses?timeout=10s": context deadline exceeded
+```
+
+**Root cause**: This issue can occur in clusters with a large number of ingresses when the admission webhook is enabled. Testing a new configuration takes too much time and does not fit into the timeout.
+
+**Solution**: There are two ways to solve this.
+* Increase the timeout:
+```
+$ kubectl edit ValidatingWebhookConfiguration ingress-nginx-admission
+...
+  timeoutSeconds: 30
+```
+* Add the `--disable-full-test` [argument](https://kubernetes.github.io/ingress-nginx/user-guide/cli-arguments/) for the ingress-nginx-controller:
+```
+$ kubectl edit ds ingress-nginx-controller
+...
+spec:
+  containers:
+      args:
+        - '--disable-full-test'
+```
 
 # Troubleshooting Kubemarine
 
