@@ -16,6 +16,7 @@
 import glob
 import importlib.util
 import io
+import logging
 import os
 import re
 import shutil
@@ -37,7 +38,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static, errors
+from kubemarine.core import utils, static, errors, os as kos
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -802,18 +803,17 @@ def process_chart_values(config, local_chart_path):
     if config_values is None and file_values is None:
         return
 
-    with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
+    chart_values = os.path.join(local_chart_path, 'values.yaml')
+    with utils.open_external(chart_values, 'r') as stream:
         merged_values = yaml.safe_load(stream)
 
-        if file_values is not None:
-            merged_values = default_merger.merge(merged_values, file_values)
-        # Values from 'values' section have priority over values in 'values_file' section
-        if config_values is not None:
-            merged_values = default_merger.merge(merged_values, config_values)
+    if file_values is not None:
+        merged_values = default_merger.merge(merged_values, file_values)
+    # Values from 'values' section have priority over values in 'values_file' section
+    if config_values is not None:
+        merged_values = default_merger.merge(merged_values, config_values)
 
-        stream.seek(0)
-        stream.write(yaml.dump(merged_values))
-        stream.truncate()
+    utils.dump_file({}, yaml.dump(merged_values), chart_values, dump_location=False)
 
 
 def get_local_chart_path(log, config):
@@ -938,7 +938,7 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
             if split_extension[1] == ".j2":
                 source_filename = split_extension[0]
 
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars'], 'env': kos.Environ()}
             with utils.open_utf8(file, 'r') as template_stream:
                 generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
 
@@ -991,7 +991,7 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
         if use_sudo:
             method = apply_common_group.sudo
         cluster.log.debug("Applying yaml...")
-        method(apply_command, hide=False)
+        method(apply_command, logging_stream_level=logging.DEBUG)
     else:
         cluster.log.debug('Apply is not required')
 

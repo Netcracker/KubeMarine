@@ -385,9 +385,10 @@ logging:
       level: debug
       correct_newlines: True
       colorize: true
+      format: "%(asctime)s %(levelname)s %(message)s"
     dump:
       level: verbose
-      format: "%(asctime)s %(process)s %(thread)s %(name)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"
+      format: "%(asctime)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"
       colorize: False
       correct_newlines: True
 

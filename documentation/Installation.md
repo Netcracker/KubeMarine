@@ -94,6 +94,7 @@ This section provides information about the inventory, features, and steps for i
     - [Dynamic Variables](#dynamic-variables)
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
+    - [Environment Variables](#environment-variables)
   - [Installation without Internet Resources](#installation-without-internet-resources)
 - [Installation Procedure](#installation-procedure)
   - [Installation Tasks Description](#installation-tasks-description)
@@ -4730,10 +4731,11 @@ is further used throughout the entire installation.
 
 **Note**: If [Dump Files](#dump-files) is enabled, then you can see merged **cluster.yaml** file version in the dump directory.
 
-To make sure that the information in the configuration file is not duplicated, the following advanced functionality appears in the yaml file:
+To simplify maintenance of the configuration file, the following advanced functionality appears in the yaml file:
 
 * List merge strategy
 * Dynamic variables
+* Environment Variables
 
 ### List Merge Strategy
 
@@ -4975,6 +4977,7 @@ section:
 
 Dynamic variables have some limitations that should be considered when working with them:
 
+* Dynamic variables are not supported in inventory files of maintenance procedures like upgrade.
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
@@ -5010,6 +5013,47 @@ For example:
 ```yaml
 authority: '{% raw %}{{ .Name }}{% endraw %} 3600 IN SOA'
 ```
+
+### Environment Variables
+
+Kubemarine supports environment variables inside the following places:
+* The configuration file **cluster.yaml**.
+* Jinja2 template files for plugins. For more information, refer to [template](#template).
+
+Environment variables are available through the predefined `env` Jinja2 variable.
+Refer to them inside the configuration file in the following way:
+
+```yaml
+section:
+  variable: '{{ env.ENV_VARIABLE_NAME }}'
+```
+
+Environment variables inherit all features and limitations of the [Dynamic Variables](#dynamic-variables) including but not limited to:
+* The ability to participate in full-fledged Jinja2 templates.
+* The recursive pointing to other variables pointing to environment variables.
+
+Consider the following more complex example:
+
+```yaml
+values:
+  variable: '{{ env["ENV_VARIABLE_NAME"] | default("nothing") }}'
+
+plugins:
+  my_plugin:
+    variable: '{{ values.variable }}'
+```
+
+The above configuration generates the following result, provided that `ENV_VARIABLE_NAME=ENV_VARIABLE_VALUE` is defined:
+
+```yaml
+values:
+  variable: ENV_VARIABLE_VALUE
+
+plugins:
+  my_plugin:
+    variable: ENV_VARIABLE_VALUE
+```
+
 ## Installation without Internet Resources
 
 If you want to install Kubernetes in a private environment, without access to the internet, then you need to redefine the addresses of remote resources.
