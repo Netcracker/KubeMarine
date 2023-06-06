@@ -141,7 +141,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
             
             for node in cluster.nodes['control-plane'].include_group(
                         cluster.nodes.get('worker')).get_ordered_members_list(
-                        provide_node_configs=True)
+                        provide_node_configs=True):
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
                 kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}",
