@@ -146,7 +146,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
                 kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}",
                                         is_async=False).get_simple_out()
-                updated_kubeadm_flags = re.sub(r'pause:.*\..*', f"pause:{pause_version}", kubeadm_flags)
+                updated_kubeadm_flags = re.sub(r'(pause:.*\.[^"]*)', f"pause:{pause_version}", kubeadm_flags)
                 node['connection'].put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
             
             with RemoteExecutor(cluster) as exe:
