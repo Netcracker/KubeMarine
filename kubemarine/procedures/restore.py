@@ -148,7 +148,7 @@ def import_nodes(cluster):
     with RemoteExecutor(cluster) as exe:
         for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
             cmd = f"readlink /etc/resolv.conf ;" \
-                  f"if [ $? ]; then sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; else sudo chattr -f /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr -f +i /etc/resolv.conf; fi "
+                  f"if [ $? ]; then sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; else sudo chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr  +i /etc/resolv.conf; fi "
             node['connection'].sudo(cmd)
 
     result = exe.get_last_results_str()
