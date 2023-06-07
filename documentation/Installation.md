@@ -199,10 +199,9 @@ The actual information about the supported versions can be found in `compatibili
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
-  * Pod Subnet: This is the subnet used for communication between pods (containers) within the Kubernetes cluster. By default, the pod subnet is set to `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6. Search for address at`services.kubeadm.networking.podSubnet`.
-  * Service Subnet: This subnet is used for services running within the Kubernetes cluster. Services are assigned IP addresses from this subnet, allowing them to communicate with other components. The default value for the service subnet is `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6. Search for address at `services.kubeadm.networking.serviceSubnet`.
-
-It's important to be aware of these default subnet configurations and adjust them if necessary based on your specific requirements. Additionally, always ensure that the network security policies are properly configured to allow traffic within these subnets for seamless communication within your OpenStack and Kubernetes environments.
+  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
+  * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
+  * Traffic to/from podSubnet, serviceSubnet is allowed inside the cluster.
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
