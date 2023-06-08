@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-from typing import Union, Optional
+from typing import Union, Optional, Callable, List
 
 from kubemarine.core import utils
 from kubemarine.core.executor import RunnersResult, Token, is_executor_active
@@ -36,34 +36,34 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined") -> RunnersGroupResult:
-    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
+def add_repo(group: NodeGroup, repo_data: Union[List[str], str]) -> RunnersGroupResult:
+    create_repo_file(group, repo_data, get_repo_file_name())
     return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update')
 
 
-def get_repo_file_name(repo_filename="predefined") -> str:
-    return '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename)
+def get_repo_file_name() -> str:
+    return '/etc/apt/sources.list.d/predefined.list'
 
 
-def create_repo_file(group: NodeGroup, repo_data, repo_file) -> None:
+def create_repo_file(group: NodeGroup, repo_data: Union[List[str], str], repo_file: str) -> None:
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
         repo_data_str = utils.read_external(repo_data)
 
-    repo_data = io.StringIO(repo_data_str)
+    repo_data_stream = io.StringIO(repo_data_str)
     if is_executor_active():
-        group.defer().put(repo_data, repo_file, sudo=True)
+        group.defer().put(repo_data_stream, repo_file, sudo=True)
     else:
-        group.put(repo_data, repo_file, sudo=True)
+        group.put(repo_data_stream, repo_file, sudo=True)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean")
 
 
-def get_install_cmd(include: Union[str, list], exclude=None) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = DEBIAN_HEADERS + 'apt update && ' + \
@@ -79,7 +79,8 @@ def get_install_cmd(include: Union[str, list], exclude=None) -> str:
     return command
 
 
-def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, RunnersGroupResult]:
+def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
+        -> Union[Token, RunnersGroupResult]:
     if include is None:
         raise Exception('You must specify included packages to install')
 
@@ -91,7 +92,8 @@ def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, Runner
         return group.sudo(command)
 
 
-def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) -> RunnersGroupResult:
+def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -107,7 +109,8 @@ def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) 
     return group.sudo(command, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None) -> RunnersGroupResult:
+def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
@@ -124,7 +127,7 @@ def upgrade(group: NodeGroup, include=None, exclude=None) -> RunnersGroupResult:
     return group.sudo(command)
 
 
-def no_changes_found(action: callable, result: RunnersResult) -> bool:
+def no_changes_found(action: Callable, result: RunnersResult) -> bool:
     if action not in (install, upgrade, remove):
         raise Exception(f"Unknown action {action}")
     return "0 upgraded, 0 newly installed, 0 to remove" in result.stdout

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy
+from typing import Dict
 
 from ruamel.yaml import CommentedMap
 
@@ -24,17 +25,17 @@ RESOURCE_PATH = utils.get_internal_resource_path("resources/configurations/compa
 
 
 class KubernetesVersions:
-    def __init__(self):
+    def __init__(self) -> None:
         with utils.open_internal(RESOURCE_PATH) as stream:
             self._kubernetes_versions = YAML.load(stream)
 
         self._validate_mapping()
 
     @property
-    def compatibility_map(self) -> dict:
+    def compatibility_map(self) -> Dict[str, Dict[str, str]]:
         return deepcopy(self._kubernetes_versions['compatibility_map'])
 
-    def sync(self):
+    def sync(self) -> None:
         k8s_versions = self._kubernetes_versions['kubernetes_versions']
         k8s_versions = utils.map_sorted(k8s_versions, key=utils.minor_version_key)
         self._kubernetes_versions['kubernetes_versions'] = k8s_versions
@@ -58,7 +59,7 @@ class KubernetesVersions:
         run(['git', 'add', RESOURCE_PATH])
         info(f"Updated kubernetes_versions.yaml")
 
-    def _validate_mapping(self):
+    def _validate_mapping(self) -> None:
         mandatory_fields = set(static.GLOBALS['plugins'])
         mandatory_fields.update(['crictl'])
         optional_fields = {

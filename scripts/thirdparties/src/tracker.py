@@ -30,15 +30,15 @@ YAML = utils.yaml_structure_preserver()
 
 class ChangesTracker(ABC):
     @abstractmethod
-    def new(self, k8s_version: str):
+    def new(self, k8s_version: str) -> None:
         pass
 
     @abstractmethod
-    def delete(self, k8s_version: str, software_name: str):
+    def delete(self, k8s_version: str, software_name: str) -> None:
         pass
 
     @abstractmethod
-    def update(self, k8s_version: str, software_name: str):
+    def update(self, k8s_version: str, software_name: str) -> None:
         pass
 
 
@@ -46,21 +46,21 @@ class ComposedTracker(ChangesTracker):
     def __init__(self, *trackers: ChangesTracker):
         self.trackers = trackers
 
-    def new(self, k8s_version: str):
+    def new(self, k8s_version: str) -> None:
         for tracker in self.trackers:
             tracker.new(k8s_version)
 
-    def delete(self, k8s_version: str, software_name: str):
+    def delete(self, k8s_version: str, software_name: str) -> None:
         for tracker in self.trackers:
             tracker.delete(k8s_version, software_name)
 
-    def update(self, k8s_version: str, software_name: str):
+    def update(self, k8s_version: str, software_name: str) -> None:
         for tracker in self.trackers:
             tracker.update(k8s_version, software_name)
 
 
 class SummaryTracker(ChangesTracker):
-    def __init__(self, kubernetes_versions: dict):
+    def __init__(self, kubernetes_versions: Dict[str, Dict[str, str]]):
         self.kubernetes_versions = kubernetes_versions
         self.new_k8s: OrderedSet[str] = OrderedSet()
         self.deleted_k8s: OrderedSet[str] = OrderedSet()
@@ -72,24 +72,24 @@ class SummaryTracker(ChangesTracker):
     def all_k8s_versions(self) -> List[str]:
         return list(self.kubernetes_versions)
 
-    def new(self, k8s_version: str):
+    def new(self, k8s_version: str) -> None:
         self.new_k8s.add(k8s_version)
 
-    def delete(self, k8s_version: str, _):
+    def delete(self, k8s_version: str, _: str) -> None:
         self._check_delete_all_previous_minor(k8s_version)
         self.deleted_k8s.add(k8s_version)
 
-    def update(self, k8s_version: str, software_name: str):
+    def update(self, k8s_version: str, software_name: str) -> None:
         if k8s_version not in self.new_k8s:
             self.updated_k8s.setdefault(k8s_version, OrderedSet()).add(software_name)
 
     def is_software_changed(self, k8s_version: str, software_name: str) -> bool:
         return k8s_version in self.new_k8s or software_name in self.updated_k8s.get(k8s_version, set())
 
-    def final_message(self, msg):
+    def final_message(self, msg: str) -> None:
         self.final_messages.append(msg)
 
-    def print(self):
+    def print(self) -> None:
         if self.new_k8s:
             info(f"New Kubernetes versions: {', '.join(self.new_k8s)}")
         if self.deleted_k8s:
@@ -142,10 +142,11 @@ class SummaryTracker(ChangesTracker):
 
         return requirements
 
-    def _get_software_requirements_link(self, settings_settings: dict, version: Optional[str]):
+    def _get_software_requirements_link(self, settings_settings: dict, version: Optional[str]) -> str:
         minor_version = None if version is None else utils.minor_version(version)
 
         requirements = settings_settings['requirements']
+        req: str
         if version in requirements:
             req = requirements[version]
         elif minor_version in requirements:
@@ -155,8 +156,8 @@ class SummaryTracker(ChangesTracker):
 
         return req.format(version=version, minor_version=minor_version)
 
-    def _check_delete_all_previous_minor(self, k8s_version):
-        def key(ver: str):
+    def _check_delete_all_previous_minor(self, k8s_version: str) -> None:
+        def key(ver: str) -> Tuple[int, int]:
             return utils.version_key(ver)[0:2]
 
         previous_versions = [ver for ver in self.all_k8s_versions if key(ver) <= key(k8s_version)]

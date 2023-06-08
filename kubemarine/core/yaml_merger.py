@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from deepmerge import Merger
+from deepmerge import Merger  # type: ignore[import]
 
 
-def list_merger(config, path, base, nxt):
+def list_merger(config: Merger, path: list, base: list, nxt: list) -> list:
     strategy = None
     strategy_definition_position = 0
     for i, v in enumerate(nxt):

@@ -42,6 +42,7 @@ dependencies = [
     "cryptography==39.0.*",
     "paramiko==2.11.*",
     "jsonschema==4.17.*",
+    "typing_extensions==4.6.*",
 ]
 requires-python = ">=3.7"
 

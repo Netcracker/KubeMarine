@@ -15,6 +15,7 @@
 
 
 from collections import OrderedDict
+from typing import List
 
 from kubemarine import plugins, k8s_certs
 from kubemarine.core import flow
@@ -23,7 +24,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 
 
-def renew_nginx_ingress_certs_task(cluster: KubernetesCluster):
+def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
     # check that renewal is required for nginx
     if not cluster.procedure_inventory.get("nginx-ingress-controller"):
         cluster.log.debug("Skipped: nginx ingress controller certs renewal is not required")
@@ -34,7 +35,7 @@ def renew_nginx_ingress_certs_task(cluster: KubernetesCluster):
     plugins.install_plugin(cluster, "nginx-ingress-controller", plugin["installation"]['procedures'])
 
 
-def k8s_certs_renew_task(cluster: KubernetesCluster):
+def k8s_certs_renew_task(cluster: KubernetesCluster) -> None:
     if not cluster.procedure_inventory.get("kubernetes"):
         cluster.log.debug("Skipped: kubernetes certs renewal is not required")
         return
@@ -43,7 +44,7 @@ def k8s_certs_renew_task(cluster: KubernetesCluster):
     cluster.nodes['control-plane'].call(k8s_certs.renew_apply)
 
 
-def k8s_certs_overview_task(cluster: KubernetesCluster):
+def k8s_certs_overview_task(cluster: KubernetesCluster) -> None:
     cluster.nodes['control-plane'].call(k8s_certs.k8s_certs_overview)
 
 
@@ -55,15 +56,15 @@ tasks = OrderedDict({
 
 
 class CertRenewAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('cert renew', recreate_inventory=True)
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
 
     cli_help = '''
     Script for certificates renewal on existing Kubernetes cluster.

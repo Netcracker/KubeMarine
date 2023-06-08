@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Tuple, ContextManager
+from typing import List, Dict, Tuple, Iterator
 
 import ruamel.yaml
 import yaml
@@ -453,7 +453,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
 
 @contextmanager
-def local_admin_config(node: NodeGroup) -> ContextManager[str]:
+def local_admin_config(node: NodeGroup) -> Iterator[str]:
     temp_filepath = "/tmp/%s" % uuid.uuid4().hex
 
     cluster_name = node.cluster.inventory['cluster_name']
@@ -1240,12 +1240,12 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    if not group_size:
+    if group_size is None:
         group_size = cluster.procedure_inventory.get('prepull_group_size')
 
-    if not group_size:
+    if group_size is None:
         log.verbose("Group size is not set in procedure inventory, a default one will be used")
-        group_size = cluster.globals.get('prepull_group_size')
+        group_size = cluster.globals['prepull_group_size']
 
     nodes = group.get_ordered_members_list()
 
@@ -1327,7 +1327,7 @@ def get_nodes_description(cluster: KubernetesCluster) -> dict:
 
 
 def get_actual_roles(nodes_description: dict) -> Dict[str, List[str]]:
-    result = {}
+    result: Dict[str, List[str]] = {}
     for node_description in nodes_description['items']:
         node_name = node_description['metadata']['name']
         labels = node_description['metadata']['labels']
@@ -1345,7 +1345,7 @@ def get_nodes_conditions(nodes_description: dict) -> Dict[str, Dict[str, dict]]:
     result = {}
     for node_description in nodes_description['items']:
         node_name = node_description['metadata']['name']
-        conditions_by_type = {}
+        conditions_by_type: Dict[str, dict] = {}
         result[node_name] = conditions_by_type
         for condition in node_description['status']['conditions']:
             conditions_by_type[condition['type']] = condition

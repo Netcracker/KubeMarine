@@ -168,13 +168,13 @@ tasks = OrderedDict({
 
 class UpgradeFlow(flow.Flow):
     def __init__(self):
-        self.target_version = None
+        self.target_version = "not supported"
 
     def _run(self, resources: DynamicResources):
         logger = resources.logger()
 
         previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
-        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        upgrade_plan = resources.procedure_inventory()['upgrade_plan']
         upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
         logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
 

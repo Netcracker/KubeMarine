@@ -14,7 +14,7 @@
 import re
 from importlib import import_module
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import yaml
 
@@ -243,10 +243,10 @@ def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
         cluster.log.verbose('Detecting control plains...')
 
     # calculate controlplain ips
-    internal_address = None
-    internal_address_source = None
-    external_address = None
-    external_address_source = None
+    internal_address: Optional[str] = None
+    internal_address_source: Optional[str] = None
+    external_address: Optional[str] = None
+    external_address_source: Optional[str] = None
 
     # vrrp_ip section is not enriched yet
     # todo what if ip is an ip of some node to remove?
@@ -287,7 +287,8 @@ def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
                             external_address_source += ' \"%s\"' % node['name']
 
     if external_address is None:
-        cluster.log.warning('Failed to detect external control plain. Something may work incorrect!')
+        if cluster:
+            cluster.log.warning('Failed to detect external control plain. Something may work incorrect!')
         external_address = internal_address
 
     if cluster:
@@ -335,7 +336,7 @@ def recursive_apply_defaults(defaults, section):
 
 
 def calculate_node_names(inventory: dict, _):
-    roles_iterators = {}
+    roles_iterators: Dict[str, int] = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
             if role_name in node['roles']:
@@ -446,7 +447,7 @@ def compile_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def compile_object(logger: log.EnhancedLogger, struct: object, root: dict, ignore_jinja_escapes=True) -> object:
+def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_jinja_escapes=True) -> Any:
     if isinstance(struct, list):
         new_struct = []
         for i, v in enumerate(struct):

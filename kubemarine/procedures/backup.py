@@ -23,6 +23,8 @@ import shutil
 import tarfile
 import time
 from collections import OrderedDict
+from typing import List
+
 import yaml
 
 from kubemarine.core import utils, flow
@@ -252,12 +254,12 @@ def export_kubernetes_version(cluster: KubernetesCluster):
 
 # There is no way to parallel resources connection via Queue or Pool:
 # the ssh connection is not possible to parallelize due to thread lock
-def download_resources(log, resources, location, control_plane: NodeGroup, namespace=None):
+def download_resources(log, resources: List[str], location, control_plane: NodeGroup, namespace=None):
 
     if namespace:
         log.debug('Downloading resources from namespace "%s"...' % namespace)
 
-    actual_resources = []
+    actual_resources: List[str] = []
 
     if not resources:
         log.debug('No resources found to download')

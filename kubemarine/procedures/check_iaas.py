@@ -22,7 +22,7 @@ import uuid
 from collections import OrderedDict
 import time
 from contextlib import contextmanager
-from typing import List, Dict, ContextManager, Any, cast, Optional
+from typing import List, Dict, Any, cast, Match, Iterator, Optional
 
 import yaml
 
@@ -167,7 +167,7 @@ def hardware_members_amount(cluster: KubernetesCluster, group_name: str):
 
 def hardware_cpu(cluster: KubernetesCluster, group_name: str):
     minimal_cpu = cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'] \
-        if group_name == 'balancer' or cluster.nodes.get('all').nodes_amount() > 1 \
+        if group_name == 'balancer' or cluster.nodes['all'].nodes_amount() > 1 \
         else cluster.globals['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
     with TestCase(cluster, '006',  'Hardware', 'VCPUs Amount - %ss' % group_name.capitalize(),
                   minimal=minimal_cpu,
@@ -176,7 +176,7 @@ def hardware_cpu(cluster: KubernetesCluster, group_name: str):
             return tc.success(results='Skipped')
         results = cluster.nodes[group_name].sudo("nproc --all")
         cluster.log.verbose(results)
-        minimal_amount = None
+        minimal_amount: Optional[int] = None
         for host, result in results.items():
             amount = int(result.stdout)
             if minimal_amount is None or minimal_amount > amount:
@@ -213,7 +213,7 @@ def hardware_ram(cluster: KubernetesCluster, group_name: str):
             return tc.success(results='Skipped')
         results = cluster.nodes[group_name].sudo("cat /proc/meminfo | awk '/DirectMap/ { print $2 }'")
         cluster.log.verbose(results)
-        minimal_amount = None
+        minimal_amount: Optional[int] = None
         for host, result in results.items():
             amount = math.floor(sum(map(lambda x: int(x), result.stdout.strip().split("\n"))) / 1000000)
             if minimal_amount is None or minimal_amount > amount:
@@ -295,8 +295,8 @@ def check_kernel_version(cluster: KubernetesCluster):
     """
     with TestCase(cluster, '015', "Software", "Kernel version") as tc:
         bad_results = {}
-        unstable_kernel_ubuntu = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('unstable_kernel')
-        unstable_kernel_centos = []
+        unstable_kernel_ubuntu: List[str] = cluster.globals['compatibility_map']['distributives']['ubuntu'][0].get('unstable_kernel')
+        unstable_kernel_centos: List[str] = []
         group = cluster.nodes['all']
         result_group = group.run('uname -r')
         for host, results in result_group.items():
@@ -345,7 +345,6 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
                 res = node.run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
                                                 cluster.inventory['globals']['timeout_download']), warn=True)
                 if res.is_any_failed():
-                    host = node.get_host()
                     broken.append(f"{host}, {destination}: {res[host].stderr}")
 
         # Remove file
@@ -428,7 +427,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 
         # Collect repository urls
         # TODO: think about better parsing
-        repository_urls = set()
+        repository_urls: List[str] = []
         repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
         if cluster.get_os_family() not in ['debian', 'rhel', 'rhel8']:
             # Skip check in case of multiply or unknown OS
@@ -436,16 +435,16 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         if isinstance(repositories, list):
             # For debian
             for repo in repositories:
-                repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
-                if repository_url is not None:
-                    repository_urls.add(repository_url)
+                repository_url = list(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')))
+                if repository_url:
+                    repository_urls.append(repository_url[0])
                 else:
                     broken.append(f"Found broken repository: '{repo}'")
         elif isinstance(repositories, dict):
             # For rhel
             for repo_name, repo_conf in repositories.items():
                 if repo_conf.get('baseurl') is not None:
-                    repository_urls.add(repo_conf.get('baseurl'))
+                    repository_urls.append(repo_conf.get('baseurl'))
                 else:
                     broken.append(f"Found broken repository: '{repo_name}'")
         elif isinstance(repositories, str):
@@ -455,13 +454,13 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
             else:
                 repositories = utils.read_external(path)
                 for repo in repositories.split('\n'):
-                    repository_url = next(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')), None)
-                    if repository_url is not None:
-                        repository_urls.add(repository_url)
+                    repository_url = list(filter(lambda x: x[:4] == 'http' and '://' in x[4:8], repo.split(' ')))
+                    if repository_url:
+                        repository_urls.append(repository_url[0])
                 if not repository_urls:
                     broken.append(f"Failed to detect repository URLs in file {path}")
 
-        repository_urls = list(repository_urls)
+        repository_urls = list(set(repository_urls))
         cluster.log.debug(f"Repositories to check: {repository_urls}")
 
         # Load script for checking sources
@@ -480,9 +479,9 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                                         f"operation can't be performed for it")
                         continue
                     python_executable = cluster.context['nodes'][host]['python']['executable']
-                    for repository_url in repository_urls:
+                    for repo_url in repository_urls:
                         node.defer().run('%s %s %s %s || echo "Package repository is unavailable"'
-                                 % (python_executable, random_temp_path, repository_url,
+                                 % (python_executable, random_temp_path, repo_url,
                                     cluster.inventory['globals']['timeout_download']))
 
             results = exe.get_last_results()
@@ -515,8 +514,8 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
 def check_access_to_packages(cluster: KubernetesCluster):
     with TestCase(cluster, '014', 'Software', 'Package Availability') as tc:
         check_package_repositories(cluster)
-        broken = []
-        warnings = []
+        broken: List[str] = []
+        warnings: List[str] = []
         group = cluster.nodes['all']
         hosts_to_packages = packages.get_all_managed_packages_for_group(group, cluster.inventory)
         with RemoteExecutor(cluster) as exe:
@@ -566,12 +565,12 @@ def detect_preinstalled_python(cluster: KubernetesCluster):
         rf'fi; done')
 
     for host, result in detected_python.items():
-        result = result.stdout.strip()
-        if not result:
+        identity = result.stdout.strip()
+        if not identity:
             nodes_context[host]["python"] = "Not installed"
         else:
-            executable, version = tuple(result.splitlines())
-            version = re.match(python_version_pattern, version).group(1)
+            executable, version = tuple(identity.splitlines())
+            version = cast(Match[str], re.match(python_version_pattern, version)).group(1)
             nodes_context[host]["python"] = {
                 "executable": executable,
                 "major_version": version
@@ -609,15 +608,15 @@ def _get_not_balancers(cluster: KubernetesCluster) -> Dict[str, NodeConfig]:
 
 
 @contextmanager
-def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], subnet) -> ContextManager[Dict[str, Any]]:
+def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], subnet) -> Iterator[Dict[str, Any]]:
     inet = ipaddress.ip_network(subnet)
     net_mask = str(inet.netmask)
     prefix = str(inet.prefixlen)
     subnet_hosts = []
-    ip_numbers=0
-    for i in inet.hosts():
-        subnet_hosts.append(i)
-        ip_numbers +=1
+    ip_numbers = 0
+    for addr in inet.hosts():
+        subnet_hosts.append(addr)
+        ip_numbers += 1
         if ip_numbers == 1000000:
            break
     subnet_hosts_len = len(subnet_hosts)
@@ -669,9 +668,9 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
     finally:
         # Remove the created aliases from network interfaces
         with RemoteExecutor(cluster):
-            for node in nodes_to_rollback.get_ordered_members_list():
-                host = node.get_host()
-                node.defer().sudo(
+            for group in nodes_to_rollback.get_ordered_members_list():
+                host = group.get_host()
+                group.defer().sudo(
                     f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
                     warn=True)
 
@@ -825,7 +824,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
             with RemoteExecutor(cluster) as exe:
                 # Run process that LISTEN TCP port
                 for host, node in nodes.items():
-                    internal_ip = node.get('internal_address')
+                    internal_ip: str = node['internal_address']
                     ip_version = ipaddress.ip_address(internal_ip).version
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version))
@@ -853,9 +852,9 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
     finally:
         with RemoteExecutor(cluster):
             # Kill the created during the test processes
-            for node in nodes_to_rollback.get_ordered_members_list():
+            for group in nodes_to_rollback.get_ordered_members_list():
                 tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-                node.defer().sudo(tcp_listener_cmd, warn=True)
+                group.defer().sudo(tcp_listener_cmd, warn=True)
 
     if skipped_nodes:
         cluster.log.warning(f"Ports in use: {skipped_nodes}")

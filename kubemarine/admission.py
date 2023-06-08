@@ -16,6 +16,7 @@ import io
 import os
 import uuid
 import re
+from typing import Dict, Any, List
 
 import ruamel.yaml
 import yaml
@@ -475,8 +476,8 @@ def manage_privileged_from_file(group: NodeGroup, filename, manage_type):
     return group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
 
 
-def resolve_oob_scope(oob_policies_conf, selector):
-    result = {
+def resolve_oob_scope(oob_policies_conf: Dict[str, Any], selector: str):
+    result: Dict[str, List[dict]] = {
         psp_list_option: [],
         roles_list_option: [],
         bindings_list_option: []
@@ -696,8 +697,8 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str):
         else:
             for item in conf["spec"]["containers"][0]["command"]:
                 if item.startswith("--"):
-                    key = re.split('=',item)[0]
-                    value = re.search('=(.*)$', item).group(1)
+                    key = item.split('=')[0]
+                    value = item[len(key)+1:]
                     if key in ["--feature-gates", "--admission-control-config-file"]:
                         del_option = "%s=%s" % (key, value)
                         new_command.remove(del_option)

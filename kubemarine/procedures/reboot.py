@@ -15,6 +15,7 @@
 
 
 from collections import OrderedDict
+from typing import List
 
 from kubemarine.core import flow
 from kubemarine.core.action import Action
@@ -24,7 +25,7 @@ from kubemarine.procedures import install
 from kubemarine import system
 
 
-def reboot(cluster: KubernetesCluster):
+def reboot(cluster: KubernetesCluster) -> None:
     if cluster.context.get('initial_procedure') != 'reboot':
         raise ImportError('Invalid reboot.py usage, please use system.reboot_nodes')
 
@@ -51,14 +52,14 @@ tasks = OrderedDict({
 
 
 class RebootAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('reboot')
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
     Script for Kubernetes nodes graceful rebooting.
 

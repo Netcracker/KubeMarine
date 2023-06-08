@@ -17,10 +17,10 @@ import os
 import sys
 from abc import ABC, abstractmethod
 
-from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler
+from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import]
 
 from copy import deepcopy
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, cast, Dict
 
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
@@ -82,7 +82,7 @@ LOGGING_NAMES_BY_LEVEL = {
 
 class VerboseLogger(ABC):
     @abstractmethod
-    def verbose(self, msg, *args, **kwargs):
+    def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
         pass
 
 
@@ -91,7 +91,7 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
         super().__init__(name, level)
         logging.addLevelName(VERBOSE, 'VERBOSE')
 
-    def verbose(self, msg, *args, **kwargs):
+    def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(VERBOSE):
             self._log(VERBOSE, msg, args, **kwargs)
 
@@ -153,8 +153,9 @@ class LogFormatter(logging.Formatter):
 
 
 class StdoutHandler(logging.StreamHandler):
-    def __init__(self):
+    def __init__(self, formatter: LogFormatter):
         super().__init__(sys.stdout)
+        self.formatter: LogFormatter = formatter
 
     def emit(self, record):
         if 'ignore_stdout' in record.__dict__:
@@ -165,32 +166,20 @@ class StdoutHandler(logging.StreamHandler):
 
 
 class FileHandlerWithHeader(logging.FileHandler):
-    def __init__(self, filename, header=None, mode='a', encoding=None, delay=0):
+    def __init__(self, formatter: LogFormatter, filename, header=None, mode='a', encoding=None):
         # Store the header information.
         self.header = header
 
-        # Determine if the file pre-exists
-        self.file_pre_exists = os.path.exists(filename)
-
         # Call the parent __init__
-        logging.FileHandler.__init__(self, filename, mode, encoding, delay)
+        logging.FileHandler.__init__(self, filename, mode, encoding)
 
-        # Write the header if delay is False and a file stream was created.
-        if not delay and header and self.stream is not None:
+        # Write the header if it was specified
+        if header:
             self.stream.write('%s\n' % header)
 
+        self.formatter: LogFormatter = formatter
+
     def emit(self, record):
-        # Create the file stream if not already created.
-        if self.stream is None:
-            self.stream = self._open()
-
-            # If the file pre_exists, it should already have a header.
-            # Else write the header to the file so that it is the first line.
-            if not self.file_pre_exists:
-                self.stream.write('')
-                if self.header:
-                    self.stream.write('%s\n' % self.header)
-
         # Call the parent class emit function.
         logging.FileHandler.emit(self, record)
 
@@ -218,9 +207,10 @@ class LogHandler:
                                        colorize=self._colorize,
                                        correct_newlines=self._correct_newlines)
 
+        self.handler: logging.Handler
         if target.lower() == 'stdout':
             self._target = 'stdout'
-            self.handler = StdoutHandler()
+            self.handler = StdoutHandler(self._formatter)
         elif target.lower() == 'graylog':
             self._target = 'graylog'
             if not kwargs.get('host'):
@@ -255,18 +245,18 @@ class LogHandler:
                 self.handler = GelfHttpHandler(**handler_options)
             else:
                 raise Exception(f'Unknown Graylog type "{kwargs["type"]}" for "{kwargs["host"]}:{kwargs["port"]}"')
+
+            self.handler.setFormatter(self._formatter)
         else:
             self._target = target
             # Output produced by remote commands might contain characters which cannot be encoded on Windows deployer.
             # Specify explicitly utf-8 encoding which is native to the remote machines.
-            self.handler = FileHandlerWithHeader(self._target, mode=filemode, header=self._header, encoding='utf-8')
+            self.handler = FileHandlerWithHeader(self._formatter, self._target, mode=filemode, header=self._header, encoding='utf-8')
 
-        self._level = LOGGING_LEVELS_BY_NAME.get(level)
-        if self._level is None:
+        if level not in LOGGING_LEVELS_BY_NAME:
             raise Exception(f'Failed to create logger - unknown logging level: "{level}"')
+        self._level = LOGGING_LEVELS_BY_NAME[level]
         self.handler.setLevel(self._level)
-
-        self.handler.setFormatter(self._formatter)
 
     def __str__(self):
         return f'target: {self._target}, level: {LOGGING_NAMES_BY_LEVEL[self._level]}, colorize: {self._colorize}, datefmt: {self._datefmt}, format: {self._format}'
@@ -281,7 +271,8 @@ class LogHandler:
 class Log:
 
     def __init__(self, raw_inventory, handlers: List[LogHandler]):
-        self._logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
+        logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
+        self._logger = cast(EnhancedLogger, logger)
         self._logger.setLevel(VERBOSE)
 
         if self._logger.hasHandlers():
@@ -324,7 +315,7 @@ def parse_log_argument(argument: str) -> LogHandler:
     :param argument: Raw CLI argument string. For example: test.log;level=verbose;colorize=true
     :return: Initialized LogHandler
     """
-    parameters = {}
+    parameters: Dict[str, Any] = {}
     argument_parts = argument.split(';')
     if not argument_parts:
         raise Exception('Defined logger do not contain parameters')
@@ -332,6 +323,7 @@ def parse_log_argument(argument: str) -> LogHandler:
     for parameter in argument_parts[1:]:
         if parameter == '':
             continue
+        value: Any
         key, value, *rest = parameter.split('=')
         if key in ['colorize', 'correct_newlines', 'debug', 'compress', 'validate']:
             value = value.lower() in ['true', '1']
@@ -398,7 +390,8 @@ def caller_info(logger: EnhancedLogger) -> Dict[str, object]:
     :return: dictionary with the invocation metadata
     """
     fn, lno, func, sinfo = logger.findCaller()
-    record: logging.LogRecord = logger.makeRecord(None, None, fn, lno, "", (), None, func=func, extra=None, sinfo=sinfo)
+    record: logging.LogRecord = logger.makeRecord("", logging.DEBUG, fn, lno, "", (), None,
+                                                  func=func, extra=None, sinfo=sinfo)
     return dict(item for item in record.__dict__.items()
                 if item[0] in (
                     # record's fields describing invocation origin

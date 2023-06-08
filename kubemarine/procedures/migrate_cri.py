@@ -18,7 +18,7 @@ from collections import OrderedDict
 
 import io
 import uuid
-from typing import List
+from typing import List, Callable
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow
@@ -41,7 +41,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
         raise Exception("Migration of CRI is possible only for cluster "
                         "with all nodes having the same and supported OS family")
 
-    enrichment_functions = [
+    enrichment_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
         _prepare_yum_repos,
         _prepare_packages,
         _configure_containerd_on_nodes,
@@ -288,7 +288,7 @@ def _config_changer(config: str, word: str):
 def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory_to_finalize
-    finalize_functions = [
+    finalize_functions: List[Callable[[KubernetesCluster, dict, bool], dict]] = [
         _prepare_yum_repos,
         _prepare_packages,
         _prepare_crictl,
@@ -296,7 +296,7 @@ def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
     ]
     for finalize_fn in finalize_functions:
         cluster.log.verbose('Calling fn "%s"' % finalize_fn.__qualname__)
-        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, finalization=True)
+        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, True)
 
     return inventory_to_finalize
 

@@ -16,7 +16,7 @@ import hashlib
 import io
 import random
 import time
-from typing import cast
+from typing import cast, Optional, List
 
 from jinja2 import Template
 
@@ -27,11 +27,11 @@ from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
 
 
-def autodetect_interface(cluster: KubernetesCluster, name):
+def autodetect_interface(cluster: KubernetesCluster, name: str) -> Optional[str]:
     for node in cluster.inventory['nodes']:
         if node['name'] == name:
             address = cluster.get_access_address_from_node(node)
-            interface = cluster.context['nodes'].get(address, {}).get('active_interface')
+            interface: str = cluster.context['nodes'].get(address, {})['active_interface']
             if interface:
                 return interface
     if cluster.context['initial_procedure'] == 'remove_node':
@@ -108,7 +108,7 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     return inventory
 
 
-def get_default_node_names(inventory):
+def get_default_node_names(inventory: dict) -> List[str]:
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
@@ -184,7 +184,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
     return installation_result
 
 
-def install_haproxy_check_script(group: NodeGroup):
+def install_haproxy_check_script(group: NodeGroup) -> None:
     script = utils.read_internal("./resources/scripts/check_haproxy.sh")
     group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
@@ -215,7 +215,7 @@ def enable(group: NodeGroup) -> None:
             system.enable_service(node, name=service_name, now=True)
 
 
-def disable(group: NodeGroup):
+def disable(group: NodeGroup) -> None:
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(

@@ -81,7 +81,7 @@ def reload(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf')
 
 
-def get_pid_max(inventory: dict):
-    max_pods = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
-    pod_pids_limit = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
+def get_pid_max(inventory: dict) -> int:
+    max_pods: int = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
+    pod_pids_limit: int = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
     return max_pods * pod_pids_limit + 2048

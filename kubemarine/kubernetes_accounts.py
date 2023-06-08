@@ -20,7 +20,7 @@ from kubemarine.core import utils, summary
 from kubemarine.core.cluster import KubernetesCluster
 
 
-def enrich_inventory(inventory: dict, _):
+def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     rbac = inventory['rbac']
     if not rbac.get("accounts"):
         return inventory
@@ -63,7 +63,7 @@ def enrich_inventory(inventory: dict, _):
     return inventory
 
 
-def install(cluster: KubernetesCluster):
+def install(cluster: KubernetesCluster) -> None:
     rbac = cluster.inventory['rbac']
     if not rbac.get("accounts"):
         cluster.log.debug("No accounts specified to install, skipping...")

@@ -16,6 +16,8 @@
 
 import sys
 from collections import OrderedDict
+from typing import Dict, List
+
 import ruamel.yaml.resolver
 import yaml
 
@@ -138,12 +140,11 @@ def main():
         descriptions_print_list = []
         max_module_name_size = len(max(procedures.keys(), key=len))
 
-        items_description_by_groups = {}
+        items_description_by_groups: Dict[str, List[str]] = {}
 
         for module_name, module in procedures.items():
-            if items_description_by_groups.get(module['group']) is None:
-                items_description_by_groups[module['group']] = []
-            items_description_by_groups[module['group']].append('  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
+            items_description_by_groups.setdefault(module['group'], [])\
+                .append('  %s%s  %s' % (module_name, ' ' * (max_module_name_size - len(module_name)), module['description']))
 
         previous_group = None
         for group, descriptions in items_description_by_groups.items():
@@ -225,9 +226,10 @@ def selftest():
     patches = module.load_patches()
     patch_ids = [patch.identifier for patch in patches]
     unique = set()
-    duplicates = [p_id for p_id in patch_ids if p_id in unique or unique.add(p_id)]
-    if duplicates:
-        raise Exception(f'Patches identifiers {duplicates} are duplicated ')
+    for p_id in patch_ids:
+        if p_id in unique:
+            raise Exception(f'Patches identifier {p_id!r} is duplicated')
+        unique.add(p_id)
 
     print("Finished")
 

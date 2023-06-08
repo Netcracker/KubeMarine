@@ -80,7 +80,7 @@ class Thirdparties(SoftwareType):
         return compatibility_map
 
 
-def validate_thirdparty_versions(kubernetes_versions: dict, thirdparty_name: str):
+def validate_thirdparty_versions(kubernetes_versions: Dict[str, Dict[str, str]], thirdparty_name: str) -> None:
     if thirdparty_name != 'crictl':
         return
 
@@ -100,7 +100,7 @@ def validate_thirdparty_versions(kubernetes_versions: dict, thirdparty_name: str
                 ))
 
 
-def get_version(kubernetes_versions: dict, k8s_version: str, thirdparty_name: str) -> str:
+def get_version(kubernetes_versions: Dict[str, Dict[str, str]], k8s_version: str, thirdparty_name: str) -> str:
     if thirdparty_name in ('kubeadm', 'kubelet', 'kubectl'):
         return k8s_version
     elif thirdparty_name == 'calicoctl':
@@ -135,8 +135,8 @@ def resolve_local_path(destination: str, version: str) -> str:
     return target_file
 
 
-def calculate_sha1(thirdparty_resolver: ThirdpartyResolver, kubernetes_versions: dict, thirdparties: List[str]) \
-        -> Dict[Tuple[str, str], str]:
+def calculate_sha1(thirdparty_resolver: ThirdpartyResolver, kubernetes_versions: Dict[str, Dict[str, str]],
+                   thirdparties: List[str]) -> Dict[Tuple[str, str], str]:
     thirdparties_sha1 = {}
     for thirdparty_name in thirdparties:
         for k8s_version in kubernetes_versions:

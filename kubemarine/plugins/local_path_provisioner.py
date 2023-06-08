@@ -22,7 +22,7 @@ from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 class LocalPathProvisionerManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
-                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
         super().__init__(logger, inventory, 'local-path-provisioner', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
@@ -45,14 +45,14 @@ class LocalPathProvisionerManifestProcessor(Processor):
             self.enrich_configmap_local_path_config,
         ]
 
-    def enrich_namespace_local_path_storage(self, manifest: Manifest):
+    def enrich_namespace_local_path_storage(self, manifest: Manifest) -> None:
         key = "Namespace_local-path-storage"
         rbac = self.inventory['rbac']
         if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
                 and rbac['pss']['defaults']['enforce'] != 'privileged':
             self.assign_default_pss_labels(manifest, key, 'privileged')
 
-    def add_clusterrolebinding_local_path_provisioner_privileged_psp(self, manifest: Manifest):
+    def add_clusterrolebinding_local_path_provisioner_privileged_psp(self, manifest: Manifest) -> None:
         # TODO add only if psp is enabled?
         new_yaml = yaml.safe_load(clusterrolebinding_local_path_provisioner_privileged_psp)
         # Insert new ClusterRoleBinding after all existing resources of this kind
@@ -60,14 +60,14 @@ class LocalPathProvisionerManifestProcessor(Processor):
                           if key.startswith("ClusterRoleBinding_"))
         self.include(manifest, max_crb_idx + 1, new_yaml)
 
-    def enrich_deployment_local_path_provisioner(self, manifest: Manifest):
+    def enrich_deployment_local_path_provisioner(self, manifest: Manifest) -> None:
         key = "Deployment_local-path-provisioner"
         self.enrich_image_for_container(manifest, key,
             container_name='local-path-provisioner', is_init_container=False)
 
         self.enrich_tolerations(manifest, key)
 
-    def enrich_storageclass_local_path(self, manifest: Manifest):
+    def enrich_storageclass_local_path(self, manifest: Manifest) -> None:
         key = "StorageClass_local-path"
         source_yaml = manifest.get_obj(key, patch=True)
         metadata = source_yaml['metadata']
@@ -81,7 +81,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
         metadata['name'] = self.inventory['plugins']['local-path-provisioner']['storage-class']['name']
         self.log.verbose(f"The {key} has been patched in 'metadata.name' with {name!r}")
 
-    def enrich_configmap_local_path_config(self, manifest: Manifest):
+    def enrich_configmap_local_path_config(self, manifest: Manifest) -> None:
         key = "ConfigMap_local-path-config"
         source_yaml = manifest.get_obj(key, patch=True)
         data = source_yaml['data']
