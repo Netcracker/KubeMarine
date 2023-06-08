@@ -31,10 +31,11 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
-from typing import Dict, List, Tuple
+from types import ModuleType
+from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set
+
 import yaml
 import inspect
-from inspect import signature
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
@@ -48,14 +49,15 @@ from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
 oob_plugins = list(static.DEFAULTS["plugins"].keys())
-LOADED_MODULES = {}
+LOADED_MODULES: Dict[str, ModuleType] = {}
+
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     for plugin_name, plugin_item in inventory["plugins"].items():
         for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
-                if procedure_types[procedure_type].get('verify') is not None:
-                    procedure_types[procedure_type]['verify'](cluster, configs)
+                if procedure_types()[procedure_type].get('verify') is not None:
+                    procedure_types()[procedure_type]['verify'](cluster, configs)
 
     return inventory
 
@@ -64,8 +66,8 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
     for plugin_name, plugin_item in inventory["plugins"].items():
         for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
             for procedure_type, configs in step.items():
-                if procedure_types[procedure_type].get('convert') is not None:
-                    step[procedure_type] = procedure_types[procedure_type]['convert'](cluster, configs)
+                if procedure_types()[procedure_type].get('convert') is not None:
+                    step[procedure_type] = procedure_types()[procedure_type]['convert'](cluster, configs)
     return inventory
 
 
@@ -74,7 +76,7 @@ def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory.get('upgrade_plan'):
+        for version in cluster.procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
@@ -165,9 +167,11 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
     return inventory
 
 
-def install(cluster: KubernetesCluster, plugins: Dict[str, dict] = None):
-    if not plugins:
+def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None):
+    if plugins_ is None:
         plugins = cluster.inventory["plugins"]
+    else:
+        plugins = plugins_
     plugins_queue: List[str] = []
     max_priority = 0
     for plugin_name, plugin_item in plugins.items():
@@ -197,11 +201,11 @@ def install_plugin(cluster: KubernetesCluster, plugin_name: str, installation_pr
 
     for current_step_i, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+            procedure_types()[apply_type]['apply'](cluster, configs, plugin_name)
 
 
 def expect_daemonset(cluster: KubernetesCluster,
-                     daemonsets_names: List[str] or List[Dict[str, str]],
+                     daemonsets_names: List[Union[str, Dict[str, str]]],
                      timeout: int = None,
                      retries: int = None,
                      node: NodeGroup = None) -> None:
@@ -253,7 +257,7 @@ def expect_daemonset(cluster: KubernetesCluster,
 
 
 def expect_replicaset(cluster: KubernetesCluster,
-                      replicasets_names: List[str] or List[Dict[str, str]],
+                      replicasets_names: List[Union[str, Dict[str, str]]],
                       timeout: int = None,
                       retries: int = None,
                       node: NodeGroup = None) -> None:
@@ -305,7 +309,7 @@ def expect_replicaset(cluster: KubernetesCluster,
 
 
 def expect_statefulset(cluster: KubernetesCluster,
-                       statefulsets_names: List[str] or List[Dict[str, str]],
+                       statefulsets_names: List[Union[str, Dict[str, str]]],
                        timeout: int = None,
                        retries: int = None,
                        node: NodeGroup = None) -> None:
@@ -357,7 +361,7 @@ def expect_statefulset(cluster: KubernetesCluster,
 
 
 def expect_deployment(cluster: KubernetesCluster,
-                      deployments_names: List[str] or List[Dict[str, str]],
+                      deployments_names: List[Union[str, Dict[str, str]]],
                       timeout: int = None,
                       retries: int = None,
                       node: NodeGroup = None):
@@ -568,6 +572,8 @@ def apply_expect(cluster: KubernetesCluster, config: dict, plugin_name=None):
 
 # **** PYTHON ****
 
+
+@no_type_check
 def get_python_module(module_path: str):
     if module_path in LOADED_MODULES:
         return LOADED_MODULES[module_path]
@@ -678,7 +684,7 @@ def apply_shell(cluster: KubernetesCluster, step: dict, plugin_name=None):
     if isinstance(commands, list):
         commands = ' && '.join(commands)
 
-    out_vars_aliases = {}
+    out_vars_aliases: Dict[str, Set[str]] = {}
     for var in out_vars:
         var_name = var['name']
         if var_name in out_vars_aliases:
@@ -845,7 +851,7 @@ def process_chart_values(config: dict, local_chart_path: str):
 
 
 def get_local_chart_path(log, config: dict):
-    chart_path = config.get('chart_path')
+    chart_path = config['chart_path']
 
     is_curl = chart_path[:4] == 'http' and '://' in chart_path[4:8]
 
@@ -952,6 +958,7 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
     log = cluster.log
     do_render = config.get('do_render', True)
 
+    source: Union[str, io.StringIO]
     source, is_external = get_source_absolute_pattern(config)
     files = glob.glob(source)
 
@@ -1024,40 +1031,41 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
         cluster.log.debug('Apply is not required')
 
 
-procedure_types = {
-    'template': {
-        'convert': convert_template,
-        'verify': verify_template,
-        'apply': apply_template
-    },
-    'expect': {
-        'convert': convert_expect,
-        'apply': apply_expect
-    },
-    'python': {
-        'verify': verify_python,
-        'apply': apply_python
-    },
-    'thirdparty': {
-        'verify': verify_thirdparty,
-        'apply': apply_thirdparty
-    },
-    'shell': {
-        'convert': convert_shell,
-        'verify': verify_shell,
-        'apply': apply_shell
-    },
-    'ansible': {
-        'convert': convert_ansible,
-        'verify': verify_ansible,
-        'apply': apply_ansible
-    },
-    'helm': {
-        'apply': apply_helm
-    },
-    'config': {
-        'convert': convert_config,
-        'verify': verify_config,
-        'apply': apply_config
-    },
-}
+def procedure_types() -> Dict[str, Dict[str, Callable]]:
+    return {
+        'template': {
+            'convert': convert_template,
+            'verify': verify_template,
+            'apply': apply_template
+        },
+        'expect': {
+            'convert': convert_expect,
+            'apply': apply_expect
+        },
+        'python': {
+            'verify': verify_python,
+            'apply': apply_python
+        },
+        'thirdparty': {
+            'verify': verify_thirdparty,
+            'apply': apply_thirdparty
+        },
+        'shell': {
+            'convert': convert_shell,
+            'verify': verify_shell,
+            'apply': apply_shell
+        },
+        'ansible': {
+            'convert': convert_ansible,
+            'verify': verify_ansible,
+            'apply': apply_ansible
+        },
+        'helm': {
+            'apply': apply_helm
+        },
+        'config': {
+            'convert': convert_config,
+            'verify': verify_config,
+            'apply': apply_config
+        },
+    }

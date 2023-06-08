@@ -29,6 +29,7 @@ from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.core.resources import DynamicResources
 
 _ShellResult = Dict[str, Any]
+_ROLE_SPEC = Union[int, List[str]]
 
 
 class FakeShell:
@@ -188,12 +189,12 @@ class FakeResources(DynamicResources):
         self._nodes_context = nodes_context
         self._procedure_inventory = procedure_inventory
 
-    def _load_inventory(self):
+    def _load_inventory(self) -> None:
         self._raw_inventory = deepcopy(self.stored_inventory)
         self._formatted_inventory = deepcopy(self.stored_inventory)
 
-    def _store_inventory(self):
-        self.stored_inventory = deepcopy(self._formatted_inventory)
+    def _store_inventory(self) -> None:
+        self.stored_inventory = deepcopy(self.formatted_inventory())
 
     def _new_cluster_instance(self, context: dict) -> FakeKubernetesCluster:
         self.last_cluster = FakeKubernetesCluster(
@@ -204,7 +205,7 @@ class FakeResources(DynamicResources):
         return self.last_cluster
 
 
-class FakeConnection(fabric.connection.Connection):
+class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
     def __init__(self, ip, cluster: FakeKubernetesCluster, **kw):
         super().__init__(ip, **kw)
@@ -350,7 +351,7 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure: str = None):
+def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure='install'):
     args = list(args) if args else []
     # todo probably increase logging level to get rid of spam in logs.
     if '--disable-dump' not in args:
@@ -411,7 +412,8 @@ def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', 
     return context
 
 
-def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mntc=0):
+def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker: _ROLE_SPEC = 1,
+                       keepalived: _ROLE_SPEC = 0, haproxy_mntc: _ROLE_SPEC = 0) -> dict:
     inventory: dict = {
         'node_defaults': {
             'keyfile': '/dev/null',
@@ -424,7 +426,7 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
         'cluster_name': 'k8s.fake.local'
     }
 
-    id_roles_map = {}
+    id_roles_map: Dict[str, List[str]] = {}
 
     for role_name in ['balancer', 'master', 'worker']:
 
@@ -459,17 +461,17 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
         })
 
     ip_i = 0
-    vrrp_ips = []
+    vrrp_ips: List[Union[str, dict]] = []
 
     if isinstance(keepalived, list):
-        vrrp_ips.append(deepcopy(keepalived))
+        vrrp_ips.extend(deepcopy(keepalived))
     elif isinstance(keepalived, int) and keepalived > 0:
         for _ in range(keepalived):
             ip_i = ip_i + 1
             vrrp_ips.append('10.101.2.%s' % ip_i)
 
     if isinstance(haproxy_mntc, list):
-        vrrp_ips.append(deepcopy(haproxy_mntc))
+        vrrp_ips.extend(deepcopy(haproxy_mntc))
     elif isinstance(haproxy_mntc, int) and haproxy_mntc > 0:
         for _ in range(haproxy_mntc):
             ip_i = ip_i + 1
@@ -536,11 +538,11 @@ def new_scheme(scheme: dict, role: str, number: int):
     return scheme
 
 
-FULLHA = {'balancer': 1, 'master': 3, 'worker': 3}
-FULLHA_KEEPALIVED = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
-FULLHA_NOBALANCERS = {'balancer': 0, 'master': 3, 'worker': 3}
-ALLINONE = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
-MINIHA = {'master': 3}
-MINIHA_KEEPALIVED = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
+FULLHA: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': 3}
+FULLHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
+FULLHA_NOBALANCERS: Dict[str, _ROLE_SPEC] = {'balancer': 0, 'master': 3, 'worker': 3}
+ALLINONE: Dict[str, _ROLE_SPEC] = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
+MINIHA: Dict[str, _ROLE_SPEC] = {'master': 3}
+MINIHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
                      'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
-NON_HA_BALANCER = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}
+NON_HA_BALANCER: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}

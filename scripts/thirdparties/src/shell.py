@@ -22,13 +22,13 @@ SYNC_CACHE = os.path.abspath(f"{__file__}/../../.synccache")
 TEMP_FILE = os.path.join(SYNC_CACHE, "tempfile")
 
 
-def info(message: str):
+def info(message: str) -> None:
     if os.name != 'nt':
         message = f'\033[1;32m{message}\033[0m'
     print(message)
 
 
-def fatal(message: str):
+def fatal(message: str) -> None:
     print(f'\033[1;31m{message}\033[0m')
     sys.exit(1)
 
@@ -39,7 +39,7 @@ def run(args: List[str]) -> str:
         .stdout.decode('utf-8')
 
 
-def curl(source: str, filepath: str):
+def curl(source: str, filepath: str) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
 

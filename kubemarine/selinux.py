@@ -14,10 +14,10 @@
 
 import io
 import re
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, List
 
 from kubemarine import system
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 # Common regexp should support the following schemes:
@@ -63,46 +63,49 @@ parsed_names_map = {
 permissive_types_regex = re.compile("Customized Permissive Types\\s*([\\w_\\s]*)\\s*", re.M)
 
 
-def get_expected_state(inventory):
-    return inventory['services']['kernel_security'].get('selinux', {}).get('state', 'enforcing')
+def get_expected_state(inventory: dict) -> str:
+    state: str = inventory['services']['kernel_security'].get('selinux', {}).get('state', 'enforcing')
+    return state
 
 
-def get_expected_policy(inventory):
-    return inventory['services']['kernel_security'].get('selinux', {}).get('policy', 'targeted')
+def get_expected_policy(inventory: dict) -> str:
+    policy: str = inventory['services']['kernel_security'].get('selinux', {}).get('policy', 'targeted')
+    return policy
 
 
-def get_expected_permissive(inventory):
-    return inventory['services']['kernel_security'].get('selinux', {}).get('permissive', [])
+def get_expected_permissive(inventory: dict) -> List[str]:
+    permissive: List[str] = inventory['services']['kernel_security'].get('selinux', {}).get('permissive', [])
+    return permissive
 
 
-def parse_selinux_status(log, stdout):
-    result = {}
+def parse_selinux_status(logger: log.EnhancedLogger, stdout: str) -> Dict[str, str]:
+    result: Dict[str, str] = {}
     if stdout is not None and stdout.strip() != '':
         for regex, key in parsed_names_map.items():
-            matches = re.findall(regex, stdout)
+            matches: List[str] = re.findall(regex, stdout)
             if matches:
                 result[key] = matches[0].strip()
-    log.verbose('Parsed status: %s' % result)
+    logger.verbose('Parsed status: %s' % result)
     return result
 
 
-def parse_selinux_permissive_types(log, stdout):
+def parse_selinux_permissive_types(logger: log.EnhancedLogger, stdout: str) -> List[str]:
     if stdout is None or stdout.strip() == '':
-        log.verbose('Permissive types pattern not found - presented stdout is empty')
+        logger.verbose('Permissive types pattern not found - presented stdout is empty')
         return []
 
-    matches = re.findall(permissive_types_regex, stdout)
+    matches: List[str] = re.findall(permissive_types_regex, stdout)
     if not matches:
-        log.verbose('Permissive types pattern not found')
+        logger.verbose('Permissive types pattern not found')
         return []
 
     types_string = matches[0]
     if types_string.strip() == '':
-        log.verbose('Permissive types pattern found, but value is empty')
+        logger.verbose('Permissive types pattern found, but value is empty')
         return []
 
     result = types_string.split('\n')
-    log.verbose('Permissive types parsed: %s' % result)
+    logger.verbose('Permissive types parsed: %s' % result)
     return result
 
 
@@ -111,7 +114,7 @@ def get_selinux_status(group: NodeGroup) -> Tuple[RunnersGroupResult, Dict[str, 
 
     result = group.sudo("sestatus && sudo semanage permissive -l")
 
-    parsed_result = {}
+    parsed_result: Dict[str, dict] = {}
     for host, node_result in result.items():
         log.verbose('Parsing status for %s...' % host)
         parsed_result[host] = parse_selinux_status(log, node_result.stdout)
@@ -120,7 +123,7 @@ def get_selinux_status(group: NodeGroup) -> Tuple[RunnersGroupResult, Dict[str, 
     return result, parsed_result
 
 
-def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None) \
+def is_config_valid(group: NodeGroup, state: str = None, policy: str = None, permissive: List[str] = None) \
         -> Tuple[bool, RunnersGroupResult, Dict[str, dict]]:
     log = group.cluster.log
 

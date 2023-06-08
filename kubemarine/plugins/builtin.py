@@ -30,7 +30,7 @@ MANIFEST_PROCESSOR_PROVIDERS: Dict[str, manifest.PROCESSOR_PROVIDER] = {
 }
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster):
+def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for plugin_name, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
         if not inventory["plugins"][plugin_name]["install"]:
             continue
@@ -56,7 +56,10 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
                 raise Exception(f"Unexpected python method arguments {list(declared_args.difference(expected_args))} "
                                 f"in {plugin_name!r} installation step {i}.")
 
-            processor_provider(cluster.log, inventory, **arguments).validate_inventory()
+            processor = processor_provider(
+                cluster.log, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name')
+            )
+            processor.validate_inventory()
             break
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml is not found for {plugin_name!r} plugin. "
@@ -65,15 +68,16 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, plugin_name: str, **arguments):
+def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, plugin_name: str,
+                           **arguments: str) -> manifest.Processor:
     if plugin_name not in MANIFEST_PROCESSOR_PROVIDERS:
         raise Exception(f"Manifest processor is not registered for {plugin_name!r} plugin.")
 
     processor_provider = MANIFEST_PROCESSOR_PROVIDERS[plugin_name]
-    return processor_provider(logger, inventory, **arguments)
+    return processor_provider(logger, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name'))
 
 
-def apply_yaml(cluster: KubernetesCluster, **arguments):
+def apply_yaml(cluster: KubernetesCluster, **arguments: str) -> None:
     arguments = dict(arguments)
     plugin_name = arguments.pop('plugin_name')
 

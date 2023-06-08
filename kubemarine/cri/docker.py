@@ -40,13 +40,13 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
 
-def enable(group: NodeGroup):
+def enable(group: NodeGroup) -> None:
     # currently it is invoked only for single node
     service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
     system.enable_service(group, name=service_name, now=True)
 
 
-def disable(group: NodeGroup):
+def disable(group: NodeGroup) -> None:
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(

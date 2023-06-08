@@ -13,7 +13,7 @@
 # limitations under the License.
 import io
 from copy import deepcopy
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Union
 
 from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
@@ -21,7 +21,7 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
 
-def is_default_thirdparty(destination: str):
+def is_default_thirdparty(destination: str) -> bool:
     return destination in static.GLOBALS['thirdparties']
 
 
@@ -44,7 +44,7 @@ def get_default_thirdparty_version(kubernetes_version: str, destination: str) ->
         return kubernetes_version
 
 
-def get_default_thirdparty_source(destination: str, version: str, in_public: bool):
+def get_default_thirdparty_source(destination: str, version: str, in_public: bool) -> str:
     """
     :param destination: absolute path of default third-party
     :param version: version of third-party
@@ -83,16 +83,18 @@ def get_default_thirdparty_identity(inventory: dict,
     return source, sha1
 
 
-def _get_software_settings_for_thirdparty(kubernetes_version: str, destination: str) -> dict:
+def _get_software_settings_for_thirdparty(kubernetes_version: str, destination: str) -> Dict[str, str]:
     if not is_default_thirdparty(destination):
         raise Exception(f"{destination} is not a default 3rd-party")
 
     thirdparty_settings = static.GLOBALS['thirdparties'][destination]
     software_name = thirdparty_settings['software_name']
-    return static.GLOBALS['compatibility_map']['software'][software_name][kubernetes_version]
+    software_settings: Dict[str, str] = static.GLOBALS['compatibility_map']['software'][software_name][kubernetes_version]
+    return software_settings
 
 
 def get_thirdparty_destination(software_name: str) -> str:
+    destination: str
     for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
         if thirdparty_settings['software_name'] == software_name:
             return destination
@@ -114,7 +116,7 @@ def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster)
 
 
 def _convert_thirdparty(thirdparties: dict, destination: str) -> dict:
-    config = thirdparties.setdefault(destination, {})
+    config: Union[str, dict] = thirdparties.setdefault(destination, {})
     if isinstance(config, str):
         thirdparties[destination] = config = {
             'source': config
@@ -128,7 +130,7 @@ def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory.get('upgrade_plan'):
+        for version in cluster.procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
@@ -170,7 +172,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
 
 
 def _verify_upgrade_plan(inventory: dict, previous_version: str,
-                         thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+                         thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
 
     thirdparties = deepcopy(inventory["services"]['thirdparties'])
     sensitive_keys = ['source', 'sha1']
@@ -299,7 +301,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
 
     if common_group.is_empty():
         cluster.log.verbose(f'No destination nodes to install thirdparty {destination!r}')
-        return
+        return None
 
     cluster.log.debug("Thirdparty \"%s\" will be installed" % destination)
     is_curl = config['source'][:4] == 'http' and '://' in config['source'][4:8]

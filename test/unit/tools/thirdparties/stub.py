@@ -139,7 +139,7 @@ class NoneManifestsEnrichment(ManifestsEnrichment):
     def __init__(self):
         super().__init__()
 
-    def run(self, tracker: SummaryTracker):
+    def run(self, tracker: SummaryTracker) -> None:
         return
 
 

@@ -15,7 +15,7 @@
 import io
 import json
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -94,13 +94,13 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
     if is_healthy:
         etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
         log.verbose(etcd_status_raw)
-        etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
-        elected_leader = None
+        etcd_status_list: List[dict] = json.load(io.StringIO(etcd_status_raw.lower().strip()))
+        elected_leader: Optional[int] = None
         for item in etcd_status_list:
-            leader = item.get('status', {}).get('leader')
-            if not leader:
+            leader: Optional[int] = item.get('status', {}).get('leader')
+            if leader is None:
                 raise Exception('ETCD member "%s" do not have leader' % item.get('endpoint'))
-            if not elected_leader:
+            if elected_leader is None:
                 elected_leader = leader
             elif elected_leader != leader:
                 raise Exception('ETCD leaders are not the same')

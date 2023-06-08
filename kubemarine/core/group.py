@@ -103,7 +103,7 @@ class GenericGroupResult(Mapping[str, _Result]):
         """
         return self.cluster.make_group(self.keys())
 
-    def is_any_has_code(self, code: int or str) -> bool:
+    def is_any_has_code(self, code: int) -> bool:
         """
         Returns true if some group result has an exit code equal to the given one. Exceptions and other objects in
         results will be ignored.
@@ -586,9 +586,9 @@ class NodeGroup:
         return results
 
     def get_online_nodes(self, online: bool) -> NodeGroup:
-        online = [host for host, node_context in self.cluster.context['nodes'].items()
-                  if node_context['access']['online'] == online]
-        return self.cluster.make_group(online).intersection_group(self)
+        online_hosts = [host for host, node_context in self.cluster.context['nodes'].items()
+                        if node_context['access']['online'] == online]
+        return self.cluster.make_group(online_hosts).intersection_group(self)
 
     def get_accessible_nodes(self) -> NodeGroup:
         accessible = [host for host, node_context in self.cluster.context['nodes'].items()

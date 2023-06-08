@@ -16,6 +16,8 @@ import textwrap
 from traceback import *
 import csv
 from datetime import datetime
+from typing import Dict
+
 from kubemarine.core import utils, log
 
 from kubemarine.core.cluster import KubernetesCluster
@@ -270,7 +272,7 @@ class TestSuite:
         log.info("\nTEST PASSED")
 
     def get_stats_data(self):
-        results = {}
+        results: Dict[str, int] = {}
         for tc in self.tcs:
             key = 'unknown'
             if tc.is_succeeded():

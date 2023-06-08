@@ -18,7 +18,7 @@ import paramiko
 import re
 import socket
 import time
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 from dateutil.parser import parse
 from ordered_set import OrderedSet
@@ -26,12 +26,13 @@ from ordered_set import OrderedSet
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token
-from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException
+from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token, GenericResult
+from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException, GenericGroupResult
 from kubemarine.core.annotations import restrict_empty_group
 
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
         "Kernel modules are not available for the current OS family"
+
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
@@ -61,7 +62,7 @@ def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster) -> dict:
         if 'remove_node' in node['roles']:
             continue
 
-        internal_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])  
+        internal_node_ip_names: List[str] = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])
 
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
@@ -69,7 +70,7 @@ def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster) -> dict:
         inventory['services']['etc_hosts_generated'][node['internal_address']] = internal_node_ip_names
 
         if node.get('address'):
-            external_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['address'], []) 
+            external_node_ip_names: List[str] = inventory['services']['etc_hosts_generated'].get(node['address'], [])
 
             external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
             external_node_ip_names.append(node['name'] + "-external")
@@ -125,7 +126,7 @@ def detect_os_family(cluster: KubernetesCluster) -> None:
 
         version_regex = re.compile("\\s\\d*\\.\\d*", re.M)
         for line in stdout.split("\n"):
-            if 'centos' in line or 'rhel' or 'rocky' in line:
+            if 'centos' in line or 'rhel' in line or 'rocky' in line:
                 # CentOS and Red Hat have a major version in VERSION_ID string
                 matches = re.findall(version_regex, line)
                 if matches:
@@ -169,24 +170,24 @@ def detect_of_family_by_name_version(name: str, version: str) -> str:
     return os_family
 
 
-def update_resolv_conf(group: NodeGroup, config: dict):
+def update_resolv_conf(group: NodeGroup, config: dict) -> None:
     # TODO: Use Jinja template
     buffer = get_resolv_conf_buffer(config)
     utils.dump_file(group.cluster, buffer, 'resolv.conf')
     group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True)
 
 
-def get_resolv_conf_buffer(config: dict):
+def get_resolv_conf_buffer(config: dict) -> io.StringIO:
     buffer = io.StringIO()
     if config.get("search") is not None:
         buffer.write("search %s\n" % config["search"])
     if config.get("nameservers") is not None:
-        for address in config.get("nameservers"):
+        for address in config["nameservers"]:
             buffer.write("nameserver %s\n" % address)
     return buffer
 
 
-def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generated') -> str:
+def generate_etc_hosts_config(inventory: dict, etc_hosts_part: str = 'etc_hosts_generated') -> str:
 # generate records for /etc/hosts from services.etc_hosts or services.etc_hosts_generated
 
     result = ""
@@ -210,7 +211,7 @@ def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generat
     return result
 
 
-def update_etc_hosts(group: NodeGroup, config: str):
+def update_etc_hosts(group: NodeGroup, config: str) -> None:
     utils.dump_file(group.cluster, config, 'etc_hosts')
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True)
 
@@ -229,7 +230,7 @@ def restart_service(group: NodeGroup, name: str = None) -> Token:
     return group.defer().sudo('systemctl restart %s' % name)
 
 
-def enable_service(group: NodeGroup, name: str = None, now=True) -> Token:
+def enable_service(group: NodeGroup, name: str = None, now: bool = True) -> Token:
     if name is None:
         raise Exception("Service name can't be empty")
 
@@ -239,7 +240,7 @@ def enable_service(group: NodeGroup, name: str = None, now=True) -> Token:
     return group.defer().sudo(cmd)
 
 
-def disable_service(group: NodeGroup, name: str = None, now=True) -> Token:
+def disable_service(group: NodeGroup, name: str = None, now: bool = True) -> Token:
     if name is None:
         raise Exception("Service name can't be empty")
 
@@ -249,7 +250,7 @@ def disable_service(group: NodeGroup, name: str = None, now=True) -> Token:
     return group.defer().sudo(cmd)
 
 
-def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str):
+def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str) -> None:
     group.sudo(f"mkdir -p /etc/systemd/system/{service_name}.service.d")
     group.put(io.StringIO(utils.read_internal(patch_source)),
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
@@ -305,7 +306,7 @@ def is_swap_disabled(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     return disabled_status, result
 
 
-def disable_swap(group: NodeGroup):
+def disable_swap(group: NodeGroup) -> Optional[RunnersGroupResult]:
     log = group.cluster.log
 
     already_disabled, result = is_swap_disabled(group)
@@ -321,6 +322,8 @@ def disable_swap(group: NodeGroup):
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
+
+    return None
 
 
 def reboot_nodes(cluster: KubernetesCluster) -> None:
@@ -499,6 +502,8 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
 
+    return None
+
 
 def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     log = group.cluster.log
@@ -516,7 +521,7 @@ def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     return is_valid, verify_results
 
 
-def verify_system(cluster: KubernetesCluster):
+def verify_system(cluster: KubernetesCluster) -> None:
     group = cluster.nodes["all"].get_new_nodes_or_self()
     log = cluster.log
     # this method handles clusters with multiple OS
@@ -538,7 +543,7 @@ def verify_system(cluster: KubernetesCluster):
     if cluster.is_task_completed('prepare.system.setup_apparmor') and os_family == 'debian':
         log.debug("Verifying Apparmor...")
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
-        apparmor_configured, result = apparmor.is_state_valid(group, expected_profiles)
+        apparmor_configured = apparmor.is_state_valid(group, expected_profiles)
         if not apparmor_configured:
             raise Exception("Apparmor is still not configured")
     else:
@@ -587,7 +592,7 @@ def detect_interface_by_address(group: NodeGroup, address: str) -> Token:
     return group.defer().run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
 
 
-def _detect_nodes_access_info(cluster: KubernetesCluster):
+def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
     nodes_context = cluster.context['nodes']
     hosts_unknown_status = [host for host, node_context in nodes_context.items() if 'access' not in node_context]
     group_unknown_status = cluster.make_group(hosts_unknown_status)
@@ -596,6 +601,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster):
 
     check_active_timeout = int(cluster.globals["nodes"]["remove"]["check_active_timeout"])
     exc = None
+    results: GenericGroupResult[GenericResult]
     try:
         # This should invoke sudo last reboot
         results = group_unknown_status.wait_and_get_boot_history(timeout=check_active_timeout)
@@ -626,7 +632,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster):
             elif isinstance(result, paramiko.ssh_exception.NoValidConnectionsError):
                 # Internal socket error, for example, when ssh daemon is off. All statuses are unchecked.
                 pass
-            else:
+            elif isinstance(exc, Exception):
                 raise exc
         else:
             access_info['online'] = True
@@ -665,18 +671,14 @@ def get_nodes_time(group: NodeGroup) -> Tuple[float, Dict[str, float], float]:
 
     parsed_time_per_node: Dict[str, float] = {}
 
-    min_time = None
-    max_time = None
-
     # TODO: request and parse more accurate timestamp in milliseconds
 
     raw_results = group.run('date')
     for host, result in raw_results.items():
         parsed_time = parse(result.stdout.strip()).timestamp() * 1000
         parsed_time_per_node[host] = parsed_time
-        if min_time is None or min_time > parsed_time:
-            min_time = parsed_time
-        if max_time is None or max_time < parsed_time:
-            max_time = parsed_time
+
+    min_time = min(parsed_time_per_node.values())
+    max_time = max(parsed_time_per_node.values())
 
     return max_time, parsed_time_per_node, max_time-min_time

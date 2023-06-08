@@ -16,7 +16,7 @@
 
 import argparse
 import sys
-from typing import Callable
+from typing import Callable, List, Dict
 
 from kubemarine.core import flow, resources
 from kubemarine.core.action import Action
@@ -32,7 +32,8 @@ additional arguments:
 """
 
 class CLIAction(Action):
-    def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup], remote_args, no_stream):
+    def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup],
+                 remote_args: List[str], no_stream: bool) -> None:
         super().__init__('do')
         self.node_group_provider = node_group_provider
         self.remote_args = remote_args
@@ -55,7 +56,7 @@ class CLIAction(Action):
         sys.exit(0)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
 
     if not cli_arguments:
         cli_arguments = sys.argv
@@ -106,9 +107,9 @@ def main(cli_arguments=None):
     })
     context['preserve_inventory'] = False
 
-    def node_group_provider(cluster: KubernetesCluster):
+    def node_group_provider(cluster: KubernetesCluster) -> NodeGroup:
         if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
-            executor_lists = {
+            executor_lists: Dict[str, List[str]] = {
                     'node': [],
                     'group': []
             }
@@ -124,7 +125,7 @@ def main(cli_arguments=None):
         else:
             return cluster.nodes['control-plane'].get_any_member()
 
-    no_stream = arguments.get('no_stream')
+    no_stream: bool = arguments['no_stream']
     action = CLIAction(node_group_provider, remote_args, no_stream)
     res = resources.DynamicResources(context, silent=True)
     flow.ActionsFlow([action]).run_flow(res, print_summary=False)

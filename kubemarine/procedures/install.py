@@ -32,7 +32,11 @@ from kubemarine.core.group import NodeGroup, GroupException, RunnersGroupResult
 from kubemarine.core.resources import DynamicResources
 
 
-def _applicable_for_new_nodes_with_roles(*roles):
+TASK_CALLABLE = Callable[[KubernetesCluster], None]
+DECORATED_GROUP_CALLABLE = Callable[[NodeGroup], None]
+
+
+def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GROUP_CALLABLE], TASK_CALLABLE]:
     """
     Decorator to annotate installation methods.
     If there are no new nodes with the specified roles to be added / installed to the cluster,
@@ -47,8 +51,8 @@ def _applicable_for_new_nodes_with_roles(*roles):
     if not roles:
         raise Exception(f'Roles are not defined')
 
-    def roles_wrapper(fn: Callable[[NodeGroup], None]):
-        def cluster_wrapper(cluster: KubernetesCluster):
+    def roles_wrapper(fn: DECORATED_GROUP_CALLABLE) -> TASK_CALLABLE:
+        def cluster_wrapper(cluster: KubernetesCluster) -> None:
             candidate_group = cluster.nodes['all'].get_new_nodes_or_self()
             group = cluster.make_group([])
             for role in roles:
@@ -295,7 +299,6 @@ def system_prepare_package_manager_configure(group: NodeGroup):
     ], **{
         "kubemarine.packages.add_repo": {
             "repo_data": repositories,
-            "repo_filename": "predefined"
         }
     })
 
@@ -316,7 +319,7 @@ def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
 
     with RemoteExecutor(cluster) as exe:
         for node in group.get_ordered_members_list():
-            pkgs = []
+            pkgs: List[str] = []
             for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
                 hosts_to_packages = packages.get_association_hosts_to_packages(node, cluster.inventory, package)
                 pkgs.extend(next(iter(hosts_to_packages.values()), []))
@@ -655,7 +658,7 @@ cumulative_points = {
 class InstallAction(Action):
     def __init__(self):
         super().__init__('install')
-        self.target_version = None
+        self.target_version = "not supported"
 
     def run(self, res: DynamicResources):
         self.target_version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())

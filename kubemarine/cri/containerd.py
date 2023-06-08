@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from io import StringIO
+from typing import Dict
 
 import toml
 import yaml
@@ -81,7 +82,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
             if is_insecure:
                 insecure_registries.append(mirror)
     # save 'auth.json' if there are credentials for registry
-    auth_registries = {"auths": {}}
+    auth_registries: Dict[str, dict] = {"auths": {}}
     if registry.get('configs'):
         registry_configs = registry['configs']
         for auth_registry in registry_configs:

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from typing import Iterator, Mapping
+from typing import Iterator, Mapping, List
 
 
 class Environ(Mapping[str, str]):
@@ -31,4 +31,4 @@ class Environ(Mapping[str, str]):
     def __iter__(self) -> Iterator[str]:
         return iter(os.environ)
 
-    __slots__ = []
+    __slots__: List[str] = []

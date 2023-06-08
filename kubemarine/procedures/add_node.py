@@ -15,8 +15,11 @@
 
 
 import copy
+import typing
 
 from collections import OrderedDict
+from typing import Any
+
 from kubemarine import kubernetes, packages
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
@@ -100,7 +103,7 @@ def cache_installed_packages(cluster: KubernetesCluster):
     packages.cache_package_versions(cluster, cluster.inventory, by_initial_nodes=True)
 
 
-tasks = OrderedDict(copy.deepcopy(install.tasks))
+tasks: typing.OrderedDict[str, Any] = OrderedDict(copy.deepcopy(install.tasks))
 del tasks["deploy"]["plugins"]
 del tasks["deploy"]["accounts"]
 tasks["deploy"]["kubernetes"]["init"] = deploy_kubernetes_join

@@ -14,6 +14,7 @@
 
 import io
 import time
+from typing import List, Optional
 
 from jinja2 import Template
 
@@ -41,11 +42,12 @@ def _get_associations_for_node(node: NodeGroup) -> dict:
     return node.cluster.get_associations_for_node(node.get_host(), 'haproxy')
 
 
-def _is_vrrp_not_bind(vrrp_item: dict):
-    return vrrp_item.get('params', {}).get('maintenance-type', '') == 'not bind'
+def _is_vrrp_not_bind(vrrp_item: dict) -> bool:
+    maintenance_type: str = vrrp_item.get('params', {}).get('maintenance-type', '')
+    return maintenance_type == 'not bind'
 
 
-def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool):
+def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> List[str]:
     # bindings list for common config and maintenance should be different
     if not maintenance and len(node['roles']) == 1:
         return ["0.0.0.0", '::']
@@ -161,28 +163,30 @@ def restart(group: NodeGroup) -> None:
     time.sleep(static.GLOBALS['haproxy']['restart_wait'])
 
 
-def disable(group: NodeGroup):
+def disable(group: NodeGroup) -> None:
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.disable_service(node, name=service_name)
 
 
-def enable(group: NodeGroup):
+def enable(group: NodeGroup) -> None:
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.enable_service(node, name=service_name, now=True)
 
 
-def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes, maintenance=False) -> str:
+def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[NodeConfig],
+               maintenance: bool = False) -> str:
 
     inventory = cluster.inventory
     bindings = _get_bindings(inventory, node, maintenance=maintenance)
 
-    config_options = inventory['services']['loadbalancer']['haproxy']
-    if config_options.get('config'):
-        return inventory['services']['loadbalancer']['haproxy']['config']
+    config_options: dict = inventory['services']['loadbalancer']['haproxy']
+    config_string: Optional[str] = config_options.get('config')
+    if config_string is not None:
+        return config_string
 
     # todo support custom template for maintenance mode
     if not maintenance and config_options.get('config_file'):
@@ -224,7 +228,7 @@ def configure(group: NodeGroup) -> None:
             defer.sudo('ls -la %s' % mntc_config_location)
 
 
-def override_haproxy18(group: NodeGroup):
+def override_haproxy18(group: NodeGroup) -> None:
     rhel_nodes = group.get_subgroup_with_os('rhel')
     if rhel_nodes.is_empty():
         group.cluster.log.debug('Haproxy18 override is not required')

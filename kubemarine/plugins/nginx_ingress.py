@@ -22,7 +22,7 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
-def check_job_for_nginx(cluster: KubernetesCluster):
+def check_job_for_nginx(cluster: KubernetesCluster) -> None:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     version = cluster.inventory['plugins']['nginx-ingress-controller']['version'].replace('v', '.').split('.')
 
@@ -37,7 +37,7 @@ def check_job_for_nginx(cluster: KubernetesCluster):
         cluster.log.debug('There are no jobs to delete')
 
 
-def enrich_inventory(inventory: dict, _):
+def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
@@ -50,7 +50,7 @@ def enrich_inventory(inventory: dict, _):
     return inventory
 
 
-def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster):
+def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     # check that renewal is required for nginx
     if cluster.context.get('initial_procedure') != 'cert_renew' \
             or not cluster.procedure_inventory.get("nginx-ingress-controller"):
@@ -68,7 +68,7 @@ def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
+def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
     # check that renewal is required for nginx
     if cluster.context.get('initial_procedure') != 'cert_renew' \
             or not cluster.procedure_inventory.get("nginx-ingress-controller"):
@@ -89,7 +89,7 @@ def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     return inventory_to_finalize
 
 
-def manage_custom_certificate(cluster: KubernetesCluster):
+def manage_custom_certificate(cluster: KubernetesCluster) -> None:
     if not cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"].get("default-certificate"):
         cluster.log.debug("No custom default ingress certificate specified, skipping...")
         return
@@ -126,7 +126,7 @@ def manage_custom_certificate(cluster: KubernetesCluster):
         first_control_plane.sudo(f"rm -rf {base_path}")
 
 
-def put_custom_certificate(first_control_plane: NodeGroup, default_cert, crt_path, key_path):
+def put_custom_certificate(first_control_plane: NodeGroup, default_cert: dict, crt_path: str, key_path: str) -> None:
     if default_cert.get("data"):
         cert = io.StringIO(default_cert["data"]["cert"])
         key = io.StringIO(default_cert["data"]["key"])
@@ -138,21 +138,21 @@ def put_custom_certificate(first_control_plane: NodeGroup, default_cert, crt_pat
     first_control_plane.put(key, key_path, sudo=True)
 
 
-def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path, key_path):
+def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path: str, key_path: str) -> None:
     crt_md5 = first_control_plane.sudo(f"openssl x509 -noout -modulus -in {crt_path} | openssl md5").get_simple_out()
     key_md5 = first_control_plane.sudo(f"openssl rsa -noout -modulus -in {key_path} | openssl md5").get_simple_out()
     if crt_md5 != key_md5:
         raise Exception("Custom default ingress certificate and key are not compatible!")
 
 
-def create_tls_secret(first_control_plane: NodeGroup, crt_path, key_path, name, namespace):
+def create_tls_secret(first_control_plane: NodeGroup, crt_path: str, key_path: str, name: str, namespace: str) -> None:
     first_control_plane.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
                       f"--dry-run -o yaml | sudo kubectl apply -f -", timeout=300)
 
 
 class IngressNginxManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
-                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
         super().__init__(logger, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
@@ -190,14 +190,14 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_service_ingress_nginx_controller,
         ]
 
-    def enrich_namespace_ingress_nginx(self, manifest: Manifest):
+    def enrich_namespace_ingress_nginx(self, manifest: Manifest) -> None:
         key = "Namespace_ingress-nginx"
         rbac = self.inventory['rbac']
         if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
                 and rbac['pss']['defaults']['enforce'] != 'privileged':
             self.assign_default_pss_labels(manifest, key, 'privileged')
 
-    def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest):
+    def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "ConfigMap_ingress-nginx-controller"
         config_map = self.inventory['plugins']['nginx-ingress-controller'].get('config_map')
         if config_map:
@@ -207,7 +207,7 @@ class IngressNginxManifestProcessor(Processor):
             self.log.verbose(f"The {key} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.config_map'")
 
-    def add_configmap_ingress_nginx_controller(self, manifest: Manifest):
+    def add_configmap_ingress_nginx_controller(self, manifest: Manifest) -> None:
         custom_headers = self.inventory['plugins']['nginx-ingress-controller'].get('custom_headers')
         if custom_headers:
             custom_headers_cm = dict(CUSTOM_HEADERS_CM)
@@ -218,7 +218,7 @@ class IngressNginxManifestProcessor(Processor):
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
 
-    def enrich_deployment_ingress_nginx_controller(self, manifest: Manifest):
+    def enrich_deployment_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
 
@@ -236,7 +236,7 @@ class IngressNginxManifestProcessor(Processor):
         source_yaml['kind'] = 'DaemonSet'
         self.log.verbose(f"The {key} has been patched in 'kind' with 'DaemonSet'")
 
-    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict):
+    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict) -> None:
         key = "Deployment_ingress-nginx-controller"
         container_args = container['args']
         for i, arg in enumerate(container_args):
@@ -248,7 +248,7 @@ class IngressNginxManifestProcessor(Processor):
         else:
             raise Exception("Failed to find '--publish-service' argument in ingress-nginx-controller container specification.")
 
-        extra_args = [
+        extra_args: List[tuple] = [
             ('--watch-ingress-without-class=', 'true')
         ]
         ssl_options = self.inventory['plugins']['nginx-ingress-controller']['controller']['ssl']
@@ -288,24 +288,24 @@ class IngressNginxManifestProcessor(Processor):
         self.log.verbose(f"The {key} has been patched in 'spec.template.spec.containers.[{container_pos}].ports' "
                          f"with the data from 'plugins.nginx-ingress-controller.ports'")
 
-    def enrich_ingressclass_nginx(self, manifest: Manifest):
+    def enrich_ingressclass_nginx(self, manifest: Manifest) -> None:
         key = "IngressClass_nginx"
         source_yaml = manifest.get_obj(key, patch=True)
         source_yaml['metadata'].setdefault('annotations', {})['ingressclass.kubernetes.io/is-default-class'] = 'true'
         self.log.verbose(f"The {key} has been patched in 'metadata.annotations' "
                          f"with 'ingressclass.kubernetes.io/is-default-class: true'")
 
-    def enrich_job_ingress_nginx_admission_create(self, manifest: Manifest):
+    def enrich_job_ingress_nginx_admission_create(self, manifest: Manifest) -> None:
         key = "Job_ingress-nginx-admission-create"
         self.enrich_image_for_container(manifest, key,
             plugin_service='webhook', container_name='create', is_init_container=False)
 
-    def enrich_job_ingress_nginx_admission_patch(self, manifest: Manifest):
+    def enrich_job_ingress_nginx_admission_patch(self, manifest: Manifest) -> None:
         key = "Job_ingress-nginx-admission-patch"
         self.enrich_image_for_container(manifest, key,
             plugin_service='webhook', container_name='patch', is_init_container=False)
 
-    def enrich_service_ingress_nginx_controller(self, manifest: Manifest):
+    def enrich_service_ingress_nginx_controller(self, manifest: Manifest) -> None:
         # The method needs some rework in case of dual stack support
         key = "Service_ingress-nginx-controller"
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
@@ -316,9 +316,6 @@ class IngressNginxManifestProcessor(Processor):
 
 
 class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         enrichment_functions = super().get_enrichment_functions()
         enrichment_functions.extend([
@@ -327,7 +324,7 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         ])
         return enrichment_functions
 
-    def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest):
+    def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "ConfigMap_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
         # For some reason, we took manifest for Digital Ocean, removed use-proxy-protocol: "true" property,
@@ -339,7 +336,7 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         self.log.verbose(f"The 'use-proxy-protocol' property has been removed from 'data' in the {key}")
         super().enrich_configmap_ingress_nginx_controller(manifest)
 
-    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict):
+    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict) -> None:
         key = "Deployment_ingress-nginx-controller"
         container_args = container['args']
         webhook_args_remove = [
@@ -361,13 +358,13 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
 
         super().enrich_deamonset_ingress_nginx_controller_container(container_pos, container)
 
-    def enrich_job_ingress_nginx_admission_create(self, manifest: Manifest):
+    def enrich_job_ingress_nginx_admission_create(self, manifest: Manifest) -> None:
         return
 
-    def enrich_job_ingress_nginx_admission_patch(self, manifest: Manifest):
+    def enrich_job_ingress_nginx_admission_patch(self, manifest: Manifest) -> None:
         return
 
-    def exclude_webhook_resources(self, manifest: Manifest):
+    def exclude_webhook_resources(self, manifest: Manifest) -> None:
         webhook_resources = [
             "ServiceAccount_ingress-nginx-admission",
             "Role_ingress-nginx-admission",
@@ -382,7 +379,7 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         for key in webhook_resources:
             self.exclude(manifest, key)
 
-    def enrich_role_ingress_nginx(self, manifest: Manifest):
+    def enrich_role_ingress_nginx(self, manifest: Manifest) -> None:
         key = "Role_ingress-nginx"
         source_yaml = manifest.get_obj(key, patch=True)
         # TODO patch only if psp is enabled?
@@ -391,8 +388,10 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         self.log.verbose(f"The {key} has been patched in 'rules' with {psp_ingress_nginx}")
 
 
-def get_ingress_nginx_manifest_processor(logger: log.VerboseLogger, inventory: dict, **kwargs):
+def get_ingress_nginx_manifest_processor(logger: log.VerboseLogger, inventory: dict,
+                                         yaml_path: Optional[str] = None, destination: Optional[str] = None) -> Processor:
     version: str = inventory['plugins']['nginx-ingress-controller']['version']
+    kwargs = {'original_yaml_path': yaml_path, 'destination_name': destination}
     if utils.minor_version(version) == 'v1.2':
         return V1_2_X_IngressNginxManifestProcessor(logger, inventory, **kwargs)
 

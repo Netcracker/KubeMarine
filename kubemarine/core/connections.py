@@ -41,7 +41,9 @@ class ConnectionPool:
 
         return conn
 
-    def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
+    def _create_connection_from_details(self, ip: str, conn_details: dict,
+                                        gateway: fabric.connection.Connection = None,
+                                        inline_ssh_env: bool = True) -> fabric.connection.Connection:
         # fabric / invoke use default encoding of deployer.
         # We need to use encoding of remote nodes to correctly encode output of remote commands.
         # Currently remote nodes are always Linux, so hard-code 'utf-8'.

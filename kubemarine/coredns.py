@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Union, List, Optional
 
 import yaml
 
@@ -94,7 +95,7 @@ def generate_nested_sections(type, data, tabsize):
             config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
 
         elif type == 'template':
-            zones = [None]
+            zones: Union[str, List[Optional[str]]] = [None]
             if data[section['name']].get('zone'):
                 zones = data[section['name']]['zone']
                 if isinstance(zones, str):
@@ -158,7 +159,7 @@ def apply_configmap(cluster: KubernetesCluster, config: str) -> RunnersGroupResu
              'sudo kubectl rollout restart -n kube-system deployment/coredns')
 
 
-def apply_patch(cluster: KubernetesCluster) -> RunnersGroupResult:
+def apply_patch(cluster: KubernetesCluster) -> Union[RunnersGroupResult, str]:
     apply_command = ''
 
     for config_type in ['deployment']:

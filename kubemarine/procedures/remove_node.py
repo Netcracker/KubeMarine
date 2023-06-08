@@ -15,8 +15,9 @@
 
 
 from collections import OrderedDict
+from typing import Optional
 
-from kubemarine import kubernetes, haproxy, keepalived, coredns
+from kubemarine import kubernetes, haproxy, keepalived
 from kubemarine.core import flow, summary
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
@@ -25,18 +26,18 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
-def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> NodeGroup:
+def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[NodeGroup]:
     all_nodes = None
     if cluster.nodes.get(node_type) is not None:
         all_nodes = cluster.nodes[node_type].get_nodes_for_removal()
     if all_nodes is None or all_nodes.is_empty():
         cluster.log.debug("Skipped - no %s to remove" % node_type)
-        return
+        return None
     active_nodes = all_nodes.get_online_nodes(True)
     disabled_nodes = all_nodes.exclude_group(active_nodes)
     if active_nodes.is_empty():
         cluster.log.debug("Skipped - %s nodes are inactive: %s" % (node_type, ", ".join(disabled_nodes.nodes)))
-        return
+        return None
     if not disabled_nodes.is_empty():
         cluster.log.debug("Partly Skipped - several %s nodes are inactive: %s"
                           % (node_type, ", ".join(disabled_nodes.nodes)))

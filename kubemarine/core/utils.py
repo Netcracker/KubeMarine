@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple
+from typing import Tuple, Callable, List, IO
 
 import yaml
 import ruamel.yaml
@@ -74,9 +74,9 @@ def prepare_dump_directory(location, reset_directory=True):
     os.makedirs(dumpdir, exist_ok=True)
 
 
-def make_ansible_inventory(location, cluster):
+def make_ansible_inventory(location, c):
     from kubemarine.core.cluster import KubernetesCluster
-    cluster: KubernetesCluster
+    cluster: KubernetesCluster = c
 
     inventory = get_final_inventory(cluster)
     roles = []
@@ -85,7 +85,7 @@ def make_ansible_inventory(location, cluster):
             if role not in roles:
                 roles.append(role)
 
-    config = {
+    config: dict = {
         'all': [
             'localhost ansible_connection=local'
         ],
@@ -161,9 +161,9 @@ def get_current_timestamp_formatted():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def get_final_inventory(cluster, initial_inventory=None):
+def get_final_inventory(c, initial_inventory=None):
     from kubemarine.core.cluster import KubernetesCluster
-    cluster: KubernetesCluster
+    cluster: KubernetesCluster = c
 
     if initial_inventory is None:
         inventory = deepcopy(cluster.inventory)
@@ -236,9 +236,9 @@ def get_dump_filepath(context, filename):
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
+def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=False):
     from kubemarine.core.group import NodeGroup
-    group: NodeGroup
+    group: NodeGroup = g
 
     log = group.cluster.log
 
@@ -254,15 +254,15 @@ def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hi
     raise Exception("Command failed")
 
 
-def open_utf8(path: str, mode='r'):
+def open_utf8(path: str, mode='r') -> IO:
     return open(path, mode + 't', encoding='utf-8')
 
 
-def open_internal(path: str, mode='r'):
+def open_internal(path: str, mode: str = 'r') -> IO:
     return open_utf8(get_internal_resource_path(path), mode)
 
 
-def open_external(path: str, mode='r'):
+def open_external(path: str, mode: str = 'r') -> IO:
     return open_utf8(get_external_resource_path(path), mode)
 
 
@@ -276,7 +276,7 @@ def read_external(path: str) -> str:
         return f.read()
 
 
-def get_external_resource_path(path):
+def get_external_resource_path(path: str) -> str:
     return os.path.abspath(path)
 
 
@@ -347,7 +347,7 @@ def yaml_structure_preserver() -> ruamel.yaml.YAML:
     return ruamel_yaml
 
 
-def is_sorted(l: list, key: callable = None) -> bool:
+def is_sorted(l: list, key: Callable = None) -> bool:
     """
     Check that the specified list is sorted.
 
@@ -360,7 +360,7 @@ def is_sorted(l: list, key: callable = None) -> bool:
     return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
 
 
-def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
+def map_sorted(map_: CommentedMap, key: Callable = None) -> CommentedMap:
     """
     Check that the specified CommentedMap is sorted, or create new sorted map from it otherwise.
 
@@ -369,14 +369,16 @@ def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
     :return: the same or new sorted instance of the map
     """
     if key is None:
-        key = lambda x: x
+        _key = lambda x: x
+    else:
+        _key = key
     map_keys = list(map_)
-    if not is_sorted(map_keys, key=key):
-        map_ = CommentedMap(sorted(map_.items(), key=lambda item: key(item[0])))
+    if not is_sorted(map_keys, key=_key):
+        map_ = CommentedMap(sorted(map_.items(), key=lambda item: _key(item[0])))
 
     return map_
 
-def insert_map_sorted(map_: CommentedMap, k, v, key: callable = None) -> None:
+def insert_map_sorted(map_: CommentedMap, k, v, key: Callable = None) -> None:
     """
     Insert new item to the CommentedMap or update the value for the existing key.
     The map should be already sorted.
@@ -406,9 +408,10 @@ def load_yaml(filepath) -> dict:
             return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
+        return {}  # unreachable
 
 
-def true_or_false(value):
+def true_or_false(value) -> str:
     """
     The method check string and boolean value
     :param value: Value that should be checked
@@ -427,7 +430,7 @@ def get_version_filepath():
     return get_internal_resource_path("version")
 
 
-def get_version():
+def get_version() -> str:
     return read_internal(get_version_filepath()).strip()
 
 
@@ -442,17 +445,19 @@ def version_key(version: str) -> Tuple[int, int, int]:
     """
     Converts vN.N.N to (N, N, N) that can be used in comparisons.
     """
-    return tuple(_test_version(version, 3))
+    v = _test_version(version, 3)
+    return v[0], v[1], v[2]
 
 
 def minor_version_key(version: str) -> Tuple[int, int]:
     """
     Converts vN.N to (N, N) that can be used in comparisons.
     """
-    return tuple(_test_version(version, 2))
+    v = _test_version(version, 2)
+    return v[0], v[1]
 
 
-def _test_version(version: str, numbers_amount: int) -> list:
+def _test_version(version: str, numbers_amount: int) -> List[int]:
     # catch version without "v" at the first symbol
     if version.startswith('v'):
         version_list: list = version[1:].split('.')

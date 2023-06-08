@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict, Tuple, Optional, Union, cast
+from typing import List, Dict, Tuple, Optional, Union, cast, Callable, Mapping, Set, Any
 
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
@@ -42,7 +42,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
+def enrich_inventory_associations(inventory: dict, cluster: KubernetesCluster) -> None:
     associations: dict = inventory['services']['packages']['associations']
     enriched_associations = {}
 
@@ -71,7 +71,7 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     inventory['services']['packages']['associations'] = enriched_associations
 
 
-def enrich_inventory_packages(inventory: dict, _):
+def enrich_inventory_packages(inventory: dict, _: KubernetesCluster) -> None:
     for _type in ['install', 'upgrade', 'remove']:
         packages_list = inventory['services']['packages'].get(_type)
         if isinstance(packages_list, list):
@@ -80,7 +80,7 @@ def enrich_inventory_packages(inventory: dict, _):
             }
 
 
-def enrich_inventory_apply_defaults(inventory: dict, _) -> dict:
+def enrich_inventory_apply_defaults(inventory: dict, _: KubernetesCluster) -> dict:
     kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
 
     for os_family in get_associations_os_family_keys():
@@ -98,7 +98,7 @@ def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict) 
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory.get('upgrade_plan'):
+        for version in cluster.procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
@@ -149,7 +149,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
 
 
 def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
-                                   *, enrich_global: bool):
+                                   *, enrich_global: bool) -> None:
     # pass enriched 'cluster.inventory' instead of 'inventory' that is being finalized
     upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory)
     if not upgrade_plan:
@@ -164,7 +164,7 @@ def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
         default_merger.merge(cluster_associations, upgrade_associations)
 
 
-def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict):
+def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> None:
     if cluster.context.get("initial_procedure") != "upgrade":
         return
 
@@ -188,7 +188,7 @@ def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict):
 
 
 def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
-                         packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+                         packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
     cluster_associations = deepcopy(cluster_associations)
 
     # validate all packages sections in procedure inventory
@@ -208,11 +208,11 @@ def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
 def get_default_package_names(os_family: str, package: str, kubernetes_version: str) -> List[str]:
     version_key = get_compatibility_version_key(os_family)
     compatibility = static.GLOBALS['compatibility_map']['software']
-    packages_names = static.GLOBALS['packages'][os_family][package]['package_name']
+    packages_names: List[Dict[str, str]] = static.GLOBALS['packages'][os_family][package]['package_name']
 
     package_versions = []
     for kv in packages_names:
-        package_name, software_name = list(kv.items())[0]
+        package_name, software_name = next((k, v) for k, v in kv.items())
         if software_name in ('haproxy', 'keepalived'):
             version = compatibility[software_name][version_key]
         else:
@@ -265,11 +265,11 @@ def get_system_packages_for_upgrade(cluster: KubernetesCluster, inventory: dict)
     return upgrade_required
 
 
-def _get_system_packages_support_upgrade(inventory: dict):
+def _get_system_packages_support_upgrade(inventory: dict) -> List[str]:
     return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
 
 
-def enrich_inventory_include_all(inventory: dict, _):
+def enrich_inventory_include_all(inventory: dict, _: KubernetesCluster) -> dict:
     for _type in ['upgrade', 'remove']:
         packages: dict = inventory['services']['packages'].get(_type)
         if packages is not None:
@@ -287,7 +287,7 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     return inventory
 
 
-def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes=False) -> dict:
+def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes: bool = False) -> dict:
     os_ids = cluster.get_os_identifiers()
     different_os = list(set(os_ids.values()))
     if len(different_os) > 1:
@@ -337,15 +337,15 @@ def get_all_managed_packages_for_group(group: NodeGroup, inventory: dict, ensure
     :return: List of packages for each relevant host.
     """
     packages_section = inventory['services']['packages']
-    hosts_to_packages = {}
+    hosts_to_packages: Dict[str, List[str]] = {}
     for node in group.get_ordered_members_list():
         os_family = node.get_nodes_os()
         node_associations = packages_section['associations'].get(os_family, {})
         for association_name in node_associations.keys():
-            packages = get_association_hosts_to_packages(
+            host_packages = get_association_hosts_to_packages(
                 node, inventory, association_name, ensured_association_only)
 
-            packages = next(iter(packages.values()), [])
+            packages: List[str] = next(iter(host_packages.values()), [])
             hosts_to_packages.setdefault(node.get_host(), []).extend(packages)
 
     custom_install_packages = inventory['services']['packages'].get('install', {}).get('include', [])
@@ -432,13 +432,13 @@ def _cache_package_associations(group: NodeGroup, inventory: dict,
         # packages can contain multiple package values, like docker package
         # (it has docker-ce, docker-cli and containerd.io packages for installation)
         if len(final_packages_list) == 1:
-            final_packages_list = final_packages_list[0]
-
-        associated_params['package_name'] = final_packages_list
+            associated_params['package_name'] = final_packages_list[0]
+        else:
+            associated_params['package_name'] = final_packages_list
 
 
 def _cache_custom_packages(cluster: KubernetesCluster, inventory: dict,
-                           detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
+                           detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool) -> None:
     if ensured_association_only:
         return
     # packages from direct installation section
@@ -473,7 +473,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
         return detected_package_versions[0]
 
 
-def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict):
+def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict) -> dict:
     final_nodes = cluster.nodes['all'].get_final_nodes()
     for os_family in get_associations_os_family_keys():
         # Do not remove OS family associations section in finalized inventory if any node has this OS family.
@@ -483,7 +483,7 @@ def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: 
     return inventory
 
 
-def get_associations_os_family_keys():
+def get_associations_os_family_keys() -> Set[str]:
     return {'debian', 'rhel', 'rhel8'}
 
 
@@ -499,7 +499,7 @@ def get_compatibility_version_key(os_family: str) -> str:
         raise ValueError(f"Unsupported {os_family!r} OS family")
 
 
-def get_package_manager(group: NodeGroup) -> apt or yum:
+def get_package_manager(group: NodeGroup):  # type: ignore[no-untyped-def]
     os_family = group.get_nodes_os()
 
     if os_family in ['rhel', 'rhel8']:
@@ -518,27 +518,30 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
     return get_package_manager(group).backup_repo(group)
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined") -> RunnersGroupResult:
-    return get_package_manager(group).add_repo(group, repo_data, repo_filename)
+def add_repo(group: NodeGroup, repo_data: Union[List[str], dict, str]) -> RunnersGroupResult:
+    return get_package_manager(group).add_repo(group, repo_data)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
     return get_package_manager(group).clean(group)
 
 
-def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, RunnersGroupResult]:
+def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
+        -> Union[Token, RunnersGroupResult]:
     return get_package_manager(group).install(group, include, exclude)
 
 
-def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) -> RunnersGroupResult:
+def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
     return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None) -> RunnersGroupResult:
+def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
     return get_package_manager(group).upgrade(group, include, exclude)
 
 
-def no_changes_found(group: NodeGroup, action: callable, result: RunnersResult) -> bool:
+def no_changes_found(group: NodeGroup, action: Callable, result: RunnersResult) -> bool:
     pkg_mgr = get_package_manager(group)
     if action is install:
         action = pkg_mgr.install
@@ -592,8 +595,9 @@ def _parse_node_detected_package(result: RunnersResult, package: str) -> str:
     return node_detected_package
 
 
-def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to_packages: Dict[str, List[str]]) \
-        -> Dict[str, Dict[str, List]]:
+def detect_installed_packages_version_hosts(
+        cluster: KubernetesCluster, hosts_to_packages: Mapping[str, Union[str, List[str]]]
+) -> Dict[str, Dict[str, List[str]]]:
     """
     Detect grouped packages versions for specified list of packages for each remote host.
 
@@ -602,14 +606,15 @@ def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to
     :return: Dictionary with grouped versions for each queried package, pointing to list of hosts,
         e.g. {"foo" -> {"foo-1": [host1, host2]}, "bar" -> {"bar-1": [host1], "bar-2": [host2]}}
     """
+    hosts_to_packages_dedup = {}
     for host, packages_list in hosts_to_packages.items():
         if isinstance(packages_list, str):
             packages_list = [packages_list]
         # deduplicate
-        hosts_to_packages[host] = list(set(packages_list))
+        hosts_to_packages_dedup[host] = list(set(packages_list))
 
     with RemoteExecutor(cluster) as exe:
-        for host, packages_list in hosts_to_packages.items():
+        for host, packages_list in hosts_to_packages_dedup.items():
             node = cluster.make_group([host])
             for package in packages_list:
                 _detect_installed_package_version(node, package)
@@ -619,7 +624,7 @@ def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to
 
     for host, multiple_results in raw_result.items():
         multiple_results = list(multiple_results.values())
-        packages_list = hosts_to_packages[host]
+        packages_list = hosts_to_packages_dedup[host]
         for i, package in enumerate(packages_list):
             result = cast(RunnersResult, multiple_results[i])
             node_detected_package = _parse_node_detected_package(result, package)
@@ -656,9 +661,9 @@ def search_package(group: NodeGroup, package: str) -> Token:
     return get_package_manager(group).search(group, package)
 
 
-def create_repo_file(group: NodeGroup, repo_data, repo_file) -> None:
+def create_repo_file(group: NodeGroup, repo_data: Union[List[str], dict, str], repo_file: str) -> None:
     get_package_manager(group).create_repo_file(group, repo_data, repo_file)
 
 
-def get_repo_filename(group: NodeGroup, repo_filename="predefined") -> str:
-    return get_package_manager(group).get_repo_file_name(repo_filename)
+def get_repo_filename(group: NodeGroup) -> str:
+    return get_package_manager(group).get_repo_file_name()

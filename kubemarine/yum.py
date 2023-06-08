@@ -14,7 +14,7 @@
 
 import configparser
 import io
-from typing import Union, Callable, Optional
+from typing import Union, Callable, Optional, List
 
 from kubemarine.core import utils
 from kubemarine.core.executor import RunnersResult, is_executor_active, Token
@@ -35,37 +35,37 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined") -> RunnersGroupResult:
-    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
+def add_repo(group: NodeGroup, repo_data: Union[dict, str]) -> RunnersGroupResult:
+    create_repo_file(group, repo_data, get_repo_file_name())
     return group.sudo('yum clean all && sudo yum updateinfo')
 
 
-def get_repo_file_name(repo_filename="predefined") -> str:
-    return '/etc/yum.repos.d/%s.repo' % repo_filename
+def get_repo_file_name() -> str:
+    return '/etc/yum.repos.d/predefined.repo'
 
 
-def create_repo_file(group: NodeGroup, repo_data, repo_file) -> None:
+def create_repo_file(group: NodeGroup, repo_data: Union[dict, str], repo_file: str) -> None:
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
         for repo_id, data in repo_data.items():
             config[repo_id] = data
-        repo_data = io.StringIO()
-        config.write(repo_data)
+        repo_data_stream = io.StringIO()
+        config.write(repo_data_stream)
     else:
-        repo_data = io.StringIO(utils.read_external(repo_data))
+        repo_data_stream = io.StringIO(utils.read_external(repo_data))
 
     if is_executor_active():
-        group.defer().put(repo_data, repo_file, sudo=True)
+        group.defer().put(repo_data_stream, repo_file, sudo=True)
     else:
-        group.put(repo_data, repo_file, sudo=True)
+        group.put(repo_data_stream, repo_file, sudo=True)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo("yum clean all")
 
 
-def get_install_cmd(include: str or list, exclude=None) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = 'yum install -y %s' % include
@@ -81,7 +81,8 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
     return command
 
 
-def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, RunnersGroupResult]:
+def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
+        -> Union[Token, RunnersGroupResult]:
     if include is None:
         raise Exception('You must specify included packages to install')
 
@@ -93,7 +94,8 @@ def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, Runner
         return group.sudo(command)
 
 
-def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) -> RunnersGroupResult:
+def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -109,7 +111,8 @@ def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) 
     return group.sudo(command, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None) -> RunnersGroupResult:
+def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
