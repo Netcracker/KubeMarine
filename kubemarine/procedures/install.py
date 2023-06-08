@@ -66,7 +66,7 @@ def _applicable_for_new_nodes_with_roles(*roles):
     return roles_wrapper
 
 
-def system_prepare_check_sudoer(cluster):
+def system_prepare_check_sudoer(cluster: KubernetesCluster):
     not_sudoers = []
     for host, node_context in cluster.context['nodes'].items():
         access_info = node_context['access']
@@ -100,7 +100,7 @@ def system_prepare_check_system(group: NodeGroup):
                                                        context["os"]["version"]))
 
 
-def system_prepare_check_cluster_installation(cluster):
+def system_prepare_check_cluster_installation(cluster: KubernetesCluster):
     if kubernetes.is_cluster_installed(cluster):
         cluster.log.debug('Cluster already installed and available at %s' % cluster.context['controlplain_uri'])
     else:
@@ -185,7 +185,7 @@ def system_prepare_policy(group: NodeGroup):
     audit_policy_dir = os.path.dirname(audit_file_name)
     group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-    collect_node = group.get_ordered_members_list(provide_node_configs=True)
+    collect_node = group.get_ordered_members_configs_list()
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
@@ -251,9 +251,9 @@ def system_prepare_policy(group: NodeGroup):
 def system_prepare_dns_hostname(group: NodeGroup):
     cluster = group.cluster
     with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            cluster.log.debug("Changing hostname '%s' = '%s'" % (node["connect_to"], node["name"]))
-            node["connection"].sudo("hostnamectl set-hostname %s" % node["name"])
+        for node in group.get_ordered_members_list():
+            cluster.log.debug("Changing hostname '%s' = '%s'" % (node.get_host(), node.get_node_name()))
+            node.sudo("hostnamectl set-hostname %s" % node.get_node_name())
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -267,9 +267,9 @@ def system_prepare_dns_resolv_conf(group: NodeGroup):
     cluster.log.debug(group.sudo("ls -la /etc/resolv.conf; sudo lsattr /etc/resolv.conf"))
 
 
-def system_prepare_dns_etc_hosts(cluster):
-    config = system.generate_etc_hosts_config(cluster.inventory, cluster, 'etc_hosts')
-    config += system.generate_etc_hosts_config(cluster.inventory, cluster, 'etc_hosts_generated')
+def system_prepare_dns_etc_hosts(cluster: KubernetesCluster):
+    config = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
+    config += system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
 
     utils.dump_file(cluster, config, 'etc_hosts')
     cluster.log.debug("\nUploading...")
@@ -412,7 +412,7 @@ def deploy_loadbalancer_haproxy_install(group: NodeGroup):
     group.call(haproxy.install)
 
 
-def deploy_loadbalancer_haproxy_configure(cluster):
+def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster):
 
     if not cluster.inventory['services'].get('loadbalancer', {}) \
             .get('haproxy', {}).get('keep_configs_updated', True):
@@ -442,7 +442,7 @@ def deploy_loadbalancer_haproxy_configure(cluster):
     haproxy.restart(group)
 
 
-def deploy_loadbalancer_keepalived_install(cluster):
+def deploy_loadbalancer_keepalived_install(cluster: KubernetesCluster):
     group = None
     if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
 
@@ -466,7 +466,7 @@ def deploy_loadbalancer_keepalived_install(cluster):
     group.call(keepalived.install)
 
 
-def deploy_loadbalancer_keepalived_configure(cluster):
+def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster):
     group = None
     if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
 
@@ -512,7 +512,7 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
     ])
 
     if 'worker' in cluster.nodes:
-        cluster.nodes.get('worker').new_group(
+        cluster.nodes['worker'].new_group(
             apply_filter=lambda node: 'control-plane' not in node['roles']) \
             .call(kubernetes.init_workers)
 
@@ -524,7 +524,7 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def deploy_coredns(cluster):
+def deploy_coredns(cluster: KubernetesCluster):
     config = coredns.generate_configmap(cluster.inventory)
 
     cluster.log.debug('Applying patch...')
@@ -534,15 +534,15 @@ def deploy_coredns(cluster):
     cluster.log.debug(coredns.apply_configmap(cluster, config))
 
 
-def deploy_plugins(cluster):
+def deploy_plugins(cluster: KubernetesCluster):
     plugins.install(cluster)
 
 
-def deploy_accounts(cluster):
+def deploy_accounts(cluster: KubernetesCluster):
     kubernetes_accounts.install(cluster)
 
 
-def overview(cluster):
+def overview(cluster: KubernetesCluster):
     cluster.log.debug("Retrieving cluster status...")
     control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
     cluster.log.debug("\nNAMESPACES:")

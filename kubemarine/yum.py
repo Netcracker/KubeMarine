@@ -21,11 +21,11 @@ from kubemarine.core import utils
 from kubemarine.core.group import NodeGroupResult, NodeGroup
 
 
-def ls_repofiles(group, **kwargs):
+def ls_repofiles(group: NodeGroup, **kwargs):
     return group.sudo('ls -la /etc/yum.repos.d', **kwargs)
 
 
-def backup_repo(group, repo_filename="*", **kwargs):
+def backup_repo(group: NodeGroup, repo_filename="*", **kwargs):
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
@@ -35,7 +35,7 @@ def backup_repo(group, repo_filename="*", **kwargs):
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % repo_filename, **kwargs)
 
 
-def add_repo(group, repo_data="", repo_filename="predefined", **kwargs):
+def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs):
     create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
     return group.sudo('yum clean all && sudo yum updateinfo', **kwargs)
 
@@ -44,7 +44,7 @@ def get_repo_file_name(repo_filename="predefined"):
     return '/etc/yum.repos.d/%s.repo' % repo_filename
 
 
-def create_repo_file(group, repo_data, repo_file):
+def create_repo_file(group: NodeGroup, repo_data, repo_file):
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
@@ -57,7 +57,7 @@ def create_repo_file(group, repo_data, repo_file):
     group.put(repo_data, repo_file, sudo=True)
 
 
-def clean(group, mode="all", **kwargs):
+def clean(group: NodeGroup, mode="all", **kwargs):
     return group.sudo("yum clean %s" % mode, **kwargs)
 
 
@@ -77,7 +77,7 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
     return command
 
 
-def install(group, include=None, exclude=None, **kwargs):
+def install(group: NodeGroup, include=None, exclude=None, **kwargs):
     if include is None:
         raise Exception('You must specify included packages to install')
 
@@ -86,7 +86,7 @@ def install(group, include=None, exclude=None, **kwargs):
     return group.sudo(command, **kwargs)
 
 
-def remove(group, include=None, exclude=None, **kwargs):
+def remove(group: NodeGroup, include=None, exclude=None, **kwargs):
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -102,7 +102,7 @@ def remove(group, include=None, exclude=None, **kwargs):
     return group.sudo(command, **kwargs)
 
 
-def upgrade(group, include=None, exclude=None, **kwargs):
+def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs):
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 

@@ -22,7 +22,7 @@ import yaml
 from kubemarine.core import log, utils
 from kubemarine.core.connections import ConnectionPool, Connections
 from kubemarine.core.environment import Environment
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, NodeConfig
 
 jinja_query_regex = re.compile("{{ .* }}", re.M)
 
@@ -111,8 +111,8 @@ class KubernetesCluster(Environment):
         return [self.get_access_address_from_node(node)
                 for node in self.get_nodes_by_names(node_names)]
 
-    def get_node(self, host: Union[str, fabric.connection.Connection]) -> dict:
-        return self.make_group([host]).get_first_member(provide_node_configs=True)
+    def get_node(self, host: Union[str, fabric.connection.Connection]) -> NodeConfig:
+        return self.make_group([host]).get_first_member_config()
 
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         ips = self.get_addresses_from_node_names(node_names)

@@ -13,15 +13,17 @@
 # limitations under the License.
 
 from kubemarine import kubernetes
+from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroup
 
 
-def k8s_certs_overview(control_planes):
-    for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
-        control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
-        control_plane['connection'].sudo("kubeadm certs check-expiration", hide=False)
+def k8s_certs_overview(control_planes: NodeGroup):
+    for control_plane in control_planes.get_ordered_members_list():
+        control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane.get_node_name()}")
+        control_plane.sudo("kubeadm certs check-expiration", hide=False)
 
 
-def renew_verify(inventory, cluster):
+def renew_verify(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get('initial_procedure') != 'cert_renew' or "kubernetes" not in cluster.procedure_inventory:
         return inventory
 
@@ -31,7 +33,7 @@ def renew_verify(inventory, cluster):
     return inventory
 
 
-def renew_apply(control_planes):
+def renew_apply(control_planes: NodeGroup):
     log = control_planes.cluster.log
 
     procedure = control_planes.cluster.procedure_inventory["kubernetes"]
@@ -49,11 +51,11 @@ def renew_apply(control_planes):
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
     control_planes.call(force_restart_control_plane)
 
-    for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
-        kubernetes.wait_for_any_pods(control_planes.cluster, control_plane["connection"], apply_filter=control_plane["name"])
+    for control_plane in control_planes.get_ordered_members_list():
+        kubernetes.wait_for_any_pods(control_planes.cluster, control_plane, apply_filter=control_plane.get_node_name())
 
 
-def force_restart_control_plane(control_planes):
+def force_restart_control_plane(control_planes: NodeGroup):
     cri_impl = control_planes.cluster.inventory['services']['cri']['containerRuntime']
     restart_containers = ["etcd", "kube-scheduler", "kube-apiserver", "kube-controller-manager"]
     c_filter = "grep -e %s" % " -e ".join(restart_containers)
@@ -64,7 +66,7 @@ def force_restart_control_plane(control_planes):
         control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
 
 
-def force_renew_kubelet_serving_certs(control_planes):
+def force_renew_kubelet_serving_certs(control_planes: NodeGroup):
     # Delete *serving* kubelet cert (kubelet.crt) and restart kubelet to create new up-to-date cert.
     # Client kubelet cert (kubelet.conf) is assumed to be updated automatically by kubelet.
     for control_plane in control_planes.get_ordered_members_list():

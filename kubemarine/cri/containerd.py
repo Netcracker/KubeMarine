@@ -27,19 +27,19 @@ from kubemarine.core.group import NodeGroup
 
 def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
+        for node in group.get_ordered_members_list():
+            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'containerd')
 
-            group.cluster.log.debug("Installing latest containerd and podman on %s node" % node['name'])
+            group.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
             # always install latest available containerd and podman
-            packages.install(node['connection'], include=os_specific_associations['package_name'])
+            packages.install(node, include=os_specific_associations['package_name'])
 
             # remove previous config.toml to avoid problems in case when previous config was broken
-            node['connection'].sudo("rm -f %s && sudo systemctl restart %s"
-                                    % (os_specific_associations['config_location'],
-                                       os_specific_associations['service_name']))
+            node.sudo("rm -f %s && sudo systemctl restart %s"
+                      % (os_specific_associations['config_location'],
+                         os_specific_associations['service_name']))
 
-            system.enable_service(node['connection'], os_specific_associations['service_name'], now=True)
+            system.enable_service(node, os_specific_associations['service_name'], now=True)
     return exe.get_last_results_str()
 
 
@@ -103,19 +103,19 @@ def configure(group: NodeGroup):
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
-            log.debug("Uploading containerd configuration to %s node..." % node['name'])
-            node['connection'].put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
-                                   sudo=True, mkdir=True)
-            log.debug("Restarting Containerd on %s node..." % node['name'])
-            node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
-                                    f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                                    f"systemctl status {os_specific_associations['service_name']}")
+        for node in group.get_ordered_members_list():
+            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'containerd')
+            log.debug("Uploading containerd configuration to %s node..." % node.get_node_name())
+            node.put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
+                     sudo=True, mkdir=True)
+            log.debug("Restarting Containerd on %s node..." % node.get_node_name())
+            node.sudo(f"chmod 600 {os_specific_associations['config_location']} && "
+                      f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                      f"systemctl status {os_specific_associations['service_name']}")
     return exe.get_last_results_str()
 
 
-def prune(group):
+def prune(group: NodeGroup):
     return group.sudo('crictl rm -fa; '
                       'sudo crictl rmp -fa; '
                       'sudo crictl rmi -a; '

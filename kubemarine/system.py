@@ -18,7 +18,7 @@ import paramiko
 import re
 import socket
 import time
-from typing import Dict
+from typing import Dict, Tuple
 
 from dateutil.parser import parse
 import fabric
@@ -34,7 +34,7 @@ from kubemarine.core.annotations import restrict_empty_group
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
         "Kernel modules are not available for the current OS family"
 
-def verify_inventory(inventory, cluster):
+def verify_inventory(inventory: dict, cluster: KubernetesCluster):
 
     if cluster.inventory['services']['ntp'].get('chrony', {}).get('servers') \
         and (cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('NTP') or
@@ -44,7 +44,7 @@ def verify_inventory(inventory, cluster):
     return inventory
 
 
-def enrich_etc_hosts(inventory, cluster):
+def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster):
 # enrich only etc_hosts_generated object, etc_hosts remains as it is
 
     # if by chance cluster.yaml contains non empty etc_hosts_generated we have to reset it
@@ -115,7 +115,7 @@ def fetch_os_versions(cluster: KubernetesCluster):
         "cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
 
 
-def detect_os_family(cluster):
+def detect_os_family(cluster: KubernetesCluster):
     results = fetch_os_versions(cluster)
 
     for connection, result in results.items():
@@ -170,17 +170,14 @@ def detect_of_family_by_name_version(name: str, version: str) -> str:
     return os_family
 
 
-def update_resolv_conf(group, config=None):
-    if config is None:
-        raise Exception("Data can't be empty")
-
+def update_resolv_conf(group: NodeGroup, config: dict):
     # TODO: Use Jinja template
     buffer = get_resolv_conf_buffer(config)
     utils.dump_file(group.cluster, buffer, 'resolv.conf')
     group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True, hide=True)
 
 
-def get_resolv_conf_buffer(config):
+def get_resolv_conf_buffer(config: dict):
     buffer = io.StringIO()
     if config.get("search") is not None:
         buffer.write("search %s\n" % config["search"])
@@ -190,7 +187,7 @@ def get_resolv_conf_buffer(config):
     return buffer
 
 
-def generate_etc_hosts_config(inventory, cluster=None, etc_hosts_part='etc_hosts_generated'):
+def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generated'):
 # generate records for /etc/hosts from services.etc_hosts or services.etc_hosts_generated
 
     result = ""
@@ -214,9 +211,7 @@ def generate_etc_hosts_config(inventory, cluster=None, etc_hosts_part='etc_hosts
     return result
 
 
-def update_etc_hosts(group, config=None):
-    if config is None:
-        raise Exception("Data can't be empty")
+def update_etc_hosts(group: NodeGroup, config: str):
     utils.dump_file(group.cluster, config, 'etc_hosts')
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True)
 
@@ -229,13 +224,13 @@ def start_service(group: NodeGroup, name: str) -> NodeGroupResult:
     return group.sudo('systemctl start %s' % name)
 
 
-def restart_service(group, name=None):
+def restart_service(group: NodeGroup, name: str = None):
     if name is None:
         raise Exception("Service name can't be empty")
     return group.sudo('systemctl restart %s' % name)
 
 
-def enable_service(group, name=None, now=True):
+def enable_service(group: NodeGroup, name: str = None, now=True):
     if name is None:
         raise Exception("Service name can't be empty")
 
@@ -245,7 +240,7 @@ def enable_service(group, name=None, now=True):
     return group.sudo(cmd)
 
 
-def disable_service(group, name=None, now=True):
+def disable_service(group: NodeGroup, name: str = None, now=True):
     if name is None:
         raise Exception("Service name can't be empty")
 
@@ -267,7 +262,7 @@ def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
     return group.sudo("systemctl status firewalld", warn=True)
 
 
-def is_firewalld_disabled(group):
+def is_firewalld_disabled(group: NodeGroup):
     result = fetch_firewalld_status(group)
     disabled_status = True
 
@@ -278,7 +273,7 @@ def is_firewalld_disabled(group):
     return disabled_status, result
 
 
-def disable_firewalld(group):
+def disable_firewalld(group: NodeGroup):
     log = group.cluster.log
 
     already_disabled, result = is_firewalld_disabled(group)
@@ -297,7 +292,7 @@ def disable_firewalld(group):
     return result
 
 
-def is_swap_disabled(group):
+def is_swap_disabled(group: NodeGroup):
     result = group.sudo("cat /proc/swaps", warn=True)
     disabled_status = True
 
@@ -309,7 +304,7 @@ def is_swap_disabled(group):
     return disabled_status, result
 
 
-def disable_swap(group):
+def disable_swap(group: NodeGroup):
     log = group.cluster.log
 
     already_disabled, result = is_swap_disabled(group)
@@ -349,7 +344,7 @@ def reboot_group(group: NodeGroup, try_graceful=None):
     first_control_plane = group.cluster.nodes['control-plane'].get_first_member()
     results = NodeGroupResult(group.cluster)
 
-    for node in group.get_ordered_members_list(provide_node_configs=True):
+    for node in group.get_ordered_members_configs_list():
         cordon_required = 'control-plane' in node['roles'] or 'worker' in node['roles']
         if cordon_required:
             res = first_control_plane.sudo(
@@ -380,15 +375,11 @@ def perform_group_reboot(group: NodeGroup):
     return result
 
 
-def reload_systemctl(group):
+def reload_systemctl(group: NodeGroup):
     return group.sudo('systemctl daemon-reload')
 
 
-def add_to_path(group, string):
-    # TODO: Also update PATH in ~/.bash_profile
-    group.sudo("export PATH=$PATH:%s" % string)
-
-def configure_chronyd(group, retries=60):
+def configure_chronyd(group: NodeGroup, retries=60):
     cluster = group.cluster
     log = cluster.log
     chronyd_config = ''
@@ -411,7 +402,7 @@ def configure_chronyd(group, retries=60):
         if results.stdout_contains("Normal"):
             log.verbose("NTP service reported successful time synchronization, validating...")
 
-            current_node_time, nodes_time, time_diff = get_nodes_time(group)
+            _, _, time_diff = get_nodes_time(group)
             if time_diff > cluster.globals['nodes']['max_time_difference']:
                 log.debug("Time is not synced yet")
                 log.debug(results)
@@ -428,7 +419,7 @@ def configure_chronyd(group, retries=60):
     raise Exception("Time not synced, but timeout is reached")
 
 
-def configure_timesyncd(group, retries=120):
+def configure_timesyncd(group: NodeGroup, retries=120):
     cluster = group.cluster
     log = cluster.log
     timesyncd_config = ''
@@ -456,7 +447,7 @@ def configure_timesyncd(group, retries=120):
         if results.stdout_contains("synchronized: yes"):
             log.verbose("NTP service reported successful time synchronization, validating...")
 
-            current_node_time, nodes_time, time_diff = get_nodes_time(group)
+            _, _, time_diff = get_nodes_time(group)
             if time_diff > cluster.globals['nodes']['max_time_difference']:
                 log.debug("Time is not synced yet")
                 log.debug(results)
@@ -473,7 +464,7 @@ def configure_timesyncd(group, retries=120):
     raise Exception("Time not synced, but timeout is reached")
 
 
-def setup_modprobe(group):
+def setup_modprobe(group: NodeGroup):
     log = group.cluster.log
 
     os_family = group.get_nodes_os()
@@ -505,7 +496,7 @@ def setup_modprobe(group):
     group.cluster.schedule_cumulative_point(verify_system)
 
 
-def is_modprobe_valid(group):
+def is_modprobe_valid(group: NodeGroup):
     log = group.cluster.log
 
     verify_results = group.sudo("lsmod", warn=True)
@@ -580,7 +571,7 @@ def verify_system(cluster: KubernetesCluster):
 def detect_active_interface(cluster: KubernetesCluster):
     group = cluster.nodes['all'].get_accessible_nodes()
     with RemoteExecutor(cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             detect_interface_by_address(node['connection'], node['internal_address'])
     for cxn, host_results in exe.get_last_results().items():
         try:
@@ -657,7 +648,7 @@ def whoami(cluster: KubernetesCluster) -> NodeGroupResult:
 
 
 @restrict_empty_group
-def get_nodes_time(group: NodeGroup) -> (float, Dict[fabric.connection.Connection, float], float):
+def get_nodes_time(group: NodeGroup) -> Tuple[float, Dict[str, float], float]:
     """
     Polls the time from the specified group of nodes, parses it and returns tuple with results.
     :param group: Group of nodes, where timestamps should be detected.
@@ -672,7 +663,7 @@ def get_nodes_time(group: NodeGroup) -> (float, Dict[fabric.connection.Connectio
     # Please, note: this method can not detect time on nodes precisely, since Kubemarine can execute commands not at the
     # same time depending on various factors, for example, restrictions on the number of open sockets.
 
-    parsed_time_per_node: Dict[fabric.connection.Connection, float] = {}
+    parsed_time_per_node: Dict[str, float] = {}
 
     min_time = None
     max_time = None
@@ -682,7 +673,7 @@ def get_nodes_time(group: NodeGroup) -> (float, Dict[fabric.connection.Connectio
     raw_results = group.run('date')
     for host, result in raw_results.items():
         parsed_time = parse(result.stdout.strip()).timestamp() * 1000
-        parsed_time_per_node[host] = parsed_time
+        parsed_time_per_node[host.host] = parsed_time
         if min_time is None or min_time > parsed_time:
             min_time = parsed_time
         if max_time is None or max_time < parsed_time:

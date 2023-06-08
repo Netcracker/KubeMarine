@@ -17,7 +17,7 @@ import re
 
 from kubemarine import system
 from kubemarine.core import utils
-
+from kubemarine.core.group import NodeGroup
 
 # Common regexp should support the following schemes:
 # SELinux status:                 enabled
@@ -105,7 +105,7 @@ def parse_selinux_permissive_types(log, stdout):
     return result
 
 
-def get_selinux_status(group):
+def get_selinux_status(group: NodeGroup):
     log = group.cluster.log
 
     result = group.sudo("sestatus && sudo semanage permissive -l")
@@ -119,7 +119,7 @@ def get_selinux_status(group):
     return result, parsed_result
 
 
-def is_config_valid(group, state=None, policy=None, permissive=None):
+def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
     log = group.cluster.log
 
     if group.get_nodes_os() == 'debian':
@@ -171,7 +171,7 @@ def is_config_valid(group, state=None, policy=None, permissive=None):
     return valid, result, parsed_result
 
 
-def setup_selinux(group):
+def setup_selinux(group: NodeGroup):
     log = group.cluster.log
 
     # this method handles cluster with multiple os, suppressing should be enabled

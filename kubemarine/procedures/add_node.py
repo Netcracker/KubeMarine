@@ -25,7 +25,7 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
-def deploy_kubernetes_join(cluster):
+def deploy_kubernetes_join(cluster: KubernetesCluster):
 
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes()
 
@@ -49,17 +49,18 @@ def deploy_kubernetes_join(cluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def add_node_finalize_inventory(cluster, inventory_to_finalize):
+def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
     new_nodes = cluster.nodes['all'].get_new_nodes()
 
     # add nodes to inventory if they in new nodes
-    for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
+    for new_node in new_nodes.get_ordered_members_list():
+        new_node_name = new_node.get_node_name()
         new_node_found = False
         for i, node in enumerate(inventory_to_finalize['nodes']):
-            if node['name'] == new_node['name']:
+            if node['name'] == new_node_name:
                 # new node already presented in final inventory - ok, just remove label
                 if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
                     inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
@@ -74,7 +75,7 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
             # search for new node config in procedure inventory
             if cluster.procedure_inventory.get('nodes', {}):
                 for node_from_procedure in cluster.procedure_inventory['nodes']:
-                    if node_from_procedure['name'] == new_node['name']:
+                    if node_from_procedure['name'] == new_node_name:
                         node_config = node_from_procedure
                         break
             # maybe new nodes from other places?

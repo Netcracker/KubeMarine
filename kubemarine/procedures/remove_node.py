@@ -87,7 +87,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
             host_name = host
             if isinstance(host_name, dict):
                 host_name = host['name']
-            if final_nodes.get_first_member(apply_filter={"name": host_name}) is None:
+            if not final_nodes.has_node(host_name):
                 hosts.remove(host)
         if not hosts:
             del inventory_to_finalize['vrrp_ips'][i]
@@ -104,7 +104,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
                 break
 
     if inventory_to_finalize['services'].get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
-        for node in nodes_for_removal.get_ordered_members_list(provide_node_configs=True):
+        for node in nodes_for_removal.get_ordered_members_configs_list():
             hostnames = [node['name'], node['internal_address']]
             if node.get('address') is not None:
                 hostnames.append(node['address'])

@@ -17,8 +17,6 @@ import json
 import time
 from typing import List, Dict
 
-import fabric.connection
-
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 

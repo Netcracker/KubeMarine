@@ -13,11 +13,11 @@
 # limitations under the License.
 from kubemarine.core import static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroupResult
+from kubemarine.core.group import NodeGroupResult, NodeGroup
 from kubemarine.cri import docker, containerd
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get("initial_procedure") == "migrate_cri":
         return inventory
 
@@ -51,7 +51,7 @@ def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def install(group):
+def install(group: NodeGroup):
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -60,7 +60,7 @@ def install(group):
         return containerd.install(group)
 
 
-def configure(group):
+def configure(group: NodeGroup):
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -69,7 +69,7 @@ def configure(group):
         return containerd.configure(group)
 
 
-def prune(group, all_implementations=False):
+def prune(group: NodeGroup, all_implementations=False):
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     result = NodeGroupResult(group.cluster)

@@ -125,8 +125,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
     def test_keepalived_group_appeared(self):
         self.assertIsNotNone(self.cluster.nodes.get('keepalived'))
 
-        balancer_1_ip = self.cluster.nodes['all'].get_member(0, provide_node_configs=True,
-                                                             apply_filter={'name': 'balancer-1'})['connect_to']
+        balancer_1_ip = self.cluster.nodes['all'].get_member_by_name('balancer-1').get_host()
         self.assertIn(balancer_1_ip, list(self.cluster.nodes['keepalived'].nodes.keys()))
 
     def test_vrrp_defined_no_hosts_and_balancers(self):
@@ -255,7 +254,7 @@ class TestKeepalivedConfigApply(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        node = cluster.nodes['keepalived'].get_first_member(provide_node_configs=True)
+        node = cluster.nodes['keepalived'].get_first_member_config()
         expected_config = keepalived.generate_config(cluster.inventory, node)
 
         package_associations = cluster.inventory['services']['packages']['associations']['rhel']['keepalived']

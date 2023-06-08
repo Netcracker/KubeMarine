@@ -20,10 +20,11 @@ Using this module you can generate new sysctl configs, install and apply them.
 import io
 
 from kubemarine.core import utils
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 
 
-def make_config(cluster):
+def make_config(cluster: KubernetesCluster):
     """
     Converts parameters from inventory['services']['sysctl'] to a string in the format of systcl.conf.
     """
@@ -80,7 +81,7 @@ def reload(group: NodeGroup) -> NodeGroupResult:
     return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf')
 
 
-def get_pid_max(inventory):
+def get_pid_max(inventory: dict):
     max_pods = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
     pod_pids_limit = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
     return max_pods * pod_pids_limit + 2048

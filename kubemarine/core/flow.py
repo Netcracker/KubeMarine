@@ -459,18 +459,18 @@ def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
     return results
 
 
-def init_tasks_flow(cluster):
+def init_tasks_flow(cluster: c.KubernetesCluster):
     if 'proceeded_tasks' not in cluster.context:
         cluster.context['proceeded_tasks'] = []
 
 
-def add_task_to_proceeded_list(cluster, task_path):
+def add_task_to_proceeded_list(cluster: c.KubernetesCluster, task_path: str):
     if not is_task_completed(cluster, task_path):
         cluster.context['proceeded_tasks'].append(task_path)
         utils.dump_file(cluster, "\n".join(cluster.context['proceeded_tasks'])+"\n", 'finished_tasks')
 
 
-def is_task_completed(cluster, task_path):
+def is_task_completed(cluster: c.KubernetesCluster, task_path: str):
     _check_within_flow(cluster)
     return task_path in cluster.context['proceeded_tasks']
 

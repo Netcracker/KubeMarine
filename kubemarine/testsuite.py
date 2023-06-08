@@ -19,6 +19,8 @@ from datetime import datetime
 from kubemarine.core import utils, log
 import fabric
 
+from kubemarine.core.cluster import KubernetesCluster
+
 TC_UNKNOWN = -1
 TC_PASSED = 0
 TC_FAILED = 1
@@ -56,7 +58,7 @@ class TestCase:
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, cluster, id, category, name, default_results=None, minimal=None, recommended=None):
+    def __init__(self, cluster: KubernetesCluster, id, category, name, default_results=None, minimal=None, recommended=None):
         self.include_in_ts(cluster.context['testsuite'])
         self.category = category
         self.id = str(id)

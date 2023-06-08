@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import io
-import os
 
 import yaml
 
@@ -21,7 +20,7 @@ from kubemarine.core import utils, summary
 from kubemarine.core.cluster import KubernetesCluster
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, _):
     rbac = inventory['rbac']
     if not rbac.get("accounts"):
         return inventory

@@ -18,11 +18,13 @@ from collections import OrderedDict
 
 import io
 import uuid
+from typing import List
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeConfig
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
@@ -30,7 +32,7 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine import packages
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
 
@@ -121,7 +123,7 @@ def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def _merge_containerd(cluster, inventory, finalization=False):
+def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization=False):
     if not inventory["services"].get("cri", {}):
         inventory["services"]["cri"] = {}
 
@@ -132,13 +134,13 @@ def _merge_containerd(cluster, inventory, finalization=False):
     return inventory
 
 
-def migrate_cri(cluster):
+def migrate_cri(cluster: KubernetesCluster):
     _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"])
-                 .get_ordered_members_list(provide_node_configs=True))
-    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
+                 .get_ordered_members_configs_list())
+    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_configs_list())
 
 
-def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
+def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeConfig]):
     """
     Migrate CRI from docker to already installed containerd.
     This method works node-by-node, configuring kubelet to use containerd.
@@ -148,9 +150,9 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
 
     for node in node_group:
         if "control-plane" in node["roles"]:
-            control_plane = node
+            control_plane = node['connection']
         else:
-            control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
+            control_plane = cluster.nodes["control-plane"].get_first_member()
 
         cluster.log.debug(f'Updating thirdparties for node "{node["connect_to"]}..."')
         thirdparties.install_all_thirparties(node["connection"])
@@ -158,7 +160,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
         cluster.log.debug("Migrating \"%s\"..." % node["name"])
         drain_cmd = kubernetes.prepare_drain_command(cluster, node['name'], disable_eviction=True)
-        control_plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
+        control_plane.sudo(drain_cmd, is_async=False, hide=False)
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
@@ -210,7 +212,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
         if "control-plane" in node["roles"]:
             kubernetes.wait_uncordon(node["connection"])
         else:
-            control_plane["connection"].sudo(f"kubectl uncordon {node['name']}", is_async=False, hide=False)
+            control_plane.sudo(f"kubectl uncordon {node['name']}", is_async=False, hide=False)
 
         if "control-plane" in node["roles"]:
             # hotfix for Ubuntu 22.04 and Kubernetes v1.21.2
@@ -232,15 +234,15 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
             packages.remove(node["connection"], include=packages_list, warn=True, hide=False)
 
         # change annotation for cri-socket
-        control_plane["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
-                                  f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
-                                  is_async=False, hide=True)
+        control_plane.sudo(f"sudo kubectl annotate node {node['name']} "
+                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
+                           is_async=False, hide=True)
 
         # delete docker socket
         node["connection"].sudo("rm -rf /var/run/docker.sock", hide=False)
 
 
-def release_calico_leaked_ips(cluster):
+def release_calico_leaked_ips(cluster: KubernetesCluster):
     """
     During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
     For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
@@ -260,13 +262,13 @@ def release_calico_leaked_ips(cluster):
     first_control_plane.sudo(f"rm {random_report_name}", is_async=False, hide=False)
     
 
-def edit_config(kubeadm_flags):
+def edit_config(kubeadm_flags: str):
     kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")
     return _config_changer(kubeadm_flags,
                            "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
 
 
-def _config_changer(config, word):
+def _config_changer(config: str, word: str):
     equal_pos = word.find("=") + 1
     param_begin_pos = config.find(word[:equal_pos])
     if param_begin_pos != -1:
@@ -279,7 +281,7 @@ def _config_changer(config, word):
         return config[:param_end_pos] + " " + word[:] + "\""
 
 
-def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory_to_finalize
     finalize_functions = [
