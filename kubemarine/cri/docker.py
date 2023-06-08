@@ -23,19 +23,19 @@ from kubemarine.core.group import NodeGroup
 
 def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'docker')
-            packages.install(node['connection'], include=os_specific_associations['package_name'])
-            enable(node['connection'])
+        for node in group.get_ordered_members_list():
+            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
+            packages.install(node, include=os_specific_associations['package_name'])
+            enable(node)
 
             # remove previous daemon.json to avoid problems in case when previous config was broken
-            node['connection'].sudo("rm -f %s && sudo systemctl restart %s"
-                                % (os_specific_associations['config_location'],
-                                   os_specific_associations['service_name']))
+            node.sudo("rm -f %s && sudo systemctl restart %s"
+                      % (os_specific_associations['config_location'],
+                         os_specific_associations['service_name']))
     return exe.get_last_results_str()
 
 
-def uninstall(group):
+def uninstall(group: NodeGroup):
     # delete all known docker packages
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
@@ -58,20 +58,20 @@ def configure(group: NodeGroup):
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
 
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'docker')
-            log.debug("Uploading docker configuration to %s node..." % node['name'])
-            node['connection'].put(StringIO(settings_json), os_specific_associations['config_location'], backup=True,
-                                   sudo=True)
-            log.debug("Restarting Docker on %s node..." % node['name'])
-            node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
-                                    f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                                    f"sudo {os_specific_associations['executable_name']} info")
+        for node in group.get_ordered_members_list():
+            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
+            log.debug("Uploading docker configuration to %s node..." % node.get_node_name())
+            node.put(StringIO(settings_json), os_specific_associations['config_location'], backup=True,
+                     sudo=True)
+            log.debug("Restarting Docker on %s node..." % node.get_node_name())
+            node.sudo(f"chmod 600 {os_specific_associations['config_location']} && "
+                      f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                      f"sudo {os_specific_associations['executable_name']} info")
 
     return exe.get_last_results_str()
 
 
-def prune(group):
+def prune(group: NodeGroup):
     return group.sudo('docker container stop $(sudo docker container ls -aq); '
                       'sudo docker container rm $(sudo docker container ls -aq); '
                       'sudo docker system prune -a -f; '

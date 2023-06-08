@@ -33,7 +33,7 @@ def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def controlplane_finalize_inventory(cluster, inventory):
+def controlplane_finalize_inventory(cluster: KubernetesCluster, inventory: dict):
     """
     Delete 'control-plane' and 'master' roles before inventory saving if they are not set in 'cluster.yaml'
     """

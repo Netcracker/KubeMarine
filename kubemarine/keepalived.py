@@ -23,7 +23,7 @@ from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.group import NodeGroup, NodeGroupResult, NodeConfig
 
 
 def autodetect_interface(cluster: KubernetesCluster, name):
@@ -40,7 +40,7 @@ def autodetect_interface(cluster: KubernetesCluster, name):
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
-def enrich_inventory_apply_defaults(inventory, cluster):
+def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster):
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -119,7 +119,7 @@ def get_default_node_names(inventory):
     return list(set(default_names))
 
 
-def enrich_inventory_calculate_nodegroup(inventory, cluster):
+def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster):
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -134,7 +134,7 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
     # it is important to remove duplicates
     names = list(set(names))
 
-    filtered_members = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=False, apply_filter={
+    filtered_members = cluster.nodes['all'].get_ordered_members_list(apply_filter={
         'name': names
     })
 
@@ -188,7 +188,7 @@ def install_haproxy_check_script(group: NodeGroup):
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
 
-def uninstall(group):
+def uninstall(group: NodeGroup):
     return packages.remove(group, include='keepalived')
 
 
@@ -196,10 +196,10 @@ def restart(group: NodeGroup):
     cluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
     with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.restart_service(node['connection'], name=service_name)
+                node.get_host(), 'keepalived', 'service_name')
+            system.restart_service(node, name=service_name)
 
     cluster.log.debug("Sleep while keepalived comes-up...")
     time.sleep(static.GLOBALS['keepalived']['restart_wait'])
@@ -207,21 +207,21 @@ def restart(group: NodeGroup):
 
 def enable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.enable_service(node['connection'], name=service_name, now=True)
+                node.get_host(), 'keepalived', 'service_name')
+            system.enable_service(node, name=service_name, now=True)
 
 
 def disable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.disable_service(node['connection'], name=service_name)
+                node.get_host(), 'keepalived', 'service_name')
+            system.disable_service(node, name=service_name)
 
 
-def generate_config(inventory, node):
+def generate_config(inventory: dict, node: NodeConfig):
     config = ''
 
     for i, item in enumerate(inventory['vrrp_ips']):
@@ -259,7 +259,7 @@ def generate_config(inventory, node):
 
 def configure(group: NodeGroup) -> NodeGroupResult:
     log = group.cluster.log
-    group_members = group.get_ordered_members_list(provide_node_configs=True)
+    group_members = group.get_ordered_members_configs_list()
 
     with RemoteExecutor(group.cluster):
         for node in group_members:

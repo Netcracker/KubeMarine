@@ -73,7 +73,7 @@ def _get_bindings(inventory: dict, node: dict, *, maintenance: bool):
     return list(set(bindings))
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
 
     for node in inventory["nodes"]:
         if 'balancer' not in node['roles']:
@@ -110,7 +110,7 @@ def enrich_inventory(inventory, cluster):
 
 def get_config_path(group: NodeGroup) -> NodeGroupResult:
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             package_associations = _get_associations_for_node(node)
             cmd = f"systemctl show -p MainPID {package_associations['service_name']} " \
                   f"| cut -d '=' -f2 " \
@@ -123,7 +123,7 @@ def get_config_path(group: NodeGroup) -> NodeGroupResult:
 
 def install(group: NodeGroup):
     with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             package_associations = _get_associations_for_node(node)
             node['connection'].sudo("%s -v" % package_associations['executable_name'], warn=True)
 
@@ -137,7 +137,7 @@ def install(group: NodeGroup):
         installation_result = exe.get_last_results_str()
     else:
         with RemoteExecutor(group.cluster) as exe:
-            for node in group.get_ordered_members_list(provide_node_configs=True):
+            for node in group.get_ordered_members_configs_list():
                 package_associations = _get_associations_for_node(node)
                 packages.install(node["connection"], include=package_associations['package_name'])
 
@@ -150,7 +150,7 @@ def install(group: NodeGroup):
     return installation_result
 
 
-def uninstall(group):
+def uninstall(group: NodeGroup):
     return packages.remove(group, include=['haproxy', 'rh-haproxy18'])
 
 
@@ -158,7 +158,7 @@ def restart(group: NodeGroup):
     cluster = group.cluster
     cluster.log.debug("Restarting haproxy in all group...")
     with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.restart_service(node['connection'], name=service_name)
 
@@ -166,16 +166,16 @@ def restart(group: NodeGroup):
     time.sleep(static.GLOBALS['haproxy']['restart_wait'])
 
 
-def disable(group):
+def disable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.disable_service(node['connection'], name=service_name)
 
 
-def enable(group):
+def enable(group: NodeGroup):
     with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+        for node in group.get_ordered_members_configs_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.enable_service(node['connection'], name=service_name,
                                   now=True)
@@ -202,10 +202,10 @@ def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance
 
 
 def configure(group: NodeGroup):
-    cluster = group.cluster
-    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_list(provide_node_configs=True)
+    cluster: KubernetesCluster = group.cluster
+    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_configs_list()
 
-    for node in group.get_ordered_members_list(provide_node_configs=True):
+    for node in group.get_ordered_members_configs_list():
         package_associations = _get_associations_for_node(node)
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 

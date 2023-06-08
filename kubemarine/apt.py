@@ -22,11 +22,11 @@ from kubemarine.core.group import NodeGroupResult, NodeGroup
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
 
 
-def ls_repofiles(group, **kwargs) -> NodeGroupResult:
+def ls_repofiles(group: NodeGroup, **kwargs) -> NodeGroupResult:
     return group.sudo('ls -la /etc/apt/sources.list.d', **kwargs)
 
 
-def backup_repo(group, repo_filename="*", **kwargs) -> NodeGroupResult or None:
+def backup_repo(group: NodeGroup, repo_filename="*", **kwargs) -> NodeGroupResult or None:
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
@@ -36,7 +36,7 @@ def backup_repo(group, repo_filename="*", **kwargs) -> NodeGroupResult or None:
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % ("/etc/apt/", repo_filename), **kwargs)
 
 
-def add_repo(group, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
+def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
     return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update', **kwargs)
 
@@ -45,7 +45,7 @@ def get_repo_file_name(repo_filename="predefined"):
     return '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename)
 
 
-def create_repo_file(group, repo_data, repo_file):
+def create_repo_file(group: NodeGroup, repo_data, repo_file):
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
@@ -54,7 +54,7 @@ def create_repo_file(group, repo_data, repo_file):
     group.put(io.StringIO(repo_data_str), repo_file, sudo=True)
 
 
-def clean(group, **kwargs) -> NodeGroupResult:
+def clean(group: NodeGroup, **kwargs) -> NodeGroupResult:
     return group.sudo(DEBIAN_HEADERS + "apt clean", **kwargs)
 
 
@@ -72,7 +72,7 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
     return command
 
 
-def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+def install(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to install')
 
@@ -83,7 +83,7 @@ def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     # thus we do not need additional checks here (in contrast to yum)
 
 
-def remove(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+def remove(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -99,7 +99,7 @@ def remove(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     return group.sudo(command, **kwargs)
 
 
-def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
+def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 

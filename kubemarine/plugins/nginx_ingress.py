@@ -23,20 +23,21 @@ from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
 def check_job_for_nginx(cluster: KubernetesCluster):
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
     version = cluster.inventory['plugins']['nginx-ingress-controller']['version'].replace('v', '.').split('.')
 
     major_version = int(version[1])
     minor_version = int(version[2])
 
-    check_jobs = first_control_plane['connection'].sudo(f"kubectl get jobs -n ingress-nginx")
+    check_jobs = first_control_plane.sudo(f"kubectl get jobs -n ingress-nginx")
     if list(check_jobs.values())[0].stderr == "" and major_version >= 1 and minor_version >= 4:
         cluster.log.debug('Delete old jobs for nginx')
-        first_control_plane['connection'].sudo(f"sudo kubectl delete job --all -n ingress-nginx", is_async=False)
+        first_control_plane.sudo(f"sudo kubectl delete job --all -n ingress-nginx", is_async=False)
     else:
         cluster.log.debug('There are no jobs to delete')
 
-def enrich_inventory(inventory, _):
+
+def enrich_inventory(inventory: dict, _):
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
@@ -49,7 +50,7 @@ def enrich_inventory(inventory, _):
     return inventory
 
 
-def cert_renew_enrichment(inventory, cluster):
+def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster):
     # check that renewal is required for nginx
     if cluster.context.get('initial_procedure') != 'cert_renew' \
             or not cluster.procedure_inventory.get("nginx-ingress-controller"):
@@ -67,7 +68,7 @@ def cert_renew_enrichment(inventory, cluster):
     return inventory
 
 
-def finalize_inventory(cluster, inventory_to_finalize):
+def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     # check that renewal is required for nginx
     if cluster.context.get('initial_procedure') != 'cert_renew' \
             or not cluster.procedure_inventory.get("nginx-ingress-controller"):
@@ -88,7 +89,7 @@ def finalize_inventory(cluster, inventory_to_finalize):
     return inventory_to_finalize
 
 
-def manage_custom_certificate(cluster):
+def manage_custom_certificate(cluster: KubernetesCluster):
     if not cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"].get("default-certificate"):
         cluster.log.debug("No custom default ingress certificate specified, skipping...")
         return
@@ -144,7 +145,7 @@ def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path, key_pat
         raise Exception("Custom default ingress certificate and key are not compatible!")
 
 
-def create_tls_secret(first_control_plane, crt_path, key_path, name, namespace):
+def create_tls_secret(first_control_plane: NodeGroup, crt_path, key_path, name, namespace):
     first_control_plane.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
                       f"--dry-run -o yaml | sudo kubectl apply -f -", timeout=300)
 

@@ -110,7 +110,7 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_registry(inventory, cluster):
+def apply_registry(inventory: dict, cluster: KubernetesCluster):
 
     if not inventory.get('registry'):
         cluster.log.verbose('Unified registry is not used')
@@ -122,7 +122,7 @@ def apply_registry(inventory, cluster):
 
     # registry contains either 'endpoints' or 'address' that is validated by JSON schema.
     if inventory['registry'].get('endpoints'):
-        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory, cluster)
+        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory)
     else:
         if inventory['registry'].get('docker_port'):
             registry_mirror_address = "%s:%s" % (inventory['registry']['address'], inventory['registry']['docker_port'])
@@ -218,7 +218,7 @@ def apply_registry(inventory, cluster):
     return inventory
 
 
-def apply_registry_endpoints(inventory, cluster):
+def apply_registry_endpoints(inventory: dict):
 
     if not inventory['registry'].get('mirror_registry'):
         inventory['registry']['mirror_registry'] = 'registry.cluster.local'
@@ -335,7 +335,7 @@ def recursive_apply_defaults(defaults, section):
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
 
-def calculate_node_names(inventory: dict, cluster):
+def calculate_node_names(inventory: dict, _):
     roles_iterators = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
@@ -363,7 +363,7 @@ def calculate_node_names(inventory: dict, cluster):
     return inventory
 
 
-def verify_node_names(inventory, cluster):
+def verify_node_names(inventory: dict, _):
     known_names = []
     for i, node in enumerate(inventory['nodes']):
         node_name = node['name']
@@ -376,7 +376,7 @@ def verify_node_names(inventory, cluster):
     return inventory
 
 
-def calculate_nodegroups(inventory, cluster):
+def calculate_nodegroups(inventory: dict, cluster: KubernetesCluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
     return inventory
@@ -521,7 +521,7 @@ def prepare_for_dump(inventory, copy=True):
     return dump_inventory
 
 
-def manage_true_false_values(inventory, cluster):
+def manage_true_false_values(inventory: dict, _):
     # Check undefined values for plugin.name.install and convert it to bool
     for plugin_name, plugin_item in inventory["plugins"].items():
         # Check install value

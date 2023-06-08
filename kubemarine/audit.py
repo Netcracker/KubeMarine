@@ -96,15 +96,14 @@ def apply_audit_rules(group: NodeGroup) -> NodeGroupResult:
 
     restart_tokens = []
     with RemoteExecutor(cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            the_node: NodeGroup = node['connection']
-            host: str = node['connect_to']
+        for node in group.get_ordered_members_list():
+            host = node.get_host()
 
             rules_config_location = cluster.get_package_association_for_node(host, 'audit', 'config_location')
-            the_node.put(io.StringIO(rules_content), rules_config_location,
-                         sudo=True, backup=True)
+            node.put(io.StringIO(rules_content), rules_config_location,
+                     sudo=True, backup=True)
 
             service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
-            restart_tokens.append(the_node.sudo(f'service {service_name} restart'))
+            restart_tokens.append(node.sudo(f'service {service_name} restart'))
 
     return exe.get_merged_nodegroup_results(restart_tokens)

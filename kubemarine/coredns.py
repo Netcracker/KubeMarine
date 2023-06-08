@@ -19,6 +19,9 @@ from kubemarine.core import utils
 
 import io
 
+from kubemarine.core.cluster import KubernetesCluster
+
+
 def proceed_section_keyvalue(data, tabsize):
     tab = " "*tabsize
     config = ''
@@ -112,7 +115,7 @@ def generate_nested_sections(type, data, tabsize):
     return config
 
 
-def generate_configmap(inventory):
+def generate_configmap(inventory: dict) -> str:
     # coredns.configmap.Hosts must exist even if it's empty
     if not inventory['services']['coredns']['configmap'].get('Hosts'):
         # Hosts must exist even if it's empty
@@ -143,7 +146,7 @@ data:'''
     return config + '\n'
 
 
-def apply_configmap(cluster, config):
+def apply_configmap(cluster: KubernetesCluster, config: str):
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
@@ -154,7 +157,7 @@ def apply_configmap(cluster, config):
              'sudo kubectl rollout restart -n kube-system deployment/coredns')
 
 
-def apply_patch(cluster):
+def apply_patch(cluster: KubernetesCluster):
     apply_command = ''
 
     for config_type in ['deployment']:

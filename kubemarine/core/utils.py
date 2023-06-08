@@ -75,6 +75,8 @@ def prepare_dump_directory(location, reset_directory=True):
 
 
 def make_ansible_inventory(location, cluster):
+    from kubemarine.core.cluster import KubernetesCluster
+    cluster: KubernetesCluster
 
     inventory = get_final_inventory(cluster)
     roles = []
@@ -95,7 +97,7 @@ def make_ansible_inventory(location, cluster):
     for role in roles:
         config[role] = []
         config['cluster:children'].append(role)
-        for node in cluster.nodes[role].get_final_nodes().get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.nodes[role].get_final_nodes().get_ordered_members_configs_list():
             record = "%s ansible_host=%s ansible_ssh_user=%s ansible_ssh_private_key_file=%s ip=%s" % \
                      (node['name'],
                       node['connect_to'],
@@ -160,6 +162,9 @@ def get_current_timestamp_formatted():
 
 
 def get_final_inventory(cluster, initial_inventory=None):
+    from kubemarine.core.cluster import KubernetesCluster
+    cluster: KubernetesCluster
+
     if initial_inventory is None:
         inventory = deepcopy(cluster.inventory)
     else:
@@ -232,6 +237,9 @@ def get_dump_filepath(context, filename):
 
 
 def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False, is_async=True):
+    from kubemarine.core.group import NodeGroup
+    group: NodeGroup
+
     log = group.cluster.log
 
     while retries > 0:
@@ -563,7 +571,7 @@ class ClusterStorage:
         archive_remote_path = f"/tmp/{archive_name}"
         log = self.cluster.log
 
-        node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member(provide_node_configs=True)
+        node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member_config()
         control_plane = self.cluster.make_group([node['connect_to']])
         data_copy_res = control_plane.sudo(f'tar -czvf {archive_remote_path} {self.dir_path}')
         log.verbose("Archive with procedures history is created:\n%s" % data_copy_res)
@@ -571,7 +579,7 @@ class ClusterStorage:
 
         log.debug("Archive with procedures history is downloaded")
 
-        for new_node in new_control_planes.get_ordered_members_list(provide_node_configs=True):
+        for new_node in new_control_planes.get_ordered_members_configs_list():
             group = self.cluster.make_group([new_node['connect_to']])
             group.put(archive_dump_path, archive_remote_path, sudo=True)
             group.sudo(f'tar -C / -xzvf {archive_remote_path}')

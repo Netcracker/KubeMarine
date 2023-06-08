@@ -371,7 +371,7 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
     return common_group.sudo(remote_commands)
 
 
-def install_all_thirparties(group):
+def install_all_thirparties(group: NodeGroup):
     cluster = group.cluster
     log = cluster.log
 

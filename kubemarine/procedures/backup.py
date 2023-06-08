@@ -65,7 +65,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
     return backup_files_list
 
 
-def prepare_backup_tmpdir(cluster):
+def prepare_backup_tmpdir(cluster: KubernetesCluster):
     backup_directory = cluster.context.get('backup_tmpdir')
     if not backup_directory:
         cluster.log.verbose('Backup directory is not ready yet, preparing..')
@@ -76,13 +76,13 @@ def prepare_backup_tmpdir(cluster):
     return backup_directory
 
 
-def verify_backup_location(cluster):
+def verify_backup_location(cluster: KubernetesCluster):
     target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         raise FileNotFoundError('Backup location directory not exists')
 
 
-def export_ansible_inventory(cluster):
+def export_ansible_inventory(cluster: KubernetesCluster):
     backup_directory = prepare_backup_tmpdir(cluster)
     shutil.copyfile(cluster.context['execution_arguments']['ansible_inventory_location'],
                     os.path.join(backup_directory, 'ansible-inventory.ini'))
@@ -100,7 +100,7 @@ def export_packages_list(cluster: KubernetesCluster):
         cluster.context['backup_descriptor']['nodes']['packages'][conn.host] = result.stdout.strip().split('\n')
 
 
-def export_hostname(cluster):
+def export_hostname(cluster: KubernetesCluster):
     cluster.context['backup_descriptor']['nodes']['hostnames'] = {}
     results = cluster.nodes['all'].sudo('hostnamectl status | head -n 1 | sed -e \'s/[a-zA-Z ]*://g\'')
     cluster.log.verbose(results)
@@ -108,7 +108,7 @@ def export_hostname(cluster):
         cluster.context['backup_descriptor']['nodes']['hostnames'][conn.host] = result.stdout.strip()
 
 
-def export_cluster_yaml(cluster):
+def export_cluster_yaml(cluster: KubernetesCluster):
     backup_directory = prepare_backup_tmpdir(cluster)
     shutil.copyfile(utils.get_dump_filepath(cluster.context, 'cluster.yaml'),
                     os.path.join(backup_directory, 'cluster.yaml'))
@@ -117,7 +117,7 @@ def export_cluster_yaml(cluster):
     cluster.log.verbose('cluster.yaml exported to backup')
 
 
-def export_nodes(cluster):
+def export_nodes(cluster: KubernetesCluster):
     backup_directory = prepare_backup_tmpdir(cluster)
     backup_nodes_data_dir = os.path.join(backup_directory, 'nodes_data')
     os.mkdir(backup_nodes_data_dir)
@@ -141,10 +141,10 @@ def export_nodes(cluster):
     cluster.log.debug('Backup created:\n%s' % data_copy_res)
 
     cluster.log.debug('Downloading nodes backups:')
-    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-        node['connection'].get('/tmp/kubemarine-backup.tar.gz',
-                               os.path.join(backup_nodes_data_dir, '%s.tar.gz' % node['name']))
-        cluster.log.debug('Backup \'%s\' downloaded' % node['name'])
+    for node in cluster.nodes['all'].get_ordered_members_list():
+        node.get('/tmp/kubemarine-backup.tar.gz',
+                 os.path.join(backup_nodes_data_dir, '%s.tar.gz' % node.get_node_name()))
+        cluster.log.debug('Backup \'%s\' downloaded' % node.get_node_name())
 
     cluster.log.verbose('Deleting backup file from nodes...')
     cluster.nodes['all'].sudo('rm -f /tmp/kubemarine-backup.tar.gz')
@@ -166,7 +166,7 @@ def export_etcd(cluster: KubernetesCluster):
         for item in etcd_status:
             # get rid of https:// and :2379
             address = item['endpoint'].split('//')[1].split(':')[0]
-            node_name = cluster.nodes['all'].get_first_member(apply_filter={"internal_address": address}, provide_node_configs=True)['name']
+            node_name = cluster.nodes['all'].get_first_member(apply_filter={"internal_address": address}).get_node_name()
             parsed_etcd_status[node_name] = item
         cluster.context['backup_descriptor']['etcd']['status'] = parsed_etcd_status
     except Exception:
@@ -191,7 +191,7 @@ def export_etcd(cluster: KubernetesCluster):
             raise Exception('Failed to detect ETCD leader - not possible to create backup from actual DB')
 
     snap_name = 'snapshot%s.db' % int(round(time.time() * 1000))
-    endpoint_ip = etcd_node.get_ordered_members_list(provide_node_configs=True)[0]["internal_address"]
+    endpoint_ip = etcd_node.get_ordered_members_configs_list()[0]["internal_address"]
     cluster.log.debug('Creating ETCD backup "%s"...' % snap_name)
     result = etcd_node.sudo(f'etcdctl snapshot save /var/lib/etcd/{snap_name} --endpoints=https://{endpoint_ip}:2379 '
                             f'&& sudo mv /var/lib/etcd/{snap_name} /tmp/{snap_name} '
@@ -204,21 +204,21 @@ def export_etcd(cluster: KubernetesCluster):
     etcd_node.sudo('rm -f /tmp/%s' % snap_name)
 
 
-def select_etcd_node(cluster):
+def select_etcd_node(cluster: KubernetesCluster):
     custom_etcd_node = cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('source_node')
 
     if custom_etcd_node:
-        etcd_node = cluster.nodes['all'].get_member_by_name(custom_etcd_node)
-        if etcd_node is None:
+        if not cluster.nodes['all'].has_node(custom_etcd_node):
             raise Exception('Unknown ETCD node selected as source')
+        etcd_node = cluster.nodes['all'].get_member_by_name(custom_etcd_node)
         return etcd_node, True
     else:
         return cluster.nodes['control-plane'].get_any_member(), False
 
 
-def retrieve_etcd_image(cluster, etcd_node):
+def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup):
     # TODO: Detect ETCD version via /etc/kubernetes/manifests/etcd.yaml config if presented, otherwise use containers
-    node_name = etcd_node.get_nodes_names()[0]
+    node_name = etcd_node.get_node_name()
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
         cont_inspect = "docker inspect $(sudo docker ps -a | grep etcd-%s | awk '{print $1; exit}')" % node_name
         etcd_container_json = json.loads(list(etcd_node.sudo(cont_inspect).values())[0].stdout)[0]
@@ -289,7 +289,7 @@ def download_resources(log, resources, location, control_plane: NodeGroup, names
     return actual_resources
 
 
-def export_kubernetes(cluster):
+def export_kubernetes(cluster: KubernetesCluster):
     backup_directory = prepare_backup_tmpdir(cluster)
     control_plane = cluster.nodes['control-plane'].get_any_member()
 
@@ -381,7 +381,7 @@ def export_kubernetes(cluster):
         cluster.context['backup_descriptor']['kubernetes']['resources']['nonnamespaced'] = nonnamespaced_resources_list
 
 
-def make_descriptor(cluster):
+def make_descriptor(cluster: KubernetesCluster):
     backup_directory = prepare_backup_tmpdir(cluster)
 
     cluster.context['backup_descriptor']['kubernetes']['thirdparties'] = cluster.inventory['services']['thirdparties']
@@ -391,7 +391,7 @@ def make_descriptor(cluster):
         output.write(yaml.dump(cluster.context['backup_descriptor']))
 
 
-def pack_data(cluster):
+def pack_data(cluster: KubernetesCluster):
     cluster_name = cluster.inventory['cluster_name']
     backup_directory = prepare_backup_tmpdir(cluster)
 

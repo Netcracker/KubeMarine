@@ -18,12 +18,13 @@ from collections import OrderedDict
 
 from kubemarine.core import flow
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 from kubemarine import system
 
 
-def reboot(cluster):
+def reboot(cluster: KubernetesCluster):
     if cluster.context.get('initial_procedure') != 'reboot':
         raise ImportError('Invalid reboot.py usage, please use system.reboot_nodes')
 
@@ -35,7 +36,7 @@ def reboot(cluster):
     nodes = []
 
     cluster.log.verbose('The following nodes will be rebooted:')
-    for node in cluster.procedure_inventory.get("nodes", cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True)):
+    for node in cluster.procedure_inventory.get("nodes", cluster.nodes['all'].get_ordered_members_configs_list()):
         nodes.append(node['name'])
         cluster.log.verbose('  - ' + node['name'])
 

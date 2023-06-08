@@ -21,7 +21,7 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import Callable, Dict, List, Union, IO
+from typing import Callable, Dict, List, Union, IO, Any, Optional
 
 import fabric
 import invoke
@@ -30,6 +30,9 @@ from invoke import UnexpectedExit
 from kubemarine.core import utils, log
 from kubemarine.core.connections import Connections
 from kubemarine.core.executor import RemoteExecutor
+
+NodeConfig = Dict[str, Any]
+GroupFilter = Union[Callable[[NodeConfig], bool], NodeConfig]
 
 _GenericResult = Union[Exception, fabric.runners.Result, fabric.transfer.Result]
 _HostToResult = Dict[str, _GenericResult]
@@ -308,7 +311,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return not self == other
 
 
-def _handle_internal_logging(fn: callable) -> callable:
+def _handle_internal_logging(fn: Callable) -> Callable[..., Union[NodeGroupResult, int]]:
     """
     Method is a decorator that handles internal streaming of output (hide=False) of fabric (invoke).
     Note! This decorator should be the outermost.
@@ -725,7 +728,7 @@ class NodeGroup:
 
         class NoPasswdResponder(invoke.Responder):
             def __init__(self):
-                super().__init__(re.escape(prompt), None)
+                super().__init__(re.escape(prompt), "")
 
             def submit(self, stream):
                 if self.pattern_matches(stream, self.pattern, "index"):
@@ -779,11 +782,11 @@ class NodeGroup:
         return {host: result.stdout.split("= ")[1].strip() if result.stdout else None
                 for host, result in results.items()}
 
-    def get_ordered_members_list(self, provide_node_configs=False, apply_filter=None) \
-            -> List[Union[dict, 'NodeGroup']]:
+    def get_ordered_members_list(self, apply_filter: GroupFilter = None) -> List[NodeGroup]:
+        nodes = self.get_ordered_members_configs_list(apply_filter)
+        return [node['connection'] for node in nodes]
 
-        if apply_filter is None:
-            apply_filter = {}
+    def get_ordered_members_configs_list(self, apply_filter: GroupFilter = None) -> List[NodeConfig]:
 
         result = []
         # we have to iterate strictly in order which was defined by user in config-file
@@ -801,7 +804,7 @@ class NodeGroup:
                         # here intentionally there is no way to filter by values in lists field,
                         # for this you need to use custom functions.
                         # Current solution implemented in this way because the filtering strategy is
-                        # unclear - do I need to include when everything matches or is partial partial matching enough?
+                        # unclear - do I need to include when everything matches or is partial matching enough?
                         for key, value in apply_filter.items():
                             if node.get(key) is None:
                                 suitable = False
@@ -817,60 +820,48 @@ class NodeGroup:
 
                 # if not filtered
                 if suitable:
-                    if provide_node_configs:
-                        result.append(node)
-                    else:
-                        result.append(node['connection'])
+                    result.append(node)
 
         return result
 
-    def get_member(self, number, provide_node_configs=False, apply_filter=None):
-        results = self.get_ordered_members_list(provide_node_configs=provide_node_configs, apply_filter=apply_filter)
+    def get_first_member(self, apply_filter: GroupFilter = None) -> NodeGroup:
+        return self.get_first_member_config(apply_filter=apply_filter)['connection']
 
+    def get_first_member_config(self, apply_filter: GroupFilter = None) -> NodeConfig:
+        results = self.get_ordered_members_configs_list(apply_filter=apply_filter)
         if not results:
-            return None
+            raise Exception("Failed to find first group member by the given criteria")
+        return results[0]
 
-        return results[number]
-
-    def get_first_member(self, provide_node_configs=False, apply_filter=None):
-        return self.get_member(0, provide_node_configs=provide_node_configs, apply_filter=apply_filter)
-
-    def get_last_member(self, provide_node_configs=False, apply_filter=None):
-        return self.get_member(-1, provide_node_configs=provide_node_configs, apply_filter=apply_filter)
-
-    def get_any_member(self, provide_node_configs=False, apply_filter=None):
-        member = random.choice(self.get_ordered_members_list(provide_node_configs=provide_node_configs,
-                                                             apply_filter=apply_filter))
-        if isinstance(member, NodeGroup):
-            # to avoid "Selected node <kubemarine.core.group.NodeGroup object at 0x7f925625d070>" writing to log,
-            # let's get node ip from selected member and pass to it to log
-            member_str = str(list(member.nodes.keys())[0])
-        else:
-            member_str = str(member)
+    def get_any_member(self, apply_filter: GroupFilter = None) -> NodeGroup:
+        member = random.choice(self.get_ordered_members_list(apply_filter=apply_filter))
+        # to avoid "Selected node <kubemarine.core.group.NodeGroup object at 0x7f925625d070>" writing to log,
+        # let's get node ip from selected member and pass to it to log
+        member_str = str(list(member.nodes.keys())[0])
         self.cluster.log.verbose(f'Selected node {member_str}')
         return member
 
-    def get_member_by_name(self, name, provide_node_configs=False):
-        return self.get_first_member(provide_node_configs=provide_node_configs, apply_filter={"name": name})
+    def get_member_by_name(self, name) -> NodeGroup:
+        return self.get_first_member(apply_filter={"name": name})
 
-    def new_group(self, apply_filter=None):
+    def new_group(self, apply_filter: GroupFilter = None) -> NodeGroup:
         return self.cluster.make_group(self.get_ordered_members_list(apply_filter=apply_filter))
 
-    def include_group(self, group):
+    def include_group(self, group: NodeGroup) -> NodeGroup:
         if group is None:
             return self
 
         ips = list(self.nodes.keys()) + list(group.nodes.keys())
         return self.cluster.make_group(list(dict.fromkeys(ips)))
 
-    def exclude_group(self, group):
+    def exclude_group(self, group: NodeGroup) -> NodeGroup:
         if group is None:
             return self
 
         ips = list(set(self.nodes.keys()) - set(group.nodes.keys()))
         return self.cluster.make_group(list(dict.fromkeys(ips)))
 
-    def intersection_group(self, group):
+    def intersection_group(self, group: NodeGroup) -> NodeGroup:
         if group is None:
             return self.cluster.make_group([])
 
@@ -886,7 +877,7 @@ class NodeGroup:
 
     def get_nodes_names(self) -> List[str]:
         result = []
-        members = self.get_ordered_members_list(provide_node_configs=True)
+        members = self.get_ordered_members_configs_list()
         for node in members:
             result.append(node['name'])
         return result
@@ -895,23 +886,23 @@ class NodeGroup:
         if len(self.nodes) != 1:
             raise Exception("Cannot get the only name from not a single node")
 
-        return self.get_first_member(provide_node_configs=True)['name']
+        return self.get_nodes_names()[0]
 
     def get_hosts(self) -> List[str]:
-        members = self.get_ordered_members_list(provide_node_configs=True)
-        return [node['connect_to'] for node in members]
+        members = self.get_ordered_members_list()
+        return [node.get_host() for node in members]
 
-    def get_host(self):
+    def get_host(self) -> str:
         if len(self.nodes) != 1:
             raise Exception("Cannot get the only host from not a single node")
 
-        return list(self.nodes.keys())[0]
+        return next(iter(self.nodes.keys()))
 
     def is_empty(self) -> bool:
         return not self.nodes
 
-    def has_node(self, node_name):
-        return self.get_first_member(apply_filter={"name": node_name}) is not None
+    def has_node(self, node_name: str) -> bool:
+        return node_name in self.get_nodes_names()
 
     def get_new_nodes(self) -> NodeGroup:
         return self.intersection_group(self.cluster.nodes.get('add_node'))
@@ -974,7 +965,7 @@ class NodeGroup:
         if os_family not in ['debian', 'rhel', 'rhel8']:
             raise Exception('Unsupported OS family provided')
         node_names = []
-        for node in self.get_ordered_members_list(provide_node_configs=True):
+        for node in self.get_ordered_members_configs_list():
             node_os_family = self.cluster.get_os_family_for_node(node['connect_to'])
             if node_os_family == os_family:
                 node_names.append(node['name'])

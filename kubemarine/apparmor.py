@@ -15,9 +15,10 @@
 import json
 
 from kubemarine import system
+from kubemarine.core.group import NodeGroup
 
 
-def get_status(group):
+def get_status(group: NodeGroup):
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")
     parsed_result = {}
@@ -53,7 +54,7 @@ def print_status(log, parsed_result):
     log.verbose(res)
 
 
-def is_state_valid(group, expected_profiles):
+def is_state_valid(group: NodeGroup, expected_profiles: dict):
     log = group.cluster.log
 
     log.verbose('Verifying Apparmor modes...')
@@ -94,7 +95,7 @@ def convert_profile(profile):
     return profile
 
 
-def configure_apparmor(group, expected_profiles):
+def configure_apparmor(group: NodeGroup, expected_profiles: dict):
     cmd = ''
     for profile in expected_profiles.get('enforce', []):
         profile = convert_profile(profile)
@@ -109,7 +110,7 @@ def configure_apparmor(group, expected_profiles):
     return group.sudo(cmd)
 
 
-def setup_apparmor(group):
+def setup_apparmor(group: NodeGroup):
     log = group.cluster.log
 
     if group.get_nodes_os() != 'debian':
