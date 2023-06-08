@@ -574,12 +574,7 @@ def apply_expect(cluster, config, plugin_name=None):
 
 # **** PYTHON ****
 
-def verify_python(cluster, step):
-    module_path, _ = utils.determine_resource_absolute_file(step['module'])
-    method_name = step['method']
-    method_arguments = step.get('arguments', {})
-
-    # Try to import the module
+def get_python_method_args(cluster, module_path, method_name, method_arguments):
     try:
         spec = importlib.util.spec_from_file_location('module', module_path)
         module = importlib.util.module_from_spec(spec)
@@ -587,21 +582,28 @@ def verify_python(cluster, step):
     except Exception as e:
         raise ValueError(f"Could not import module {module_path}: {e}")
 
-    # Check if the method exists
     if not hasattr(module, method_name):
         raise ValueError(f"Module {module_path} does not have method {method_name}")
 
-    # Get the method object
     method = getattr(module, method_name)
+    method_signature = inspect.signature(method)
 
-    # Get the signature of the method
-    signature = inspect.signature(method)
-
-    # Check if the passed arguments match the signature
     try:
-        signature.bind(cluster=cluster, **method_arguments)
+        method_signature.bind(cluster=cluster, **method_arguments)
     except TypeError as e:
         raise ValueError(f"Invalid arguments for method {method_name}: {e}")
+
+    return method, method_arguments
+
+
+def verify_python(cluster, step):
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
+    method_name = step['method']
+    method_arguments = step.get('arguments', {})
+
+    method, method_arguments = get_python_method_args(cluster, module_path, method_name, method_arguments)
+
+    # Perform any additional verification if needed
 
 
 def apply_python(cluster, step, plugin_name=None):
@@ -609,12 +611,10 @@ def apply_python(cluster, step, plugin_name=None):
     method_name = step['method']
     method_arguments = step.get('arguments', {})
 
+    method, method_arguments = get_python_method_args(cluster, module_path, method_name, method_arguments)
+
     cluster.log.debug("Running method %s from %s module..." % (method_name, module_path))
-    module_filename = os.path.basename(module_path)
-    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    getattr(module, method_name)(cluster, **method_arguments)
+    method(cluster, **method_arguments) 
 
 
 # **** THIRDPARTIES ****
