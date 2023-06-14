@@ -20,6 +20,7 @@ from kubemarine.core import utils
 import io
 
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import RunnersGroupResult
 
 
 def proceed_section_keyvalue(data, tabsize):
@@ -146,7 +147,7 @@ data:'''
     return config + '\n'
 
 
-def apply_configmap(cluster: KubernetesCluster, config: str):
+def apply_configmap(cluster: KubernetesCluster, config: str) -> RunnersGroupResult:
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
@@ -157,7 +158,7 @@ def apply_configmap(cluster: KubernetesCluster, config: str):
              'sudo kubectl rollout restart -n kube-system deployment/coredns')
 
 
-def apply_patch(cluster: KubernetesCluster):
+def apply_patch(cluster: KubernetesCluster) -> RunnersGroupResult:
     apply_command = ''
 
     for config_type in ['deployment']:

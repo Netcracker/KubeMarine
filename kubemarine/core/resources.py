@@ -37,11 +37,11 @@ class DynamicResources:
 
         self._silent = silent
         self._logger: Optional[log.EnhancedLogger] = None
-        self._raw_inventory = None
-        self._formatted_inventory = None
-        self._procedure_inventory = None
+        self._raw_inventory: Optional[dict] = None
+        self._formatted_inventory: Optional[dict] = None
+        self._procedure_inventory: Optional[dict] = None
 
-        self._nodes_context = None
+        self._nodes_context: Optional[dict] = None
         """
         The nodes_context variable should hold node specific information that is not changed during Kubemarine run.
         The variable should be initialized on demand and only once.
@@ -50,8 +50,8 @@ class DynamicResources:
         self._cluster: Optional[c.KubernetesCluster] = None
 
         args: dict = context['execution_arguments']
-        self.inventory_filepath = args['config']
-        self.procedure_inventory_filepath = args.get('procedure_config')
+        self.inventory_filepath: Optional[str] = args['config']
+        self.procedure_inventory_filepath: Optional[str] = args.get('procedure_config')
 
     def logger_if_initialized(self):
         return self._logger
@@ -83,6 +83,8 @@ class DynamicResources:
         return self._procedure_inventory
 
     def _load_inventory(self):
+        if not self.inventory_filepath:
+            raise Exception("Path to inventory is not defined")
         logger = self._logger
         if not self._silent:
             msg = "Loading inventory file '%s'" % self.inventory_filepath
@@ -120,6 +122,8 @@ class DynamicResources:
         self._cluster = None
 
     def _store_inventory(self):
+        if not self.inventory_filepath:
+            raise Exception("Path to inventory is not defined")
         # replace initial inventory file with changed inventory
         with utils.open_external(self.inventory_filepath, "w+") as stream:
             utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)

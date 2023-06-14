@@ -126,7 +126,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         self.assertIsNotNone(self.cluster.nodes.get('keepalived'))
 
         balancer_1_ip = self.cluster.nodes['all'].get_member_by_name('balancer-1').get_host()
-        self.assertIn(balancer_1_ip, list(self.cluster.nodes['keepalived'].nodes.keys()))
+        self.assertIn(balancer_1_ip, self.cluster.nodes['keepalived'].get_hosts())
 
     def test_vrrp_defined_no_hosts_and_balancers(self):
         # vrrp_ip defined, but hosts for it is not defined + no balancers to auto determine -> then raise exception
@@ -189,7 +189,6 @@ class TestKeepalivedInstallation(unittest.TestCase):
         actual_result = keepalived.install(cluster.nodes['keepalived'])
 
         # verify installation result should be the same as simulated and contain version print stdout
-        expected_results_1 = cluster.nodes["all"]._make_result(expected_results_1)
         self.assertEqual(expected_results_1, actual_result)
 
     def test_keepalived_installation_when_not_installed(self):
@@ -237,7 +236,6 @@ class TestKeepalivedInstallation(unittest.TestCase):
         actual_result = keepalived.install(cluster.nodes['keepalived'])
 
         # verify installation result should be the same as simulated and contain version print stdout
-        expected_results = cluster.nodes["all"]._make_result(expected_results)
         self.assertEqual(expected_results, actual_result)
 
 
@@ -254,8 +252,8 @@ class TestKeepalivedConfigApply(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        node = cluster.nodes['keepalived'].get_first_member_config()
-        expected_config = keepalived.generate_config(cluster.inventory, node)
+        node = cluster.nodes['keepalived'].get_first_member()
+        expected_config = keepalived.generate_config(cluster.inventory, node.get_config())
 
         package_associations = cluster.inventory['services']['packages']['associations']['rhel']['keepalived']
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
@@ -278,11 +276,10 @@ class TestKeepalivedConfigApply(unittest.TestCase):
 
         actual_result = keepalived.configure(cluster.nodes['keepalived'])
 
-        expected_result = cluster.nodes["all"]._make_result(simulated_result)
-        self.assertEqual(expected_result, actual_result)
+        self.assertEqual(simulated_result, actual_result)
 
         # read placed data in FakeFS
-        actual_config = cluster.fake_fs.read(node['connect_to'], package_associations['config_location'])
+        actual_config = cluster.fake_fs.read(node.get_host(), package_associations['config_location'])
 
         self.assertEqual(expected_config, actual_config)
 

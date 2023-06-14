@@ -17,7 +17,7 @@ from typing import Tuple, Optional, Dict, List
 
 from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -267,7 +267,7 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     return inventory
 
 
-def get_install_group(cluster: KubernetesCluster, config: dict):
+def get_install_group(cluster: KubernetesCluster, config: dict) -> NodeGroup:
     return cluster.create_group_from_groups_nodes_names(
         config.get('groups', []), config.get('nodes', []))
 
@@ -287,7 +287,7 @@ def get_group_require_unzip(cluster: KubernetesCluster, inventory: dict) -> Node
     return group
 
 
-def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupResult or None:
+def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[RunnersGroupResult]:
     cluster = filter_group.cluster
     config = cluster.inventory['services'].get('thirdparties', {}).get(destination)
 
@@ -371,8 +371,8 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
     return common_group.sudo(remote_commands)
 
 
-def install_all_thirparties(group: NodeGroup):
-    cluster = group.cluster
+def install_all_thirparties(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     if not cluster.inventory['services'].get('thirdparties', {}):

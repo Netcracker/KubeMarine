@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler
 
 from copy import deepcopy
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
@@ -296,9 +296,8 @@ class Log:
 
 
 class LoggerWriter:
-    def __init__(self, logger: EnhancedLogger, level, caller: dict, prefix: str):
+    def __init__(self, logger: EnhancedLogger, caller: dict, prefix: str) -> None:
         self.logger = logger
-        self.level = level
         self.caller = caller
         self.prefix = prefix
         self.buf = ""
@@ -315,7 +314,7 @@ class LoggerWriter:
             self._log()
 
     def _log(self):
-        self.logger.log(self.level, self.buf, extra={'real_caller': self.caller, 'prefix': self.prefix})
+        self.logger.log(logging.DEBUG, self.buf, extra={'real_caller': self.caller, 'prefix': self.prefix})
         self.buf = ""
 
 
@@ -391,9 +390,12 @@ def init_log_from_context_args(globals, context, raw_inventory) -> Log:
     return log
 
 
-def caller_info(logger: EnhancedLogger) -> dict:
+def caller_info(logger: EnhancedLogger) -> Dict[str, object]:
     """
     Catches and returns invocation metadata of the method that calls caller_info()
+
+    :param logger: EnhancedLogger
+    :return: dictionary with the invocation metadata
     """
     fn, lno, func, sinfo = logger.findCaller()
     record: logging.LogRecord = logger.makeRecord(None, None, fn, lno, "", (), None, func=func, extra=None, sinfo=sinfo)

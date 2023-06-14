@@ -14,10 +14,11 @@
 
 import io
 import re
+from typing import Tuple, Optional, Dict
 
 from kubemarine import system
 from kubemarine.core import utils
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 # Common regexp should support the following schemes:
 # SELinux status:                 enabled
@@ -105,26 +106,26 @@ def parse_selinux_permissive_types(log, stdout):
     return result
 
 
-def get_selinux_status(group: NodeGroup):
+def get_selinux_status(group: NodeGroup) -> Tuple[RunnersGroupResult, Dict[str, dict]]:
     log = group.cluster.log
 
     result = group.sudo("sestatus && sudo semanage permissive -l")
 
     parsed_result = {}
-    for connection, node_result in result.items():
-        log.verbose('Parsing status for %s...' % connection.host)
-        parsed_result[connection] = parse_selinux_status(log, node_result.stdout)
-        parsed_result[connection]['permissive_types'] = parse_selinux_permissive_types(log, node_result.stdout)
+    for host, node_result in result.items():
+        log.verbose('Parsing status for %s...' % host)
+        parsed_result[host] = parse_selinux_status(log, node_result.stdout)
+        parsed_result[host]['permissive_types'] = parse_selinux_permissive_types(log, node_result.stdout)
     log.verbose("Parsed remote sestatus summary:\n%s" % parsed_result)
     return result, parsed_result
 
 
-def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
+def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None) \
+        -> Tuple[bool, RunnersGroupResult, Dict[str, dict]]:
     log = group.cluster.log
 
     if group.get_nodes_os() == 'debian':
-        log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
-        return
+        raise Exception("Selinux is not supported on Ubuntu/Debian os family")
 
     log.verbose('Verifying selinux configs...')
 
@@ -140,7 +141,7 @@ def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
     result, parsed_result = get_selinux_status(group)
     valid = True
 
-    for connection, selinux_status in parsed_result.items():
+    for host, selinux_status in parsed_result.items():
 
         if selinux_status['status'] == 'disabled' and state == 'disabled':
             continue
@@ -152,7 +153,7 @@ def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
                 policy != selinux_status.get('policy_from_file', policy) or \
                 policy != selinux_status.get('policy', policy):
             valid = False
-            log.verbose('Selinux configs are not matched at %s' % connection.host)
+            log.verbose('Selinux configs are not matched at %s' % host)
             break
 
         if permissive:
@@ -160,7 +161,7 @@ def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
                 if permissive_type not in selinux_status['permissive_types']:
                     valid = False
                     log.verbose('Permissive type %s not found in types %s at %s '
-                                % (permissive_type, selinux_status['permissive_types'], connection.host))
+                                % (permissive_type, selinux_status['permissive_types'], host))
                     break
             # if no break was called in previous for loop, then else called and no break will be called in current loop
             else:
@@ -171,13 +172,13 @@ def is_config_valid(group: NodeGroup, state=None, policy=None, permissive=None):
     return valid, result, parsed_result
 
 
-def setup_selinux(group: NodeGroup):
+def setup_selinux(group: NodeGroup) -> Optional[RunnersGroupResult]:
     log = group.cluster.log
 
     # this method handles cluster with multiple os, suppressing should be enabled
     if group.get_nodes_os() not in ['rhel', 'rhel8']:
         log.debug("Skipped - selinux is not supported on Ubuntu/Debian os family")
-        return
+        return None
 
     expected_state = get_expected_state(group.cluster.inventory)
     expected_policy = get_expected_policy(group.cluster.inventory)
@@ -209,3 +210,4 @@ def setup_selinux(group: NodeGroup):
 
     group.cluster.schedule_cumulative_point(system.reboot_nodes)
     group.cluster.schedule_cumulative_point(system.verify_system)
+    return None

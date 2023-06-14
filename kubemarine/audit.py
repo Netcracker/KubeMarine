@@ -18,12 +18,13 @@ Using this module you can install, enable audit and configure audit rules.
 """
 
 import io
+from typing import Optional
 
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -40,13 +41,13 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def install(group: NodeGroup) -> str or None:
+def install(group: NodeGroup) -> Optional[RunnersGroupResult]:
     """
     Automatically installs and enables the audit service for the specified nodes
     :param group: Nodes group on which audit installation should be performed
     :return: String with installation output from nodes or None, when audit installation was skipped
     """
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     log.verbose('Searching for already installed auditd package...')
@@ -64,7 +65,7 @@ def install(group: NodeGroup) -> str or None:
 
     if not not_installed_hosts:
         log.debug('Auditd is already installed on all nodes')
-        return
+        return None
     else:
         log.debug(f'Auditd package is not installed on {not_installed_hosts}, installing...')
 
@@ -78,16 +79,16 @@ def install(group: NodeGroup) -> str or None:
             service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
             system.enable_service(the_node, name=service_name)
 
-    return exe.get_last_results_str()
+    return exe.get_merged_runners_result()
 
 
-def apply_audit_rules(group: NodeGroup) -> NodeGroupResult:
+def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
     """
     Generates and applies audit rules to the group
     :param group: Nodes group, where audit service should be configured
     :return: Service restart result or nothing if audit rules are non exists, or restart is not required
     """
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     log.debug('Applying audit rules...')
@@ -98,12 +99,12 @@ def apply_audit_rules(group: NodeGroup) -> NodeGroupResult:
     with RemoteExecutor(cluster) as exe:
         for node in group.get_ordered_members_list():
             host = node.get_host()
+            defer = node.defer()
 
             rules_config_location = cluster.get_package_association_for_node(host, 'audit', 'config_location')
-            node.put(io.StringIO(rules_content), rules_config_location,
-                     sudo=True, backup=True)
+            defer.put(io.StringIO(rules_content), rules_config_location, sudo=True, backup=True)
 
             service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
-            restart_tokens.append(node.sudo(f'service {service_name} restart'))
+            restart_tokens.append(defer.sudo(f'service {service_name} restart'))
 
-    return exe.get_merged_nodegroup_results(restart_tokens)
+    return exe.get_merged_runners_result(restart_tokens)

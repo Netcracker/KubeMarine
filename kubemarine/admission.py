@@ -345,7 +345,7 @@ def restart_pods_task(cluster: KubernetesCluster):
 
     # we do not know to wait for, only for system pods maybe
     cluster.log.debug("Waiting for system pods...")
-    first_control_plane.call(kubernetes.wait_for_any_pods, connection=None)
+    kubernetes.wait_for_any_pods(cluster, first_control_plane)
 
 
 def update_kubeadm_configmap_psp(first_control_plane: NodeGroup, target_state: str):

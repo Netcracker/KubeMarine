@@ -18,23 +18,22 @@ import paramiko
 import re
 import socket
 import time
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 from dateutil.parser import parse
-import fabric
 from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token
+from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException
 from kubemarine.core.annotations import restrict_empty_group
 
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
         "Kernel modules are not available for the current OS family"
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster):
+def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     if cluster.inventory['services']['ntp'].get('chrony', {}).get('servers') \
         and (cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('NTP') or
@@ -44,7 +43,7 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster):
+def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster) -> dict:
 # enrich only etc_hosts_generated object, etc_hosts remains as it is
 
     # if by chance cluster.yaml contains non empty etc_hosts_generated we have to reset it
@@ -80,7 +79,7 @@ def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
+def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
@@ -104,7 +103,7 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def fetch_os_versions(cluster: KubernetesCluster):
+def fetch_os_versions(cluster: KubernetesCluster) -> RunnersGroupResult:
     group = cluster.nodes['all'].get_accessible_nodes()
     '''
     For Red Hat, CentOS, Oracle Linux, and Ubuntu information in /etc/os-release /etc/redhat-release is sufficient but,
@@ -115,10 +114,10 @@ def fetch_os_versions(cluster: KubernetesCluster):
         "cat /etc/*elease; cat /etc/debian_version 2> /dev/null | sed 's/\\(.\\+\\)/DEBIAN_VERSION=\"\\1\"/' || true")
 
 
-def detect_os_family(cluster: KubernetesCluster):
+def detect_os_family(cluster: KubernetesCluster) -> None:
     results = fetch_os_versions(cluster)
 
-    for connection, result in results.items():
+    for host, result in results.items():
         stdout = result.stdout.lower()
 
         version = None
@@ -150,7 +149,7 @@ def detect_os_family(cluster: KubernetesCluster):
 
         cluster.log.debug("OS family: %s" % os_family)
 
-        cluster.context["nodes"][connection.host]["os"] = {
+        cluster.context["nodes"][host]["os"] = {
             'name': name,
             'version': version,
             'family': os_family
@@ -174,7 +173,7 @@ def update_resolv_conf(group: NodeGroup, config: dict):
     # TODO: Use Jinja template
     buffer = get_resolv_conf_buffer(config)
     utils.dump_file(group.cluster, buffer, 'resolv.conf')
-    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True, hide=True)
+    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True)
 
 
 def get_resolv_conf_buffer(config: dict):
@@ -187,7 +186,7 @@ def get_resolv_conf_buffer(config: dict):
     return buffer
 
 
-def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generated'):
+def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generated') -> str:
 # generate records for /etc/hosts from services.etc_hosts or services.etc_hosts_generated
 
     result = ""
@@ -213,41 +212,41 @@ def generate_etc_hosts_config(inventory: dict, etc_hosts_part='etc_hosts_generat
 
 def update_etc_hosts(group: NodeGroup, config: str):
     utils.dump_file(group.cluster, config, 'etc_hosts')
-    group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True)
+    group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True)
 
 
-def stop_service(group: NodeGroup, name: str) -> NodeGroupResult:
+def stop_service(group: NodeGroup, name: str) -> RunnersGroupResult:
     return group.sudo('systemctl stop %s' % name)
 
 
-def start_service(group: NodeGroup, name: str) -> NodeGroupResult:
+def start_service(group: NodeGroup, name: str) -> RunnersGroupResult:
     return group.sudo('systemctl start %s' % name)
 
 
-def restart_service(group: NodeGroup, name: str = None):
+def restart_service(group: NodeGroup, name: str = None) -> Token:
     if name is None:
         raise Exception("Service name can't be empty")
-    return group.sudo('systemctl restart %s' % name)
+    return group.defer().sudo('systemctl restart %s' % name)
 
 
-def enable_service(group: NodeGroup, name: str = None, now=True):
+def enable_service(group: NodeGroup, name: str = None, now=True) -> Token:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl enable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.sudo(cmd)
+    return group.defer().sudo(cmd)
 
 
-def disable_service(group: NodeGroup, name: str = None, now=True):
+def disable_service(group: NodeGroup, name: str = None, now=True) -> Token:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl disable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.sudo(cmd)
+    return group.defer().sudo(cmd)
 
 
 def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str):
@@ -258,11 +257,11 @@ def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str
     group.sudo("systemctl daemon-reload")
 
 
-def fetch_firewalld_status(group: NodeGroup) -> NodeGroupResult:
+def fetch_firewalld_status(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo("systemctl status firewalld", warn=True)
 
 
-def is_firewalld_disabled(group: NodeGroup):
+def is_firewalld_disabled(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     result = fetch_firewalld_status(group)
     disabled_status = True
 
@@ -273,8 +272,9 @@ def is_firewalld_disabled(group: NodeGroup):
     return disabled_status, result
 
 
-def disable_firewalld(group: NodeGroup):
-    log = group.cluster.log
+def disable_firewalld(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
     already_disabled, result = is_firewalld_disabled(group)
 
@@ -284,15 +284,16 @@ def disable_firewalld(group: NodeGroup):
 
     log.verbose("Trying to stop and disable FirewallD...")
 
-    result = disable_service(group, name='firewalld', now=True)
+    with RemoteExecutor(cluster) as exe:
+        disable_service(group, name='firewalld', now=True)
 
-    group.cluster.schedule_cumulative_point(reboot_nodes)
-    group.cluster.schedule_cumulative_point(verify_system)
+    cluster.schedule_cumulative_point(reboot_nodes)
+    cluster.schedule_cumulative_point(verify_system)
 
-    return result
+    return exe.get_merged_runners_result()
 
 
-def is_swap_disabled(group: NodeGroup):
+def is_swap_disabled(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     result = group.sudo("cat /proc/swaps", warn=True)
     disabled_status = True
 
@@ -322,50 +323,53 @@ def disable_swap(group: NodeGroup):
     group.cluster.schedule_cumulative_point(verify_system)
 
 
-def reboot_nodes(cluster: KubernetesCluster):
+def reboot_nodes(cluster: KubernetesCluster) -> None:
     cluster.nodes["all"].get_new_nodes_or_self().call(reboot_group)
 
 
-def reboot_group(group: NodeGroup, try_graceful=None):
-    log = group.cluster.log
+def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
     if try_graceful is None:
-        if 'controlplain_uri' not in group.cluster.context.keys():
-            kubernetes.is_cluster_installed(group.cluster)
+        if 'controlplain_uri' not in cluster.context.keys():
+            kubernetes.is_cluster_installed(cluster)
 
     graceful_reboot = try_graceful is True or \
-                      (try_graceful is None and group.cluster.context['controlplain_uri'] is not None)
+                      (try_graceful is None and cluster.context['controlplain_uri'] is not None)
 
     if not graceful_reboot:
         return perform_group_reboot(group)
 
     log.verbose('Graceful reboot required')
 
-    first_control_plane = group.cluster.nodes['control-plane'].get_first_member()
-    results = NodeGroupResult(group.cluster)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    results: Dict[str, RunnersResult] = {}
 
-    for node in group.get_ordered_members_configs_list():
-        cordon_required = 'control-plane' in node['roles'] or 'worker' in node['roles']
+    for node in group.get_ordered_members_list():
+        node_config = node.get_config()
+        node_name = node.get_node_name()
+        cordon_required = 'control-plane' in node_config['roles'] or 'worker' in node_config['roles']
         if cordon_required:
             res = first_control_plane.sudo(
-                kubernetes.prepare_drain_command(group.cluster, node["name"], disable_eviction=False),
+                kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=False),
                 warn=True)
             log.verbose(res)
-        log.debug(f'Rebooting node "{node["name"]}"')
-        raw_results = perform_group_reboot(node['connection'])
+        log.debug(f'Rebooting node "{node_name}"')
+        raw_results = perform_group_reboot(node)
         if cordon_required:
-            res = first_control_plane.sudo(f'kubectl uncordon {node["name"]}', warn=True)
+            res = first_control_plane.sudo(f'kubectl uncordon {node_name}', warn=True)
             log.verbose(res)
         results.update(raw_results)
 
-    return results
+    return RunnersGroupResult(cluster, results)
 
 
-def get_reboot_history(group: NodeGroup):
+def get_reboot_history(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo('last reboot')
 
 
-def perform_group_reboot(group: NodeGroup):
+def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
     log = group.cluster.log
 
     initial_boot_history = get_reboot_history(group)
@@ -375,12 +379,12 @@ def perform_group_reboot(group: NodeGroup):
     return result
 
 
-def reload_systemctl(group: NodeGroup):
-    return group.sudo('systemctl daemon-reload')
+def reload_systemctl(group: NodeGroup) -> Token:
+    return group.defer().sudo('systemctl daemon-reload')
 
 
-def configure_chronyd(group: NodeGroup, retries=60):
-    cluster = group.cluster
+def configure_chronyd(group: NodeGroup, retries: int = 60) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
     chronyd_config = ''
 
@@ -419,8 +423,8 @@ def configure_chronyd(group: NodeGroup, retries=60):
     raise Exception("Time not synced, but timeout is reached")
 
 
-def configure_timesyncd(group: NodeGroup, retries=120):
-    cluster = group.cluster
+def configure_timesyncd(group: NodeGroup, retries: int = 120) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
     timesyncd_config = ''
 
@@ -464,14 +468,14 @@ def configure_timesyncd(group: NodeGroup, retries=120):
     raise Exception("Time not synced, but timeout is reached")
 
 
-def setup_modprobe(group: NodeGroup):
+def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
     log = group.cluster.log
 
     os_family = group.get_nodes_os()
     if group.cluster.inventory['services'].get('modprobe') is None \
             or not group.cluster.inventory['services']['modprobe']:
         log.debug('Skipped - no modprobe configs in inventory')
-        return
+        return None
 
     is_valid, result = is_modprobe_valid(group)
 
@@ -489,14 +493,14 @@ def setup_modprobe(group: NodeGroup):
 
     log.debug("Uploading config...")
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
-    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True, hide=True)
+    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
     group.sudo("modprobe -a %s" % raw_config)
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
 
 
-def is_modprobe_valid(group: NodeGroup):
+def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     log = group.cluster.log
 
     verify_results = group.sudo("lsmod", warn=True)
@@ -504,9 +508,9 @@ def is_modprobe_valid(group: NodeGroup):
 
     os_family = group.get_nodes_os()
     for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        for conn, result in verify_results.items():
+        for host, result in verify_results.items():
             if module_name not in result.stdout:
-                log.debug('Kernel module %s not found at %s' % (module_name, conn.host))
+                log.debug('Kernel module %s not found at %s' % (module_name, host))
                 is_valid = False
 
     return is_valid, verify_results
@@ -568,23 +572,19 @@ def verify_system(cluster: KubernetesCluster):
         log.debug('Modprobe verification skipped - origin setup task was not completed')
 
 
-def detect_active_interface(cluster: KubernetesCluster):
+def detect_active_interface(cluster: KubernetesCluster) -> None:
     group = cluster.nodes['all'].get_accessible_nodes()
     with RemoteExecutor(cluster) as exe:
-        for node in group.get_ordered_members_configs_list():
-            detect_interface_by_address(node['connection'], node['internal_address'])
-    for cxn, host_results in exe.get_last_results().items():
-        try:
-            interface = list(host_results.values())[0].stdout.strip()
-        except Exception:
-            interface = None
-        cluster.context['nodes'][cxn.host]['active_interface'] = interface
-
-    return exe.get_last_results_str()
+        for node in group.get_ordered_members_list():
+            detect_interface_by_address(node, node.get_config()['internal_address'])
+    results: RunnersGroupResult = exe.get_merged_runners_result()
+    for host, result in results.items():
+        interface = result.stdout.strip()
+        cluster.context['nodes'][host]['active_interface'] = interface
 
 
-def detect_interface_by_address(group: NodeGroup, address: str):
-    return group.run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
+def detect_interface_by_address(group: NodeGroup, address: str) -> Token:
+    return group.defer().run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
 
 
 def _detect_nodes_access_info(cluster: KubernetesCluster):
@@ -599,17 +599,17 @@ def _detect_nodes_access_info(cluster: KubernetesCluster):
     try:
         # This should invoke sudo last reboot
         results = group_unknown_status.wait_and_get_boot_history(timeout=check_active_timeout)
-    except fabric.group.GroupException as e:
+    except GroupException as e:
         exc = e
         results = e.result
 
-    for connection, result in results.items():
+    for host, result in results.items():
         access_info = {
             'online': False,
             'accessible': False,
             'sudo': 'No'
         }
-        nodes_context[connection.host]['access'] = access_info
+        nodes_context[host]['access'] = access_info
 
         if isinstance(result, Exception):
             if NodeGroup.is_require_nopasswd_exception(result):
@@ -634,15 +634,15 @@ def _detect_nodes_access_info(cluster: KubernetesCluster):
             access_info['sudo'] = "Yes"
 
 
-def whoami(cluster: KubernetesCluster) -> NodeGroupResult:
+def whoami(cluster: KubernetesCluster) -> RunnersGroupResult:
     '''
     Determines different nodes access information, such as if the node is online, ssh credentials are correct, etc.
     '''
     _detect_nodes_access_info(cluster)
 
     results = cluster.nodes["all"].get_sudo_nodes().sudo("whoami")
-    for connection, result in results.items():
-        node_ctx = cluster.context['nodes'][connection.host]
+    for host, result in results.items():
+        node_ctx = cluster.context['nodes'][host]
         node_ctx['access']['sudo'] = 'Root' if result.stdout.strip() == "root" else 'Yes'
     return results
 
@@ -673,7 +673,7 @@ def get_nodes_time(group: NodeGroup) -> Tuple[float, Dict[str, float], float]:
     raw_results = group.run('date')
     for host, result in raw_results.items():
         parsed_time = parse(result.stdout.strip()).timestamp() * 1000
-        parsed_time_per_node[host.host] = parsed_time
+        parsed_time_per_node[host] = parsed_time
         if min_time is None or min_time > parsed_time:
             min_time = parsed_time
         if max_time is None or max_time < parsed_time:

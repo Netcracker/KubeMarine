@@ -18,10 +18,10 @@ from io import StringIO
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
-def install(group: NodeGroup):
+def install(group: NodeGroup) -> RunnersGroupResult:
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list():
             os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
@@ -29,13 +29,13 @@ def install(group: NodeGroup):
             enable(node)
 
             # remove previous daemon.json to avoid problems in case when previous config was broken
-            node.sudo("rm -f %s && sudo systemctl restart %s"
+            node.defer().sudo("rm -f %s && sudo systemctl restart %s"
                       % (os_specific_associations['config_location'],
                          os_specific_associations['service_name']))
-    return exe.get_last_results_str()
+    return exe.get_merged_runners_result()
 
 
-def uninstall(group: NodeGroup):
+def uninstall(group: NodeGroup) -> RunnersGroupResult:
     # delete all known docker packages
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
@@ -47,33 +47,39 @@ def enable(group: NodeGroup):
 
 
 def disable(group: NodeGroup):
-    service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
-    system.disable_service(group, name=service_name, now=True)
+    with RemoteExecutor(group.cluster):
+        for node in group.get_ordered_members_list():
+            service_name = group.cluster.get_package_association_for_node(
+                node.get_host(), 'docker', 'service_name')
+            system.disable_service(node, name=service_name, now=True)
 
 
-def configure(group: NodeGroup):
+def configure(group: NodeGroup) -> RunnersGroupResult:
     log = group.cluster.log
 
     settings_json = json.dumps(group.cluster.inventory["services"]['cri']['dockerConfig'], sort_keys=True, indent=4)
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
 
+    tokens = []
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list():
+            defer = node.defer()
             os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
             log.debug("Uploading docker configuration to %s node..." % node.get_node_name())
-            node.put(StringIO(settings_json), os_specific_associations['config_location'], backup=True,
-                     sudo=True)
+            defer.put(StringIO(settings_json), os_specific_associations['config_location'],
+                      backup=True, sudo=True)
             log.debug("Restarting Docker on %s node..." % node.get_node_name())
-            node.sudo(f"chmod 600 {os_specific_associations['config_location']} && "
-                      f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                      f"sudo {os_specific_associations['executable_name']} info")
+            tokens.append(defer.sudo(
+                f"chmod 600 {os_specific_associations['config_location']} && "
+                f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                f"sudo {os_specific_associations['executable_name']} info"))
 
-    return exe.get_last_results_str()
+    return exe.get_merged_runners_result(tokens)
 
 
-def prune(group: NodeGroup):
+def prune(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo('docker container stop $(sudo docker container ls -aq); '
                       'sudo docker container rm $(sudo docker container ls -aq); '
                       'sudo docker system prune -a -f; '
                       # kill all containerd-shim processes, so that no orphan containers remain 
-                      'sudo pkill -9 -f "^containerd-shim"', warn=True, hide=True)
+                      'sudo pkill -9 -f "^containerd-shim"', warn=True)

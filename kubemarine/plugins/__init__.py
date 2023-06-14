@@ -16,7 +16,6 @@
 import glob
 import importlib.util
 import io
-import logging
 import os
 import re
 import shutil
@@ -41,7 +40,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
 from kubemarine.core import utils, static, errors, os as kos
 from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.kubernetes.replicaset import ReplicaSet
@@ -412,10 +411,6 @@ def expect_deployment(cluster: KubernetesCluster,
 def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace=None, timeout=None, retries=None,
                 node: NodeGroup = None, apply_filter: str = None):
 
-    if isinstance(cluster, NodeGroup):
-        # when instead of cluster there was received a group
-        cluster = cluster.cluster
-
     if timeout is None:
         timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
     if retries is None:
@@ -700,7 +695,7 @@ def apply_shell(cluster: KubernetesCluster, step: dict, plugin_name=None):
             f"echo \"${var_name}\" | sed 's/^/  /'"
         commands = f"{commands} && {echo_var_cmd}"
 
-    in_vars_dict = {}
+    in_vars_dict: Dict[str, str] = {}
     for var in in_vars:
         var_name = var['name']
         # get defined value or saved value, defaulting to empty value
@@ -710,12 +705,11 @@ def apply_shell(cluster: KubernetesCluster, step: dict, plugin_name=None):
         # wrap variable value with single-quotes for `inline_ssh_env` feature to work correctly with different content
         in_vars_dict[var_name] = f"'{var_value}'"
 
-    method = common_group.run
-    if sudo:
-        method = common_group.sudo
-
     cluster.log.debug('Running shell command...')
-    result = method(commands, env=in_vars_dict)
+    if sudo:
+        result = common_group.sudo(commands, env=in_vars_dict)
+    else:
+        result = common_group.run(commands, env=in_vars_dict)
 
     if out_vars:
         stdout = list(result.values())[0].stdout
@@ -1021,11 +1015,11 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     destination_common_group.put(source, destination_path, backup=True, sudo=use_sudo)
 
     if apply_required:
-        method = apply_common_group.run
-        if use_sudo:
-            method = apply_common_group.sudo
         cluster.log.debug("Applying yaml...")
-        method(apply_command, logging_stream_level=logging.DEBUG)
+        if use_sudo:
+            apply_common_group.sudo(apply_command, logging_stream=True)
+        else:
+            apply_common_group.run(apply_command, logging_stream=True)
     else:
         cluster.log.debug('Apply is not required')
 

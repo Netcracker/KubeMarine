@@ -38,17 +38,18 @@ class CLIAction(Action):
         self.remote_args = remote_args
         self.no_stream = no_stream
 
-    def run(self, res: DynamicResources):
-        executors_group = self.node_group_provider(res.cluster())
+    def run(self, res: DynamicResources) -> None:
+        cluster = res.cluster()
+        executors_group = self.node_group_provider(cluster)
         if executors_group.is_empty():
             print('Failed to find any of specified nodes or groups')
             sys.exit(1)
 
-        res = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True)
+        result = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True)
         if self.no_stream:
-            res.print()
+            cluster.log.debug(result)
 
-        if res.is_any_failed():
+        if result.is_any_failed():
             sys.exit(1)
 
         sys.exit(0)

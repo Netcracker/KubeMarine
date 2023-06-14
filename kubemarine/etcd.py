@@ -23,10 +23,11 @@ from kubemarine.core.group import NodeGroup
 
 # the methods requires etcdctl.sh to be installed on all active control-plane nodes during thirdparties task.
 
-def remove_members(group: NodeGroup):
-    log = group.cluster.log
+def remove_members(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    control_planes = group.cluster.nodes["control-plane"]
+    control_planes = cluster.nodes["control-plane"]
     managing_control_plane = control_planes.get_unchanged_nodes().get_any_member()
 
     log.verbose(f"etcd will be managed using {managing_control_plane.get_nodes_names()[0]}.")
@@ -69,8 +70,7 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
     time.sleep(init_timeout)
     while retries > 0:
         start_time = time.time()
-        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json',
-                                          is_async=False, hide=True).get_simple_out()
+        etcd_health_raw = connection.sudo('etcdctl endpoint health --cluster -w json').get_simple_out()
         end_time = time.time()
         sudo_time = int(end_time - start_time)
         log.verbose(etcd_health_raw)
@@ -92,8 +92,7 @@ def wait_for_health(cluster: KubernetesCluster, connection: NodeGroup) -> List[D
             retries -= 1
 
     if is_healthy:
-        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json',
-                                          is_async=False, hide=True).get_simple_out()
+        etcd_status_raw = connection.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
         log.verbose(etcd_status_raw)
         etcd_status_list = json.load(io.StringIO(etcd_status_raw.lower().strip()))
         elected_leader = None

@@ -13,11 +13,11 @@
 # limitations under the License.
 from kubemarine.core import static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.group import RunnersGroupResult, NodeGroup
 from kubemarine.cri import docker, containerd
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get("initial_procedure") == "migrate_cri":
         return inventory
 
@@ -41,7 +41,7 @@ def get_initial_cri_impl(inventory: dict) -> str:
     return cri_impl
 
 
-def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
+def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict) -> dict:
     if inventory['services']['cri']['containerRuntime'] == 'docker':
         if inventory['services']['cri'].get('containerdConfig'):
             del inventory['services']['cri']['containerdConfig']
@@ -51,7 +51,7 @@ def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def install(group: NodeGroup):
+def install(group: NodeGroup) -> RunnersGroupResult:
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -60,7 +60,7 @@ def install(group: NodeGroup):
         return containerd.install(group)
 
 
-def configure(group: NodeGroup):
+def configure(group: NodeGroup) -> RunnersGroupResult:
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -72,11 +72,11 @@ def configure(group: NodeGroup):
 def prune(group: NodeGroup, all_implementations=False):
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
-    result = NodeGroupResult(group.cluster)
+    result = RunnersGroupResult(group.cluster, {})
     if cri_impl == "docker" or all_implementations:
-        result.update(docker.prune(group))
+        result = docker.prune(group)
 
     if cri_impl == "containerd" or all_implementations:
-        result.update(containerd.prune(group))
+        result = containerd.prune(group)
 
     return result

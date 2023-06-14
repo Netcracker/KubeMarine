@@ -13,19 +13,20 @@
 # limitations under the License.
 
 import json
+from typing import Dict
 
 from kubemarine import system
 from kubemarine.core.group import NodeGroup
 
 
-def get_status(group: NodeGroup):
+def get_status(group: NodeGroup) -> Dict[str, dict]:
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")
     parsed_result = {}
     if result:
-        for connection, node_result in result.items():
-            log.verbose('Parsing status for %s...' % connection.host)
-            parsed_result[connection] = parse_status(node_result.stdout)
+        for host, node_result in result.items():
+            log.verbose('Parsing status for %s...' % host)
+            parsed_result[host] = parse_status(node_result.stdout)
     print_status(log, parsed_result)
     return parsed_result
 
@@ -62,7 +63,7 @@ def is_state_valid(group: NodeGroup, expected_profiles: dict):
     parsed_result = get_status(group)
     valid = True
 
-    for connection, status in parsed_result.items():
+    for host, status in parsed_result.items():
         for state, profiles in expected_profiles.items():
             if not profiles:
                 continue
@@ -71,18 +72,18 @@ def is_state_valid(group: NodeGroup, expected_profiles: dict):
                     for remote_profiles in status.values():
                         if profile in remote_profiles:
                             valid = False
-                            log.verbose('Mode %s is enabled on remote host %s' % (state, connection.host))
+                            log.verbose('Mode %s is enabled on remote host %s' % (state, host))
                             break
             else:
                 if not status.get(state):
                     valid = False
-                    log.verbose('Mode %s is not presented on remote host %s' % (state, connection.host))
+                    log.verbose('Mode %s is not presented on remote host %s' % (state, host))
                     break
                 # check if all 'cluster.yaml' settings reflect on particular node
                 for profile in profiles:
                     if profile not in status[state]:
                         valid = False
-                        log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, connection.host))
+                        log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, host))
                         break
 
     return valid, parsed_result

@@ -17,9 +17,9 @@ from traceback import *
 import csv
 from datetime import datetime
 from kubemarine.core import utils, log
-import fabric
 
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import GroupException
 
 TC_UNKNOWN = -1
 TC_PASSED = 0
@@ -50,8 +50,8 @@ class TestCase:
         elif type is TestWarn:
             self.warn(value)
         else:
-            if isinstance(value, fabric.group.GroupException):
-                value.result.print()
+            if isinstance(value, GroupException):
+                self.cluster.log.debug(value.result)
             else:
                 print_exc()
             self.exception(value)

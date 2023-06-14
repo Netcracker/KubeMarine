@@ -112,8 +112,8 @@ class CriUpgradeAction(Action):
             self.upgrade_cri(cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"]), workers=True)
         self.upgrade_cri(cluster.nodes["control-plane"], workers=False)
 
-    def upgrade_cri(self, group: NodeGroup, workers: bool):
-        cluster = group.cluster
+    def upgrade_cri(self, group: NodeGroup, workers: bool) -> None:
+        cluster: KubernetesCluster = group.cluster
 
         drain_timeout = cluster.procedure_inventory.get('drain_timeout')
         grace_period = cluster.procedure_inventory.get('grace_period')
@@ -128,13 +128,13 @@ class CriUpgradeAction(Action):
             drain_cmd = kubernetes.prepare_drain_command(
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
-            control_plane.sudo(drain_cmd, is_async=False, hide=False)
+            control_plane.sudo(drain_cmd, hide=False)
 
             kubernetes.upgrade_cri_if_required(node)
             node.sudo('systemctl restart kubelet')
 
             if workers:
-                control_plane.sudo(f"kubectl uncordon {node_name}", is_async=False, hide=False)
+                control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
             else:
                 kubernetes.wait_uncordon(node)
 
@@ -200,9 +200,9 @@ class BalancerUpgradeAction(Action):
         self._run(group)
         res.make_final_inventory()
 
-    def _run(self, group: NodeGroup):
-        cluster = group.cluster
-        packages.install(group, cluster.get_package_association(self.package_name, 'package_name'))
+    def _run(self, group: NodeGroup) -> None:
+        cluster: KubernetesCluster = group.cluster
+        packages.install(group, include=cluster.get_package_association(self.package_name, 'package_name'))
         if self.package_name == 'haproxy':
             haproxy.restart(group)
         else:

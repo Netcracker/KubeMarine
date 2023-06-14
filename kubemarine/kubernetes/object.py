@@ -84,7 +84,7 @@ class KubernetesObject:
         cmd = f'kubectl get {self.kind} -n {self.namespace} {self.name} -o json'
         result = control_plane.sudo(cmd, warn=suppress_exceptions)
         self._cluster.log.verbose(result)
-        if not result.is_any_failed():
+        if not result.is_any_has_code(1):
             self._obj = json.loads(result.get_simple_out())
             self._reload_t = time.time()
         return self

@@ -44,7 +44,7 @@ class TestFakeShell(unittest.TestCase):
                                     'run', ['whoami'])
 
         results = self.cluster.nodes['all'].run('whoami')
-        for conn, result in results.items():
+        for result in results.values():
             self.assertEqual('anonymous', result.stdout, msg="Invalid fake nodegroup result stdout")
 
     def test_calculate_calls(self):
@@ -80,7 +80,7 @@ class TestFakeFS(unittest.TestCase):
         self.cluster.fake_fs.reset()
 
         expected_data = 'hello\nworld'
-        node_hostname = list(self.cluster.nodes['master'].nodes.keys())[0]
+        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
 
         self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', expected_data)
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
@@ -91,7 +91,7 @@ class TestFakeFS(unittest.TestCase):
         self.cluster.fake_fs.reset()
 
         expected_data = io.BytesIO(b'hello\nworld')
-        node_hostname = list(self.cluster.nodes['master'].nodes.keys())[0]
+        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
 
         self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', expected_data)
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt').encode('utf-8')
@@ -101,7 +101,7 @@ class TestFakeFS(unittest.TestCase):
     def test_get_nonexistent(self):
         self.cluster.fake_fs.reset()
 
-        node_hostname = list(self.cluster.nodes['master'].nodes.keys())[0]
+        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
         self.assertIsNone(actual_data, msg="Reading did not return None in response")
 

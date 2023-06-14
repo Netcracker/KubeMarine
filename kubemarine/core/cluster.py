@@ -11,22 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import re
 from copy import deepcopy
-from typing import Dict, List, Union, Iterable, Tuple, Optional
+from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
 
-import fabric
 import yaml
 
 from kubemarine.core import log, utils
-from kubemarine.core.connections import ConnectionPool, Connections
+from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup, NodeConfig
 
-jinja_query_regex = re.compile("{{ .* }}", re.M)
-
-_AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
+_AnyConnectionTypes = Union[str, NodeGroup, NodeConfig]
 
 
 class KubernetesCluster(Environment):
@@ -44,12 +39,13 @@ class KubernetesCluster(Environment):
         self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
+        # connection pool should be created every time, because it relies on partially enriched inventory
+        self.connection_pool = ConnectionPool(self)
+
         self._logger = logger if logger is not None \
             else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
 
-        self._inventory = {}
-        # connection pool should be created every time, because it is relied on partially enriched inventory
-        self._connection_pool = ConnectionPool(self)
+        self._inventory: dict = {}
 
     def enrich(self, custom_enrichment_fns: List[str] = None):
         # do not make dumps for custom enrichment functions, because result is generally undefined
@@ -66,21 +62,18 @@ class KubernetesCluster(Environment):
     def log(self) -> log.EnhancedLogger:
         return self._logger
 
-    def make_group(self, ips: List[_AnyConnectionTypes]) -> NodeGroup:
-        connections: Connections = {}
+    def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> NodeGroup:
+        hosts = []
         for ip in ips:
-            if isinstance(ip, fabric.connection.Connection):
-                ip = ip.host
-                connections[ip] = self._connection_pool.get_connection(ip)
+            if isinstance(ip, dict):
+                hosts.append(ip['connect_to'])
             elif isinstance(ip, NodeGroup):
-                for host, connection in ip.nodes.items():
-                    ip = connection.host
-                    connections[ip] = self._connection_pool.get_connection(ip)
+                hosts.extend(ip.nodes)
             elif isinstance(ip, str):
-                connections[ip] = self._connection_pool.get_connection(ip)
+                hosts.append(ip)
             else:
                 raise Exception('Unsupported connection object type')
-        return NodeGroup(connections, self)
+        return NodeGroup(hosts, self)
 
     def get_access_address_from_node(self, node: dict):
         """
@@ -111,8 +104,8 @@ class KubernetesCluster(Environment):
         return [self.get_access_address_from_node(node)
                 for node in self.get_nodes_by_names(node_names)]
 
-    def get_node(self, host: Union[str, fabric.connection.Connection]) -> NodeConfig:
-        return self.make_group([host]).get_first_member_config()
+    def get_node(self, host: _AnyConnectionTypes) -> NodeConfig:
+        return self.make_group([host]).get_config()
 
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         ips = self.get_addresses_from_node_names(node_names)

@@ -16,6 +16,7 @@ import hashlib
 import io
 import random
 import time
+from typing import cast
 
 from jinja2 import Template
 
@@ -23,7 +24,7 @@ from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult, NodeConfig
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
 
 
 def autodetect_interface(cluster: KubernetesCluster, name):
@@ -40,7 +41,7 @@ def autodetect_interface(cluster: KubernetesCluster, name):
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
-def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster):
+def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -119,7 +120,7 @@ def get_default_node_names(inventory):
     return list(set(default_names))
 
 
-def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster):
+def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster) -> dict:
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -145,13 +146,13 @@ def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesClu
     cluster.roles.append('keepalived')
 
     # fill in ips
-    cluster.ips['keepalived'] = list(cluster.nodes['keepalived'].nodes.keys())
+    cluster.ips['keepalived'] = cluster.nodes['keepalived'].get_hosts()
 
     return inventory
 
 
-def install(group: NodeGroup):
-    cluster = group.cluster
+def install(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     # todo why check and try to install all keepalives but finally filter out only new nodes?
@@ -171,7 +172,8 @@ def install(group: NodeGroup):
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
-        installation_result = packages.install(group, include=package_associations['package_name'])
+        installation_result = cast(RunnersGroupResult,
+                                   packages.install(group, include=package_associations['package_name']))
 
     service_name = package_associations['service_name']
     patch_path = "./resources/drop_ins/keepalived.conf"
@@ -188,12 +190,12 @@ def install_haproxy_check_script(group: NodeGroup):
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
 
-def uninstall(group: NodeGroup):
+def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include='keepalived')
 
 
-def restart(group: NodeGroup):
-    cluster = group.cluster
+def restart(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
     with RemoteExecutor(cluster):
         for node in group.get_ordered_members_list():
@@ -205,7 +207,7 @@ def restart(group: NodeGroup):
     time.sleep(static.GLOBALS['keepalived']['restart_wait'])
 
 
-def enable(group: NodeGroup):
+def enable(group: NodeGroup) -> None:
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list():
             service_name = group.cluster.get_package_association_for_node(
@@ -221,7 +223,7 @@ def disable(group: NodeGroup):
             system.disable_service(node, name=service_name)
 
 
-def generate_config(inventory: dict, node: NodeConfig):
+def generate_config(inventory: dict, node: NodeConfig) -> str:
     config = ''
 
     for i, item in enumerate(inventory['vrrp_ips']):
@@ -257,24 +259,25 @@ def generate_config(inventory: dict, node: NodeConfig):
     return config
 
 
-def configure(group: NodeGroup) -> NodeGroupResult:
-    log = group.cluster.log
-    group_members = group.get_ordered_members_configs_list()
+def configure(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
+    group_members = group.get_ordered_members_list()
 
-    with RemoteExecutor(group.cluster):
+    with RemoteExecutor(cluster):
         for node in group_members:
+            node_name = node.get_node_name()
+            log.debug("Configuring keepalived on '%s'..." % node_name)
 
-            log.debug("Configuring keepalived on '%s'..." % node['name'])
-
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'], 'keepalived')
+            package_associations = cluster.get_associations_for_node(node.get_host(), 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-            group.sudo('mkdir -p %s' % configs_directory, hide=True)
+            group.defer().sudo('mkdir -p %s' % configs_directory)
 
-            config = generate_config(group.cluster.inventory, node)
-            utils.dump_file(group.cluster, config, 'keepalived_%s.conf' % node['name'])
+            config = generate_config(cluster.inventory, node.get_config())
+            utils.dump_file(cluster, config, 'keepalived_%s.conf' % node_name)
 
-            node['connection'].put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node.defer().put(io.StringIO(config), package_associations['config_location'], sudo=True)
 
     log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
 
