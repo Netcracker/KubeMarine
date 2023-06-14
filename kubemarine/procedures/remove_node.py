@@ -35,11 +35,11 @@ def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> NodeGroup:
     active_nodes = all_nodes.get_online_nodes(True)
     disabled_nodes = all_nodes.exclude_group(active_nodes)
     if active_nodes.is_empty():
-        cluster.log.debug("Skipped - %s nodes are inactive: %s" % (node_type, ", ".join(disabled_nodes.nodes.keys())))
+        cluster.log.debug("Skipped - %s nodes are inactive: %s" % (node_type, ", ".join(disabled_nodes.nodes)))
         return
     if not disabled_nodes.is_empty():
         cluster.log.debug("Partly Skipped - several %s nodes are inactive: %s"
-                          % (node_type, ", ".join(disabled_nodes.nodes.keys())))
+                          % (node_type, ", ".join(disabled_nodes.nodes)))
     return active_nodes
 
 

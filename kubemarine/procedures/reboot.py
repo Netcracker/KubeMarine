@@ -36,7 +36,7 @@ def reboot(cluster: KubernetesCluster):
     nodes = []
 
     cluster.log.verbose('The following nodes will be rebooted:')
-    for node in cluster.procedure_inventory.get("nodes", cluster.nodes['all'].get_ordered_members_configs_list()):
+    for node in cluster.procedure_inventory.get("nodes", cluster.inventory['nodes']):
         nodes.append(node['name'])
         cluster.log.verbose('  - ' + node['name'])
 

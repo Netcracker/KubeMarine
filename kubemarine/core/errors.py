@@ -15,7 +15,6 @@ import io
 import sys
 import traceback
 
-from fabric.exceptions import GroupException
 from concurrent.futures import TimeoutError
 
 KME_DICTIONARY: dict = {
@@ -112,6 +111,7 @@ def pretty_print_error(reason: Exception, log=None) -> None:
 
             return
 
+    from kubemarine.core.group import GroupException
     if isinstance(reason, GroupException):
         description = "KME0002: Remote group exception"
 
@@ -120,11 +120,11 @@ def pretty_print_error(reason: Exception, log=None) -> None:
         else:
             sys.stderr.write(f"{description}\n")
 
-        for connection, result in reason.result.items():
+        for host, result in reason.result.items():
             if log:
-                log.critical("%s:" % connection.host)
+                log.critical("%s:" % host)
             else:
-                sys.stderr.write("\n%s:" % connection.host)
+                sys.stderr.write("\n%s:" % host)
 
             found_dictionary_code = None
             for dictionary_code, dictionary_kme in KME_DICTIONARY.items():

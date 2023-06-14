@@ -21,53 +21,47 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import Callable, Dict, List, Union, IO, Any, Optional
+from typing import Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, cast, Optional, Iterable
 
-import fabric
 import invoke
 from invoke import UnexpectedExit
 
 from kubemarine.core import utils, log
-from kubemarine.core.connections import Connections
-from kubemarine.core.executor import RemoteExecutor
+from kubemarine.core.executor import (
+    RemoteExecutor, Token, GenericResult, RunnersResult,
+    get_active_executor, HostToResult
+)
 
 NodeConfig = Dict[str, Any]
 GroupFilter = Union[Callable[[NodeConfig], bool], NodeConfig]
 
-_GenericResult = Union[Exception, fabric.runners.Result, fabric.transfer.Result]
-_HostToResult = Dict[str, _GenericResult]
+_Result = TypeVar('_Result', bound=GenericResult, covariant=True)
 
 
-# fabric.runners.Result is not equitable OOB, let it make equitable
-def _compare_fabric_results(self: fabric.runners.Result, other) -> bool:
-    if not isinstance(other, fabric.runners.Result):
-        return False
+class GenericGroupResult(Mapping[str, _Result]):
 
-    # todo should other fields be compared? Or probably custom class should be used to store result.
-    return self.exited == other.exited \
-        and self.stdout == other.stdout \
-        and self.stderr == other.stderr
-
-
-fabric.runners.Result.__eq__ = _compare_fabric_results
-fabric.runners.Result.__ne__ = lambda self, other: not _compare_fabric_results(self, other)
-
-
-class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connection, _GenericResult]):
-
-    def __init__(self, cluster, results: _HostToResult or NodeGroupResult = None) -> None:
-        super().__init__()
-
+    def __init__(self, cluster, results: Mapping[str, _Result]) -> None:
         self.cluster = cluster
+        self._result: Dict[str, _Result] = dict(results)
 
-        if results is not None:
-            for host, result in results.items():
-                if isinstance(results, NodeGroupResult):
-                    host = host.host
-                connection = cluster.nodes['all'].nodes.get(host)
-                if connection is None:
-                    raise Exception(f'Host "{host}" was not found in provided cluster object')
-                self[connection] = result
+    def __getitem__(self, host: str) -> _Result:
+        return self._result[host]
+
+    def __len__(self) -> int:
+        return len(self._result)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._result)
+
+    @property
+    def succeeded(self):
+        return dict(item for item in self.items()
+                    if not isinstance(item[1], Exception))
+
+    @property
+    def failed(self):
+        return dict(item for item in self.items()
+                    if isinstance(item[1], Exception))
 
     def get_simple_out(self) -> str:
         if len(self) != 1:
@@ -75,7 +69,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
                                       "exactly one node, but %s were provided." % list(self.keys()))
 
         res = list(self.values())[0]
-        if not isinstance(res, fabric.runners.Result):
+        if not isinstance(res, RunnersResult):
             raise NotImplementedError("It does not make sense to return simple output for result of type %s"
                                       % type(res))
 
@@ -83,41 +77,31 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
 
     def __str__(self) -> str:
         output = ""
-        for conn, result in self.items():
+        for host, result in self.items():
 
             # TODO: support print other possible exceptions
             if isinstance(result, invoke.exceptions.UnexpectedExit):
                 result = result.result
 
-            # for now we do not know how-to print transfer result
-            if not isinstance(result, fabric.runners.Result):
+            # for now, we do not know how-to print transfer result
+            if not isinstance(result, RunnersResult):
                 continue
 
             if output != "":
                 output += "\n"
-            output += "\t%s: code=%i" % (conn.host, result.exited)
+            output += "\t%s: code=%i" % (host, result.exited)
             if result.stdout:
                 output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
             if result.stderr:
                 output += "\n\t\tSTDERR: %s" % result.stderr.replace("\n", "\n\t\t        ")
         return output
 
-    def print(self) -> None:
-        """
-        Prints debug message to log with results for each node
-        :return: None
-        """
-        self.cluster.log.debug(self)
-
     def get_group(self) -> NodeGroup:
         """
         Forms and returns a new group from node results
         :return: NodeGroup
         """
-        hosts = []
-        for connection in list(self.keys()):
-            hosts.append(connection.host)
-        return self.cluster.make_group(hosts)
+        return self.cluster.make_group(self.keys())
 
     def is_any_has_code(self, code: int or str) -> bool:
         """
@@ -126,58 +110,55 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :param code: The code with which the result codes will be compared
         :return: Boolean
         """
-        for conn, result in self.items():
-            if isinstance(result, fabric.runners.Result) and str(result.exited) == str(code):
+        for result in self.values():
+            if isinstance(result, RunnersResult) and result.exited == code:
                 return True
         return False
 
     def is_any_excepted(self) -> bool:
         """
-        Returns true if at least one result in group is an execution
+        Returns true if at least one result in group is an exception
         :return: Boolean
         """
-        for conn, result in self.items():
-            if isinstance(result, Exception):
-                return True
-        return False
+        return len(self.get_excepted_hosts_list()) > 0
 
     def is_any_failed(self) -> bool:
         """
-        Returns true if at least one result in the group finished with code 1 or failed with an exception
+        Returns true if at least one result in the group finished with non-zero code
         :return: Boolean
         """
-        return self.is_any_has_code(1) or self.is_any_excepted()
+        return len(self.get_failed_hosts_list()) > 0
 
-    def get_excepted_nodes_list(self) -> List[fabric.connection.Connection]:
+    def get_excepted_hosts_list(self) -> List[str]:
         """
-        Returns a list of nodes connections, for which the result is an exception
-        :return: List with nodes connections
+        Returns a list of hosts, for which the result is an exception
+        :return: List with hosts
         """
-        failed_nodes: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
+        failed_hosts: List[str] = []
+        for host, result in self.items():
             if isinstance(result, Exception):
-                failed_nodes.append(conn)
-        return failed_nodes
+                failed_hosts.append(host)
+        return failed_hosts
 
     def get_excepted_nodes_group(self) -> NodeGroup:
         """
         Forms and returns new NodeGroup of nodes, for which the result is an exception
         :return: NodeGroup:
         """
-        nodes_list = self.get_excepted_nodes_list()
+        nodes_list = self.get_excepted_hosts_list()
         return self.cluster.make_group(nodes_list)
 
-    def get_exited_nodes_list(self) -> List[fabric.connection.Connection]:
+    def get_exited_hosts_list(self) -> List[str]:
         """
-        Returns a list of nodes connections, for which the result is the completion of the command and the formation of
-        the Fabric Result
-        :return: List with nodes connections
+        Returns a list of hosts, for which the result is the completion of the command and the formation of
+        the RunnersResult
+        :return: List with hosts
         """
-        failed_nodes: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
-            if isinstance(result, fabric.runners.Result):
-                failed_nodes.append(conn)
-        return failed_nodes
+        failed_hosts: List[str] = []
+        for host, result in self.items():
+            if isinstance(result, RunnersResult):
+                failed_hosts.append(host)
+        return failed_hosts
 
     def get_exited_nodes_group(self) -> NodeGroup:
         """
@@ -185,70 +166,51 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         formation of the Fabric Result
         :return: NodeGroup:
         """
-        nodes_list = self.get_exited_nodes_list()
+        nodes_list = self.get_exited_hosts_list()
         return self.cluster.make_group(nodes_list)
 
-    def get_failed_nodes_list(self) -> List[fabric.connection.Connection]:
+    def get_failed_hosts_list(self) -> List[str]:
         """
-        Returns a list of nodes connections that either exited with an exception, or the exit code is equals 1
-        :return: List with nodes connections
+        Returns a list of hosts whose result finished with non-zero code
+        :return: List with hosts
         """
-        failed_nodes: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
-            if isinstance(result, Exception) or result.exited == 1:
-                failed_nodes.append(conn)
-        return failed_nodes
+        failed_hosts: List[str] = []
+        for host, result in self.items():
+            if isinstance(result, RunnersResult) and result.failed:
+                failed_hosts.append(host)
+        return failed_hosts
 
     def get_failed_nodes_group(self) -> NodeGroup:
         """
         Forms and returns new NodeGroup of nodes that either exited with an exception, or the exit code is equals 1
         :return: NodeGroup:
         """
-        nodes_list = self.get_failed_nodes_list()
+        nodes_list = self.get_failed_hosts_list()
         return self.cluster.make_group(nodes_list)
 
-    def get_nonzero_nodes_list(self) -> List[fabric.connection.Connection]:
+    def get_hosts_list_where_value_in_stdout(self, value: str) -> List[str]:
         """
-        Returns a list of nodes connections that exited with non-zero exit code
-        :return: List with nodes connections
+        Returns a list of hosts that contains the given string value in results stderr.
+        :param value: The string value to be found in the nodes results stdout.
+        :return: List with hosts
         """
-        nonzero_nodes: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
-            if isinstance(result, Exception) or result.exited != 0:
-                nonzero_nodes.append(conn)
-        return nonzero_nodes
+        hosts_with_stderr_value: List[str] = []
+        for host, result in self.items():
+            if isinstance(result, RunnersResult) and value in result.stdout:
+                hosts_with_stderr_value.append(host)
+        return hosts_with_stderr_value
 
-    def get_nonzero_nodes_group(self) -> NodeGroup:
+    def get_hosts_list_where_value_in_stderr(self, value: str) -> List[str]:
         """
-        Forms and returns new NodeGroup of nodes that exited with non-zero exit code
-        :return: NodeGroup:
-        """
-        nodes_list = self.get_nonzero_nodes_list()
-        return self.cluster.make_group(nodes_list)
-
-    def get_nodes_list_where_value_in_stdout(self, value: str) -> List[fabric.connection.Connection]:
-        """
-        Returns a list of node connections that contains the given string value in results stderr.
+        Returns a list of hosts that contains the given string value in results stderr.
         :param value: The string value to be found in the nodes results stderr.
-        :return: List with nodes connections
+        :return: List with hosts
         """
-        nodes_with_stderr_value: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
-            if isinstance(result, fabric.runners.Result) and value in result.stdout:
-                nodes_with_stderr_value.append(conn)
-        return nodes_with_stderr_value
-
-    def get_nodes_list_where_value_in_stderr(self, value: str) -> List[fabric.connection.Connection]:
-        """
-        Returns a list of node connections that contains the given string value in results stderr.
-        :param value: The string value to be found in the nodes results stderr.
-        :return: List with nodes connections
-        """
-        nodes_with_stderr_value: List[fabric.connection.Connection] = []
-        for conn, result in self.items():
-            if isinstance(result, fabric.runners.Result) and value in result.stderr:
-                nodes_with_stderr_value.append(conn)
-        return nodes_with_stderr_value
+        hosts_with_stderr_value: List[str] = []
+        for host, result in self.items():
+            if isinstance(result, RunnersResult) and value in result.stderr:
+                hosts_with_stderr_value.append(host)
+        return hosts_with_stderr_value
 
     def get_nodes_group_where_value_in_stdout(self, value: str) -> NodeGroup:
         """
@@ -256,7 +218,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :param value: The string value to be found in the nodes results stdout.
         :return: NodeGroup
         """
-        nodes_list = self.get_nodes_list_where_value_in_stdout(value)
+        nodes_list = self.get_hosts_list_where_value_in_stdout(value)
         return self.cluster.make_group(nodes_list)
 
     def get_nodes_group_where_value_in_stderr(self, value: str) -> NodeGroup:
@@ -265,7 +227,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :param value: The string value to be found in the nodes results stderr.
         :return: NodeGroup
         """
-        nodes_list = self.get_nodes_list_where_value_in_stderr(value)
+        nodes_list = self.get_hosts_list_where_value_in_stderr(value)
         return self.cluster.make_group(nodes_list)
 
     def stdout_contains(self, value: str) -> bool:
@@ -274,7 +236,7 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :param value: The string value to be found in the nodes results stdout.
         :return: true if string presented
         """
-        return len(self.get_nodes_list_where_value_in_stdout(value)) > 0
+        return len(self.get_hosts_list_where_value_in_stdout(value)) > 0
 
     def stderr_contains(self, value: str) -> bool:
         """
@@ -282,25 +244,25 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         :param value: The string value to be found in the nodes results stderr.
         :return: true if string presented
         """
-        return len(self.get_nodes_list_where_value_in_stderr(value)) > 0
+        return len(self.get_hosts_list_where_value_in_stderr(value)) > 0
 
     def __eq__(self, other) -> bool:
         if self is other:
             return True
 
-        if not isinstance(other, NodeGroupResult):
+        if not isinstance(other, GenericGroupResult):
             return False
 
         if len(self) != len(other):
             return False
 
-        for conn, result in self.items():
-            compared_result = other.get(conn)
+        for host, result in self.items():
+            compared_result = other.get(host)
             if compared_result is None:
                 return False
 
-            if not isinstance(result, fabric.runners.Result) or not isinstance(compared_result, fabric.runners.Result):
-                raise NotImplementedError('Currently only instances of fabric.runners.Result can be compared')
+            if not isinstance(result, RunnersResult) or not isinstance(compared_result, RunnersResult):
+                raise NotImplementedError('Currently only instances of RunnersResult can be compared')
 
             if result != compared_result:
                 return False
@@ -311,117 +273,98 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return not self == other
 
 
-def _handle_internal_logging(fn: Callable) -> Callable[..., Union[NodeGroupResult, int]]:
-    """
-    Method is a decorator that handles internal streaming of output (hide=False) of fabric (invoke).
-    Note! This decorator should be the outermost.
+class NodeGroupResult(GenericGroupResult[GenericResult]):
+    pass
 
-    :param fn: Origin function to apply annotation to
-    :return: Validation wrapper function
-    """
-    def do(self: 'NodeGroup', *args, logging_stream_level: int = None, **kwargs):
-        if logging_stream_level is not None and 'hide' in kwargs:
-            raise ValueError("'hide' and 'logging_stream_level' should not be combined")
 
-        logger = self.cluster.log
-        if logging_stream_level is not None:
-            # We want to stream output immediately to logging framework, thus not hide.
-            kwargs['hide'] = False
+class RunnersGroupResult(GenericGroupResult[RunnersResult]):
+    pass
 
-            caller = log.caller_info(logger)
-            out = log.LoggerWriter(logger, logging_stream_level, caller, '[remote] ')
-            err = log.LoggerWriter(logger, logging_stream_level, caller, '[stderr] ')
 
-            return fn(self, *args, out_stream=out, err_stream=err, **kwargs)
-
-        results = None
-        try:
-            results = fn(self, *args, **kwargs)
-            return results
-        except fabric.group.GroupException as e:
-            results = e.result
-            raise
-        finally:
-            # if hide is False, we already logged only to stdout, and should log to other handlers.
-            if results is not None and not kwargs.get('hide', True):
-                logger.debug(results, extra={'ignore_stdout': True})
-
-    return do
+class GroupException(Exception):
+    def __init__(self, result: GenericGroupResult[GenericResult]):
+        self.result: GenericGroupResult[GenericResult] = result
 
 
 class NodeGroup:
 
-    def __init__(self, connections: Connections, cluster):
+    def __init__(self, hosts: Iterable[str], cluster):
         from kubemarine.core.cluster import KubernetesCluster
 
         self.cluster: KubernetesCluster = cluster
-        self.nodes = connections
+        self.nodes = set(hosts)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if self is other:
             return True
 
         if not isinstance(other, NodeGroup):
             return False
 
-        if self.cluster != other.cluster:
-            return False
+        return self.nodes == other.nodes
 
-        if len(self.nodes.keys()) != len(other.nodes.keys()):
-            return False
-
-        for host, connection in self.nodes.items():
-            other_host_conn = other.nodes.get(host)
-            if other_host_conn is None:
-                return False
-            if other_host_conn != connection:
-                return False
-
-        return True
-
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         return not self == other
 
-    def __hash__(self):
-        # TODO: include cluster object and real connections into hash value
-        nodes_addresses = tuple(self.nodes.keys())
-        return hash(nodes_addresses)
+    def _make_runners_result(self, result: NodeGroupResult) -> RunnersGroupResult:
+        return RunnersGroupResult(self.cluster,
+                                  {host: cast(RunnersResult, res) for host, res in result.items()})
 
-    def _make_result(self, results: _HostToResult) -> NodeGroupResult:
+    def _make_result_or_fail(self, results: HostToResult) -> NodeGroupResult:
         group_result = NodeGroupResult(self.cluster, results)
-        return group_result
 
-    def _make_result_or_fail(self, results: _HostToResult,
-                             failure_criteria: Callable[[str, _GenericResult], bool]) -> NodeGroupResult:
-        failed_hosts = [host for host, result in results.items() if failure_criteria(host, result)]
-        group_result = self._make_result(results)
-
-        if failed_hosts:
-            raise fabric.group.GroupException(group_result)
+        if group_result.is_any_excepted():
+            raise GroupException(group_result)
 
         return group_result
 
-    @_handle_internal_logging
-    def run(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
-        return self.do("run", *args, **kwargs)
+    def run(self, command: str,
+            warn: bool = False, hide: bool = True,
+            env: Dict[str, str] = None, timeout: int = None,
+            logging_stream: bool = False) -> RunnersGroupResult:
+        caller: Optional[Dict[str, object]] = None
+        if logging_stream:
+            # fetching of the caller info should be at the earliest point
+            caller = log.caller_info(self.cluster.log)
+        return self._do("run", command, caller,
+                        warn=warn, hide=hide, env=env, timeout=timeout)
 
-    @_handle_internal_logging
-    def sudo(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
-        return self.do("sudo", *args, **kwargs)
+    def sudo(self, command: str,
+             warn: bool = False, hide: bool = True,
+             env: Dict[str, str] = None, timeout: int = None,
+             logging_stream: bool = False) -> RunnersGroupResult:
+        caller: Optional[Dict[str, object]] = None
+        if logging_stream:
+            # fetching of the caller info should be at the earliest point
+            caller = log.caller_info(self.cluster.log)
+        return self._do("sudo", command, caller,
+                        warn=warn, hide=hide, env=env, timeout=timeout)
 
-    def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):
+    def get(self, remote_file: str, local_file: str) -> None:
+        self._do_with_wa("get", remote_file, local_file)
+
+    def put(self, local_file: Union[io.StringIO, str], remote_file: str,
+            backup=False, sudo=False, mkdir=False, immutable=False) -> None:
+        self._put(local_file, remote_file, False,
+                  backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
+
+    def defer(self) -> DeferredGroup:
+        return DeferredGroup(self)
+
+    def _put(self, local_file: Union[io.StringIO, str], remote_file: str,
+             deferred: bool, **kwargs) -> None:
         if isinstance(local_file, io.StringIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s with options %s"
-                                     % (remote_file, list(self.nodes.keys()), kwargs))
+                                     % (remote_file, list(self.nodes), kwargs))
             # This is a W/A to avoid https://github.com/paramiko/paramiko/issues/1133
             # if text contains non-ASCII characters.
             # Use the same encoding as paramiko uses, see paramiko/file.py/BufferedFile.write()
             bytes_stream = io.BytesIO(local_file.getvalue().encode('utf-8'))
-            self._put(bytes_stream, remote_file, **kwargs)
+            self._advanced_put(bytes_stream, remote_file, deferred, **kwargs)
             return
 
         self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s with options %s"
-                                 % (local_file, remote_file, list(self.nodes.keys()), kwargs))
+                                 % (local_file, remote_file, list(self.nodes), kwargs))
 
         self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
         local_file_hash = self.get_local_file_sha1(local_file)
@@ -441,20 +384,13 @@ class NodeGroup:
 
         group_to_upload = self.cluster.make_group(hosts_to_upload)
 
-        with open(local_file, "rb") as local_stream:
-            group_to_upload._put(local_stream, remote_file, **kwargs)
+        if not os.path.isfile(local_file):
+            raise Exception(f"File {local_file} does not exist")
 
-    def _put(self, local_stream: IO, remote_file: str, **kwargs):
-        hide = kwargs.pop("hide", True) is True
-        sudo = kwargs.pop("sudo", False) is True
-        backup = kwargs.pop("backup", False) is True
-        mkdir = kwargs.pop("mkdir", False) is True
-        immutable = kwargs.pop("immutable", False) is True
+        group_to_upload._advanced_put(local_file, remote_file, deferred, **kwargs)
 
-        # for unknown reason fabric v2 can't put async
-        # Let's remember passed value, which by default is True, and make it False forcibly.
-        is_async = kwargs.pop("is_async", True) is not False
-        kwargs["is_async"] = False
+    def _advanced_put(self, local_stream: Union[io.BytesIO, str], remote_file: str, deferred: bool,
+                      backup=False, sudo=False, mkdir=False, immutable=False) -> None:
 
         if sudo:
             self.cluster.log.verbose('A sudoer upload required')
@@ -468,17 +404,26 @@ class NodeGroup:
         if immutable:
             self.cluster.log.verbose('File \"%s\" immutable set required' % remote_file)
 
-        if not sudo and not backup and not immutable:
-            # no additional commands execution is required - directly upload file
-            self.do("put", local_stream, remote_file, **kwargs)
+        advanced_move_required = sudo or backup or immutable
+        temp_filepath = remote_file
+
+        if advanced_move_required:
+            # for unknown reason fabric v2 can't put as sudo, and we should use WA via mv
+            # also, if we need to backup the file first, then we also have to upload file to tmp first
+
+            temp_filepath = "/tmp/%s" % uuid.uuid4().hex
+            self.cluster.log.verbose("Uploading to temporary file '%s'..." % temp_filepath)
+
+        if deferred:
+            # TODO why we do not put async in eager mode, but still put async in deferred mode?
+            #  See else branch below.
+            self._do_queue("put", local_stream, temp_filepath)
+        else:
+            # for unknown reason fabric v2 can't put async
+            self._do_with_wa("put", local_stream, temp_filepath, is_async=False)
+
+        if not advanced_move_required:
             return
-
-        # for unknown reason fabric v2 can't put as sudo, and we should use WA via mv
-        # also, if we need to backup the file first, then we also have to upload file to tmp first
-
-        temp_filepath = "/tmp/%s" % uuid.uuid4().hex
-        self.cluster.log.verbose("Uploading to temporary file '%s'..." % temp_filepath)
-        self.do("put", local_stream, temp_filepath, **kwargs)
 
         self.cluster.log.verbose("Moving temporary file '%s' to '%s'..." % (temp_filepath, remote_file))
 
@@ -510,35 +455,46 @@ class NodeGroup:
             else:
                 mv_command = "chattr -i %s; %s; chattr +i %s" % (remote_file, mv_command, remote_file)
 
-        kwargs["hide"] = hide
-        kwargs["is_async"] = is_async
-        self.sudo(mv_command, **kwargs)
+        if deferred:
+            self.defer().sudo(mv_command)
+        else:
+            self.sudo(mv_command)
 
-    def get(self, *args, **kwargs):
-        return self.do("get", *args, **kwargs)
+    def _do(self, do_type: str, command: str, caller: Optional[Dict[str, object]], **kwargs) -> RunnersGroupResult:
+        """
+        The method should be called directly from run & sudo without any extra wrappers.
+        """
+        do_stream = not kwargs['hide'] or caller is not None
+        if do_stream and len(self.nodes) > 1:
+            raise ValueError("Streaming of output is supported only for the single node")
 
-    def do(self, do_type, *args, **kwargs) -> Union[NodeGroupResult, int]:
-        raw_results = self._do_with_wa(do_type, *args, **kwargs)
-        if isinstance(raw_results, int):
-            return raw_results
-        return self._make_result_or_fail(raw_results, lambda host, result: isinstance(result, Exception))
+        logger = self.cluster.log
+        if caller is not None:
+            # We want to stream output immediately to logging framework, thus not hide.
+            kwargs['hide'] = False
 
-    def _do_with_wa(self, do_type, *args, **kwargs) -> Union[_HostToResult, int]:
-        # by default all code is async, but can be set False forcibly
-        is_async = kwargs.pop("is_async", True) is not False
+            out = log.LoggerWriter(logger, caller, '[remote] ')
+            err = log.LoggerWriter(logger, caller, '[stderr] ')
 
-        left_nodes = self.nodes
+            results = self._do_with_wa(do_type, command, out_stream=out, err_stream=err, **kwargs)
+        else:
+            results = self._do_with_wa(do_type, command, **kwargs)
+            # if hide is False, we already logged only to stdout, and should log to other handlers.
+            if not kwargs['hide']:
+                logger.debug(results, extra={'ignore_stdout': True})
+
+        return self._make_runners_result(results)
+
+    def _do_with_wa(self, do_type, *args, **kwargs) -> NodeGroupResult:
+        left_nodes: List[str] = list(self.nodes)
         retry = 0
-        results: _HostToResult = {}
+        results: HostToResult = {}
         while True:
             retry += 1
 
-            result = self._do(do_type, left_nodes, is_async, *args, **kwargs)
-            if isinstance(result, int):
-                return result
-
+            result = self._do_exec(left_nodes, do_type, *args, **kwargs)
             results.update(result)
-            left_nodes = {host: left_nodes[host] for host, result in results.items() if isinstance(result, Exception)}
+            left_nodes = [host for host, result in results.items() if isinstance(result, Exception)]
 
             if not left_nodes or retry >= self.cluster.globals['workaround']['retries'] \
                     or not self._try_workaround(results, left_nodes):
@@ -547,12 +503,12 @@ class NodeGroup:
             self.cluster.log.verbose('Retrying #%s...' % retry)
             time.sleep(self.cluster.globals['workaround']['delay_period'])
 
-        return results
+        return self._make_result_or_fail(results)
 
-    def _try_workaround(self, results: _HostToResult, failed_nodes: Connections) -> bool:
+    def _try_workaround(self, results: HostToResult, failed_nodes: List[str]) -> bool:
         not_booted = []
 
-        for host in failed_nodes.keys():
+        for host in failed_nodes:
             exception = results[host]
             if isinstance(exception, UnexpectedExit):
                 exception_message = str(exception.result)
@@ -578,8 +534,7 @@ class NodeGroup:
 
         return True
 
-    def _do(self, do_type: str, nodes: Connections, is_async, *args, **kwargs) -> Union[_HostToResult, int]:
-
+    def _default_connection_kwargs(self, do_type: str, kwargs: dict) -> dict:
         if do_type in ["run", "sudo"]:
             # by default fabric will print all output from nodes
             # let's disable this feature if it was not forcibly defined
@@ -589,29 +544,25 @@ class NodeGroup:
             if kwargs.get("timeout", None) is None:
                 kwargs["timeout"] = self.cluster.globals['nodes']['command_execution']['timeout']
 
-        execution_timeout = kwargs.get("timeout", None)
+        return kwargs
 
-        results = {}
+    def _do_exec(self, nodes: List[str], do_type: str, *args: object, is_async: bool = True, **kwargs: object) -> HostToResult:
+        kwargs = self._default_connection_kwargs(do_type, kwargs)
 
-        if not nodes:
-            self.cluster.log.verbose('No nodes to perform %s %s with options: %s' % (do_type, args, kwargs))
-            return results
+        try:
+            with RemoteExecutor(self.cluster, parallel=is_async, timeout=kwargs.get("timeout")) as executor:
+                executor.queue(nodes, (do_type, args, kwargs))
 
-        self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (do_type, args, list(nodes.keys()), kwargs))
+            result: GenericGroupResult[GenericResult] = executor.get_merged_nodegroup_result()
+        except GroupException as exc:
+            result = exc.result
 
-        executor = RemoteExecutor(self.cluster, lazy=False, parallel=is_async, timeout=execution_timeout)
-        results = executor.queue(nodes, (do_type, args, kwargs))
+        return dict(result.items())
 
-        if not isinstance(results, int):
-            simplified_results = {}
-            for cnx, conn_results in results.items():
-                raw_results = list(conn_results.values())
-                if len(raw_results) > 1:
-                    raise Exception('Unexpected condition: not supported multiple results with non-lazy GRE')
-                simplified_results[cnx.host] = raw_results[0]
-            return simplified_results
-
-        return results
+    def _do_queue(self, do_type: str, *args: object, **kwargs: object) -> Token:
+        kwargs = self._default_connection_kwargs(do_type, kwargs)
+        executor = get_active_executor()
+        return executor.queue(self.nodes, (do_type, args, kwargs))
 
     def call(self, action, **kwargs):
         return self.call_batch([action], **{"%s.%s" % (action.__module__, action.__name__): kwargs})
@@ -634,38 +585,40 @@ class NodeGroup:
 
         return results
 
-    def get_online_nodes(self, online: bool) -> 'NodeGroup':
+    def get_online_nodes(self, online: bool) -> NodeGroup:
         online = [host for host, node_context in self.cluster.context['nodes'].items()
                   if node_context['access']['online'] == online]
         return self.cluster.make_group(online).intersection_group(self)
 
-    def get_accessible_nodes(self) -> 'NodeGroup':
+    def get_accessible_nodes(self) -> NodeGroup:
         accessible = [host for host, node_context in self.cluster.context['nodes'].items()
                       if node_context['access']['accessible']]
         return self.cluster.make_group(accessible).intersection_group(self)
 
-    def get_sudo_nodes(self) -> 'NodeGroup':
+    def get_sudo_nodes(self) -> NodeGroup:
         sudo = [host for host, node_context in self.cluster.context['nodes'].items()
                 if node_context['access']['sudo'] != "No"]
         return self.cluster.make_group(sudo).intersection_group(self)
 
-    def wait_for_reboot(self, initial_boot_history: NodeGroupResult, timeout=None) -> NodeGroupResult:
-        results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
-        return self._make_result_or_fail(
-            results,
-            lambda host, result: isinstance(result, Exception) or result == initial_boot_history.get(self.nodes[host])
-        )
+    def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout=None) -> RunnersGroupResult:
+        results = self._make_runners_result(self._make_result_or_fail(
+            self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
+        ))
+        if any(result == initial_boot_history.get(host) for host, result in results.items()):
+            raise GroupException(results)
 
-    def wait_and_get_boot_history(self, timeout=None) -> NodeGroupResult:
-        results = self._await_rebooted_nodes(timeout)
-        return self._make_result_or_fail(results, lambda _, r: isinstance(r, Exception))
+        return results
 
-    def wait_and_get_active_nodes(self, timeout=None) -> 'NodeGroup':
+    def wait_and_get_boot_history(self, timeout=None) -> RunnersGroupResult:
+        return self.wait_for_reboot(RunnersGroupResult(self.cluster, {}), timeout=timeout)
+
+    def wait_and_get_active_nodes(self, timeout=None) -> NodeGroup:
         results = self._await_rebooted_nodes(timeout)
         not_booted = [host for host, result in results.items() if isinstance(result, Exception)]
         return self.exclude_group(self.cluster.make_group(not_booted))
 
-    def _await_rebooted_nodes(self, timeout=None, initial_boot_history: NodeGroupResult = None) -> _HostToResult:
+    def _await_rebooted_nodes(self, timeout=None, initial_boot_history: RunnersGroupResult = None) \
+            -> HostToResult:
 
         if timeout is None:
             timeout = int(self.cluster.inventory['globals']['nodes']['boot']['timeout'])
@@ -675,10 +628,10 @@ class NodeGroup:
         if initial_boot_history:
             self.cluster.log.verbose("Initial boot history:\n%s" % initial_boot_history)
         else:
-            initial_boot_history = NodeGroupResult(self.cluster)
+            initial_boot_history = RunnersGroupResult(self.cluster, {})
 
-        left_nodes = self.nodes
-        results: _HostToResult = {}
+        left_nodes: List[str] = list(self.nodes)
+        results: HostToResult = {}
         time_start = datetime.now()
 
         self.cluster.log.verbose("Trying to connect to nodes, timeout is %s seconds..." % timeout)
@@ -687,17 +640,17 @@ class NodeGroup:
         # during specified number of seconds
         while True:
             attempt_time_start = datetime.now()
-            self.disconnect(list(left_nodes.keys()))
+            self.disconnect(left_nodes)
 
             self.cluster.log.verbose("Attempting to connect to nodes...")
             # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
             results.update(self._do_nopasswd(left_nodes, "last reboot"))
-            left_nodes = {host: left_nodes[host] for host, result in results.items()
+            left_nodes = [host for host, result in results.items()
                           if (isinstance(result, Exception)
                               # Something is wrong with sudo access. Node is active.
                               and not NodeGroup.is_require_nopasswd_exception(result))
                           or (not isinstance(result, Exception)
-                              and result == initial_boot_history.get(self.nodes[host]))}
+                              and result == initial_boot_history.get(host))]
 
             waited = (datetime.now() - time_start).total_seconds()
 
@@ -710,20 +663,20 @@ class NodeGroup:
                                              % (host, str(exc)))
 
             self.cluster.log.verbose("Nodes %s are not ready yet, remaining time to wait %i"
-                                     % (list(left_nodes.keys()), timeout - waited))
+                                     % (left_nodes, timeout - waited))
 
             attempt_time = (datetime.now() - attempt_time_start).total_seconds()
             if attempt_time < delay_period:
                 time.sleep(delay_period - attempt_time)
 
         if left_nodes:
-            self.cluster.log.verbose("Failed to wait for boot of nodes %s" % list(left_nodes.keys()))
+            self.cluster.log.verbose("Failed to wait for boot of nodes %s" % left_nodes)
         else:
             self.cluster.log.verbose("All nodes are online now")
 
         return results
 
-    def _do_nopasswd(self, left_nodes: Connections, command: str):
+    def _do_nopasswd(self, left_nodes: List[str], command: str) -> HostToResult:
         prompt = '[sudo] password: '
 
         class NoPasswdResponder(invoke.Responder):
@@ -742,8 +695,9 @@ class NodeGroup:
 
         # Currently only NOPASSWD sudoers are supported.
         # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
-        return self._do("run", left_nodes, True, f"sudo -S -p '{prompt}' {command}",
-                        watchers=[NoPasswdResponder()])
+        return self._do_exec(left_nodes, "run", f"sudo -S -p '{prompt}' {command}",
+                             is_async=True,
+                             watchers=[NoPasswdResponder()])
 
     @staticmethod
     def is_require_nopasswd_exception(exc: Exception):
@@ -776,15 +730,13 @@ class NodeGroup:
         return utils.get_local_file_sha1(filename)
 
     def get_remote_file_sha1(self, filename: str) -> Dict[str, str]:
-        results = self._do_with_wa("sudo", "openssl sha1 %s" % filename, warn=True)
-        self._make_result_or_fail(results, lambda h, r: isinstance(r, Exception))
-
+        results = self.sudo("openssl sha1 %s" % filename, warn=True)
         return {host: result.stdout.split("= ")[1].strip() if result.stdout else None
                 for host, result in results.items()}
 
     def get_ordered_members_list(self, apply_filter: GroupFilter = None) -> List[NodeGroup]:
         nodes = self.get_ordered_members_configs_list(apply_filter)
-        return [node['connection'] for node in nodes]
+        return [self.cluster.make_group([node]) for node in nodes]
 
     def get_ordered_members_configs_list(self, apply_filter: GroupFilter = None) -> List[NodeConfig]:
 
@@ -792,7 +744,7 @@ class NodeGroup:
         # we have to iterate strictly in order which was defined by user in config-file
         for node in self.cluster.inventory['nodes']:
             # is iterable node from inventory is part of current NodeGroup?
-            if node['connect_to'] in self.nodes.keys():
+            if node['connect_to'] in self.nodes:
 
                 # apply filters
                 suitable = True
@@ -825,20 +777,14 @@ class NodeGroup:
         return result
 
     def get_first_member(self, apply_filter: GroupFilter = None) -> NodeGroup:
-        return self.get_first_member_config(apply_filter=apply_filter)['connection']
-
-    def get_first_member_config(self, apply_filter: GroupFilter = None) -> NodeConfig:
-        results = self.get_ordered_members_configs_list(apply_filter=apply_filter)
+        results = self.get_ordered_members_list(apply_filter=apply_filter)
         if not results:
             raise Exception("Failed to find first group member by the given criteria")
         return results[0]
 
     def get_any_member(self, apply_filter: GroupFilter = None) -> NodeGroup:
-        member = random.choice(self.get_ordered_members_list(apply_filter=apply_filter))
-        # to avoid "Selected node <kubemarine.core.group.NodeGroup object at 0x7f925625d070>" writing to log,
-        # let's get node ip from selected member and pass to it to log
-        member_str = str(list(member.nodes.keys())[0])
-        self.cluster.log.verbose(f'Selected node {member_str}')
+        member: NodeGroup = random.choice(self.get_ordered_members_list(apply_filter=apply_filter))
+        self.cluster.log.verbose(f'Selected node {member.get_host()}')
         return member
 
     def get_member_by_name(self, name) -> NodeGroup:
@@ -847,31 +793,32 @@ class NodeGroup:
     def new_group(self, apply_filter: GroupFilter = None) -> NodeGroup:
         return self.cluster.make_group(self.get_ordered_members_list(apply_filter=apply_filter))
 
-    def include_group(self, group: NodeGroup) -> NodeGroup:
+    def include_group(self, group: Optional[NodeGroup]) -> NodeGroup:
         if group is None:
             return self
 
-        ips = list(self.nodes.keys()) + list(group.nodes.keys())
-        return self.cluster.make_group(list(dict.fromkeys(ips)))
+        ips = self.nodes.union(group.nodes)
+        return self.cluster.make_group(ips)
 
-    def exclude_group(self, group: NodeGroup) -> NodeGroup:
+    def exclude_group(self, group: Optional[NodeGroup]) -> NodeGroup:
         if group is None:
             return self
 
-        ips = list(set(self.nodes.keys()) - set(group.nodes.keys()))
-        return self.cluster.make_group(list(dict.fromkeys(ips)))
+        ips = self.nodes - group.nodes
+        return self.cluster.make_group(ips)
 
-    def intersection_group(self, group: NodeGroup) -> NodeGroup:
+    def intersection_group(self, group: Optional[NodeGroup]) -> NodeGroup:
         if group is None:
             return self.cluster.make_group([])
 
-        ips = list(set(self.nodes.keys()).intersection(set(group.nodes.keys())))
-        return self.cluster.make_group(list(dict.fromkeys(ips)))
+        ips = self.nodes.intersection(group.nodes)
+        return self.cluster.make_group(ips)
 
     def disconnect(self, hosts: List[str] = None):
-        for host, cxn in self.nodes.items():
-            if host in (hosts or self.nodes.keys()):
+        for host in self.nodes:
+            if host in (hosts or self.nodes):
                 self.cluster.log.verbose('Disconnected session with %s' % host)
+                cxn = self.cluster.connection_pool.get_connection(host)
                 cxn.close()
                 cxn._sftp = None
 
@@ -896,7 +843,13 @@ class NodeGroup:
         if len(self.nodes) != 1:
             raise Exception("Cannot get the only host from not a single node")
 
-        return next(iter(self.nodes.keys()))
+        return next(iter(self.nodes))
+
+    def get_config(self) -> NodeConfig:
+        if len(self.nodes) != 1:
+            raise Exception("Cannot get the only node config from not a single node")
+
+        return self.get_ordered_members_configs_list()[0]
 
     def is_empty(self) -> bool:
         return not self.nodes
@@ -939,7 +892,7 @@ class NodeGroup:
         Returns the number of nodes within a group
         :return: Integer
         """
-        return len(self.nodes.keys())
+        return len(self.nodes)
 
     def get_nodes_os(self) -> str:
         """
@@ -947,7 +900,7 @@ class NodeGroup:
 
         :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
         """
-        return self.cluster.get_os_family_for_nodes(self.nodes.keys())
+        return self.cluster.get_os_family_for_nodes(self.nodes)
 
     def is_multi_os(self) -> bool:
         """
@@ -964,9 +917,34 @@ class NodeGroup:
         """
         if os_family not in ['debian', 'rhel', 'rhel8']:
             raise Exception('Unsupported OS family provided')
-        node_names = []
-        for node in self.get_ordered_members_configs_list():
-            node_os_family = self.cluster.get_os_family_for_node(node['connect_to'])
+        hosts = []
+        for host in self.nodes:
+            node_os_family = self.cluster.get_os_family_for_node(host)
             if node_os_family == os_family:
-                node_names.append(node['name'])
-        return self.cluster.make_group_from_nodes(node_names)
+                hosts.append(host)
+        return self.cluster.make_group(hosts)
+
+
+class DeferredGroup:
+    def __init__(self, group: NodeGroup):
+        self._group = group
+
+    def run(self, command: str,
+            warn: bool = False, hide: bool = True,
+            env: Dict[str, str] = None, timeout: int = None) -> Token:
+        return self._group._do_queue("run", command,
+                                     warn=warn, hide=hide, env=env, timeout=timeout)
+
+    def sudo(self, command: str,
+             warn: bool = False, hide: bool = True,
+             env: Dict[str, str] = None, timeout: int = None) -> Token:
+        return self._group._do_queue("sudo", command,
+                                     warn=warn, hide=hide, env=env, timeout=timeout)
+
+    def get(self, remote_file: str, local_file: str) -> None:
+        self._group._do_queue("get", remote_file, local_file)
+
+    def put(self, local_file: Union[io.StringIO, str], remote_file: str,
+            backup=False, sudo=False, mkdir=False, immutable=False) -> None:
+        self._group._put(local_file, remote_file, True,
+                         backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)

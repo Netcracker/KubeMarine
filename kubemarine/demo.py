@@ -16,45 +16,35 @@ import io
 import re
 import threading
 from copy import deepcopy
-from typing import List, Dict, Union, Any, IO, Optional
+from typing import List, Dict, Union, Any, Optional, Mapping, Iterable
 
-import fabric
+import fabric  # type: ignore[import]
 from invoke import UnexpectedExit
 
 from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core import group, flow, connections
-from kubemarine.core.connections import Connections
-from kubemarine.core.group import NodeGroup, NodeGroupResult, _GenericResult, _HostToResult
+from kubemarine.core.executor import RunnersResult, GenericResult
+from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.core.resources import DynamicResources
 
-ShellResult = Dict[str, Union[NodeGroupResult, Any]]
+_ShellResult = Dict[str, Any]
 
 
 class FakeShell:
     def __init__(self):
-        self.results: Dict[str, List[ShellResult]] = {}
-        self.history: Dict[str, List[ShellResult]] = {}
+        self.results: Dict[str, List[_ShellResult]] = {}
+        self.history: Dict[str, List[_ShellResult]] = {}
         self._lock = threading.Lock()
-
-    def __deepcopy__(self, memodict: dict):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memodict[id(self)] = result
-        result.results = deepcopy(self.results, memodict)
-        result.history = deepcopy(self.history, memodict)
-        result._lock = threading.Lock()
-        return result
 
     def reset(self):
         self.results = {}
         self.history = {}
 
-    def add(self, results: Union[NodeGroupResult, _HostToResult], do_type, args, usage_limit=0):
+    def add(self, results: Mapping[str, GenericResult], do_type, args, usage_limit=0):
         args.sort()
 
         for host, result in results.items():
-            host = host.host if isinstance(host, fabric.connection.Connection) else host
             result = {
                 'result': result,
                 'do_type': do_type,
@@ -67,7 +57,7 @@ class FakeShell:
 
             self.results.setdefault(host, []).append(result)
 
-    def find(self, host: str, do_type, args, kwargs) -> _GenericResult:
+    def find(self, host: str, do_type, args, kwargs) -> GenericResult:
         # TODO: Support kwargs
         with self._lock:
             if isinstance(args, tuple):
@@ -117,14 +107,6 @@ class FakeFS:
     def __init__(self):
         self.storage: Dict[str, Dict[str, str]] = {}
         self._lock = threading.Lock()
-
-    def __deepcopy__(self, memodict: dict):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memodict[id(self)] = result
-        result.storage = deepcopy(self.storage, memodict)
-        result._lock = threading.Lock()
-        return result
 
     def reset(self):
         self.storage = {}
@@ -179,7 +161,7 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_shell = kwargs.pop("fake_shell", FakeShell())
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
-        self._connection_pool = FakeConnectionPool(self)
+        self.connection_pool = FakeConnectionPool(self)
 
     def make_group(self, ips) -> NodeGroup:
         nodegroup = super().make_group(ips)
@@ -341,20 +323,18 @@ class FakeConnection(fabric.connection.Connection):
 
 class FakeNodeGroup(group.NodeGroup):
 
-    def __init__(self, connections: Connections, cluster_: FakeKubernetesCluster):
-        super().__init__(connections, cluster_)
+    def __init__(self, hosts: Iterable[str], cluster_: FakeKubernetesCluster):
+        super().__init__(hosts, cluster_)
 
     def get_local_file_sha1(self, filename):
         return '0'
 
     def get_remote_file_sha1(self, filename):
-        return {host: '1' for host in self.nodes.keys()}
+        return {host: '1' for host in self.nodes}
 
-    def _put(self, local_stream: IO, remote_file: str, **kwargs):
-        kwargs.pop("sudo", None)
-        kwargs.pop("backup", None)
-        kwargs.pop("immutable", None)
-        super()._put(local_stream, remote_file, **kwargs)
+    def _advanced_put(self, local_stream: Union[io.BytesIO, str], remote_file: str, deferred: bool,
+                      backup=False, sudo=False, mkdir=False, immutable=False):
+        super()._advanced_put(local_stream, remote_file, deferred)
 
 
 class FakeConnectionPool(connections.ConnectionPool):
@@ -395,6 +375,7 @@ def new_cluster(inventory, procedure_inventory=None, context: dict = None,
     context['nodes'] = nodes_context
 
     # It is possible to disable FakeCluster and create real cluster Object for some business case
+    cluster: KubernetesCluster
     if fake:
         cluster = FakeKubernetesCluster(inventory, context, procedure_inventory=procedure_inventory)
     else:
@@ -513,26 +494,32 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
     return inventory
 
 
+def create_nodegroup_result_by_hosts(cluster: KubernetesCluster, results: Dict[str, GenericResult]) -> NodeGroupResult:
+    return NodeGroupResult(cluster, results)
+
+
 def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
-    return NodeGroupResult(group_.cluster, create_hosts_exception_result(group_.get_hosts(), exception))
+    hosts_to_result = create_hosts_exception_result(group_.get_hosts(), exception)
+    return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_exception_result(hosts: List[str], exception: Exception) -> _HostToResult:
+def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dict[str, GenericResult]:
     return {host: exception for host in hosts}
 
 
 def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
-    return NodeGroupResult(group_.cluster, create_hosts_result(group_.get_hosts(), stdout, stderr, code))
+    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code)
+    return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> _HostToResult:
+def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> Dict[str, GenericResult]:
     # each host should have its own result instance.
     return {host: create_result(stdout, stderr, code) for host in hosts}
 
 
-def create_result(stdout='', stderr='', code=0) -> _GenericResult:
+def create_result(stdout='', stderr='', code=0) -> RunnersResult:
     # connection will be later replaced to fake
-    return fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=None)
+    return RunnersResult(stdout=stdout, stderr=stderr, exited=code)
 
 
 def empty_action(*args, **kwargs) -> None:

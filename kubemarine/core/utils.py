@@ -236,7 +236,7 @@ def get_dump_filepath(context, filename):
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False, is_async=True):
+def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False):
     from kubemarine.core.group import NodeGroup
     group: NodeGroup
 
@@ -244,7 +244,7 @@ def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hi
 
     while retries > 0:
         log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide, is_async=is_async)
+        result = group.sudo(command, warn=warn, hide=hide)
         exit_code = list(result.values())[0].exited
         if exit_code == 0:
             log.debug("Command succeeded")
@@ -512,15 +512,16 @@ class ClusterStorage:
         command = f'ls {self.dir_path} | grep -v latest_dump'
         node_group_results = self.cluster.nodes["control-plane"].get_final_nodes().sudo(command)
         with RemoteExecutor(self.cluster):
-            for cxn, result in node_group_results.items():
-                control_plane = self.cluster.make_group([cxn.host])
+            for host, result in node_group_results.items():
+                control_plane = self.cluster.make_group([host]).defer()
                 files = result.stdout.split()
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
                     if i >= not_pack_file and i < delete_old:
                         if 'tar.gz' not in file:
-                            control_plane.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
-                                       f'sudo rm -r {self.dir_path + file}')
+                            control_plane.sudo(
+                                f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
+                                f'sudo rm -r {self.dir_path + file}')
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
@@ -571,16 +572,14 @@ class ClusterStorage:
         archive_remote_path = f"/tmp/{archive_name}"
         log = self.cluster.log
 
-        node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member_config()
-        control_plane = self.cluster.make_group([node['connect_to']])
+        control_plane = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member()
         data_copy_res = control_plane.sudo(f'tar -czvf {archive_remote_path} {self.dir_path}')
         log.verbose("Archive with procedures history is created:\n%s" % data_copy_res)
         control_plane.get(archive_remote_path, archive_dump_path)
 
         log.debug("Archive with procedures history is downloaded")
 
-        for new_node in new_control_planes.get_ordered_members_configs_list():
-            group = self.cluster.make_group([new_node['connect_to']])
+        for group in new_control_planes.get_ordered_members_list():
             group.put(archive_dump_path, archive_remote_path, sudo=True)
             group.sudo(f'tar -C / -xzvf {archive_remote_path}')
-            log.debug(f"Archive with procedures history is uploaded to {new_node['name']!r}")
+            log.debug(f"Archive with procedures history is uploaded to {group.get_node_name()!r}")

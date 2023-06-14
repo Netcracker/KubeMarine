@@ -96,16 +96,16 @@ def export_packages_list(cluster: KubernetesCluster):
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"
     results = cluster.nodes['all'].sudo(cmd)
-    for conn, result in results.items():
-        cluster.context['backup_descriptor']['nodes']['packages'][conn.host] = result.stdout.strip().split('\n')
+    for host, result in results.items():
+        cluster.context['backup_descriptor']['nodes']['packages'][host] = result.stdout.strip().split('\n')
 
 
 def export_hostname(cluster: KubernetesCluster):
     cluster.context['backup_descriptor']['nodes']['hostnames'] = {}
     results = cluster.nodes['all'].sudo('hostnamectl status | head -n 1 | sed -e \'s/[a-zA-Z ]*://g\'')
     cluster.log.verbose(results)
-    for conn, result in results.items():
-        cluster.context['backup_descriptor']['nodes']['hostnames'][conn.host] = result.stdout.strip()
+    for host, result in results.items():
+        cluster.context['backup_descriptor']['nodes']['hostnames'][host] = result.stdout.strip()
 
 
 def export_cluster_yaml(cluster: KubernetesCluster):
@@ -173,7 +173,7 @@ def export_etcd(cluster: KubernetesCluster):
         cluster.log.verbose('Failed to load and parse ETCD status')
 
     if is_custom_etcd_node:
-        cluster.context['backup_descriptor']['etcd']['source'] = etcd_node.get_nodes_names()[0]
+        cluster.context['backup_descriptor']['etcd']['source'] = etcd_node.get_node_name()
     else:
         # if user did not provide node, then we have to select leader by ourselves
         if not etcd_status:
@@ -191,7 +191,7 @@ def export_etcd(cluster: KubernetesCluster):
             raise Exception('Failed to detect ETCD leader - not possible to create backup from actual DB')
 
     snap_name = 'snapshot%s.db' % int(round(time.time() * 1000))
-    endpoint_ip = etcd_node.get_ordered_members_configs_list()[0]["internal_address"]
+    endpoint_ip = etcd_node.get_config()["internal_address"]
     cluster.log.debug('Creating ETCD backup "%s"...' % snap_name)
     result = etcd_node.sudo(f'etcdctl snapshot save /var/lib/etcd/{snap_name} --endpoints=https://{endpoint_ip}:2379 '
                             f'&& sudo mv /var/lib/etcd/{snap_name} /tmp/{snap_name} '

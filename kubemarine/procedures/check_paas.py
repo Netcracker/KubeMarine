@@ -65,27 +65,27 @@ def services_status(cluster: KubernetesCluster, service_type: str):
 
         statuses = []
         failed = False
-        for connection, node_result in result.items():
+        for host, node_result in result.items():
             if node_result.return_code == 4:
                 statuses.append('service is missing')
                 failed = True
                 cluster.log.debug('%s is not presented on host %s, skipped'
-                                  % (service_type.capitalize(), connection.host))
+                                  % (service_type.capitalize(), host))
                 continue
             matches = re.findall(status_regexp, node_result.stdout)
             if matches:
                 status = matches[0][0].strip()
                 cluster.log.debug(
-                    '%s status is \"%s\" at host %s' % (service_type.capitalize(), status, connection.host))
+                    '%s status is \"%s\" at host %s' % (service_type.capitalize(), status, host))
                 if status != 'active (running)':
                     statuses.append(status)
                     failed = True
             elif node_result.return_code != 0:
                 failed = True
                 cluster.log.error('%s status has bad exit code \"%s\" at host %s'
-                                  % (service_type.capitalize(), node_result.return_code, connection.host))
+                                  % (service_type.capitalize(), node_result.return_code, host))
             else:
-                raise Exception('Failed to detect status for \"%s\"' % connection.host)
+                raise Exception('Failed to detect status for \"%s\"' % host)
 
         statuses = list(set(statuses))
 
@@ -279,6 +279,7 @@ def thirdparties_hashes(cluster: KubernetesCluster):
 
         #Create tmp dir for loading thirdparty without default sha
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        first_control_plane_host = first_control_plane.get_host()
 
         for path, config in cluster.inventory['services']['thirdparties'].items():
             group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
@@ -302,25 +303,27 @@ def thirdparties_hashes(cluster: KubernetesCluster):
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
                 # Load thirdparty to temporary dir
                 remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
-                results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
-                host, result = list(results.items())[0]
-                if result.failed:
-                    broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
-                    cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                results = first_control_plane.sudo(remote_commands, warn=True)
+                if results.is_any_failed():
+                    host = first_control_plane_host
+                    msg = f"Can`t download thirdparty {path} on {host} for getting sha: {results[host].stderr}"
+                    broken.append(msg)
+                    cluster.log.verbose(msg)
                 else:
                     # Get temporary thirdparty sha
                     cluster.log.verbose(f"Get temporary thirdparty sha for {path}...")
                     results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
-                    host, result = list(results.items())[0]
-                    if result.failed:
-                        broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
-                        cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                    if results.is_any_failed():
+                        host = first_control_plane_host
+                        msg = f'failed to get sha for temporary file {random_path} on {host}: {results[host].stderr}'
+                        broken.append(msg)
+                        cluster.log.verbose(msg)
                     else:
                         expected_sha = result.stdout.strip()
                         cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
-                first_control_plane.sudo(final_commands, hide=True, warn=True)
+                first_control_plane.sudo(final_commands, warn=True)
 
             recommended_sha = thirdparties.get_thirdparty_recommended_sha(path, cluster)
             if recommended_sha is not None and recommended_sha != expected_sha:
@@ -342,15 +345,15 @@ def thirdparties_hashes(cluster: KubernetesCluster):
             # Searching actual SHA, if possible
             for host, result in results.items():
                 if result.failed:
-                    broken.append(f'failed to get {path} sha {host.host}: {result.stderr}')
+                    broken.append(f'failed to get {path} sha {host}: {result.stderr}')
                     continue
 
                 found_sha = result.stdout.strip()
                 if actual_sha is None:
                     actual_sha = found_sha
-                    first_host = host.host
+                    first_host = host
                 elif actual_sha != found_sha:
-                    broken.append(f'got inconsistent sha for {path}: {found_sha} on host {host.host}, '
+                    broken.append(f'got inconsistent sha for {path}: {found_sha} on host {host}, '
                                   f'different from first host {first_host} sha {actual_sha}')
                     actual_sha = None
                     break
@@ -384,19 +387,19 @@ def thirdparties_hashes(cluster: KubernetesCluster):
                 for host, result in res.items():
                     if result.failed:
                         broken.append(f'can not verify files SHA for archive {path} '
-                                      f'on host {host.host}, unpacked to {unpack_dir}')
+                                      f'on host {host}, unpacked to {unpack_dir}')
                         continue
                     files_results = result.stdout.strip().split('\n')
                     for file_result in files_results:
                         result_parts = file_result.split()
                         if len(result_parts) != 3:
                             broken.append(f'can not verify files SHA for archive {path} '
-                                          f'on host {host.host}, unpacked to {unpack_dir}')
+                                          f'on host {host}, unpacked to {unpack_dir}')
                             continue
                         filename, archive_hash, fs_hash = result_parts[0], result_parts[1], result_parts[2]
                         if archive_hash != fs_hash:
                             broken.append(f'hash for file {filename} from archive {path} '
-                                          f'on host {host.host} is not equal to hash for file unpacked to {unpack_dir}')
+                                          f'on host {host} is not equal to hash for file unpacked to {unpack_dir}')
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
@@ -416,7 +419,7 @@ def find_hosts_missing_thirdparty(group: NodeGroup, path: str) -> List[str]:
     missing = []
     for host, result in results.items():
         if result.failed:
-            missing.append(host.host)
+            missing.append(host)
     return missing
 
 
@@ -635,17 +638,17 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         enforcing_ips = []
         permissive_ips = []
         bad_ips = []
-        for conn, results in selinux_parsed_result.items():
+        for host, results in selinux_parsed_result.items():
             if results.get('status', '') != 'disabled':
                 if results['mode'] == 'enforcing':
-                    enforcing_ips.append(conn.host)
+                    enforcing_ips.append(host)
                 elif results['mode'] == 'permissive' and cluster.inventory.get('services', {})\
                         .get('kernel_security', {}).get('selinux', {}).get('state') == 'permissive':
-                    permissive_ips.append(conn.host)
+                    permissive_ips.append(host)
                 else:
-                    bad_ips.append([conn.host, results['mode']])
+                    bad_ips.append([host, results['mode']])
             else:
-                bad_ips.append([conn.host, 'disabled'])
+                bad_ips.append([host, 'disabled'])
 
         if group.nodes_amount() == len(enforcing_ips):
             tc.success(results='enforcing')
@@ -815,9 +818,9 @@ def control_plane_configuration_status(cluster: KubernetesCluster):
                             'kube-scheduler': 'scheduler'}
         static_pods_content = []
         not_presented_static_pods = []
-        for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
+        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list():
             for static_pod_name, value in static_pod_names.items():
-                result = control_plane['connection'].sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
+                result = control_plane.sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
                 exit_code = list(result.values())[0].exited
                 result = result.get_simple_out()
                 if exit_code == 0:
@@ -830,15 +833,16 @@ def control_plane_configuration_status(cluster: KubernetesCluster):
                 del static_pod_names[not_presented_static_pod]
 
             result = dict()
-            result['name'] = control_plane['name']
+            result['name'] = control_plane.get_node_name()
             version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
 
+            node_config = control_plane.get_config()
             for static_pod in static_pods_content:
                 result[static_pod['metadata']['name']] = dict()
                 result[static_pod['metadata']['name']]['correct_version'] = \
                     version in static_pod["spec"]["containers"][0].get("image", "")
                 result[static_pod['metadata']['name']]['correct_properties'] = \
-                    check_extra_args(cluster, static_pod, control_plane)
+                    check_extra_args(cluster, static_pod, node_config)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
             results.append(result)
 
@@ -1234,13 +1238,13 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
         results = group.sudo("aa-enabled")
         enabled_nodes = []
         invalid_nodes = []
-        for connection, item in results.items():
+        for host, item in results.items():
             apparmor_status = item.stdout
-            cluster.log.warning(f"Apparmor on node: {connection.host} enabled: {apparmor_status}")
+            cluster.log.warning(f"Apparmor on node: {host} enabled: {apparmor_status}")
             if apparmor_status ==  "Yes":
-                enabled_nodes.append(connection.host)
+                enabled_nodes.append(host)
             else:
-                enabled_nodes.append(connection.host)
+                enabled_nodes.append(host)
         if group.nodes_amount() == len(enabled_nodes):
             tc.success(results='enabled')
         else:

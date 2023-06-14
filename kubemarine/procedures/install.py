@@ -15,9 +15,8 @@
 
 
 from collections import OrderedDict
-from typing import Callable
+from typing import Callable, List
 
-import fabric
 import yaml
 import os
 import io
@@ -29,7 +28,7 @@ from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins,
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils, summary
 from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, GroupException, RunnersGroupResult
 from kubemarine.core.resources import DynamicResources
 
 
@@ -81,7 +80,7 @@ def system_prepare_check_sudoer(cluster: KubernetesCluster):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_check_system(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     cluster.log.debug(system.fetch_os_versions(cluster))
     for address, context in cluster.context["nodes"].items():
         if address not in group.nodes:
@@ -109,7 +108,7 @@ def system_prepare_check_cluster_installation(cluster: KubernetesCluster):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_chrony(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     if cluster.inventory['services']['ntp'].get('chrony', {}).get('servers') is None:
         cluster.log.debug("Skipped - NTP servers from chrony is not defined in config file")
         return
@@ -118,7 +117,7 @@ def system_prepare_system_chrony(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_timesyncd(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     if not cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('NTP') and \
             not cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP'):
         cluster.log.debug("Skipped - NTP servers from timesyncd is not defined in config file")
@@ -128,7 +127,7 @@ def system_prepare_system_timesyncd(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_sysctl(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     if cluster.inventory['services'].get('sysctl') is None or not cluster.inventory['services']['sysctl']:
         cluster.log.debug("Skipped - sysctl is not defined or empty in config file")
         return
@@ -178,21 +177,21 @@ def system_prepare_policy(group: NodeGroup):
     """
     Task generates rules for logging kubernetes and on audit
     """
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
     audit_log_dir = os.path.dirname(api_server_extra_args['audit-log-path'])
     audit_file_name = api_server_extra_args['audit-policy-file']
     audit_policy_dir = os.path.dirname(audit_file_name)
     group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-    collect_node = group.get_ordered_members_configs_list()
+    collect_node = group.get_ordered_members_list()
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
         #download rules in cluster
         for node in collect_node:
-            node['connection'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+            node.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
         audit_config = True
         cluster.log.debug("Audit cluster policy config")
     else:
@@ -201,25 +200,27 @@ def system_prepare_policy(group: NodeGroup):
 
     if kubernetes.is_cluster_installed(cluster) and audit_config is True and cluster.context['initial_procedure'] != 'add_node':
         for control_plane in collect_node:
-            config_new = (kubernetes.get_kubeadm_config(cluster.inventory))
+            node_config = control_plane.get_config()
+            config_new = kubernetes.get_kubeadm_config(cluster.inventory)
 
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
             # and only "else" branch remains
             if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-                control_plane['connection'].put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+                control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
 
-                control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
-                                             f"--config=/etc/kubernetes/audit-on-config.yaml && "
-                                             f"sudo sed -i 's/--bind-address=.*$/--bind-address="
-                                             f"{control_plane['internal_address']}/' "
-                                             f"/etc/kubernetes/manifests/kube-apiserver.yaml")
+                control_plane.sudo(
+                    f"kubeadm init phase control-plane apiserver "
+                    f"--config=/etc/kubernetes/audit-on-config.yaml && "
+                    f"sudo sed -i 's/--bind-address=.*$/--bind-address="
+                    f"{node_config['internal_address']}/' "
+                    f"/etc/kubernetes/manifests/kube-apiserver.yaml")
             else:
                 # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
                 init_config = {
                     'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
                     'kind': 'InitConfiguration',
                     'localAPIEndpoint': {
-                        'advertiseAddress': control_plane['internal_address']
+                        'advertiseAddress': node_config['internal_address']
                     },
                     'patches': {
                         'directory': '/etc/kubernetes/patches'
@@ -228,37 +229,37 @@ def system_prepare_policy(group: NodeGroup):
 
                 config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
-                control_plane['connection'].put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+                control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
 
                 kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
 
-                control_plane['connection'].sudo(f"kubeadm init phase control-plane apiserver "
-                                             f"--config=/etc/kubernetes/audit-on-config.yaml ")
+                control_plane.sudo(f"kubeadm init phase control-plane apiserver "
+                                   f"--config=/etc/kubernetes/audit-on-config.yaml ")
 
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-                control_plane['connection'].call(utils.wait_command_successful,
-                                                 command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
+                control_plane.call(utils.wait_command_successful,
+                                   command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
             else:
-                control_plane['connection'].call(utils.wait_command_successful,
-                                                 command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
-                                                         " | awk '{print $1}')")
-            control_plane['connection'].call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-            control_plane['connection'].sudo("kubeadm init phase upload-config kubeadm "
-                                             "--config=/etc/kubernetes/audit-on-config.yaml")
+                control_plane.call(utils.wait_command_successful,
+                                   command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
+                                           " | awk '{print $1}')")
+            control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            control_plane.sudo("kubeadm init phase upload-config kubeadm "
+                               "--config=/etc/kubernetes/audit-on-config.yaml")
 
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_dns_hostname(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     with RemoteExecutor(cluster):
         for node in group.get_ordered_members_list():
             cluster.log.debug("Changing hostname '%s' = '%s'" % (node.get_host(), node.get_node_name()))
-            node.sudo("hostnamectl set-hostname %s" % node.get_node_name())
+            node.defer().sudo("hostnamectl set-hostname %s" % node.get_node_name())
 
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_dns_resolv_conf(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     if cluster.inventory["services"].get("resolv.conf") is None:
         cluster.log.debug("Skipped - resolv.conf section not defined in config file")
         return
@@ -282,7 +283,7 @@ def system_prepare_dns_etc_hosts(cluster: KubernetesCluster):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_package_manager_configure(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
     if not repositories:
         cluster.log.debug("Skipped - no repositories defined for configuration")
@@ -310,8 +311,8 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
     ])
 
 
-def manage_mandatory_packages(group: NodeGroup):
-    cluster = group.cluster
+def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
 
     with RemoteExecutor(cluster) as exe:
         for node in group.get_ordered_members_list():
@@ -322,14 +323,14 @@ def manage_mandatory_packages(group: NodeGroup):
 
             if pkgs:
                 cluster.log.debug(f"Installing {pkgs} on {node.get_node_name()!r}")
-                packages.install(node, pkgs)
+                packages.install(node, include=pkgs)
 
-    return exe.get_merged_result()
+    return exe.get_merged_runners_result()
 
 
 def manage_custom_packages(group: NodeGroup):
-    cluster = group.cluster
-    batch_tasks = []
+    cluster: KubernetesCluster = group.cluster
+    batch_tasks: List[Callable] = []
     batch_parameters = {}
 
     packages_section = cluster.inventory["services"].get("packages", {})
@@ -360,7 +361,7 @@ def manage_custom_packages(group: NodeGroup):
 
     try:
         batch_results = group.call_batch(batch_tasks, **batch_parameters)
-    except fabric.group.GroupException:
+    except GroupException:
         cluster.log.verbose('Exception occurred! Trying to handle is there anything updated or not...')
         # todo develop cases when we can continue even if exception occurs
         raise
@@ -368,10 +369,10 @@ def manage_custom_packages(group: NodeGroup):
     any_changes_found = False
     for action, results in batch_results.items():
         cluster.log.verbose('Verifying packages changes after \'%s\' action...' % action)
-        for conn, result in results.items():
-            node = cluster.make_group([conn])
+        for host, result in results.items():
+            node = cluster.make_group([host])
             if not packages.no_changes_found(node, action, result):
-                cluster.log.verbose('Packages changed at %s' % conn.host)
+                cluster.log.verbose('Packages changed at %s' % host)
                 any_changes_found = True
 
     if any_changes_found:
@@ -399,7 +400,7 @@ def system_cri_configure(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_thirdparties(group: NodeGroup):
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
@@ -512,8 +513,7 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
     ])
 
     if 'worker' in cluster.nodes:
-        cluster.nodes['worker'].new_group(
-            apply_filter=lambda node: 'control-plane' not in node['roles']) \
+        cluster.nodes['worker'].exclude_group(cluster.nodes['control-plane']) \
             .call(kubernetes.init_workers)
 
     cluster.nodes['all'].call_batch([

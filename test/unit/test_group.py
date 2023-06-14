@@ -17,9 +17,8 @@
 import unittest
 import random
 
-import fabric
-
 from kubemarine import demo
+from kubemarine.core.group import GroupException
 from kubemarine.demo import FakeKubernetesCluster
 
 
@@ -33,10 +32,10 @@ class TestGroupCreation(unittest.TestCase):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get('worker').nodes.keys())[1:])
-        filtered_group = cluster.nodes.get('worker').new_group(apply_filter=lambda node: 'master' not in node['roles'])
+        expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
+        filtered_group = cluster.nodes['worker'].new_group(apply_filter=lambda node: 'master' not in node['roles'])
 
-        self.assertDictEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
+        self.assertEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
 
     def test_exclude_group(self):
         inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
@@ -44,16 +43,16 @@ class TestGroupCreation(unittest.TestCase):
 
         result_group = cluster.nodes['all'].exclude_group(cluster.nodes['balancer'])
 
-        self.assertDictEqual(cluster.nodes['master'].nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(cluster.nodes['master'].nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_exclude_group_2(self):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get('worker').nodes.keys())[1:])
-        result_group = cluster.nodes.get('worker').exclude_group(cluster.nodes['master'])
+        expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
+        result_group = cluster.nodes['worker'].exclude_group(cluster.nodes['master'])
 
-        self.assertDictEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_include_group(self):
         inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
@@ -61,7 +60,7 @@ class TestGroupCreation(unittest.TestCase):
 
         result_group = cluster.nodes['balancer'].include_group(cluster.nodes['master'])
 
-        self.assertDictEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
 
 
 class TestGroupCall(unittest.TestCase):
@@ -79,20 +78,19 @@ class TestGroupCall(unittest.TestCase):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
         empty_group = cluster.nodes["worker"].new_group(apply_filter=lambda node: 'xxx' in node['roles'])
         # if there no nodes in empty group - an exception should not be produced - empty result should be returned
-        empty_group.run('whoami', is_async=True)
-        empty_group.run('whoami', is_async=False)
+        empty_group.run('whoami')
 
     def test_GroupException_one_node_failed(self):
         all_nodes = TestGroupCall.cluster.nodes["all"]
         results = demo.create_hosts_result(all_nodes.get_hosts(), stdout='example result')
-        results[random.choice(list(all_nodes.nodes.keys()))] = Exception('Some error')
+        results[random.choice(all_nodes.get_hosts())] = Exception('Some error')
 
         TestGroupCall.cluster.fake_shell.add(results, "run", ['some command'])
 
         exception = None
         try:
             all_nodes.run('some command')
-        except fabric.group.GroupException as e:
+        except GroupException as e:
             exception = e
 
         self.assertIsNotNone(exception, msg="GroupException should be raised")

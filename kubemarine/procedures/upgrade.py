@@ -137,15 +137,18 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 if isinstance(value, dict):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
+            tokens = []
             with RemoteExecutor(cluster) as exe:
                 for node in cluster.nodes['control-plane'].include_group(
                         cluster.nodes.get('worker')).get_ordered_members_list():
+                    defer = node.defer()
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
-                    node.put(StringIO(config_string), os_specific_associations['config_location'],
-                             backup=True, sudo=True, mkdir=True)
-                    node.sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                              f"systemctl status {os_specific_associations['service_name']}")
-            return exe.get_last_results_str()
+                    defer.put(StringIO(config_string), os_specific_associations['config_location'],
+                              backup=True, sudo=True, mkdir=True)
+                    tokens.append(defer.sudo(
+                        f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                        f"systemctl status {os_specific_associations['service_name']}"))
+            return exe.get_merged_runners_result(tokens)
 
 
 tasks = OrderedDict({
@@ -241,8 +244,7 @@ def fix_cri_socket(cluster: KubernetesCluster):
     if cluster.inventory["services"]["cri"]["containerRuntime"] == "containerd":
         control_plane = cluster.nodes["control-plane"].get_first_member()
         control_plane.sudo(f"sudo kubectl annotate nodes --all "
-                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
-                           , is_async=False, hide=True)
+                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
 

@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict, Tuple
-
-import fabric
+from typing import List, Dict, Tuple, Optional, Union, cast
 
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -372,7 +370,7 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
     :param ensured_association_only: Specify whether to take 'cache_versions' property into account.
     :return: List of packages for each relevant host.
     """
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
 
     packages_section = inventory['services']['packages']
     if not packages_section['mandatory'].get(association_name, True):
@@ -412,8 +410,8 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
 
 
 def _cache_package_associations(group: NodeGroup, inventory: dict,
-                                detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
-    cluster = group.cluster
+                                detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool) -> None:
+    cluster: KubernetesCluster = group.cluster
     associations = inventory['services']['packages']['associations'][cluster.get_os_family()]
     for association_name, associated_params in associations.items():
         hosts_to_packages = get_association_hosts_to_packages(
@@ -512,35 +510,35 @@ def get_package_manager(group: NodeGroup) -> apt or yum:
     raise Exception('Failed to return package manager for unknown or multiple OS')
 
 
-def ls_repofiles(group: NodeGroup, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).ls_repofiles(group, **kwargs)
+def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
+    return get_package_manager(group).ls_repofiles(group)
 
 
-def backup_repo(group: NodeGroup, repo_filename="*", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).backup_repo(group, repo_filename, **kwargs)
+def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
+    return get_package_manager(group).backup_repo(group)
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).add_repo(group, repo_data, repo_filename, **kwargs)
+def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined") -> RunnersGroupResult:
+    return get_package_manager(group).add_repo(group, repo_data, repo_filename)
 
 
-def clean(group: NodeGroup, mode="all", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).clean(group, mode, **kwargs)
+def clean(group: NodeGroup) -> RunnersGroupResult:
+    return get_package_manager(group).clean(group)
 
 
-def install(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).install(group, include, exclude, **kwargs)
+def install(group: NodeGroup, include=None, exclude=None) -> Union[Token, RunnersGroupResult]:
+    return get_package_manager(group).install(group, include, exclude)
 
 
-def remove(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).remove(group, include, exclude, **kwargs)
+def remove(group: NodeGroup, include=None, exclude=None, warn=False, hide=True) -> RunnersGroupResult:
+    return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
+def upgrade(group: NodeGroup, include=None, exclude=None) -> RunnersGroupResult:
+    return get_package_manager(group).upgrade(group, include, exclude)
 
 
-def no_changes_found(group: NodeGroup, action: callable, result: fabric.runners.Result) -> bool:
+def no_changes_found(group: NodeGroup, action: callable, result: RunnersResult) -> bool:
     pkg_mgr = get_package_manager(group)
     if action is install:
         action = pkg_mgr.install
@@ -563,7 +561,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
+def _detect_installed_package_version(group: NodeGroup, package: str) -> Token:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -580,10 +578,10 @@ def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGro
     package_name = get_package_name(os_family, package)
 
     cmd = get_detect_package_version_cmd(os_family, package_name)
-    return group.sudo(cmd)
+    return group.defer().sudo(cmd)
 
 
-def _parse_node_detected_package(result: fabric.runners.Result, package: str) -> str:
+def _parse_node_detected_package(result: RunnersResult, package: str) -> str:
     node_detected_package = result.stdout.strip() + result.stderr.strip()
     # consider version, which ended with special symbol = or - as not installed
     # (it is possible in some cases to receive "containerd=" version)
@@ -617,17 +615,14 @@ def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to
                 _detect_installed_package_version(node, package)
 
     raw_result = exe.get_last_results()
-    if not raw_result:
-        return {}
-
     results: Dict[str, Dict[str, List]] = {}
 
-    for conn, multiple_results in raw_result.items():
+    for host, multiple_results in raw_result.items():
         multiple_results = list(multiple_results.values())
-        host = conn.host
         packages_list = hosts_to_packages[host]
         for i, package in enumerate(packages_list):
-            node_detected_package = _parse_node_detected_package(multiple_results[i], package)
+            result = cast(RunnersResult, multiple_results[i])
+            node_detected_package = _parse_node_detected_package(result, package)
             results.setdefault(package, {}).setdefault(node_detected_package, []).append(host)
 
     return results
@@ -657,13 +652,13 @@ def get_package_name(os_family: str, package: str) -> str:
     return package_name
 
 
-def search_package(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).search(group, package, **kwargs)
+def search_package(group: NodeGroup, package: str) -> Token:
+    return get_package_manager(group).search(group, package)
 
 
-def create_repo_file(group: NodeGroup, repo_data, repo_file):
+def create_repo_file(group: NodeGroup, repo_data, repo_file) -> None:
     get_package_manager(group).create_repo_file(group, repo_data, repo_file)
 
 
-def get_repo_filename(group: NodeGroup, repo_filename="predefined"):
+def get_repo_filename(group: NodeGroup, repo_filename="predefined") -> str:
     return get_package_manager(group).get_repo_file_name(repo_filename)

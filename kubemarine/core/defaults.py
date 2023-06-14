@@ -90,9 +90,8 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     for i, node in enumerate(inventory["nodes"]):
         address = cluster.get_access_address_from_node(node)
 
-        # we have definitely know how to connect
+        # we definitely know how to connect
         cluster.inventory["nodes"][i]["connect_to"] = address
-        cluster.inventory["nodes"][i]["connection"] = cluster.make_group([address])
 
         if not cluster.context["nodes"].get(address):
             cluster.context["nodes"][address] = {}
@@ -506,17 +505,13 @@ def _escape_jinja_character(value):
     return value
 
 
-def prepare_for_dump(inventory, copy=True):
-    # preparation for dump required to remove memory links
+def prepare_for_dump(inventory: dict, copy: bool = True) -> dict:
+    # different preparations before the inventory can be dumped
 
     if copy:
         dump_inventory = deepcopy(inventory)
     else:
         dump_inventory = inventory
-
-    for i, node in enumerate(dump_inventory['nodes']):
-        if 'connection' in dump_inventory['nodes'][i]:
-            del dump_inventory['nodes'][i]['connection']
 
     return dump_inventory
 
