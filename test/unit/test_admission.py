@@ -72,6 +72,19 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['RoleBinding', 'ClusterRoleBinding']"):
             self._new_cluster()
 
+    def test_default_admission_for_kuber_version(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+
+        # Old kuber version with default psp admission
+        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.24.11'}
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual(cluster.inventory['rbac']['admission'], 'psp')
+
+        # New kuber version with default pss admission
+        inventory['services']['kubeadm'] = {'kubernetesVersion': 'v1.25.2'}
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual(cluster.inventory['rbac']['admission'], 'pss')
+
     def _stub_resource(self, kind):
         return {
             'apiVersion': 'policy/v1beta1',

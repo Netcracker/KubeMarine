@@ -120,3 +120,7 @@ class TestTemplate(unittest.TestCase):
                         if len(history) == 1 and history[0]["used_times"] == 1:
                             cnt += 1
                     self.assertEqual(1, cnt)
+
+
+if __name__ == '__main__':
+    unittest.main()

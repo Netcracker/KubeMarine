@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import io
 import os
 import random
@@ -28,6 +27,7 @@ import fabric
 import invoke
 from invoke import UnexpectedExit
 
+from kubemarine.core import utils, log
 from kubemarine.core.connections import Connections
 from kubemarine.core.executor import RemoteExecutor
 
@@ -308,6 +308,44 @@ class NodeGroupResult(fabric.group.GroupResult, Dict[fabric.connection.Connectio
         return not self == other
 
 
+def _handle_internal_logging(fn: callable) -> callable:
+    """
+    Method is a decorator that handles internal streaming of output (hide=False) of fabric (invoke).
+    Note! This decorator should be the outermost.
+
+    :param fn: Origin function to apply annotation to
+    :return: Validation wrapper function
+    """
+    def do(self: 'NodeGroup', *args, logging_stream_level: int = None, **kwargs):
+        if logging_stream_level is not None and 'hide' in kwargs:
+            raise ValueError("'hide' and 'logging_stream_level' should not be combined")
+
+        logger = self.cluster.log
+        if logging_stream_level is not None:
+            # We want to stream output immediately to logging framework, thus not hide.
+            kwargs['hide'] = False
+
+            caller = log.caller_info(logger)
+            out = log.LoggerWriter(logger, logging_stream_level, caller, '[remote] ')
+            err = log.LoggerWriter(logger, logging_stream_level, caller, '[stderr] ')
+
+            return fn(self, *args, out_stream=out, err_stream=err, **kwargs)
+
+        results = None
+        try:
+            results = fn(self, *args, **kwargs)
+            return results
+        except fabric.group.GroupException as e:
+            results = e.result
+            raise
+        finally:
+            # if hide is False, we already logged only to stdout, and should log to other handlers.
+            if results is not None and not kwargs.get('hide', True):
+                logger.debug(results, extra={'ignore_stdout': True})
+
+    return do
+
+
 class NodeGroup:
 
     def __init__(self, connections: Connections, cluster):
@@ -360,9 +398,11 @@ class NodeGroup:
 
         return group_result
 
+    @_handle_internal_logging
     def run(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("run", *args, **kwargs)
 
+    @_handle_internal_logging
     def sudo(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("sudo", *args, **kwargs)
 
@@ -478,12 +518,7 @@ class NodeGroup:
         raw_results = self._do_with_wa(do_type, *args, **kwargs)
         if isinstance(raw_results, int):
             return raw_results
-        group_results = self._make_result_or_fail(raw_results, lambda host, result: isinstance(result, Exception))
-
-        if not kwargs.get('hide', True):
-            self.cluster.log.debug(group_results, extra={'ignore_stdout': True})
-
-        return group_results
+        return self._make_result_or_fail(raw_results, lambda host, result: isinstance(result, Exception))
 
     def _do_with_wa(self, do_type, *args, **kwargs) -> Union[_HostToResult, int]:
         # by default all code is async, but can be set False forcibly
@@ -734,20 +769,10 @@ class NodeGroup:
 
         return False
 
-    def get_local_file_sha1(self, filename):
-        sha1 = hashlib.sha1()
+    def get_local_file_sha1(self, filename: str) -> str:
+        return utils.get_local_file_sha1(filename)
 
-        # Read local file by chunks of 2^16 bytes (65536) and calculate aggregated SHA1
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(2 ** 16)
-                if not data:
-                    break
-                sha1.update(data)
-
-        return sha1.hexdigest()
-
-    def get_remote_file_sha1(self, filename):
+    def get_remote_file_sha1(self, filename: str) -> Dict[str, str]:
         results = self._do_with_wa("sudo", "openssl sha1 %s" % filename, warn=True)
         self._make_result_or_fail(results, lambda h, r: isinstance(r, Exception))
 

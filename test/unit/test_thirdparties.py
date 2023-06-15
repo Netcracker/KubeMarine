@@ -68,7 +68,7 @@ class SHACalculationTest(unittest.TestCase):
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/kubelet", cluster))
         self.assertEqual(cluster.globals['compatibility_map']['software']['kubectl']['v1.24.2']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/kubectl", cluster))
-        self.assertEqual(cluster.globals['compatibility_map']['software']['calico']['v1.24']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['calicoctl']['v1.24.2']['sha1'],
                          thirdparties.get_thirdparty_recommended_sha("/usr/bin/calicoctl", cluster))
         self.assertIsNone(thirdparties.get_thirdparty_recommended_sha("custom/thirdparty/without/sha", cluster))
         self.assertIsNone(thirdparties.get_thirdparty_recommended_sha("custom/thirdparty/with/sha", cluster))
@@ -87,7 +87,7 @@ class SHACalculationTest(unittest.TestCase):
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/kubelet"])
         self.assertEqual(self.customized_services['thirdparties']['/usr/bin/kubectl']['sha1'],
                          cluster.inventory['services']['thirdparties']["/usr/bin/kubectl"]['sha1'])
-        self.assertEqual(cluster.globals['compatibility_map']['software']['calico']['v1.24']['sha1'],
+        self.assertEqual(cluster.globals['compatibility_map']['software']['calicoctl']['v1.24.2']['sha1'],
                          cluster.inventory['services']['thirdparties']["/usr/bin/calicoctl"]['sha1'])
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["custom/thirdparty/without/sha"])
         self.assertEqual(self.customized_services['thirdparties']['custom/thirdparty/with/sha']['sha1'],

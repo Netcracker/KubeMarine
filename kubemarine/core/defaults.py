@@ -21,7 +21,7 @@ import yaml
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import jinja
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, log, os
 from kubemarine.core.yaml_merger import default_merger
 
 # All enrichment procedures should not connect to any node.
@@ -29,19 +29,21 @@ from kubemarine.core.yaml_merger import default_merger
 DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.core.schema.verify_inventory",
     "kubemarine.core.defaults.merge_defaults",
+    "kubemarine.kubernetes.verify_initial_version",
+    "kubemarine.admission.enrich_default_admission",
     "kubemarine.kubernetes.add_node_enrichment",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.controlplane.controlplane_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
     "kubemarine.kubernetes.enrich_upgrade_inventory",
-    "kubemarine.plugins.enrich_upgrade_inventory",
-    "kubemarine.packages.enrich_inventory_associations",
-    "kubemarine.packages.enrich_inventory_packages",
-    "kubemarine.system.enrich_upgrade_inventory",
     "kubemarine.core.defaults.compile_inventory",
     "kubemarine.core.defaults.manage_true_false_values",
+    "kubemarine.plugins.enrich_upgrade_inventory",
+    "kubemarine.packages.enrich_inventory",
+    "kubemarine.packages.enrich_upgrade_inventory",
+    "kubemarine.packages.enrich_inventory_apply_defaults",
+    "kubemarine.thirdparties.enrich_upgrade_inventory",
     "kubemarine.admission.manage_enrichment",
-    "kubemarine.thirdparties.enrich_inventory_apply_upgrade_defaults",
     "kubemarine.procedures.migrate_cri.enrich_inventory",
     "kubemarine.core.defaults.apply_registry",
     "kubemarine.core.defaults.calculate_node_names",
@@ -64,9 +66,9 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.plugins.enrich_inventory",
     "kubemarine.plugins.verify_inventory",
     "kubemarine.plugins.builtin.verify_inventory",
-    "kubemarine.coredns.enrich_add_hosts_config",
     "kubemarine.k8s_certs.renew_verify",
-    "kubemarine.cri.enrich_inventory"
+    "kubemarine.cri.enrich_inventory",
+    "kubemarine.system.enrich_kernel_modules"
 ]
 
 supported_defaults = {
@@ -182,51 +184,36 @@ def apply_registry(inventory, cluster):
     elif cri_impl == "containerd":
         registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
 
-        if not inventory['services']['cri']['containerdConfig'].get(registry_section):
+        containerd_config = inventory['services']['cri']['containerdConfig']
+        if not containerd_config.get(registry_section):
             if not containerd_endpoints:
                 containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
 
-            inventory['services']['cri']['containerdConfig'][registry_section] = {
+            containerd_config[registry_section] = {
                 'endpoint': containerd_endpoints
             }
 
-        effective_kubernetes_version = ".".join(inventory['services']['kubeadm']['kubernetesVersion'].split('.')[0:2])
-        pause_version = cluster.globals['compatibility_map']['software']['pause'][effective_kubernetes_version]['version']
-        if not inventory['services']['cri']['containerdConfig'].get('plugins."io.containerd.grpc.v1.cri"'):
-            inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'] = {}
-        if not inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"'].get('sandbox_image'):
-            inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']['sandbox_image'] = \
+        path = 'plugins."io.containerd.grpc.v1.cri"'
+        if not containerd_config.get(path):
+            containerd_config[path] = {}
+        if not containerd_config[path].get('sandbox_image'):
+            kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+            pause_version = cluster.globals['compatibility_map']['software']['pause'][kubernetes_version]['version']
+            containerd_config[path]['sandbox_image'] = \
                 f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
-    if inventory['services'].get('thirdparties', []) and thirdparties_address:
-        for destination, config in inventory['services']['thirdparties'].items():
+    from kubemarine import thirdparties
 
-            if isinstance(config, str):
-                new_source = inventory['services']['thirdparties'][destination]
-            elif config.get('source') is not None:
-                new_source = inventory['services']['thirdparties'][destination]['source']
-            else:
+    if thirdparties_address:
+        for destination, config in inventory['services']['thirdparties'].items():
+            if not thirdparties.is_default_thirdparty(destination) or isinstance(config, str) or 'source' in config:
                 continue
 
-            for binary in ['kubeadm', 'kubelet', 'kubectl']:
-                if destination == '/usr/bin/' + binary:
-                    new_source = new_source.replace('https://storage.googleapis.com/kubernetes-release/release',
-                                                    '%s/kubernetes/%s'
-                                                    % (thirdparties_address, binary))
-
-            if '/usr/bin/calicoctl' == destination:
-                new_source = new_source.replace('https://github.com/projectcalico/calico/releases/download',
-                                                '%s/projectcalico/calico'
-                                                % thirdparties_address)
-
-            if '/usr/bin/crictl.tar.gz' == destination:
-                new_source = new_source.replace('https://github.com/kubernetes-sigs/cri-tools/releases/download',
-                                                '%s/kubernetes-sigs/cri-tools'
-                                                % thirdparties_address)
-            if isinstance(config, str):
-                inventory['services']['thirdparties'][destination] = new_source
-            else:
-                inventory['services']['thirdparties'][destination]['source'] = new_source
+            source, sha1 = thirdparties.get_default_thirdparty_identity(cluster.inventory, destination, in_public=False)
+            source = source.format(registry=thirdparties_address)
+            config['source'] = source
+            if 'sha1' not in config:
+                config['sha1'] = sha1
 
     return inventory
 
@@ -425,12 +412,13 @@ def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=Tru
     return inventory
 
 
-def compile_inventory(inventory, cluster):
+def compile_inventory(inventory: dict, cluster: KubernetesCluster):
 
     # convert references in yaml to normal values
     iterations = 100
     root = deepcopy(inventory)
     root['globals'] = static.GLOBALS
+    root['env'] = os.Environ()
 
     while iterations > 0:
 
@@ -459,38 +447,41 @@ def compile_inventory(inventory, cluster):
     return inventory
 
 
-def compile_object(log, struct, root, ignore_jinja_escapes=True):
+def compile_object(logger: log.EnhancedLogger, struct: object, root: dict, ignore_jinja_escapes=True) -> object:
     if isinstance(struct, list):
         new_struct = []
         for i, v in enumerate(struct):
-            struct[i] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            struct[i] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
             # delete empty list entries, which can appear after jinja compilation
             if struct[i] != '':
                 new_struct.append(struct[i])
         struct = new_struct
     elif isinstance(struct, dict):
         for k, v in struct.items():
-            struct[k] = compile_object(log, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
+            struct[k] = compile_object(logger, v, root, ignore_jinja_escapes=ignore_jinja_escapes)
     elif isinstance(struct, str) and ('{{' in struct or '{%' in struct):
-        struct = compile_string(log, struct, root, ignore_jinja_escapes=ignore_jinja_escapes)
+        struct = compile_string(logger, struct, root, ignore_jinja_escapes=ignore_jinja_escapes)
+
     return struct
 
 
-def compile_string(log, struct, root, ignore_jinja_escapes=True):
-    log.verbose("Rendering \"%s\"" % struct)
+def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
+                   ignore_jinja_escapes=True) -> str:
+    logger.verbose("Rendering \"%s\"" % struct)
 
     if ignore_jinja_escapes:
         iterator = escaped_expression_regex.finditer(struct)
         struct = re.sub(escaped_expression_regex, '', struct)
-        struct = jinja.new(log, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
 
+        # TODO this does not work for {raw}{jinja}{raw}{jinja}
         for match in iterator:
             span = match.span()
             struct = struct[:span[0]] + match.group() + struct[span[0]:]
     else:
-        struct = jinja.new(log, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
 
-    log.verbose("\tRendered as \"%s\"" % struct)
+    logger.verbose("\tRendered as \"%s\"" % struct)
     return struct
 
 

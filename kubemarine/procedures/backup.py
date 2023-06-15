@@ -51,6 +51,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
         f"/etc/systemd/system/{keepalived_service}.service.d/{keepalived_service}.conf",
         "/usr/local/bin/check_haproxy.sh",
         "/etc/kubernetes",
+        "/root/.kube/config",
         "/etc/systemd/system/kubelet.service"
     ]
 
@@ -283,8 +284,7 @@ def download_resources(log, resources, location, control_plane: NodeGroup, names
         result = result.strip()
         if result and result != '':
             actual_resources.append(resource)
-            with utils.open_external(resource_file_path, 'w') as resource_file_stream:
-                resource_file_stream.write(result)
+            utils.dump_file({}, result, resource_file_path, dump_location=False)
 
     return actual_resources
 
@@ -467,7 +467,7 @@ def main(cli_arguments=None):
         }
     }
 
-    flow.run_actions(context, [BackupAction()])
+    flow.ActionsFlow([BackupAction()]).run_flow(context)
 
 
 if __name__ == '__main__':

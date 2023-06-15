@@ -43,6 +43,10 @@
           },
           "additionalProperties": false
         },
+        "args": {
+          "type": "array",
+          "description": "Additional arguments."
+        },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
         },

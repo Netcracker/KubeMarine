@@ -14,19 +14,11 @@
 
 from kubemarine import kubernetes
 
-version_kubectl_alpha_removed = "v1.21.0"
-
 
 def k8s_certs_overview(control_planes):
-    if kubernetes.version_higher_or_equal(control_planes.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                          version_kubectl_alpha_removed):
-        for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
-            control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
-            control_plane['connection'].sudo("kubeadm certs check-expiration", hide=False)
-    else:
-        for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
-            control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
-            control_plane['connection'].sudo("kubeadm alpha certs check-expiration", hide=False)
+    for control_plane in control_planes.get_ordered_members_list(provide_node_configs=True):
+        control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane['name']}")
+        control_plane['connection'].sudo("kubeadm certs check-expiration", hide=False)
 
 
 def renew_verify(inventory, cluster):
@@ -45,13 +37,8 @@ def renew_apply(control_planes):
     procedure = control_planes.cluster.procedure_inventory["kubernetes"]
     cert_list = procedure["cert-list"]
 
-    if kubernetes.version_higher_or_equal(control_planes.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                          version_kubectl_alpha_removed):
-        for cert in cert_list:
-            control_planes.sudo(f"kubeadm certs renew {cert}")
-    else:
-        for cert in cert_list:
-            control_planes.sudo(f"kubeadm alpha certs renew {cert}")
+    for cert in cert_list:
+        control_planes.sudo(f"kubeadm certs renew {cert}")
 
     if "all" in cert_list or "admin.conf" in cert_list:
         # need to update cluster-admin config

@@ -288,12 +288,16 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                                  "Rules list validation failed")
 
     def test_all_images_contain_registry(self):
-        for k8s_version in self.latest_k8s_supporting_specific_versions.values():
-            for typha_enabled, expected_num_images in ((False, 5), (True, 6)):
-                with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
-                    inventory = self._enable_typha(k8s_version, typha_enabled)
-                    num_images = self.check_all_images_contain_registry(inventory)
-                    self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
+        for k8s_version, typha_enabled, expected_num_images in (
+            (self.k8s_1_21_x, False, 4),
+            (self.k8s_1_21_x, True, 5),
+            (self.k8s_latest, False, 3),
+            (self.k8s_latest, True, 4),
+        ):
+            with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
+                inventory = self._enable_typha(k8s_version, typha_enabled)
+                num_images = self.check_all_images_contain_registry(inventory)
+                self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
 
 
 if __name__ == '__main__':

@@ -18,12 +18,10 @@ import paramiko
 import re
 import socket
 import time
-from copy import deepcopy
 from typing import Dict
 
 from dateutil.parser import parse
 import fabric
-import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import selinux, kubernetes, apparmor
@@ -31,9 +29,10 @@ from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroupResult, NodeGroup
-from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.annotations import restrict_empty_group
 
+ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
+        "Kernel modules are not available for the current OS family"
 
 def verify_inventory(inventory, cluster):
 
@@ -46,114 +45,63 @@ def verify_inventory(inventory, cluster):
 
 
 def enrich_etc_hosts(inventory, cluster):
+# enrich only etc_hosts_generated object, etc_hosts remains as it is
+
+    # if by chance cluster.yaml contains non empty etc_hosts_generated we have to reset it
+    inventory['services']['etc_hosts_generated'] = {}
+
     control_plain = inventory['control_plain']['internal']
 
-    control_plain_names = inventory['services']['etc_hosts'].get(control_plain, [])
+    control_plain_names = []
     control_plain_names.append(cluster.inventory['cluster_name'])
     control_plain_names.append('control-plain')
     control_plain_names = list(OrderedSet(control_plain_names))
-    inventory['services']['etc_hosts'][control_plain] = control_plain_names
+    inventory['services']['etc_hosts_generated'][control_plain] = control_plain_names
 
     for node in cluster.inventory['nodes']:
         if 'remove_node' in node['roles']:
             continue
 
-        internal_node_ip_names = inventory['services']['etc_hosts'].get(node['internal_address'], [])
+        internal_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['internal_address'], [])  
+
         internal_node_ip_names.append("%s.%s" % (node['name'], cluster.inventory['cluster_name']))
         internal_node_ip_names.append(node['name'])
         internal_node_ip_names = list(OrderedSet(internal_node_ip_names))
-        inventory['services']['etc_hosts'][node['internal_address']] = internal_node_ip_names
+        inventory['services']['etc_hosts_generated'][node['internal_address']] = internal_node_ip_names
 
         if node.get('address'):
-            external_node_ip_names = inventory['services']['etc_hosts'].get(node['address'], [])
+            external_node_ip_names = inventory['services']['etc_hosts_generated'].get(node['address'], []) 
+
             external_node_ip_names.append("%s-external.%s" % (node['name'], cluster.inventory['cluster_name']))
             external_node_ip_names.append(node['name'] + "-external")
             external_node_ip_names = list(OrderedSet(external_node_ip_names))
-            inventory['services']['etc_hosts'][node['address']] = external_node_ip_names
+            inventory['services']['etc_hosts_generated'][node['address']] = external_node_ip_names
 
     return inventory
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster):
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-
+def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster):
+    """
+    The method enrich the list of kernel modules ('services.modprobe') according to OS family
+    """
+    
     os_family = cluster.get_os_family()
-    if os_family in ('unknown', 'unsupported', 'multiple'):
-        raise Exception("Upgrade is possible only for cluster "
-                        "with all nodes having the same and supported OS family")
-
-    # validate all packages sections in procedure inventory
-    base_associations = static.DEFAULTS["services"]["packages"]["associations"][os_family]
-
-    cluster_associations = deepcopy(inventory["services"]["packages"]["associations"][os_family])
-    previous_ver = cluster.context["initial_kubernetes_version"]
-    upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
-    for version in upgrade_plan:
-        upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
-        for package in get_system_packages(cluster):
-            if base_associations[package]["package_name"] != cluster_associations[package]["package_name"] \
-                    and not upgrade_associations.get(package, {}).get("package_name"):
-                raise Exception(f"Associations are redefined for {package} in cluster.yaml for version {previous_ver}, "
-                                f"but not present in procedure inventory for version {version}. "
-                                f"Please, specify required associations explicitly in procedure inventory "
-                                f"for all versions since {previous_ver}.")
-            if upgrade_associations.get(package, {}).get("package_name"):
-                cluster_associations[package]["package_name"] = upgrade_associations[package]["package_name"]
-        previous_ver = version
-
-    upgrade_required = get_system_packages_for_upgrade(cluster)
-    cluster.context["packages"] = {"upgrade_required": upgrade_required}
-
-    upgrade_ver = cluster.context["upgrade_version"]
-    packages_section = deepcopy(cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}))
-    # Move associations to the OS family specific section, and then merge with associations from procedure.
-    # This effectively allows to specify only global section but not for specific OS family.
-    # This restriction is because system.enrich_upgrade_inventory goes after packages.enrich_inventory_associations,
-    # but in future the restriction can be eliminated.
-    associations = packages_section.pop("associations", {})
-    default_merger.merge(inventory["services"]["packages"]["associations"][os_family], associations)
-
-    for _type in ['install', 'upgrade', 'remove']:
-        packages = packages_section.pop(_type, None)
-        if packages is None:
-            continue
-        if isinstance(packages, list):
-            packages = {'include': packages}
-        default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
-
-    # merge remained packages section
-    default_merger.merge(inventory["services"]["packages"], packages_section)
+    if os_family in ["unknown", "unsupported"]:
+        raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
+    elif os_family in ["debian", "rhel", "rhel8"]:
+        modprobe = {}
+        modprobe[os_family] = inventory["services"]["modprobe"][os_family]
+        inventory["services"]["modprobe"] = modprobe
+    elif os_family == "multiple":
+        modprobe = {}
+        os_families = set()
+        for node in cluster.nodes['all'].get_final_nodes().get_hosts():
+            os_families.add(cluster.get_os_family_for_node(node))
+        for item in os_families:
+            modprobe[item] = inventory["services"]["modprobe"][item]
+        inventory["services"]["modprobe"] = modprobe
 
     return inventory
-
-
-def get_system_packages_for_upgrade(cluster):
-    upgrade_ver = cluster.context["upgrade_version"]
-    previous_ver = cluster.context["initial_kubernetes_version"]
-    compatibility = cluster.globals["compatibility_map"]["software"]
-
-    # handle special cases in which upgrade is not required for particular package
-    cluster_associations = cluster.inventory["services"]["packages"]["associations"][cluster.get_os_family()]
-    upgrade_associations = cluster.procedure_inventory.get(upgrade_ver, {}).get("packages", {}).get("associations", {})
-    system_packages = get_system_packages(cluster)
-    upgrade_required = list(system_packages)
-    for package in system_packages:
-        defined_association = upgrade_associations.get(package, {}).get("package_name")
-        if defined_association and defined_association == cluster_associations[package]['package_name']:
-            # case 1: package_name is defined in upgrade inventory but is equal to one already defined in cluster.yaml
-            upgrade_required.remove(package)
-        elif compatibility.get(package) and compatibility[package][upgrade_ver] == compatibility[package][previous_ver] \
-                and not defined_association:
-            # case 2: package_name is not defined in upgrade inventory and default versions are equal
-            upgrade_required.remove(package)
-
-    # all other packages should be updated
-    return upgrade_required
-
-
-def get_system_packages(cluster):
-    return [cluster.inventory['services']['cri']['containerRuntime']]
 
 
 def fetch_os_versions(cluster: KubernetesCluster):
@@ -178,7 +126,7 @@ def detect_os_family(cluster):
 
         version_regex = re.compile("\\s\\d*\\.\\d*", re.M)
         for line in stdout.split("\n"):
-            if 'centos' in line or 'rhel' in line:
+            if 'centos' in line or 'rhel' or 'rocky' in line:
                 # CentOS and Red Hat have a major version in VERSION_ID string
                 matches = re.findall(version_regex, line)
                 if matches:
@@ -198,14 +146,7 @@ def detect_os_family(cluster):
 
         cluster.log.debug("Distribution: %s; Version: %s" % (name, version))
 
-        os_family = 'unsupported'
-        if name in cluster.globals["compatibility_map"]["distributives"]:
-            os_family = 'unknown'
-            os_family_list = cluster.globals["compatibility_map"]["distributives"][name]
-            for os_family_item in os_family_list:
-                if version in os_family_item["versions"]:
-                    os_family = os_family_item["os_family"]
-                    break
+        os_family = detect_of_family_by_name_version(name, version)
 
         cluster.log.debug("OS family: %s" % os_family)
 
@@ -216,25 +157,17 @@ def detect_os_family(cluster):
         }
 
 
-def get_compatibility_version_key(cluster: KubernetesCluster) -> str or None:
-    """
-    Get os-specific version key to be used in software compatibility map.
-    :param cluster: Cluster object for which to resolve compatibility version key.
-    :return: String to use as version key. None if OS is unknown or multiple OS present.
-    """
-    """
-    Return os-specific version compatibility key.
-    If OS is unknown or multiple OS, then returns None.
-    """
-    os = cluster.get_os_family()
-    if os == "rhel":
-        return "version_rhel"
-    elif os == "rhel8":
-        return "version_rhel8"
-    elif os == "debian":
-        return "version_debian"
-    else:
-        return None
+def detect_of_family_by_name_version(name: str, version: str) -> str:
+    os_family = 'unsupported'
+    if name in static.GLOBALS["compatibility_map"]["distributives"]:
+        os_family = 'unknown'
+        os_family_list = static.GLOBALS["compatibility_map"]["distributives"][name]
+        for os_family_item in os_family_list:
+            if version in os_family_item["versions"]:
+                os_family = os_family_item["os_family"]
+                break
+
+    return os_family
 
 
 def update_resolv_conf(group, config=None):
@@ -257,29 +190,18 @@ def get_resolv_conf_buffer(config):
     return buffer
 
 
-def generate_etc_hosts_config(inventory, cluster=None):
+def generate_etc_hosts_config(inventory, cluster=None, etc_hosts_part='etc_hosts_generated'):
+# generate records for /etc/hosts from services.etc_hosts or services.etc_hosts_generated
+
     result = ""
 
     max_len_ip = 0
 
-    ignore_ips = []
-    if cluster and cluster.context['initial_procedure'] == 'remove_node':
-        for removal_node in cluster.procedure_inventory.get("nodes"):
-            removal_node_name = removal_node['name']
-            for node in inventory['nodes']:
-                if node['name'] == removal_node_name:
-                    if node.get('address'):
-                        ignore_ips.append(node['address'])
-                    if node.get('internal_address'):
-                        ignore_ips.append(node['internal_address'])
-
-    ignore_ips = list(set(ignore_ips))
-
-    for ip in list(inventory['services']['etc_hosts'].keys()):
+    for ip in list(inventory['services'][etc_hosts_part].keys()):
         if len(ip) > max_len_ip:
             max_len_ip = len(ip)
 
-    for ip, names in inventory['services']['etc_hosts'].items():
+    for ip, names in inventory['services'][etc_hosts_part].items():
         if isinstance(names, list):
             # remove records with empty values from list
             names = list(filter(len, names))
@@ -287,8 +209,7 @@ def generate_etc_hosts_config(inventory, cluster=None):
             if not names:
                 continue
             names = " ".join(names)
-        if ip not in ignore_ips:
-            result += "%s%s  %s\n" % (ip, " " * (max_len_ip - len(ip)), names)
+        result += "%s%s  %s\n" % (ip, " " * (max_len_ip - len(ip)), names)
 
     return result
 
@@ -432,8 +353,8 @@ def reboot_group(group: NodeGroup, try_graceful=None):
         cordon_required = 'control-plane' in node['roles'] or 'worker' in node['roles']
         if cordon_required:
             res = first_control_plane.sudo(
-                kubernetes.prepare_drain_command(node, group.cluster.inventory['services']['kubeadm']['kubernetesVersion'],
-                                                 group.cluster.globals, False, group.cluster.nodes), warn=True)
+                kubernetes.prepare_drain_command(group.cluster, node["name"], disable_eviction=False),
+                warn=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node["name"]}"')
         raw_results = perform_group_reboot(node['connection'])
@@ -555,6 +476,7 @@ def configure_timesyncd(group, retries=120):
 def setup_modprobe(group):
     log = group.cluster.log
 
+    os_family = group.get_nodes_os()
     if group.cluster.inventory['services'].get('modprobe') is None \
             or not group.cluster.inventory['services']['modprobe']:
         log.debug('Skipped - no modprobe configs in inventory')
@@ -568,7 +490,7 @@ def setup_modprobe(group):
 
     config = ''
     raw_config = ''
-    for module_name in group.cluster.inventory['services']['modprobe']:
+    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
         module_name = module_name.strip()
         if module_name is not None and module_name != '':
             config += module_name + "\n"
@@ -589,7 +511,8 @@ def is_modprobe_valid(group):
     verify_results = group.sudo("lsmod", warn=True)
     is_valid = True
 
-    for module_name in group.cluster.inventory['services']['modprobe']:
+    os_family = group.get_nodes_os()
+    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
         for conn, result in verify_results.items():
             if module_name not in result.stdout:
                 log.debug('Kernel module %s not found at %s' % (module_name, conn.host))

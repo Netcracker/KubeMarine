@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "description": "Section for packages and their management",
-  "allOf": [{"$ref": "#/definitions/Properties"}],
+  "allOf": [{"$ref": "#/definitions/CustomPackages"}],
   "properties": {
     "package_manager": {
       "type": "object",
@@ -41,16 +41,21 @@
     "associations": {
       "$ref": "packages/associations.json",
       "description": "Configure predefined associations of package objects. If configured in the common section, the associations are automatically switched to the section corresponding to your operating system."
+    },
+    "cache_versions": {
+      "type": "boolean",
+      "default": true,
+      "description": "Specifies whether to install exactly the same package versions from associations section during the add_node procedure"
     }
   },
   "propertyNames": {
     "anyOf": [
-      {"$ref": "#/definitions/PropertyNames"},
-      {"enum": ["package_manager", "mandatory", "associations"]}
+      {"$ref": "#/definitions/CustomPackagesPropertyNames"},
+      {"enum": ["package_manager", "mandatory", "associations", "cache_versions"]}
     ]
   },
   "definitions": {
-    "Properties": {
+    "CustomPackages": {
       "properties": {
         "install": {
           "description": "List of custom packages to install. Can be specified as list or as two lists that are to be included and excluded during processing.",
@@ -81,16 +86,11 @@
             {"$ref": "#/definitions/IncludeExcludePermissive"},
             {"$ref": "../common/utils.json#/definitions/MergeableSetOfStrings"}
           ]
-        },
-        "cache_versions": {
-          "type": "boolean",
-          "default": true,
-          "description": "Specifies whether to install exactly the same package versions from associations section during the add_node procedure"
         }
       }
     },
-    "PropertyNames": {
-      "enum": ["install", "upgrade", "remove", "cache_versions"]
+    "CustomPackagesPropertyNames": {
+      "enum": ["install", "upgrade", "remove"]
     },
     "YumRepositories": {
       "type": "object",

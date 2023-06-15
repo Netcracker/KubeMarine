@@ -20,7 +20,7 @@ import time
 from jinja2 import Template
 
 from kubemarine import system, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeGroupResult
@@ -193,14 +193,16 @@ def uninstall(group):
 
 
 def restart(group: NodeGroup):
-    results = NodeGroupResult(group.cluster)
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        service_name = group.cluster.get_package_association_for_node(
-            node['connect_to'], 'keepalived', 'service_name')
-        results.update(system.restart_service(node['connection'], name=service_name))
-        group.cluster.log.debug("Sleep while keepalived comes-up...")
-        time.sleep(group.cluster.globals['keepalived']['restart_wait'])
-    return results
+    cluster = group.cluster
+    cluster.log.debug("Restarting keepalived in all group...")
+    with RemoteExecutor(cluster):
+        for node in group.get_ordered_members_list(provide_node_configs=True):
+            service_name = group.cluster.get_package_association_for_node(
+                node['connect_to'], 'keepalived', 'service_name')
+            system.restart_service(node['connection'], name=service_name)
+
+    cluster.log.debug("Sleep while keepalived comes-up...")
+    time.sleep(static.GLOBALS['keepalived']['restart_wait'])
 
 
 def enable(group: NodeGroup):
@@ -276,7 +278,6 @@ def configure(group: NodeGroup) -> NodeGroupResult:
 
     log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
 
-    log.debug("Restarting keepalived in all group...")
     restart(group)
 
     return group.sudo('systemctl status %s' % package_associations['service_name'], warn=True)

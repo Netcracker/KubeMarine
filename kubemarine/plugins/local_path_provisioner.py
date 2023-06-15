@@ -17,19 +17,13 @@ from typing import List, Optional
 
 import yaml
 
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core import log
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 class LocalPathProvisionerManifestProcessor(Processor):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'local-path-provisioner'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/local-path-provisioner-{version}-original.yaml"
-        if destination_name is None:
-            destination_name = f"local-path-provisioner-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(logger, inventory, 'local-path-provisioner', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -64,7 +58,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
         # Insert new ClusterRoleBinding after all existing resources of this kind
         max_crb_idx = max(i for i, key in enumerate(manifest.all_obj_keys())
                           if key.startswith("ClusterRoleBinding_"))
-        manifest.include(max_crb_idx + 1, new_yaml)
+        self.include(manifest, max_crb_idx + 1, new_yaml)
 
     def enrich_deployment_local_path_provisioner(self, manifest: Manifest):
         key = "Deployment_local-path-provisioner"

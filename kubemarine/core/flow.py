@@ -17,10 +17,11 @@ import os
 import shlex
 import sys
 import time
+from abc import abstractmethod, ABC
 from copy import deepcopy
 from typing import Type, Optional, List, Union
 
-from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary
+from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log
 
 DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 TASK_DESCRIPTION_TEMPLATE = """
@@ -31,33 +32,75 @@ tasks list:
 END_OF_TASKS = object()
 
 
-def run_actions(context: Union[dict, res.DynamicResources], actions: List[action.Action],
-                print_summary: bool = True) -> Optional[c.KubernetesCluster]:
+class FlowResult:
+    def __init__(self, context: dict, logger: log.EnhancedLogger):
+        self.context = context
+        self.logger = logger
+
+
+class Flow(ABC):
+    def run_flow(self, context: Union[dict, res.DynamicResources], print_summary: bool = True) -> FlowResult:
+        time_start = time.time()
+
+        resources: res.DynamicResources = context
+        if isinstance(context, dict):
+            resources = res.DynamicResources(context)
+
+        context = resources.context
+        args: dict = context['execution_arguments']
+
+        try:
+            if not args.get('disable_dump', True):
+                utils.prepare_dump_directory(args.get('dump_location'),
+                                             reset_directory=not args.get('disable_dump_cleanup', False))
+            logger = resources.logger()
+            self._run(resources)
+        except Exception as exc:
+            logger = resources.logger_if_initialized()
+            if isinstance(exc, errors.FailException):
+                utils.do_fail(exc.message, exc.reason, exc.hint, log=logger)
+            else:
+                utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
+                              log=logger)
+
+        time_end = time.time()
+
+        if print_summary:
+            summary.schedule_report(resources.working_context, summary.SummaryItem.EXECUTION_TIME,
+                                    utils.get_elapsed_string(time_start, time_end))
+            summary.print_summary(resources.working_context, logger)
+            logger.info("SUCCESSFULLY FINISHED")
+
+        return FlowResult(resources.working_context, logger)
+
+    @abstractmethod
+    def _run(self, resources: res.DynamicResources):
+        pass
+
+
+class ActionsFlow(Flow):
+    def __init__(self, actions: List[action.Action]):
+        self._actions = actions
+
+    def _run(self, resources: res.DynamicResources):
+        run_actions(resources, self._actions)
+
+
+def run_actions(resources: res.DynamicResources, actions: List[action.Action]) -> None:
     """
     Runs actions one by one, recreates inventory when necessary,
     managing such resources as cluster object and raw inventory.
 
     For each initialized cluster object, preserves inventory if any action is succeeded.
     """
-    time_start = time.time()
-
-    resources: res.DynamicResources = context
-    if isinstance(context, dict):
-        resources = res.DynamicResources(context)
 
     context = resources.context
-
-    args: dict = context['execution_arguments']
-    if not args.get('disable_dump', True):
-        utils.prepare_dump_directory(args.get('dump_location'),
-                                     reset_directory=not args.get('disable_dump_cleanup', False))
-
-    log = resources.logger()
+    logger = resources.logger()
 
     successfully_performed = []
     last_cluster = None
     for act in actions:
-        act.prepare_context(resources.context)
+        act.prepare_context(context)
 
         if not successfully_performed:
             # first action in group
@@ -69,18 +112,15 @@ def run_actions(context: Union[dict, res.DynamicResources], actions: List[action
                 with utils.open_external(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
         try:
-            log.info(f"Running action '{act.identifier}'")
+            logger.info(f"Running action '{act.identifier}'")
             act.run(resources)
+            act.reset_context(context)
             successfully_performed.append(act.identifier)
-        except Exception as exc:
+        except Exception:
             if successfully_performed:
                 _post_process_actions_group(last_cluster, context, successfully_performed, failed=True)
 
-            if isinstance(exc, errors.FailException):
-                utils.do_fail(exc.message, exc.reason, exc.hint, log=log)
-            else:
-                utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
-                              log=log)
+            raise
 
         last_cluster = resources.cluster_if_initialized()
 
@@ -100,18 +140,8 @@ def run_actions(context: Union[dict, res.DynamicResources], actions: List[action
     if successfully_performed:
         _post_process_actions_group(last_cluster, context, successfully_performed)
 
-    time_end = time.time()
 
-    if print_summary:
-        summary.schedule_report(resources.working_context, summary.SummaryItem.EXECUTION_TIME,
-                                utils.get_elapsed_string(time_start, time_end))
-        summary.print_summary(resources.working_context, log)
-        log.info("SUCCESSFULLY FINISHED")
-
-    return last_cluster
-
-
-def _post_process_actions_group(last_cluster: c.KubernetesCluster, context: dict,
+def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], context: dict,
                                 successfully_performed: list, failed=False):
     if last_cluster is None:
         return
@@ -159,7 +189,7 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
         return
 
     init_tasks_flow(cluster)
-    run_flow(tasks, final_list, cluster, cumulative_points, [])
+    run_tasks_recursive(tasks, final_list, cluster, cumulative_points, [])
     proceed_cumulative_point(cluster, cumulative_points, END_OF_TASKS,
                              force=args.get('force_cumulative_points', False))
 
@@ -246,8 +276,8 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
     return filtered, final_list
 
 
-def run_flow(tasks: dict, final_task_names: List[str], cluster: c.KubernetesCluster,
-             cumulative_points: dict, _task_path: List[str]):
+def run_tasks_recursive(tasks: dict, final_task_names: List[str], cluster: c.KubernetesCluster,
+                        cumulative_points: dict, _task_path: List[str]):
     for task_name, task in tasks.items():
         __task_path = _task_path + [task_name]
         __task_name = ".".join(__task_path)
@@ -271,7 +301,7 @@ def run_flow(tasks: dict, final_task_names: List[str], cluster: c.KubernetesClus
                     hint=cluster.globals['error_handling']['failure_message'] % (sys.argv[0], __task_name)
                 )
         else:
-            run_flow(task, final_task_names, cluster, cumulative_points, __task_path)
+            run_tasks_recursive(task, final_task_names, cluster, cumulative_points, __task_path)
 
 
 def new_common_parser(cli_help):

@@ -16,11 +16,12 @@ import io
 import re
 import threading
 from copy import deepcopy
-from typing import List, Dict, Union, Any, IO
+from typing import List, Dict, Union, Any, IO, Optional
 
 import fabric
 from invoke import UnexpectedExit
 
+from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core import group, flow, connections
 from kubemarine.core.connections import Connections
@@ -36,7 +37,7 @@ class FakeShell:
         self.history: Dict[str, List[ShellResult]] = {}
         self._lock = threading.Lock()
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict: dict):
         cls = self.__class__
         result = cls.__new__(cls)
         memodict[id(self)] = result
@@ -117,7 +118,7 @@ class FakeFS:
         self.storage: Dict[str, Dict[str, str]] = {}
         self._lock = threading.Lock()
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict: dict):
         cls = self.__class__
         result = cls.__new__(cls)
         memodict[id(self)] = result
@@ -193,25 +194,32 @@ class FakeKubernetesCluster(KubernetesCluster):
 
 class FakeResources(DynamicResources):
     def __init__(self, context, raw_inventory: dict, procedure_inventory: dict = None,
-                 cluster: KubernetesCluster = None,
+                 nodes_context: dict = None,
                  fake_shell: FakeShell = None, fake_fs: FakeFS = None):
         super().__init__(context, True)
         self.inventory_filepath = None
         self.procedure_inventory_filepath = None
-        self._raw_inventory = raw_inventory
-        self._formatted_inventory = raw_inventory
+        self.stored_inventory = raw_inventory
+        self.last_cluster: Optional[FakeKubernetesCluster] = None
+        self.fake_shell = fake_shell if fake_shell else FakeShell()
+        self.fake_fs = fake_fs if fake_fs else FakeFS()
+        self._nodes_context = nodes_context
         self._procedure_inventory = procedure_inventory
-        self._cluster = cluster
-        if cluster:
-            self._logger = cluster.log
-        self._fake_shell = fake_shell if fake_shell else FakeShell()
-        self._fake_fs = fake_fs if fake_fs else FakeFS()
 
-    def _new_cluster_instance(self, context: dict):
-        return FakeKubernetesCluster(self.raw_inventory(), context,
-                                     procedure_inventory=self.procedure_inventory(),
-                                     logger=self.logger(),
-                                     fake_shell=self._fake_shell, fake_fs=self._fake_fs)
+    def _load_inventory(self):
+        self._raw_inventory = deepcopy(self.stored_inventory)
+        self._formatted_inventory = deepcopy(self.stored_inventory)
+
+    def _store_inventory(self):
+        self.stored_inventory = deepcopy(self._formatted_inventory)
+
+    def _new_cluster_instance(self, context: dict) -> FakeKubernetesCluster:
+        self.last_cluster = FakeKubernetesCluster(
+            self.raw_inventory(), context,
+            procedure_inventory=self.procedure_inventory(), logger=self.logger(),
+            fake_shell=self.fake_shell, fake_fs=self.fake_fs
+        )
+        return self.last_cluster
 
 
 class FakeConnection(fabric.connection.Connection):
@@ -397,12 +405,7 @@ def new_cluster(inventory, procedure_inventory=None, context: dict = None,
 
 
 def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', net_interface='eth0') -> dict:
-    os_family = None
-
-    if os_name in ['centos', 'rhel']:
-        os_family = 'rhel'
-    elif os_name in ['ubuntu', 'debian']:
-        os_family = 'debian'
+    os_family = system.detect_of_family_by_name_version(os_name, os_version)
 
     context = {}
     for node in inventory['nodes']:

@@ -1,0 +1,40 @@
+# The file is managed by "scripts/thirdparties/sync.py".
+# It should still be manually changed to upgrade packages.
+#
+# Each software is mapped to the list of Kubernetes versions for which the upgrade is relevant.
+# Special case is for packages 'haproxy' and 'keepalived'
+# that have boolean flag if upgrade is necessary for all Kubernetes versions.
+#
+# The order of upgrade of defined by the implementation.
+
+thirdparties:
+  calicoctl: []
+  crictl: []
+packages:
+  docker:
+    version_rhel: []
+    version_rhel8: []
+    version_debian: []
+  containerd:
+    version_debian: []
+  containerdio:
+    version_rhel: []
+    version_rhel8: []
+    version_debian: []
+  podman:
+    version_rhel: []
+    version_rhel8: []
+    version_debian: []
+  haproxy:
+    version_rhel: false
+    version_rhel8: false
+    version_debian: false
+  keepalived:
+    version_rhel: false
+    version_rhel8: false
+    version_debian: false
+plugins:
+  calico: []
+  nginx-ingress-controller: []
+  kubernetes-dashboard: []
+  local-path-provisioner: []

@@ -51,6 +51,8 @@ kubemarine install \
 
 **Note**: Be careful when specifying the format and date format. Enclose the entire `log` argument, but do not enclose the `format` and `datefmt` sections. Also, do not use separators like `=` or `;` in the format, otherwise it can cause a parsing failure.
 
+**Note**: Kubemarine uses ANSI codes to display text and background colors. In order for the colors to be displayed correctly in Windows, you need to use Windows Terminal.
+
 ## Output to File
 
 Kubemarine allows you to output logs to a file. For this, the following parameters are supported:

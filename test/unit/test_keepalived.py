@@ -24,8 +24,7 @@ from test.unit import utils
 
 class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.cluster = demo.new_cluster(self.inventory)
         self.cluster2 = demo.new_cluster(self.inventory)

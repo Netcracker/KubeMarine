@@ -15,11 +15,25 @@
 import io
 from typing import Optional, List
 
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
+
+def check_job_for_nginx(cluster: KubernetesCluster):
+    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    version = cluster.inventory['plugins']['nginx-ingress-controller']['version'].replace('v', '.').split('.')
+
+    major_version = int(version[1])
+    minor_version = int(version[2])
+
+    check_jobs = first_control_plane['connection'].sudo(f"kubectl get jobs -n ingress-nginx")
+    if list(check_jobs.values())[0].stderr == "" and major_version >= 1 and minor_version >= 4:
+        cluster.log.debug('Delete old jobs for nginx')
+        first_control_plane['connection'].sudo(f"sudo kubectl delete job --all -n ingress-nginx", is_async=False)
+    else:
+        cluster.log.debug('There are no jobs to delete')
 
 def enrich_inventory(inventory, _):
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
@@ -135,15 +149,9 @@ def create_tls_secret(first_control_plane, crt_path, key_path, name, namespace):
 
 
 class IngressNginxManifestProcessor(Processor):
-    def __init__(self, cluster: KubernetesCluster, inventory: dict,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        plugin_name = 'nginx-ingress-controller'
-        version = inventory['plugins'][plugin_name]['version']
-        if original_yaml_path is None:
-            original_yaml_path = f"plugins/yaml/nginx-ingress-controller-{version}-original.yaml"
-        if destination_name is None:
-            destination_name = f"nginx-ingress-controller-{version}.yaml"
-        super().__init__(cluster, inventory, plugin_name, original_yaml_path, destination_name)
+        super().__init__(logger, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -203,7 +211,7 @@ class IngressNginxManifestProcessor(Processor):
             custom_headers_cm['data'] = custom_headers
             # Insert custom-headers ConfigMap before ingress-nginx-controller ConfigMap
             ingres_nginx_cm = manifest.key_index("ConfigMap_ingress-nginx-controller")
-            manifest.include(ingres_nginx_cm, custom_headers_cm)
+            self.include(manifest, ingres_nginx_cm, custom_headers_cm)
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
 
@@ -241,6 +249,20 @@ class IngressNginxManifestProcessor(Processor):
             ('--watch-ingress-without-class=', 'true')
         ]
         ssl_options = self.inventory['plugins']['nginx-ingress-controller']['controller']['ssl']
+        additional_args = self.inventory['plugins']['nginx-ingress-controller']['controller'].get('args')
+
+        if additional_args:
+            for arg in additional_args:
+                pars_arg = arg.split('=')
+                for i, container_arg in enumerate(container_args):
+                    if container_arg.startswith(pars_arg[0]):
+                       raise Exception(
+                           f"{pars_arg[0]!r} argument is already defined in ingress-nginx-controller container specification.")
+                else:
+                    container_args.append(arg)
+                    self.log.verbose(f"The {arg!r} argument has been added to "
+                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
         if ssl_options['enableSslPassthrough']:
             extra_args.append(('--enable-ssl-passthrough',))
         if ssl_options.get('default-certificate'):
@@ -346,7 +368,7 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
             "ValidatingWebhookConfiguration_ingress-nginx-admission",
         ]
         for key in webhook_resources:
-            manifest.exclude(key)
+            self.exclude(manifest, key)
 
     def enrich_role_ingress_nginx(self, manifest: Manifest):
         key = "Role_ingress-nginx"
@@ -357,12 +379,12 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         self.log.verbose(f"The {key} has been patched in 'rules' with {psp_ingress_nginx}")
 
 
-def get_ingress_nginx_manifest_processor(cluster: KubernetesCluster, inventory: dict, **kwargs):
+def get_ingress_nginx_manifest_processor(logger: log.VerboseLogger, inventory: dict, **kwargs):
     version: str = inventory['plugins']['nginx-ingress-controller']['version']
     if utils.minor_version(version) == 'v1.2':
-        return V1_2_X_IngressNginxManifestProcessor(cluster, inventory, **kwargs)
+        return V1_2_X_IngressNginxManifestProcessor(logger, inventory, **kwargs)
 
-    return IngressNginxManifestProcessor(cluster, inventory, **kwargs)
+    return IngressNginxManifestProcessor(logger, inventory, **kwargs)
 
 
 CUSTOM_HEADERS_CM = {

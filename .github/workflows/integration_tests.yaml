@@ -1,0 +1,171 @@
+name: Integration Tests
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  collect_kubernetes_versions:
+    runs-on: ubuntu-22.04
+    outputs:
+      kuber_versions: ${{ steps.versions.outputs.kuber_versions }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Install software
+        run: pip3 install yq
+      - name: Parse kubernetes versions
+        id: versions
+        run: |
+          versions=$(cat ./kubemarine/resources/configurations/compatibility/kubernetes_versions.yaml | \
+            python3 -m yq -c '.compatibility_map | keys')
+          echo Parsed versions: $versions
+          echo "kuber_versions=$versions" >> $GITHUB_OUTPUT
+
+  test-default-installation:
+    runs-on: ubuntu-22.04
+    needs: collect_kubernetes_versions
+    env:
+      cluster_yaml_file: ./ci/default_cluster.yaml
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes-version: ${{ fromJSON(needs.collect_kubernetes_versions.outputs.kuber_versions) }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Check ips
+        run: ip a
+      - name: Ssh preparation
+        run: |
+          ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
+          cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+          ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
+      - name: Test ssh connection
+        run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Install Kubemarine with dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+      - name: Remove moby-runc to resolve conflicts
+        run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt update && sudo apt install -y systemd
+          sudo systemctl start systemd-journald.service	
+         # TODO: change to kubemarine runtime values feature
+      - name: Set kubernetes version to cluster.yaml
+        run: sed -i "s/<KUBERNETES_VERSION>/${{ matrix.kubernetes-version }}/" ${{ env.cluster_yaml_file }}
+      - name: Check Iaas
+        id: test_check_iaas
+        run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }}  --dump-location ./results/check_iaas_dump/
+      - name: Install
+        id: test_install
+        run: kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
+      - name: Check paas
+        id: test_check_paas
+        run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+        run: |
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+          sudo journalctl > ./results/journald-logs.txt 
+      - name: Change not-recommended symbols in dump files
+        if: failure()
+        run: rename 's/[:]/_/g' ./results/*/dump/*
+      - name: Collect dump artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: default_cluster_procedure_dumps-${{ matrix.kubernetes-version }}
+          path: ./results/
+          retention-days: 7
+
+  test-extended-installation:
+    runs-on: ubuntu-22.04
+    env:
+      cluster_yaml_file: ./ci/extended_cluster.yaml
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Check ips
+        run: ip a
+      - name: Ssh preparation
+        run: |
+          ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa -q
+          cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+          ssh-keyscan -H 172.17.0.1 >> ~/.ssh/known_hosts
+      - name: Add ip alias
+        run: sudo ifconfig docker0:0 172.17.1.1 up
+      - name: Test ssh connection
+        run: ssh -i ~/.ssh/id_rsa 172.17.0.1 echo "Test"
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Install Kubemarine with dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+      - name: Remove moby-runc to resolve conflicts
+        run: sudo apt remove moby-runc
+      - name: Install rename
+        run: sudo apt install rename
+      - name: Install and start journald
+        run: |
+          sudo apt update && sudo apt install -y systemd
+          sudo systemctl start systemd-journald.service	
+      - name: Check Iaas
+        id: test_check_iaas
+        run: kubemarine check_iaas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_iaas_dump/
+      - name: Install
+        id: test_install
+        run: kubemarine install -c ${{ env.cluster_yaml_file }} --disable-cumulative-points --dump-location ./results/install_dump/
+      - name: Check paas
+        id: test_check_paas
+        run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Collect journalctl logs
+        if: failure()
+        run: |
+          sudo journalctl -u kubelet -u kube-proxy -u kube-apiserver -u kube-controller-manager -u kube-scheduler > ./results/journald_kube-logs.txt
+          sudo journalctl > ./results/journald-logs.txt
+      - name: Change not-recommended symbols in dump files
+        if: failure()
+        run: rename 's/[:]/_/g' ./results/*/dump/*
+      - name: Collect dump artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: extended_cluster_procedure_dumps
+          path: ./results/
+          retention-days: 7
+
+  thirdparties_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: pip install . && pip uninstall -y kubemarine
+      - name: Run scripts/thirdparties/sync.py
+        run: python scripts/thirdparties/sync.py --refresh-manifests
+      - name: Check source code unchanged
+        run: |
+          if ! git diff --exit-code; then
+            echo ""
+            echo -e "\033[91mkubernetes_versions.yaml may be not synchronized with internal compatibility maps, or plugin manifests. See diff above.\033[0m"
+            echo -e "\033[91mDo not change internal compatibility maps manually. Use scripts/thirdparties/sync.py to synchronize the compatibility maps.\033[0m"
+            exit 1
+          fi

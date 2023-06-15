@@ -22,9 +22,10 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p1_reinstall_calico import CalicoFixes
 
 patches: List[Patch] = [
-    CalicoFixes(),
 ]
-"""List of patches which can be executed strictly in the declared order"""
+"""
+List of patches that is sorted according to the Patch.priority() before execution.
+Patches that have the same priority, are executed in the declared order.
+"""

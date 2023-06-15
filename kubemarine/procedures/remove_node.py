@@ -112,15 +112,6 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
                 if name in inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs']:
                     inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs'].remove(name)
 
-    if inventory_to_finalize['services'].get('etc_hosts'):
-        for node in nodes_for_removal.get_ordered_members_list(provide_node_configs=True):
-            if inventory_to_finalize['services']['etc_hosts'].get(node['internal_address']):
-                del inventory_to_finalize['services']['etc_hosts'][node['internal_address']]
-            if node.get('address') is not None and inventory_to_finalize['services']['etc_hosts'].get(node['address']):
-                del inventory_to_finalize['services']['etc_hosts'][node['address']]
-
-        coredns.enrich_add_hosts_config(inventory_to_finalize, cluster)
-
     return inventory_to_finalize
 
 
@@ -172,7 +163,7 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='remove_node')
 
-    flow.run_actions(context, [RemoveNodeAction()])
+    flow.ActionsFlow([RemoveNodeAction()]).run_flow(context)
 
 
 if __name__ == '__main__':

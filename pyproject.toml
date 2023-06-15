@@ -32,7 +32,7 @@ dependencies = [
     "jinja2==3.1.*",
     "MarkupSafe==2.1.*",
     "invoke==1.6.*",
-    "ruamel.yaml==0.17.*",
+    "ruamel.yaml==0.17.22",
     "pygelf==0.4.*",
     "toml==0.10.*",
     "python-dateutil==2.8.*",
@@ -46,7 +46,7 @@ dependencies = [
 requires-python = ">=3.7"
 
 [project.optional-dependencies]
-ansible = ["ansible==6.7.*"]
+ansible = ["ansible==7.0.*"]
 
 # Auxiliary executable roughly equivalent to python -m kubemarine
 # Allows to not worry about exact path to python executable on the client machine
@@ -64,7 +64,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "0.15.1"
+current_version = "0.18.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true

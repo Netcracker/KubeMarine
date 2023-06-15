@@ -124,8 +124,9 @@ def main(cli_arguments=None):
             return cluster.nodes['control-plane'].get_any_member()
 
     no_stream = arguments.get('no_stream')
-    res = resources.DynamicResources(context, silent=False)
-    flow.run_actions(res, [CLIAction(node_group_provider, remote_args, no_stream)], print_summary=False)
+    action = CLIAction(node_group_provider, remote_args, no_stream)
+    res = resources.DynamicResources(context, silent=True)
+    flow.ActionsFlow([action]).run_flow(res, print_summary=False)
 
 
 if __name__ == '__main__':

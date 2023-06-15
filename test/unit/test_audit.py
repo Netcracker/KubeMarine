@@ -25,8 +25,7 @@ from kubemarine.demo import FakeKubernetesCluster
 
 class NodeGroupResultsTest(unittest.TestCase):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA)
 
     def new_debian_cluster(self) -> FakeKubernetesCluster:
@@ -167,3 +166,7 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         self.assertEqual(expected_data, actual_data,
                          msg='Audit rules file contains invalid content')
+
+
+if __name__ == '__main__':
+    unittest.main()

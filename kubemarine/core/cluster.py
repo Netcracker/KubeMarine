@@ -147,6 +147,7 @@ class KubernetesCluster(Environment):
         return [
             "kubemarine.core.schema.verify_inventory",
             "kubemarine.core.defaults.merge_defaults",
+            "kubemarine.kubernetes.verify_initial_version",
             "kubemarine.kubernetes.add_node_enrichment",
             "kubemarine.kubernetes.remove_node_enrichment",
             "kubemarine.controlplane.controlplane_node_enrichment",
@@ -291,7 +292,7 @@ class KubernetesCluster(Environment):
 
         return association_value
 
-    def get_package_association(self, package: str, association_key: str) -> str or list:
+    def get_package_association(self, package: str, association_key: str) -> Union[str, List[str]]:
         """
         Returns the specified association for the specified package from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.
@@ -318,13 +319,14 @@ class KubernetesCluster(Environment):
     def make_finalized_inventory(self):
         from kubemarine.core import defaults
         from kubemarine.procedures import remove_node
-        from kubemarine import controlplane, cri, packages
+        from kubemarine import admission, controlplane, cri, packages
 
         cluster_finalized_functions = {
             packages.cache_package_versions,
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
             remove_node.remove_node_finalize_inventory,
+            admission.update_finalized_inventory,
             defaults.escape_jinja_characters_for_inventory,
             controlplane.controlplane_finalize_inventory,
         }
@@ -341,8 +343,7 @@ class KubernetesCluster(Environment):
         data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
-        with utils.open_external(finalized_filename, 'w') as f:
-            f.write(data)
+        utils.dump_file(self, data, finalized_filename, dump_location=False)
 
     def preserve_inventory(self):
         self.log.debug("Start preserving of the information about the procedure.")

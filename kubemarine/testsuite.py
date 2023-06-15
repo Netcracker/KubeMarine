@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import io
 import textwrap
 from traceback import *
 import csv
 from datetime import datetime
-from kubemarine.core import utils
+from kubemarine.core import utils, log
 import fabric
 
 TC_UNKNOWN = -1
@@ -56,8 +56,8 @@ class TestCase:
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, ts, id, category, name, default_results=None, minimal=None, recommended=None):
-        self.include_in_ts(ts)
+    def __init__(self, cluster, id, category, name, default_results=None, minimal=None, recommended=None):
+        self.include_in_ts(cluster.context['testsuite'])
         self.category = category
         self.id = str(id)
         self.name = name
@@ -65,6 +65,7 @@ class TestCase:
         self.results = default_results
         self.minimal = minimal
         self.recommended = recommended
+        self.cluster = cluster
 
     def include_in_ts(self, ts):
         ts.register_tc(self)
@@ -99,17 +100,29 @@ class TestCase:
 
         color = ""
         if self.is_succeeded():
-            color = "\x1b[38;5;041m"
-            output += " \x1b[48;5;041m\x1b[38;5;232m   OK   \x1b[49m\x1b[39m  "
+            if self.check_color():
+                color = "\x1b[38;5;041m"
+                output += " \x1b[48;5;041m\x1b[38;5;232m   OK   \x1b[49m\x1b[39m  "
+            else:
+                output += "    OK     "
         if self.is_failed():
-            color = "\x1b[38;5;196m"
-            output += " \x1b[48;5;196m\x1b[38;5;231m  FAIL  \x1b[49m\x1b[39m  "
+            if self.check_color():
+                color = "\x1b[38;5;196m"
+                output += " \x1b[48;5;196m\x1b[38;5;231m  FAIL  \x1b[49m\x1b[39m  "
+            else:
+                output += "   FAIL    "
         if self.is_warned():
-            color = "\x1b[38;5;208m"
-            output += " \x1b[48;5;208m\x1b[38;5;231m  WARN  \x1b[49m\x1b[39m  "
+            if self.check_color():
+                color = "\x1b[38;5;208m"
+                output += " \x1b[48;5;208m\x1b[38;5;231m  WARN  \x1b[49m\x1b[39m  "
+            else:
+                output += "   WARN    "
         if self.is_excepted():
-            color = "\x1b[31m"
-            output += " \x1b[41m ERROR? \x1b[49m  "
+            if self.check_color():
+                color = "\x1b[31m"
+                output += " \x1b[41m ERROR? \x1b[49m  "
+            else:
+                output += "  ERROR?   "
 
         output += self.id + "  "
         output += self.name + " "
@@ -117,7 +130,10 @@ class TestCase:
         results = " " + str(self.results)
 
         output += "." * (146 - len(output) - len(results))
-        output += "%s%s\x1b[39m" % (color, results)
+        if self.check_color():
+            output += "%s%s\x1b[39m" % (color, results)
+        else:
+            output += "%s" % (results)
 
         if show_minimal:
             if self.minimal is None:
@@ -137,6 +153,12 @@ class TestCase:
             output += "\n                  HINT:\n" + textwrap.indent(str(self.results.hint), "                       ")
 
         return output
+
+    def check_color(self):
+        for handler in self.cluster.log.handlers:
+            if isinstance(handler, log.StdoutHandler) and handler.formatter.colorize:
+                return True
+        return False
 
     def get_readable_status(self):
         if self.is_succeeded():
@@ -217,15 +239,18 @@ class TestSuite:
 
         for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
             colors = ''
-            if key == 'succeeded':
-                colors = "\x1b[48;5;041m\x1b[38;5;232m"
-            if key == 'failed':
-                colors = "\x1b[48;5;196m\x1b[38;5;231m"
-            if key == 'warned':
-                colors = "\x1b[48;5;208m\x1b[38;5;231m"
-            if key == 'excepted':
-                colors = "\x1b[41m"
-            result += "%s %s %s \x1b[49m\x1b[39m " % (colors, value ,key.upper())
+            if tc.check_color():
+                if key == 'succeeded':
+                    colors = "\x1b[48;5;041m\x1b[38;5;232m"
+                if key == 'failed':
+                    colors = "\x1b[48;5;196m\x1b[38;5;231m"
+                if key == 'warned':
+                    colors = "\x1b[48;5;208m\x1b[38;5;231m"
+                if key == 'excepted':
+                    colors = "\x1b[41m"
+                result += "%s %s %s \x1b[49m\x1b[39m " % (colors, value ,key.upper())
+            else:
+                result += "%s %s  " % (value ,key.upper())
 
         result += "\n"
 
@@ -259,47 +284,53 @@ class TestSuite:
         return results
 
     def save_csv(self, destination_file_path, delimiter=';'):
-        with utils.open_external(destination_file_path, mode='w') as stream:
-            csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
-            for tc in self.tcs:
-                csv_writer.writerow([
-                    tc.category.lower(),
-                    tc.get_readable_status(),
-                    tc.id,
-                    tc.name,
-                    tc.results,
-                    tc.minimal,
-                    tc.recommended
-                ])
+        stream = io.StringIO()
+
+        csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        csv_writer.writerow(['group', 'status', 'test_id', 'test_name', 'current_result', 'minimal_result', 'recommended_result'])
+        for tc in self.tcs:
+            csv_writer.writerow([
+                tc.category.lower(),
+                tc.get_readable_status(),
+                tc.id,
+                tc.name,
+                tc.results,
+                tc.minimal,
+                tc.recommended
+            ])
+
+        utils.dump_file({}, stream, destination_file_path, dump_location=False)
 
     def save_html(self, destination_file_path, check_type, append_styles=True):
-        with utils.open_external(destination_file_path, mode='w') as stream:
-            stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
-            for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
-                stream.write('<div class="%s">%s %s</div>' % (key, value, key))
-            stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
-            stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
-            for tc in self.tcs:
-                minimal = tc.minimal
-                if minimal is None:
-                    minimal = ''
-                recommended = tc.recommended
-                if recommended is None:
-                    recommended = ''
-                stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
-                             (tc.get_readable_status(),
-                              tc.category.lower(),
-                              tc.get_readable_status(),
-                              tc.id,
-                              tc.name,
-                              tc.results,
-                              minimal,
-                              recommended
-                              ))
-            stream.write('</tbody></table>')
-            if append_styles:
-                css = utils.read_internal('resources/reports/check_report.css')
-                stream.write('<style>\n%s\n</style>' % css)
+        stream = io.StringIO()
 
-            stream.write('</body></html>')
+        stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
+        for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
+            stream.write('<div class="%s">%s %s</div>' % (key, value, key))
+        stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
+        stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
+        for tc in self.tcs:
+            minimal = tc.minimal
+            if minimal is None:
+                minimal = ''
+            recommended = tc.recommended
+            if recommended is None:
+                recommended = ''
+            stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
+                         (tc.get_readable_status(),
+                          tc.category.lower(),
+                          tc.get_readable_status(),
+                          tc.id,
+                          tc.name,
+                          tc.results,
+                          minimal,
+                          recommended
+                          ))
+        stream.write('</tbody></table>')
+        if append_styles:
+            css = utils.read_internal('resources/reports/check_report.css')
+            stream.write('<style>\n%s\n</style>' % css)
+
+        stream.write('</body></html>')
+
+        utils.dump_file({}, stream, destination_file_path, dump_location=False)

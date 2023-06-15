@@ -16,6 +16,7 @@
 import glob
 import importlib.util
 import io
+import logging
 import os
 import re
 import shutil
@@ -38,7 +39,7 @@ from inspect import signature
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, errors, os as kos
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -69,49 +70,100 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def enrich_upgrade_inventory(inventory, cluster):
-    if cluster.context.get("initial_procedure") != "upgrade":
+def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        upgrade_version = context["upgrade_version"]
+        upgrade_plan = []
+        for version in cluster.procedure_inventory.get('upgrade_plan'):
+            if utils.version_key(version) < utils.version_key(upgrade_version):
+                continue
+
+            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("plugins", {})))
+
+    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_plugin' in context:
+        upgrade_plugins = cluster.procedure_inventory.get('upgrade', {}).get("plugins", {})
+        upgrade_plugins = dict(item for item in upgrade_plugins.items()
+                               if item[0] == context['upgrading_plugin'])
+        upgrade_plan = [("", upgrade_plugins)]
+    else:
+        upgrade_plan = []
+
+    return upgrade_plan
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
         return inventory
 
-    base_plugins = static.DEFAULTS["plugins"]
-    current_plugins = deepcopy(inventory["plugins"])
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        previous_version = context['initial_kubernetes_version']
+        plugins_verify = oob_plugins
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+        plugins_verify = [context['upgrading_plugin']]
+
+    _verify_upgrade_plan(cluster.raw_inventory, previous_version, plugins_verify, upgrade_plan)
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def _verify_upgrade_plan(raw_inventory: dict, previous_version: str,
+                         plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+    raw_plugins = deepcopy(raw_inventory.get('plugins', {}))
 
     # validate all plugin sections in procedure inventory
-    upgrade_plan = cluster.procedure_inventory.get('upgrade_plan')
-    previous_version = cluster.context['initial_kubernetes_version']
-    for version in upgrade_plan:
-        upgrade_plugins = cluster.procedure_inventory.get(version, {}).get("plugins", {})
-        for oob_plugin in oob_plugins:
-            verify_image_redefined(oob_plugin,
+    for version, upgrade_plugins in upgrade_plan:
+        for plugin_name in plugins_verify:
+            verify_image_redefined(plugin_name,
                                    previous_version,
-                                   base_plugins[oob_plugin],
-                                   current_plugins[oob_plugin],
-                                   upgrade_plugins.get(oob_plugin, {}))
-        default_merger.merge(current_plugins, upgrade_plugins)
+                                   version,
+                                   raw_plugins.get(plugin_name, {}),
+                                   upgrade_plugins.get(plugin_name, {}))
+        default_merger.merge(raw_plugins, upgrade_plugins)
         previous_version = version
 
-    upgrade_plugins = cluster.procedure_inventory.get(cluster.context["upgrade_version"], {}).get("plugins", {})
-    default_merger.merge(inventory["plugins"], upgrade_plugins)
-    return inventory
 
-
-def verify_image_redefined(plugin_name, previous_version, base_plugin, cluster_plugin, upgrade_plugin):
+def verify_image_redefined(plugin_name, previous_version, next_version, raw_plugins, upgrade_plugin):
     """
     If some image in "cluster_plugin" is different from image in "base_plugin",
     i.e. redefined, then "upgrade_plugin" should have this image explicitly
     redefined too.
     """
-    for key, value in base_plugin.items():
+    sensitive_keys = ['image', 'helper-pod-image', 'version']
+    for key, value in raw_plugins.items():
         if isinstance(value, dict):
             verify_image_redefined(plugin_name,
                                    previous_version,
-                                   base_plugin[key],
-                                   cluster_plugin[key],
+                                   next_version,
+                                   value,
                                    upgrade_plugin.get(key, {}))
-        elif key == "image" and base_plugin["image"] != cluster_plugin["image"] and not upgrade_plugin.get("image"):
-            raise Exception(f"Image is redefined for {plugin_name} in cluster.yaml for version {previous_version}, "
-                            f"but not present in procedure inventory for next version(s). "
-                            f"Please, specify required plugin version explicitly in procedure inventory.")
+        elif key not in sensitive_keys:
+            continue
+        elif value and not upgrade_plugin.get(key):
+            raise errors.KME("KME0009",
+                             key=key, plugin_name=plugin_name,
+                             previous_version_spec=f" for version {previous_version}" if previous_version else "",
+                             next_version_spec=f" for next version {next_version}" if next_version else ""
+            )
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
+        return inventory
+
+    _, upgrade_plugins = upgrade_plan[0]
+    if upgrade_plugins:
+        default_merger.merge(inventory.setdefault("plugins", {}), upgrade_plugins)
+
+    return inventory
 
 
 def install(cluster, plugins=None):
@@ -168,9 +220,9 @@ def expect_daemonset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following DaemonSets to be up to date: {daemonsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -220,9 +272,9 @@ def expect_replicaset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following ReplicaSets to be up to date: {replicasets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -272,9 +324,9 @@ def expect_statefulset(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following StatefulSets to be up to date: {statefulsets_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -324,9 +376,9 @@ def expect_deployment(cluster: KubernetesCluster,
     log = cluster.log
 
     if timeout is None:
-        timeout = cluster.globals['deployments']['expect']['timeout']
+        timeout = cluster.inventory['globals']['expect']['deployments']['timeout']
     if retries is None:
-        retries = cluster.globals['deployments']['expect']['retries']
+        retries = cluster.inventory['globals']['expect']['deployments']['retries']
 
     log.debug(f"Expecting the following Deployments to be up to date: {deployments_names}")
     log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -365,9 +417,9 @@ def expect_pods(cluster, pods, namespace=None, timeout=None, retries=None,
         cluster = cluster.cluster
 
     if timeout is None:
-        timeout = cluster.globals['pods']['expect']['plugins']['timeout']
+        timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
     if retries is None:
-        retries = cluster.globals['pods']['expect']['plugins']['retries']
+        retries = cluster.inventory['globals']['expect']['pods']['plugins']['retries']
 
     cluster.log.debug("Expecting the following pods to be ready: %s" % pods)
     cluster.log.verbose("Max expectation time: %ss" % (timeout * retries))
@@ -768,27 +820,26 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
 
 def process_chart_values(config, local_chart_path):
     config_values = config.get("values")
+    file_values = None
     config_values_file = config.get("values_file")
+    if config_values_file is not None:
+        with utils.open_external(config_values_file) as stream:
+            file_values = yaml.safe_load(stream)
 
+    if config_values is None and file_values is None:
+        return
+
+    chart_values = os.path.join(local_chart_path, 'values.yaml')
+    with utils.open_external(chart_values, 'r') as stream:
+        merged_values = yaml.safe_load(stream)
+
+    if file_values is not None:
+        merged_values = default_merger.merge(merged_values, file_values)
+    # Values from 'values' section have priority over values in 'values_file' section
     if config_values is not None:
-        with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
-            original_values = yaml.safe_load(stream)
-            stream.seek(0)
-            merged_values = default_merger.merge(original_values, config_values)
-            stream.write(yaml.dump(merged_values))
-            stream.truncate()
-    else:
-        if config_values_file is not None:
-            with utils.open_external(os.path.join(local_chart_path, 'values.yaml'), 'r+') as stream:
-                with utils.open_external(config_values_file, 'r+') as additional_stream:
-                    original_values = yaml.safe_load(stream)
-                    additional_values = yaml.safe_load(additional_stream)
-                    if additional_values is None:
-                        return
-                    stream.seek(0)
-                    merged_values = default_merger.merge(original_values, additional_values)
-                    stream.write(yaml.dump(merged_values))
-                    stream.truncate()
+        merged_values = default_merger.merge(merged_values, config_values)
+
+    utils.dump_file({}, yaml.dump(merged_values), chart_values, dump_location=False)
 
 
 def get_local_chart_path(log, config):
@@ -913,7 +964,7 @@ def _apply_file(cluster: KubernetesCluster, config: dict, file_type: str) -> Non
             if split_extension[1] == ".j2":
                 source_filename = split_extension[0]
 
-            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars']}
+            render_vars = {**cluster.inventory, 'runtime_vars': cluster.context['runtime_vars'], 'env': kos.Environ()}
             with utils.open_utf8(file, 'r') as template_stream:
                 generated_data = jinja.new(log).from_string(template_stream.read()).render(**render_vars)
 
@@ -966,7 +1017,7 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
         if use_sudo:
             method = apply_common_group.sudo
         cluster.log.debug("Applying yaml...")
-        method(apply_command, hide=False)
+        method(apply_command, logging_stream_level=logging.DEBUG)
     else:
         cluster.log.debug('Apply is not required')
 

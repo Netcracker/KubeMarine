@@ -15,27 +15,21 @@
 
 
 from collections import OrderedDict
-from copy import deepcopy
+from distutils.util import strtobool
 from io import StringIO
+from itertools import chain
+from typing import List
 
 import toml
 
-from distutils.util import strtobool
-
+from kubemarine import kubernetes, plugins
+from kubemarine.core import flow
+from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.resources import DynamicResources
-from kubemarine.core.yaml_merger import default_merger
-from kubemarine.core import flow
-from kubemarine.procedures import install
-from kubemarine import kubernetes, plugins
-from itertools import chain
-from kubemarine.core import utils
 from kubemarine.core.executor import RemoteExecutor
-
-
-
-
+from kubemarine.core.resources import DynamicResources
+from kubemarine.procedures import install
 
 
 def system_prepare_thirdparties(cluster):
@@ -54,24 +48,25 @@ def prepull_images(cluster):
 
 
 def kubernetes_upgrade(cluster):
-    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
+    disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
+    drain_kwargs = {
+        'disable_eviction': disable_eviction, 'drain_timeout': drain_timeout, 'grace_period': grace_period
+    }
 
-    kubernetes.upgrade_first_control_plane(version, upgrade_group, cluster,
-                                    drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_first_control_plane(upgrade_group, cluster, **drain_kwargs)
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_control_planes(version, upgrade_group, cluster,
-                                     drain_timeout=drain_timeout, grace_period=grace_period)
+    kubernetes.upgrade_other_control_planes(upgrade_group, cluster, **drain_kwargs)
+
     if cluster.nodes.get('worker', []):
-        kubernetes.upgrade_workers(version, upgrade_group, cluster,
-                                   drain_timeout=drain_timeout, grace_period=grace_period)
+        kubernetes.upgrade_workers(upgrade_group, cluster, **drain_kwargs)
 
     cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     cluster.context['cached_nodes_versions_cleaned'] = True
@@ -113,18 +108,16 @@ def upgrade_containerd(cluster: KubernetesCluster):
         This function fixes the incorrect version of pause during the cluster update procedure
     """
 
-
     cri = cluster.inventory["services"]["cri"]['containerRuntime']
     if cri == 'containerd':
         path = 'plugins."io.containerd.grpc.v1.cri"'
         target_kubernetes_version = cluster.context["upgrade_version"]
-        index_pos = target_kubernetes_version.rfind(".")
-        target_kubernetes_version = target_kubernetes_version[:index_pos]
         pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
         if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
             return
-        last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[2]
-        if last_pause_version != pause_version:
+        last_pause_version = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"].split(":")[
+            2]
+        if True:
             sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
             param_begin_pos = sandbox.rfind(":")
             sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
@@ -145,7 +138,8 @@ def upgrade_containerd(cluster: KubernetesCluster):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
             with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(
+                for node in cluster.nodes['control-plane'].include_group(
+                        cluster.nodes.get('worker')).get_ordered_members_list(
                         provide_node_configs=True):
                     os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
                     node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
@@ -171,43 +165,28 @@ tasks = OrderedDict({
 })
 
 
-def upgrade_finalize_inventory(cluster, inventory):
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-    upgrade_version = cluster.context.get("upgrade_version")
+class UpgradeFlow(flow.Flow):
+    def __init__(self):
+        self.target_version = None
 
-    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
+    def _run(self, resources: DynamicResources):
+        logger = resources.logger()
 
-    # if thirdparties was not defined in procedure.yaml,
-    # then no need to forcibly place them: user may want to use default
-    if cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties'):
-        inventory['services']['thirdparties'] = cluster.procedure_inventory[upgrade_version]['thirdparties']
+        previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
+        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
+        logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
 
-    if cluster.procedure_inventory.get(upgrade_version, {}).get("plugins"):
-        inventory.setdefault("plugins", {})
-        default_merger.merge(inventory["plugins"], cluster.procedure_inventory[upgrade_version]["plugins"])
+        self.target_version = upgrade_plan[-1]
+        kubernetes.verify_supported_version(self.target_version, logger)
 
-    if cluster.procedure_inventory.get(upgrade_version, {}).get("packages"):
-        inventory['services'].setdefault("packages", {})
-        packages_section = deepcopy(cluster.procedure_inventory[upgrade_version]["packages"])
-        for _type in ['install', 'upgrade', 'remove']:
-            packages = packages_section.pop(_type, None)
-            if packages is None:
-                continue
-            if isinstance(packages, list):
-                packages = {'include': packages}
+        args = resources.context['execution_arguments']
+        if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
+            raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
-            packages_list = inventory['services']['packages'].get(_type)
-            if isinstance(packages_list, list):
-                inventory['services']['packages'][_type] = {
-                    'include': packages_list
-                }
-            default_merger.merge(inventory["services"]["packages"].setdefault(_type, {}), packages)
-        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
-        # we still merge global associations section because it has priority during enrichment.
-        default_merger.merge(inventory["services"]["packages"], packages_section)
-
-    return inventory
+        # todo inventory is preserved few times, probably need to preserve it once instead.
+        actions = [UpgradeAction(version) for version in upgrade_plan]
+        flow.run_actions(resources, actions)
 
 
 class UpgradeAction(Action):
@@ -219,7 +198,7 @@ class UpgradeAction(Action):
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
-    def prepare_context(self, context: dict):
+    def prepare_context(self, context: dict) -> None:
         context['upgrade_version'] = self.upgrade_version
         context['dump_filename_prefix'] = self.upgrade_version
 
@@ -235,39 +214,22 @@ def main(cli_arguments=None):
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
-    args = context['execution_arguments']
-    resources = DynamicResources(context)
+    flow_ = UpgradeFlow()
+    result = flow_.run_flow(context)
 
-    upgrade_plan = verify_upgrade_plan(resources.procedure_inventory().get('upgrade_plan'))
-    verification_version_result = kubernetes.verify_target_version(upgrade_plan[-1])
-
-    if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
-        raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
-
-    # todo inventory is preserved few times, probably need to preserve it once instead.
-    actions = [UpgradeAction(version) for version in upgrade_plan]
-    flow.run_actions(resources, actions)
-
-    if verification_version_result:
-        print(verification_version_result)
+    kubernetes.verify_supported_version(flow_.target_version, result.logger)
 
 
-def verify_upgrade_plan(upgrade_plan):
-    if not upgrade_plan:
-        raise Exception('Upgrade plan is not specified or empty')
+def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
+    kubernetes.verify_allowed_version(previous_version)
+    for version in upgrade_plan:
+        kubernetes.verify_allowed_version(version)
 
-    upgrade_plan.sort()
+    upgrade_plan.sort(key=utils.version_key)
 
-    previous_version = None
-    for i in range(0, len(upgrade_plan)):
-        version = upgrade_plan[i]
-        if version == 'v1.24.0':
-            raise Exception('Attempt to upgrade to an unstable version of kubernetes')
-        if previous_version is not None:
-            kubernetes.test_version_upgrade_possible(previous_version, version)
+    for version in upgrade_plan:
+        kubernetes.test_version_upgrade_possible(previous_version, version)
         previous_version = version
-
-    print('Loaded upgrade plan: current ⭢', ' ⭢ '.join(upgrade_plan))
 
     return upgrade_plan
 
@@ -282,14 +244,16 @@ def fix_cri_socket(cluster):
         control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
         control_plane["connection"].sudo(f"sudo kubectl annotate nodes --all \
                                      --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
-                                     , is_async=False, hide=True)
+                                         , is_async=False, hide=True)
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
+
 
 def kubernetes_apply_taints(cluster):
     # Apply taints after upgrade
     group = cluster.nodes['control-plane']
     kubernetes.apply_taints(group)
+
 
 if __name__ == '__main__':
     main()

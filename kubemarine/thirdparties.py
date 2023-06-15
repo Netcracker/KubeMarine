@@ -13,67 +13,218 @@
 # limitations under the License.
 import io
 from copy import deepcopy
+from typing import Tuple, Optional, Dict, List
 
-from kubemarine.core import utils, static
+from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.yaml_merger import default_merger
 
 
-def enrich_inventory_apply_upgrade_defaults(inventory, cluster):
-    if cluster.context.get('initial_procedure') == 'upgrade':
-        upgrade_version = cluster.context["upgrade_version"]
-        upgrade_thirdparties = cluster.procedure_inventory.get(upgrade_version, {}).get('thirdparties')
-        if upgrade_thirdparties:
-            upgrade_thirdparties = deepcopy(upgrade_thirdparties)
-            default_thirdparties = static.DEFAULTS['services']['thirdparties']
-
-            # keep some configurations (unpack) from default thirdparties, if they are not re-defined
-            for destination, config in upgrade_thirdparties.items():
-                if destination in default_thirdparties and 'unpack' in default_thirdparties[destination]\
-                        and 'unpack' not in config:
-                    config['unpack'] = deepcopy(default_thirdparties[destination]['unpack'])
-
-            inventory['services']['thirdparties'] = upgrade_thirdparties
-        else:
-            cluster.log.warning('New thirdparties for upgrade procedure is not set in procedure config - default will be used')
-    return inventory
+def is_default_thirdparty(destination: str):
+    return destination in static.GLOBALS['thirdparties']
 
 
-def get_thirdparty_recommended_sha(destination, cluster):
-    cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
-    # Get kubeadm version
-    kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    effective_kubernetes_version = ".".join(kubernetes_version.split('.')[0:2])
+def get_default_thirdparties() -> List[str]:
+    return list(static.GLOBALS['thirdparties'])
 
-    # Get software versions map
-    software_name = cluster.globals['thirdparties'].get(destination, {}).get('software_name', None)
-    software_versions = cluster.globals['compatibility_map']['software'].get(software_name, {})
 
-    # Return sha1 related to used kubernetes version
-    recommended_sha = software_versions[kubernetes_version].get('sha1', None) \
-        if kubernetes_version in software_versions else \
-        software_versions.get(effective_kubernetes_version, {}).get('sha1', None)
+def get_default_thirdparty_version(kubernetes_version: str, destination: str) -> str:
+    """
+    :param kubernetes_version: Kubernetes version
+    :param destination: absolute path of default third-party
+    :return: version of third-party from compatibility map
+    """
+    software_settings = _get_software_settings_for_thirdparty(kubernetes_version, destination)
 
-    if recommended_sha is not None:
-        cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
+    if 'version' in software_settings:
+        return software_settings['version']
     else:
-        cluster.log.verbose(f"Recommended sha for thirdparty {destination} doesn't exist")
+        # kubeadm, kubelet, kubectl
+        return kubernetes_version
+
+
+def get_default_thirdparty_source(destination: str, version: str, in_public: bool):
+    """
+    :param destination: absolute path of default third-party
+    :param version: version of third-party
+    :param in_public: flag whether to return third-party URL in public resources.
+    :return: URL of the third-party source.
+    """
+    if not is_default_thirdparty(destination):
+        raise Exception(f"{destination} is not a default 3rd-party")
+
+    thirdparty_settings = static.GLOBALS['thirdparties'][destination]
+    if in_public:
+        source_prefix = thirdparty_settings['source_prefix']['public']
+    else:
+        source_prefix = thirdparty_settings['source_prefix']['private']
+
+    relative_path = thirdparty_settings['relative_path'].format(version=version)
+    return f"{source_prefix}/{relative_path}"
+
+
+def get_default_thirdparty_identity(inventory: dict,
+                                    destination: str, in_public: bool) -> Tuple[str, str]:
+    """
+    :param inventory: inventory of the cluster
+    :param destination: absolute path of default third-party
+    :param in_public: flag whether to return third-party URL in public resources.
+    :return: a pair of the third-party URL and sha1
+    """
+    kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+
+    software_settings = _get_software_settings_for_thirdparty(kubernetes_version, destination)
+    sha1 = software_settings['sha1']
+
+    version = get_default_thirdparty_version(kubernetes_version, destination)
+    source = get_default_thirdparty_source(destination, version, in_public)
+
+    return source, sha1
+
+
+def _get_software_settings_for_thirdparty(kubernetes_version: str, destination: str) -> dict:
+    if not is_default_thirdparty(destination):
+        raise Exception(f"{destination} is not a default 3rd-party")
+
+    thirdparty_settings = static.GLOBALS['thirdparties'][destination]
+    software_name = thirdparty_settings['software_name']
+    return static.GLOBALS['compatibility_map']['software'][software_name][kubernetes_version]
+
+
+def get_thirdparty_destination(software_name: str) -> str:
+    for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
+        if thirdparty_settings['software_name'] == software_name:
+            return destination
+    else:
+        raise Exception(f"Failed to find third-party destination for {software_name!r}")
+
+
+def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster) -> Optional[str]:
+    if not is_default_thirdparty(destination):
+        # 3rd-party is not managed by Kubemarine
+        return None
+
+    cluster.log.verbose("Calculate recommended sha for thirdparty %s..." % destination)
+    _, recommended_sha = get_default_thirdparty_identity(cluster.inventory,
+                                                         destination, in_public=True)
+    cluster.log.verbose(f"Recommended sha for thirdparty {destination} was calculated: {recommended_sha}")
 
     return recommended_sha
 
 
-def enrich_inventory_apply_defaults(inventory, cluster):
-    # if thirdparties is empty, then nothing to do
-    if not inventory['services'].get('thirdparties', {}):
+def _convert_thirdparty(thirdparties: dict, destination: str) -> dict:
+    config = thirdparties.setdefault(destination, {})
+    if isinstance(config, str):
+        thirdparties[destination] = config = {
+            'source': config
+        }
+
+    return config
+
+
+def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        upgrade_version = context["upgrade_version"]
+        upgrade_plan = []
+        for version in cluster.procedure_inventory.get('upgrade_plan'):
+            if utils.version_key(version) < utils.version_key(upgrade_version):
+                continue
+
+            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("thirdparties", {})))
+
+    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_thirdparty' in context:
+        upgrade_thirdparties = cluster.procedure_inventory.get('upgrade', {}).get("thirdparties", {})
+        upgrade_thirdparties = dict(item for item in upgrade_thirdparties.items()
+                                    if item[0] == context['upgrading_thirdparty'])
+        upgrade_plan = [("", upgrade_thirdparties)]
+    else:
+        upgrade_plan = []
+
+    return upgrade_plan
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
         return inventory
-    raw_inventory = cluster.raw_inventory
 
-    for destination, config in inventory['services']['thirdparties'].items():
+    context = cluster.context
+    if context.get("initial_procedure") == "upgrade":
+        previous_version = context['initial_kubernetes_version']
+        # Validation is currently turned off for backward compatibility.
+        # It is possible to redefine all thirdparties with templates depending on Kubernetes version and the compatibility map.
+        # This technically allows to not supply new thirdparties during upgrade.
+        # The validation is turned on for new functionality of thirdparty upgrade during Kubemarine migration.
+        #
+        # thirdparties_verify = get_default_thirdparties()
+        thirdparties_verify = []
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+        thirdparties_verify = [context['upgrading_thirdparty']]
 
-        if isinstance(config, str):
-            config = {
-                'source': config
-            }
+    _verify_upgrade_plan(inventory, previous_version, thirdparties_verify, upgrade_plan)
+
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def _verify_upgrade_plan(inventory: dict, previous_version: str,
+                         thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+
+    thirdparties = deepcopy(inventory["services"]['thirdparties'])
+    sensitive_keys = ['source', 'sha1']
+
+    for version, upgrade_thirdparties in upgrade_plan:
+        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
+
+        for destination in thirdparties_verify:
+            config = _convert_thirdparty(thirdparties, destination)
+            upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
+
+            for key in sensitive_keys:
+                if config.get(key) and not upgrade_config.get(key):
+                    raise errors.KME("KME0011",
+                                     key=key, thirdparty=destination,
+                                     previous_version_spec=f" for version {previous_version}" if previous_version else "",
+                                     next_version_spec=f" for next version {version}" if version else "")
+
+            default_merger.merge(config, upgrade_config)
+
+        previous_version = version
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory)
+
+
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    if not upgrade_plan:
+        return inventory
+
+    _, upgrade_thirdparties = upgrade_plan[0]
+    if upgrade_thirdparties:
+        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
+        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
+
+        for destination in upgrade_thirdparties:
+            config = _convert_thirdparty(thirdparties, destination)
+            upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
+            default_merger.merge(config, upgrade_config)
+
+    return inventory
+
+
+def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
+    thirdparties: Dict[str, dict] = inventory['services'].get('thirdparties', {})
+    # if thirdparties is empty, then nothing to do
+    if not thirdparties:
+        return inventory
+
+    for destination in thirdparties:
+
+        config = _convert_thirdparty(thirdparties, destination)
 
         if config.get('mode') is None:
             config['mode'] = 700
@@ -100,20 +251,18 @@ def enrich_inventory_apply_defaults(inventory, cluster):
                                     'Expected any of %s, but \'%s\' found.'
                                     % (destination, all_nodes_names, node_name))
 
-        raw_config = raw_inventory.get('services', {}).get('thirdparties', {}).get(destination, {})
-        recommended_sha = get_thirdparty_recommended_sha(destination, cluster)
-        if 'source' not in raw_config and 'sha1' not in raw_config and recommended_sha is not None:
-            config['sha1'] = get_thirdparty_recommended_sha(destination, cluster)
-
-        inventory['services']['thirdparties'][destination] = config
+        if is_default_thirdparty(destination) and 'source' not in config:
+            source, sha1 = get_default_thirdparty_identity(cluster.inventory, destination, in_public=True)
+            config['source'] = source
+            if 'sha1' not in config:
+                config['sha1'] = sha1
 
     # remove "crictl" from thirdparties when docker is used, but ONLY IF it is NOT explicitly specified in cluster.yaml
     cri_name = inventory['services']['cri']['containerRuntime']
     crictl_key = '/usr/bin/crictl.tar.gz'
     if cri_name == "docker" and \
-            crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}) and \
-            crictl_key in inventory['services']['thirdparties']:
-        del(inventory['services']['thirdparties'][crictl_key])
+            crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}):
+        del(thirdparties[crictl_key])
 
     return inventory
 
@@ -200,18 +349,24 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         extension = destination.split('.')[-1]
         if extension == 'zip':
             cluster.log.verbose('Unzip will be used for unpacking')
-            # TODO re-installation waits forever
-            remote_commands += ' && sudo unzip %s -d %s' % (destination, config['unpack'])
+            remote_commands += ' && sudo unzip -o %s -d %s' % (destination, config['unpack'])
+            
+            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chmod %s %s/FILE' \
+                   % (destination, config['mode'], config['unpack'])
+            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chown -R %s %s/FILE' \
+                   % (destination, config['owner'], config['unpack'])
+            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+            
         else:
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
-
-        # TODO access rights do not work for zip
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
+            
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
                            % (destination, config['mode'], config['unpack'])
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
                            % (destination, config['owner'], config['unpack'])
-        remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+            remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+
 
     return common_group.sudo(remote_commands)
 

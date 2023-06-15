@@ -1,23 +1,29 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
+  "description": "You can install or upgrade HELM chart on the Kubernetes cluster",
   "properties": {
     "chart_path": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "The path on local host to the Helm chart. The URL link to chart archive is also supported."
     },
     "values": {
-      "type": "object"
+      "type": "object",
+      "description": "YAML formatted values for the chart that override values from the values.yaml file from the provided chart. The values from this parameter also override the values from the 'values_file' parameter."
     },
     "values_file": {
-      "type": "string"
+      "type": "string",
+      "description": "The path on local host to the file with YAML formatted values for the chart that override values from the values.yaml file from the provided chart."
     },
     "release": {
-      "type": "string"
+      "type": "string",
+      "description": "The target Helm release. It is equal to the chart name by default."
     },
     "namespace": {
       "type": "string",
-      "default": "default"
+      "default": "default",
+      "description": "The cloud namespace where the chart should be installed"
     }
   },
   "required": ["chart_path"],

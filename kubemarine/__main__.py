@@ -159,11 +159,7 @@ Usage: kubemarine <procedure> <arguments>
 ''' % '\n'.join(descriptions_print_list))
         sys.exit(1)
 
-    result = import_procedure(arguments[0]).main(arguments[1:])
-    if result is not None:
-        from kubemarine.testsuite import TestSuite
-        if isinstance(result, TestSuite) and result.is_any_test_failed():
-            sys.exit(1)
+    import_procedure(arguments[0]).main(arguments[1:])
 
 
 def import_procedure(name):
@@ -225,8 +221,8 @@ def selftest():
 
     print('\nValidating patch duplicates ...')
 
-    from kubemarine import patches
-    patches = patches.patches
+    module = import_procedure('migrate_kubemarine')
+    patches = module.load_patches()
     patch_ids = [patch.identifier for patch in patches]
     unique = set()
     duplicates = [p_id for p_id in patch_ids if p_id in unique or unique.add(p_id)]

@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
 import unittest
 from typing import Optional, List, Dict
-from unittest import mock
 
 from kubemarine import demo
 from kubemarine.core import static, utils
@@ -32,15 +30,14 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         plugin_versions = list({plugin['version'] for k8s, plugin in self.compatibility_map().items()})
         for plugin_version in plugin_versions:
             latest_k8s = next(k8s for k8s in reversed(self.k8s_versions)
-                              if self.compatibility_map()[utils.minor_version(k8s)]['version'] == plugin_version)
+                              if self.compatibility_map()[k8s]['version'] == plugin_version)
             self.latest_k8s_supporting_specific_versions[plugin_version] = latest_k8s
 
     def compatibility_map(self) -> dict:
         return static.GLOBALS['compatibility_map']['software'][self.plugin_name]
 
     def expected_image_tag(self, k8s_version: str, image: str):
-        minor_k8s_version = utils.minor_version(k8s_version)
-        return self.compatibility_map()[minor_k8s_version].get(image)
+        return self.compatibility_map()[k8s_version].get(image)
 
     def get_latest_k8s(self, minor_k8s_version: Optional[str] = None) -> str:
         return next(k8s for k8s in reversed(self.k8s_versions)
@@ -55,40 +52,29 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
     def inventory(self, k8s_version):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
-        # TODO in future we should enable suitable admission implementation by default
-        if utils.version_key(k8s_version)[0:2] >= (1, 24):
-            inventory.setdefault('rbac', {})['admission'] = 'pss'
-
         return inventory
 
     def enrich_yaml(self, cluster: demo.FakeKubernetesCluster) -> Manifest:
-        with mock.patch('kubemarine.plugins.apply_source') as apply_source:
-            # For regression testing with jinja templates, the following code can be used instead of builtin.apply_yaml
-            #
-            # from kubemarine import plugins
-            # version = cluster.inventory['plugins'][self.plugin_name]['version']
-            # version = utils.minor_version(version)
-            # config = {
-            #     "source": f"templates/plugins/<paste template filename>.yaml.j2"
-            # }
-            # plugins.apply_template(cluster, config)
-            builtin.apply_yaml(cluster, plugin_name=self.plugin_name)
-            enriched_source: io.StringIO = apply_source.call_args[0][1]['source']
-            return Manifest(cluster.log, enriched_source)
+        # For regression testing with jinja templates, the following code can be used instead of builtin.apply_yaml
+        # with mock.patch('kubemarine.plugins.apply_source') as apply_source:
+        #     from kubemarine import plugins
+        #     version = cluster.inventory['plugins'][self.plugin_name]['version']
+        #     version = utils.minor_version(version)
+        #     config = {
+        #         "source": f"templates/plugins/<paste template filename>.yaml.j2"
+        #     }
+        #     plugins.apply_template(cluster, config)
+        processor = builtin.get_manifest_processor(cluster.log, cluster.inventory, self.plugin_name)
+        return processor.enrich()
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:
         nginx = inventory.setdefault('plugins', {}).setdefault(self.plugin_name, {})
         nginx.setdefault('installation', {})['registry'] = 'example.registry'
         cluster = demo.new_cluster(inventory)
         manifest = self.enrich_yaml(cluster)
-        num_images = 0
-        for key in manifest.all_obj_keys():
-            obj = self.get_obj(manifest, key)
-            for spec_section in ('containers', 'initContainers'):
-                containers = obj.get('spec', {}).get('template', {}).get('spec', {}).get(spec_section, [])
-                for container in containers:
-                    num_images += 1
-                    self.assertTrue(container['image'].startswith('example.registry/'),
-                                    f"{container['image']} was not enriched with registry")
+        images = manifest.get_all_container_images()
+        for image in images:
+            self.assertTrue(image.startswith('example.registry/'),
+                            f"{image} was not enriched with registry")
 
-        return num_images
+        return len(images)
