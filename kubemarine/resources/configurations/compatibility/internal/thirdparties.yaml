@@ -12,6 +12,8 @@ kubeadm:
     sha1: 190703cfe16ad00d0f91487d00bece9667cd5903
   v1.22.9:
     sha1: 33418daedfd3651ebcf5c0ab0c6c701764962e5d
+  v1.23.1:
+    sha1: ac147fd6a951670fe7414cee8b3cb1e6ac1d40d1
   v1.23.6:
     sha1: 90386507b3214adb6b2d4ed05a07e80f11f674d6
   v1.23.11:
@@ -43,6 +45,8 @@ kubelet:
     sha1: 41a2980963427a17c4fbce74aee6bb0bcf08b9ff
   v1.22.9:
     sha1: 21b4104937b65fdf0fdf9fbb57ff22a879b21e3f
+  v1.23.1:
+    sha1: 4a7e2e5f5e6b8e95efa52931786bc275a037bc50
   v1.23.6:
     sha1: 326110dcb62b66e69490d039b170682fb71c5560
   v1.23.11:
@@ -74,6 +78,8 @@ kubectl:
     sha1: de9b5c2fe2faefc2b4a61adf6f89144d3f0a09b1
   v1.22.9:
     sha1: e4137d683b9f93211bb6d9fa155d0bb423e871c9
+  v1.23.1:
+    sha1: 4ceb8d046a2d8253495aa86d13f11e2eb29644fc
   v1.23.6:
     sha1: 65a24196b4cc9a3d2eafbd254b9d2d4add8ba152
   v1.23.11:
@@ -110,6 +116,9 @@ calicoctl:
     version: v3.24.2
     sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
   v1.22.9:
+    version: v3.24.2
+    sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
+  v1.23.1:
     version: v3.24.2
     sha1: c4de7a203e5a3a942fdf130bc9ec180111fc2ab6
   v1.23.6:
@@ -158,6 +167,9 @@ crictl:
     version: v1.23.0
     sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
   v1.22.9:
+    version: v1.23.0
+    sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
+  v1.23.1:
     version: v1.23.0
     sha1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2
   v1.23.6:
