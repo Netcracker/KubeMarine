@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 
-PYINSTALLER_VERSION = "5.8.0"
+PYINSTALLER_VERSION = "5.12.0"
 
 
 def call(args):
