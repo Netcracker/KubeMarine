@@ -604,6 +604,8 @@ plugins:
     env:
       IP_AUTODETECTION_METHOD: kubernetes-internal-ip
 ```
+**Note**: `kubernetes-internal-ip` autodetection method cannot be used in calico earlier than v3.22.4 due to a [known issue](https://github.com/projectcalico/calico/issues/6142).
+
 For more information on IP autodetection methods, refer to the [official documentation](https://docs.tigera.io/calico/3.25/reference/configure-calico-node#ip-autodetection-methods).
 
 
