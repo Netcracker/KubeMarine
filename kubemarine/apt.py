@@ -30,28 +30,32 @@ def backup_repo(group, repo_filename="*", **kwargs) -> NodeGroupResult or None:
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
+    dry_run = utils.check_dry_run_status_active(group.cluster)
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
     return group.sudo("find %s -type f -name '%s.list' | "
-                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % ("/etc/apt/", repo_filename), **kwargs)
+                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % ("/etc/apt/", repo_filename),
+                      dry_run=dry_run, **kwargs)
 
 
 def add_repo(group, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
-    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
-    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update', **kwargs)
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    create_repo_file(group, repo_data, get_repo_file_name(repo_filename), dry_run)
+    return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update',
+                      dry_run=dry_run, **kwargs)
 
 
 def get_repo_file_name(repo_filename="predefined"):
     return '%s/%s.list' % ("/etc/apt/sources.list.d/", repo_filename)
 
 
-def create_repo_file(group, repo_data, repo_file):
+def create_repo_file(group, repo_data, repo_file, dry_run=False):
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
     else:
         repo_data_str = utils.read_external(repo_data)
-    group.put(io.StringIO(repo_data_str), repo_file, sudo=True)
+    group.put(io.StringIO(repo_data_str), repo_file, sudo=True, dry_run=dry_run)
 
 
 def clean(group, **kwargs) -> NodeGroupResult:

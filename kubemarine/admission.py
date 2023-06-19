@@ -234,7 +234,9 @@ def install_psp_task(cluster):
     if not is_security_enabled(cluster.inventory):
         cluster.log.debug("Pod security disabled, skipping policies installation...")
         return
-
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Installing Pod security policies...")
+        return
     first_control_plane = cluster.nodes["control-plane"].get_first_member()
 
     cluster.log.debug("Installing OOB policies...")
@@ -807,25 +809,30 @@ def update_finalized_inventory(cluster, inventory_to_finalize):
 
     return inventory_to_finalize
 
+
 def copy_pss(group):
-    if  group.cluster.inventory['rbac']['admission'] !=  "pss":
+    cluster = group.cluster
+    if cluster.inventory['rbac']['admission'] !=  "pss":
         return
-    if group.cluster.context.get('initial_procedure') == 'manage_pss':
-        if not is_security_enabled(group.cluster.inventory) and \
-                group.cluster.procedure_inventory["pss"]["pod-security"] != "enabled":
-            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+    if cluster.context.get('initial_procedure') == 'manage_pss':
+        if not is_security_enabled(cluster.inventory) and \
+                cluster.procedure_inventory["pss"]["pod-security"] != "enabled":
+            cluster.log.debug("Pod security disabled, skipping pod admission installation...")
             return
-    if group.cluster.context.get('initial_procedure') == 'install':
+    if cluster.context.get('initial_procedure') == 'install':
         if not is_security_enabled(group.cluster.inventory):
-            group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
+            cluster.log.debug("Pod security disabled, skipping pod admission installation...")
             return
 
-    defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
-    exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
+    defaults = cluster.inventory["rbac"]["pss"]["defaults"]
+    exemptions = cluster.inventory["rbac"]["pss"]["exemptions"]
     # create admission config from template and cluster.yaml
     admission_config = Template(utils.read_internal(admission_template))\
-                       .render(defaults=defaults,exemptions=exemptions)
+        .render(defaults=defaults, exemptions=exemptions)
 
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("Copying Admission config files")
+        return None
     # put admission config on every control-planes
     filename = uuid.uuid4().hex
     remote_path = tmp_filepath_pattern % filename

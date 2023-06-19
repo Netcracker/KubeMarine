@@ -170,14 +170,15 @@ def detect_of_family_by_name_version(name: str, version: str) -> str:
     return os_family
 
 
-def update_resolv_conf(group, config=None):
+def update_resolv_conf(group, config=None, dry_run=False):
     if config is None:
         raise Exception("Data can't be empty")
 
     # TODO: Use Jinja template
     buffer = get_resolv_conf_buffer(config)
     utils.dump_file(group.cluster, buffer, 'resolv.conf')
-    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True, sudo=True, hide=True)
+    group.put(buffer, "/etc/resolv.conf", backup=True, immutable=True,
+              sudo=True, hide=True, dry_run=dry_run)
 
 
 def get_resolv_conf_buffer(config):
@@ -214,11 +215,11 @@ def generate_etc_hosts_config(inventory, cluster=None, etc_hosts_part='etc_hosts
     return result
 
 
-def update_etc_hosts(group, config=None):
+def update_etc_hosts(group, config=None, dry_run=False):
     if config is None:
         raise Exception("Data can't be empty")
     utils.dump_file(group.cluster, config, 'etc_hosts')
-    group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True)
+    group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True, hide=True, dry_run=dry_run)
 
 
 def stop_service(group: NodeGroup, name: str) -> NodeGroupResult:
@@ -252,7 +253,7 @@ def disable_service(group, name=None, now=True):
     cmd = 'systemctl disable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.sudo(cmd)
+    return group.sudo(cmd, dry_run=utils.check_dry_run_status_active(group.cluster))
 
 
 def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str):
@@ -319,15 +320,19 @@ def disable_swap(group):
         return result
 
     log.verbose("Switching swap off...")
-
-    group.sudo('swapoff -a', warn=True)
-    group.sudo('sed -i.bak \'/swap/d\' /etc/fstab', warn=True)
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    group.sudo('swapoff -a', warn=True, dry_run=dry_run)
+    group.sudo('sed -i.bak \'/swap/d\' /etc/fstab', warn=True, dry_run=dry_run)
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
 
 
 def reboot_nodes(cluster: KubernetesCluster):
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Performing reboot")
+        return
+
     cluster.nodes["all"].get_new_nodes_or_self().call(reboot_group)
 
 
@@ -380,13 +385,14 @@ def perform_group_reboot(group: NodeGroup):
     return result
 
 
-def reload_systemctl(group):
-    return group.sudo('systemctl daemon-reload')
+def reload_systemctl(group, dry_run=False):
+    return group.sudo('systemctl daemon-reload', dry_run=dry_run)
 
 
 def add_to_path(group, string):
     # TODO: Also update PATH in ~/.bash_profile
     group.sudo("export PATH=$PATH:%s" % string)
+
 
 def configure_chronyd(group, retries=60):
     cluster = group.cluster
@@ -405,6 +411,11 @@ def configure_chronyd(group, retries=60):
     utils.dump_file(cluster, chronyd_config, 'chrony.conf')
     group.put(io.StringIO(chronyd_config), '/etc/chrony.conf', backup=True, sudo=True)
     group.sudo('systemctl restart chronyd')
+
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run] Successfully configured chronyd")
+        return
+
     while retries > 0:
         log.debug("Waiting for time sync, retries left: %s" % retries)
         results = group.sudo('chronyc tracking && sudo chronyc sources')
@@ -450,6 +461,9 @@ def configure_timesyncd(group, retries=120):
                      '&& sudo systemctl restart systemd-timesyncd.service '
                      '&& sudo systemctl status systemd-timesyncd.service')
     log.verbose(res)
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run] Successfully configured timesyncd")
+        return
     while retries > 0:
         log.debug("Waiting for time sync, retries left: %s" % retries)
         results = group.sudo('timedatectl timesync-status && sudo timedatectl status')
@@ -498,8 +512,10 @@ def setup_modprobe(group):
 
     log.debug("Uploading config...")
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
-    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True, hide=True)
-    group.sudo("modprobe -a %s" % raw_config)
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf",
+              backup=True, sudo=True, hide=True, dry_run=dry_run)
+    group.sudo("modprobe -a %s" % raw_config, dry_run=dry_run)
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
@@ -522,6 +538,9 @@ def is_modprobe_valid(group):
 
 
 def verify_system(cluster: KubernetesCluster):
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] verifying system")
+        return
     group = cluster.nodes["all"].get_new_nodes_or_self()
     log = cluster.log
     # this method handles clusters with multiple OS

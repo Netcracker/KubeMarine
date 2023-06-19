@@ -464,6 +464,10 @@ def _test_version(version: str, numbers_amount: int) -> list:
     raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
 
 
+def check_dry_run_status_active(cluster):
+    return cluster.context.get("dry_run")
+
+
 class ClusterStorage:
     """
     File preservation:

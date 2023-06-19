@@ -68,6 +68,9 @@ def install(group: NodeGroup) -> str or None:
     else:
         log.debug(f'Auditd package is not installed on {not_installed_hosts}, installing...')
 
+    if utils.check_dry_run_status_active(group.cluster):
+        return None
+
     with RemoteExecutor(cluster) as exe:
         for host in not_installed_hosts:
             the_node = cluster.make_group([host])
@@ -93,6 +96,9 @@ def apply_audit_rules(group: NodeGroup) -> NodeGroupResult:
     log.debug('Applying audit rules...')
     rules_content = " \n".join(cluster.inventory['services']['audit']['rules'])
     utils.dump_file(cluster, rules_content, 'audit.rules')
+
+    if utils.check_dry_run_status_active(group.cluster):
+        return None
 
     restart_tokens = []
     with RemoteExecutor(cluster) as exe:

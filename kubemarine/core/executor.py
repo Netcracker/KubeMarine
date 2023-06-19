@@ -290,7 +290,7 @@ class RemoteExecutor:
         """
         self.get_merged_result()
 
-    def get_merged_result(self):
+    def get_merged_result(self, dry_run=False):
         """
         Returns last results, merged into NodeGroupResult. If any node failed, throws GroupException.
 
@@ -298,6 +298,8 @@ class RemoteExecutor:
 
         :return: NodeGroupResult
         """
+        if dry_run:
+            return None
         executor = self._get_active_executor()
         if len(executor.results) == 0:
             return None

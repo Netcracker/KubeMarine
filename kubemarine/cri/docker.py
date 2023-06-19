@@ -22,6 +22,9 @@ from kubemarine.core.group import NodeGroup
 
 
 def install(group: NodeGroup):
+    if utils.check_dry_run_status_active(group.cluster):
+        group.cluster.log.debug("[dry-run] Installing Docker")
+        return None
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'docker')
@@ -56,6 +59,8 @@ def configure(group: NodeGroup):
 
     settings_json = json.dumps(group.cluster.inventory["services"]['cri']['dockerConfig'], sort_keys=True, indent=4)
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
+    if utils.check_dry_run_status_active(group.cluster):
+        group.cluster.log.debug("[dry-run] Configuring Docker")
 
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):

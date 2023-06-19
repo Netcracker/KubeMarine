@@ -173,6 +173,7 @@ def is_config_valid(group, state=None, policy=None, permissive=None):
 
 def setup_selinux(group):
     log = group.cluster.log
+    dry_run = utils.check_dry_run_status_active(group.cluster)
 
     # this method handles cluster with multiple os, suppressing should be enabled
     if group.get_nodes_os() not in ['rhel', 'rhel8']:
@@ -196,7 +197,7 @@ def setup_selinux(group):
 
     log.debug("Uploading selinux config...")
     utils.dump_file(group.cluster, config, 'selinux_config')
-    group.put(config, '/etc/selinux/config', backup=True, sudo=True)
+    group.put(config, '/etc/selinux/config', backup=True, sudo=True, dry_run=dry_run)
 
     semanage_commands = ''
     for item in expected_permissive:
@@ -205,7 +206,7 @@ def setup_selinux(group):
         semanage_commands = semanage_commands + 'semanage permissive -a %s' % item
     log.verbose("The following command will be executed to configure permissive:\n%s" % semanage_commands)
 
-    group.sudo(semanage_commands)
+    group.sudo(semanage_commands, dry_run=dry_run)
 
     group.cluster.schedule_cumulative_point(system.reboot_nodes)
     group.cluster.schedule_cumulative_point(system.verify_system)

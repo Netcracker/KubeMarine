@@ -66,6 +66,7 @@ def enrich_inventory(inventory, cluster):
 
 def install(cluster: KubernetesCluster):
     rbac = cluster.inventory['rbac']
+    dry_run = utils.check_dry_run_status_active(cluster)
     if not rbac.get("accounts"):
         cluster.log.debug("No accounts specified to install, skipping...")
         return
@@ -86,10 +87,10 @@ def install(cluster: KubernetesCluster):
 
         cluster.log.debug("Uploading template...")
         cluster.log.debug("\tDestination: %s" % destination_path)
-        cluster.nodes['control-plane'].put(io.StringIO(dump), destination_path, sudo=True)
+        cluster.nodes['control-plane'].put(io.StringIO(dump), destination_path, sudo=True, dry_run=dry_run)
 
         cluster.log.debug("Applying yaml...")
-        cluster.nodes['control-plane'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False)
+        cluster.nodes['control-plane'].get_first_member().sudo('kubectl apply -f %s' % destination_path, hide=False, dry_run=dry_run)
 
         cluster.log.debug('Loading token...')
         load_tokens_cmd = 'kubectl -n %s get secret ' \
@@ -98,14 +99,17 @@ def install(cluster: KubernetesCluster):
 
         token = []
         retries = cluster.globals['accounts']['retries']
-        # Token creation in Kubernetes 1.24 is not syncronus, therefore retries are necessary
-        while retries > 0:
-            result = cluster.nodes['control-plane'].get_first_member().sudo(load_tokens_cmd)
-            token = list(result.values())[0].stdout
-            if not token:
-                retries -= 1
-            else:
-                break
+        if dry_run:
+            token = ["dry-run"]
+        else:
+            # Token creation in Kubernetes 1.24 is not syncronus, therefore retries are necessary
+            while retries > 0:
+                result = cluster.nodes['control-plane'].get_first_member().sudo(load_tokens_cmd)
+                token = list(result.values())[0].stdout
+                if not token:
+                    retries -= 1
+                else:
+                    break
         if not token:
             raise Exception(f"The token loading for {account['name']} 'ServiceAccount' failed")
 

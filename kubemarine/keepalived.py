@@ -192,9 +192,11 @@ def uninstall(group):
     return packages.remove(group, include='keepalived')
 
 
-def restart(group: NodeGroup):
+def restart(group: NodeGroup, dry_run=False):
     cluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
+    if dry_run:
+        return
     with RemoteExecutor(cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             service_name = group.cluster.get_package_association_for_node(
@@ -260,7 +262,7 @@ def generate_config(inventory, node):
 def configure(group: NodeGroup) -> NodeGroupResult:
     log = group.cluster.log
     group_members = group.get_ordered_members_list(provide_node_configs=True)
-
+    dry_run = utils.check_dry_run_status_active(group.cluster)
     with RemoteExecutor(group.cluster):
         for node in group_members:
 
@@ -269,15 +271,15 @@ def configure(group: NodeGroup) -> NodeGroupResult:
             package_associations = group.cluster.get_associations_for_node(node['connect_to'], 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-            group.sudo('mkdir -p %s' % configs_directory, hide=True)
+            group.sudo('mkdir -p %s' % configs_directory, hide=True, dry_run=dry_run)
 
             config = generate_config(group.cluster.inventory, node)
             utils.dump_file(group.cluster, config, 'keepalived_%s.conf' % node['name'])
 
-            node['connection'].put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node['connection'].put(io.StringIO(config), package_associations['config_location'], sudo=True, dry_run=dry_run)
 
-    log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
+    log.debug(group.sudo('ls -la %s' % package_associations['config_location'], dry_run=dry_run))
 
-    restart(group)
+    restart(group, dry_run)
 
-    return group.sudo('systemctl status %s' % package_associations['service_name'], warn=True)
+    return group.sudo('systemctl status %s' % package_associations['service_name'], warn=True, dry_run=dry_run)

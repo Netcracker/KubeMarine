@@ -26,6 +26,9 @@ from kubemarine.core.group import NodeGroup
 
 
 def install(group: NodeGroup):
+    if utils.check_dry_run_status_active(group.cluster):
+        group.cluster.log.debug("[dry-run] Installing Containerd")
+        return None
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
@@ -49,7 +52,8 @@ def configure(group: NodeGroup):
     log.debug("Uploading crictl configuration for containerd...")
     crictl_config = yaml.dump({"runtime-endpoint": "unix:///run/containerd/containerd.sock"})
     utils.dump_file(group.cluster, crictl_config, 'crictl.yaml')
-    group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True)
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True, dry_run=dry_run)
 
     config_string = ""
     # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
@@ -89,19 +93,22 @@ def configure(group: NodeGroup):
             if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
                 auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
         auth_json = json.dumps(auth_registries)
-        group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
-        group.sudo("chmod 600 /etc/containers/auth.json")
+        group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True, dry_run=dry_run)
+        group.sudo("chmod 600 /etc/containers/auth.json", dry_run=dry_run)
     if insecure_registries:
         log.debug("Uploading podman configuration...")
         podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"
         utils.dump_file(group.cluster, podman_registries, 'podman_registries.conf')
-        group.sudo("mkdir -p /etc/containers/")
-        group.put(StringIO(podman_registries), "/etc/containers/registries.conf", backup=True, sudo=True)
+        group.sudo("mkdir -p /etc/containers/", dry_run=dry_run)
+        group.put(StringIO(podman_registries), "/etc/containers/registries.conf", backup=True, sudo=True, dry_run=dry_run)
     else:
         log.debug("Removing old podman configuration...")
-        group.sudo("rm -f /etc/containers/registries.conf")
+        group.sudo("rm -f /etc/containers/registries.conf", dry_run=dry_run)
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
+    if dry_run:
+        return None
+
     with RemoteExecutor(group.cluster) as exe:
         for node in group.get_ordered_members_list(provide_node_configs=True):
             os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')

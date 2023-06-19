@@ -262,7 +262,7 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     crictl_key = '/usr/bin/crictl.tar.gz'
     if cri_name == "docker" and \
             crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}):
-        del(thirdparties[crictl_key])
+        del thirdparties[crictl_key]
 
     return inventory
 
@@ -289,6 +289,7 @@ def get_group_require_unzip(cluster: KubernetesCluster, inventory: dict) -> Node
 
 def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupResult or None:
     cluster = filter_group.cluster
+    dry_run = utils.check_dry_run_status_active(cluster)
     config = cluster.inventory['services'].get('thirdparties', {}).get(destination)
 
     if config is None:
@@ -329,11 +330,11 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         remote_commands += ' && sudo rm -f %s && sudo curl --max-time %d -f -g -L %s -o %s && ' % (destination, cluster.inventory['globals']['timeout_download'], config['source'], destination)
     else:
         cluster.log.verbose('Installation via sftp upload detected')
-        cluster.log.debug(common_group.sudo(remote_commands))
+        cluster.log.debug(common_group.sudo(remote_commands, dry_run=dry_run))
         remote_commands = ''
         # TODO: Possible use SHA1 from inventory instead of calculating if provided?
         script = utils.read_internal(config['source'])
-        common_group.put(io.StringIO(script), destination, sudo=True)
+        common_group.put(io.StringIO(script), destination, sudo=True, dry_run=dry_run)
 
         # TODO: Do not upload local files if they already exists on remote machines
 
@@ -350,25 +351,24 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> NodeGroupRe
         if extension == 'zip':
             cluster.log.verbose('Unzip will be used for unpacking')
             remote_commands += ' && sudo unzip -o %s -d %s' % (destination, config['unpack'])
-            
+
             remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chmod %s %s/FILE' \
                    % (destination, config['mode'], config['unpack'])
             remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chown -R %s %s/FILE' \
                    % (destination, config['owner'], config['unpack'])
             remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
-            
+
         else:
             cluster.log.verbose('Tar will be used for unpacking')
             remote_commands += ' && sudo tar -zxf %s -C %s' % (destination, config['unpack'])
-            
+
             remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chmod %s %s/FILE' \
                            % (destination, config['mode'], config['unpack'])
             remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo chown %s %s/FILE' \
                            % (destination, config['owner'], config['unpack'])
             remote_commands += ' && sudo tar -tf %s | xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
 
-
-    return common_group.sudo(remote_commands)
+    return common_group.sudo(remote_commands, dry_run=dry_run)
 
 
 def install_all_thirparties(group):

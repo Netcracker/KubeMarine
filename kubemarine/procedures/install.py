@@ -145,6 +145,9 @@ def system_prepare_system_setup_selinux(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_apparmor(group: NodeGroup):
+    if utils.check_dry_run_status_active(group.cluster):
+        group.cluster.log.debug("[dry-run] Setting up apparmor")
+        return
     group.call(apparmor.setup_apparmor)
 
 
@@ -179,25 +182,29 @@ def system_prepare_policy(group: NodeGroup):
     Task generates rules for logging kubernetes and on audit
     """
     cluster = group.cluster
+    dry_run = utils.check_dry_run_status_active(cluster)
     api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
     audit_log_dir = os.path.dirname(api_server_extra_args['audit-log-path'])
     audit_file_name = api_server_extra_args['audit-policy-file']
     audit_policy_dir = os.path.dirname(audit_file_name)
-    group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+    group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}", dry_run=dry_run)
     policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
     collect_node = group.get_ordered_members_list(provide_node_configs=True)
 
     if policy_config:
         policy_config_file = yaml.dump(policy_config)
         utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
-        #download rules in cluster
+        # download rules in cluster
         for node in collect_node:
-            node['connection'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
+            node['connection'].put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True, dry_run=dry_run)
         audit_config = True
         cluster.log.debug("Audit cluster policy config")
     else:
         audit_config = False
         cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
+
+    if dry_run:
+        return
 
     if kubernetes.is_cluster_installed(cluster) and audit_config is True and cluster.context['initial_procedure'] != 'add_node':
         for control_plane in collect_node:
@@ -250,10 +257,11 @@ def system_prepare_policy(group: NodeGroup):
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_dns_hostname(group: NodeGroup):
     cluster = group.cluster
+    dry_run = utils.check_dry_run_status_active(cluster)
     with RemoteExecutor(cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             cluster.log.debug("Changing hostname '%s' = '%s'" % (node["connect_to"], node["name"]))
-            node["connection"].sudo("hostnamectl set-hostname %s" % node["name"])
+            node["connection"].sudo("hostnamectl set-hostname %s" % node["name"], dry_run=dry_run)
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -262,9 +270,9 @@ def system_prepare_dns_resolv_conf(group: NodeGroup):
     if cluster.inventory["services"].get("resolv.conf") is None:
         cluster.log.debug("Skipped - resolv.conf section not defined in config file")
         return
-
-    system.update_resolv_conf(group, config=cluster.inventory["services"].get("resolv.conf"))
-    cluster.log.debug(group.sudo("ls -la /etc/resolv.conf; sudo lsattr /etc/resolv.conf"))
+    dry_run = utils.check_dry_run_status_active(cluster)
+    system.update_resolv_conf(group, config=cluster.inventory["services"].get("resolv.conf"), dry_run=dry_run)
+    cluster.log.debug(group.sudo("ls -la /etc/resolv.conf; sudo lsattr /etc/resolv.conf", dry_run=dry_run))
 
 
 def system_prepare_dns_etc_hosts(cluster):
@@ -275,9 +283,10 @@ def system_prepare_dns_etc_hosts(cluster):
     cluster.log.debug("\nUploading...")
 
     group = cluster.nodes['all'].get_final_nodes()
+    dry_run = utils.check_dry_run_status_active(cluster)
 
-    system.update_etc_hosts(group, config=config)
-    cluster.log.debug(group.sudo("ls -la /etc/hosts"))
+    system.update_etc_hosts(group, config=config, dry_run=dry_run)
+    cluster.log.debug(group.sudo("ls -la /etc/hosts", dry_run=dry_run))
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -312,7 +321,7 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
 
 def manage_mandatory_packages(group: NodeGroup):
     cluster = group.cluster
-
+    dry_run = utils.check_dry_run_status_active(cluster)
     with RemoteExecutor(cluster) as exe:
         for node in group.get_ordered_members_list():
             pkgs = []
@@ -322,13 +331,17 @@ def manage_mandatory_packages(group: NodeGroup):
 
             if pkgs:
                 cluster.log.debug(f"Installing {pkgs} on {node.get_node_name()!r}")
-                packages.install(node, pkgs)
+                if not dry_run:
+                    packages.install(node, pkgs)
 
     return exe.get_merged_result()
 
 
 def manage_custom_packages(group: NodeGroup):
     cluster = group.cluster
+    if utils.check_dry_run_status_active(group.cluster):
+        cluster.log.verbose("[dry-run] performing manage_custom_packages")
+        return
     batch_tasks = []
     batch_parameters = {}
 
@@ -409,10 +422,16 @@ def system_prepare_thirdparties(group: NodeGroup):
 
 @_applicable_for_new_nodes_with_roles('balancer')
 def deploy_loadbalancer_haproxy_install(group: NodeGroup):
+    if utils.check_dry_run_status_active(group.cluster):
+        group.cluster.log.debug("[dry-run] Installing load-balancer HA-PROXY")
+        return
     group.call(haproxy.install)
 
 
 def deploy_loadbalancer_haproxy_configure(cluster):
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Configuring load-balancer HA-PROXY")
+        return
 
     if not cluster.inventory['services'].get('loadbalancer', {}) \
             .get('haproxy', {}).get('keep_configs_updated', True):
@@ -462,6 +481,9 @@ def deploy_loadbalancer_keepalived_install(cluster):
         cluster.log.debug('Skipped - no VRRP IPs to perform')
         return
 
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug('Installing load-balancer Keepalived')
+        return
     # add_node will impact all keepalived
     group.call(keepalived.install)
 
@@ -525,13 +547,14 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
 
 
 def deploy_coredns(cluster):
+    dry_run = utils.check_dry_run_status_active(cluster)
     config = coredns.generate_configmap(cluster.inventory)
 
     cluster.log.debug('Applying patch...')
-    cluster.log.debug(coredns.apply_patch(cluster))
+    cluster.log.debug(coredns.apply_patch(cluster, dry_run))
 
     cluster.log.debug('Applying configmap...')
-    cluster.log.debug(coredns.apply_configmap(cluster, config))
+    cluster.log.debug(coredns.apply_configmap(cluster, config, dry_run))
 
 
 def deploy_plugins(cluster):
@@ -545,6 +568,9 @@ def deploy_accounts(cluster):
 def overview(cluster):
     cluster.log.debug("Retrieving cluster status...")
     control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Cluster is healthy...")
+        return
     cluster.log.debug("\nNAMESPACES:")
     control_plane.sudo("kubectl get namespaces", hide=False)
     cluster.log.debug("\nNODES:")

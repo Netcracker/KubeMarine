@@ -184,9 +184,8 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
     cluster = resources.cluster()
 
     if args.get('without_act', False):
+        cluster.context["dry_run"] = True
         resources.context['preserve_inventory'] = False
-        cluster.log.debug('\nFurther acting manually disabled')
-        return
 
     init_tasks_flow(cluster)
     run_tasks_recursive(tasks, final_list, cluster, cumulative_points, [])

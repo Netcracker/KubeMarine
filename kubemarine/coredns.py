@@ -143,18 +143,18 @@ data:'''
     return config + '\n'
 
 
-def apply_configmap(cluster, config):
+def apply_configmap(cluster, config, dry_run=False):
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
     group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
-    group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True)
+    group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True, dry_run=dry_run)
 
     return cluster.nodes['control-plane'].get_final_nodes().get_first_member()\
         .sudo('kubectl apply -f /etc/kubernetes/coredns-configmap.yaml && '
-             'sudo kubectl rollout restart -n kube-system deployment/coredns')
+             'sudo kubectl rollout restart -n kube-system deployment/coredns', dry_run=dry_run)
 
 
-def apply_patch(cluster):
+def apply_patch(cluster, dry_run=False):
     apply_command = ''
 
     for config_type in ['deployment']:
@@ -172,11 +172,11 @@ def apply_patch(cluster):
         utils.dump_file(cluster, config, filename)
 
         group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
-        group.put(io.StringIO(config), filepath, backup=True, sudo=True)
+        group.put(io.StringIO(config), filepath, backup=True, sudo=True, dry_run=dry_run)
 
         apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)
 
     if apply_command == '':
         return 'Nothing to patch'
 
-    return cluster.nodes['control-plane'].get_final_nodes().get_first_member().sudo(apply_command)
+    return cluster.nodes['control-plane'].get_final_nodes().get_first_member().sudo(apply_command, dry_run=dry_run)

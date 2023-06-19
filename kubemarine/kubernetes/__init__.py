@@ -206,6 +206,9 @@ def reset_installation_env(group: NodeGroup):
 
     cluster = group.cluster
 
+    if utils.check_dry_run_status_active(cluster):
+        return
+
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
 
@@ -322,41 +325,49 @@ def is_available_control_plane(control_plane):
 
 def install(group):
     log = group.cluster.log
+    dry_run = utils.check_dry_run_status_active(group.cluster)
 
     with RemoteExecutor(group.cluster):
         log.debug("Making systemd unit...")
-        group.sudo('rm -rf /etc/systemd/system/kubelet*')
+        group.sudo('rm -rf /etc/systemd/system/kubelet*', dry_run=dry_run)
         for node in group.cluster.inventory["nodes"]:
             # perform only for current group members
             if node["connect_to"] in group.nodes.keys():
                 template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
                     hostname=node["name"])
                 log.debug("Uploading to '%s'..." % node["connect_to"])
-                node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-                node["connection"].sudo("chmod 644 /etc/systemd/system/kubelet.service")
+                node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True, dry_run=dry_run)
+                node["connection"].sudo("chmod 644 /etc/systemd/system/kubelet.service", dry_run=dry_run)
 
         log.debug("\nReloading systemd daemon...")
-        system.reload_systemctl(group)
-        group.sudo('systemctl enable kubelet')
+        system.reload_systemctl(group, dry_run)
+        group.sudo('systemctl enable kubelet', dry_run=dry_run)
 
-    return group.sudo('systemctl status kubelet', warn=True)
+    return group.sudo('systemctl status kubelet', warn=True, dry_run=dry_run)
 
 
 def join_other_control_planes(group):
     other_control_planes_group = group.get_ordered_members_list(provide_node_configs=True)[1:]
-
-    join_dict = group.cluster.context["join_dict"]
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    join_dict = group.cluster.context.get("join_dict")
     for node in other_control_planes_group:
+        if dry_run:
+            log.debug('[dry-run]Joining control-plane \'%s\'...' % node['name'])
+            continue
         join_control_plane(group, node, join_dict)
 
     group.cluster.log.debug("Verifying installation...")
     first_control_plane = group.get_first_member(provide_node_configs=True)
-    return first_control_plane['connection'].sudo("kubectl get pods --all-namespaces -o=wide")
+    return first_control_plane['connection'].sudo("kubectl get pods --all-namespaces -o=wide", dry_run=dry_run)
 
 
-def join_new_control_plane(group):
-    join_dict = get_join_dict(group)
+def join_new_control_plane(group, dry_run=False):
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    join_dict = get_join_dict(group, dry_run)
     for node in group.get_ordered_members_list(provide_node_configs=True):
+        if dry_run:
+            log.debug('[dry-run]Joining control-plane \'%s\'...' % node['name'])
+            continue
         join_control_plane(group, node, join_dict)
 
 
@@ -493,7 +504,12 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
     return kubeconfig_filename
 
 
-def get_join_dict(group):
+def get_join_dict(group, dry_run=False):
+    join_dict = {}
+    if dry_run:
+        join_dict['discovery-token-ca-cert-hash'] = None
+        join_dict['token'] = None
+        return join_dict
     first_control_plane = group.cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
     token_result = first_control_plane['connection'].sudo("kubeadm token create --print-join-command", hide=False)
     join_strings = list(token_result.values())[0].stdout.rstrip("\n")
@@ -512,7 +528,9 @@ def get_join_dict(group):
 
 
 def init_first_control_plane(group):
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
+    dry_run = utils.check_dry_run_status_active(cluster)
 
     first_control_plane = group.get_first_member(provide_node_configs=True)
     first_control_plane_group = first_control_plane["connection"]
@@ -547,8 +565,8 @@ def init_first_control_plane(group):
     utils.dump_file(group.cluster, config, 'init-config_%s.yaml' % first_control_plane['name'])
 
     log.debug("Uploading init config to initial control_plane...")
-    first_control_plane_group.sudo("mkdir -p /etc/kubernetes")
-    first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
+    first_control_plane_group.sudo("mkdir -p /etc/kubernetes", dry_run=dry_run)
+    first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True, dry_run=dry_run)
 
     # put control-plane patches
     create_kubeadm_patches_for_node(group.cluster, first_control_plane)
@@ -562,7 +580,9 @@ def init_first_control_plane(group):
                                      " --config=/etc/kubernetes/init-config.yaml"
                                      " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
                                      " --v=5",
-                                     hide=False)
+                                     hide=False, dry_run=dry_run)
+    if dry_run:
+        return
 
     copy_admin_config(log, first_control_plane_group)
 
@@ -670,7 +690,8 @@ def wait_for_nodes(group: NodeGroup):
 
 
 def init_workers(group):
-    join_dict = group.cluster.context.get("join_dict", get_join_dict(group))
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    join_dict = group.cluster.context.get("join_dict", get_join_dict(group, dry_run))
 
     join_config = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
@@ -705,8 +726,8 @@ def init_workers(group):
 
     utils.dump_file(group.cluster, config, 'join-config-workers.yaml')
 
-    group.sudo("mkdir -p /etc/kubernetes")
-    group.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
+    group.sudo("mkdir -p /etc/kubernetes", dry_run=dry_run)
+    group.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True, dry_run=dry_run)
 
     # put control-plane patches
     for node in group.get_ordered_members_list(provide_node_configs=True):
@@ -718,12 +739,15 @@ def init_workers(group):
             "kubeadm join --config=/etc/kubernetes/join-config.yaml"
             " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
             " --v=5",
-            is_async=False, hide=False)
+            is_async=False, hide=False, dry_run=dry_run)
 
 def apply_labels(group):
     log = group.cluster.log
 
     log.debug("Applying additional labels for nodes")
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run]Successfully applied additional labels")
+        return None
     # TODO: Add "--overwrite-labels" switch
     # TODO: Add labels validation after applying
     with RemoteExecutor(group.cluster):
@@ -747,6 +771,9 @@ def apply_taints(group):
     log = group.cluster.log
 
     log.debug("Applying additional taints for nodes")
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run]Successfully applied additional taints")
+        return None
     with RemoteExecutor(group.cluster):
         for node in group.get_ordered_members_list(provide_node_configs=True):
             if "taints" not in node:
@@ -1218,6 +1245,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     """
 
     cluster = group.cluster
+    dry_run = utils.check_dry_run_status_active(cluster)
     log = cluster.log
 
     if not group_size:
@@ -1240,8 +1268,8 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
-            for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
-                if node_i < len(nodes):
+            for node_i in range(group_i*group_size, (group_i*group_size) + group_size):
+                if node_i < len(nodes) and not dry_run:
                     images_prepull(nodes[node_i])
 
     return exe.get_last_results_str()
@@ -1269,6 +1297,9 @@ def images_prepull(group: NodeGroup):
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.verbose("[dry-run] Scheduling running nodes report")
+        return
     summary.schedule_delayed_report(cluster, exec_running_nodes_report)
 
 
@@ -1350,9 +1381,13 @@ def get_patched_flags_for_control_plane_item(inventory, control_plane_item, node
 
     return flags
 
+
 # function to create kubeadm patches and put them to a node
-def create_kubeadm_patches_for_node(cluster, node):
+def create_kubeadm_patches_for_node(cluster, node, dry_run=False):
     cluster.log.verbose(f"Create and upload kubeadm patches to %s..." % node['name'])
+    if dry_run:
+        return
+
     node['connection'].sudo('sudo rm -rf /etc/kubernetes/patches ; sudo mkdir -p /etc/kubernetes/patches', warn=True)
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed

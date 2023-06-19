@@ -67,17 +67,19 @@ def configure(group: NodeGroup) -> NodeGroupResult:
     The configuration will be placed in sysctl daemon directory.
     """
     config = make_config(group.cluster)
-    group.sudo('rm -f /etc/sysctl.d/98-*-sysctl.conf')
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    group.sudo('rm -f /etc/sysctl.d/98-*-sysctl.conf', dry_run=dry_run)
     utils.dump_file(group.cluster, config, '98-kubemarine-sysctl.conf')
-    group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf', backup=True, sudo=True)
-    return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf')
+    group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf', backup=True, sudo=True, dry_run=dry_run)
+    return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf', dry_run=dry_run)
 
 
 def reload(group: NodeGroup) -> NodeGroupResult:
     """
     Reloads sysctl configuration in the specified group.
     """
-    return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf')
+    return group.sudo('sysctl -p /etc/sysctl.d/98-*-sysctl.conf',
+                      dry_run=utils.check_dry_run_status_active(group.cluster))
 
 
 def get_pid_max(inventory):

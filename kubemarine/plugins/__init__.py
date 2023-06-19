@@ -193,11 +193,14 @@ def install(cluster, plugins=None):
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
+    dry_run = utils.check_dry_run_status_active(cluster)
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
-
-    for current_step_i, step in enumerate(installation_procedure):
+    for _, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+            if not dry_run:
+                procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
+            elif procedure_types[apply_type].get('verify'):
+                procedure_types[apply_type]['verify'](cluster, configs)
 
 
 def expect_daemonset(cluster: KubernetesCluster,

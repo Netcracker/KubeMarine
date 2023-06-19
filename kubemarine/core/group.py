@@ -346,6 +346,33 @@ def _handle_internal_logging(fn: callable) -> callable:
     return do
 
 
+def _handle_dry_run(fn: callable) -> callable:
+    """
+    Method is a decorator that handles internal streaming of output (hide=False) of fabric (invoke).
+    Note! This decorator should be the outermost.
+    :param fn: Origin function to apply annotation to
+    :return: Validation wrapper function
+    """
+    def do_dry_run(self: 'NodeGroup', *args, **kwargs):
+        results = {}
+
+        if kwargs.get("dry_run"):
+            if fn.__name__ == "put":
+                self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s with options %s"
+                                 % (args[0], args[1], list(self.nodes.keys()), kwargs))
+            else:
+                self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (fn.__name__, args[0], list(self.nodes.keys()), kwargs))
+            return NodeGroupResult(self.cluster, results)
+        try:
+            results = fn(self, *args, **kwargs)
+            return results
+        except fabric.group.GroupException as e:
+            results = e.result
+            raise
+
+    return do_dry_run
+
+
 class NodeGroup:
 
     def __init__(self, connections: Connections, cluster):
@@ -399,13 +426,16 @@ class NodeGroup:
         return group_result
 
     @_handle_internal_logging
+    @_handle_dry_run
     def run(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("run", *args, **kwargs)
 
     @_handle_internal_logging
+    @_handle_dry_run
     def sudo(self, *args, **kwargs) -> Union[NodeGroupResult, int]:
         return self.do("sudo", *args, **kwargs)
 
+    @_handle_dry_run
     def put(self, local_file: Union[io.StringIO, str], remote_file: str, **kwargs):
         if isinstance(local_file, io.StringIO):
             self.cluster.log.verbose("Text is being transferred to remote file \"%s\" on nodes %s with options %s"
@@ -441,6 +471,7 @@ class NodeGroup:
         with open(local_file, "rb") as local_stream:
             group_to_upload._put(local_stream, remote_file, **kwargs)
 
+    @_handle_dry_run
     def _put(self, local_stream: IO, remote_file: str, **kwargs):
         hide = kwargs.pop("hide", True) is True
         sudo = kwargs.pop("sudo", False) is True
