@@ -574,22 +574,41 @@ def apply_expect(cluster, config, plugin_name=None):
 
 # **** PYTHON ****
 
-def get_python_method_args(cluster, module_path, method_name, method_arguments):
-    try:
-        spec = importlib.util.spec_from_file_location('module', module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    except Exception as e:
-        raise ValueError(f"Could not import module {module_path}: {e}")
+loaded_modules = {}
 
+
+def get_python_module(module_path):
+    if module_path in loaded_modules:
+        return loaded_modules[module_path]
+
+    spec = importlib.util.spec_from_file_location('module', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    loaded_modules[module_path] = module
+
+    return module
+
+
+def get_python_method_args(cluster, step):
+    module_path, _ = utils.determine_resource_absolute_file(step['module'])
+    method_name = step['method']
+    method_arguments = step.get('arguments', {})
+
+    module = get_python_module(module_path)
+
+    # Check if the method exists
     if not hasattr(module, method_name):
         raise ValueError(f"Module {module_path} does not have method {method_name}")
 
+    # Get the method object
     method = getattr(module, method_name)
-    method_signature = inspect.signature(method)
 
+    # Get the signature of the method
+    signature = inspect.signature(method)
+
+    # Check if the passed arguments match the signature
     try:
-        method_signature.bind(cluster=cluster, **method_arguments)
+        signature.bind(cluster=cluster, **method_arguments)
     except TypeError as e:
         raise ValueError(f"Invalid arguments for method {method_name}: {e}")
 
@@ -597,24 +616,15 @@ def get_python_method_args(cluster, module_path, method_name, method_arguments):
 
 
 def verify_python(cluster, step):
-    module_path, _ = utils.determine_resource_absolute_file(step['module'])
-    method_name = step['method']
-    method_arguments = step.get('arguments', {})
-
-    method, method_arguments = get_python_method_args(cluster, module_path, method_name, method_arguments)
-
-    # Perform any additional verification if needed
+    method, method_arguments = get_python_method_args(cluster, step)
+    # Additional verification logic can be added here
 
 
 def apply_python(cluster, step, plugin_name=None):
-    module_path, _ = utils.determine_resource_absolute_file(step['module'])
-    method_name = step['method']
-    method_arguments = step.get('arguments', {})
+    method, method_arguments = get_python_method_args(cluster, step)
 
-    method, method_arguments = get_python_method_args(cluster, module_path, method_name, method_arguments)
-
-    cluster.log.debug("Running method %s from %s module..." % (method_name, module_path))
-    method(cluster, **method_arguments) 
+    cluster.log.debug("Running method %s from %s module..." % (method.__name__, method.__module__))
+    method(cluster, **method_arguments)
 
 
 # **** THIRDPARTIES ****
