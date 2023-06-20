@@ -27,8 +27,6 @@ import tarfile
 import time
 import urllib.request
 import zipfile
-import ipaddress 
-import pyimod02_importers
 from copy import deepcopy
 from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
