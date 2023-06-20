@@ -21,7 +21,7 @@ from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup, NodeConfig
 
-_AnyConnectionTypes = Union[str, NodeGroup, NodeConfig]
+_AnyConnectionTypes = Union[str, NodeGroup]
 
 
 class KubernetesCluster(Environment):
@@ -63,17 +63,7 @@ class KubernetesCluster(Environment):
         return self._logger
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> NodeGroup:
-        hosts = []
-        for ip in ips:
-            if isinstance(ip, dict):
-                hosts.append(ip['connect_to'])
-            elif isinstance(ip, NodeGroup):
-                hosts.extend(ip.nodes)
-            elif isinstance(ip, str):
-                hosts.append(ip)
-            else:
-                raise Exception('Unsupported connection object type')
-        return NodeGroup(hosts, self)
+        return NodeGroup(ips, self)
 
     def get_access_address_from_node(self, node: dict) -> str:
         """

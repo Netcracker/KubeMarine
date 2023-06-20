@@ -30,7 +30,7 @@ from kubemarine.core import flow, utils
 from kubemarine import system, packages
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor, RunnersResult
+from kubemarine.core.executor import RunnersResult
 from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.core.group import NodeConfig, GroupException, RunnersGroupResult
@@ -397,20 +397,20 @@ def check_package_repositories(cluster: KubernetesCluster):
         group = cluster.make_group(hosts)
         random_repos_conf_path = "/tmp/%s.repo" % uuid.uuid4().hex
         tokens = []
-        with RemoteExecutor(cluster) as exe:
-            for node in group.get_ordered_members_list():
+        with group.executor() as exe:
+            for node in exe.group.get_ordered_members_list():
                 # Create temp repos file
                 packages.create_repo_file(node, repositories, random_repos_conf_path)
 
                 # Compare with existed resolv.conf
                 predefined_repos_file = packages.get_repo_filename(node)
-                compare_token = node.defer().sudo(
+                compare_token = node.sudo(
                     '[ -f %s ] && cmp --silent %s %s' %
                     (predefined_repos_file, predefined_repos_file, random_repos_conf_path),
                     warn=True)
                 tokens.append(compare_token)
 
-        results: RunnersGroupResult = exe.get_merged_runners_result(tokens)
+        results = exe.get_merged_runners_result(tokens)
         for host, result in results.items():
             nodes_context[host]["package_repos_are_actual"] = not result.failed
 
@@ -470,8 +470,8 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         all_group.put(io.StringIO(check_script), random_temp_path)
 
         if repository_urls:
-            with RemoteExecutor(cluster) as exe:
-                for node in all_group.get_ordered_members_list():
+            with all_group.executor() as exe:
+                for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
                     # Check with script
                     if cluster.context['nodes'][host]['python'] == 'Not installed':
@@ -480,7 +480,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                         continue
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     for repo_url in repository_urls:
-                        node.defer().run('%s %s %s %s || echo "Package repository is unavailable"'
+                        node.run('%s %s %s %s || echo "Package repository is unavailable"'
                                  % (python_executable, random_temp_path, repo_url,
                                     cluster.inventory['globals']['timeout_download']))
 
@@ -518,13 +518,13 @@ def check_access_to_packages(cluster: KubernetesCluster):
         warnings: List[str] = []
         group = cluster.nodes['all']
         hosts_to_packages = packages.get_all_managed_packages_for_group(group, cluster.inventory)
-        with RemoteExecutor(cluster) as exe:
-            for host, packages_to_check in hosts_to_packages.items():
-                packages_to_check = list(set(packages_to_check))
+        with group.executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
+                packages_to_check = list(set(hosts_to_packages[host]))
                 hosts_to_packages[host] = packages_to_check
                 cluster.log.debug(f"Packages to check for node {host}: {packages_to_check}")
 
-                node = cluster.make_group([host])
                 for package in packages_to_check:
                     packages.search_package(node, package)
 
@@ -629,21 +629,22 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
     try:
         # Assign random IP for the subnet on every node
         i = 30
-        for host, node in nodes.items():
+        for host, node_config in nodes.items():
             inf = cluster.context['nodes'][host]['active_interface']
             if not inf:
-                raise TestFailure(f"Failed to detect active interface on {node['name']}")
+                raise TestFailure(f"Failed to detect active interface on {node_config['name']}")
             host_to_inf[host] = inf
             random_host = subnet_hosts[subnet_hosts_len - i]
             host_to_ip[host] = random_host
             i = i + 1
 
-        with RemoteExecutor(cluster) as exe:
-            for host, node in nodes.items():
+        with cluster.make_group(nodes).executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
                 existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
-                cluster.make_group([host]).defer().sudo(existing_alias, warn=True)
+                node.sudo(existing_alias, warn=True)
 
-        results: RunnersGroupResult = exe.get_merged_runners_result()
+        results = exe.get_merged_runners_result()
         for host, result in results.items():
             if not result.stdout and not result.stderr and result.exited == 1:
                 # grep returned nothing, subnet is not used.
@@ -653,13 +654,13 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
                 del nodes[host]
 
         try:
-            with RemoteExecutor(cluster) as exe:
+            with cluster.make_group(nodes).executor() as exe:
                 # Create alias from the node network interface for the subnet on every node
-                for host, node in nodes.items():
-                    cluster.make_group([host]).defer().sudo(
-                        f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
+                for node in exe.group.get_ordered_members_list():
+                    host = node.get_host()
+                    node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
 
-            nodes_to_rollback = cluster.make_group(list(nodes.keys()))
+            nodes_to_rollback = cluster.make_group(nodes.keys())
         except GroupException as e:
             nodes_to_rollback = e.result.get_exited_nodes_group()
             raise
@@ -667,12 +668,11 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
         yield host_to_ip
     finally:
         # Remove the created aliases from network interfaces
-        with RemoteExecutor(cluster):
-            for group in nodes_to_rollback.get_ordered_members_list():
-                host = group.get_host()
-                group.defer().sudo(
-                    f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
-                    warn=True)
+        with nodes_to_rollback.executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
+                node.sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
+                          warn=True)
 
     if skipped_nodes:
         raise TestWarn(f"Cannot perform check on {skipped_nodes}: subnet is already in use. "
@@ -724,7 +724,7 @@ def tcp_connect(cluster: KubernetesCluster, node_from: NodeConfig, node_to: Node
     mtu -= 40
     cluster.log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
     cmd = cmd_for_ports(tcp_ports, f"echo $(dd if=/dev/urandom bs={mtu}  count=1) >/dev/tcp/{host_to_ip[node_to['connect_to']]}/%s")
-    group = cluster.make_group([node_from])
+    group = cluster.make_group([node_from['connect_to']])
     group.sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
@@ -807,30 +807,31 @@ def check_tcp_connect_between_all_nodes(cluster: KubernetesCluster, node_list: L
 @contextmanager
 def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], tcp_ports):
     detect_preinstalled_python(cluster)
-    nodes_without_python = {node['name']: node for host, node in nodes.items()
+    nodes_without_python = {node_config['name']: node_config for host, node_config in nodes.items()
                             if cluster.context['nodes'][host]['python'] == "Not installed"}
-    for node in nodes_without_python.values():
-        del nodes[node['connect_to']]
+    for node_nonfig in nodes_without_python.values():
+        del nodes[node_nonfig['connect_to']]
 
     # currently tcp listener can be run on both python 2 and 3
     check_script = utils.read_internal('resources/scripts/simple_tcp_listener.py')
     tcp_listener = "/tmp/%s.py" % uuid.uuid4().hex
-    cluster.make_group(list(nodes.keys())).put(io.StringIO(check_script), tcp_listener)
+    cluster.make_group(nodes.keys()).put(io.StringIO(check_script), tcp_listener)
 
     skipped_nodes = {}
     nodes_to_rollback = cluster.make_group([])
     try:
         try:
-            with RemoteExecutor(cluster) as exe:
+            with cluster.make_group(nodes).executor() as exe:
                 # Run process that LISTEN TCP port
-                for host, node in nodes.items():
-                    internal_ip: str = node['internal_address']
+                for node in exe.group.get_ordered_members_list():
+                    host = node.get_host()
+                    internal_ip: str = nodes[host]['internal_address']
                     ip_version = ipaddress.ip_address(internal_ip).version
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version))
-                    cluster.make_group([host]).defer().sudo(tcp_listener_cmd, warn=True)
+                    node.sudo(tcp_listener_cmd, warn=True)
 
-            results: RunnersGroupResult = exe.get_merged_runners_result()
+            results = exe.get_merged_runners_result()
             nodes_to_rollback = results.get_group()
         except GroupException as e:
             nodes_to_rollback = e.result.get_exited_nodes_group()
@@ -850,11 +851,11 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
         yield
 
     finally:
-        with RemoteExecutor(cluster):
+        with nodes_to_rollback.executor() as exe:
             # Kill the created during the test processes
-            for group in nodes_to_rollback.get_ordered_members_list():
+            for node in exe.group.get_ordered_members_list():
                 tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-                group.defer().sudo(tcp_listener_cmd, warn=True)
+                node.sudo(tcp_listener_cmd, warn=True)
 
     if skipped_nodes:
         cluster.log.warning(f"Ports in use: {skipped_nodes}")

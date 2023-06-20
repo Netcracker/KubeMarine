@@ -19,7 +19,7 @@ from concurrent.futures import TimeoutError
 from invoke import UnexpectedExit
 
 from kubemarine import demo
-from kubemarine.core.executor import RemoteExecutor, RunnersResult
+from kubemarine.core.executor import RunnersResult
 from kubemarine.core.group import GroupException
 
 
@@ -30,8 +30,8 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_get_merged_results_all_success(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("echo \"foo\"")
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("echo \"foo\"")
             exe.flush()
 
             for result in exe.get_merged_runners_result().values():
@@ -40,8 +40,8 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_flush_all_fail(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("false")
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("false")
             exception = None
             try:
                 exe.flush()
@@ -53,8 +53,8 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_get_merged_results_all_exited_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("false", warn=True)
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("false", warn=True)
             exe.flush()
 
             for result in exe.get_merged_runners_result().values():
@@ -64,8 +64,8 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_flush_all_excepted(self):
         results = demo.create_exception_result(self.cluster.nodes["all"], TimeoutError())
         self.cluster.fake_shell.add(results, "run", ["sleep 1000"])
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("sleep 1000", warn=True)
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("sleep 1000", warn=True)
             exception = None
             try:
                 exe.flush()
@@ -79,11 +79,9 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
-        with RemoteExecutor(self.cluster) as exe:
-            for host in self.cluster.nodes["all"].get_hosts():
-                node = self.cluster.make_group([host])
-                node.defer().run("echo \"foo\"")
-                node.defer().run("echo \"bar\"")
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("echo \"foo\"")
+            exe.group.run("echo \"bar\"")
 
             exe.flush()
 
@@ -96,11 +94,9 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
         tokens = []
-        with RemoteExecutor(self.cluster) as exe:
-            for host in self.cluster.nodes["all"].get_hosts():
-                node = self.cluster.make_group([host])
-                node.defer().run("echo \"foo\"")
-                tokens.append(node.defer().run("echo \"bar\""))
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("echo \"foo\"")
+            tokens.append(exe.group.run("echo \"bar\""))
 
             exe.flush()
 
@@ -112,12 +108,10 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_shell.add(results, "run", ["false"])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
-        with RemoteExecutor(self.cluster) as exe:
-            for host in self.cluster.nodes["all"].get_hosts():
-                node = self.cluster.make_group([host])
-                node.defer().run("false")
-                node.defer().run("echo \"bar\"")
-                node.defer().put(io.StringIO('test'), '/fake/path')
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("false")
+            exe.group.run("echo \"bar\"")
+            exe.group.put(io.StringIO('test'), '/fake/path')
 
             exception = None
             try:
@@ -135,8 +129,8 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_not_throw_on_failed_all_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("false", warn=True)
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("false", warn=True)
 
         for result in exe.get_merged_runners_result().values():
             self.assertIsInstance(result, RunnersResult)
@@ -146,8 +140,8 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_exception_result(self.cluster.nodes["all"], TimeoutError())
         self.cluster.fake_shell.add(results, "run", ["sleep 1000"])
         with self.assertRaises(GroupException), \
-                RemoteExecutor(self.cluster) as exe:
-            self.cluster.nodes["all"].defer().run("sleep 1000", warn=True)
+                self.cluster.nodes["all"].executor() as exe:
+            exe.group.run("sleep 1000", warn=True)
 
 
 if __name__ == '__main__':

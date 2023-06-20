@@ -17,19 +17,19 @@ from io import StringIO
 
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, DeferredGroup
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list():
-            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
+    cluster = group.cluster
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'docker')
             packages.install(node, include=os_specific_associations['package_name'])
             enable(node)
 
             # remove previous daemon.json to avoid problems in case when previous config was broken
-            node.defer().sudo("rm -f %s && sudo systemctl restart %s"
+            node.sudo("rm -f %s && sudo systemctl restart %s"
                       % (os_specific_associations['config_location'],
                          os_specific_associations['service_name']))
     return exe.get_merged_runners_result()
@@ -40,16 +40,16 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include=['docker', 'docker-engine', 'docker.io', 'docker-ce'])
 
 
-def enable(group: NodeGroup) -> None:
+def enable(group: DeferredGroup) -> None:
     # currently it is invoked only for single node
     service_name = group.cluster.get_package_association_for_node(group.get_host(), 'docker', 'service_name')
     system.enable_service(group, name=service_name, now=True)
 
 
 def disable(group: NodeGroup) -> None:
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list():
-            service_name = group.cluster.get_package_association_for_node(
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'docker', 'service_name')
             system.disable_service(node, name=service_name, now=True)
 
@@ -61,15 +61,14 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
 
     tokens = []
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list():
-            defer = node.defer()
-            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'docker')
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'docker')
             log.debug("Uploading docker configuration to %s node..." % node.get_node_name())
-            defer.put(StringIO(settings_json), os_specific_associations['config_location'],
-                      backup=True, sudo=True)
+            node.put(StringIO(settings_json), os_specific_associations['config_location'],
+                     backup=True, sudo=True)
             log.debug("Restarting Docker on %s node..." % node.get_node_name())
-            tokens.append(defer.sudo(
+            tokens.append(node.sudo(
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
                 f"sudo {os_specific_associations['executable_name']} info"))

@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import io
-from typing import Union, Optional, Callable, List
+from typing import Union, Optional, List
 
 from kubemarine.core import utils
-from kubemarine.core.executor import RunnersResult, Token, is_executor_active
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.executor import RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 
 DEBIAN_HEADERS = 'DEBIAN_FRONTEND=noninteractive '
 
@@ -45,7 +45,7 @@ def get_repo_file_name() -> str:
     return '/etc/apt/sources.list.d/predefined.list'
 
 
-def create_repo_file(group: NodeGroup, repo_data: Union[List[str], str], repo_file: str) -> None:
+def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], str], repo_file: str) -> None:
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
@@ -53,10 +53,7 @@ def create_repo_file(group: NodeGroup, repo_data: Union[List[str], str], repo_fi
         repo_data_str = utils.read_external(repo_data)
 
     repo_data_stream = io.StringIO(repo_data_str)
-    if is_executor_active():
-        group.defer().put(repo_data_stream, repo_file, sudo=True)
-    else:
-        group.put(repo_data_stream, repo_file, sudo=True)
+    group.put(repo_data_stream, repo_file, sudo=True)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
@@ -79,21 +76,18 @@ def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str
     return command
 
 
-def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
-        -> Union[Token, RunnersGroupResult]:
+def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to install')
 
     command = get_install_cmd(include, exclude)
 
-    if is_executor_active():
-        return group.defer().sudo(command)
-    else:
-        return group.sudo(command)
+    return group.sudo(command)
 
 
-def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
-           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
+def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -109,8 +103,8 @@ def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Uni
     return group.sudo(command, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
+def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
@@ -127,15 +121,15 @@ def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
     return group.sudo(command)
 
 
-def no_changes_found(action: Callable, result: RunnersResult) -> bool:
-    if action not in (install, upgrade, remove):
+def no_changes_found(action: str, result: RunnersResult) -> bool:
+    if action not in ('install', 'upgrade', 'remove'):
         raise Exception(f"Unknown action {action}")
     return "0 upgraded, 0 newly installed, 0 to remove" in result.stdout
 
 
-def search(group: NodeGroup, package: str) -> Token:
+def search(group: DeferredGroup, package: str) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
     command = DEBIAN_HEADERS + 'apt show %s  || echo "Package is unavailable"' % package
 
-    return group.defer().sudo(command)
+    return group.sudo(command)

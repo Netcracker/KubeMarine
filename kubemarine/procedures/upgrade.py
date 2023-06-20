@@ -27,7 +27,6 @@ from kubemarine.core import flow
 from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
@@ -137,15 +136,14 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 if isinstance(value, dict):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
+            kubernetes_nodes = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
             tokens = []
-            with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['control-plane'].include_group(
-                        cluster.nodes.get('worker')).get_ordered_members_list():
-                    defer = node.defer()
+            with kubernetes_nodes.executor() as exe:
+                for node in exe.group.get_ordered_members_list():
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
-                    defer.put(StringIO(config_string), os_specific_associations['config_location'],
-                              backup=True, sudo=True, mkdir=True)
-                    tokens.append(defer.sudo(
+                    node.put(StringIO(config_string), os_specific_associations['config_location'],
+                             backup=True, sudo=True, mkdir=True)
+                    tokens.append(node.sudo(
                         f"sudo systemctl restart {os_specific_associations['service_name']} && "
                         f"systemctl status {os_specific_associations['service_name']}"))
             return exe.get_merged_runners_result(tokens)

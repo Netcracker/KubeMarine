@@ -15,7 +15,7 @@
 
 
 from collections import OrderedDict
-from typing import Callable, List
+from typing import Callable, List, Dict
 
 import yaml
 import os
@@ -27,7 +27,6 @@ from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils, summary
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, GroupException, RunnersGroupResult
 from kubemarine.core.resources import DynamicResources
 
@@ -255,10 +254,10 @@ def system_prepare_policy(group: NodeGroup):
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_dns_hostname(group: NodeGroup):
     cluster: KubernetesCluster = group.cluster
-    with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list():
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             cluster.log.debug("Changing hostname '%s' = '%s'" % (node.get_host(), node.get_node_name()))
-            node.defer().sudo("hostnamectl set-hostname %s" % node.get_node_name())
+            node.sudo("hostnamectl set-hostname %s" % node.get_node_name())
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -293,14 +292,8 @@ def system_prepare_package_manager_configure(group: NodeGroup):
         cluster.log.debug("Skipped - no repositories defined for configuration")
         return
 
-    group.call_batch([
-        packages.backup_repo,
-        packages.add_repo
-    ], **{
-        "kubemarine.packages.add_repo": {
-            "repo_data": repositories,
-        }
-    })
+    group.call(packages.backup_repo)
+    group.call(packages.add_repo, repo_data=repositories)
 
     cluster.log.debug("Nodes contain the following repositories:")
     cluster.log.debug(packages.ls_repofiles(group))
@@ -317,8 +310,8 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
 def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
 
-    with RemoteExecutor(cluster) as exe:
-        for node in group.get_ordered_members_list():
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             pkgs: List[str] = []
             for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
                 hosts_to_packages = packages.get_association_hosts_to_packages(node, cluster.inventory, package)
@@ -331,43 +324,35 @@ def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     return exe.get_merged_runners_result()
 
 
-def manage_custom_packages(group: NodeGroup):
+def manage_custom_packages(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
-    batch_tasks: List[Callable] = []
-    batch_parameters = {}
 
+    batch_results: Dict[str, RunnersGroupResult] = {}
     packages_section = cluster.inventory["services"].get("packages", {})
     if packages_section.get("remove", {}).get("include"):
-        batch_tasks.append(packages.remove)
-        batch_parameters["kubemarine.packages.remove"] = {
-            "include": packages_section['remove']['include'],
-            "exclude": packages_section['remove'].get('exclude')
-        }
+        cluster.log.debug("Running kubemarine.packages.remove: ")
+        remove = packages_section['remove']
+        batch_results['remove'] = results = packages.remove(
+            group, include=remove['include'], exclude=remove.get('exclude'))
+        cluster.log.debug(results)
 
     if packages_section.get("install", {}).get("include"):
-        batch_tasks.append(packages.install)
-        batch_parameters["kubemarine.packages.install"] = {
-            "include": packages_section['install']['include'],
-            "exclude": packages_section['install'].get('exclude')
-        }
+        cluster.log.debug("Running kubemarine.packages.install: ")
+        install = packages_section['install']
+        batch_results['install'] = results = packages.install(
+            group, include=install['include'], exclude=install.get('exclude'))
+        cluster.log.debug(results)
 
     if packages_section.get("upgrade", {}).get("include"):
-        batch_tasks.append(packages.upgrade)
-        batch_parameters["kubemarine.packages.upgrade"] = {
-            "include": packages_section['upgrade']['include'],
-            "exclude": packages_section['upgrade'].get('exclude')
-        }
+        cluster.log.debug("Running kubemarine.packages.upgrade: ")
+        upgrade = packages_section['upgrade']
+        batch_results['upgrade'] = results = packages.upgrade(
+            group, include=upgrade['include'], exclude=upgrade.get('exclude'))
+        cluster.log.debug(results)
 
-    if not batch_tasks:
+    if not batch_results:
         cluster.log.debug("Skipped - no packages configuration defined in config file")
-        return
-
-    try:
-        batch_results = group.call_batch(batch_tasks, **batch_parameters)
-    except GroupException:
-        cluster.log.verbose('Exception occurred! Trying to handle is there anything updated or not...')
-        # todo develop cases when we can continue even if exception occurs
-        raise
+        return None
 
     any_changes_found = False
     for action, results in batch_results.items():
@@ -383,6 +368,8 @@ def manage_custom_packages(group: NodeGroup):
         cluster.schedule_cumulative_point(system.reboot_nodes)
     else:
         cluster.log.verbose('No packages changed, nodes restart will not be scheduled')
+
+    return None
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
@@ -437,8 +424,8 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster):
         cluster.log.debug('Skipped - no balancers to perform')
         return
 
-    with RemoteExecutor(cluster):
-        group.call_batch([
+    with group.executor() as exe:
+        exe.group.call_batch([
             haproxy.configure,
             haproxy.override_haproxy18,
         ])

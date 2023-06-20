@@ -29,8 +29,8 @@ import ipaddress
 from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor, Token, is_executor_active
-from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
+from kubemarine.core.executor import Token
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup
 from kubemarine.core.errors import KME
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
@@ -324,26 +324,25 @@ def install(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    with RemoteExecutor(cluster):
+    with group.executor() as exe:
         log.debug("Making systemd unit...")
-        for node in group.get_ordered_members_list():
-            defer = node.defer()
-            defer.sudo('rm -rf /etc/systemd/system/kubelet*')
+        for node in exe.group.get_ordered_members_list():
+            node.sudo('rm -rf /etc/systemd/system/kubelet*')
             node.get_node_name()
             template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
                 hostname=node.get_node_name())
             log.debug("Uploading to '%s'..." % node.get_host())
-            defer.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-            defer.sudo("chmod 644 /etc/systemd/system/kubelet.service")
+            node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
+            node.sudo("chmod 644 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
-        system.reload_systemctl(group)
-        group.defer().sudo('systemctl enable kubelet')
+        system.reload_systemctl(exe.group)
+        exe.group.sudo('systemctl enable kubelet')
 
     return group.sudo('systemctl status kubelet', warn=True)
 
 
-def join_other_control_planes(group: NodeGroup):
+def join_other_control_planes(group: NodeGroup) -> RunnersGroupResult:
     other_control_planes_group = group.get_ordered_members_list()[1:]
 
     join_dict = group.cluster.context["join_dict"]
@@ -433,11 +432,11 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
         log.debug("Patching apiServer bind-address for control-plane %s" % node_name)
 
-        with RemoteExecutor(cluster):
+        with node.executor():
             defer.sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
                        "/etc/kubernetes/manifests/kube-apiserver.yaml" % node_config['internal_address'])
             defer.sudo("systemctl restart kubelet")
-            copy_admin_config(log, node)
+            copy_admin_config(log, defer)
     else:
         node.sudo(
             "kubeadm join "
@@ -445,9 +444,9 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
             " --v=5",
             hide=False)
-        with RemoteExecutor(cluster):
+        with node.executor():
             defer.sudo("systemctl restart kubelet")
-            copy_admin_config(log, node)
+            copy_admin_config(log, defer)
 
     wait_for_any_pods(cluster, node, apply_filter=node_name)
 
@@ -469,13 +468,10 @@ def local_admin_config(node: NodeGroup) -> Iterator[str]:
         node.sudo(f'rm -f {temp_filepath}')
 
 
-def copy_admin_config(logger: log.EnhancedLogger, nodes: NodeGroup):
+def copy_admin_config(logger: log.EnhancedLogger, nodes: AbstractGroup[RunResult]) -> None:
     logger.debug("Setting up admin-config...")
     command = "mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config"
-    if is_executor_active():
-        return nodes.defer().sudo(command)
-    else:
-        return nodes.sudo(command)
+    nodes.sudo(command)
 
 
 def fetch_admin_config(cluster: KubernetesCluster) -> str:
@@ -520,7 +516,7 @@ def get_join_dict(group: NodeGroup) -> dict:
     return join_dict
 
 
-def init_first_control_plane(group: NodeGroup):
+def init_first_control_plane(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
@@ -730,7 +726,7 @@ def init_workers(group: NodeGroup) -> None:
             hide=False)
 
 
-def apply_labels(group: NodeGroup):
+def apply_labels(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
@@ -738,14 +734,14 @@ def apply_labels(group: NodeGroup):
     # TODO: Add "--overwrite-labels" switch
     # TODO: Add labels validation after applying
     control_plane = cluster.nodes["control-plane"].get_first_member()
-    with RemoteExecutor(cluster):
+    with control_plane.executor() as exe:
         for node in group.get_ordered_members_configs_list():
             if "labels" not in node:
                 log.verbose("No additional labels found for %s" % node['name'])
                 continue
             log.verbose("Found additional labels for %s: %s" % (node['name'], node['labels']))
             for key, value in node["labels"].items():
-                control_plane.defer().sudo("kubectl label node %s %s=%s" % (node["name"], key, value))
+                exe.group.sudo("kubectl label node %s %s=%s" % (node["name"], key, value))
 
     log.debug("Successfully applied additional labels")
 
@@ -753,20 +749,20 @@ def apply_labels(group: NodeGroup):
     # TODO: Add wait for pods on worker nodes
 
 
-def apply_taints(group: NodeGroup):
+def apply_taints(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     log.debug("Applying additional taints for nodes")
     control_plane = cluster.nodes["control-plane"].get_first_member()
-    with RemoteExecutor(cluster):
+    with control_plane.executor() as exe:
         for node in group.get_ordered_members_configs_list():
             if "taints" not in node:
                 log.verbose("No additional taints found for %s" % node['name'])
                 continue
             log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
             for taint in node["taints"]:
-                control_plane.defer().sudo("kubectl taint node %s %s" % (node["name"], taint))
+                exe.group.sudo("kubectl taint node %s %s" % (node["name"], taint))
 
     log.debug("Successfully applied additional taints")
 
@@ -1247,28 +1243,29 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
         log.verbose("Group size is not set in procedure inventory, a default one will be used")
         group_size = cluster.globals['prepull_group_size']
 
-    nodes = group.get_ordered_members_list()
+    nodes_amount = group.nodes_amount()
 
     # group_size should be greater than 0
-    if len(nodes) != 0 and len(nodes) < group_size:
-        group_size = len(nodes)
+    if nodes_amount != 0 and nodes_amount < group_size:
+        group_size = nodes_amount
 
-    groups_amount = math.ceil(len(nodes) / group_size)
+    groups_amount = math.ceil(nodes_amount / group_size)
 
-    log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (len(nodes), group_size, groups_amount))
+    log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (nodes_amount, group_size, groups_amount))
     tokens = []
-    with RemoteExecutor(cluster) as exe:
+    with group.executor() as exe:
+        nodes = exe.group.get_ordered_members_list()
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
-                if node_i < len(nodes):
+                if node_i < nodes_amount:
                     tokens.append(images_prepull(nodes[node_i]))
 
     return exe.get_merged_runners_result(tokens)
 
 
-def images_prepull(group: NodeGroup) -> Token:
+def images_prepull(group: DeferredGroup) -> Token:
     """
     Prepull kubeadm images on group.
     :param group: NodeGroup where prepull should be performed.
@@ -1284,10 +1281,9 @@ def images_prepull(group: NodeGroup) -> Token:
     configure_container_runtime(group.cluster, kubeadm_init)
     config = f'{config}---\n{yaml.dump(kubeadm_init, default_flow_style=False)}'
 
-    defer = group.defer()
-    defer.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
+    group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
-    return defer.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
+    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
