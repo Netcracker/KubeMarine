@@ -49,7 +49,7 @@ from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
 oob_plugins = list(static.DEFAULTS["plugins"].keys())
-
+LOADED_MODULES = {}
 
 def verify_inventory(inventory, cluster):
     for plugin_name, plugin_item in inventory["plugins"].items():
@@ -571,22 +571,20 @@ def apply_expect(cluster, config, plugin_name=None):
                         timeout=config['pods'].get('timeout'),
                         retries=config['pods'].get('retries'))
 
-
 # **** PYTHON ****
 
-loaded_modules = {}
-
-
 def get_python_module(module_path):
-    if module_path in loaded_modules:
-        return loaded_modules[module_path]
+    if module_path in LOADED_MODULES:
+        return LOADED_MODULES[module_path]
 
     spec = importlib.util.spec_from_file_location('module', module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    loaded_modules[module_path] = module
-
-    return module
+    try:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        LOADED_MODULES[module_path] = module
+    except Exception as e:
+        raise ValueError(f"Could not import module {module_path}: {e}")
+    return module 
 
 
 def get_python_method_args(cluster, step):

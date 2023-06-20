@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import unittest
+from unittest.mock import patch
 from copy import deepcopy
 
 from kubemarine import demo
@@ -70,7 +71,7 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, r"Requested resource m is not exists"):
             demo.new_cluster(inventory)
 
-    @unittest.mock.patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
+    @patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
     def test_verify_python_import_error(self, patch):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
@@ -80,9 +81,9 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, r"Could not import module"):
             demo.new_cluster(inventory) 
 
-    @unittest.mock.patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
-    @unittest.mock.patch('importlib.util.spec_from_file_location', return_value=MOCK_SPEC)
-    @unittest.mock.patch('importlib.util.module_from_spec', return_value=None)
+    @patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
+    @patch('importlib.util.spec_from_file_location', return_value=MOCK_SPEC)
+    @patch('importlib.util.module_from_spec', return_value=None)
     def test_verify_python_method_not_exist(self, patch, patch1, patch2):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
