@@ -14,11 +14,11 @@
 
 import configparser
 import io
-from typing import Union, Callable, Optional, List
+from typing import Union, Optional, List
 
 from kubemarine.core import utils
-from kubemarine.core.executor import RunnersResult, is_executor_active, Token
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.executor import RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 
 
 def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
@@ -44,7 +44,7 @@ def get_repo_file_name() -> str:
     return '/etc/yum.repos.d/predefined.repo'
 
 
-def create_repo_file(group: NodeGroup, repo_data: Union[dict, str], repo_file: str) -> None:
+def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[dict, str], repo_file: str) -> None:
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
@@ -52,13 +52,12 @@ def create_repo_file(group: NodeGroup, repo_data: Union[dict, str], repo_file: s
             config[repo_id] = data
         repo_data_stream = io.StringIO()
         config.write(repo_data_stream)
+    elif isinstance(repo_data, list):
+        raise Exception("Not supported repositories format for yum package manager")
     else:
         repo_data_stream = io.StringIO(utils.read_external(repo_data))
 
-    if is_executor_active():
-        group.defer().put(repo_data_stream, repo_file, sudo=True)
-    else:
-        group.put(repo_data_stream, repo_file, sudo=True)
+    group.put(repo_data_stream, repo_file, sudo=True)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
@@ -81,21 +80,19 @@ def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str
     return command
 
 
-def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
-        -> Union[Token, RunnersGroupResult]:
+def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to install')
 
     command = get_install_cmd(include, exclude)
 
-    if is_executor_active():
-        return group.defer().sudo(command)
-    else:
-        return group.sudo(command)
+    return group.sudo(command)
 
 
-def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
-           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
+def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+           exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -111,8 +108,8 @@ def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Uni
     return group.sudo(command, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
+def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
@@ -128,20 +125,20 @@ def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
     return group.sudo(command)
 
 
-def no_changes_found(action: Callable, result: RunnersResult) -> bool:
-    if action is install:
+def no_changes_found(action: str, result: RunnersResult) -> bool:
+    if action == 'install':
         return "Nothing to do" in result.stdout
-    elif action is upgrade:
+    elif action == 'upgrade':
         return "No packages marked for update" in result.stdout
-    elif action is remove:
+    elif action == 'remove':
         return "No Packages marked for removal" in result.stdout
     else:
         raise Exception(f"Unknown action {action}")
 
 
-def search(group: NodeGroup, package: str) -> Token:
+def search(group: DeferredGroup, package: str) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
     command = 'yum list %s || echo "Package is unavailable"' % package
 
-    return group.defer().sudo(command)
+    return group.sudo(command)

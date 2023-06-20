@@ -131,6 +131,8 @@ module = [
     "kubemarine.core.connections",
     "kubemarine.core.environment",
     "kubemarine.core.errors",
+    "kubemarine.core.executor",
+    "kubemarine.core.group",
     "kubemarine.core.os",
     "kubemarine.core.patch",
     "kubemarine.core.schema",

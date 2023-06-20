@@ -15,7 +15,7 @@ import collections
 import concurrent
 import random
 import time
-from typing import Tuple, List, Dict, Callable, Any, Optional, Union, cast, Collection, OrderedDict, Set
+from typing import Tuple, List, Dict, Callable, Any, Optional, Union, Collection, OrderedDict, Set
 
 import fabric  # type: ignore[import]
 import fabric.transfer  # type: ignore[import]
@@ -23,30 +23,31 @@ import fabric.transfer  # type: ignore[import]
 from concurrent.futures.thread import ThreadPoolExecutor
 
 from kubemarine.core import log
+from kubemarine.core.connections import ConnectionPool
 
 
 class RunnersResult:
-    def __init__(self, stdout="", stderr="", exited=0):
+    def __init__(self, stdout: str = "", stderr: str = "", exited: int = 0) -> None:
         self.stdout = stdout
         self.stderr = stderr
         self.exited = exited
 
     @property
-    def return_code(self):
+    def return_code(self) -> int:
         return self.exited
 
     @property
-    def ok(self):
+    def ok(self) -> bool:
         return self.exited == 0
 
     @property
-    def failed(self):
+    def failed(self) -> bool:
         return not self.ok
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self.ok
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, RunnersResult):
             return False
 
@@ -54,8 +55,8 @@ class RunnersResult:
             and self.stdout == other.stdout \
             and self.stderr == other.stderr
 
-    def __ne__(self, other):
-        return not (self == other)
+    def __ne__(self, other: object) -> bool:
+        return not self == other
 
 
 Token = int
@@ -72,14 +73,14 @@ _PayloadItem = Tuple[_Action, _Callback, Token]
 _MergedPayload = Tuple[_Action, List[_Callback], List[Token]]
 
 
-class RemoteExecutor:
+class RawExecutor:
 
-    def __init__(self, cluster,
-                 parallel=True,
-                 ignore_failed=False,
-                 timeout=None):
-        from kubemarine.core.cluster import KubernetesCluster
-        self.cluster: KubernetesCluster = cluster
+    def __init__(self, logger: log.EnhancedLogger, connection_pool: ConnectionPool,
+                 parallel: bool = True,
+                 ignore_failed: bool = False,
+                 timeout: int = None) -> None:
+        self.logger = logger
+        self.connection_pool = connection_pool
         self.parallel = parallel
         # TODO support ignore_failed option.
         #  Probably it should be chosen automatically depending on warn=? of commands kwargs (not of the same executor option).
@@ -91,18 +92,7 @@ class RemoteExecutor:
         self._command_separator = ''.join(random.choice('=-_') for _ in range(32))
         self._supported_args = {'hide', 'warn', 'timeout', 'watchers', 'env', 'out_stream', 'err_stream'}
 
-    def __enter__(self):
-        _GRE_STACK.append(self)
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        if not (self is get_active_executor()):
-            raise Exception("Unexpected condition: leaving executor is not active")
-        _GRE_STACK.pop()
-        if self._connections_queue:
-            self.flush()
-
-    def _actions_mergeable(self, action1: _Action, action2: _Action):
+    def _actions_mergeable(self, action1: _Action, action2: _Action) -> bool:
         do_type1, _, kwargs1 = action1
         do_type2, _, kwargs2 = action2
         if do_type1 not in ["sudo", "run"] or do_type1 != do_type2:
@@ -225,9 +215,9 @@ class RemoteExecutor:
             raise Exception(f"Arguments {', '.join(map(repr, not_supported_args))} are not supported")
 
         if not target:
-            self.cluster.log.verbose('No nodes to perform %s %s with options: %s' % (do_type, args, kwargs))
+            self.logger.verbose('No nodes to perform %s %s with options: %s' % (do_type, args, kwargs))
         else:
-            self.cluster.log.verbose(
+            self.logger.verbose(
                 'Performing %s %s on nodes %s with options: %s' % (do_type, args, list(target), kwargs))
             for host in target:
                 self._connections_queue.setdefault(host, []).append((action, callback, token))
@@ -237,7 +227,7 @@ class RemoteExecutor:
     def get_last_results(self) -> Dict[str, TokenizedResult]:
         return self._last_results
 
-    def _merge_results(self, filter_tokens: Optional[List[int]] = None) -> HostToResult:
+    def merge_last_results(self, filter_tokens: Optional[List[int]] = None) -> HostToResult:
         group_results: HostToResult = {}
         for host, host_results in self.get_last_results().items():
             merged_result = RunnersResult()
@@ -276,73 +266,16 @@ class RemoteExecutor:
 
         return group_results
 
-    def get_merged_nodegroup_result(self, filter_tokens: Optional[List[int]] = None):
-        """
-        Returns last results, merged into simple NodeGroupResult.
-        If any node failed, throws GroupException.
-
-        The method can be useful to check exceptions.
-        To check the result, use get_merged_runners_result().
-
-        :param filter_tokens: tokens to filter result of specific commands in the batch
-        :return: NodeGroupResult
-        """
-
-        # Throw any exceptions ONLY when no handlers waits for results. For non-queued results any exceptions should
-        # handled via _do_with_wa() or other parent error handling mechanism.
-        # For queued flushes, exception handling with W/A is currently not supported.
-        # TODO: Merge results/exceptions handling with kubemarine.core.group.NodeGroup._do_with_wa to avoid code dup
-
-        results = self._merge_results(filter_tokens=filter_tokens)
-        # TODO: Get rid of this WA import, added to avoid circular import problem
-        from kubemarine.core.group import NodeGroupResult, GroupException
-        group_result = NodeGroupResult(self.cluster, results)
-        if len(group_result.failed) > 0:
-            # If any failed, then throw exception.
-            # Do not check 'warn' arg, because if any command had 'False' value, UnexpectedExit can be already thrown.
-            raise GroupException(group_result)
-
-        return group_result
-
-    def get_merged_runners_result(self, filter_tokens: Optional[List[int]] = None):
-        """
-        Returns last results, merged into simple RunnersGroupResult.
-        If any node failed, throws GroupException.
-        If failed convert to the runners result (e.g. if put/get commands were in the batch), throws Exception.
-
-        The method can be useful to
-        1) check exceptions,
-        2) check result in case only one command per node is executed,
-        3) check result of specific commands in the batch if filter_tokens parameter is provided.
-        4) merge the result to print it to logs.
-
-        For more fine-grained control, use get_last_results().
-
-        :param filter_tokens: tokens to filter result of specific commands in the batch
-        :return: RunnersGroupResult
-        """
-        # TODO: Get rid of this WA import, added to avoid circular import problem
-        from kubemarine.core.group import RunnersGroupResult
-
-        group_result = self.get_merged_nodegroup_result(filter_tokens=filter_tokens)
-        for result in group_result.values():
-            if not isinstance(result, RunnersResult):
-                raise Exception("Cannot convert transfer result to the simple runners result")
-
-        return RunnersGroupResult(self.cluster,
-                                  {host: cast(RunnersResult, res) for host, res in group_result.items()})
-
     def flush(self) -> Dict[str, TokenizedResult]:
         """
-        Flushes the connections' queue.
-        Returns grouped result, or throws GroupException in case of any failure.
+        Flushes the connections' queue and returns grouped result
 
         :return: grouped tokenized results per connection.
         """
         batch_results: Dict[str, TokenizedResult] = {}
 
         if not self._connections_queue:
-            self.cluster.log.verbose('Queue is empty, nothing to perform')
+            self.logger.verbose('Queue is empty, nothing to perform')
             self._last_results = batch_results
             return batch_results
 
@@ -371,10 +304,10 @@ class RemoteExecutor:
                 for host, payload in batch.items():
                     if host in failed_hosts:
                         continue
-                    cxn = self.cluster.connection_pool.get_connection(host)
+                    cxn = self.connection_pool.get_connection(host)
                     action, callbacks, tokens = payload
                     do_type, args, kwargs = action
-                    self.cluster.log.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
+                    self.logger.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
                     safe_exec(futures, host, lambda: TPE.submit(getattr(cxn, do_type), *args, **kwargs))
 
                 for host, future in futures.items():
@@ -389,11 +322,9 @@ class RemoteExecutor:
         self._connections_queue = {}
         self._last_results = batch_results
 
-        self.get_merged_nodegroup_result()
-
         return batch_results
 
-    def _flush_logger_writers(self, batch: Dict[str, _MergedPayload]):
+    def _flush_logger_writers(self, batch: Dict[str, _MergedPayload]) -> None:
         for payload in batch.values():
             action, _, _ = payload
             _, _, kwargs = action
@@ -401,19 +332,3 @@ class RemoteExecutor:
                 if isinstance(kwargs.get(stream_key), log.LoggerWriter):
                     writer: log.LoggerWriter = kwargs[stream_key]
                     writer.flush(remainder=True)
-
-
-# Cannot annotate in Python 3.7
-# https://github.com/python/cpython/issues/79120
-_GRE_STACK = []  # type: ignore[var-annotated]
-
-
-def is_executor_active() -> bool:
-    return bool(_GRE_STACK)
-
-
-def get_active_executor() -> RemoteExecutor:
-    if not _GRE_STACK:
-        raise Exception("Trying to access last active executor out of any executor context")
-
-    return _GRE_STACK[-1]

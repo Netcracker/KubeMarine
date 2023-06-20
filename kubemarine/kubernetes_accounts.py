@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+from typing import Optional
 
 import yaml
 
@@ -95,7 +96,7 @@ def install(cluster: KubernetesCluster) -> None:
                           '$(sudo kubectl -n %s get sa %s -o \'jsonpath={.secrets[0].name}\') -o \'jsonpath={.data.token}\'' \
                           '| sudo base64 -d' % (account['namespace'], account['namespace'], account['name'])
 
-        token = []
+        token: Optional[str] = None
         retries = cluster.globals['accounts']['retries']
         # Token creation in Kubernetes 1.24 is not syncronus, therefore retries are necessary
         while retries > 0:

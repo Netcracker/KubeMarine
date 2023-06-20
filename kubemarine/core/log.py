@@ -293,18 +293,18 @@ class LoggerWriter:
         self.prefix = prefix
         self.buf = ""
 
-    def write(self, message):
+    def write(self, message: str) -> None:
         lines = message.split('\n')
         for line in lines[:-1]:
             self.buf = self.buf + line
             self._log()
         self.buf = self.buf + lines[-1]
 
-    def flush(self, remainder=False):
+    def flush(self, remainder: bool = False) -> None:
         if remainder and self.buf:
             self._log()
 
-    def _log(self):
+    def _log(self) -> None:
         self.logger.log(logging.DEBUG, self.buf, extra={'real_caller': self.caller, 'prefix': self.prefix})
         self.buf = ""
 

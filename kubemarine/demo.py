@@ -11,10 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import annotations
+
 import argparse
 import io
 import re
 import threading
+from abc import ABC
 from copy import deepcopy
 from typing import List, Dict, Union, Any, Optional, Mapping, Iterable
 
@@ -22,10 +26,13 @@ import fabric  # type: ignore[import]
 from invoke import UnexpectedExit
 
 from kubemarine import system
-from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core import group, flow, connections
-from kubemarine.core.executor import RunnersResult, GenericResult
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.cluster import KubernetesCluster, _AnyConnectionTypes
+from kubemarine.core import flow, connections
+from kubemarine.core.executor import RunnersResult, GenericResult, Token
+from kubemarine.core.group import (
+    AbstractGroup, NodeGroup, NodeGroupResult, DeferredGroup, RunnersGroupResult,
+    GROUP_RUN_TYPE
+)
 from kubemarine.core.resources import DynamicResources
 
 _ShellResult = Dict[str, Any]
@@ -164,9 +171,8 @@ class FakeKubernetesCluster(KubernetesCluster):
         super().__init__(*args, **kwargs)
         self.connection_pool = FakeConnectionPool(self)
 
-    def make_group(self, ips) -> NodeGroup:
-        nodegroup = super().make_group(ips)
-        return FakeNodeGroup(nodegroup.nodes, self)
+    def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
+        return FakeNodeGroup(ips, self)
 
     def dump_finalized_inventory(self):
         return
@@ -322,20 +328,28 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
         pass
 
 
-class FakeNodeGroup(group.NodeGroup):
+class FakeAbstractGroup(AbstractGroup[GROUP_RUN_TYPE], ABC):
+    def defer(self) -> FakeDeferredGroup:
+        return FakeDeferredGroup(self.nodes, self.cluster)
 
-    def __init__(self, hosts: Iterable[str], cluster_: FakeKubernetesCluster):
-        super().__init__(hosts, cluster_)
+    def eager(self) -> FakeNodeGroup:
+        return FakeNodeGroup(self.nodes, self.cluster)
 
-    def get_local_file_sha1(self, filename):
+    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+                     backup=False, sudo=False, mkdir=False, immutable=False):
+        super()._put_with_mv(local_stream, remote_file, backup=False, sudo=False, mkdir=False, immutable=False)
+
+
+class FakeNodeGroup(NodeGroup, FakeAbstractGroup[RunnersGroupResult]):
+    def get_local_file_sha1(self, filename: str) -> str:
         return '0'
 
-    def get_remote_file_sha1(self, filename):
+    def get_remote_file_sha1(self, filename: str) -> Dict[str, Optional[str]]:
         return {host: '1' for host in self.nodes}
 
-    def _advanced_put(self, local_stream: Union[io.BytesIO, str], remote_file: str, deferred: bool,
-                      backup=False, sudo=False, mkdir=False, immutable=False):
-        super()._advanced_put(local_stream, remote_file, deferred)
+
+class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
+    pass
 
 
 class FakeConnectionPool(connections.ConnectionPool):
@@ -544,5 +558,5 @@ FULLHA_NOBALANCERS: Dict[str, _ROLE_SPEC] = {'balancer': 0, 'master': 3, 'worker
 ALLINONE: Dict[str, _ROLE_SPEC] = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
 MINIHA: Dict[str, _ROLE_SPEC] = {'master': 3}
 MINIHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
-                     'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
+                                            'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
 NON_HA_BALANCER: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}

@@ -24,7 +24,7 @@ from kubemarine import demo
 class NodeGroupResultsTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
 
     def test_nodegroup_result_to_str(self):
         expected_results_str = '''	10.101.1.2: code=1

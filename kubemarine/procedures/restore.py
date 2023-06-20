@@ -192,7 +192,7 @@ def import_etcd(cluster: KubernetesCluster):
     etcd_instances = 0
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
         cluster.log.debug('Restoring ETCD member ' + control_plane['name'])
-        control_plane_conn = cluster.make_group([control_plane])
+        control_plane_conn = cluster.make_group([control_plane['connect_to']])
         control_plane_conn.sudo(
             f'chmod 777 {snap_name} && '
             f'sudo ls -la {snap_name} && '

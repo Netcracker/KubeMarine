@@ -26,8 +26,9 @@ from ordered_set import OrderedSet
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token, GenericResult
-from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException, GenericGroupResult
+from kubemarine.core.executor import RunnersResult, Token, GenericResult
+from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException, GenericGroupResult, DeferredGroup, \
+    AbstractGroup, GROUP_RUN_TYPE
 from kubemarine.core.annotations import restrict_empty_group
 
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
@@ -216,38 +217,38 @@ def update_etc_hosts(group: NodeGroup, config: str) -> None:
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True)
 
 
-def stop_service(group: NodeGroup, name: str) -> RunnersGroupResult:
+def stop_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str) -> GROUP_RUN_TYPE:
     return group.sudo('systemctl stop %s' % name)
 
 
-def start_service(group: NodeGroup, name: str) -> RunnersGroupResult:
+def start_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str) -> GROUP_RUN_TYPE:
     return group.sudo('systemctl start %s' % name)
 
 
-def restart_service(group: NodeGroup, name: str = None) -> Token:
+def restart_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
-    return group.defer().sudo('systemctl restart %s' % name)
+    return group.sudo('systemctl restart %s' % name)
 
 
-def enable_service(group: NodeGroup, name: str = None, now: bool = True) -> Token:
+def enable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None, now: bool = True) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl enable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.defer().sudo(cmd)
+    return group.sudo(cmd)
 
 
-def disable_service(group: NodeGroup, name: str = None, now: bool = True) -> Token:
+def disable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None, now: bool = True) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl disable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.defer().sudo(cmd)
+    return group.sudo(cmd)
 
 
 def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str) -> None:
@@ -285,13 +286,12 @@ def disable_firewalld(group: NodeGroup) -> RunnersGroupResult:
 
     log.verbose("Trying to stop and disable FirewallD...")
 
-    with RemoteExecutor(cluster) as exe:
-        disable_service(group, name='firewalld', now=True)
+    result = disable_service(group, name='firewalld', now=True)
 
     cluster.schedule_cumulative_point(reboot_nodes)
     cluster.schedule_cumulative_point(verify_system)
 
-    return exe.get_merged_runners_result()
+    return result
 
 
 def is_swap_disabled(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
@@ -382,8 +382,8 @@ def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
     return result
 
 
-def reload_systemctl(group: NodeGroup) -> Token:
-    return group.defer().sudo('systemctl daemon-reload')
+def reload_systemctl(group: AbstractGroup[GROUP_RUN_TYPE]) -> GROUP_RUN_TYPE:
+    return group.sudo('systemctl daemon-reload')
 
 
 def configure_chronyd(group: NodeGroup, retries: int = 60) -> RunnersGroupResult:
@@ -579,17 +579,17 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:
     group = cluster.nodes['all'].get_accessible_nodes()
-    with RemoteExecutor(cluster) as exe:
-        for node in group.get_ordered_members_list():
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             detect_interface_by_address(node, node.get_config()['internal_address'])
-    results: RunnersGroupResult = exe.get_merged_runners_result()
+    results = exe.get_merged_runners_result()
     for host, result in results.items():
         interface = result.stdout.strip()
         cluster.context['nodes'][host]['active_interface'] = interface
 
 
-def detect_interface_by_address(group: NodeGroup, address: str) -> Token:
-    return group.defer().run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
+def detect_interface_by_address(group: DeferredGroup, address: str) -> Token:
+    return group.run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
 
 
 def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:

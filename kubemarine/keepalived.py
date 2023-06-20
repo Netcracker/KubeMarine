@@ -16,14 +16,13 @@ import hashlib
 import io
 import random
 import time
-from typing import cast, Optional, List
+from typing import Optional, List
 
 from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
 
 
@@ -135,12 +134,10 @@ def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesClu
     # it is important to remove duplicates
     names = list(set(names))
 
-    filtered_members = cluster.nodes['all'].get_ordered_members_list(apply_filter={
+    # create new group where keepalived will be installed
+    cluster.nodes['keepalived'] = cluster.nodes['all'].new_group(apply_filter={
         'name': names
     })
-
-    # create new group where keepalived will be installed
-    cluster.nodes['keepalived'] = cluster.make_group(filtered_members)
 
     # create new role
     cluster.roles.append('keepalived')
@@ -172,8 +169,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         log.debug("Keepalived already installed, nothing to install")
         installation_result = keepalived_version
     else:
-        installation_result = cast(RunnersGroupResult,
-                                   packages.install(group, include=package_associations['package_name']))
+        installation_result = packages.install(group, include=package_associations['package_name'])
 
     service_name = package_associations['service_name']
     patch_path = "./resources/drop_ins/keepalived.conf"
@@ -197,9 +193,9 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
 def restart(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
-    with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list():
-            service_name = group.cluster.get_package_association_for_node(
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
             system.restart_service(node, name=service_name)
 
@@ -208,17 +204,17 @@ def restart(group: NodeGroup) -> None:
 
 
 def enable(group: NodeGroup) -> None:
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list():
-            service_name = group.cluster.get_package_association_for_node(
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
             system.enable_service(node, name=service_name, now=True)
 
 
 def disable(group: NodeGroup) -> None:
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list():
-            service_name = group.cluster.get_package_association_for_node(
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
             system.disable_service(node, name=service_name)
 
@@ -262,22 +258,21 @@ def generate_config(inventory: dict, node: NodeConfig) -> str:
 def configure(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
-    group_members = group.get_ordered_members_list()
 
-    with RemoteExecutor(cluster):
-        for node in group_members:
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
             log.debug("Configuring keepalived on '%s'..." % node_name)
 
             package_associations = cluster.get_associations_for_node(node.get_host(), 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-            group.defer().sudo('mkdir -p %s' % configs_directory)
+            exe.group.sudo('mkdir -p %s' % configs_directory)
 
             config = generate_config(cluster.inventory, node.get_config())
             utils.dump_file(cluster, config, 'keepalived_%s.conf' % node_name)
 
-            node.defer().put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node.put(io.StringIO(config), package_associations['config_location'], sudo=True)
 
     log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
 

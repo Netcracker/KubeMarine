@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict, Tuple, Optional, Union, cast, Callable, Mapping, Set, Any
+from typing import List, Dict, Tuple, Optional, Union, cast, Mapping, Set
 
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor, RunnersResult, Token
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.executor import RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -356,7 +356,7 @@ def get_all_managed_packages_for_group(group: NodeGroup, inventory: dict, ensure
     return hosts_to_packages
 
 
-def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, association_name: str,
+def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory: dict, association_name: str,
                                       ensured_association_only: bool = False) \
         -> Dict[str, List[str]]:
     """
@@ -380,7 +380,7 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
 
     if association_name == 'unzip':
         from kubemarine import thirdparties
-        relevant_group = thirdparties.get_group_require_unzip(cluster, inventory)
+        relevant_group: AbstractGroup[RunResult] = thirdparties.get_group_require_unzip(cluster, inventory)
     else:
         groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
         relevant_group = cluster.create_group_from_groups_nodes_names(groups, [])
@@ -499,7 +499,7 @@ def get_compatibility_version_key(os_family: str) -> str:
         raise ValueError(f"Unsupported {os_family!r} OS family")
 
 
-def get_package_manager(group: NodeGroup):  # type: ignore[no-untyped-def]
+def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]):  # type: ignore[no-untyped-def]
     os_family = group.get_nodes_os()
 
     if os_family in ['rhel', 'rhel8']:
@@ -526,29 +526,23 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
     return get_package_manager(group).clean(group)
 
 
-def install(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None) \
-        -> Union[Token, RunnersGroupResult]:
+def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     return get_package_manager(group).install(group, include, exclude)
 
 
-def remove(group: NodeGroup, include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
-           warn: bool = False, hide: bool = True) -> RunnersGroupResult:
+def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
     return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide)
 
 
-def upgrade(group: NodeGroup, include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> RunnersGroupResult:
+def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     return get_package_manager(group).upgrade(group, include, exclude)
 
 
-def no_changes_found(group: NodeGroup, action: Callable, result: RunnersResult) -> bool:
+def no_changes_found(group: NodeGroup, action: str, result: RunnersResult) -> bool:
     pkg_mgr = get_package_manager(group)
-    if action is install:
-        action = pkg_mgr.install
-    elif action is upgrade:
-        action = pkg_mgr.upgrade
-    elif action is remove:
-        action = pkg_mgr.remove
     return pkg_mgr.no_changes_found(action, result)
 
 
@@ -564,7 +558,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def _detect_installed_package_version(group: NodeGroup, package: str) -> Token:
+def _detect_installed_package_version(group: DeferredGroup, package: str) -> Token:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -581,7 +575,7 @@ def _detect_installed_package_version(group: NodeGroup, package: str) -> Token:
     package_name = get_package_name(os_family, package)
 
     cmd = get_detect_package_version_cmd(os_family, package_name)
-    return group.defer().sudo(cmd)
+    return group.sudo(cmd)
 
 
 def _parse_node_detected_package(result: RunnersResult, package: str) -> str:
@@ -613,20 +607,18 @@ def detect_installed_packages_version_hosts(
         # deduplicate
         hosts_to_packages_dedup[host] = list(set(packages_list))
 
-    with RemoteExecutor(cluster) as exe:
-        for host, packages_list in hosts_to_packages_dedup.items():
-            node = cluster.make_group([host])
-            for package in packages_list:
+    with cluster.make_group(hosts_to_packages).executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            for package in hosts_to_packages_dedup[node.get_host()]:
                 _detect_installed_package_version(node, package)
 
     raw_result = exe.get_last_results()
     results: Dict[str, Dict[str, List]] = {}
 
     for host, multiple_results in raw_result.items():
-        multiple_results = list(multiple_results.values())
-        packages_list = hosts_to_packages_dedup[host]
-        for i, package in enumerate(packages_list):
-            result = cast(RunnersResult, multiple_results[i])
+        for i, result in enumerate(multiple_results.values()):
+            result = cast(RunnersResult, result)
+            package = hosts_to_packages_dedup[host][i]
             node_detected_package = _parse_node_detected_package(result, package)
             results.setdefault(package, {}).setdefault(node_detected_package, []).append(host)
 
@@ -657,13 +649,13 @@ def get_package_name(os_family: str, package: str) -> str:
     return package_name
 
 
-def search_package(group: NodeGroup, package: str) -> Token:
+def search_package(group: DeferredGroup, package: str) -> Token:
     return get_package_manager(group).search(group, package)
 
 
-def create_repo_file(group: NodeGroup, repo_data: Union[List[str], dict, str], repo_file: str) -> None:
+def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], dict, str], repo_file: str) -> None:
     get_package_manager(group).create_repo_file(group, repo_data, repo_file)
 
 
-def get_repo_filename(group: NodeGroup) -> str:
+def get_repo_filename(group: AbstractGroup[RunResult]) -> str:
     return get_package_manager(group).get_repo_file_name()

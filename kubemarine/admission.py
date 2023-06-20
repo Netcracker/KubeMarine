@@ -313,8 +313,7 @@ def reconfigure_plugin_task(cluster: KubernetesCluster):
     first_control_plane = cluster.nodes["control-plane"].get_first_member()
 
     cluster.log.debug("Updating kubeadm config map")
-    result = first_control_plane.call(update_kubeadm_configmap, target_state=target_state)
-    final_admission_plugins_list = list(result.values())[0]
+    final_admission_plugins_list = first_control_plane.call(update_kubeadm_configmap, target_state=target_state)
 
     # update api-server config on all control-planes
     cluster.log.debug("Updating kube-apiserver configs on control-planes")
@@ -349,7 +348,7 @@ def restart_pods_task(cluster: KubernetesCluster):
     kubernetes.wait_for_any_pods(cluster, first_control_plane)
 
 
-def update_kubeadm_configmap_psp(first_control_plane: NodeGroup, target_state: str):
+def update_kubeadm_configmap_psp(first_control_plane: NodeGroup, target_state: str) -> str:
     yaml = ruamel.yaml.YAML()
 
     # load kubeadm config map and retrieve cluster config
@@ -377,11 +376,11 @@ def update_kubeadm_configmap_psp(first_control_plane: NodeGroup, target_state: s
     return final_plugins_string
 
 
-def update_kubeadm_configmap(first_control_plane: NodeGroup, target_state: str):
+def update_kubeadm_configmap(first_control_plane: NodeGroup, target_state: str) -> str:
     admission_impl = first_control_plane.cluster.inventory['rbac']['admission']
     if admission_impl == "psp":
         return update_kubeadm_configmap_psp(first_control_plane, target_state)
-    elif admission_impl == "pss":
+    else:  # admission_impl == "pss":
         return update_kubeadm_configmap_pss(first_control_plane, target_state)
 
 
@@ -651,8 +650,7 @@ def manage_pss(cluster: KubernetesCluster, manage_type: str):
         copy_pss(cluster.nodes["control-plane"])
 
         cluster.log.debug("Updating kubeadm config map")
-        result = first_control_plane.call(update_kubeadm_configmap_pss, target_state="enabled")
-        final_features_list = list(result.values())[0]
+        final_features_list = first_control_plane.call(update_kubeadm_configmap_pss, target_state="enabled")
 
         # update api-server config on all control-planes
         cluster.log.debug("Updating kube-apiserver configs on control-planes")
@@ -660,14 +658,13 @@ def manage_pss(cluster: KubernetesCluster, manage_type: str):
     # 'init' make changes during init Kubernetes cluster
     elif manage_type == "init":
         cluster.log.debug("Updating kubeadm config map")
-        result = first_control_plane.call(update_kubeadm_configmap_pss, target_state="enabled")
+        first_control_plane.call(update_kubeadm_configmap_pss, target_state="enabled")
     # 'delete' - disable PSS
     elif manage_type == "delete":
         # set labels for predifined plugins namespaces and namespaces defined in procedure config
         label_namespace_pss(cluster, manage_type)
 
-        result = first_control_plane.call(update_kubeadm_configmap, target_state="disabled")
-        final_features_list = list(result.values())[0]
+        final_features_list = first_control_plane.call(update_kubeadm_configmap, target_state="disabled")
 
         # update api-server config on all control-planes
         cluster.log.debug("Updating kube-apiserver configs on control-planes")
@@ -721,7 +718,7 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str):
         control_planes.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
-def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: str):
+def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: str) -> str:
     yaml = ruamel.yaml.YAML()
 
     final_feature_list = ""

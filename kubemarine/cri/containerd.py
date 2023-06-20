@@ -22,21 +22,20 @@ import json
 from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list():
-            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'containerd')
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
 
-            group.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
+            exe.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
             # always install latest available containerd and podman
             packages.install(node, include=os_specific_associations['package_name'])
 
             # remove previous config.toml to avoid problems in case when previous config was broken
-            node.defer().sudo("rm -f %s && sudo systemctl restart %s"
+            node.sudo("rm -f %s && sudo systemctl restart %s"
                       % (os_specific_associations['config_location'],
                          os_specific_associations['service_name']))
 
@@ -104,15 +103,14 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     tokens = []
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list():
-            defer = node.defer()
-            os_specific_associations = group.cluster.get_associations_for_node(node.get_host(), 'containerd')
+    with group.executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
             log.debug("Uploading containerd configuration to %s node..." % node.get_node_name())
-            defer.put(StringIO(config_string), os_specific_associations['config_location'],
-                      backup=True, sudo=True, mkdir=True)
+            node.put(StringIO(config_string), os_specific_associations['config_location'],
+                     backup=True, sudo=True, mkdir=True)
             log.debug("Restarting Containerd on %s node..." % node.get_node_name())
-            tokens.append(defer.sudo(
+            tokens.append(node.sudo(
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
                 f"systemctl status {os_specific_associations['service_name']}"))
