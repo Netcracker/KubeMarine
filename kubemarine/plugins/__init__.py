@@ -573,9 +573,9 @@ def apply_expect(cluster, config, plugin_name=None):
 
 # **** PYTHON ****
 
-def verify_python(cluster, step):
-    # TODO: verify fields types and contents
-    return
+def get_python_module(module_path):
+    if module_path in LOADED_MODULES:
+        return LOADED_MODULES[module_path]
 
     spec = importlib.util.spec_from_file_location('module', module_path)
     try:
@@ -592,12 +592,7 @@ def get_python_method_args(cluster, step):
     method_name = step['method']
     method_arguments = step.get('arguments', {})
 
-    cluster.log.debug("Running method %s from %s module..." % (method_name, module_path))
-    module_filename = os.path.basename(module_path)
-    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    getattr(module, method_name)(cluster, **method_arguments)
+    module = get_python_module(module_path)
 
     # Check if the method exists
     if not hasattr(module, method_name):
@@ -824,7 +819,7 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
         cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 

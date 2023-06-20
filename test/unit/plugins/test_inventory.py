@@ -63,12 +63,34 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(errors.FailException, r"'method' is a required property"):
             demo.new_cluster(inventory)
 
-    def test_verify_python_valid(self):
+    def test_verify_python_module_not_exist(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['plugins'] = {'custom': {'installation': {'procedures': [
             {'python': {'module': 'm', 'method': 'f'}}
         ]}}}
-        demo.new_cluster(inventory)
+        with self.assertRaisesRegex(Exception, r"Requested resource m is not exists"):
+            demo.new_cluster(inventory)
+
+    @patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
+    def test_verify_python_import_error(self, patch):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['plugins'] = {'custom': {'installation': {'procedures': [
+            {'python': {'module': 'm', 'method': 'f'}}
+        ]}}}
+
+        with self.assertRaisesRegex(Exception, r"Could not import module"):
+            demo.new_cluster(inventory) 
+
+    @patch('kubemarine.core.utils.determine_resource_absolute_file', return_value=("path", True))
+    @patch('importlib.util.spec_from_file_location', return_value=MOCK_SPEC)
+    @patch('importlib.util.module_from_spec', return_value=None)
+    def test_verify_python_method_not_exist(self, patch, patch1, patch2):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['plugins'] = {'custom': {'installation': {'procedures': [
+            {'python': {'module': 'plugins/builtin.py', 'method': 'apply_yaml'}}
+        ]}}}
+        with self.assertRaisesRegex(Exception, r"Module path does not have method apply_yaml"):
+            demo.new_cluster(inventory) 
 
     def test_verify_shell_empty_command(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
