@@ -14,7 +14,7 @@
 
 import configparser
 import io
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
 from kubemarine.core.executor import RunnersResult, Token
@@ -35,7 +35,7 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
-def add_repo(group: NodeGroup, repo_data: Union[dict, str]) -> RunnersGroupResult:
+def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name())
     return group.sudo('yum clean all && sudo yum updateinfo')
 
@@ -44,7 +44,9 @@ def get_repo_file_name() -> str:
     return '/etc/yum.repos.d/predefined.repo'
 
 
-def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[dict, str], repo_file: str) -> None:
+def create_repo_file(group: AbstractGroup[RunResult],
+                     repo_data: Union[List[str], Dict[str, dict], str],
+                     repo_file: str) -> None:
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()

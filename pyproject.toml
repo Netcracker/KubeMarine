@@ -162,6 +162,7 @@ module = [
     "kubemarine.procedures.manage_pss",
     "kubemarine.procedures.migrate_kubemarine",
     "kubemarine.procedures.reboot",
+    "kubemarine.packages",
     "kubemarine.selinux",
     "kubemarine.sysctl",
     "kubemarine.system",
@@ -179,7 +180,6 @@ module = [
     "kubemarine.core.cluster",
     "kubemarine.core.resources",
     "kubemarine.kubernetes.object",
-    "kubemarine.packages",
 ]
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
