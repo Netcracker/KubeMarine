@@ -720,8 +720,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         self._do_with_wa("get", remote_file, local_file)
 
     def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
-        # for unknown reason fabric v2 can't put async
-        self._do_with_wa("put", local_stream, remote_file, is_async=False)
+        self._do_with_wa("put", local_stream, remote_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
              **kwargs: Any) -> RunnersGroupResult:
@@ -799,11 +798,10 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         return True
 
     def _do_exec(self, nodes: List[str], do_type: str, *args: object, **kwargs: Any) -> HostToResult:
-        is_async = kwargs.pop('is_async', True)
         kwargs = self._default_connection_kwargs(do_type, kwargs)
 
         executor = RawExecutor(self.cluster.log, self.cluster.connection_pool,
-                               parallel=is_async, timeout=kwargs.get('timeout'))
+                               timeout=kwargs.get('timeout'))
         executor.queue(nodes, (do_type, args, kwargs))
         executor.flush()
         return executor.merge_last_results()
@@ -961,8 +959,6 @@ class DeferredGroup(AbstractGroup[Token]):
         return self._do_queue(do_type, command, **kwargs)
 
     def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
-        # TODO why we do not put async in eager mode, but still put async in deferred mode?
-        #  See NodeGroup._put.
         self._do_queue("put", local_stream, remote_file)
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: object) -> Token:
@@ -972,12 +968,12 @@ class DeferredGroup(AbstractGroup[Token]):
 
 
 class RemoteExecutor(RawExecutor):
-    def __init__(self, group: AbstractGroup[RunResult], parallel: bool = True,
+    def __init__(self, group: AbstractGroup[RunResult],
                  ignore_failed: bool = False, timeout: int = None) -> None:
         self.group = group.defer()
         self.cluster = group.cluster
         super().__init__(self.cluster.log, self.cluster.connection_pool,
-                         parallel, ignore_failed, timeout)
+                         ignore_failed, timeout)
 
     def __enter__(self) -> RemoteExecutor:
         _GRE_STACK.append(self)

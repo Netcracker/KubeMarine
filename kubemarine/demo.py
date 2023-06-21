@@ -18,9 +18,10 @@ import argparse
 import io
 import re
 import threading
+import time
 from abc import ABC
 from copy import deepcopy
-from typing import List, Dict, Union, Any, Optional, Mapping, Iterable
+from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO
 
 import fabric  # type: ignore[import]
 from invoke import UnexpectedExit
@@ -114,31 +115,50 @@ class FakeShell:
 class FakeFS:
     def __init__(self):
         self.storage: Dict[str, Dict[str, str]] = {}
+        self.emulate_latency = False
         self._lock = threading.Lock()
 
     def reset(self):
         self.storage = {}
+        self.emulate_latency = False
 
     def reset_host(self, host):
         self.storage[host] = {}
 
-    # covered by test.test_demo.TestFakeFS.test_put_string
-    # covered by test.test_demo.TestFakeFS.test_put_stringio
-    # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
+    # covered by test.test_demo.TestFakeFS.test_put_file
+    # covered by test.test_demo.TestFakeFS.test_put_bytesio
+    # covered by test.test_group.TestGroupCall.test_write_stream
     def write(self, host, filename, data):
+        if isinstance(data, io.BytesIO):
+            # Emulate how fabric handles file-like objects.
+            # See fabric.transfer.Transfer.put
+            pointer = data.tell()
+            try:
+                data.seek(0)
+                text = self._transfer(data)
+            finally:
+                data.seek(pointer)
+        elif isinstance(data, str):
+            with open(data, "rb") as fl:
+                text = self._transfer(fl)
+        else:
+            raise ValueError("Unsupported data type " + str(type(data)))
+
         with self._lock:
-            if isinstance(data, io.BytesIO):
-                data = data.getvalue().decode('utf-8')
-            elif isinstance(data, str):
-                # this is for self-testing purpose
-                pass
-            elif isinstance(data, io.IOBase):
-                data = data.read().decode('utf-8')
-            else:
-                raise ValueError("Unsupported data type " + str(type(data)))
-            if self.storage.get(host) is None:
-                self.storage[host] = {}
-            self.storage[host][filename] = data
+            self.storage.setdefault(host, {})[filename] = text
+
+    def _transfer(self, fl: IO) -> str:
+        # Emulate how paramiko transfers files.
+        # See paramiko.sftp_client.SFTPClient._transfer_with_callback
+        target = io.BytesIO()
+        while True:
+            data = fl.read(32768)
+            target.write(data)
+            if self.emulate_latency:
+                time.sleep(0.1)
+            if len(data) == 0:
+                break
+        return target.getvalue().decode('utf-8')
 
     # covered by test.test_demo.TestFakeFS.test_put_string
     # covered by test.test_demo.TestFakeFS.test_get_nonexistent

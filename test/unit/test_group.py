@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import io
+import os
+import tempfile
 import unittest
 import random
 
@@ -72,6 +73,7 @@ class TestGroupCall(unittest.TestCase):
 
     def tearDown(self):
         TestGroupCall.cluster.fake_shell.reset()
+        TestGroupCall.cluster.fake_fs.reset()
 
     def test_run_empty_group(self):
         # bug reproduces inside _do(), that is why it is necessary to use real cluster
@@ -101,6 +103,35 @@ class TestGroupCall(unittest.TestCase):
                 self.assertEqual('Some error', result.args[0], msg="Unexpected exception message")
 
         self.assertEqual(1, nested_exc, msg="One wrapped exception should happen")
+
+    def test_write_stream(self):
+        expected_data = 'hello\nworld'
+        self.cluster.nodes['master'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
+        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['master'].get_hosts(), '/tmp/test/file.txt')
+
+        for host, actual_data in actual_data_group.items():
+            self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal for node %s" % host)
+
+    def test_write_large_stream(self):
+        self.cluster.fake_fs.emulate_latency = True
+        all_nodes = self.cluster.nodes["all"]
+        all_nodes.put(io.StringIO('a' * 100000), '/fake/path')
+
+        for host in all_nodes.get_hosts():
+            self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
+
+    def test_write_large_file(self):
+        self.cluster.fake_fs.emulate_latency = True
+        with tempfile.TemporaryDirectory() as tempdir:
+            file = os.path.join(tempdir, 'file.txt')
+            with open(file, 'w') as f:
+                f.write('a' * 100000)
+
+            all_nodes = self.cluster.nodes["all"]
+            all_nodes.put(file, '/fake/path')
+
+            for host in all_nodes.get_hosts():
+                self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
 
 
 if __name__ == '__main__':

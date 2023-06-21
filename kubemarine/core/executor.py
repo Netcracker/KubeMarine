@@ -13,8 +13,8 @@
 # limitations under the License.
 import collections
 import concurrent
+import io
 import random
-import time
 from typing import Tuple, List, Dict, Callable, Any, Optional, Union, Collection, OrderedDict, Set
 
 import fabric  # type: ignore[import]
@@ -76,12 +76,10 @@ _MergedPayload = Tuple[_Action, List[_Callback], List[Token]]
 class RawExecutor:
 
     def __init__(self, logger: log.EnhancedLogger, connection_pool: ConnectionPool,
-                 parallel: bool = True,
                  ignore_failed: bool = False,
                  timeout: int = None) -> None:
         self.logger = logger
         self.connection_pool = connection_pool
-        self.parallel = parallel
         # TODO support ignore_failed option.
         #  Probably it should be chosen automatically depending on warn=? of commands kwargs (not of the same executor option).
         self.ignore_failed = False
@@ -282,8 +280,6 @@ class RawExecutor:
         callable_batches: List[Dict[str, _MergedPayload]] = self._get_callables()
 
         max_workers = len(self._connections_queue)
-        if not self.parallel:
-            max_workers = 1
 
         with ThreadPoolExecutor(max_workers=max_workers) as TPE:
             failed_hosts: Set[str] = set()
@@ -293,10 +289,7 @@ class RawExecutor:
 
                 def safe_exec(result_map: Dict[str, Any], host: str, call: Callable[[], Any]) -> None:
                     try:
-                        # sleep required to avoid thread starvation
-                        time.sleep(0.1)
                         result_map[host] = call()
-                        time.sleep(0.1)
                     except Exception as e:
                         failed_hosts.add(host)
                         results[host] = e
@@ -307,8 +300,9 @@ class RawExecutor:
                     cxn = self.connection_pool.get_connection(host)
                     action, callbacks, tokens = payload
                     do_type, args, kwargs = action
+                    args = self._localize_mutable_args(do_type, args)
                     self.logger.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
-                    safe_exec(futures, host, lambda: TPE.submit(getattr(cxn, do_type), *args, **kwargs))
+                    futures[host] = TPE.submit(getattr(cxn, do_type), *args, **kwargs)
 
                 for host, future in futures.items():
                     safe_exec(results, host, lambda: future.result(timeout=self.timeout))
@@ -323,6 +317,16 @@ class RawExecutor:
         self._last_results = batch_results
 
         return batch_results
+
+    def _localize_mutable_args(self, do_type: str, args: tuple) -> tuple:
+        if do_type == 'put':
+            local_stream, remote_file = args
+            if isinstance(local_stream, io.BytesIO):
+                local_stream = io.BytesIO(local_stream.getvalue())
+
+            return local_stream, remote_file
+
+        return args
 
     def _flush_logger_writers(self, batch: Dict[str, _MergedPayload]) -> None:
         for payload in batch.values():
