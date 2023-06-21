@@ -24,11 +24,9 @@ import yaml
 from kubemarine.core import utils, flow, defaults
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
-from kubemarine.core.executor import RemoteExecutor
 
 
 def missing_or_empty(file):
@@ -138,22 +136,22 @@ def restore_thirdparties(cluster: KubernetesCluster):
 
 
 def import_nodes(cluster: KubernetesCluster):
-    for node in cluster.nodes['all'].get_ordered_members_list():
-        node_name = node.get_node_name()
-        node.put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node_name),
-                 '/tmp/kubemarine-backup.tar.gz')
-        cluster.log.debug('Backup \'%s\' uploaded' % node_name)
+    with cluster.nodes['all'].executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node_name = node.get_node_name()
+            cluster.log.debug('Uploading backup for \'%s\'' % node_name)
+            node.put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node_name),
+                     '/tmp/kubemarine-backup.tar.gz')
 
     cluster.log.debug('Unpacking backup...')
 
-    with RemoteExecutor(cluster) as exe:
-        for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-            cmd = f"readlink /etc/resolv.conf ;" \
-                  f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf; else sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; fi "
-            node['connection'].sudo(cmd)
+    unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite"
+    result = cluster.nodes['all'].sudo(
+        f"readlink /etc/resolv.conf ; "
+        f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; {unpack_cmd} && sudo chattr +i /etc/resolv.conf; "
+        f"else {unpack_cmd}; fi ")
 
-    result = exe.get_last_results_str()
-    cluster.log.debug('%s',result)
+    cluster.log.debug(result)
 
 
 def import_etcd(cluster: KubernetesCluster):
