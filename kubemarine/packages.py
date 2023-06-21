@@ -14,6 +14,8 @@
 from copy import deepcopy
 from typing import List, Dict, Tuple, Optional, Union, cast, Mapping, Set
 
+from typing_extensions import Protocol
+
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
@@ -499,7 +501,37 @@ def get_compatibility_version_key(os_family: str) -> str:
         raise ValueError(f"Unsupported {os_family!r} OS family")
 
 
-def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]):  # type: ignore[no-untyped-def]
+class PackageManager(Protocol):
+    def ls_repofiles(self, group: NodeGroup) -> RunnersGroupResult: ...
+
+    def backup_repo(self, group: NodeGroup) -> Optional[RunnersGroupResult]: ...
+
+    def add_repo(self, group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult: ...
+
+    def get_repo_file_name(self) -> str: ...
+
+    def create_repo_file(self, group: AbstractGroup[RunResult],
+                         repo_data: Union[List[str], Dict[str, dict], str],
+                         repo_file: str) -> None: ...
+
+    def clean(self, group: NodeGroup) -> RunnersGroupResult: ...
+
+    def install(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+
+    def remove(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+               exclude: Union[str, List[str]] = None,
+               warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE: ...
+
+    def upgrade(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+
+    def no_changes_found(self, action: str, result: RunnersResult) -> bool: ...
+
+    def search(self, group: DeferredGroup, package: str) -> Token: ...
+
+
+def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]) -> PackageManager:
     os_family = group.get_nodes_os()
 
     if os_family in ['rhel', 'rhel8']:
@@ -520,6 +552,14 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
 
 def add_repo(group: NodeGroup, repo_data: Union[List[str], dict, str]) -> RunnersGroupResult:
     return get_package_manager(group).add_repo(group, repo_data)
+
+
+def get_repo_filename(group: AbstractGroup[RunResult]) -> str:
+    return get_package_manager(group).get_repo_file_name()
+
+
+def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], dict, str], repo_file: str) -> None:
+    get_package_manager(group).create_repo_file(group, repo_data, repo_file)
 
 
 def clean(group: NodeGroup) -> RunnersGroupResult:
@@ -544,6 +584,10 @@ def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]]
 def no_changes_found(group: NodeGroup, action: str, result: RunnersResult) -> bool:
     pkg_mgr = get_package_manager(group)
     return pkg_mgr.no_changes_found(action, result)
+
+
+def search_package(group: DeferredGroup, package: str) -> Token:
+    return get_package_manager(group).search(group, package)
 
 
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
@@ -647,15 +691,3 @@ def get_package_name(os_family: str, package: str) -> str:
             package_name = package.split("=")[0]
 
     return package_name
-
-
-def search_package(group: DeferredGroup, package: str) -> Token:
-    return get_package_manager(group).search(group, package)
-
-
-def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], dict, str], repo_file: str) -> None:
-    get_package_manager(group).create_repo_file(group, repo_data, repo_file)
-
-
-def get_repo_filename(group: AbstractGroup[RunResult]) -> str:
-    return get_package_manager(group).get_repo_file_name()

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
 from kubemarine.core.executor import RunnersResult, Token
@@ -36,7 +36,7 @@ def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
                       "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
-def add_repo(group: NodeGroup, repo_data: Union[List[str], str]) -> RunnersGroupResult:
+def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
     create_repo_file(group, repo_data, get_repo_file_name())
     return group.sudo(DEBIAN_HEADERS + 'apt clean && sudo apt update')
 
@@ -45,10 +45,14 @@ def get_repo_file_name() -> str:
     return '/etc/apt/sources.list.d/predefined.list'
 
 
-def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], str], repo_file: str) -> None:
+def create_repo_file(group: AbstractGroup[RunResult],
+                     repo_data: Union[List[str], Dict[str, dict], str],
+                     repo_file: str) -> None:
     # if repo_data is list, then convert it to string using join
     if isinstance(repo_data, list):
         repo_data_str = "\n".join(repo_data) + "\n"
+    elif isinstance(repo_data, dict):
+        raise Exception("Not supported repositories format for apt package manager")
     else:
         repo_data_str = utils.read_external(repo_data)
 
