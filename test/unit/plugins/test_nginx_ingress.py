@@ -181,6 +181,15 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 self.assertEqual(expected_num_resources, webhook_resources,
                                  f"ingress-nginx for {k8s_version} should have {expected_num_resources} webhook resources")
 
+    def test_service_ipv6(self):
+        inventory = self.inventory(self.k8s_latest)
+        inventory['nodes'][0]['internal_address'] = '2001::1'
+        cluster = demo.new_cluster(inventory)
+        manifest = self.enrich_yaml(cluster)
+        data = self.get_obj(manifest, "Service_ingress-nginx-controller")
+        self.assertEqual(['IPv6'], data['spec']['ipFamilies'],
+                        f"ingress-nginx enrichment error for IPv6 family")
+
     def test_v1_2_x_controller_container_difference(self):
         for k8s_version, presence_checker in (
             (self.k8s_1_24_x, self.assertFalse),
