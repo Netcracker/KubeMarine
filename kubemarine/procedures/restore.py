@@ -28,6 +28,7 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
+from kubemarine.core.executor import RemoteExecutor
 
 
 def missing_or_empty(file):
@@ -143,9 +144,15 @@ def import_nodes(cluster):
         cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
 
     cluster.log.debug('Unpacking backup...')
-    result = cluster.nodes['all'].sudo(
-        'chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf')
-    cluster.log.debug(result)
+
+    with RemoteExecutor(cluster) as exe:
+        for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
+            cmd = f"readlink /etc/resolv.conf ;" \
+                  f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf; else sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; fi "
+            node['connection'].sudo(cmd)
+
+    result = exe.get_last_results_str()
+    cluster.log.debug('%s',result)
 
 
 def import_etcd(cluster: KubernetesCluster):
