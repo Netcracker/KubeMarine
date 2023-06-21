@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import io
+import os
+import tempfile
 import unittest
 
 from concurrent.futures import TimeoutError
@@ -142,6 +144,27 @@ class RemoteExecutorTest(unittest.TestCase):
         with self.assertRaises(GroupException), \
                 self.cluster.nodes["all"].executor() as exe:
             exe.group.run("sleep 1000", warn=True)
+
+    def test_write_large_stream(self):
+        self.cluster.fake_fs.emulate_latency = True
+        with self.cluster.nodes["all"].executor() as exe:
+            exe.group.put(io.StringIO('a' * 100000), '/fake/path')
+
+        for host in self.cluster.nodes["all"].get_hosts():
+            self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
+
+    def test_write_large_file(self):
+        self.cluster.fake_fs.emulate_latency = True
+        with tempfile.TemporaryDirectory() as tempdir:
+            file = os.path.join(tempdir, 'file.txt')
+            with open(file, 'w') as f:
+                f.write('a' * 100000)
+
+            with self.cluster.nodes["all"].executor() as exe:
+                exe.group.put(file, '/fake/path')
+
+            for host in self.cluster.nodes["all"].get_hosts():
+                self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
 
 
 if __name__ == '__main__':

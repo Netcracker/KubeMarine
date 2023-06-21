@@ -15,6 +15,8 @@
 
 
 import io
+import os.path
+import tempfile
 import unittest
 
 from kubemarine import demo, system
@@ -76,20 +78,22 @@ class TestFakeFS(unittest.TestCase):
     def setUp(self):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
-    def test_put_string(self):
-        self.cluster.fake_fs.reset()
+    def test_put_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            file = os.path.join(tempdir, 'file.txt')
+            with open(file, 'w') as f:
+                f.write('hello\nworld')
+            with open(file, 'rb') as f:
+                expected_data = f.read().decode('utf-8')
 
-        expected_data = 'hello\nworld'
-        node_hostname = self.cluster.nodes['master'].get_hosts()[0]
+            node_hostname = self.cluster.nodes['master'].get_hosts()[0]
 
-        self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', expected_data)
-        actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
+            self.cluster.fake_fs.write(node_hostname, '/tmp/test/file.txt', file)
+            actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
 
-        self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal")
+            self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal")
 
     def test_put_bytesio(self):
-        self.cluster.fake_fs.reset()
-
         expected_data = io.BytesIO(b'hello\nworld')
         node_hostname = self.cluster.nodes['master'].get_hosts()[0]
 
@@ -99,21 +103,9 @@ class TestFakeFS(unittest.TestCase):
         self.assertEqual(expected_data.getvalue(), actual_data, msg="Written and read data are not equal")
 
     def test_get_nonexistent(self):
-        self.cluster.fake_fs.reset()
-
         node_hostname = self.cluster.nodes['master'].get_hosts()[0]
         actual_data = self.cluster.fake_fs.read(node_hostname, '/tmp/test/file.txt')
         self.assertIsNone(actual_data, msg="Reading did not return None in response")
-
-    def test_write_file_to_cluster(self):
-        self.cluster.fake_fs.reset()
-
-        expected_data = 'hello\nworld'
-        self.cluster.nodes['master'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
-        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['master'].get_hosts(), '/tmp/test/file.txt')
-
-        for host, actual_data in actual_data_group.items():
-            self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal for node %s" % host)
 
 
 if __name__ == '__main__':
