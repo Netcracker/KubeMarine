@@ -641,7 +641,7 @@ def manage_pss(cluster: KubernetesCluster, manage_type: str):
                 control_plane.call(utils.wait_command_successful, command="docker stop "
                                                        "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
                                                        " | awk '{print $1}')")
-            control_planes.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
     # 'install' - enable PSS
     elif manage_type == "install":
         # set labels for predifined plugins namespaces and namespaces defined in procedure config
@@ -715,7 +715,7 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str):
             control_plane.call(utils.wait_command_successful, command="docker stop "
                                                        "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
                                                        " | awk '{print $1}')")
-        control_planes.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+        control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
 
 
 def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: str) -> str:
