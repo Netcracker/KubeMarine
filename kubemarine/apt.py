@@ -134,6 +134,6 @@ def no_changes_found(action: str, result: RunnersResult) -> bool:
 def search(group: DeferredGroup, package: str) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
-    command = DEBIAN_HEADERS + 'apt show %s  || echo "Package is unavailable"' % package
+    command = DEBIAN_HEADERS + 'apt show %s' % package
 
-    return group.sudo(command)
+    return group.sudo(command, warn=True)

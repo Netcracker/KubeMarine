@@ -991,8 +991,8 @@ class DeferredGroup(AbstractGroup[Token]):
 
 
 class RemoteExecutor(RawExecutor):
-    def __init__(self, group: NodeGroup, ignore_failed: bool = False, timeout: int = None) -> None:
-        super().__init__(group.cluster.log, group.cluster.connection_pool, ignore_failed, timeout)
+    def __init__(self, group: NodeGroup, timeout: int = None) -> None:
+        super().__init__(group.cluster.log, group.cluster.connection_pool, timeout)
         self.group: DeferredGroup = group._make_defer(self)
         self.cluster = group.cluster
 

@@ -79,13 +79,9 @@ _T = TypeVar('_T', bound='RawExecutor')
 class RawExecutor:
 
     def __init__(self, logger: log.EnhancedLogger, connection_pool: ConnectionPool,
-                 ignore_failed: bool = False,
                  timeout: int = None) -> None:
         self.logger = logger
         self.connection_pool = connection_pool
-        # TODO support ignore_failed option.
-        #  Probably it should be chosen automatically depending on warn=? of commands kwargs (not of the same executor option).
-        self.ignore_failed = False
         self.timeout = timeout
         self._connections_queue: Dict[str, List[_PayloadItem]] = {}
         self._last_token = -1
@@ -159,19 +155,17 @@ class RawExecutor:
         # TODO: In long term run, collect callbacks and wait for them
         return reparsed_results
 
-    def _merge_actions(self, payload_items: List[_PayloadItem]) -> List[_MergedPayload]:
-        if self.ignore_failed:
-            # todo exit codes in separators do not work, because 'echo _command_separator' always rewrites exit code to 0
+    def _get_separator(self, warn: bool) -> str:
+        if warn:
             separator_symbol = ";"
         else:
             separator_symbol = "&&"
 
-        separator = f" {separator_symbol} " \
-                    f"echo \"{self._command_separator}\" {separator_symbol} " \
-                    f"echo $? {separator_symbol} " \
-                    f"echo \"{self._command_separator}\" {separator_symbol} " \
-                    f"echo \"{self._command_separator}\" 1>&2 {separator_symbol} "
+        return f" {separator_symbol} " \
+               f"printf \"%s\\n$?\\n%s\\n\" \"{self._command_separator}\" \"{self._command_separator}\" {separator_symbol} " \
+               f"echo \"{self._command_separator}\" 1>&2 {separator_symbol} "
 
+    def _merge_actions(self, payload_items: List[_PayloadItem]) -> List[_MergedPayload]:
         merged_payloads: List[_MergedPayload] = []
 
         for payload in payload_items:
@@ -190,6 +184,8 @@ class RawExecutor:
             precommand = ''
             if do_type == 'sudo':
                 precommand = 'sudo '
+
+            separator = self._get_separator(kwargs.get('warn', False))
 
             merged_action_command: str = previous_action[1][0] + separator + precommand + action[1][0]
             merged_action: _Action = (do_type, (merged_action_command,), kwargs)

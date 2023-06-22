@@ -596,9 +596,6 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
 
-    # This is WA for RemoteExecutor, since any package failed others are not checked
-    # TODO: get rid of this WA and use warn=True in sudo
-    cmd += ' || true'
     return cmd
 
 
@@ -619,7 +616,7 @@ def _detect_installed_package_version(group: DeferredGroup, package: str) -> Tok
     package_name = get_package_name(os_family, package)
 
     cmd = get_detect_package_version_cmd(os_family, package_name)
-    return group.sudo(cmd)
+    return group.sudo(cmd, warn=True)
 
 
 def _parse_node_detected_package(result: RunnersResult, package: str) -> str:

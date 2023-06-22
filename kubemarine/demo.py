@@ -241,9 +241,7 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
         command_sep = r'[=\-_]{32}'
         sep_symbol = r'\&\&|;'
         final_sep = rf" ({sep_symbol}) " \
-                    rf"echo \"({command_sep})\" \1 " \
-                    rf"echo \$\? \1 " \
-                    rf"echo \"\2\" \1 " \
+                    rf"printf \"%s\\n\$\?\\n%s\\n\" \"({command_sep})\" \"\2\" \1 " \
                     rf"echo \"\2\" 1>\&2 \1 (sudo )?"
 
         self.separator_ptrn = re.compile(final_sep)
@@ -297,12 +295,9 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                 stdout += found_result.stdout
                 stderr += found_result.stderr
                 prev_exited = found_result.exited
-                if prev_exited != 0:
-                    if sep_symbol == ';':
-                        prev_exited = 0  # todo bug of RemoteExecutor
-                    else:
-                        # stop fake execution
-                        break
+                if prev_exited != 0 and sep_symbol != ';':
+                    # stop fake execution
+                    break
 
             final_res = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=prev_exited, connection=self)
             if prev_exited == 0 or kwargs.get('warn', False):

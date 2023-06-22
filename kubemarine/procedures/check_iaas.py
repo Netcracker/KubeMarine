@@ -480,9 +480,10 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                         continue
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     for repo_url in repository_urls:
-                        node.run('%s %s %s %s || echo "Package repository is unavailable"'
+                        node.run('%s %s %s %s'
                                  % (python_executable, random_temp_path, repo_url,
-                                    cluster.inventory['globals']['timeout_download']))
+                                    cluster.inventory['globals']['timeout_download']),
+                                 warn=True)
 
             results = exe.get_last_results()
             for host, url_results in results.items():
@@ -497,7 +498,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                     problem_handler = broken
                 for i, result in enumerate(url_results.values()):
                     result = cast(RunnersResult, result)
-                    if "Package repository is unavailable" in result.stdout:
+                    if result.failed:
                         problem_handler.append(f"{host}, {repository_urls[i]}: {result.stderr}")
 
         # Remove file
@@ -541,7 +542,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
             packages_to_check = hosts_to_packages[host]
             for i, result in enumerate(results.values()):
                 result = cast(RunnersResult, result)
-                if "Package is unavailable" in result.stdout:
+                if result.failed:
                     problem_handler.append(f"Package {packages_to_check[i]} is unavailable for node {host}")
 
         if broken:
