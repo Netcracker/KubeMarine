@@ -67,7 +67,6 @@ def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finaliz
                 # new node already presented in final inventory - ok, just remove label
                 if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
                     inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
-                    cluster.inventory['nodes'][i]['roles'].remove('add_node')
                 new_node_found = True
                 break
 
