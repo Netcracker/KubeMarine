@@ -301,13 +301,14 @@ class KubernetesCluster(Environment):
 
     def make_finalized_inventory(self) -> dict:
         from kubemarine.core import defaults
-        from kubemarine.procedures import remove_node
+        from kubemarine.procedures import add_node, remove_node
         from kubemarine import admission, controlplane, cri, packages
 
         cluster_finalized_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
             packages.cache_package_versions,
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
+            add_node.add_node_finalize_inventory,
             remove_node.remove_node_finalize_inventory,
             admission.update_finalized_inventory,
             defaults.escape_jinja_characters_for_inventory,
