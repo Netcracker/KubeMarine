@@ -1665,6 +1665,9 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 
 There might be a situation when you have to change the pod network used in a cluster. The default `podSubnet` (`10.128.0.0/14` for IPv4 and `fd02::/48` for IPv6) may be inappropriate for some reason.
 
+**Note**: Before proceeding, choose networks for `podSubnet` and `serviceSubnet` carefully, especially in case of IPv6 environments.
+For example, it is not recommended to use networks from deprecated Site-Local scoped address prefix (fec0::/10). It is better to use the Unique Local Unicast range (fc00::/7).
+
 If you are going to deploy a cluster from scratch, you can set custom `podSubnet` in the cluster.yaml:
 ```yaml
 services:
