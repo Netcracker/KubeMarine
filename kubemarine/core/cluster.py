@@ -101,20 +101,22 @@ class KubernetesCluster(Environment):
         ips = self.get_addresses_from_node_names(node_names)
         return self.make_group(ips)
 
+    def make_group_from_roles(self, roles: Iterable[str]) -> NodeGroup:
+        group = self.make_group([])
+        for role in roles:
+            if role not in self.nodes:
+                self.log.verbose(f'Group {role!r} is requested for usage, but this group does not exist.')
+                continue
+
+            group = group.include_group(self.nodes[role])
+
+        return group
+
     def create_group_from_groups_nodes_names(self, groups_names: List[str], nodes_names: List[str]) -> NodeGroup:
-        common_group = self.make_group([])
+        common_group = self.make_group_from_roles(groups_names)
 
         if nodes_names:
-            common_group = self.make_group_from_nodes(nodes_names)
-
-        if groups_names:
-            for group in groups_names:
-
-                if group not in self.roles:
-                    self.log.verbose('Group \'%s\' is requested for usage, but this group is not exists.' % group)
-                    continue
-
-                common_group = common_group.include_group(self.nodes[group])
+            common_group = common_group.include_group(self.make_group_from_nodes(nodes_names))
 
         return common_group
 

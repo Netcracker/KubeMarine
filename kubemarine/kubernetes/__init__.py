@@ -324,7 +324,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         log.debug("Making systemd unit...")
         for node in exe.group.get_ordered_members_list():
             node.sudo('rm -rf /etc/systemd/system/kubelet*')
@@ -364,7 +364,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
     log = cluster.log
     node_config = node.get_config()
     node_name = node.get_node_name()
-    defer = node.defer()
+    defer = node.new_defer()
 
     join_config: dict = {
         'apiVersion': cluster.inventory["services"]["kubeadm"]['apiVersion'],
@@ -432,11 +432,11 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
         log.debug("Patching apiServer bind-address for control-plane %s" % node_name)
 
-        with node.executor():
-            defer.sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
-                       "/etc/kubernetes/manifests/kube-apiserver.yaml" % node_config['internal_address'])
-            defer.sudo("systemctl restart kubelet")
-            copy_admin_config(log, defer)
+        defer.sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
+                   "/etc/kubernetes/manifests/kube-apiserver.yaml" % node_config['internal_address'])
+        defer.sudo("systemctl restart kubelet")
+        copy_admin_config(log, defer)
+        defer.flush()
     else:
         node.sudo(
             "kubeadm join "
@@ -444,9 +444,9 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
             " --v=5",
             hide=False)
-        with node.executor():
-            defer.sudo("systemctl restart kubelet")
-            copy_admin_config(log, defer)
+        defer.sudo("systemctl restart kubelet")
+        copy_admin_config(log, defer)
+        defer.flush()
 
     wait_for_any_pods(cluster, node, apply_filter=node_name)
 
@@ -734,7 +734,7 @@ def apply_labels(group: NodeGroup) -> RunnersGroupResult:
     # TODO: Add "--overwrite-labels" switch
     # TODO: Add labels validation after applying
     control_plane = cluster.nodes["control-plane"].get_first_member()
-    with control_plane.executor() as exe:
+    with control_plane.new_executor() as exe:
         for node in group.get_ordered_members_configs_list():
             if "labels" not in node:
                 log.verbose("No additional labels found for %s" % node['name'])
@@ -755,7 +755,7 @@ def apply_taints(group: NodeGroup) -> RunnersGroupResult:
 
     log.debug("Applying additional taints for nodes")
     control_plane = cluster.nodes["control-plane"].get_first_member()
-    with control_plane.executor() as exe:
+    with control_plane.new_executor() as exe:
         for node in group.get_ordered_members_configs_list():
             if "taints" not in node:
                 log.verbose("No additional taints found for %s" % node['name'])
@@ -1253,7 +1253,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
 
     log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (nodes_amount, group_size, groups_amount))
     tokens = []
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         nodes = exe.group.get_ordered_members_list()
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)

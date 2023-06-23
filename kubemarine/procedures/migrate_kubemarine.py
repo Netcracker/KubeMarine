@@ -190,7 +190,7 @@ class BalancerUpgradeAction(Action):
             return
 
         role = 'balancer' if self.package_name == 'haproxy' else 'keepalived'
-        group = cluster.create_group_from_groups_nodes_names([role], [])
+        group = cluster.make_group_from_roles([role])
         if group.is_empty():
             logger.info(f"No nodes to install {self.package_name!r}.")
             return

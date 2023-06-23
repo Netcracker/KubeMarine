@@ -136,7 +136,7 @@ def restore_thirdparties(cluster: KubernetesCluster):
 
 
 def import_nodes(cluster: KubernetesCluster):
-    with cluster.nodes['all'].executor() as exe:
+    with cluster.nodes['all'].new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
             cluster.log.debug('Uploading backup for \'%s\'' % node_name)

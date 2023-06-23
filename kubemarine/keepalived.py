@@ -193,7 +193,7 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
 def restart(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
@@ -204,7 +204,7 @@ def restart(group: NodeGroup) -> None:
 
 
 def enable(group: NodeGroup) -> None:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
@@ -212,7 +212,7 @@ def enable(group: NodeGroup) -> None:
 
 
 def disable(group: NodeGroup) -> None:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'keepalived', 'service_name')
@@ -259,7 +259,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
             log.debug("Configuring keepalived on '%s'..." % node_name)

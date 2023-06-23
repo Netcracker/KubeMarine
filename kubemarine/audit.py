@@ -68,7 +68,7 @@ def install(group: NodeGroup) -> Optional[RunnersGroupResult]:
     else:
         log.debug(f'Auditd package is not installed on {not_installed_hosts}, installing...')
 
-    with cluster.make_group(not_installed_hosts).executor() as exe:
+    with cluster.make_group(not_installed_hosts).new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             package_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'package_name')
             packages.install(node, include=package_name)
@@ -93,7 +93,7 @@ def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(cluster, rules_content, 'audit.rules')
 
     restart_tokens = []
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             host = node.get_host()
 

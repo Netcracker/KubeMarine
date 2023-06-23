@@ -22,10 +22,9 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
-from types import FunctionType, TracebackType
+from types import FunctionType
 from typing import (
-    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set,
-    Type, cast
+    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast
 )
 
 import invoke
@@ -33,7 +32,7 @@ from invoke import UnexpectedExit
 
 from kubemarine.core import utils, log
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, TokenizedResult
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult
 )
 
 NodeConfig = Dict[str, Any]
@@ -291,7 +290,7 @@ class RunnersGroupResult(GenericGroupResult[RunnersResult]):
 
 class GroupException(Exception):
     def __init__(self, result: GenericGroupResult[GenericResult]):
-        self.result: GenericGroupResult[GenericResult] = result
+        self.result = result
 
 
 RunResult = Union[RunnersGroupResult, Token]
@@ -314,17 +313,9 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             else:
                 raise Exception('Unsupported connection object type')
 
-    def make_group(self: GROUP_SELF, ips: Iterable[Union[str, GROUP_SELF]]) -> GROUP_SELF:
-        return self.__class__(ips, self.cluster)
-
-    def defer(self) -> DeferredGroup:
-        return DeferredGroup(self.nodes, self.cluster)
-
-    def eager(self) -> NodeGroup:
-        return NodeGroup(self.nodes, self.cluster)
-
-    def executor(self) -> RemoteExecutor:
-        return RemoteExecutor(self)
+    @abstractmethod
+    def _make_group(self: GROUP_SELF, ips: Iterable[Union[str, GROUP_SELF]]) -> GROUP_SELF:
+        pass
 
     def __eq__(self, other: object) -> bool:
         if self is other:
@@ -389,7 +380,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
                                      % (local_file, remote_file, list(self.nodes)))
 
             self.cluster.log.verbose('File size: %s' % os.path.getsize(local_file))
-            eager_group = self.eager()
+            eager_group = self.cluster.make_group(self.nodes)
             local_file_hash = eager_group.get_local_file_sha1(local_file)
             self.cluster.log.verbose('Local file hash: %s' % local_file_hash)
             remote_file_hashes = eager_group.get_remote_file_sha1(remote_file)
@@ -406,7 +397,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
                 return
 
             local_stream = local_file
-            group_to_upload = self.make_group(hosts_to_upload)
+            group_to_upload = self._make_group(hosts_to_upload)
 
         group_to_upload._put_with_mv(local_stream, remote_file,
                                      backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
@@ -526,21 +517,21 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def get_online_nodes(self: GROUP_SELF, online: bool) -> GROUP_SELF:
         online_hosts = [host for host, node_context in self.cluster.context['nodes'].items()
                         if node_context['access']['online'] == online]
-        return self.make_group(online_hosts).intersection_group(self)
+        return self._make_group(online_hosts).intersection_group(self)
 
     def get_accessible_nodes(self: GROUP_SELF) -> GROUP_SELF:
         accessible = [host for host, node_context in self.cluster.context['nodes'].items()
                       if node_context['access']['accessible']]
-        return self.make_group(accessible).intersection_group(self)
+        return self._make_group(accessible).intersection_group(self)
 
     def get_sudo_nodes(self: GROUP_SELF) -> GROUP_SELF:
         sudo = [host for host, node_context in self.cluster.context['nodes'].items()
                 if node_context['access']['sudo'] != "No"]
-        return self.make_group(sudo).intersection_group(self)
+        return self._make_group(sudo).intersection_group(self)
 
     def get_ordered_members_list(self: GROUP_SELF, apply_filter: GroupFilter = None) -> List[GROUP_SELF]:
         nodes = self.get_ordered_members_configs_list(apply_filter)
-        return [self.make_group([node['connect_to']]) for node in nodes]
+        return [self._make_group([node['connect_to']]) for node in nodes]
 
     def get_ordered_members_configs_list(self, apply_filter: GroupFilter = None) -> List[NodeConfig]:
 
@@ -595,28 +586,19 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         return self.get_first_member({"name": name})
 
     def new_group(self: GROUP_SELF, apply_filter: GroupFilter = None) -> GROUP_SELF:
-        return self.make_group(self.get_ordered_members_list(apply_filter))
+        return self._make_group(self.get_ordered_members_list(apply_filter))
 
-    def include_group(self: GROUP_SELF, group: Optional[GROUP_SELF]) -> GROUP_SELF:
-        if group is None:
-            return self
-
+    def include_group(self: GROUP_SELF, group: GROUP_SELF) -> GROUP_SELF:
         ips = self.nodes.union(group.nodes)
-        return self.make_group(ips)
+        return self._make_group(ips)
 
-    def exclude_group(self: GROUP_SELF, group: Optional[GROUP_SELF]) -> GROUP_SELF:
-        if group is None:
-            return self
-
+    def exclude_group(self: GROUP_SELF, group: GROUP_SELF) -> GROUP_SELF:
         ips = self.nodes - group.nodes
-        return self.make_group(ips)
+        return self._make_group(ips)
 
-    def intersection_group(self: GROUP_SELF, group: Optional[GROUP_SELF]) -> GROUP_SELF:
-        if group is None:
-            return self.make_group([])
-
+    def intersection_group(self: GROUP_SELF, group: GROUP_SELF) -> GROUP_SELF:
         ips = self.nodes.intersection(group.nodes)
-        return self.make_group(ips)
+        return self._make_group(ips)
 
     def get_nodes_names(self) -> List[str]:
         result = []
@@ -712,10 +694,22 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             node_os_family = self.cluster.get_os_family_for_node(host)
             if node_os_family == os_family:
                 hosts.append(host)
-        return self.make_group(hosts)
+        return self._make_group(hosts)
 
 
 class NodeGroup(AbstractGroup[RunnersGroupResult]):
+    def _make_group(self: NodeGroup, ips: Iterable[Union[str, NodeGroup]]) -> NodeGroup:
+        return NodeGroup(ips, self.cluster)
+
+    def _make_defer(self, executor: RemoteExecutor) -> DeferredGroup:
+        return DeferredGroup(self.nodes, self.cluster, executor)
+
+    def new_defer(self) -> DeferredGroup:
+        return self.new_executor().group
+
+    def new_executor(self) -> RemoteExecutor:
+        return RemoteExecutor(self)
+
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_with_wa("get", remote_file, local_file)
 
@@ -792,7 +786,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
                 return False
 
         # if there are not booted nodes, but we succeeded to wait for at least one is booted, we can continue execution
-        if not_booted and self.make_group(not_booted).wait_and_get_active_nodes().is_empty():
+        if not_booted and self._make_group(not_booted).wait_and_get_active_nodes().is_empty():
             return False
 
         return True
@@ -821,7 +815,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_and_get_active_nodes(self, timeout: int = None) -> NodeGroup:
         results = self._await_rebooted_nodes(timeout)
         not_booted = [host for host, result in results.items() if isinstance(result, Exception)]
-        return self.exclude_group(self.make_group(not_booted))
+        return self.exclude_group(self._make_group(not_booted))
 
     def _await_rebooted_nodes(self, timeout: int = None, initial_boot_history: RunnersGroupResult = None) \
             -> HostToResult:
@@ -949,6 +943,20 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
 
 class DeferredGroup(AbstractGroup[Token]):
+    def __init__(self, ips: Iterable[Union[str, DeferredGroup]], cluster: object, executor: RemoteExecutor):
+        super().__init__(ips, cluster)
+        self._executor = executor
+
+    @property
+    def executor(self) -> RemoteExecutor:
+        return self._executor
+
+    def flush(self) -> None:
+        self._executor.flush()
+
+    def _make_group(self, ips: Iterable[Union[str, DeferredGroup]]) -> DeferredGroup:
+        return DeferredGroup(ips, self.cluster, self._executor)
+
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_queue("get", remote_file, local_file)
 
@@ -963,34 +971,35 @@ class DeferredGroup(AbstractGroup[Token]):
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: object) -> Token:
         kwargs = self._default_connection_kwargs(do_type, kwargs)
-        executor = get_active_executor()
-        return executor.queue(self.nodes, (do_type, args, kwargs))
+        return self._executor.queue(self.nodes, (do_type, args, kwargs))
+
+    def include_group(self: DeferredGroup, group: DeferredGroup) -> DeferredGroup:
+        self._check_same_bound_executor(group)
+        return AbstractGroup.include_group(self, group)
+
+    def exclude_group(self, group: DeferredGroup) -> DeferredGroup:
+        self._check_same_bound_executor(group)
+        return AbstractGroup.exclude_group(self, group)
+
+    def intersection_group(self, group: DeferredGroup) -> DeferredGroup:
+        self._check_same_bound_executor(group)
+        return AbstractGroup.intersection_group(self, group)
+
+    def _check_same_bound_executor(self, group: DeferredGroup) -> None:
+        if self._executor is not group._executor:
+            raise ValueError("Trying to apply set operation on deferred groups bound to different executors")
 
 
 class RemoteExecutor(RawExecutor):
-    def __init__(self, group: AbstractGroup[RunResult],
-                 ignore_failed: bool = False, timeout: int = None) -> None:
-        self.group = group.defer()
+    def __init__(self, group: NodeGroup, ignore_failed: bool = False, timeout: int = None) -> None:
+        super().__init__(group.cluster.log, group.cluster.connection_pool, ignore_failed, timeout)
+        self.group: DeferredGroup = group._make_defer(self)
         self.cluster = group.cluster
-        super().__init__(self.cluster.log, self.cluster.connection_pool,
-                         ignore_failed, timeout)
 
-    def __enter__(self) -> RemoteExecutor:
-        _GRE_STACK.append(self)
-        return self
-
-    def __exit__(self, exc_type: Optional[Type[Exception]], exc_value: Optional[Exception],
-                 tb: Optional[TracebackType]) -> None:
-        if not (self is get_active_executor()):
-            raise Exception("Unexpected condition: leaving executor is not active")
-        _GRE_STACK.pop()
-        if self._connections_queue:
-            self.flush()
-
-    def flush(self) -> Dict[str, TokenizedResult]:
+    def flush(self) -> None:
         """
         Flushes the connections' queue.
-        Returns grouped result, or throws GroupException in case of any failure.
+        Throws GroupException in case of any failure.
 
         :return: grouped tokenized results per connection.
         """
@@ -1001,7 +1010,6 @@ class RemoteExecutor(RawExecutor):
         # For queued flushes, exception handling with W/A is currently not supported.
         # TODO: Merge results/exceptions handling with kubemarine.core.group.NodeGroup._do_with_wa to avoid code dup
         self.group.make_result_or_fail(self.merge_last_results())
-        return self._last_results
 
     def get_merged_runners_result(self, filter_tokens: Optional[List[int]] = None) -> RunnersGroupResult:
         """
@@ -1022,13 +1030,3 @@ class RemoteExecutor(RawExecutor):
         """
         host_results = self.merge_last_results(filter_tokens=filter_tokens)
         return self.group.make_runners_result(host_results)
-
-
-_GRE_STACK: List[RemoteExecutor] = []
-
-
-def get_active_executor() -> RemoteExecutor:
-    if not _GRE_STACK:
-        raise Exception("Trying to access last active executor out of any executor context")
-
-    return _GRE_STACK[-1]

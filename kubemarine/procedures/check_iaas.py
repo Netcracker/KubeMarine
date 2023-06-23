@@ -397,7 +397,7 @@ def check_package_repositories(cluster: KubernetesCluster):
         group = cluster.make_group(hosts)
         random_repos_conf_path = "/tmp/%s.repo" % uuid.uuid4().hex
         tokens = []
-        with group.executor() as exe:
+        with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 # Create temp repos file
                 packages.create_repo_file(node, repositories, random_repos_conf_path)
@@ -470,7 +470,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         all_group.put(io.StringIO(check_script), random_temp_path)
 
         if repository_urls:
-            with all_group.executor() as exe:
+            with all_group.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
                     # Check with script
@@ -518,7 +518,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
         warnings: List[str] = []
         group = cluster.nodes['all']
         hosts_to_packages = packages.get_all_managed_packages_for_group(group, cluster.inventory)
-        with group.executor() as exe:
+        with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 packages_to_check = list(set(hosts_to_packages[host]))
@@ -638,7 +638,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
             host_to_ip[host] = random_host
             i = i + 1
 
-        with cluster.make_group(nodes).executor() as exe:
+        with cluster.make_group(nodes).new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
@@ -654,7 +654,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
                 del nodes[host]
 
         try:
-            with cluster.make_group(nodes).executor() as exe:
+            with cluster.make_group(nodes).new_executor() as exe:
                 # Create alias from the node network interface for the subnet on every node
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
@@ -668,7 +668,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
         yield host_to_ip
     finally:
         # Remove the created aliases from network interfaces
-        with nodes_to_rollback.executor() as exe:
+        with nodes_to_rollback.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 node.sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
@@ -821,7 +821,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
     nodes_to_rollback = cluster.make_group([])
     try:
         try:
-            with cluster.make_group(nodes).executor() as exe:
+            with cluster.make_group(nodes).new_executor() as exe:
                 # Run process that LISTEN TCP port
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
@@ -851,7 +851,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
         yield
 
     finally:
-        with nodes_to_rollback.executor() as exe:
+        with nodes_to_rollback.new_executor() as exe:
             # Kill the created during the test processes
             for node in exe.group.get_ordered_members_list():
                 tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))

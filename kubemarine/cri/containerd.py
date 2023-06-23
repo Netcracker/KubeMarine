@@ -26,7 +26,7 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
 
@@ -103,7 +103,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
     tokens = []
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
             log.debug("Uploading containerd configuration to %s node..." % node.get_node_name())

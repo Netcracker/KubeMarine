@@ -15,7 +15,8 @@
 
 
 from collections import OrderedDict
-from typing import Callable, List, Dict
+from types import FunctionType
+from typing import Callable, List, Dict, cast
 
 import yaml
 import os
@@ -27,7 +28,7 @@ from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils, summary
-from kubemarine.core.group import NodeGroup, GroupException, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.resources import DynamicResources
 
 
@@ -53,14 +54,13 @@ def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GRO
     def roles_wrapper(fn: DECORATED_GROUP_CALLABLE) -> TASK_CALLABLE:
         def cluster_wrapper(cluster: KubernetesCluster) -> None:
             candidate_group = cluster.nodes['all'].get_new_nodes_or_self()
-            group = cluster.make_group([])
-            for role in roles:
-                group = group.include_group(cluster.nodes.get(role))
+            group = cluster.make_group_from_roles(roles)
             group = group.intersection_group(candidate_group)
             if not group.is_empty():
                 fn(group)
             else:
-                fn_name = fn.__module__ + '.' + fn.__qualname__
+                func = cast(FunctionType, fn)
+                fn_name = func.__module__ + '.' + func.__qualname__
                 cluster.log.debug(f"Skip running {fn_name} as no new node with roles {roles} has been found.")
 
         return cluster_wrapper
@@ -254,7 +254,7 @@ def system_prepare_policy(group: NodeGroup):
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_dns_hostname(group: NodeGroup):
     cluster: KubernetesCluster = group.cluster
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             cluster.log.debug("Changing hostname '%s' = '%s'" % (node.get_host(), node.get_node_name()))
             node.sudo("hostnamectl set-hostname %s" % node.get_node_name())
@@ -310,7 +310,7 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
 def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
 
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             pkgs: List[str] = []
             for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
@@ -417,14 +417,14 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster):
         if cluster.context['initial_procedure'] != 'remove_node':
             group = cluster.nodes['balancer'].get_new_nodes_or_self()
 
-        if not cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_changed_nodes().is_empty():
+        if not cluster.make_group_from_roles(['control-plane', 'worker']).get_changed_nodes().is_empty():
             group = cluster.nodes['balancer'].get_final_nodes()
 
     if group is None or group.is_empty():
         cluster.log.debug('Skipped - no balancers to perform')
         return
 
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         exe.group.call_batch([
             haproxy.configure,
             haproxy.override_haproxy18,

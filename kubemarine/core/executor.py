@@ -15,7 +15,8 @@ import collections
 import concurrent
 import io
 import random
-from typing import Tuple, List, Dict, Callable, Any, Optional, Union, Collection, OrderedDict, Set
+from types import TracebackType
+from typing import Tuple, List, Dict, Callable, Any, Optional, Union, Collection, OrderedDict, Set, TypeVar, Type
 
 import fabric  # type: ignore[import]
 import fabric.transfer  # type: ignore[import]
@@ -72,6 +73,8 @@ _Callback = Optional[Callable]
 _PayloadItem = Tuple[_Action, _Callback, Token]
 _MergedPayload = Tuple[_Action, List[_Callback], List[Token]]
 
+_T = TypeVar('_T', bound='RawExecutor')
+
 
 class RawExecutor:
 
@@ -89,6 +92,22 @@ class RawExecutor:
         self._last_results: Dict[str, TokenizedResult] = {}
         self._command_separator = ''.join(random.choice('=-_') for _ in range(32))
         self._supported_args = {'hide', 'warn', 'timeout', 'watchers', 'env', 'out_stream', 'err_stream'}
+        self._closed = False
+
+    def __enter__(self: _T) -> _T:
+        self._check_closed()
+        return self
+
+    def __exit__(self, exc_type: Optional[Type[Exception]], exc_value: Optional[Exception],
+                 tb: Optional[TracebackType]) -> None:
+        if self._connections_queue:
+            self.flush()
+
+        self._closed = True
+
+    def _check_closed(self) -> None:
+        if self._closed:
+            raise ValueError("Executor is closed")
 
     def _actions_mergeable(self, action1: _Action, action2: _Action) -> bool:
         do_type1, _, kwargs1 = action1
@@ -204,6 +223,7 @@ class RawExecutor:
 
     def queue(self, target: Collection[str], action: _Action, callback: Callable = None) -> int:
         # TODO support callbacks
+        self._check_closed()
         callback = None
         self._last_token = token = self._last_token + 1
 
@@ -264,18 +284,19 @@ class RawExecutor:
 
         return group_results
 
-    def flush(self) -> Dict[str, TokenizedResult]:
+    def flush(self) -> None:
         """
         Flushes the connections' queue and returns grouped result
 
         :return: grouped tokenized results per connection.
         """
+        self._check_closed()
         batch_results: Dict[str, TokenizedResult] = {}
 
         if not self._connections_queue:
             self.logger.verbose('Queue is empty, nothing to perform')
             self._last_results = batch_results
-            return batch_results
+            return
 
         callable_batches: List[Dict[str, _MergedPayload]] = self._get_callables()
 
@@ -315,8 +336,6 @@ class RawExecutor:
 
         self._connections_queue = {}
         self._last_results = batch_results
-
-        return batch_results
 
     def _localize_mutable_args(self, do_type: str, args: tuple) -> tuple:
         if do_type == 'put':
