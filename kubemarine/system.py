@@ -251,7 +251,7 @@ def disable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None, now:
     return group.sudo(cmd)
 
 
-def patch_systemd_service(group: NodeGroup, service_name: str, patch_source: str) -> None:
+def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source: str) -> None:
     group.sudo(f"mkdir -p /etc/systemd/system/{service_name}.service.d")
     group.put(io.StringIO(utils.read_internal(patch_source)),
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
@@ -579,7 +579,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:
     group = cluster.nodes['all'].get_accessible_nodes()
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             detect_interface_by_address(node, node.get_config()['internal_address'])
     results = exe.get_merged_runners_result()

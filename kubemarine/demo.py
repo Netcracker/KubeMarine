@@ -32,7 +32,7 @@ from kubemarine.core import flow, connections
 from kubemarine.core.executor import RunnersResult, GenericResult, Token
 from kubemarine.core.group import (
     AbstractGroup, NodeGroup, NodeGroupResult, DeferredGroup, RunnersGroupResult,
-    GROUP_RUN_TYPE
+    GROUP_RUN_TYPE, RemoteExecutor, RunResult
 )
 from kubemarine.core.resources import DynamicResources
 
@@ -349,18 +349,18 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
 
 class FakeAbstractGroup(AbstractGroup[GROUP_RUN_TYPE], ABC):
-    def defer(self) -> FakeDeferredGroup:
-        return FakeDeferredGroup(self.nodes, self.cluster)
-
-    def eager(self) -> FakeNodeGroup:
-        return FakeNodeGroup(self.nodes, self.cluster)
-
     def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
                      backup=False, sudo=False, mkdir=False, immutable=False):
         super()._put_with_mv(local_stream, remote_file, backup=False, sudo=False, mkdir=False, immutable=False)
 
 
 class FakeNodeGroup(NodeGroup, FakeAbstractGroup[RunnersGroupResult]):
+    def _make_group(self, ips: Iterable[Union[str, NodeGroup]]) -> FakeNodeGroup:
+        return FakeNodeGroup(ips, self.cluster)
+
+    def _make_defer(self, executor: RemoteExecutor) -> FakeDeferredGroup:
+        return FakeDeferredGroup(self.nodes, self.cluster, executor)
+
     def get_local_file_sha1(self, filename: str) -> str:
         return '0'
 
@@ -369,7 +369,8 @@ class FakeNodeGroup(NodeGroup, FakeAbstractGroup[RunnersGroupResult]):
 
 
 class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
-    pass
+    def _make_group(self, ips: Iterable[Union[str, DeferredGroup]]) -> FakeDeferredGroup:
+        return FakeDeferredGroup(ips, self.cluster, self._executor)
 
 
 class FakeConnectionPool(connections.ConnectionPool):
@@ -534,7 +535,7 @@ def create_nodegroup_result_by_hosts(cluster: KubernetesCluster, results: Dict[s
     return NodeGroupResult(cluster, results)
 
 
-def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
+def create_exception_result(group_: AbstractGroup[RunResult], exception: Exception) -> NodeGroupResult:
     hosts_to_result = create_hosts_exception_result(group_.get_hosts(), exception)
     return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
@@ -543,7 +544,7 @@ def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dic
     return {host: exception for host in hosts}
 
 
-def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
+def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout='', stderr='', code=0) -> NodeGroupResult:
     hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code)
     return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 

@@ -30,7 +30,7 @@ from kubemarine.procedures import install
 
 def deploy_kubernetes_join(cluster: KubernetesCluster):
 
-    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes()
+    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_new_nodes()
 
     if group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")

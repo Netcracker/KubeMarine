@@ -136,9 +136,9 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 if isinstance(value, dict):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
-            kubernetes_nodes = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
+            kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
             tokens = []
-            with kubernetes_nodes.executor() as exe:
+            with kubernetes_nodes.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
                     node.put(StringIO(config_string), os_specific_associations['config_location'],

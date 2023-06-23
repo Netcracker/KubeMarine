@@ -515,7 +515,7 @@ class ClusterStorage:
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
         node_group_results = self.cluster.nodes["control-plane"].get_final_nodes().sudo(command)
-        with node_group_results.get_group().executor() as exe:
+        with node_group_results.get_group().new_executor() as exe:
             for control_plane in exe.group.get_ordered_members_list():
                 result = node_group_results[control_plane.get_host()]
                 files = result.stdout.split()

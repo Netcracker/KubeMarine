@@ -385,7 +385,7 @@ def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory
         relevant_group: AbstractGroup[RunResult] = thirdparties.get_group_require_unzip(cluster, inventory)
     else:
         groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
-        relevant_group = cluster.create_group_from_groups_nodes_names(groups, [])
+        relevant_group = cluster.make_group_from_roles(groups)
 
     if association_name in ('docker', 'containerd') \
             and association_name != inventory['services']['cri']['containerRuntime']:
@@ -651,7 +651,7 @@ def detect_installed_packages_version_hosts(
         # deduplicate
         hosts_to_packages_dedup[host] = list(set(packages_list))
 
-    with cluster.make_group(hosts_to_packages).executor() as exe:
+    with cluster.make_group(hosts_to_packages).new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             for package in hosts_to_packages_dedup[node.get_host()]:
                 _detect_installed_package_version(node, package)

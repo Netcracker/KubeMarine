@@ -109,7 +109,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
 
 def get_config_path(group: NodeGroup) -> RunnersGroupResult:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             package_associations = _get_associations_for_node(node)
             cmd = f"systemctl show -p MainPID {package_associations['service_name']} " \
@@ -123,27 +123,32 @@ def get_config_path(group: NodeGroup) -> RunnersGroupResult:
 
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
-    with group.executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            package_associations = _get_associations_for_node(node)
-            node.sudo("%s -v" % package_associations['executable_name'], warn=True)
+    defer = group.new_defer()
+    for node in defer.get_ordered_members_list():
+        package_associations = _get_associations_for_node(node)
+        node.sudo("%s -v" % package_associations['executable_name'], warn=True)
 
-    installation_result = exe.get_merged_runners_result()
+    defer.flush()
+    installation_result = defer.executor.get_merged_runners_result()
 
     if not installation_result.is_any_failed():
         cluster.log.debug("HAProxy already installed, nothing to install")
     else:
-        with group.executor() as exe:
-            for node in exe.group.get_ordered_members_list():
-                package_associations = _get_associations_for_node(node)
-                packages.install(node, include=package_associations['package_name'])
+        for node in defer.get_ordered_members_list():
+            package_associations = _get_associations_for_node(node)
+            packages.install(node, include=package_associations['package_name'])
 
-        installation_result = exe.get_merged_runners_result()
+        defer.flush()
+        installation_result = defer.executor.get_merged_runners_result()
 
-    service_name = package_associations['service_name']
-    patch_path = "./resources/drop_ins/haproxy.conf"
-    group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
-    enable(group)
+    for node in defer.get_ordered_members_list():
+        package_associations = _get_associations_for_node(node)
+        service_name = package_associations['service_name']
+        patch_path = "./resources/drop_ins/haproxy.conf"
+        node.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
+        enable(node)
+
+    defer.flush()
     return installation_result
 
 
@@ -154,7 +159,7 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
 def restart(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting haproxy in all group...")
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.restart_service(node, name=service_name)
@@ -164,17 +169,16 @@ def restart(group: NodeGroup) -> None:
 
 
 def disable(group: NodeGroup) -> None:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
             system.disable_service(node, name=service_name)
 
 
-def enable(group: NodeGroup) -> None:
-    with group.executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            service_name = _get_associations_for_node(node)['service_name']
-            system.enable_service(node, name=service_name, now=True)
+def enable(node: DeferredGroup) -> None:
+    # currently it is invoked only for single node
+    service_name = _get_associations_for_node(node)['service_name']
+    system.enable_service(node, name=service_name, now=True)
 
 
 def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[NodeConfig],

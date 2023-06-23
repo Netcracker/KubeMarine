@@ -59,7 +59,7 @@ def loadbalancer_remove_keepalived(cluster: KubernetesCluster):
 
 
 def remove_kubernetes_nodes(cluster: KubernetesCluster):
-    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_nodes_for_removal()
+    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_for_removal()
 
     if group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")

@@ -22,7 +22,7 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult, DeferredGroup
 
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'docker')
             packages.install(node, include=os_specific_associations['package_name'])
@@ -47,7 +47,7 @@ def enable(group: DeferredGroup) -> None:
 
 
 def disable(group: NodeGroup) -> None:
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = exe.cluster.get_package_association_for_node(
                 node.get_host(), 'docker', 'service_name')
@@ -61,7 +61,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
 
     tokens = []
-    with group.executor() as exe:
+    with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'docker')
             log.debug("Uploading docker configuration to %s node..." % node.get_node_name())

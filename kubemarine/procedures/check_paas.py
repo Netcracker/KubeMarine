@@ -48,11 +48,11 @@ def services_status(cluster: KubernetesCluster, service_type: str):
 
         group = cluster.nodes['all']
         if service_type == 'haproxy':
-            group = cluster.create_group_from_groups_nodes_names(['balancer'], [])
+            group = cluster.make_group_from_roles(['balancer'])
         elif service_type == 'keepalived':
-            group = cluster.create_group_from_groups_nodes_names(['keepalived'], [])
+            group = cluster.make_group_from_roles(['keepalived'])
         elif service_type == 'docker' or service_type == "containerd" or service_type == 'kubelet':
-            group = cluster.create_group_from_groups_nodes_names(['control-plane', 'worker'], [])
+            group = cluster.make_group_from_roles(['control-plane', 'worker'])
 
         if group.is_empty():
             raise TestWarn("No nodes to check service status",
@@ -581,7 +581,7 @@ def nodes_pid_max(cluster: KubernetesCluster):
         control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
-        for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list():
+        for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
             node_name = node.get_node_name()
 
             node_info = control_plane.sudo("kubectl get node %s -o yaml" % node_name).get_simple_out()

@@ -32,7 +32,7 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_get_merged_results_all_success(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("echo \"foo\"")
             exe.flush()
 
@@ -42,7 +42,7 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_flush_all_fail(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("false")
             exception = None
             try:
@@ -55,7 +55,7 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_get_merged_results_all_exited_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("false", warn=True)
             exe.flush()
 
@@ -66,7 +66,7 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_flush_all_excepted(self):
         results = demo.create_exception_result(self.cluster.nodes["all"], TimeoutError())
         self.cluster.fake_shell.add(results, "run", ["sleep 1000"])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("sleep 1000", warn=True)
             exception = None
             try:
@@ -81,7 +81,7 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("echo \"foo\"")
             exe.group.run("echo \"bar\"")
 
@@ -96,7 +96,7 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
         tokens = []
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("echo \"foo\"")
             tokens.append(exe.group.run("echo \"bar\""))
 
@@ -110,7 +110,7 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_shell.add(results, "run", ["false"])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("false")
             exe.group.run("echo \"bar\"")
             exe.group.put(io.StringIO('test'), '/fake/path')
@@ -131,7 +131,7 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_not_throw_on_failed_all_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("false", warn=True)
 
         for result in exe.get_merged_runners_result().values():
@@ -142,12 +142,34 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_exception_result(self.cluster.nodes["all"], TimeoutError())
         self.cluster.fake_shell.add(results, "run", ["sleep 1000"])
         with self.assertRaises(GroupException), \
-                self.cluster.nodes["all"].executor() as exe:
+                self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("sleep 1000", warn=True)
+
+    def test_execute_without_context(self):
+        group = self.cluster.nodes["all"].new_defer()
+        results = demo.create_nodegroup_result(group, stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+
+        group.run("echo \"foo\"")
+        group.flush()
+        for result in group.executor.get_merged_runners_result().values():
+            self.assertEqual("foo\n", result.stdout)
+
+    def test_execute_members_without_context(self):
+        group = self.cluster.nodes["all"].new_defer()
+        results = demo.create_nodegroup_result(group, stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+
+        for node in group.get_ordered_members_list():
+            node.run("echo \"foo\"")
+
+        group.flush()
+        for result in group.executor.get_merged_runners_result().values():
+            self.assertEqual("foo\n", result.stdout)
 
     def test_write_large_stream(self):
         self.cluster.fake_fs.emulate_latency = True
-        with self.cluster.nodes["all"].executor() as exe:
+        with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.put(io.StringIO('a' * 100000), '/fake/path')
 
         for host in self.cluster.nodes["all"].get_hosts():
@@ -160,7 +182,7 @@ class RemoteExecutorTest(unittest.TestCase):
             with open(file, 'w') as f:
                 f.write('a' * 100000)
 
-            with self.cluster.nodes["all"].executor() as exe:
+            with self.cluster.nodes["all"].new_executor() as exe:
                 exe.group.put(file, '/fake/path')
 
             for host in self.cluster.nodes["all"].get_hosts():
