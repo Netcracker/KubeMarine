@@ -148,7 +148,6 @@ def upgrade_containerd(cluster: KubernetesCluster):
                                         is_async=False).get_simple_out()
                 updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"pause:{pause_version}",delemeter=":")
                 node['connection'].put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-                node['connection'].sudo("systemctl restart kubelet")
                 
 
             with RemoteExecutor(cluster) as exe:
@@ -161,6 +160,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
                                            sudo=True, mkdir=True)
                     node['connection'].sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
                                             f"systemctl status {os_specific_associations['service_name']}")
+                    node['connection'].sudo("systemctl restart kubelet")
             return exe.get_last_results_str()
 
 
