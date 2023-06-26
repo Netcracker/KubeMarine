@@ -339,9 +339,6 @@ def manage_mandatory_packages(group: NodeGroup):
 
 def manage_custom_packages(group: NodeGroup):
     cluster = group.cluster
-    if utils.check_dry_run_status_active(group.cluster):
-        cluster.log.verbose("[dry-run] performing manage_custom_packages")
-        return
     batch_tasks = []
     batch_parameters = {}
 
@@ -369,6 +366,10 @@ def manage_custom_packages(group: NodeGroup):
 
     if not batch_tasks:
         cluster.log.debug("Skipped - no packages configuration defined in config file")
+        return
+
+    if utils.check_dry_run_status_active(group.cluster):
+        cluster.log.verbose("[dry-run] Managing Custom Packages...")
         return
 
     try:

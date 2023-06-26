@@ -407,7 +407,7 @@ def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=Tru
     if make_dumps:
         from kubemarine import controlplane
         inventory_for_dump = controlplane.controlplane_finalize_inventory(cluster, prepare_for_dump(inventory))
-        utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
+        # utils.dump_file(cluster, yaml.dump(inventory_for_dump, ), "cluster.yaml")
 
     return inventory
 

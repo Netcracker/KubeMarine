@@ -82,7 +82,7 @@ def install(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
 
     command = get_install_cmd(include, exclude)
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
     # apt fails to install (downgrade) package if it is already present and has higher version,
     # thus we do not need additional checks here (in contrast to yum)
 

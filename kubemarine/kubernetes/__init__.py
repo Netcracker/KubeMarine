@@ -815,7 +815,7 @@ def get_kubeadm_config(inventory):
     return f'{kubeadm_kubelet}---\n{kubeadm}'
 
 
-def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, dry_run=False, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
@@ -826,8 +826,8 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
 
     # put control-plane patches
-    create_kubeadm_patches_for_node(cluster, first_control_plane)
-    
+    create_kubeadm_patches_for_node(cluster, first_control_plane, dry_run=dry_run)
+
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     # and only "else" branch remains
     if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
@@ -839,16 +839,20 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
         flags += " --config /tmp/kubeadm_config.yaml"
 
     drain_cmd = prepare_drain_command(cluster, first_control_plane['name'], **drain_kwargs)
-    first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
+    first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False, dry_run=dry_run)
 
-    upgrade_cri_if_required(first_control_plane['connection'])
+    upgrade_cri_if_required(first_control_plane['connection'], dry_run=dry_run)
 
     # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-    fix_flag_kubelet(cluster, first_control_plane)
+    fix_flag_kubelet(cluster, first_control_plane, dry_run=dry_run)
 
     first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
                                     f"sudo kubectl uncordon {first_control_plane['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+                                    f"sudo systemctl restart kubelet", is_async=False, hide=False, dry_run=dry_run)
+    if dry_run:
+        cluster.log.debug("[dry-run]Nodes have correct Kubernetes version...")
+        cluster.log.debug("[dry-run] Pods are ready!")
+        return
 
     copy_admin_config(cluster.log, first_control_plane['connection'])
 
@@ -857,7 +861,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     exclude_node_from_upgrade_list(first_control_plane['connection'], first_control_plane['name'])
 
 
-def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCluster, dry_run=False, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
@@ -871,15 +875,15 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             cluster.log.debug("Upgrading control-plane \"%s\"" % node['name'])
 
             # put control-plane patches
-            create_kubeadm_patches_for_node(cluster, node)
+            create_kubeadm_patches_for_node(cluster, node, dry_run=dry_run)
 
             drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
-            node['connection'].sudo(drain_cmd, is_async=False, hide=False)
+            node['connection'].sudo(drain_cmd, is_async=False, hide=False, dry_run=dry_run)
 
-            upgrade_cri_if_required(node['connection'])
+            upgrade_cri_if_required(node['connection'], dry_run=dry_run)
 
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-            fix_flag_kubelet(cluster, node)
+            fix_flag_kubelet(cluster, node, dry_run=dry_run)
 
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
             # and only "else" branch remains
@@ -888,19 +892,23 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
                                     f"sudo sed -i 's/--bind-address=.*$/--bind-address={node['internal_address']}/' "
                                     f"/etc/kubernetes/manifests/kube-apiserver.yaml && "
                                     f"sudo kubectl uncordon {node['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+                                    f"sudo systemctl restart kubelet", is_async=False, hide=False, dry_run=dry_run)
             else:
                 node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
                                     f"sudo kubectl uncordon {node['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+                                    f"sudo systemctl restart kubelet", is_async=False, hide=False, dry_run=dry_run)
 
+            if dry_run:
+                cluster.log.debug("[dry-run]Nodes have correct Kubernetes version...")
+                cluster.log.debug("[dry-run] Pods are ready!")
+                continue
             expect_kubernetes_version(cluster, version, apply_filter=node['name'])
             copy_admin_config(cluster.log, node['connection'])
             wait_for_any_pods(cluster, node['connection'], apply_filter=node['name'])
             exclude_node_from_upgrade_list(first_control_plane, node['name'])
 
 
-def patch_kubeadm_configmap(first_control_plane, cluster):
+def patch_kubeadm_configmap(first_control_plane, cluster, dry_run=False):
     '''
     Checks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
@@ -937,12 +945,12 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
     kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
     result_config = kubelet_config + "---\n" + updated_config.getvalue()
-    first_control_plane["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
+    first_control_plane["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True, dry_run=dry_run)
 
     return True
 
 
-def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
+def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, dry_run=False, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
 
@@ -956,27 +964,30 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         cluster.log.debug("Upgrading worker \"%s\"" % node['name'])
 
         # put control-plane patches
-        create_kubeadm_patches_for_node(cluster, node)
+        create_kubeadm_patches_for_node(cluster, node, dry_run=dry_run)
 
         drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
-        first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
+        first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False, dry_run=dry_run)
 
-        upgrade_cri_if_required(node['connection'])
+        upgrade_cri_if_required(node['connection'], dry_run=dry_run)
 
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-        fix_flag_kubelet(cluster, node)
+        fix_flag_kubelet(cluster, node, dry_run=dry_run)
 
         # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
         # and only "else" branch remains
         if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
             node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true && "
-                                "sudo systemctl restart kubelet")
+                                "sudo systemctl restart kubelet", dry_run=dry_run)
         else:
            node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-                                "sudo systemctl restart kubelet")
+                                "sudo systemctl restart kubelet", dry_run=dry_run)
 
-        first_control_plane['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False)
-
+        first_control_plane['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False, dry_run=dry_run)
+        if dry_run:
+            cluster.log.debug("[dry-run]Nodes have correct Kubernetes version...")
+            cluster.log.debug("[dry-run] Pods are ready!")
+            continue
         expect_kubernetes_version(cluster, version, apply_filter=node['name'])
         # workers do not have system pods to wait for their start
         exclude_node_from_upgrade_list(first_control_plane, node['name'])
@@ -1000,7 +1011,7 @@ def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
     return drain_cmd
 
 
-def upgrade_cri_if_required(group: NodeGroup):
+def upgrade_cri_if_required(group: NodeGroup, dry_run=False):
     # currently it is invoked only for single node
     cluster = group.cluster
     log = cluster.log
@@ -1013,9 +1024,9 @@ def upgrade_cri_if_required(group: NodeGroup):
         packages.install(group, include=cri_packages)
         log.debug(f"Restarting all containers on node: {group.get_node_name()}")
         if cri_impl == "docker":
-            group.sudo("docker container rm -f $(sudo docker container ls -q)", warn=True)
+            group.sudo("docker container rm -f $(sudo docker container ls -q)", warn=True, dry_run=dry_run)
         else:
-            group.sudo("crictl rm -fa", warn=True)
+            group.sudo("crictl rm -fa", warn=True, dry_run=dry_run)
     else:
         log.debug(f"{cri_impl} upgrade is not required")
 
@@ -1032,6 +1043,7 @@ def verify_upgrade_versions(cluster):
                                                  " -o custom-columns='VERSION:.status.nodeInfo.kubeletVersion' "
                                                  "| grep -vw ^VERSION ")
         curr_version = list(result.values())[0].stdout
+        print("@@@@@@@@@@@@@@@@@@@@@@@@@@", curr_version)
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 
@@ -1420,7 +1432,7 @@ def create_kubeadm_patches_for_node(cluster, node, dry_run=False):
 
     return
 
-def fix_flag_kubelet(cluster: KubernetesCluster, node: dict):
+def fix_flag_kubelet(cluster: KubernetesCluster, node: dict, dry_run=False):
     #Deprecated flag removal function for kubelet
     kubeadm_file = "/var/lib/kubelet/kubeadm-flags.env"
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
@@ -1432,4 +1444,4 @@ def fix_flag_kubelet(cluster: KubernetesCluster, node: dict):
     kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-        node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
+        node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True, dry_run=dry_run)

@@ -53,29 +53,31 @@ def kubernetes_upgrade(cluster):
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
     disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
+    dry_run = utils.check_dry_run_status_active(cluster)
     drain_kwargs = {
         'disable_eviction': disable_eviction, 'drain_timeout': drain_timeout, 'grace_period': grace_period
     }
 
-    kubernetes.upgrade_first_control_plane(upgrade_group, cluster, **drain_kwargs)
+    kubernetes.upgrade_first_control_plane(upgrade_group, cluster, dry_run=dry_run, **drain_kwargs)
 
     # After first control-plane upgrade is finished we may loose our CoreDNS changes.
     # Thus, we need to re-apply our CoreDNS changes immediately after first control-plane upgrade.
     install.deploy_coredns(cluster)
 
-    kubernetes.upgrade_other_control_planes(upgrade_group, cluster, **drain_kwargs)
+    kubernetes.upgrade_other_control_planes(upgrade_group, cluster, dry_run=dry_run, **drain_kwargs)
 
     if cluster.nodes.get('worker', []):
-        kubernetes.upgrade_workers(upgrade_group, cluster, **drain_kwargs)
+        kubernetes.upgrade_workers(upgrade_group, cluster, dry_run=dry_run, **drain_kwargs)
 
-    cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+    cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt', dry_run=dry_run)
     cluster.context['cached_nodes_versions_cleaned'] = True
 
 
 def kubernetes_cleanup_nodes_versions(cluster):
+    dry_run = utils.check_dry_run_status_active(cluster)
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
-        cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+        cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt', dry_run=dry_run)
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
     kubernetes_apply_taints(cluster)
@@ -137,6 +139,8 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 if isinstance(value, dict):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
+            if utils.check_dry_run_status_active(cluster):
+                return
             with RemoteExecutor(cluster) as exe:
                 for node in cluster.nodes['control-plane'].include_group(
                         cluster.nodes.get('worker')).get_ordered_members_list(

@@ -363,6 +363,8 @@ def _handle_dry_run(fn: callable) -> callable:
             else:
                 self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (fn.__name__, args[0], list(self.nodes.keys()), kwargs))
             return NodeGroupResult(self.cluster, results)
+        elif "dry_run" in kwargs.keys():
+            del kwargs["dry_run"]
         try:
             results = fn(self, *args, **kwargs)
             return results

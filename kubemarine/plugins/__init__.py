@@ -194,14 +194,10 @@ def install(cluster, plugins=None):
 
 
 def install_plugin(cluster, plugin_name, installation_procedure):
-    dry_run = utils.check_dry_run_status_active(cluster)
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
     for _, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            if not dry_run:
-                procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
-            elif procedure_types[apply_type].get('verify'):
-                procedure_types[apply_type]['verify'](cluster, configs)
+            procedure_types[apply_type]['apply'](cluster, configs, plugin_name)
 
 
 def expect_daemonset(cluster: KubernetesCluster,
@@ -549,6 +545,9 @@ def apply_expect(cluster, config, plugin_name=None):
     # TODO: Add support for expect services and expect nodes
 
     for expect_type, expect_conf in config.items():
+        if utils.check_dry_run_status_active(cluster):
+            cluster.log.debug(f"[dry-run] {expect_type} are up to date...")
+            return None
         if expect_type == 'daemonsets':
             expect_daemonset(cluster, config['daemonsets']['list'],
                              timeout=config['daemonsets'].get('timeout'),
@@ -717,8 +716,11 @@ def apply_shell(cluster, step, plugin_name=None):
     if sudo:
         method = common_group.sudo
 
+    dry_run = utils.check_dry_run_status_active(cluster)
     cluster.log.debug('Running shell command...')
-    result = method(commands, env=in_vars_dict)
+    result = method(commands, env=in_vars_dict, dry_run=dry_run)
+    if dry_run:
+        return None
 
     if out_vars:
         stdout = list(result.values())[0].stdout
@@ -781,6 +783,9 @@ def apply_ansible(cluster, step, plugin_name=None):
     cluster.log.verbose("Running shell \"%s\"" % command)
 
     result = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Successfully applied ansible plugin...")
+        return None
     if result.returncode != 0:
         raise Exception("Failed to apply ansible plugin, see error above")
 
@@ -824,6 +829,9 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
 
     command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
     output = subprocess.check_output(command, shell=True)
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Successfully applied helm plugin...")
+        return None
     cluster.log.debug(output.decode('utf-8'))
 
     return output
@@ -1010,7 +1018,7 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     source = config['source']
     destination_path = config['destination']
     apply_command = config.get('apply_command', 'kubectl apply -f %s' % destination_path)
-
+    dry_run = utils.check_dry_run_status_active(cluster)
     if not destination_groups and not destination_nodes:
         destination_common_group = cluster.nodes['control-plane']
     else:
@@ -1021,14 +1029,14 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     else:
         apply_common_group = cluster.create_group_from_groups_nodes_names(apply_groups, apply_nodes)
 
-    destination_common_group.put(source, destination_path, backup=True, sudo=use_sudo)
+    destination_common_group.put(source, destination_path, backup=True, sudo=use_sudo, dry_run=dry_run)
 
     if apply_required:
         method = apply_common_group.run
         if use_sudo:
             method = apply_common_group.sudo
         cluster.log.debug("Applying yaml...")
-        method(apply_command, logging_stream_level=logging.DEBUG)
+        method(apply_command, logging_stream_level=logging.DEBUG, dry_run=dry_run)
     else:
         cluster.log.debug('Apply is not required')
 
