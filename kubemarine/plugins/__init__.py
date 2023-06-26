@@ -33,8 +33,9 @@ from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
 from typing import Dict, List, Tuple
-
 import yaml
+import inspect
+from inspect import signature
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
@@ -48,7 +49,7 @@ from kubemarine.kubernetes.statefulset import StatefulSet
 
 # list of plugins owned and managed by kubemarine
 oob_plugins = list(static.DEFAULTS["plugins"].keys())
-
+LOADED_MODULES = {}
 
 def verify_inventory(inventory, cluster):
     for plugin_name, plugin_item in inventory["plugins"].items():
@@ -573,25 +574,58 @@ def apply_expect(cluster, config, plugin_name=None):
                         timeout=config['pods'].get('timeout'),
                         retries=config['pods'].get('retries'))
 
-
 # **** PYTHON ****
 
-def verify_python(cluster, step):
-    # TODO: verify fields types and contents
-    return
+def get_python_module(module_path):
+    if module_path in LOADED_MODULES:
+        return LOADED_MODULES[module_path]
+
+    spec = importlib.util.spec_from_file_location('module', module_path)
+    try:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        LOADED_MODULES[module_path] = module
+    except Exception as e:
+        raise ValueError(f"Could not import module {module_path}: {e}")
+    return module 
 
 
-def apply_python(cluster, step, plugin_name=None):
+def get_python_method_args(cluster, step):
     module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
 
-    cluster.log.debug("Running method %s from %s module..." % (method_name, module_path))
-    module_filename = os.path.basename(module_path)
-    spec = importlib.util.spec_from_file_location(os.path.splitext(module_filename)[0], module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    getattr(module, method_name)(cluster, **method_arguments)
+    module = get_python_module(module_path)
+
+    # Check if the method exists
+    if not hasattr(module, method_name):
+        raise ValueError(f"Module {module_path} does not have method {method_name}")
+
+    # Get the method object
+    method = getattr(module, method_name)
+
+    # Get the signature of the method
+    signature = inspect.signature(method)
+
+    # Check if the passed arguments match the signature
+    try:
+        signature.bind(cluster=cluster, **method_arguments)
+    except TypeError as e:
+        raise ValueError(f"Invalid arguments for method {method_name}: {e}")
+
+    return method, method_arguments
+
+
+def verify_python(cluster, step):
+    method, method_arguments = get_python_method_args(cluster, step)
+    # Additional verification logic can be added here
+
+
+def apply_python(cluster, step, plugin_name=None):
+    method, method_arguments = get_python_method_args(cluster, step)
+
+    cluster.log.debug("Running method %s from %s module..." % (method.__name__, method.__module__))
+    method(cluster, **method_arguments)
 
 
 # **** THIRDPARTIES ****
@@ -788,7 +822,7 @@ def apply_helm(cluster: KubernetesCluster, config, plugin_name=None):
         cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 

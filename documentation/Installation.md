@@ -201,6 +201,7 @@ The actual information about the supported versions can be found in `compatibili
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
   * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
+  * Traffic to/from podSubnet, serviceSubnet is allowed inside the cluster.
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
