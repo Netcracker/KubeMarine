@@ -39,7 +39,7 @@ def deploy_kubernetes_join(cluster: KubernetesCluster):
     cluster.nodes['control-plane'].get_new_nodes().call(kubernetes.join_new_control_plane)
 
     if "worker" in cluster.nodes:
-        cluster.nodes['worker'].exclude_group(cluster.nodes['control-plane']) \
+        cluster.nodes['worker'].get_new_nodes().exclude_group(cluster.nodes['control-plane']) \
             .call(kubernetes.init_workers)
 
     group.call_batch([
