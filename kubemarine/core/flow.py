@@ -131,8 +131,8 @@ def run_actions(resources: res.DynamicResources, actions: List[action.Action]) -
                     timestamp = utils.get_current_timestamp_formatted()
                     inventory_file_basename = os.path.basename(resources.inventory_filepath)
                     utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
-
-            resources.recreate_inventory()
+            if not utils.check_dry_run_status_active(last_cluster):
+                resources.recreate_inventory()
             _post_process_actions_group(last_cluster, context, successfully_performed)
             successfully_performed = []
             last_cluster = None
@@ -313,7 +313,7 @@ def new_common_parser(cli_help):
                         help='define main cluster configuration file')
 
     parser.add_argument('--ansible-inventory-location',
-                        default='./ansible-inventory.ini',
+                        default='ansible-inventory.ini',
                         help='auto-generated ansible-compatible inventory file location')
 
     parser.add_argument('--dump-location',

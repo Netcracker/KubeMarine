@@ -363,6 +363,7 @@ def join_other_control_planes(group):
 
 def join_new_control_plane(group, dry_run=False):
     dry_run = utils.check_dry_run_status_active(group.cluster)
+    log = group.cluster.log
     join_dict = get_join_dict(group, dry_run)
     for node in group.get_ordered_members_list(provide_node_configs=True):
         if dry_run:
@@ -645,6 +646,9 @@ def wait_uncordon(node: NodeGroup):
 
 def wait_for_nodes(group: NodeGroup):
     log = group.cluster.log
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run] All nodes are ready!")
+        return
 
     first_control_plane = group.cluster.nodes["control-plane"].get_first_member()
     node_names = group.get_nodes_names()
@@ -1043,7 +1047,6 @@ def verify_upgrade_versions(cluster):
                                                  " -o custom-columns='VERSION:.status.nodeInfo.kubeletVersion' "
                                                  "| grep -vw ^VERSION ")
         curr_version = list(result.values())[0].stdout
-        print("@@@@@@@@@@@@@@@@@@@@@@@@@@", curr_version)
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 

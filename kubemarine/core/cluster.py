@@ -343,7 +343,8 @@ class KubernetesCluster(Environment):
         data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
-        utils.dump_file(self, data, finalized_filename, dump_location=False)
+        if not utils.check_dry_run_status_active(self):
+            utils.dump_file(self, data, finalized_filename, dump_location=False)
 
     def preserve_inventory(self):
         self.log.debug("Start preserving of the information about the procedure.")

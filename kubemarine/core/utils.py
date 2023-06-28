@@ -152,7 +152,11 @@ def make_ansible_inventory(location, cluster):
             config_compiled += '\n' + string
         config_compiled += '\n\n'
 
-    dump_file({}, config_compiled, location, dump_location=False)
+    dump_location = False
+    args = cluster.context.get('execution_arguments')
+    if args.get('without_act', None):
+        dump_location = True
+    dump_file(cluster, config_compiled, location, dump_location=dump_location)
 
 
 def get_current_timestamp_formatted():
@@ -205,7 +209,7 @@ def dump_file(context, data: object, filename: str,
             cluster = context
             context = cluster.context
 
-        args = context['execution_arguments']
+        args = context.get('execution_arguments', {})
         if args.get('disable_dump', True) \
                 and not (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
             return

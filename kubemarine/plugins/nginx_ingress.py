@@ -28,6 +28,9 @@ def check_job_for_nginx(cluster: KubernetesCluster):
 
     major_version = int(version[1])
     minor_version = int(version[2])
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug('[dry-run] There are no jobs to delete')
+        return
 
     check_jobs = first_control_plane['connection'].sudo(f"kubectl get jobs -n ingress-nginx")
     if list(check_jobs.values())[0].stderr == "" and major_version >= 1 and minor_version >= 4:
