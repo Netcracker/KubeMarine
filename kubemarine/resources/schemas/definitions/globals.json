@@ -119,6 +119,12 @@
                "minimal": 1,
                "default": 600,
                "description": "Timeout for node reboot in seconds"
+             },
+             "disconnect_timeout": {
+               "type": "integer",
+               "minimal": 1,
+               "default": 30,
+               "description": "Timeout for graceful SSH disconnect during the reboot in seconds"
              }
            }
          }

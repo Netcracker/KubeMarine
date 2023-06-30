@@ -530,6 +530,7 @@ globals:
       retries: 60
     boot:
       timeout: 900
+      disconnect_timeout: 60
 ```
 
 The following parameters are supported:
@@ -545,6 +546,7 @@ The following parameters are supported:
 | `nodes.ready.timeout`            | int  | no        | 5             | `10`    | Timeout between `nodes.ready.retries` for cluster node readiness waiting                                           |
 | `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
 | `nodes.boot.timeout`             | int  | no        | 600           | `900`   | Timeout for node reboot waiting                                                                                    |
+| `nodes.boot.disconnect_timeout`  | int  | no        | 30            | `60`    | Timeout for graceful SSH disconnect during the reboot in seconds                                                   |
 
 
 ### node_defaults

@@ -342,7 +342,7 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
                       (try_graceful is None and cluster.context['controlplain_uri'] is not None)
 
     if not graceful_reboot:
-        return perform_group_reboot(group)
+        return group.reboot()
 
     log.verbose('Graceful reboot required')
 
@@ -359,27 +359,13 @@ def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupRes
                 warn=True)
             log.verbose(res)
         log.debug(f'Rebooting node "{node_name}"')
-        raw_results = perform_group_reboot(node)
+        raw_results = node.reboot()
         if cordon_required:
             res = first_control_plane.sudo(f'kubectl uncordon {node_name}', warn=True)
             log.verbose(res)
         results.update(raw_results)
 
     return RunnersGroupResult(cluster, results)
-
-
-def get_reboot_history(group: NodeGroup) -> RunnersGroupResult:
-    return group.sudo('last reboot')
-
-
-def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
-    log = group.cluster.log
-
-    initial_boot_history = get_reboot_history(group)
-    result = group.sudo(group.cluster.globals['nodes']['boot']['reboot_command'], warn=True)
-    log.debug("Waiting for boot up...")
-    group.wait_for_reboot(initial_boot_history)
-    return result
 
 
 def reload_systemctl(group: AbstractGroup[GROUP_RUN_TYPE]) -> GROUP_RUN_TYPE:

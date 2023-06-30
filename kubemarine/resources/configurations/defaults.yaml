@@ -18,6 +18,7 @@ globals:
       retries: 15
     boot:
      timeout: 600
+     disconnect_timeout: 30
   timeout_download:
     60
 

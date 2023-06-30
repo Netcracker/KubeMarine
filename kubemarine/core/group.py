@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import io
+import math
 import os
 import random
 import re
@@ -800,17 +801,51 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         executor.flush()
         return executor.merge_last_results()
 
-    def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout: int = None) -> RunnersGroupResult:
-        results = self.make_runners_result(
-            self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
-        )
+    def _get_boot_config(self) -> dict:
+        boot_config = dict(self.cluster.inventory['globals']['nodes']['boot'])
+        boot_config.update(self.cluster.globals['nodes']['boot'])
+        return boot_config
+
+    def reboot(self) -> RunnersGroupResult:
+        initial_boot_history = self.sudo('last reboot')
+        self.cluster.log.verbose("Initial boot history:\n%s" % initial_boot_history)
+
+        boot_config = self._get_boot_config()
+        reboot_command = boot_config['reboot_command']
+        disconnect_timeout = boot_config['disconnect_timeout']
+        delay = boot_config['defaults']['delay_period']
+
+        reboot_result = self.sudo(reboot_command, warn=True)
+
+        self.cluster.log.debug("Waiting for boot up...")
+        self.cluster.log.verbose("Waiting for graceful SSH disconnect, timeout is %s seconds..." % disconnect_timeout)
+        time_start = datetime.now()
+        left_nodes = self.get_hosts()
+        elapsed = 0
+        while left_nodes:
+            elapsed = (datetime.now() - time_start).total_seconds()
+            if elapsed >= disconnect_timeout:
+                break
+            left_nodes = [host for host in left_nodes
+                          if self.cluster.connection_pool.get_connection(host).is_connected]
+            if left_nodes:
+                self.cluster.log.verbose("Nodes %s are still connected, remaining time to wait %i"
+                                         % (left_nodes, disconnect_timeout - elapsed))
+                time.sleep(delay)
+
+        if left_nodes:
+            self.cluster.log.warning("Failed to wait for disconnect of nodes %s. Trying to reconnect." % left_nodes)
+
+        timeout = boot_config['timeout']
+        results = self.wait_and_get_boot_history(math.ceil(timeout - elapsed), initial_boot_history)
         if any(result == initial_boot_history.get(host) for host, result in results.items()):
             raise GroupException(results)
 
-        return results
+        return reboot_result
 
-    def wait_and_get_boot_history(self, timeout: int = None) -> RunnersGroupResult:
-        return self.wait_for_reboot(RunnersGroupResult(self.cluster, {}), timeout=timeout)
+    def wait_and_get_boot_history(self, timeout: int = None,
+                                  initial_boot_history: RunnersGroupResult = None) -> RunnersGroupResult:
+        return self.make_runners_result(self._await_rebooted_nodes(timeout, initial_boot_history))
 
     def wait_and_get_active_nodes(self, timeout: int = None) -> NodeGroup:
         results = self._await_rebooted_nodes(timeout)
@@ -820,14 +855,13 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def _await_rebooted_nodes(self, timeout: int = None, initial_boot_history: RunnersGroupResult = None) \
             -> HostToResult:
 
+        boot_config = self._get_boot_config()
         if timeout is None:
-            timeout = int(self.cluster.inventory['globals']['nodes']['boot']['timeout'])
+            timeout = boot_config['timeout']
 
-        delay_period = self.cluster.globals['nodes']['boot']['defaults']['delay_period']
+        delay_period = boot_config['defaults']['delay_period']
 
-        if initial_boot_history:
-            self.cluster.log.verbose("Initial boot history:\n%s" % initial_boot_history)
-        else:
+        if initial_boot_history is None:
             initial_boot_history = RunnersGroupResult(self.cluster, {})
 
         left_nodes: List[str] = list(self.nodes)
