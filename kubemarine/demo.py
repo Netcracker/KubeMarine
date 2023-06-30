@@ -268,8 +268,8 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
     def _do(self, do_type, *args, **kwargs) -> fabric.runners.Result:
         if do_type in ['sudo', 'run']:
             # start fake execution of commands
-            command = list(args)[0]
-            commands, sep_symbol, command_sep = self._split_command(do_type, command)
+            original_command = list(args)[0]
+            commands, sep_symbol, command_sep = self._split_command(do_type, original_command)
 
             stdout = ""
             stderr = ""
@@ -299,7 +299,8 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                     # stop fake execution
                     break
 
-            final_res = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=prev_exited, connection=self)
+            final_res = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=prev_exited,
+                                              connection=self, command=original_command)
             if prev_exited == 0 or kwargs.get('warn', False):
                 return final_res
 
@@ -550,8 +551,8 @@ def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> Dict[
 
 
 def create_result(stdout='', stderr='', code=0) -> RunnersResult:
-    # connection will be later replaced to fake
-    return RunnersResult(stdout=stdout, stderr=stderr, exited=code)
+    # command and 'hide' option will be later replaced with actual
+    return RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr)
 
 
 def empty_action(*args, **kwargs) -> None:

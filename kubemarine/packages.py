@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict, Tuple, Optional, Union, cast, Mapping, Set
+from typing import List, Dict, Tuple, Optional, Union, Mapping, Set
 
 from typing_extensions import Protocol
 
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RunnersResult, Token
-from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
+from kubemarine.core.executor import RunnersResult, Token, Callback
+from kubemarine.core.group import (
+    NodeGroup, DeferredGroup, AbstractGroup, RunResult, GROUP_RUN_TYPE,
+    CollectorCallback, RunnersGroupResult
+)
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -517,7 +520,8 @@ class PackageManager(Protocol):
     def clean(self, group: NodeGroup) -> RunnersGroupResult: ...
 
     def install(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+                exclude: Union[str, List[str]] = None,
+                callback: Callback = None) -> GROUP_RUN_TYPE: ...
 
     def remove(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
                exclude: Union[str, List[str]] = None,
@@ -528,7 +532,7 @@ class PackageManager(Protocol):
 
     def no_changes_found(self, action: str, result: RunnersResult) -> bool: ...
 
-    def search(self, group: DeferredGroup, package: str) -> Token: ...
+    def search(self, group: DeferredGroup, package: str, callback: Callback = None) -> Token: ...
 
 
 def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]) -> PackageManager:
@@ -567,8 +571,9 @@ def clean(group: NodeGroup) -> RunnersGroupResult:
 
 
 def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
-    return get_package_manager(group).install(group, include, exclude)
+            exclude: Union[str, List[str]] = None,
+            callback: Callback = None) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).install(group, include, exclude, callback)
 
 
 def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
@@ -586,8 +591,8 @@ def no_changes_found(group: NodeGroup, action: str, result: RunnersResult) -> bo
     return pkg_mgr.no_changes_found(action, result)
 
 
-def search_package(group: DeferredGroup, package: str) -> Token:
-    return get_package_manager(group).search(group, package)
+def search_package(group: DeferredGroup, package: str, callback: Callback = None) -> Token:
+    return get_package_manager(group).search(group, package, callback)
 
 
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
@@ -599,7 +604,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def _detect_installed_package_version(group: DeferredGroup, package: str) -> Token:
+def _detect_installed_package_version(group: DeferredGroup, package: str, collector: CollectorCallback) -> Token:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -616,7 +621,7 @@ def _detect_installed_package_version(group: DeferredGroup, package: str) -> Tok
     package_name = get_package_name(os_family, package)
 
     cmd = get_detect_package_version_cmd(os_family, package_name)
-    return group.sudo(cmd, warn=True)
+    return group.sudo(cmd, warn=True, callback=collector)
 
 
 def _parse_node_detected_package(result: RunnersResult, package: str) -> str:
@@ -648,17 +653,16 @@ def detect_installed_packages_version_hosts(
         # deduplicate
         hosts_to_packages_dedup[host] = list(set(packages_list))
 
+    collector = CollectorCallback(cluster)
     with cluster.make_group(hosts_to_packages).new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             for package in hosts_to_packages_dedup[node.get_host()]:
-                _detect_installed_package_version(node, package)
+                _detect_installed_package_version(node, package, collector)
 
-    raw_result = exe.get_last_results()
     results: Dict[str, Dict[str, List]] = {}
 
-    for host, multiple_results in raw_result.items():
-        for i, result in enumerate(multiple_results.values()):
-            result = cast(RunnersResult, result)
+    for host, multiple_results in collector.results.items():
+        for i, result in enumerate(multiple_results):
             package = hosts_to_packages_dedup[host][i]
             node_detected_package = _parse_node_detected_package(result, package)
             results.setdefault(package, {}).setdefault(node_detected_package, []).append(host)

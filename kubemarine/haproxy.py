@@ -21,7 +21,9 @@ from jinja2 import Template
 from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup, RunnersGroupResult, NodeConfig, DeferredGroup, RunResult, AbstractGroup
+from kubemarine.core.group import (
+    NodeGroup, RunnersGroupResult, NodeConfig, DeferredGroup, RunResult, AbstractGroup, CollectorCallback
+)
 
 ERROR_VRRP_IS_NOT_CONFIGURED = \
     'Balancer is combined with other role, but there is no VRRP IP configured for node \'%s\'.'
@@ -109,6 +111,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
 
 def get_config_path(group: NodeGroup) -> RunnersGroupResult:
+    collector = CollectorCallback(group.cluster)
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             package_associations = _get_associations_for_node(node)
@@ -116,30 +119,30 @@ def get_config_path(group: NodeGroup) -> RunnersGroupResult:
                   f"| cut -d '=' -f2 " \
                   f"| xargs -I PID sudo cat /proc/PID/environ " \
                   f"| tr '\\0' '\\n' | grep CONFIG | cut -d \"=\" -f2 | tr -d '\\n'"
-            node.sudo(cmd)
+            node.sudo(cmd, callback=collector)
 
-    return exe.get_merged_runners_result()
+    return collector.result
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
     defer = group.new_defer()
+    collector = CollectorCallback(cluster)
     for node in defer.get_ordered_members_list():
         package_associations = _get_associations_for_node(node)
-        node.sudo("%s -v" % package_associations['executable_name'], warn=True)
+        node.sudo("%s -v" % package_associations['executable_name'], warn=True, callback=collector)
 
     defer.flush()
-    installation_result = defer.executor.get_merged_runners_result()
 
-    if not installation_result.is_any_failed():
+    if not collector.result.is_any_failed():
         cluster.log.debug("HAProxy already installed, nothing to install")
     else:
+        collector = CollectorCallback(cluster)
         for node in defer.get_ordered_members_list():
             package_associations = _get_associations_for_node(node)
-            packages.install(node, include=package_associations['package_name'])
+            packages.install(node, include=package_associations['package_name'], callback=collector)
 
         defer.flush()
-        installation_result = defer.executor.get_merged_runners_result()
 
     for node in defer.get_ordered_members_list():
         package_associations = _get_associations_for_node(node)
@@ -149,7 +152,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         enable(node)
 
     defer.flush()
-    return installation_result
+    return collector.result
 
 
 def uninstall(group: NodeGroup) -> RunnersGroupResult:

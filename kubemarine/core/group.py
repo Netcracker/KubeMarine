@@ -28,11 +28,11 @@ from typing import (
 )
 
 import invoke
-from invoke import UnexpectedExit
 
-from kubemarine.core import utils, log
+from kubemarine.core import utils, log, errors
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult,
+    UnexpectedExit
 )
 
 NodeConfig = Dict[str, Any]
@@ -57,16 +57,6 @@ class GenericGroupResult(Mapping[str, _RESULT]):
     def __iter__(self) -> Iterator[str]:
         return iter(self._result)
 
-    @property
-    def succeeded(self) -> HostToResult:
-        return dict((k, v) for k, v in self.items()
-                    if not isinstance(v, Exception))
-
-    @property
-    def failed(self) -> Dict[str, Exception]:
-        return dict((k, v) for k, v in self.items()
-                    if isinstance(v, Exception))
-
     def get_simple_out(self) -> str:
         if len(self) != 1:
             raise NotImplementedError("Simple output can be returned only for NodeGroupResult consisted of "
@@ -80,25 +70,24 @@ class GenericGroupResult(Mapping[str, _RESULT]):
         return res.stdout
 
     def __str__(self) -> str:
-        output = ""
+        host_outputs = []
         for host, result in self.items():
+            output = f"{host}:"
 
-            # TODO: support print other possible exceptions
-            if isinstance(result, invoke.exceptions.UnexpectedExit):
-                result = result.result
+            if isinstance(result, RunnersResult):
+                output += f" code={result.repr_code()}"
+                repr_out = result.repr_out()
+                if repr_out:
+                    output += '\n\t' + repr_out.replace('\n', '\n\t')
 
-            # for now, we do not know how-to print transfer result
-            if not isinstance(result, RunnersResult):
-                continue
+            # The exception may be only the last in the list. We are also sure to have at least one result per node.
+            if isinstance(result, Exception):
+                exception = errors.wrap_kme_exception(result)
+                output += '\n\t' + str(exception).replace('\n', '\n\t')
 
-            if output != "":
-                output += "\n"
-            output += "\t%s: code=%i" % (host, result.exited)
-            if result.stdout:
-                output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
-            if result.stderr:
-                output += "\n\t\tSTDERR: %s" % result.stderr.replace("\n", "\n\t\t        ")
-        return output
+            host_outputs.append(output)
+
+        return "\n".join(host_outputs)
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -122,59 +111,12 @@ class GenericGroupResult(Mapping[str, _RESULT]):
                 return True
         return False
 
-    def is_any_excepted(self) -> bool:
-        """
-        Returns true if at least one result in group is an exception
-        :return: Boolean
-        """
-        return len(self.get_excepted_hosts_list()) > 0
-
     def is_any_failed(self) -> bool:
         """
         Returns true if at least one result in the group finished with non-zero code
         :return: Boolean
         """
         return len(self.get_failed_hosts_list()) > 0
-
-    def get_excepted_hosts_list(self) -> List[str]:
-        """
-        Returns a list of hosts, for which the result is an exception
-        :return: List with hosts
-        """
-        failed_hosts: List[str] = []
-        for host, result in self.items():
-            if isinstance(result, Exception):
-                failed_hosts.append(host)
-        return failed_hosts
-
-    def get_excepted_nodes_group(self) -> NodeGroup:
-        """
-        Forms and returns new NodeGroup of nodes, for which the result is an exception
-        :return: NodeGroup:
-        """
-        nodes_list = self.get_excepted_hosts_list()
-        return self._make_group(nodes_list)
-
-    def get_exited_hosts_list(self) -> List[str]:
-        """
-        Returns a list of hosts, for which the result is the completion of the command and the formation of
-        the RunnersResult
-        :return: List with hosts
-        """
-        failed_hosts: List[str] = []
-        for host, result in self.items():
-            if isinstance(result, RunnersResult):
-                failed_hosts.append(host)
-        return failed_hosts
-
-    def get_exited_nodes_group(self) -> NodeGroup:
-        """
-        Forms and returns new NodeGroup of nodes, for which the result is the completion of the command and the
-        formation of the Fabric Result
-        :return: NodeGroup:
-        """
-        nodes_list = self.get_exited_hosts_list()
-        return self._make_group(nodes_list)
 
     def get_failed_hosts_list(self) -> List[str]:
         """
@@ -288,9 +230,41 @@ class RunnersGroupResult(GenericGroupResult[RunnersResult]):
     pass
 
 
-class GroupException(Exception):
-    def __init__(self, result: GenericGroupResult[GenericResult]):
-        self.result = result
+class CollectorCallback(Callback):
+    def __init__(self, cluster: object) -> None:
+        self.cluster = cluster
+        self.results: Dict[str, List[RunnersResult]] = {}
+        """
+        List of collected results for each host.
+        If all commands are exited for the particular host, the number and order of results
+        correspond to the number and order of the queued commands,
+        for which the given callback was requested.
+        """
+        self._result: Optional[RunnersGroupResult] = None
+
+    def accept(self, host: str, token: Token, result: RunnersResult) -> None:
+        self.results.setdefault(host, []).append(result)
+        self._result = None
+
+    @property
+    def result(self) -> RunnersGroupResult:
+        """
+        Merges the collected `results` into the single RunnersGroupResult instance.
+        This can be useful to check merged output of the commands.
+
+        Note that if the result of more than one command is merged,
+        one SHOULD NOT use `RunnersResult.exited` and `RunnersResult.command`,
+        as the exit code and command of few commands are undefined.
+
+        :return: merged RunnersGroupResult instance.
+        """
+        if self._result is None:
+            self._result = RunnersGroupResult(
+                self.cluster,
+                {host: RunnersResult.merge(results) for host, results in self.results.items()}
+            )
+
+        return self._result
 
 
 RunResult = Union[RunnersGroupResult, Token]
@@ -332,24 +306,24 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def run(self, command: str,
             warn: bool = False, hide: bool = True,
             env: Dict[str, str] = None, timeout: int = None,
-            logging_stream: bool = False) -> GROUP_RUN_TYPE:
+            logging_stream: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
         if logging_stream:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("run", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout)
+                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
 
     def sudo(self, command: str,
              warn: bool = False, hide: bool = True,
              env: Dict[str, str] = None, timeout: int = None,
-             logging_stream: bool = False) -> GROUP_RUN_TYPE:
+             logging_stream: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
         if logging_stream:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("sudo", command, caller,
-                         warn=warn, hide=hide, env=env, timeout=timeout)
+                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
 
     @abstractmethod
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -468,25 +442,9 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
         pass
 
-    def make_runners_result(self, host_results: Mapping[str, GenericResult]) -> RunnersGroupResult:
-        results = {}
-        for host, result in host_results.items():
-            if isinstance(result, Exception):
-                raise GroupException(NodeGroupResult(self.cluster, host_results))
-            if not isinstance(result, RunnersResult):
-                raise Exception("Cannot convert transfer result to the simple runners result")
-
-            results[host] = result
-
-        return RunnersGroupResult(self.cluster, results)
-
-    def make_result_or_fail(self, host_results: Mapping[str, GenericResult]) -> NodeGroupResult:
-        result = NodeGroupResult(self.cluster, host_results)
-
-        if result.is_any_excepted():
-            raise GroupException(result)
-
-        return result
+    def _unsafe_make_runners_result(self, host_results: HostToResult) -> RunnersGroupResult:
+        return RunnersGroupResult(self.cluster,
+                                  {host: cast(RunnersResult, result) for host, result in host_results.items()})
 
     def call(self, action: Callable[..., _T], **kwargs: object) -> _T:
         func = cast(FunctionType, action)
@@ -733,17 +691,19 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
             out = log.LoggerWriter(logger, caller, '[remote] ')
             err = log.LoggerWriter(logger, caller, '[stderr] ')
 
-            results = self._do_with_wa(do_type, command, out_stream=out, err_stream=err, **kwargs)
+            results = self._unsafe_make_runners_result(self._do_with_wa(
+                do_type, command, out_stream=out, err_stream=err, **kwargs))
         else:
-            results = self._do_with_wa(do_type, command, **kwargs)
+            results = self._unsafe_make_runners_result(
+                self._do_with_wa(do_type, command, **kwargs))
             # if hide is False, we already logged only to stdout, and should log to other handlers.
             if not kwargs['hide']:
                 logger.debug(results, extra={'ignore_stdout': True})
 
-        return self.make_runners_result(results)
+        return results
 
-    def _do_with_wa(self, do_type: str, *args: object, **kwargs: Any) -> NodeGroupResult:
-        left_nodes: List[str] = list(self.nodes)
+    def _do_with_wa(self, do_type: str, *args: object, **kwargs: Any) -> HostToResult:
+        left_nodes = self.get_hosts()
         retry = 0
         results: HostToResult = {}
         while True:
@@ -760,7 +720,10 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
             self.cluster.log.verbose('Retrying #%s...' % retry)
             time.sleep(self.cluster.globals['workaround']['delay_period'])
 
-        return self.make_result_or_fail(results)
+        if left_nodes:
+            raise GroupResultException(NodeGroupResult(self.cluster, results))
+
+        return results
 
     def _try_workaround(self, results: HostToResult, failed_nodes: List[str]) -> bool:
         not_booted = []
@@ -768,6 +731,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         for host in failed_nodes:
             exception = results[host]
             if isinstance(exception, UnexpectedExit):
+                # Do not str(exception) because it discards output in case of hide=False
                 exception_message = str(exception.result)
             else:
                 exception_message = str(exception)
@@ -792,22 +756,23 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         return True
 
     def _do_exec(self, nodes: List[str], do_type: str, *args: object, **kwargs: Any) -> HostToResult:
+        callback: Callback = kwargs.pop('callback', None)
         kwargs = self._default_connection_kwargs(do_type, kwargs)
 
         executor = RawExecutor(self.cluster.log, self.cluster.connection_pool,
                                timeout=kwargs.get('timeout'))
-        executor.queue(nodes, (do_type, args, kwargs))
+        executor.queue(nodes, (do_type, args, kwargs), callback=callback)
         executor.flush()
-        return executor.merge_last_results()
+        return {host: next(iter(results.values()))
+                for host, results in executor.get_last_results().items()}
 
     def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout: int = None) -> RunnersGroupResult:
-        results = self.make_runners_result(
-            self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
-        )
-        if any(result == initial_boot_history.get(host) for host, result in results.items()):
-            raise GroupException(results)
+        results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
+        if any(isinstance(result, Exception) or result == initial_boot_history.get(host)
+               for host, result in results.items()):
+            raise GroupResultException(NodeGroupResult(self.cluster, results))
 
-        return results
+        return self._unsafe_make_runners_result(results)
 
     def wait_and_get_boot_history(self, timeout: int = None) -> RunnersGroupResult:
         return self.wait_for_reboot(RunnersGroupResult(self.cluster, {}), timeout=timeout)
@@ -963,15 +928,19 @@ class DeferredGroup(AbstractGroup[Token]):
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]], **kwargs: object) -> Token:
         do_stream = not kwargs['hide'] or caller is not None
         if do_stream:
+            # To support streaming of output with use of RemoteExecutor in deferred mode, it is necessary to:
+            # 1) Make sure that no two commands are executed with streaming in parallel to avoid mess in output
+            # 2) Do not print output twice if error occurred.
             raise ValueError("Streaming of output is currently not supported in deferred mode")
         return self._do_queue(do_type, command, **kwargs)
 
     def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
         self._do_queue("put", local_stream, remote_file)
 
-    def _do_queue(self, do_type: str, *args: object, **kwargs: object) -> Token:
+    def _do_queue(self, do_type: str, *args: object, **kwargs: Any) -> Token:
+        callback: Callback = kwargs.pop('callback', None)
         kwargs = self._default_connection_kwargs(do_type, kwargs)
-        return self._executor.queue(self.nodes, (do_type, args, kwargs))
+        return self._executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
 
     def include_group(self: DeferredGroup, group: DeferredGroup) -> DeferredGroup:
         self._check_same_bound_executor(group)
@@ -1009,24 +978,103 @@ class RemoteExecutor(RawExecutor):
         # handled via _do_with_wa() or other parent error handling mechanism.
         # For queued flushes, exception handling with W/A is currently not supported.
         # TODO: Merge results/exceptions handling with kubemarine.core.group.NodeGroup._do_with_wa to avoid code dup
-        self.group.make_result_or_fail(self.merge_last_results())
+        for host, results in self._last_results.items():
+            if any(isinstance(result, Exception) for _, result in results.items()):
+                raise RemoteGroupException(self.cluster, self._last_results)
 
-    def get_merged_runners_result(self, filter_tokens: Optional[List[int]] = None) -> RunnersGroupResult:
+
+class GroupException(Exception):
+    def __init__(self, cluster: object, results: Dict[str, List[GenericResult]]):
+        self.cluster = cluster
+        self._results = results
+
+    def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
+        return NodeGroup(hosts, self.cluster)
+
+    def is_any_excepted(self) -> bool:
         """
-        Returns last results, merged into simple RunnersGroupResult.
-        If any node failed, throws GroupException.
-        If failed convert to the runners result (e.g. if put/get commands were in the batch), throws Exception.
+        Returns true if at least one result in group is an exception
 
-        The method can be useful to
-        1) check exceptions,
-        2) check result in case only one command per node is executed,
-        3) check result of specific commands in the batch if filter_tokens parameter is provided.
-        4) merge the result to print it to logs.
-
-        For more fine-grained control, use get_last_results().
-
-        :param filter_tokens: tokens to filter result of specific commands in the batch
-        :return: RunnersGroupResult
+        :return: Boolean
         """
-        host_results = self.merge_last_results(filter_tokens=filter_tokens)
-        return self.group.make_runners_result(host_results)
+        return len(self.get_excepted_hosts_list()) > 0
+
+    def get_excepted_hosts_list(self) -> List[str]:
+        """
+        Returns a list of hosts, for which the result is an exception.
+
+        :return: List with hosts
+        """
+        excepted_hosts: List[str] = []
+        for host, results in self._results.items():
+            if any(isinstance(result, Exception) for result in results):
+                excepted_hosts.append(host)
+        return excepted_hosts
+
+    def get_excepted_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes, for which the result is an exception.
+
+        :return: NodeGroup:
+        """
+        nodes_list = self.get_excepted_hosts_list()
+        return self._make_group(nodes_list)
+
+    def get_exited_hosts_list(self) -> List[str]:
+        """
+        Returns a list of hosts, for which the result is the completion of all commands.
+
+        :return: List with hosts
+        """
+        exited_hosts: List[str] = []
+        for host, results in self._results.items():
+            if all(isinstance(result, RunnersResult) for result in results):
+                exited_hosts.append(host)
+        return exited_hosts
+
+    def get_exited_nodes_group(self) -> NodeGroup:
+        """
+        Forms and returns new NodeGroup of nodes, for which the result is the completion of all commands.
+
+        :return: NodeGroup
+        """
+        nodes_list = self.get_exited_hosts_list()
+        return self._make_group(nodes_list)
+
+    def __str__(self) -> str:
+        # We always print output of all commands in the batch even if they are not failed,
+        # for the reason that the user code might want to print output of some commands in the batch,
+        # but failed to do that because of the exception.
+        host_outputs = []
+        for host, results in self._results.items():
+            output = f"{host}:"
+
+            # filter out transfer results and the last exception if present
+            runners_results = [res for res in results if isinstance(res, RunnersResult)]
+            if runners_results:
+                merged_result = RunnersResult.merge(runners_results)
+                output += f" code={merged_result.repr_code()}"
+                repr_out = merged_result.repr_out(hide_already_printed=True)
+                if repr_out:
+                    output += '\n\t' + repr_out.replace('\n', '\n\t')
+
+            # The exception may be only the last in the list. We are also sure to have at least one result per node.
+            if isinstance(results[-1], Exception):
+                exception = errors.wrap_kme_exception(results[-1])
+                output += '\n\t' + str(exception).replace('\n', '\n\t')
+
+            host_outputs.append(output)
+
+        return "\n".join(host_outputs)
+
+
+class GroupResultException(GroupException):
+    def __init__(self, result: GenericGroupResult[GenericResult]):
+        super().__init__(result.cluster, {host: [res] for host, res in result.items()})
+        self.result = result
+
+
+class RemoteGroupException(GroupException):
+    def __init__(self, cluster: object, results: Dict[str, TokenizedResult]):
+        super().__init__(cluster, {host: list(res.values()) for host, res in results.items()})
+        self.results = results

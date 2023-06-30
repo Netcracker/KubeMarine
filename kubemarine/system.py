@@ -26,9 +26,11 @@ from ordered_set import OrderedSet
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RunnersResult, Token, GenericResult
-from kubemarine.core.group import RunnersGroupResult, NodeGroup, GroupException, GenericGroupResult, DeferredGroup, \
-    AbstractGroup, GROUP_RUN_TYPE
+from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback
+from kubemarine.core.group import (
+    GenericGroupResult, RunnersGroupResult, GroupResultException,
+    NodeGroup, DeferredGroup, AbstractGroup, GROUP_RUN_TYPE, CollectorCallback
+)
 from kubemarine.core.annotations import restrict_empty_group
 
 ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
@@ -217,38 +219,41 @@ def update_etc_hosts(group: NodeGroup, config: str) -> None:
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True)
 
 
-def stop_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str) -> GROUP_RUN_TYPE:
-    return group.sudo('systemctl stop %s' % name)
+def stop_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Callback = None) -> GROUP_RUN_TYPE:
+    return group.sudo('systemctl stop %s' % name, callback=callback)
 
 
-def start_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str) -> GROUP_RUN_TYPE:
-    return group.sudo('systemctl start %s' % name)
+def start_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Callback = None) -> GROUP_RUN_TYPE:
+    return group.sudo('systemctl start %s' % name, callback=callback)
 
 
-def restart_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None) -> GROUP_RUN_TYPE:
+def restart_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None,
+                    callback: Callback = None) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
-    return group.sudo('systemctl restart %s' % name)
+    return group.sudo('systemctl restart %s' % name, callback=callback)
 
 
-def enable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None, now: bool = True) -> GROUP_RUN_TYPE:
+def enable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None,
+                   now: bool = True, callback: Callback = None) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl enable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.sudo(cmd)
+    return group.sudo(cmd, callback=callback)
 
 
-def disable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None, now: bool = True) -> GROUP_RUN_TYPE:
+def disable_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str = None,
+                    now: bool = True, callback: Callback = None) -> GROUP_RUN_TYPE:
     if name is None:
         raise Exception("Service name can't be empty")
 
     cmd = 'systemctl disable %s' % name
     if now:
         cmd = cmd + " --now"
-    return group.sudo(cmd)
+    return group.sudo(cmd, callback=callback)
 
 
 def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source: str) -> None:
@@ -579,17 +584,17 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:
     group = cluster.nodes['all'].get_accessible_nodes()
+    collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
-            detect_interface_by_address(node, node.get_config()['internal_address'])
-    results = exe.get_merged_runners_result()
-    for host, result in results.items():
+            detect_interface_by_address(node, node.get_config()['internal_address'], collector=collector)
+    for host, result in collector.result.items():
         interface = result.stdout.strip()
         cluster.context['nodes'][host]['active_interface'] = interface
 
 
-def detect_interface_by_address(group: DeferredGroup, address: str) -> Token:
-    return group.run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address)
+def detect_interface_by_address(group: DeferredGroup, address: str, collector: CollectorCallback) -> Token:
+    return group.run("/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % address, callback=collector)
 
 
 def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
@@ -605,7 +610,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
     try:
         # This should invoke sudo last reboot
         results = group_unknown_status.wait_and_get_boot_history(timeout=check_active_timeout)
-    except GroupException as e:
+    except GroupResultException as e:
         exc = e
         results = e.result
 

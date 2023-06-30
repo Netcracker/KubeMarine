@@ -15,8 +15,9 @@ import collections
 import concurrent
 import io
 import random
+from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Tuple, List, Dict, Callable, Any, Optional, Union, Collection, OrderedDict, Set, TypeVar, Type
+from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, Set, TypeVar, Type
 
 import fabric  # type: ignore[import]
 import fabric.transfer  # type: ignore[import]
@@ -28,10 +29,27 @@ from kubemarine.core.connections import ConnectionPool
 
 
 class RunnersResult:
-    def __init__(self, stdout: str = "", stderr: str = "", exited: int = 0) -> None:
+    def __init__(self, commands: List[str], exit_codes: List[int], stdout: str = "", stderr: str = "",
+                 hide: bool = False) -> None:
+        self.commands = commands
         self.stdout = stdout
         self.stderr = stderr
-        self.exited = exited
+        self.exit_codes = exit_codes
+        self.hide = hide
+
+    @property
+    def command(self) -> str:
+        if len(self.commands) > 1:
+            raise ValueError("Commands cannot be merged")
+
+        return next(iter(self.commands))
+
+    @property
+    def exited(self) -> int:
+        if len(self.exit_codes) > 1:
+            raise ValueError("Exit codes cannot be merged")
+
+        return next(iter(self.exit_codes))
 
     @property
     def return_code(self) -> int:
@@ -39,7 +57,7 @@ class RunnersResult:
 
     @property
     def ok(self) -> bool:
-        return self.exited == 0
+        return all(code == 0 for code in self.exit_codes)
 
     @property
     def failed(self) -> bool:
@@ -59,19 +77,93 @@ class RunnersResult:
     def __ne__(self, other: object) -> bool:
         return not self == other
 
+    @staticmethod
+    def merge(results: List['RunnersResult']) -> 'RunnersResult':
+        if len(results) == 0:
+            raise ValueError("At least one result should be present")
+
+        hide = results[0].hide
+        commands = []
+        stdout = ""
+        stderr = ""
+        exit_codes = []
+        for result in results:
+            if result.hide != hide:
+                raise ValueError("Cannot merge instances of RunnersResult with different 'hide' property")
+            commands.append(result.command)
+            stdout += result.stdout
+            stderr += result.stderr
+            exit_codes.append(result.exited)
+
+        return RunnersResult(commands, exit_codes, stdout, stderr, hide=hide)
+
+    def __str__(self) -> str:
+        return f"Command exited with status {self.repr_code()}.\n" \
+               f"{self.repr_out()}"
+
+    def repr_code(self) -> str:
+        unique_codes = set(self.exit_codes)
+        return str(self.exit_codes[0]) if len(unique_codes) == 1 else "'undefined'"
+
+    def repr_out(self, *, hide_already_printed: bool = False) -> str:
+        ret = []
+        for x in ("stdout", "stderr"):
+            val: str = getattr(self, x)
+            if val:
+                val = 'already printed' if hide_already_printed and not self.hide else val.rstrip()
+                ret.append(f"=== {x} ===\n"
+                           f"{val.rstrip()}\n")
+        return "\n".join(ret)
+
+
+class UnexpectedExit(Exception):
+    def __init__(self, result: RunnersResult):
+        self.result = result
+
+    def __str__(self) -> str:
+        ret = [
+            "Encountered a bad command exit code!\n",
+            f"Command: {self.result.command!r}\n",
+            f"Exit code: {self.result.exited}\n",
+        ]
+        repr_out = self.result.repr_out(hide_already_printed=True)
+        if repr_out:
+            ret.append(repr_out)
+
+        return "\n".join(ret)
+
 
 Token = int
 GenericResult = Union[Exception, RunnersResult, fabric.transfer.Result]
 HostToResult = Dict[str, GenericResult]
 TokenizedResult = OrderedDict[Token, GenericResult]
 
+
+class Callback(ABC):
+    """
+    Callback to process the result of commands.
+    """
+
+    @abstractmethod
+    def accept(self, host: str, token: Token, result: RunnersResult) -> None:
+        """
+        The method is called after the run / sudo command is exited.
+        Calling of the method happens sequentially in one thread after some batch of commands is executed on all nodes.
+
+        For the particular host, the order of results with which the method is called
+        corresponds to the order of queued commands, for which the given callback was requested.
+
+        :param host: host on which the command was executed
+        :param token: identifier of the queued action
+        :param result: RunnersResult instance holding the result of the exited command.
+        """
+        pass
+
+
 _RawHostToResult = Dict[str, Union[Exception, fabric.runners.Result, fabric.transfer.Result]]
 
 _Action = Tuple[str, tuple, dict]
-_Callback = Optional[Callable]
-
-_PayloadItem = Tuple[_Action, _Callback, Token]
-_MergedPayload = Tuple[_Action, List[_Callback], List[Token]]
+_PayloadItem = Tuple[_Action, Optional[Callback], Token]
 
 _T = TypeVar('_T', bound='RawExecutor')
 
@@ -123,36 +215,49 @@ class RawExecutor:
 
         return True
 
-    def _reparse_results(self, results: _RawHostToResult, batch: Dict[str, _MergedPayload]) \
-            -> Dict[str, TokenizedResult]:
+    def _reparse_results(self, results: _RawHostToResult, batch: Dict[str, List[_PayloadItem]],
+                         failed_hosts: Set[str]) -> Dict[str, TokenizedResult]:
         reparsed_results: Dict[str, TokenizedResult] = {}
         for host, result in results.items():
-            if isinstance(result, fabric.runners.Result):
-                result = RunnersResult(result.stdout, result.stderr, result.exited)
+            payloads = batch[host]
 
             conn_results: TokenizedResult = collections.OrderedDict()
-            action, callbacks, tokens = batch[host]
-            if (isinstance(result, RunnersResult)
-                    and self._command_separator in result.stdout
-                    and self._command_separator in result.stderr):
-                stderrs = result.stderr.split(self._command_separator + '\n')
-                raw_stdouts = result.stdout.split(self._command_separator + '\n')
-                stdouts = []
-                exit_codes = []
-                i = 0
-                while i < len(raw_stdouts):
-                    stdouts.append(raw_stdouts[i])
-                    if i + 1 < len(raw_stdouts):
-                        exit_codes.append(int(raw_stdouts[i + 1].strip()))
-                    i += 2
-                exit_codes.append(result.exited)
-                for i, code in enumerate(exit_codes):
-                    token = tokens[i]
-                    conn_results[token] = RunnersResult(stdouts[i], stderrs[i], code)
-            else:
-                conn_results[tokens[0]] = result
             reparsed_results[host] = conn_results
-        # TODO: In long term run, collect callbacks and wait for them
+            if not isinstance(result, fabric.runners.Result):
+                token = payloads[0][2]
+                conn_results[token] = result
+                continue
+
+            # unpack last action in list of payloads
+            _, _, kwargs = payloads[-1][0]
+
+            stderrs = result.stderr.split(self._command_separator + '\n')
+            raw_stdouts = result.stdout.split(self._command_separator + '\n')
+            stdouts = []
+            exit_codes = []
+            i = 0
+            while i < len(raw_stdouts):
+                stdouts.append(raw_stdouts[i])
+                if i + 1 < len(raw_stdouts):
+                    exit_codes.append(int(raw_stdouts[i + 1].strip()))
+                i += 2
+            exit_codes.append(result.exited)
+            for i, code in enumerate(exit_codes):
+                action, callback, token = payloads[i]
+                command: str = action[1][0]
+                result = RunnersResult(
+                    [command], [code], stdouts[i], stderrs[i], hide=kwargs.get('hide', False))
+
+                # If the last command was exited with non-zero code and warn if False (default),
+                # the result is an UnexpectedExit exception.
+                if i == len(exit_codes) - 1 and result.exited != 0 and not kwargs.get('warn', False):
+                    result = UnexpectedExit(result)
+                    failed_hosts.add(host)
+
+                conn_results[token] = result
+                if callback is not None and isinstance(result, RunnersResult):
+                    callback.accept(host, token, result)
+
         return reparsed_results
 
     def _get_separator(self, warn: bool) -> str:
@@ -165,47 +270,36 @@ class RawExecutor:
                f"printf \"%s\\n$?\\n%s\\n\" \"{self._command_separator}\" \"{self._command_separator}\" {separator_symbol} " \
                f"echo \"{self._command_separator}\" 1>&2 {separator_symbol} "
 
-    def _merge_actions(self, payload_items: List[_PayloadItem]) -> List[_MergedPayload]:
-        merged_payloads: List[_MergedPayload] = []
+    def _merge_actions(self, payload_items: List[_PayloadItem]) -> List[List[_PayloadItem]]:
+        merged_payloads: List[List[_PayloadItem]] = []
 
         for payload in payload_items:
-            action, callback, token = payload
             if not merged_payloads:
-                merged_payloads.append((action, [callback], [token]))
+                merged_payloads.append([payload])
                 continue
 
-            previous_action, callbacks, tokens = merged_payloads[-1]
+            action = payload[0]
+            previous_payloads = merged_payloads[-1]
+            previous_action = previous_payloads[-1][0]
             if not self._actions_mergeable(previous_action, action):
-                merged_payloads.append((action, [callback], [token]))
+                merged_payloads.append(([payload]))
                 continue
 
-            do_type, _, kwargs = previous_action
-
-            precommand = ''
-            if do_type == 'sudo':
-                precommand = 'sudo '
-
-            separator = self._get_separator(kwargs.get('warn', False))
-
-            merged_action_command: str = previous_action[1][0] + separator + precommand + action[1][0]
-            merged_action: _Action = (do_type, (merged_action_command,), kwargs)
-            callbacks.append(callback)
-            tokens.append(token)
-            merged_payloads[-1] = (merged_action, callbacks, tokens)
+            previous_payloads.append(payload)
 
         return merged_payloads
 
-    def _get_callables(self) -> List[Dict[str, _MergedPayload]]:
-        callables: Dict[str, List[_MergedPayload]] = {}
+    def _get_callables(self) -> List[Dict[str, List[_PayloadItem]]]:
+        callables: Dict[str, List[List[_PayloadItem]]] = {}
 
         for host, payload_items in self._connections_queue.items():
             callables[host] = self._merge_actions(payload_items)
 
         i = 0
-        batches: List[Dict[str, _MergedPayload]] = []
+        batches: List[Dict[str, List[_PayloadItem]]] = []
 
         while True:
-            batch: Dict[str, _MergedPayload] = {}
+            batch: Dict[str, List[_PayloadItem]] = {}
             for host, actions in callables.items():
                 if len(actions) > i:
                     batch[host] = actions[i]
@@ -217,10 +311,8 @@ class RawExecutor:
 
         return batches
 
-    def queue(self, target: Collection[str], action: _Action, callback: Callable = None) -> int:
-        # TODO support callbacks
+    def queue(self, target: List[str], action: _Action, callback: Callback = None) -> int:
         self._check_closed()
-        callback = None
         self._last_token = token = self._last_token + 1
 
         do_type, args, kwargs = action
@@ -241,45 +333,6 @@ class RawExecutor:
     def get_last_results(self) -> Dict[str, TokenizedResult]:
         return self._last_results
 
-    def merge_last_results(self, filter_tokens: Optional[List[int]] = None) -> HostToResult:
-        group_results: HostToResult = {}
-        for host, host_results in self.get_last_results().items():
-            merged_result = RunnersResult()
-            object_result = None
-
-            tokens = host_results.keys() if filter_tokens is None else filter_tokens
-            for token, result in host_results.items():
-                if isinstance(result, Exception):
-                    object_result = result
-                    break
-                elif token not in tokens:
-                    continue
-
-                if isinstance(result, RunnersResult):
-                    if result.stdout:
-                        merged_result.stdout += result.stdout
-                    if result.stderr:
-                        merged_result.stderr += result.stderr
-
-                    # Exit codes can not be merged, that's why they are assigned by priority:
-                    # 1. Most important code is 1, it should be assigned if any results contains it
-                    # 2. Non-zero exit code from last command
-                    # 3. Zero exit code, when all commands succeeded
-                    if result.exited == 1 or (
-                            merged_result.exited != 1 and result.exited != merged_result.exited):
-                        merged_result.exited = result.exited
-                else:
-                    object_result = result
-
-            # Some commands can produce non-parsed objects, like 'timeout'
-            # In that case it is impossible to merge something, and last such an "object" should be passed as a result
-            if object_result is not None:
-                group_results[host] = object_result
-            else:
-                group_results[host] = merged_result
-
-        return group_results
-
     def flush(self) -> None:
         """
         Flushes the connections' queue and returns grouped result
@@ -294,7 +347,7 @@ class RawExecutor:
             self._last_results = batch_results
             return
 
-        callable_batches: List[Dict[str, _MergedPayload]] = self._get_callables()
+        callable_batches: List[Dict[str, List[_PayloadItem]]] = self._get_callables()
 
         max_workers = len(self._connections_queue)
 
@@ -311,14 +364,11 @@ class RawExecutor:
                         failed_hosts.add(host)
                         results[host] = e
 
-                for host, payload in batch.items():
+                for host, payloads in batch.items():
                     if host in failed_hosts:
                         continue
                     cxn = self.connection_pool.get_connection(host)
-                    action, callbacks, tokens = payload
-                    do_type, args, kwargs = action
-                    args = self._localize_mutable_args(do_type, args)
-                    self.logger.verbose('Executing %s %s with options: %s' % (do_type, args, kwargs))
+                    do_type, args, kwargs = self._prepare_merged_action(host, payloads)
                     futures[host] = TPE.submit(getattr(cxn, do_type), *args, **kwargs)
 
                 for host, future in futures.items():
@@ -326,25 +376,58 @@ class RawExecutor:
 
                 self._flush_logger_writers(batch)
 
-                parsed_results: Dict[str, TokenizedResult] = self._reparse_results(results, batch)
+                parsed_results: Dict[str, TokenizedResult] = self._reparse_results(results, batch, failed_hosts)
                 for host, tokenized_results in parsed_results.items():
                     batch_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
 
         self._connections_queue = {}
         self._last_results = batch_results
 
-    def _localize_mutable_args(self, do_type: str, args: tuple) -> tuple:
+    def _prepare_merged_action(self, host: str, payloads: List[_PayloadItem]) -> _Action:
+        # unpack last action in list of payloads
+        do_type, args, kwargs = payloads[-1][0]
+
+        if do_type == 'get':
+            self.logger.verbose('Executing get %s on host %s with options: %s' % (args, host, kwargs))
         if do_type == 'put':
             local_stream, remote_file = args
             if isinstance(local_stream, io.BytesIO):
+                # Each thread should use its own instance of BytesIO.
                 local_stream = io.BytesIO(local_stream.getvalue())
+                self.logger.verbose(
+                    'Executing put %s on host %s with options: %s' % (('<text>', remote_file), host, kwargs))
+            else:
+                self.logger.verbose('Executing put %s on host %s with options: %s' % (args, host, kwargs))
 
-            return local_stream, remote_file
+            args = (local_stream, remote_file)
 
-        return args
+        if do_type in ('run', 'sudo'):
+            commands: List[str] = [action[1][0] for action, _, _ in payloads]
+            self.logger.verbose('Executing %s %s on host %s with options: %s' % (do_type, commands, host, kwargs))
 
-    def _flush_logger_writers(self, batch: Dict[str, _MergedPayload]) -> None:
-        for payload in batch.values():
+            precommand = ''
+            if do_type == 'sudo':
+                precommand = 'sudo '
+
+            warn: bool = kwargs.get('warn', False)
+            separator = self._get_separator(warn)
+
+            merged_command = (separator + precommand).join(commands)
+            args = (merged_command,)
+
+            if not warn:
+                kwargs = dict(kwargs)
+                # Do not fail when exiting with non-zero code.
+                # If 'warn' is initially True, then the exception will be raised during reparsing of result
+                kwargs['warn'] = True
+
+        return do_type, args, kwargs
+
+    def _flush_logger_writers(self, batch: Dict[str, List[_PayloadItem]]) -> None:
+        for payloads in batch.values():
+            # Actions are merged only if there are no out_stream/err_stream or if they are the same instance.
+            # It is thus enough to take only first action from payloads
+            payload = payloads[0]
             action, _, _ = payload
             _, _, kwargs = action
             for stream_key in ('out_stream', 'err_stream'):
