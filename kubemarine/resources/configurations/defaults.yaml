@@ -36,6 +36,7 @@ services:
     protectKernelDefaults: true
     podPidsLimit: 4096
     cgroupDriver: systemd
+    serializeImagePulls: false
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:

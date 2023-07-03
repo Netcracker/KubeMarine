@@ -1477,10 +1477,13 @@ By default, the installer uses the following parameters:
 |podPidsLimit|4096|
 |maxPods|110|
 |cgroupDriver|systemd|
+|serializeImagePulls|false|
 
 `podPidsLimit` the default value is chosen to prevent [Fork Bomb](https://en.wikipedia.org/wiki/Fork_bomb)
 
 `cgroupDriver` field defines which cgroup driver the kubelet controls. [Configuring the kubelet cgroup driver](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/#configuring-the-kubelet-cgroup-driver).
+
+`serializeImagePulls` parameter defines whether the images will be pulled in parallel or one at a time.
 
 **Warning**: If you want to change the values of variables `podPidsLimit` and `maxPods`, you have to update the value of the `pid_max` (this value should not less than result of next expression: `maxPods * podPidsLimit + 2048`), which can be done using task `prepare.system.sysctl`. To get more info about `pid_max` you can go to [sysctl](#sysctl) section.
 
