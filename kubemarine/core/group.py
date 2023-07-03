@@ -306,9 +306,9 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def run(self, command: str,
             warn: bool = False, hide: bool = True,
             env: Dict[str, str] = None, timeout: int = None,
-            logging_stream: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
+            callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
-        if logging_stream:
+        if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("run", command, caller,
@@ -317,9 +317,9 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def sudo(self, command: str,
              warn: bool = False, hide: bool = True,
              env: Dict[str, str] = None, timeout: int = None,
-             logging_stream: bool = False, callback: Callback = None) -> GROUP_RUN_TYPE:
+             callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
-        if logging_stream:
+        if not hide:
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("sudo", command, caller,
@@ -679,28 +679,17 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         """
         The method should be called directly from run & sudo without any extra wrappers.
         """
-        do_stream = not kwargs['hide'] or caller is not None
+        do_stream = not kwargs['hide']
         if do_stream and len(self.nodes) > 1:
             raise ValueError("Streaming of output is supported only for the single node")
 
-        logger = self.cluster.log
-        if caller is not None:
-            # We want to stream output immediately to logging framework, thus not hide.
-            kwargs['hide'] = False
+        if do_stream:
+            logger = self.cluster.log
+            kwargs['out_stream'] = log.LoggerWriter(logger, caller, '\t')
+            kwargs['err_stream'] = log.LoggerWriter(logger, caller, '\t')
 
-            out = log.LoggerWriter(logger, caller, '[remote] ')
-            err = log.LoggerWriter(logger, caller, '[stderr] ')
-
-            results = self._unsafe_make_runners_result(self._do_with_wa(
-                do_type, command, out_stream=out, err_stream=err, **kwargs))
-        else:
-            results = self._unsafe_make_runners_result(
-                self._do_with_wa(do_type, command, **kwargs))
-            # if hide is False, we already logged only to stdout, and should log to other handlers.
-            if not kwargs['hide']:
-                logger.debug(results, extra={'ignore_stdout': True})
-
-        return results
+        results = self._do_with_wa(do_type, command, **kwargs)
+        return self._unsafe_make_runners_result(results)
 
     def _do_with_wa(self, do_type: str, *args: object, **kwargs: Any) -> HostToResult:
         left_nodes = self.get_hosts()
@@ -926,7 +915,7 @@ class DeferredGroup(AbstractGroup[Token]):
         self._do_queue("get", remote_file, local_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]], **kwargs: object) -> Token:
-        do_stream = not kwargs['hide'] or caller is not None
+        do_stream = not kwargs['hide']
         if do_stream:
             # To support streaming of output with use of RemoteExecutor in deferred mode, it is necessary to:
             # 1) Make sure that no two commands are executed with streaming in parallel to avoid mess in output

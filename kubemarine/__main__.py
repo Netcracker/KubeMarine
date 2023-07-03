@@ -32,12 +32,6 @@ import yaml
 # See: https://bugs.python.org/issue29288
 u''.encode('idna')
 
-# This redirect required for fixing Fabric2 problem:
-# In Kubemarine stdout messages writes only to stdout - no stderr messaging at all,
-# but Fabric2 writes to stderr if hide=false used and remote console has stderr messages.
-sys.stderr = sys.stdout
-
-
 # Take pattern to resolve float used by ruamel instead of that is used by pyyaml.
 # https://sourceforge.net/p/ruamel-yaml/code/ci/0.17.21/tree/resolver.py#l43
 # Initially introduced for keepalived that generates random password string.
