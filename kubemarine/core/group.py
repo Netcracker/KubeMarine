@@ -467,9 +467,6 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             if kwargs.get("hide") is None:
                 kwargs['hide'] = True
 
-            if kwargs.get('timeout') is None:
-                kwargs["timeout"] = self.cluster.globals['nodes']['command_execution']['timeout']
-
         return kwargs
 
     def get_online_nodes(self: GROUP_SELF, online: bool) -> GROUP_SELF:
@@ -662,11 +659,11 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def _make_defer(self, executor: RemoteExecutor) -> DeferredGroup:
         return DeferredGroup(self.nodes, self.cluster, executor)
 
-    def new_defer(self) -> DeferredGroup:
-        return self.new_executor().group
+    def new_defer(self, timeout: int = None) -> DeferredGroup:
+        return self.new_executor(timeout).group
 
-    def new_executor(self) -> RemoteExecutor:
-        return RemoteExecutor(self)
+    def new_executor(self, timeout: int = None) -> RemoteExecutor:
+        return RemoteExecutor(self, timeout=timeout)
 
     def get(self, remote_file: str, local_file: str) -> None:
         self._do_with_wa("get", remote_file, local_file)
@@ -683,7 +680,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         if do_stream and len(self.nodes) > 1:
             raise ValueError("Streaming of output is supported only for the single node")
 
-        if do_stream:
+        if do_stream and caller is not None:
             logger = self.cluster.log
             kwargs['out_stream'] = log.LoggerWriter(logger, caller, '\t')
             kwargs['err_stream'] = log.LoggerWriter(logger, caller, '\t')

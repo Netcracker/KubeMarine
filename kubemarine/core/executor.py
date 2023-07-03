@@ -24,7 +24,9 @@ import fabric.transfer  # type: ignore[import]
 
 from concurrent.futures.thread import ThreadPoolExecutor
 
-from kubemarine.core import log
+import invoke
+
+from kubemarine.core import log, static
 from kubemarine.core.connections import ConnectionPool
 
 
@@ -133,6 +135,23 @@ class UnexpectedExit(Exception):
         return "\n".join(ret)
 
 
+class CommandTimedOut(Exception):
+    def __init__(self, result: RunnersResult, timeout: int):
+        self.result = result
+        self.timeout = timeout
+
+    def __str__(self) -> str:
+        ret = [
+            f"Command did not complete within {self.timeout} seconds!\n",
+            f"Command: {self.result.command!r}\n",
+        ]
+        repr_out = self.result.repr_out(hide_already_printed=True)
+        if repr_out:
+            ret.append(repr_out)
+
+        return "\n".join(ret)
+
+
 Token = int
 GenericResult = Union[Exception, RunnersResult, fabric.transfer.Result]
 HostToResult = Dict[str, GenericResult]
@@ -175,6 +194,8 @@ class RawExecutor:
         self.logger = logger
         self.connection_pool = connection_pool
         self.timeout = timeout
+        if timeout is None:
+            self.timeout = static.GLOBALS['nodes']['command_execution']['timeout']
         self._connections_queue: Dict[str, List[_PayloadItem]] = {}
         self._last_token = -1
         self._last_results: Dict[str, TokenizedResult] = {}
@@ -204,61 +225,86 @@ class RawExecutor:
             return False
 
         for arg in self._supported_args:
-            if arg in ('out_stream', 'err_stream') and not (kwargs1.get(arg) is kwargs2.get(arg)):
-                return False
+            if arg in ('out_stream', 'err_stream') and kwargs1.get(arg) is kwargs2.get(arg):
+                continue
 
-            if arg in ('env', 'watchers') and (kwargs1.get(arg) is not None or kwargs2.get(arg) is not None):
-                return False
+            if arg in ('hide', 'warn') and kwargs1.get(arg) == kwargs2.get(arg):
+                continue
 
-            if kwargs1.get(arg) != kwargs2.get(arg):
+            # If any action has 'env', or 'watchers', they are not mergeable.
+            # Actions that have specific 'timeout' params are also not mergeable,
+            # as we need to apply the specified timeout to the exactly one command.
+            if kwargs1.get(arg) is not None or kwargs2.get(arg) is not None:
                 return False
 
         return True
 
-    def _reparse_results(self, results: _RawHostToResult, batch: Dict[str, List[_PayloadItem]],
+    def _reparse_results(self, raw_results: _RawHostToResult, batch: Dict[str, List[_PayloadItem]],
                          failed_hosts: Set[str]) -> Dict[str, TokenizedResult]:
         reparsed_results: Dict[str, TokenizedResult] = {}
-        for host, result in results.items():
+        for host, raw_result in raw_results.items():
             payloads = batch[host]
-
             conn_results: TokenizedResult = collections.OrderedDict()
             reparsed_results[host] = conn_results
-            if not isinstance(result, fabric.runners.Result):
+
+            runner_exception = None
+            if isinstance(raw_result, invoke.UnexpectedExit) or isinstance(raw_result, invoke.CommandTimedOut):
+                # If UnexpectedExit, all separators are printed till the last failed command.
+                # CommandTimedOut may currently arise only for the single command in the batch,
+                # so it definitely have no separators in the output, and it is thus safe to parse it.
+                runner_exception = raw_result
+                raw_result = raw_result.result
+
+            if not isinstance(raw_result, fabric.runners.Result):
                 token = payloads[0][2]
-                conn_results[token] = result
+                conn_results[token] = raw_result
                 continue
 
-            # unpack last action in list of payloads
-            _, _, kwargs = payloads[-1][0]
+            results = self._reparse_fabric_result(payloads, raw_result)
 
-            stderrs = result.stderr.split(self._command_separator + '\n')
-            raw_stdouts = result.stdout.split(self._command_separator + '\n')
-            stdouts = []
-            exit_codes = []
-            i = 0
-            while i < len(raw_stdouts):
-                stdouts.append(raw_stdouts[i])
-                if i + 1 < len(raw_stdouts):
-                    exit_codes.append(int(raw_stdouts[i + 1].strip()))
-                i += 2
-            exit_codes.append(result.exited)
-            for i, code in enumerate(exit_codes):
-                action, callback, token = payloads[i]
-                command: str = action[1][0]
-                result = RunnersResult(
-                    [command], [code], stdouts[i], stderrs[i], hide=kwargs.get('hide', False))
-
-                # If the last command was exited with non-zero code and warn if False (default),
-                # the result is an UnexpectedExit exception.
-                if i == len(exit_codes) - 1 and result.exited != 0 and not kwargs.get('warn', False):
-                    result = UnexpectedExit(result)
+            for i, result in enumerate(results):
+                reparsed_result: GenericResult = result
+                _, callback, token = payloads[i]
+                if i == len(results) - 1 and runner_exception is not None:
                     failed_hosts.add(host)
+                    if isinstance(runner_exception, invoke.UnexpectedExit):
+                        # Commands were successful until the last command in the batch.
+                        reparsed_result = UnexpectedExit(result)
+                    if isinstance(runner_exception, invoke.CommandTimedOut):
+                        # There can be only one (and the last) command with 'timeout' in the batch.
+                        reparsed_result = CommandTimedOut(result, runner_exception.timeout)
 
-                conn_results[token] = result
-                if callback is not None and isinstance(result, RunnersResult):
-                    callback.accept(host, token, result)
+                conn_results[token] = reparsed_result
+                if callback is not None and isinstance(reparsed_result, RunnersResult):
+                    callback.accept(host, token, reparsed_result)
 
         return reparsed_results
+
+    def _reparse_fabric_result(self, payloads: List[_PayloadItem],
+                               result: fabric.runners.Result) -> List[RunnersResult]:
+        # unpack last action in list of payloads
+        _, _, kwargs = payloads[-1][0]
+
+        stderrs = result.stderr.split(self._command_separator + '\n')
+        raw_stdouts = result.stdout.split(self._command_separator + '\n')
+        stdouts = []
+        exit_codes = []
+        i = 0
+        while i < len(raw_stdouts):
+            stdouts.append(raw_stdouts[i])
+            if i + 1 < len(raw_stdouts):
+                exit_codes.append(int(raw_stdouts[i + 1].strip()))
+            i += 2
+        exit_codes.append(result.exited)
+
+        results = []
+        for i, code in enumerate(exit_codes):
+            action, _, _ = payloads[i]
+            command: str = action[1][0]
+            results.append(RunnersResult(
+                    [command], [code], stdouts[i], stderrs[i], hide=kwargs.get('hide', False)))
+
+        return results
 
     def _get_separator(self, warn: bool) -> str:
         if warn:
@@ -402,6 +448,10 @@ class RawExecutor:
             args = (local_stream, remote_file)
 
         if do_type in ('run', 'sudo'):
+            # Do not add 'timeout=self.timeout'.
+            # Though it is possible in case of only one command in the batch, it is unsafe in case of few commands.
+            # If few commands failed with timeout, we currently do not have safe algorithm to reparse the results.
+
             commands: List[str] = [action[1][0] for action, _, _ in payloads]
             self.logger.verbose('Executing %s %s on host %s with options: %s' % (do_type, commands, host, kwargs))
 
@@ -414,12 +464,6 @@ class RawExecutor:
 
             merged_command = (separator + precommand).join(commands)
             args = (merged_command,)
-
-            if not warn:
-                kwargs = dict(kwargs)
-                # Do not fail when exiting with non-zero code.
-                # If 'warn' is initially True, then the exception will be raised during reparsing of result
-                kwargs['warn'] = True
 
         return do_type, args, kwargs
 

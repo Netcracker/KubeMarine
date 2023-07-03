@@ -241,7 +241,7 @@ class RemoteExecutorTest(unittest.TestCase):
             self.assertEqual(1, len(result), "Result should be partially collected")
             self.assertEqual("foo\n", result[0].stdout, "Result was not collected")
 
-    def test_represent_group_exception(self):
+    def test_represent_group_exception_one_command_failed(self):
         group = self.cluster.nodes["control-plane"].new_defer()
         results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
@@ -276,6 +276,52 @@ class RemoteExecutorTest(unittest.TestCase):
             \t
             \t=== stderr ===
             \tfailed
+            \t
+            10.101.1.3: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t
+            10.101.1.4: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t"""
+                                ).replace("""\
+            """, ""
+                                          )
+        self.assertEqual(expected_results_str, str(exception),
+                         "Unexpected textual representation of remote group exception")
+
+    def test_represent_group_exception_timeout(self):
+        group = self.cluster.nodes["control-plane"].new_defer()
+        results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_hosts_result(group.get_hosts(), stdout="bar\n")
+        results[group.get_first_member().get_host()] = demo.create_result(stdout="bar\n", timeout=10)
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\" && sleep 10"])
+
+        group.run("echo \"foo\"", timeout=10)
+        group.run("echo \"bar\" && sleep 10", timeout=10)
+
+        exception = None
+        try:
+            group.flush()
+        except RemoteGroupException as exc:
+            exception = exc
+
+        self.assertIsNotNone(exception, "Exception was not raised")
+        expected_results_str = ("""\
+            10.101.1.2: code=0
+            \t=== stdout ===
+            \tfoo
+            \t
+            \tCommand did not complete within 10 seconds!
+            \t
+            \tCommand: 'echo "bar" && sleep 10'
+            \t
+            \t=== stdout ===
+            \tbar
             \t
             10.101.1.3: code=0
             \t=== stdout ===
