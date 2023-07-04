@@ -39,7 +39,7 @@ dependencies = [
     "deepdiff==6.2.*",
     "ordered-set==4.1.*",
     # cryptography is a transitive dependency of paramiko. Fix version to avoid unexpected deprecation warnings.
-    "cryptography==39.0.*",
+    "cryptography==41.0.*",
     "paramiko==2.11.*",
     "jsonschema==4.17.*",
 ]
