@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ipaddress
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import os
 
@@ -22,7 +22,7 @@ from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
 # DEPRECATED
-def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str):
+def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str) -> None:
     """
     The method implements full processing for Calico plugin
     :param calico_original_yaml: path to original Calico manifest
@@ -129,7 +129,7 @@ class CalicoManifestProcessor(Processor):
         :param container: object describing a container
         """
         key = "DaemonSet_calico-node"
-        env_delete = []
+        env_delete: List[str] = []
         ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
         if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
             env_delete.extend([
@@ -139,15 +139,15 @@ class CalicoManifestProcessor(Processor):
         if utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled']) == "false":
             env_delete.append('FELIX_TYPHAK8SSERVICENAME')
 
-        for env in env_delete:
+        for name in env_delete:
             for i, e in enumerate(container['env']):
-                if e['name'] == env:
+                if e['name'] == name:
                     del container['env'][i]
-                    self.log.verbose(f"The {env!r} env variable has been removed from "
+                    self.log.verbose(f"The {name!r} env variable has been removed from "
                                     f"'spec.template.spec.containers.[{container_pos}].env' in the {key}")
                     break
 
-        env_update = {}
+        env_update: Dict[str, dict] = {}
         for name, value in self.inventory['plugins']['calico']['env'].items():
             if name in env_delete:
                 continue
@@ -183,9 +183,9 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "Deployment_calico-typha"
-        source_yaml = manifest.get_obj(key, patch=True, allow_absent=True)
-        if source_yaml is None:
-            return
+        if not manifest.has_obj(key):
+            return None
+        source_yaml = manifest.get_obj(key, patch=True)
 
         default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                                {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
@@ -230,8 +230,7 @@ class CalicoManifestProcessor(Processor):
     def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
         """
         The method implements the enrichment procedure for Calico CRD Felixconfigurations
-        :param cluster: Cluster object
-        :param obj_list: list of objects for enrichment
+        :param manifest: Container to operate with manifest objects
         """
 
         key = "CustomResourceDefinition_felixconfigurations.crd.projectcalico.org"

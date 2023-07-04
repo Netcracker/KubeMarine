@@ -11,50 +11,49 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import annotations
+
 import argparse
 import io
 import re
 import threading
+import time
+from abc import ABC
 from copy import deepcopy
-from typing import List, Dict, Union, Any, IO, Optional
+from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO
 
-import fabric
+import fabric  # type: ignore[import]
 from invoke import UnexpectedExit
 
 from kubemarine import system
-from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core import group, flow, connections
-from kubemarine.core.connections import Connections
-from kubemarine.core.group import NodeGroup, NodeGroupResult, _GenericResult, _HostToResult
+from kubemarine.core.cluster import KubernetesCluster, _AnyConnectionTypes
+from kubemarine.core import flow, connections
+from kubemarine.core.executor import RunnersResult, GenericResult, Token
+from kubemarine.core.group import (
+    AbstractGroup, NodeGroup, NodeGroupResult, DeferredGroup, RunnersGroupResult,
+    GROUP_RUN_TYPE, RemoteExecutor, RunResult
+)
 from kubemarine.core.resources import DynamicResources
 
-ShellResult = Dict[str, Union[NodeGroupResult, Any]]
+_ShellResult = Dict[str, Any]
+_ROLE_SPEC = Union[int, List[str]]
 
 
 class FakeShell:
     def __init__(self):
-        self.results: Dict[str, List[ShellResult]] = {}
-        self.history: Dict[str, List[ShellResult]] = {}
+        self.results: Dict[str, List[_ShellResult]] = {}
+        self.history: Dict[str, List[_ShellResult]] = {}
         self._lock = threading.Lock()
-
-    def __deepcopy__(self, memodict: dict):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memodict[id(self)] = result
-        result.results = deepcopy(self.results, memodict)
-        result.history = deepcopy(self.history, memodict)
-        result._lock = threading.Lock()
-        return result
 
     def reset(self):
         self.results = {}
         self.history = {}
 
-    def add(self, results: Union[NodeGroupResult, _HostToResult], do_type, args, usage_limit=0):
+    def add(self, results: Mapping[str, GenericResult], do_type, args, usage_limit=0):
         args.sort()
 
         for host, result in results.items():
-            host = host.host if isinstance(host, fabric.connection.Connection) else host
             result = {
                 'result': result,
                 'do_type': do_type,
@@ -67,7 +66,7 @@ class FakeShell:
 
             self.results.setdefault(host, []).append(result)
 
-    def find(self, host: str, do_type, args, kwargs) -> _GenericResult:
+    def find(self, host: str, do_type, args, kwargs) -> GenericResult:
         # TODO: Support kwargs
         with self._lock:
             if isinstance(args, tuple):
@@ -116,39 +115,50 @@ class FakeShell:
 class FakeFS:
     def __init__(self):
         self.storage: Dict[str, Dict[str, str]] = {}
+        self.emulate_latency = False
         self._lock = threading.Lock()
-
-    def __deepcopy__(self, memodict: dict):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memodict[id(self)] = result
-        result.storage = deepcopy(self.storage, memodict)
-        result._lock = threading.Lock()
-        return result
 
     def reset(self):
         self.storage = {}
+        self.emulate_latency = False
 
     def reset_host(self, host):
         self.storage[host] = {}
 
-    # covered by test.test_demo.TestFakeFS.test_put_string
-    # covered by test.test_demo.TestFakeFS.test_put_stringio
-    # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
+    # covered by test.test_demo.TestFakeFS.test_put_file
+    # covered by test.test_demo.TestFakeFS.test_put_bytesio
+    # covered by test.test_group.TestGroupCall.test_write_stream
     def write(self, host, filename, data):
+        if isinstance(data, io.BytesIO):
+            # Emulate how fabric handles file-like objects.
+            # See fabric.transfer.Transfer.put
+            pointer = data.tell()
+            try:
+                data.seek(0)
+                text = self._transfer(data)
+            finally:
+                data.seek(pointer)
+        elif isinstance(data, str):
+            with open(data, "rb") as fl:
+                text = self._transfer(fl)
+        else:
+            raise ValueError("Unsupported data type " + str(type(data)))
+
         with self._lock:
-            if isinstance(data, io.BytesIO):
-                data = data.getvalue().decode('utf-8')
-            elif isinstance(data, str):
-                # this is for self-testing purpose
-                pass
-            elif isinstance(data, io.IOBase):
-                data = data.read().decode('utf-8')
-            else:
-                raise ValueError("Unsupported data type " + str(type(data)))
-            if self.storage.get(host) is None:
-                self.storage[host] = {}
-            self.storage[host][filename] = data
+            self.storage.setdefault(host, {})[filename] = text
+
+    def _transfer(self, fl: IO) -> str:
+        # Emulate how paramiko transfers files.
+        # See paramiko.sftp_client.SFTPClient._transfer_with_callback
+        target = io.BytesIO()
+        while True:
+            data = fl.read(32768)
+            target.write(data)
+            if self.emulate_latency:
+                time.sleep(0.1)
+            if len(data) == 0:
+                break
+        return target.getvalue().decode('utf-8')
 
     # covered by test.test_demo.TestFakeFS.test_put_string
     # covered by test.test_demo.TestFakeFS.test_get_nonexistent
@@ -179,11 +189,10 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_shell = kwargs.pop("fake_shell", FakeShell())
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
-        self._connection_pool = FakeConnectionPool(self)
+        self.connection_pool = FakeConnectionPool(self)
 
-    def make_group(self, ips) -> NodeGroup:
-        nodegroup = super().make_group(ips)
-        return FakeNodeGroup(nodegroup.nodes, self)
+    def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
+        return FakeNodeGroup(ips, self)
 
     def dump_finalized_inventory(self):
         return
@@ -206,12 +215,12 @@ class FakeResources(DynamicResources):
         self._nodes_context = nodes_context
         self._procedure_inventory = procedure_inventory
 
-    def _load_inventory(self):
+    def _load_inventory(self) -> None:
         self._raw_inventory = deepcopy(self.stored_inventory)
         self._formatted_inventory = deepcopy(self.stored_inventory)
 
-    def _store_inventory(self):
-        self.stored_inventory = deepcopy(self._formatted_inventory)
+    def _store_inventory(self) -> None:
+        self.stored_inventory = deepcopy(self.formatted_inventory())
 
     def _new_cluster_instance(self, context: dict) -> FakeKubernetesCluster:
         self.last_cluster = FakeKubernetesCluster(
@@ -222,7 +231,7 @@ class FakeResources(DynamicResources):
         return self.last_cluster
 
 
-class FakeConnection(fabric.connection.Connection):
+class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
     def __init__(self, ip, cluster: FakeKubernetesCluster, **kw):
         super().__init__(ip, **kw)
@@ -339,22 +348,29 @@ class FakeConnection(fabric.connection.Connection):
         pass
 
 
-class FakeNodeGroup(group.NodeGroup):
+class FakeAbstractGroup(AbstractGroup[GROUP_RUN_TYPE], ABC):
+    def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
+                     backup=False, sudo=False, mkdir=False, immutable=False):
+        super()._put_with_mv(local_stream, remote_file, backup=False, sudo=False, mkdir=False, immutable=False)
 
-    def __init__(self, connections: Connections, cluster_: FakeKubernetesCluster):
-        super().__init__(connections, cluster_)
 
-    def get_local_file_sha1(self, filename):
+class FakeNodeGroup(NodeGroup, FakeAbstractGroup[RunnersGroupResult]):
+    def _make_group(self, ips: Iterable[Union[str, NodeGroup]]) -> FakeNodeGroup:
+        return FakeNodeGroup(ips, self.cluster)
+
+    def _make_defer(self, executor: RemoteExecutor) -> FakeDeferredGroup:
+        return FakeDeferredGroup(self.nodes, self.cluster, executor)
+
+    def get_local_file_sha1(self, filename: str) -> str:
         return '0'
 
-    def get_remote_file_sha1(self, filename):
-        return {host: '1' for host in self.nodes.keys()}
+    def get_remote_file_sha1(self, filename: str) -> Dict[str, Optional[str]]:
+        return {host: '1' for host in self.nodes}
 
-    def _put(self, local_stream: IO, remote_file: str, **kwargs):
-        kwargs.pop("sudo", None)
-        kwargs.pop("backup", None)
-        kwargs.pop("immutable", None)
-        super()._put(local_stream, remote_file, **kwargs)
+
+class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
+    def _make_group(self, ips: Iterable[Union[str, DeferredGroup]]) -> FakeDeferredGroup:
+        return FakeDeferredGroup(ips, self.cluster, self._executor)
 
 
 class FakeConnectionPool(connections.ConnectionPool):
@@ -370,7 +386,7 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure: str = None):
+def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure='install'):
     args = list(args) if args else []
     # todo probably increase logging level to get rid of spam in logs.
     if '--disable-dump' not in args:
@@ -395,6 +411,7 @@ def new_cluster(inventory, procedure_inventory=None, context: dict = None,
     context['nodes'] = nodes_context
 
     # It is possible to disable FakeCluster and create real cluster Object for some business case
+    cluster: KubernetesCluster
     if fake:
         cluster = FakeKubernetesCluster(inventory, context, procedure_inventory=procedure_inventory)
     else:
@@ -430,7 +447,8 @@ def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', 
     return context
 
 
-def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mntc=0):
+def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker: _ROLE_SPEC = 1,
+                       keepalived: _ROLE_SPEC = 0, haproxy_mntc: _ROLE_SPEC = 0) -> dict:
     inventory: dict = {
         'node_defaults': {
             'keyfile': '/dev/null',
@@ -443,7 +461,7 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
         'cluster_name': 'k8s.fake.local'
     }
 
-    id_roles_map = {}
+    id_roles_map: Dict[str, List[str]] = {}
 
     for role_name in ['balancer', 'master', 'worker']:
 
@@ -478,17 +496,17 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
         })
 
     ip_i = 0
-    vrrp_ips = []
+    vrrp_ips: List[Union[str, dict]] = []
 
     if isinstance(keepalived, list):
-        vrrp_ips.append(deepcopy(keepalived))
+        vrrp_ips.extend(deepcopy(keepalived))
     elif isinstance(keepalived, int) and keepalived > 0:
         for _ in range(keepalived):
             ip_i = ip_i + 1
             vrrp_ips.append('10.101.2.%s' % ip_i)
 
     if isinstance(haproxy_mntc, list):
-        vrrp_ips.append(deepcopy(haproxy_mntc))
+        vrrp_ips.extend(deepcopy(haproxy_mntc))
     elif isinstance(haproxy_mntc, int) and haproxy_mntc > 0:
         for _ in range(haproxy_mntc):
             ip_i = ip_i + 1
@@ -513,26 +531,32 @@ def generate_inventory(balancer=1, master=1, worker=1, keepalived=0, haproxy_mnt
     return inventory
 
 
-def create_exception_result(group_: NodeGroup, exception: Exception) -> NodeGroupResult:
-    return NodeGroupResult(group_.cluster, create_hosts_exception_result(group_.get_hosts(), exception))
+def create_nodegroup_result_by_hosts(cluster: KubernetesCluster, results: Dict[str, GenericResult]) -> NodeGroupResult:
+    return NodeGroupResult(cluster, results)
 
 
-def create_hosts_exception_result(hosts: List[str], exception: Exception) -> _HostToResult:
+def create_exception_result(group_: AbstractGroup[RunResult], exception: Exception) -> NodeGroupResult:
+    hosts_to_result = create_hosts_exception_result(group_.get_hosts(), exception)
+    return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
+
+
+def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dict[str, GenericResult]:
     return {host: exception for host in hosts}
 
 
-def create_nodegroup_result(group_: NodeGroup, stdout='', stderr='', code=0) -> NodeGroupResult:
-    return NodeGroupResult(group_.cluster, create_hosts_result(group_.get_hosts(), stdout, stderr, code))
+def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout='', stderr='', code=0) -> NodeGroupResult:
+    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code)
+    return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> _HostToResult:
+def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> Dict[str, GenericResult]:
     # each host should have its own result instance.
     return {host: create_result(stdout, stderr, code) for host in hosts}
 
 
-def create_result(stdout='', stderr='', code=0) -> _GenericResult:
+def create_result(stdout='', stderr='', code=0) -> RunnersResult:
     # connection will be later replaced to fake
-    return fabric.runners.Result(stdout=stdout, stderr=stderr, exited=code, connection=None)
+    return RunnersResult(stdout=stdout, stderr=stderr, exited=code)
 
 
 def empty_action(*args, **kwargs) -> None:
@@ -549,11 +573,11 @@ def new_scheme(scheme: dict, role: str, number: int):
     return scheme
 
 
-FULLHA = {'balancer': 1, 'master': 3, 'worker': 3}
-FULLHA_KEEPALIVED = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
-FULLHA_NOBALANCERS = {'balancer': 0, 'master': 3, 'worker': 3}
-ALLINONE = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
-MINIHA = {'master': 3}
-MINIHA_KEEPALIVED = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
-                     'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
-NON_HA_BALANCER = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}
+FULLHA: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': 3}
+FULLHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'balancer': 2, 'master': 3, 'worker': 3, 'keepalived': 1}
+FULLHA_NOBALANCERS: Dict[str, _ROLE_SPEC] = {'balancer': 0, 'master': 3, 'worker': 3}
+ALLINONE: Dict[str, _ROLE_SPEC] = {'master': 1, 'balancer': ['master-1'], 'worker': ['master-1'], 'keepalived': 1}
+MINIHA: Dict[str, _ROLE_SPEC] = {'master': 3}
+MINIHA_KEEPALIVED: Dict[str, _ROLE_SPEC] = {'master': 3, 'balancer': ['master-1', 'master-2', 'master-3'],
+                                            'worker': ['master-1', 'master-2', 'master-3'], 'keepalived': 1}
+NON_HA_BALANCER: Dict[str, _ROLE_SPEC] = {'balancer': 1, 'master': 3, 'worker': ['master-1', 'master-2', 'master-3']}

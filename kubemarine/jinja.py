@@ -18,18 +18,17 @@ import jinja2
 from kubemarine.core import defaults, log
 
 
-def new(logger: log.EnhancedLogger, recursive_compile=False, root: dict = None):
-    if recursive_compile and root is None:
-        raise Exception(
-            "If recursive compilation is enabled, "
-            "'root' parameter should also be specified to provide compilation context.")
-
-    def _precompile(filter_: str, struct: str):
+def new(logger: log.EnhancedLogger, recursive_compile: bool = False, root: dict = None) -> jinja2.Environment:
+    def _precompile(filter_: str, struct: str) -> str:
         if not isinstance(struct, str):
             raise ValueError(f"Filter {filter_!r} can be applied only on string")
 
         if not recursive_compile:
             return struct
+        elif root is None:
+            raise Exception(
+                "If recursive compilation is enabled, "
+                "'root' parameter should also be specified to provide compilation context.")
 
         struct = precompile(logger, struct, root)
 

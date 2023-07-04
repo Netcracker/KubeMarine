@@ -29,24 +29,24 @@ class SummaryItem(enum.Enum):
     ACCOUNT_TOKENS = (4, "Account Tokens File")
     EXECUTION_TIME = (5, "Elapsed")
 
-    def __init__(self, order, text):
+    def __init__(self, order: int, text: str) -> None:
         self.order = order
         self.text = text
 
-    def __lt__(self, other):
+    def __lt__(self, other: 'SummaryItem') -> bool:
         return self.order < other.order
 
 
-def schedule_report(context: dict, property: SummaryItem, value: str):
+def schedule_report(context: dict, property: SummaryItem, value: str) -> None:
     context.setdefault('summary_report', {})[property] = value
 
 
-def schedule_delayed_report(cluster: KubernetesCluster, call: Callable[[KubernetesCluster], None]):
+def schedule_delayed_report(cluster: KubernetesCluster, call: Callable[[KubernetesCluster], None]) -> None:
     cluster.context.setdefault('delayed_summary_report', []).append(call)
     cluster.schedule_cumulative_point(exec_delayed)
 
 
-def print_summary(context: dict, logger: log.EnhancedLogger):
+def print_summary(context: dict, logger: log.EnhancedLogger) -> None:
     summary_items: Dict[SummaryItem, str] = context.get('summary_report', {})
     max_length = max(len(si.text) for si in summary_items.keys())
     logger.info('')
@@ -55,6 +55,6 @@ def print_summary(context: dict, logger: log.EnhancedLogger):
         logger.info(key + value)
 
 
-def exec_delayed(cluster: KubernetesCluster):
+def exec_delayed(cluster: KubernetesCluster) -> None:
     for call in cluster.context.get('delayed_summary_report', []):
         call(cluster)

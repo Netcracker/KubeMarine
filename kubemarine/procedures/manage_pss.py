@@ -15,6 +15,7 @@
 
 
 from collections import OrderedDict
+from typing import List
 
 from kubemarine import admission
 from kubemarine.core import flow
@@ -30,15 +31,15 @@ tasks = OrderedDict({
 
 
 class PSSAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('manage pss', recreate_inventory=True)
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
 
     cli_help = '''
     Script for managing pss on existing Kubernetes cluster.

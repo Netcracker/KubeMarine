@@ -20,7 +20,7 @@ from kubemarine.core.resources import DynamicResources
 class Action(ABC):
     """Base class for doing some work based on provided DynamicResources"""
 
-    def __init__(self, identifier: str, recreate_inventory=False):
+    def __init__(self, identifier: str, recreate_inventory: bool = False) -> None:
         """
         Constructor of Action to be invoked from derived classes.
 

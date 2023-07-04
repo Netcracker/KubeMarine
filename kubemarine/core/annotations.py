@@ -11,33 +11,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Callable, TypeVar
+
+from typing_extensions import ParamSpec
 
 from kubemarine.core.group import NodeGroup
 
 
-def restrict_multi_os_group(fn: callable):
+_P = ParamSpec('_P')
+_T = TypeVar('_T')
+
+
+def restrict_multi_os_group(fn: Callable[_P, _T]) -> Callable[_P, _T]:
     """
     Method is an annotation that does not allow origin method to use different OS families in the same group.
     :param fn: Origin function to apply annotation validation to
     :return: Validation wrapper function
     """
-    def wrapper(group: NodeGroup, *args, **kwargs):
-        # TODO: walk through all nodes in *args, check isinstance NodeGroup and perform validation
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+        group = next((g for g in args if isinstance(g, NodeGroup)), None)
+        if group is None:
+            raise Exception("Failed to find argument of NodeGroup type")
         if group.is_multi_os():
             raise Exception(f'Method "{str(fn)}" do not supports multi-os group')
-        return fn(group, *args, **kwargs)
+        return fn(*args, **kwargs)
     return wrapper
 
 
-def restrict_empty_group(fn: callable):
+def restrict_empty_group(fn: Callable[_P, _T]) -> Callable[_P, _T]:
     """
     Method is an annotation that prohibits passing empty groups to the function.
     :param fn: Origin function to apply annotation validation to
     :return: Validation wrapper function
     """
-    def wrapper(group: NodeGroup, *args, **kwargs):
-        # TODO: walk through all nodes in *args, check isinstance NodeGroup and perform validation
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+        group = next((g for g in args if isinstance(g, NodeGroup)), None)
+        if group is None:
+            raise Exception("Failed to find argument of NodeGroup type")
         if group.is_empty():
             raise Exception(f'Method "{str(fn)}" prohibits passing empty groups to it')
-        return fn(group, *args, **kwargs)
+        return fn(*args, **kwargs)
     return wrapper

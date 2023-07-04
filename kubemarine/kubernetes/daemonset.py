@@ -18,7 +18,7 @@ from kubemarine.kubernetes.object import KubernetesObject
 
 class DaemonSet(KubernetesObject):
 
-    def __init__(self, cluster: KubernetesCluster, name=None, namespace=None, obj=None):
+    def __init__(self, cluster: KubernetesCluster, name: str = None, namespace: str = None, obj: dict = None) -> None:
         super().__init__(cluster, kind='DaemonSet', name=name, namespace=namespace, obj=obj)
 
     def is_actual_and_ready(self) -> bool:

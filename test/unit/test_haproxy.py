@@ -18,6 +18,7 @@ import unittest
 
 from kubemarine import haproxy, yum
 from kubemarine import demo
+from kubemarine.core.group import NodeGroupResult
 
 
 class HAProxyDefaultsEnrichment(unittest.TestCase):
@@ -90,8 +91,6 @@ class TestHaproxyInstallation(unittest.TestCase):
         actual_result = haproxy.install(cluster.nodes['balancer'])
 
         # verify installation result should be the same as simulated and contain version print stdout
-        expected_results_1 = get_result_str(expected_results_1)
-
         self.assertEqual(expected_results_1, actual_result)
 
     def test_haproxy_installation_when_not_installed(self):
@@ -134,23 +133,7 @@ class TestHaproxyInstallation(unittest.TestCase):
         actual_result = haproxy.install(cluster.nodes['balancer'])
 
         # verify installation result should be the same as simulated and contain version print stdout
-        expected_results = get_result_str(expected_results)
-
         self.assertEqual(expected_results, actual_result)
-
-
-def get_result_str(results):
-    output = ""
-    for conn, result in results.items():
-        if output != "":
-            output += "\n"
-        output += "\t%s (%s): code=%i" % (conn.host, 0, result.exited)
-        if result.stdout:
-            output += "\n\t\tSTDOUT: %s" % result.stdout.replace("\n", "\n\t\t        ")
-        if result.stderr:
-            output += "\n\t\tSTDERR: %s" % result.stderr.replace("\n", "\n\t\t        ")
-
-    return output
 
 
 if __name__ == '__main__':

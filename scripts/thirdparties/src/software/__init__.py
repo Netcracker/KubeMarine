@@ -14,7 +14,7 @@
 
 import os.path
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from ruamel.yaml import CommentedMap
 
@@ -129,7 +129,7 @@ class InternalCompatibility:
     def load(self, tracker: ChangesTracker, filename: str) -> CompatibilityMap:
         return CompatibilityMap(tracker, filename)
 
-    def store(self, compatibility_map: CompatibilityMap):
+    def store(self, compatibility_map: CompatibilityMap) -> None:
         with utils.open_internal(compatibility_map.resource_path, 'w') as stream:
             YAML.dump(compatibility_map.compatibility_map, stream)
 
@@ -138,7 +138,7 @@ class InternalCompatibility:
 
 
 class UpgradeConfig:
-    def __init__(self):
+    def __init__(self) -> None:
         with utils.open_internal(SOFTWARE_UPGRADE_PATH) as stream:
             self.config: CommentedMap = YAML.load(stream)
 
@@ -146,7 +146,7 @@ class UpgradeConfig:
     def name(self) -> str:
         return os.path.basename(SOFTWARE_UPGRADE_PATH)
 
-    def prepare(self, tracker: SummaryTracker, software_types: List[str]):
+    def prepare(self, tracker: SummaryTracker, software_types: List[str]) -> None:
         """
         Create stubs for known software types and delete unexpected software types.
 
@@ -164,7 +164,7 @@ class UpgradeConfig:
                 tracker.deleted_unexpected_content = True
                 print(f"Deleted {key!r} from {self.name}")
 
-    def store(self):
+    def store(self) -> None:
         with utils.open_internal(SOFTWARE_UPGRADE_PATH, 'w') as stream:
             YAML.dump(self.config, stream)
 
@@ -180,8 +180,8 @@ class UpgradeSoftware(ChangesTracker):
         if software_names:
             self.config: CommentedMap = upgrade_config.config[software_type]
         else:
-            self.config: CommentedMap = upgrade_config.config.pop(software_type)
-        self._new_k8s = set()
+            self.config = upgrade_config.config.pop(software_type)
+        self._new_k8s: Set[str] = set()
 
     def prepare(self, summary_tracker: SummaryTracker) -> None:
         """
@@ -200,17 +200,17 @@ class UpgradeSoftware(ChangesTracker):
                 summary_tracker.deleted_unexpected_content = True
                 print(f"Deleted {self.software_type}.{key} from {self.upgrade_config.name}")
 
-    def new(self, k8s_version: str):
+    def new(self, k8s_version: str) -> None:
         self._new_k8s.add(k8s_version)
 
-    def delete(self, k8s_version: str, software_name: str):
+    def delete(self, k8s_version: str, software_name: str) -> None:
         if software_name not in self.software_names:
             return
         k8s_versions: list = self.config[software_name]
         if k8s_version in k8s_versions:
             k8s_versions.remove(k8s_version)
 
-    def update(self, k8s_version: str, software_name: str):
+    def update(self, k8s_version: str, software_name: str) -> None:
         if k8s_version in self._new_k8s:
             return
         if software_name not in self.software_names:
