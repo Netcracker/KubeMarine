@@ -26,7 +26,7 @@ from ordered_set import OrderedSet
 from kubemarine import selinux, kubernetes, apparmor
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback
+from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
 from kubemarine.core.group import (
     GenericGroupResult, RunnersGroupResult, GroupResultException,
     NodeGroup, DeferredGroup, AbstractGroup, GROUP_RUN_TYPE, CollectorCallback
@@ -383,6 +383,7 @@ def perform_group_reboot(group: NodeGroup) -> RunnersGroupResult:
     initial_boot_history = get_reboot_history(group)
     result = group.sudo(group.cluster.globals['nodes']['boot']['reboot_command'], warn=True)
     log.debug("Waiting for boot up...")
+    log.verbose("Initial boot history:\n%s" % initial_boot_history)
     group.wait_for_reboot(initial_boot_history)
     return result
 
@@ -623,7 +624,7 @@ def _detect_nodes_access_info(cluster: KubernetesCluster) -> None:
         nodes_context[host]['access'] = access_info
 
         if isinstance(result, Exception):
-            if NodeGroup.is_require_nopasswd_exception(result):
+            if RawExecutor.is_require_nopasswd_exception(result):
                 # The error is thrown only if connection is successful, but something is wrong with sudo access.
                 # In general, sudo password is incorrect. In our case, user is not a sudoer, or not a nopasswd sudoer.
                 access_info['online'] = True

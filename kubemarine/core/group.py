@@ -17,22 +17,16 @@ from __future__ import annotations
 import io
 import os
 import random
-import re
-import time
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime
 from types import FunctionType
 from typing import (
     Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast
 )
 
-import invoke
-
 from kubemarine.core import utils, log, errors
 from kubemarine.core.executor import (
     RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult,
-    UnexpectedExit
 )
 
 NodeConfig = Dict[str, Any]
@@ -460,15 +454,6 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         for action in actions:
             self.call(action)
 
-    def _default_connection_kwargs(self, do_type: str, kwargs: dict) -> dict:
-        if do_type in ["run", "sudo"]:
-            # by default fabric will print all output from nodes
-            # let's disable this feature if it was not forcibly defined
-            if kwargs.get("hide") is None:
-                kwargs['hide'] = True
-
-        return kwargs
-
     def get_online_nodes(self: GROUP_SELF, online: bool) -> GROUP_SELF:
         online_hosts = [host for host, node_context in self.cluster.context['nodes'].items()
                         if node_context['access']['online'] == online]
@@ -666,10 +651,10 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         return RemoteExecutor(self, timeout=timeout)
 
     def get(self, remote_file: str, local_file: str) -> None:
-        self._do_with_wa("get", remote_file, local_file)
+        self._do_exec("get", remote_file, local_file)
 
     def _put(self, local_stream: Union[io.BytesIO, str], remote_file: str) -> None:
-        self._do_with_wa("put", local_stream, remote_file)
+        self._do_exec("put", local_stream, remote_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
              **kwargs: Any) -> RunnersGroupResult:
@@ -685,72 +670,23 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
             kwargs['out_stream'] = log.LoggerWriter(logger, caller, '\t')
             kwargs['err_stream'] = log.LoggerWriter(logger, caller, '\t')
 
-        results = self._do_with_wa(do_type, command, **kwargs)
+        results = self._do_exec(do_type, command, **kwargs)
         return self._unsafe_make_runners_result(results)
 
-    def _do_with_wa(self, do_type: str, *args: object, **kwargs: Any) -> HostToResult:
-        left_nodes = self.get_hosts()
-        retry = 0
-        results: HostToResult = {}
-        while True:
-            retry += 1
+    def _do_exec(self, do_type: str, *args: object, **kwargs: Any) -> HostToResult:
+        callback: Callback = kwargs.pop('callback', None)
 
-            result = self._do_exec(left_nodes, do_type, *args, **kwargs)
-            results.update(result)
-            left_nodes = [host for host, result in results.items() if isinstance(result, Exception)]
+        executor = RawExecutor(self.cluster, timeout=kwargs.get('timeout'))
+        executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
+        executor.flush()
 
-            if not left_nodes or retry >= self.cluster.globals['workaround']['retries'] \
-                    or not self._try_workaround(results, left_nodes):
-                break
+        results = {host: next(iter(results.values()))
+                   for host, results in executor.get_last_results().items()}
 
-            self.cluster.log.verbose('Retrying #%s...' % retry)
-            time.sleep(self.cluster.globals['workaround']['delay_period'])
-
-        if left_nodes:
+        if any(isinstance(result, Exception) for result in results.values()):
             raise GroupResultException(NodeGroupResult(self.cluster, results))
 
         return results
-
-    def _try_workaround(self, results: HostToResult, failed_nodes: List[str]) -> bool:
-        not_booted = []
-
-        for host in failed_nodes:
-            exception = results[host]
-            if isinstance(exception, UnexpectedExit):
-                # Do not str(exception) because it discards output in case of hide=False
-                exception_message = str(exception.result)
-            else:
-                exception_message = str(exception)
-
-            if self.is_allowed_etcd_exception(exception_message):
-                self.cluster.log.verbose("Detected ETCD problem at %s, need retry: %s" % (host, exception_message))
-            elif self.is_allowed_kubernetes_exception(exception_message):
-                self.cluster.log.verbose("Detected kubernetes problem at %s, need retry: %s" % (host, exception_message))
-            elif self.is_allowed_connection_exception(exception_message):
-                self.cluster.log.verbose("Detected connection exception at %s, will try to reconnect to node. Exception: %s"
-                                         % (host, exception_message))
-                not_booted.append(host)
-            else:
-                self.cluster.log.verbose("Detected unavoidable exception at %s, trying to solve automatically: %s"
-                                         % (host, exception_message))
-                return False
-
-        # if there are not booted nodes, but we succeeded to wait for at least one is booted, we can continue execution
-        if not_booted and self._make_group(not_booted).wait_and_get_active_nodes().is_empty():
-            return False
-
-        return True
-
-    def _do_exec(self, nodes: List[str], do_type: str, *args: object, **kwargs: Any) -> HostToResult:
-        callback: Callback = kwargs.pop('callback', None)
-        kwargs = self._default_connection_kwargs(do_type, kwargs)
-
-        executor = RawExecutor(self.cluster.log, self.cluster.connection_pool,
-                               timeout=kwargs.get('timeout'))
-        executor.queue(nodes, (do_type, args, kwargs), callback=callback)
-        executor.flush()
-        return {host: next(iter(results.values()))
-                for host, results in executor.get_last_results().items()}
 
     def wait_for_reboot(self, initial_boot_history: RunnersGroupResult, timeout: int = None) -> RunnersGroupResult:
         results = self._await_rebooted_nodes(timeout, initial_boot_history=initial_boot_history)
@@ -763,126 +699,11 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
     def wait_and_get_boot_history(self, timeout: int = None) -> RunnersGroupResult:
         return self.wait_for_reboot(RunnersGroupResult(self.cluster, {}), timeout=timeout)
 
-    def wait_and_get_active_nodes(self, timeout: int = None) -> NodeGroup:
-        results = self._await_rebooted_nodes(timeout)
-        not_booted = [host for host, result in results.items() if isinstance(result, Exception)]
-        return self.exclude_group(self._make_group(not_booted))
-
     def _await_rebooted_nodes(self, timeout: int = None, initial_boot_history: RunnersGroupResult = None) \
             -> HostToResult:
 
-        if timeout is None:
-            timeout = int(self.cluster.inventory['globals']['nodes']['boot']['timeout'])
-
-        delay_period = self.cluster.globals['nodes']['boot']['defaults']['delay_period']
-
-        if initial_boot_history:
-            self.cluster.log.verbose("Initial boot history:\n%s" % initial_boot_history)
-        else:
-            initial_boot_history = RunnersGroupResult(self.cluster, {})
-
-        left_nodes: List[str] = list(self.nodes)
-        results: HostToResult = {}
-        time_start = datetime.now()
-
-        self.cluster.log.verbose("Trying to connect to nodes, timeout is %s seconds..." % timeout)
-
-        # each connection has timeout, so the only we need is to repeat connecting attempts
-        # during specified number of seconds
-        while True:
-            attempt_time_start = datetime.now()
-            self.disconnect(left_nodes)
-
-            self.cluster.log.verbose("Attempting to connect to nodes...")
-            # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
-            results.update(self._do_nopasswd(left_nodes, "last reboot"))
-            left_nodes = [host for host, result in results.items()
-                          if (isinstance(result, Exception)
-                              # Something is wrong with sudo access. Node is active.
-                              and not NodeGroup.is_require_nopasswd_exception(result))
-                          or (not isinstance(result, Exception)
-                              and result == initial_boot_history.get(host))]
-
-            waited = (datetime.now() - time_start).total_seconds()
-
-            if not left_nodes or waited >= timeout:
-                break
-
-            for host, exc in results.items():
-                if isinstance(exc, Exception) and not self.is_allowed_connection_exception(str(exc)):
-                    self.cluster.log.verbose("Unexpected exception at %s, node is considered as not booted: %s"
-                                             % (host, str(exc)))
-
-            self.cluster.log.verbose("Nodes %s are not ready yet, remaining time to wait %i"
-                                     % (left_nodes, timeout - waited))
-
-            attempt_time = (datetime.now() - attempt_time_start).total_seconds()
-            if attempt_time < delay_period:
-                time.sleep(delay_period - attempt_time)
-
-        if left_nodes:
-            self.cluster.log.verbose("Failed to wait for boot of nodes %s" % left_nodes)
-        else:
-            self.cluster.log.verbose("All nodes are online now")
-
-        return results
-
-    def _do_nopasswd(self, left_nodes: List[str], command: str) -> HostToResult:
-        prompt = '[sudo] password: '
-
-        class NoPasswdResponder(invoke.Responder):
-            def __init__(self) -> None:
-                super().__init__(re.escape(prompt), "")
-
-            def submit(self, stream: str) -> Iterable[str]:
-                if self.pattern_matches(stream, self.pattern, "index"):
-                    # If user appears to be not a NOPASSWD sudoer, "sudo" suggests to write password.
-                    # This is a W/A to handle the situation in a docker container without pseudo-TTY (no -t option)
-                    # As long as we require NOPASSWD, we can just fail immediately in such cases.
-                    raise invoke.exceptions.ResponseNotAccepted("The user should be a NOPASSWD sudoer")
-
-                # The only acceptable situation, responder does nothing.
-                return []
-
-        # Currently only NOPASSWD sudoers are supported.
-        # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
-        return self._do_exec(left_nodes, "run", f"sudo -S -p '{prompt}' {command}",
-                             watchers=[NoPasswdResponder()])
-
-    @staticmethod
-    def is_require_nopasswd_exception(exc: Exception) -> bool:
-        return isinstance(exc, invoke.exceptions.Failure) \
-               and isinstance(exc.reason, invoke.exceptions.ResponseNotAccepted)
-
-    def is_allowed_connection_exception(self, exception_message: str) -> bool:
-        exception_message = exception_message.partition('\n')[0]
-        for known_exception_message in self.cluster.globals['connection']['bad_connection_exceptions']:
-            if known_exception_message in exception_message:
-                return True
-
-        return False
-
-    def is_allowed_etcd_exception(self, exception_message: str) -> bool:
-        for known_exception_message in self.cluster.globals['etcd']['temporary_exceptions']:
-            if known_exception_message in exception_message:
-                return True
-
-        return False
-
-    def is_allowed_kubernetes_exception(self, exception_message: str) -> bool:
-        for known_exception_message in self.cluster.globals['kubernetes']['temporary_exceptions']:
-            if known_exception_message in exception_message:
-                return True
-
-        return False
-
-    def disconnect(self, hosts: List[str] = None) -> None:
-        for host in self.nodes:
-            if host in (hosts or self.nodes):
-                self.cluster.log.verbose('Disconnected session with %s' % host)
-                cxn = self.cluster.connection_pool.get_connection(host)
-                cxn.close()
-                cxn._sftp = None
+        executor = RawExecutor(self.cluster)
+        return executor.wait_for_boot(self.get_hosts(), timeout, initial_boot_history)
 
     def get_local_file_sha1(self, filename: str) -> str:
         return utils.get_local_file_sha1(filename)
@@ -925,7 +746,6 @@ class DeferredGroup(AbstractGroup[Token]):
 
     def _do_queue(self, do_type: str, *args: object, **kwargs: Any) -> Token:
         callback: Callback = kwargs.pop('callback', None)
-        kwargs = self._default_connection_kwargs(do_type, kwargs)
         return self._executor.queue(self.get_hosts(), (do_type, args, kwargs), callback=callback)
 
     def include_group(self: DeferredGroup, group: DeferredGroup) -> DeferredGroup:
@@ -947,7 +767,7 @@ class DeferredGroup(AbstractGroup[Token]):
 
 class RemoteExecutor(RawExecutor):
     def __init__(self, group: NodeGroup, timeout: int = None) -> None:
-        super().__init__(group.cluster.log, group.cluster.connection_pool, timeout)
+        super().__init__(group.cluster, timeout)
         self.group: DeferredGroup = group._make_defer(self)
         self.cluster = group.cluster
 
@@ -960,10 +780,6 @@ class RemoteExecutor(RawExecutor):
         """
         super().flush()
 
-        # Throw any exceptions ONLY when no handlers waits for results. For non-queued results any exceptions should
-        # handled via _do_with_wa() or other parent error handling mechanism.
-        # For queued flushes, exception handling with W/A is currently not supported.
-        # TODO: Merge results/exceptions handling with kubemarine.core.group.NodeGroup._do_with_wa to avoid code dup
         for host, results in self._last_results.items():
             if any(isinstance(result, Exception) for _, result in results.items()):
                 raise RemoteGroupException(self.cluster, self._last_results)

@@ -15,9 +15,12 @@ import collections
 import concurrent
 import io
 import random
+import re
+import time
 from abc import ABC, abstractmethod
+from datetime import datetime
 from types import TracebackType
-from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, Set, TypeVar, Type
+from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable
 
 import fabric  # type: ignore[import]
 import fabric.transfer  # type: ignore[import]
@@ -27,7 +30,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 import invoke
 
 from kubemarine.core import log, static
-from kubemarine.core.connections import ConnectionPool
+from kubemarine.core.environment import Environment
 
 
 class RunnersResult:
@@ -189,10 +192,10 @@ _T = TypeVar('_T', bound='RawExecutor')
 
 class RawExecutor:
 
-    def __init__(self, logger: log.EnhancedLogger, connection_pool: ConnectionPool,
-                 timeout: int = None) -> None:
-        self.logger = logger
-        self.connection_pool = connection_pool
+    def __init__(self, cluster: Environment, timeout: int = None) -> None:
+        self.logger = cluster.log
+        self.connection_pool = cluster.connection_pool
+        self.inventory = cluster.inventory
         self.timeout = timeout
         if timeout is None:
             self.timeout = static.GLOBALS['nodes']['command_execution']['timeout']
@@ -200,7 +203,7 @@ class RawExecutor:
         self._last_token = -1
         self._last_results: Dict[str, TokenizedResult] = {}
         self._command_separator = ''.join(random.choice('=-_') for _ in range(32))
-        self._supported_args = {'hide', 'warn', 'timeout', 'watchers', 'env', 'out_stream', 'err_stream'}
+        self._supported_args = {'hide', 'warn', 'timeout', 'env', 'out_stream', 'err_stream'}
         self._closed = False
 
     def __enter__(self: _T) -> _T:
@@ -231,7 +234,7 @@ class RawExecutor:
             if arg in ('hide', 'warn') and kwargs1.get(arg) == kwargs2.get(arg):
                 continue
 
-            # If any action has 'env', or 'watchers', they are not mergeable.
+            # If any action has 'env' param, they are not mergeable.
             # Actions that have specific 'timeout' params are also not mergeable,
             # as we need to apply the specified timeout to the exactly one command.
             if kwargs1.get(arg) is not None or kwargs2.get(arg) is not None:
@@ -239,8 +242,8 @@ class RawExecutor:
 
         return True
 
-    def _reparse_results(self, raw_results: _RawHostToResult, batch: Dict[str, List[_PayloadItem]],
-                         failed_hosts: Set[str]) -> Dict[str, TokenizedResult]:
+    def _reparse_results(self, raw_results: _RawHostToResult,
+                         batch: Dict[str, List[_PayloadItem]]) -> Dict[str, TokenizedResult]:
         reparsed_results: Dict[str, TokenizedResult] = {}
         for host, raw_result in raw_results.items():
             payloads = batch[host]
@@ -266,7 +269,6 @@ class RawExecutor:
                 reparsed_result: GenericResult = result
                 _, callback, token = payloads[i]
                 if i == len(results) - 1 and runner_exception is not None:
-                    failed_hosts.add(host)
                     if isinstance(runner_exception, invoke.UnexpectedExit):
                         # Commands were successful until the last command in the batch.
                         reparsed_result = UnexpectedExit(result)
@@ -357,9 +359,13 @@ class RawExecutor:
 
         return batches
 
+    def _next_token(self) -> int:
+        self._last_token += 1
+        return self._last_token
+
     def queue(self, target: List[str], action: _Action, callback: Callback = None) -> int:
         self._check_closed()
-        self._last_token = token = self._last_token + 1
+        token = self._next_token()
 
         do_type, args, kwargs = action
         not_supported_args = set(kwargs.keys()) - self._supported_args
@@ -386,11 +392,10 @@ class RawExecutor:
         :return: grouped tokenized results per connection.
         """
         self._check_closed()
-        batch_results: Dict[str, TokenizedResult] = {}
+        self._last_results = {}
 
         if not self._connections_queue:
             self.logger.verbose('Queue is empty, nothing to perform')
-            self._last_results = batch_results
             return
 
         callable_batches: List[Dict[str, List[_PayloadItem]]] = self._get_callables()
@@ -398,36 +403,35 @@ class RawExecutor:
         max_workers = len(self._connections_queue)
 
         with ThreadPoolExecutor(max_workers=max_workers) as TPE:
-            failed_hosts: Set[str] = set()
             for batch in callable_batches:
-                results: _RawHostToResult = {}
-                futures: Dict[str, concurrent.futures.Future] = {}
+                # filter out hosts with failed commands
+                batch = {host: payloads for host, payloads in batch.items()
+                         # failed command is always last if present
+                         if host not in self._last_results
+                         or not isinstance(list(self._last_results[host].values())[-1], Exception)}
 
-                def safe_exec(result_map: Dict[str, Any], host: str, call: Callable[[], Any]) -> None:
-                    try:
-                        result_map[host] = call()
-                    except Exception as e:
-                        failed_hosts.add(host)
-                        results[host] = e
+                retry = 0
+                batch_results: Dict[str, TokenizedResult] = {}
+                while True:
+                    retry += 1
 
-                for host, payloads in batch.items():
-                    if host in failed_hosts:
-                        continue
-                    cxn = self.connection_pool.get_connection(host)
-                    do_type, args, kwargs = self._prepare_merged_action(host, payloads)
-                    futures[host] = TPE.submit(getattr(cxn, do_type), *args, **kwargs)
+                    parsed_results = self._do_batch(batch, TPE)
+                    for host, tokenized_results in parsed_results.items():
+                        batch_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
 
-                for host, future in futures.items():
-                    safe_exec(results, host, lambda: future.result(timeout=self.timeout))
+                    batch = self._get_remained_batch(batch, batch_results)
 
-                self._flush_logger_writers(batch)
+                    if (not batch or retry >= static.GLOBALS['workaround']['retries']
+                            or not self._try_workaround(batch, batch_results, TPE)):
+                        break
 
-                parsed_results: Dict[str, TokenizedResult] = self._reparse_results(results, batch, failed_hosts)
-                for host, tokenized_results in parsed_results.items():
-                    batch_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
+                    self.logger.verbose('Retrying #%s...' % retry)
+                    time.sleep(static.GLOBALS['workaround']['delay_period'])
+
+                for host, tokenized_results in batch_results.items():
+                    self._last_results.setdefault(host, collections.OrderedDict()).update(tokenized_results)
 
         self._connections_queue = {}
-        self._last_results = batch_results
 
     def _prepare_merged_action(self, host: str, payloads: List[_PayloadItem]) -> _Action:
         # unpack last action in list of payloads
@@ -478,3 +482,212 @@ class RawExecutor:
                 if isinstance(kwargs.get(stream_key), log.LoggerWriter):
                     writer: log.LoggerWriter = kwargs[stream_key]
                     writer.flush(remainder=True)
+
+    def _do_batch(self, batch: Dict[str, List[_PayloadItem]], tpe: ThreadPoolExecutor) -> Dict[str, TokenizedResult]:
+        results: _RawHostToResult = {}
+        futures: Dict[str, concurrent.futures.Future] = {}
+
+        def safe_exec(result_map: Dict[str, Any], host: str, call: Callable[[], Any]) -> None:
+            try:
+                result_map[host] = call()
+            except Exception as e:
+                results[host] = e
+
+        for host, payloads in batch.items():
+            cxn = self.connection_pool.get_connection(host)
+            do_type, args, kwargs = self._prepare_merged_action(host, payloads)
+            safe_exec(futures, host, lambda: tpe.submit(getattr(cxn, do_type), *args, **kwargs))
+
+        for host, future in futures.items():
+            safe_exec(results, host, lambda: future.result(timeout=self.timeout))
+
+        self._flush_logger_writers(batch)
+
+        return self._reparse_results(results, batch)
+
+    def _get_remained_batch(self, batch: Dict[str, List[_PayloadItem]],
+                            batch_results: Dict[str, TokenizedResult]) -> Dict[str, List[_PayloadItem]]:
+        remained_batch = {}
+        for host, payloads in batch.items():
+            remained_payloads = []
+            for payload in payloads:
+                _, _, token = payload
+                # Command is not yet executed or failed.
+                # Not yet executed commands can be only after the failed command.
+                if token not in batch_results[host] or isinstance(batch_results[host][token], Exception):
+                    remained_payloads.append(payload)
+
+            if remained_payloads:
+                remained_batch[host] = remained_payloads
+
+        return remained_batch
+
+    def _try_workaround(self, batch: Dict[str, List[_PayloadItem]],
+                        batch_results: Dict[str, TokenizedResult], tpe: ThreadPoolExecutor) -> bool:
+        not_booted = []
+
+        for host in batch:
+            # failed command is always last
+            exception = list(batch_results[host].values())[-1]
+            if isinstance(exception, CommandTimedOut):
+                self.logger.verbose("Command timed out at %s: %s" % (host, str(exception.result)))
+                return False
+            elif isinstance(exception, UnexpectedExit):
+                # Do not str(exception) because it discards output in case of hide=False
+                exception_message = str(exception.result)
+            else:
+                exception_message = str(exception)
+
+            if self._is_allowed_etcd_exception(exception_message):
+                self.logger.verbose("Detected ETCD problem at %s, need retry: %s" % (host, exception_message))
+            elif self._is_allowed_kubernetes_exception(exception_message):
+                self.logger.verbose("Detected kubernetes problem at %s, need retry: %s" % (host, exception_message))
+            elif self._is_allowed_connection_exception(exception_message):
+                self.logger.verbose("Detected connection exception at %s, will try to reconnect to node. Exception: %s"
+                                    % (host, exception_message))
+                not_booted.append(host)
+            else:
+                self.logger.verbose("Detected unavoidable exception at %s, trying to solve automatically: %s"
+                                         % (host, exception_message))
+                return False
+
+        if not_booted:
+            results = self._wait_for_boot_with_executor(not_booted, tpe)
+            # if there are not booted nodes, but we succeeded to wait for at least one is booted,
+            # we can continue execution
+            if all(isinstance(result, Exception) for result in results.values()):
+                return False
+
+        return True
+
+    def wait_for_boot(self, left_nodes: List[str], timeout: int = None,
+                      initial_boot_history: Mapping[str, RunnersResult] = None) -> HostToResult:
+        with ThreadPoolExecutor(max_workers=len(left_nodes)) as TPE:
+            return self._wait_for_boot_with_executor(left_nodes, TPE, timeout, initial_boot_history)
+
+    def _wait_for_boot_with_executor(self, left_nodes: List[str], tpe: ThreadPoolExecutor,
+                                     timeout: int = None,
+                                     initial_boot_history: Mapping[str, RunnersResult] = None) -> HostToResult:
+
+        boot_config = self._get_boot_config()
+        if timeout is None:
+            timeout = boot_config['timeout']
+
+        delay_period = boot_config['defaults']['delay_period']
+
+        if initial_boot_history is None:
+            initial_boot_history = {}
+
+        results: HostToResult = {}
+        time_start = datetime.now()
+
+        self.logger.verbose("Trying to connect to nodes, timeout is %s seconds..." % timeout)
+
+        # each connection has timeout, so the only we need is to repeat connecting attempts
+        # during specified number of seconds
+        while True:
+            attempt_time_start = datetime.now()
+            self._disconnect(left_nodes)
+
+            self.logger.verbose("Attempting to connect to nodes...")
+            # this should be invoked without explicit timeout, and relied on fabric Connection timeout instead.
+            results.update(self._do_nopasswd(left_nodes, tpe, "last reboot"))
+            left_nodes = [host for host, result in results.items()
+                          if (isinstance(result, Exception)
+                              # Something is wrong with sudo access. Node is active.
+                              and not self.is_require_nopasswd_exception(result))
+                          or (not isinstance(result, Exception)
+                              and result == initial_boot_history.get(host))]
+
+            waited = (datetime.now() - time_start).total_seconds()
+
+            if not left_nodes or waited >= timeout:
+                break
+
+            for host, exc in results.items():
+                if isinstance(exc, Exception) and not self._is_allowed_connection_exception(str(exc)):
+                    self.logger.verbose("Unexpected exception at %s, node is considered as not booted: %s"
+                                             % (host, str(exc)))
+
+            self.logger.verbose("Nodes %s are not ready yet, remaining time to wait %i"
+                                % (left_nodes, timeout - waited))
+
+            attempt_time = (datetime.now() - attempt_time_start).total_seconds()
+            if attempt_time < delay_period:
+                time.sleep(delay_period - attempt_time)
+
+        if left_nodes:
+            self.logger.verbose("Failed to wait for boot of nodes %s" % left_nodes)
+        else:
+            self.logger.verbose("All nodes are online now")
+
+        return results
+
+    def _get_boot_config(self) -> dict:
+        boot_config = dict(self.inventory['globals']['nodes']['boot'])
+        boot_config.update(static.GLOBALS['nodes']['boot'])
+        return boot_config
+
+    def _do_nopasswd(self, left_nodes: List[str], tpe: ThreadPoolExecutor, command: str) -> HostToResult:
+        prompt = '[sudo] password: '
+
+        class NoPasswdResponder(invoke.Responder):
+            def __init__(self) -> None:
+                super().__init__(re.escape(prompt), "")
+
+            def submit(self, stream: str) -> Iterable[str]:
+                if self.pattern_matches(stream, self.pattern, "index"):
+                    # If user appears to be not a NOPASSWD sudoer, "sudo" suggests to write password.
+                    # This is a W/A to handle the situation in a docker container without pseudo-TTY (no -t option)
+                    # As long as we require NOPASSWD, we can just fail immediately in such cases.
+                    raise invoke.exceptions.ResponseNotAccepted("The user should be a NOPASSWD sudoer")
+
+                # The only acceptable situation, responder does nothing.
+                return []
+
+        # Currently only NOPASSWD sudoers are supported.
+        # Thus, running of connection.sudo("something") should be equal to connection.run("sudo something")
+        token = self._next_token()
+        action: _Action = ("run", (f"sudo -S -p '{prompt}' {command}",),
+                           {"hide": True, "watchers": [NoPasswdResponder()]})
+        payload: _PayloadItem = (action, None, token)
+        batch = {host: [payload] for host in left_nodes}
+        parsed_results = self._do_batch(batch, tpe)
+        return {host: next(iter(results.values())) for host, results in parsed_results.items()}
+
+    @staticmethod
+    def is_require_nopasswd_exception(exc: Exception) -> bool:
+        return isinstance(exc, invoke.exceptions.Failure) \
+               and isinstance(exc.reason, invoke.exceptions.ResponseNotAccepted)
+
+    @staticmethod
+    def _is_allowed_connection_exception(exception_message: str) -> bool:
+        exception_message = exception_message.partition('\n')[0]
+        for known_exception_message in static.GLOBALS['connection']['bad_connection_exceptions']:
+            if known_exception_message in exception_message:
+                return True
+
+        return False
+
+    @staticmethod
+    def _is_allowed_etcd_exception(exception_message: str) -> bool:
+        for known_exception_message in static.GLOBALS['etcd']['temporary_exceptions']:
+            if known_exception_message in exception_message:
+                return True
+
+        return False
+
+    @staticmethod
+    def _is_allowed_kubernetes_exception(exception_message: str) -> bool:
+        for known_exception_message in static.GLOBALS['kubernetes']['temporary_exceptions']:
+            if known_exception_message in exception_message:
+                return True
+
+        return False
+
+    def _disconnect(self, hosts: List[str]) -> None:
+        for host in hosts:
+            self.logger.verbose('Disconnected session with %s' % host)
+            cxn = self.connection_pool.get_connection(host)
+            cxn.close()
+            cxn._sftp = None

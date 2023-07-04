@@ -28,7 +28,8 @@ import invoke
 
 from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster, _AnyConnectionTypes
-from kubemarine.core import flow, connections
+from kubemarine.core import flow, connections, static
+from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import RunnersResult, GenericResult, Token, CommandTimedOut
 from kubemarine.core.group import (
     AbstractGroup, NodeGroup, NodeGroupResult, DeferredGroup, RunnersGroupResult,
@@ -189,7 +190,13 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_shell = kwargs.pop("fake_shell", FakeShell())
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
-        self.connection_pool = FakeConnectionPool(self)
+
+    @property
+    def connection_pool(self) -> ConnectionPool:
+        if self._connection_pool is None:
+            self._connection_pool = FakeConnectionPool(self.inventory, self.fake_shell, self.fake_fs)
+
+        return self._connection_pool
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)
@@ -233,10 +240,10 @@ class FakeResources(DynamicResources):
 
 class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
-    def __init__(self, ip, cluster: FakeKubernetesCluster, **kw):
+    def __init__(self, ip, fake_shell: FakeShell, fake_fs: FakeFS, **kw):
         super().__init__(ip, **kw)
-        self.fake_shell = cluster.fake_shell
-        self.fake_fs = cluster.fake_fs
+        self.fake_shell = fake_shell
+        self.fake_fs = fake_fs
 
         command_sep = r'[=\-_]{32}'
         sep_symbol = r'\&\&|;'
@@ -376,15 +383,16 @@ class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
 
 
 class FakeConnectionPool(connections.ConnectionPool):
-    def __init__(self, cluster: FakeKubernetesCluster):
-        super().__init__(cluster)
-        self.cluster = cluster
+    def __init__(self, inventory: dict, fake_shell: FakeShell, fake_fs: FakeFS):
+        super().__init__(inventory)
+        self.fake_shell = fake_shell
+        self.fake_fs = fake_fs
 
     def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
         return FakeConnection(
-            ip, self.cluster,
-            user=conn_details.get('username', self._env.globals['connection']['defaults']['username']),
-            port=conn_details.get('connection_port', self._env.globals['connection']['defaults']['port'])
+            ip, self.fake_shell, self.fake_fs,
+            user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
+            port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port'])
         )
 
 
