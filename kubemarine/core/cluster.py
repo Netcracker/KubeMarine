@@ -11,30 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import re
 from copy import deepcopy
-from typing import Dict, List, Union, Iterable, Tuple, Optional
+from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
 
-import fabric
 import yaml
 
 from kubemarine.core import log, utils
-from kubemarine.core.connections import ConnectionPool, Connections
+from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, NodeConfig
 
-jinja_query_regex = re.compile("{{ .* }}", re.M)
-
-_AnyConnectionTypes = Union[str, NodeGroup, fabric.connection.Connection]
+_AnyConnectionTypes = Union[str, NodeGroup]
 
 
 class KubernetesCluster(Environment):
 
     def __init__(self, inventory: dict, context: dict, procedure_inventory: dict = None,
-                 logger: log.EnhancedLogger = None):
-        self.roles = []
-        self.ips = {
+                 logger: log.EnhancedLogger = None) -> None:
+        self.roles: List[str] = []
+        self.ips: Dict[str, List[str]] = {
             "all": []
         }
         self.nodes: Dict[str, NodeGroup] = {}
@@ -44,14 +39,15 @@ class KubernetesCluster(Environment):
         self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
+        # connection pool should be created every time, because it relies on partially enriched inventory
+        self.connection_pool = ConnectionPool(self)
+
         self._logger = logger if logger is not None \
             else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
 
-        self._inventory = {}
-        # connection pool should be created every time, because it is relied on partially enriched inventory
-        self._connection_pool = ConnectionPool(self)
+        self._inventory: dict = {}
 
-    def enrich(self, custom_enrichment_fns: List[str] = None):
+    def enrich(self, custom_enrichment_fns: List[str] = None) -> None:
         # do not make dumps for custom enrichment functions, because result is generally undefined
         make_dumps = custom_enrichment_fns is None
         from kubemarine.core import defaults
@@ -66,23 +62,10 @@ class KubernetesCluster(Environment):
     def log(self) -> log.EnhancedLogger:
         return self._logger
 
-    def make_group(self, ips: List[_AnyConnectionTypes]) -> NodeGroup:
-        connections: Connections = {}
-        for ip in ips:
-            if isinstance(ip, fabric.connection.Connection):
-                ip = ip.host
-                connections[ip] = self._connection_pool.get_connection(ip)
-            elif isinstance(ip, NodeGroup):
-                for host, connection in ip.nodes.items():
-                    ip = connection.host
-                    connections[ip] = self._connection_pool.get_connection(ip)
-            elif isinstance(ip, str):
-                connections[ip] = self._connection_pool.get_connection(ip)
-            else:
-                raise Exception('Unsupported connection object type')
-        return NodeGroup(connections, self)
+    def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> NodeGroup:
+        return NodeGroup(ips, self)
 
-    def get_access_address_from_node(self, node: dict):
+    def get_access_address_from_node(self, node: dict) -> str:
         """
         Returns address which should be used to connect to the node via Fabric.
         The address also can be used as unique identifier of the node.
@@ -91,7 +74,7 @@ class KubernetesCluster(Environment):
         if address is None:
             address = node.get('address')
         if address is None:
-            address = node.get('internal_address')
+            address = node['internal_address']
 
         return address
 
@@ -103,7 +86,7 @@ class KubernetesCluster(Environment):
 
         return result
 
-    def get_node_by_name(self, node_name) -> Optional[dict]:
+    def get_node_by_name(self, node_name: str) -> Optional[dict]:
         nodes = self.get_nodes_by_names([node_name])
         return next(iter(nodes), None)
 
@@ -111,39 +94,41 @@ class KubernetesCluster(Environment):
         return [self.get_access_address_from_node(node)
                 for node in self.get_nodes_by_names(node_names)]
 
-    def get_node(self, host: Union[str, fabric.connection.Connection]) -> dict:
-        return self.make_group([host]).get_first_member(provide_node_configs=True)
+    def get_node(self, host: _AnyConnectionTypes) -> NodeConfig:
+        return self.make_group([host]).get_config()
 
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         ips = self.get_addresses_from_node_names(node_names)
         return self.make_group(ips)
 
+    def make_group_from_roles(self, roles: Iterable[str]) -> NodeGroup:
+        group = self.make_group([])
+        for role in roles:
+            if role not in self.nodes:
+                self.log.verbose(f'Group {role!r} is requested for usage, but this group does not exist.')
+                continue
+
+            group = group.include_group(self.nodes[role])
+
+        return group
+
     def create_group_from_groups_nodes_names(self, groups_names: List[str], nodes_names: List[str]) -> NodeGroup:
-        common_group = self.make_group([])
+        common_group = self.make_group_from_roles(groups_names)
 
         if nodes_names:
-            common_group = self.make_group_from_nodes(nodes_names)
-
-        if groups_names:
-            for group in groups_names:
-
-                if group not in self.roles:
-                    self.log.verbose('Group \'%s\' is requested for usage, but this group is not exists.' % group)
-                    continue
-
-                common_group = common_group.include_group(self.nodes[group])
+            common_group = common_group.include_group(self.make_group_from_nodes(nodes_names))
 
         return common_group
 
-    def schedule_cumulative_point(self, point_method):
+    def schedule_cumulative_point(self, point_method: Callable) -> None:
         from kubemarine.core import flow
-        return flow.schedule_cumulative_point(self, point_method)
+        flow.schedule_cumulative_point(self, point_method)
 
-    def is_task_completed(self, task_path) -> bool:
+    def is_task_completed(self, task_path: str) -> bool:
         from kubemarine.core import flow
         return flow.is_task_completed(self, task_path)
 
-    def get_facts_enrichment_fns(self):
+    def get_facts_enrichment_fns(self) -> List[str]:
         return [
             "kubemarine.core.schema.verify_inventory",
             "kubemarine.core.defaults.merge_defaults",
@@ -178,7 +163,7 @@ class KubernetesCluster(Environment):
         self.log.debug('Detecting nodes context finished!')
         return deepcopy(self.context['nodes'])
 
-    def _check_online_nodes(self):
+    def _check_online_nodes(self) -> None:
         """
         Check that only subset of nodes for removal can be offline
         """
@@ -193,7 +178,7 @@ class KubernetesCluster(Environment):
                             "or incorrect ssh port is specified.")
 
     # todo this check can probably be moved to prepare.check tasks group of each procedure
-    def _check_accessible_nodes(self):
+    def _check_accessible_nodes(self) -> None:
         """
         Check that all online nodes are accessible.
         """
@@ -253,7 +238,7 @@ class KubernetesCluster(Environment):
 
         return os_ids
 
-    def get_associations(self):
+    def get_associations(self) -> dict:
         """
         Returns association for all packages from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.
@@ -281,7 +266,7 @@ class KubernetesCluster(Environment):
         node_os_family = self.get_os_family_for_node(host)
         return self._get_associations_for_os(node_os_family, package)
 
-    def _get_package_associations_for_os(self, os_family: str, package: str, association_key: str) -> str or list:
+    def _get_package_associations_for_os(self, os_family: str, package: str, association_key: str) -> Any:
         associations = self._get_associations_for_os(os_family, package)
         association_value = associations.get(association_key)
         if association_value is None:
@@ -292,7 +277,7 @@ class KubernetesCluster(Environment):
 
         return association_value
 
-    def get_package_association(self, package: str, association_key: str) -> Union[str, List[str]]:
+    def get_package_association(self, package: str, association_key: str) -> Any:
         """
         Returns the specified association for the specified package from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.
@@ -304,7 +289,7 @@ class KubernetesCluster(Environment):
         os_family = self.get_os_family()
         return self._get_package_associations_for_os(os_family, package, association_key)
 
-    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> str or list:
+    def get_package_association_for_node(self, host: str, package: str, association_key: str) -> Any:
         """
         Returns the specified association for the specified package from inventory for specific node.
 
@@ -316,20 +301,21 @@ class KubernetesCluster(Environment):
         os_family = self.get_os_family_for_node(host)
         return self._get_package_associations_for_os(os_family, package, association_key)
 
-    def make_finalized_inventory(self):
+    def make_finalized_inventory(self) -> dict:
         from kubemarine.core import defaults
-        from kubemarine.procedures import remove_node
+        from kubemarine.procedures import add_node, remove_node
         from kubemarine import admission, controlplane, cri, packages
 
-        cluster_finalized_functions = {
+        cluster_finalized_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
             packages.cache_package_versions,
             packages.remove_unused_os_family_associations,
             cri.remove_invalid_cri_config,
+            add_node.add_node_finalize_inventory,
             remove_node.remove_node_finalize_inventory,
             admission.update_finalized_inventory,
             defaults.escape_jinja_characters_for_inventory,
             controlplane.controlplane_finalize_inventory,
-        }
+        ]
 
         # copying is currently not necessary, but it is possible in general.
         prepared_inventory = self.inventory
@@ -338,14 +324,14 @@ class KubernetesCluster(Environment):
 
         return defaults.prepare_for_dump(prepared_inventory, copy=False)
 
-    def dump_finalized_inventory(self):
+    def dump_finalized_inventory(self) -> None:
         inventory_for_dump = self.make_finalized_inventory()
         data = yaml.dump(inventory_for_dump)
         finalized_filename = "cluster_finalized.yaml"
         utils.dump_file(self, data, finalized_filename)
         utils.dump_file(self, data, finalized_filename, dump_location=False)
 
-    def preserve_inventory(self):
+    def preserve_inventory(self) -> None:
         self.log.debug("Start preserving of the information about the procedure.")
         cluster_storage = utils.ClusterStorage(self)
         cluster_storage.make_dir()

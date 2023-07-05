@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-from typing import Callable, Optional, List, IO
+from typing import Callable, Optional, List, IO, Tuple, cast
 
 import ruamel.yaml
 import os
@@ -28,16 +28,16 @@ from kubemarine.core.cluster import KubernetesCluster
 ERROR_MANIFEST_NOT_FOUND = "Cannot find original manifest %s for '%s' plugin"
 
 
-def get_default_manifest_path(plugin_name: str, version: str):
+def get_default_manifest_path(plugin_name: str, version: str) -> str:
     resource = f"plugins/yaml/{plugin_name}-{version}-original.yaml"
     return utils.get_internal_resource_path(resource)
 
 
 class Manifest:
-    def __init__(self, stream: IO):
-        self._patched = OrderedSet()
-        self._excluded = OrderedSet()
-        self._included = OrderedSet()
+    def __init__(self, stream: IO) -> None:
+        self._patched = OrderedSet[str]()
+        self._excluded = OrderedSet[str]()
+        self._included = OrderedSet[str]()
         self._obj_list = self._load(stream)
 
     def obj_key(self, obj: dict) -> str:
@@ -53,7 +53,10 @@ class Manifest:
 
         raise ValueError(f"{key} not found")
 
-    def get_obj(self, key: str, *, patch: bool, allow_absent=False) -> Optional[dict]:
+    def has_obj(self, key: str) -> bool:
+        return any(self.obj_key(obj) == key for obj in self._obj_list)
+
+    def get_obj(self, key: str, *, patch: bool) -> dict:
         """
         Get manifest object in YAML format for the specified key.
         By default, ensure presence of the object.
@@ -62,7 +65,6 @@ class Manifest:
 
         :param key: 'kind' and 'name' of object
         :param patch: boolean value that tells the manifest that the searched object is going to be patched.
-        :param allow_absent: if true, do not throw exception if the object by key is absent.
         :return: manifest object
         """
         for obj in self._obj_list:
@@ -71,16 +73,14 @@ class Manifest:
                     self._patched.add(key)
                 return obj
 
-        if not allow_absent:
-            raise ValueError(f"{key} not found")
-        return None
+        raise ValueError(f"{key} not found")
 
-    def include(self, index: int, obj: dict):
+    def include(self, index: int, obj: dict) -> None:
         self._obj_list.insert(index, obj)
         key = self.obj_key(obj)
         self._included.add(key)
 
-    def exclude(self, key: str):
+    def exclude(self, key: str) -> None:
         del self._obj_list[self.key_index(key)]
         self._excluded.add(key)
 
@@ -151,7 +151,7 @@ EnrichmentFunction = Callable[[Manifest], None]
 
 class Processor(ABC):
     def __init__(self, logger: log.VerboseLogger, inventory: dict, plugin_name: str,
-                 original_yaml_path: Optional[str], destination_name: Optional[str]):
+                 original_yaml_path: Optional[str], destination_name: Optional[str]) -> None:
         """
         :param logger: VerboseLogger instance
         :param inventory: inventory of the cluster
@@ -179,14 +179,15 @@ class Processor(ABC):
         pass
 
     def get_version(self) -> str:
-        return self.inventory['plugins'][self.plugin_name]['version']
+        version: str = self.inventory['plugins'][self.plugin_name]['version']
+        return version
 
-    def include(self, manifest: Manifest, index: int, obj: dict):
+    def include(self, manifest: Manifest, index: int, obj: dict) -> None:
         key = manifest.obj_key(obj)
         manifest.include(index, obj)
         self.log.verbose(f"The {key} has been added")
 
-    def exclude(self, manifest: Manifest, key: str):
+    def exclude(self, manifest: Manifest, key: str) -> None:
         manifest.exclude(key)
         self.log.verbose(f"The {key} has been excluded from result")
 
@@ -212,7 +213,7 @@ class Processor(ABC):
 
         # check if known objects were excluded
         for key in known_objects:
-            if manifest.get_obj(key, patch=False, allow_absent=True) is None:
+            if not manifest.has_obj(key):
                 self.log.verbose(f"The current version of original yaml does not include "
                                  f"the following object: {key}")
 
@@ -244,7 +245,7 @@ class Processor(ABC):
 
         return manifest
 
-    def apply(self, cluster: KubernetesCluster, manifest: Manifest):
+    def apply(self, cluster: KubernetesCluster, manifest: Manifest) -> None:
         logger = cluster.log
         enriched_manifest = manifest.dump()
         utils.dump_file(cluster, enriched_manifest, self.destination_name)
@@ -272,13 +273,13 @@ class Processor(ABC):
 
         return manifest_path
 
-    def _get_destination(self, custom_destination_name) -> str:
+    def _get_destination(self, custom_destination_name: Optional[str]) -> str:
         if custom_destination_name is not None:
             return custom_destination_name
 
         return f'{self.plugin_name}-{self.get_version()}.yaml'
 
-    def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str):
+    def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str) -> None:
         source_yaml = manifest.get_obj(key, patch=True)
         labels: dict = source_yaml['metadata'].setdefault('labels', {})
         labels.update({
@@ -293,7 +294,7 @@ class Processor(ABC):
 
     def find_container_for_patch(self, manifest: Manifest, key: str,
                                  *,
-                                 container_name: str, is_init_container: bool, allow_absent=False) -> (int, dict):
+                                 container_name: str, is_init_container: bool) -> Tuple[int, dict]:
         """
         Find container according to the search criteria.
 
@@ -301,9 +302,17 @@ class Processor(ABC):
         :param key: 'kind' and 'name' of object
         :param container_name: name of container to assign the image in the spec
         :param is_init_container: whether to search container in 'initContainers' or in 'containers' spec.
-        :param allow_absent: if True, and if container is not found, return -1, None
         :return: tuple of container index within the spec and the container data.
         """
+        pos, container = self._find_optional_container(
+            manifest, key,
+            container_name=container_name, is_init_container=is_init_container, allow_absent=False)
+
+        return pos, cast(dict, container)
+
+    def _find_optional_container(self, manifest: Manifest, key: str,
+                                 container_name: str, is_init_container: bool, allow_absent: bool = False) \
+            -> Tuple[int, Optional[dict]]:
         source_yaml = manifest.get_obj(key, patch=True)
         template_spec = source_yaml['spec']['template']['spec']
         spec_containers_section = 'initContainers' if is_init_container else 'containers'
@@ -316,7 +325,7 @@ class Processor(ABC):
 
         return container_pos, container
 
-    def get_target_image(self, plugin_service: Optional[str] = None, image_key: Optional[str] = 'image'):
+    def get_target_image(self, plugin_service: Optional[str] = None, image_key: Optional[str] = 'image') -> str:
         """
         Calculates full image path from the plugin configuration in inventory.
 
@@ -329,7 +338,7 @@ class Processor(ABC):
         plugin_service_section = plugin_section
         if plugin_service:
             plugin_service_section = plugin_service_section[plugin_service]
-        image = plugin_service_section[image_key]
+        image: str = plugin_service_section[image_key]
         if registry:
             image = f"{registry}/{image}"
 
@@ -339,7 +348,7 @@ class Processor(ABC):
                                    *,
                                    plugin_service: Optional[str] = None,
                                    container_name: str, is_init_container: bool,
-                                   allow_absent=False) -> None:
+                                   allow_absent: bool = False) -> None:
         """
         The method patches the image of the specified container.
 
@@ -354,9 +363,9 @@ class Processor(ABC):
 
         spec_containers_section = 'initContainers' if is_init_container else 'containers'
 
-        container_pos, container = self.find_container_for_patch(manifest, key,
+        container_pos, container = self._find_optional_container(manifest, key,
             container_name=container_name, is_init_container=is_init_container, allow_absent=allow_absent)
-        if container_pos == -1:
+        if container is None:
             return
 
         container['image'] = image
@@ -365,7 +374,7 @@ class Processor(ABC):
 
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,
-                             plugin_service: str):
+                             plugin_service: str) -> None:
         source_yaml = manifest.get_obj(key, patch=True)
         node_selector = self.inventory['plugins'][self.plugin_name][plugin_service]['nodeSelector']
         source_yaml['spec']['template']['spec']['nodeSelector'] = node_selector
@@ -375,7 +384,7 @@ class Processor(ABC):
                            *,
                            plugin_service: Optional[str] = None,
                            extra_tolerations: List[dict] = None,
-                           override=False):
+                           override: bool = False) -> None:
         source_yaml = manifest.get_obj(key, patch=True)
         template_spec: dict = source_yaml['spec']['template']['spec']
         if override and template_spec.get('tolerations', []):
@@ -395,4 +404,4 @@ class Processor(ABC):
             self.log.verbose(f"The {key} has been patched in 'spec.template.spec.tolerations' with '{val}'")
 
 
-PROCESSOR_PROVIDER = Callable[[log.VerboseLogger, dict, str, str], Processor]
+PROCESSOR_PROVIDER = Callable[[log.VerboseLogger, dict, Optional[str], Optional[str]], Processor]

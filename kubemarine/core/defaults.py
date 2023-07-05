@@ -14,7 +14,7 @@
 import re
 from importlib import import_module
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import yaml
 
@@ -90,9 +90,8 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     for i, node in enumerate(inventory["nodes"]):
         address = cluster.get_access_address_from_node(node)
 
-        # we have definitely know how to connect
+        # we definitely know how to connect
         cluster.inventory["nodes"][i]["connect_to"] = address
-        cluster.inventory["nodes"][i]["connection"] = cluster.make_group([address])
 
         if not cluster.context["nodes"].get(address):
             cluster.context["nodes"][address] = {}
@@ -110,7 +109,7 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_registry(inventory, cluster):
+def apply_registry(inventory: dict, cluster: KubernetesCluster):
 
     if not inventory.get('registry'):
         cluster.log.verbose('Unified registry is not used')
@@ -122,7 +121,7 @@ def apply_registry(inventory, cluster):
 
     # registry contains either 'endpoints' or 'address' that is validated by JSON schema.
     if inventory['registry'].get('endpoints'):
-        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory, cluster)
+        registry_mirror_address, containerd_endpoints, thirdparties_address = apply_registry_endpoints(inventory)
     else:
         if inventory['registry'].get('docker_port'):
             registry_mirror_address = "%s:%s" % (inventory['registry']['address'], inventory['registry']['docker_port'])
@@ -218,7 +217,7 @@ def apply_registry(inventory, cluster):
     return inventory
 
 
-def apply_registry_endpoints(inventory, cluster):
+def apply_registry_endpoints(inventory: dict):
 
     if not inventory['registry'].get('mirror_registry'):
         inventory['registry']['mirror_registry'] = 'registry.cluster.local'
@@ -244,10 +243,10 @@ def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
         cluster.log.verbose('Detecting control plains...')
 
     # calculate controlplain ips
-    internal_address = None
-    internal_address_source = None
-    external_address = None
-    external_address_source = None
+    internal_address: Optional[str] = None
+    internal_address_source: Optional[str] = None
+    external_address: Optional[str] = None
+    external_address_source: Optional[str] = None
 
     # vrrp_ip section is not enriched yet
     # todo what if ip is an ip of some node to remove?
@@ -288,7 +287,8 @@ def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
                             external_address_source += ' \"%s\"' % node['name']
 
     if external_address is None:
-        cluster.log.warning('Failed to detect external control plain. Something may work incorrect!')
+        if cluster:
+            cluster.log.warning('Failed to detect external control plain. Something may work incorrect!')
         external_address = internal_address
 
     if cluster:
@@ -335,8 +335,8 @@ def recursive_apply_defaults(defaults, section):
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
 
-def calculate_node_names(inventory: dict, cluster):
-    roles_iterators = {}
+def calculate_node_names(inventory: dict, _):
+    roles_iterators: Dict[str, int] = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
             if role_name in node['roles']:
@@ -363,7 +363,7 @@ def calculate_node_names(inventory: dict, cluster):
     return inventory
 
 
-def verify_node_names(inventory, cluster):
+def verify_node_names(inventory: dict, _):
     known_names = []
     for i, node in enumerate(inventory['nodes']):
         node_name = node['name']
@@ -376,7 +376,7 @@ def verify_node_names(inventory, cluster):
     return inventory
 
 
-def calculate_nodegroups(inventory, cluster):
+def calculate_nodegroups(inventory: dict, cluster: KubernetesCluster):
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
     return inventory
@@ -447,7 +447,7 @@ def compile_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def compile_object(logger: log.EnhancedLogger, struct: object, root: dict, ignore_jinja_escapes=True) -> object:
+def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_jinja_escapes=True) -> Any:
     if isinstance(struct, list):
         new_struct = []
         for i, v in enumerate(struct):
@@ -506,22 +506,18 @@ def _escape_jinja_character(value):
     return value
 
 
-def prepare_for_dump(inventory, copy=True):
-    # preparation for dump required to remove memory links
+def prepare_for_dump(inventory: dict, copy: bool = True) -> dict:
+    # different preparations before the inventory can be dumped
 
     if copy:
         dump_inventory = deepcopy(inventory)
     else:
         dump_inventory = inventory
 
-    for i, node in enumerate(dump_inventory['nodes']):
-        if 'connection' in dump_inventory['nodes'][i]:
-            del dump_inventory['nodes'][i]['connection']
-
     return dump_inventory
 
 
-def manage_true_false_values(inventory, cluster):
+def manage_true_false_values(inventory: dict, _):
     # Check undefined values for plugin.name.install and convert it to bool
     for plugin_name, plugin_item in inventory["plugins"].items():
         # Check install value

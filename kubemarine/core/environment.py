@@ -29,5 +29,5 @@ class Environment(ABC):
         return static.GLOBALS
 
     @staticmethod
-    def is_deploying_from_windows():
+    def is_deploying_from_windows() -> bool:
         return os.name == 'nt'

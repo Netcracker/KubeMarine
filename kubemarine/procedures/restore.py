@@ -24,11 +24,9 @@ import yaml
 from kubemarine.core import utils, flow, defaults
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
-from kubemarine.core.executor import RemoteExecutor
 
 
 def missing_or_empty(file):
@@ -39,7 +37,7 @@ def missing_or_empty(file):
         return True
 
 
-def replace_config_from_backup_if_needed(procedure_inventory_filepath, config):
+def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str):
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
         with utils.open_external(procedure_inventory_filepath, 'r') as stream:
@@ -55,7 +53,7 @@ def replace_config_from_backup_if_needed(procedure_inventory_filepath, config):
             tar.close()
 
 
-def unpack_data(cluster):
+def unpack_data(cluster: KubernetesCluster):
     backup_tmp_directory = backup.prepare_backup_tmpdir(cluster)
     backup_file_source = cluster.procedure_inventory.get('backup_location')
 
@@ -89,7 +87,7 @@ def unpack_data(cluster):
         cluster.context['backup_descriptor'] = yaml.safe_load(stream)
 
 
-def verify_backup_data(cluster):
+def verify_backup_data(cluster: KubernetesCluster):
     if not cluster.context['backup_descriptor'].get('kubernetes', {}).get('version'):
         cluster.log.debug('Not possible to verify Kubernetes version, because descriptor do not contain such information')
         return
@@ -107,7 +105,7 @@ def verify_backup_data(cluster):
         cluster.log.debug('Kubernetes version from backup is correct')
 
 
-def stop_cluster(cluster):
+def stop_cluster(cluster: KubernetesCluster):
     cluster.log.debug('Stopping the existing cluster...')
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":
@@ -126,7 +124,7 @@ def stop_cluster(cluster):
     cluster.log.verbose(result)
 
 
-def restore_thirdparties(cluster):
+def restore_thirdparties(cluster: KubernetesCluster):
     custom_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
     if custom_thirdparties:
         for name, value in custom_thirdparties.items():
@@ -137,22 +135,23 @@ def restore_thirdparties(cluster):
     install.system_prepare_thirdparties(cluster)
 
 
-def import_nodes(cluster):
-    for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-        node['connection'].put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name']),
-                               '/tmp/kubemarine-backup.tar.gz')
-        cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
+def import_nodes(cluster: KubernetesCluster):
+    with cluster.nodes['all'].new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node_name = node.get_node_name()
+            cluster.log.debug('Uploading backup for \'%s\'' % node_name)
+            node.put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node_name),
+                     '/tmp/kubemarine-backup.tar.gz')
 
     cluster.log.debug('Unpacking backup...')
 
-    with RemoteExecutor(cluster) as exe:
-        for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
-            cmd = f"readlink /etc/resolv.conf ;" \
-                  f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf; else sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; fi "
-            node['connection'].sudo(cmd)
+    unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite"
+    result = cluster.nodes['all'].sudo(
+        f"readlink /etc/resolv.conf ; "
+        f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; {unpack_cmd} && sudo chattr +i /etc/resolv.conf; "
+        f"else {unpack_cmd}; fi ")
 
-    result = exe.get_last_results_str()
-    cluster.log.debug('%s',result)
+    cluster.log.debug(result)
 
 
 def import_etcd(cluster: KubernetesCluster):
@@ -178,7 +177,7 @@ def import_etcd(cluster: KubernetesCluster):
 
     initial_cluster_list = []
     initial_cluster_list_without_names = []
-    for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+    for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
         initial_cluster_list.append(control_plane['name'] + '=https://' + control_plane["internal_address"] + ":2380")
         initial_cluster_list_without_names.append(control_plane["internal_address"] + ":2379")
     initial_cluster = ','.join(initial_cluster_list)
@@ -189,9 +188,9 @@ def import_etcd(cluster: KubernetesCluster):
         cont_runtime = "podman"
 
     etcd_instances = 0
-    for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+    for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
         cluster.log.debug('Restoring ETCD member ' + control_plane['name'])
-        control_plane_conn: NodeGroup = control_plane['connection']
+        control_plane_conn = cluster.make_group([control_plane['connect_to']])
         control_plane_conn.sudo(
             f'chmod 777 {snap_name} && '
             f'sudo ls -la {snap_name} && '
@@ -252,7 +251,7 @@ def import_etcd(cluster: KubernetesCluster):
         cluster.log.verbose('It is not possible to verify db size - descriptor do not contain such information')
 
 
-def reboot(cluster):
+def reboot(cluster: KubernetesCluster):
     system.reboot_group(cluster.nodes['all'], try_graceful=False)
     kubernetes.wait_for_nodes(cluster.nodes['control-plane'])
 

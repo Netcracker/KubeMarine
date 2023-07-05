@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Tuple, ContextManager
+from typing import List, Dict, Tuple, Iterator
 
 import ruamel.yaml
 import yaml
@@ -29,8 +29,8 @@ import ipaddress
 from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.executor import Token
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup
 from kubemarine.core.errors import KME
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
@@ -39,7 +39,7 @@ ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than o
 ERROR_MINOR_RANGE_EXCEEDED='Minor version \"%s\" rises to new \"%s\" more than one'
 
 
-def add_node_enrichment(inventory, cluster):
+def add_node_enrichment(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
 
@@ -56,7 +56,7 @@ def add_node_enrichment(inventory, cluster):
     return inventory
 
 
-def remove_node_enrichment(inventory, cluster):
+def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory
 
@@ -93,7 +93,7 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
     return inventory
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, _):
     repository = inventory['services']['kubeadm'].get('imageRepository', "")
     if repository:
         inventory['services']['kubeadm']['dns'] = {}
@@ -204,7 +204,7 @@ def reset_installation_env(group: NodeGroup):
 
     log.debug("Cleaning up previous installation...")
 
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
@@ -244,7 +244,7 @@ def reset_installation_env(group: NodeGroup):
             is_add_or_remove_procedure = False
 
     if not nodes_for_manual_etcd_remove.is_empty():
-        log.warning(f"Nodes {list(nodes_for_manual_etcd_remove.nodes.keys())} are considered as not active. "
+        log.warning(f"Nodes {nodes_for_manual_etcd_remove.get_hosts()} are considered as not active. "
                     "Full cleanup procedure cannot be performed. "
                     "Corresponding members will be removed from etcd manually.")
         etcd.remove_members(nodes_for_manual_etcd_remove)
@@ -253,12 +253,12 @@ def reset_installation_env(group: NodeGroup):
         drain_nodes(nodes_for_draining, drain_timeout=drain_timeout, grace_period=grace_period)
 
     if is_add_or_remove_procedure and not active_nodes.is_empty():
-        log.verbose(f"Resetting kubeadm on nodes {list(active_nodes.nodes.keys())} ...")
+        log.verbose(f"Resetting kubeadm on nodes {active_nodes.get_hosts()} ...")
         result = active_nodes.sudo('sudo kubeadm reset -f')
         log.debug("Kubeadm successfully reset:\n%s" % result)
 
     if not active_nodes.is_empty():
-        log.verbose(f"Cleaning nodes {list(active_nodes.nodes.keys())} ...")
+        log.verbose(f"Cleaning nodes {active_nodes.get_hosts()} ...")
         # bash semicolon mark will avoid script from exiting and will resume the execution
         result = active_nodes.sudo(
             'sudo kubeadm reset phase cleanup-node; '  # it is required to "cleanup-node" for all procedures
@@ -269,106 +269,109 @@ def reset_installation_env(group: NodeGroup):
         # Disabled initial prune for images prepull feature. Need analysis for possible negative impact.
         # result.update(cri.prune(active_nodes, all_implementations=True))
 
-        log.debug(f"Nodes {list(active_nodes.nodes.keys())} cleaned up successfully:\n" + "%s" % result)
+        log.debug(f"Nodes {active_nodes.get_hosts()} cleaned up successfully:\n" + "%s" % result)
 
     if is_add_or_remove_procedure:
         return delete_nodes(group)
 
 
-def drain_nodes(group, disable_eviction=False, drain_timeout=None, grace_period=None):
-    log = group.cluster.log
+def drain_nodes(group: NodeGroup, disable_eviction=False, drain_timeout=None, grace_period=None):
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    control_plane = group.cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    control_plane = cluster.nodes['control-plane'].get_final_nodes().get_first_member()
     result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
     log.verbose("Detected the following nodes in cluster:\n%s" % stdout)
 
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        if node["name"] in stdout:
-            log.debug("Draining node %s..." % node["name"])
+    for node in group.get_ordered_members_list():
+        node_name = node.get_node_name()
+        if node_name in stdout:
+            log.debug("Draining node %s..." % node_name)
             drain_cmd = prepare_drain_command(
-                group.cluster, node["name"],
+                cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
             control_plane.sudo(drain_cmd, hide=False)
         else:
-            log.warning("Node %s is not found in cluster and can't be drained" % node["name"])
+            log.warning("Node %s is not found in cluster and can't be drained" % node_name)
 
     return control_plane.sudo("kubectl get nodes")
 
 
-def delete_nodes(group):
-    log = group.cluster.log
+def delete_nodes(group: NodeGroup):
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    control_plane = group.cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    control_plane = cluster.nodes['control-plane'].get_final_nodes().get_first_member()
     result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
     log.verbose("Detected the following nodes in cluster:\n%s" % stdout)
 
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        if node["name"] in stdout:
-            log.debug("Deleting node %s from the cluster..." % node["name"])
-            control_plane.sudo("kubectl delete node %s" % node["name"], hide=False)
+    for node in group.get_ordered_members_list():
+        node_name = node.get_node_name()
+        if node_name in stdout:
+            log.debug("Deleting node %s from the cluster..." % node_name)
+            control_plane.sudo("kubectl delete node %s" % node_name, hide=False)
         else:
-            log.warning("Node %s is not found in cluster and can't be removed" % node["name"])
+            log.warning("Node %s is not found in cluster and can't be removed" % node_name)
 
     return control_plane.sudo("kubectl get nodes")
 
 
-def is_available_control_plane(control_plane):
-    return not ("new_node" in control_plane["roles"] or "remove_node" in control_plane["roles"])
+def install(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-
-def install(group):
-    log = group.cluster.log
-
-    with RemoteExecutor(group.cluster):
+    with group.new_executor() as exe:
         log.debug("Making systemd unit...")
-        group.sudo('rm -rf /etc/systemd/system/kubelet*')
-        for node in group.cluster.inventory["nodes"]:
-            # perform only for current group members
-            if node["connect_to"] in group.nodes.keys():
-                template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
-                    hostname=node["name"])
-                log.debug("Uploading to '%s'..." % node["connect_to"])
-                node["connection"].put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-                node["connection"].sudo("chmod 644 /etc/systemd/system/kubelet.service")
+        for node in exe.group.get_ordered_members_list():
+            node.sudo('rm -rf /etc/systemd/system/kubelet*')
+            node.get_node_name()
+            template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
+                hostname=node.get_node_name())
+            log.debug("Uploading to '%s'..." % node.get_host())
+            node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
+            node.sudo("chmod 644 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
-        system.reload_systemctl(group)
-        group.sudo('systemctl enable kubelet')
+        system.reload_systemctl(exe.group)
+        exe.group.sudo('systemctl enable kubelet')
 
     return group.sudo('systemctl status kubelet', warn=True)
 
 
-def join_other_control_planes(group):
-    other_control_planes_group = group.get_ordered_members_list(provide_node_configs=True)[1:]
+def join_other_control_planes(group: NodeGroup) -> RunnersGroupResult:
+    other_control_planes_group = group.get_ordered_members_list()[1:]
 
     join_dict = group.cluster.context["join_dict"]
     for node in other_control_planes_group:
-        join_control_plane(group, node, join_dict)
+        join_control_plane(group.cluster, node, join_dict)
 
     group.cluster.log.debug("Verifying installation...")
-    first_control_plane = group.get_first_member(provide_node_configs=True)
-    return first_control_plane['connection'].sudo("kubectl get pods --all-namespaces -o=wide")
+    first_control_plane = group.get_first_member()
+    return first_control_plane.sudo("kubectl get pods --all-namespaces -o=wide")
 
 
-def join_new_control_plane(group):
+def join_new_control_plane(group: NodeGroup):
     join_dict = get_join_dict(group)
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        join_control_plane(group, node, join_dict)
+    for node in group.get_ordered_members_list():
+        join_control_plane(group.cluster, node, join_dict)
 
 
-def join_control_plane(group, node, join_dict):
-    log = group.cluster.log
+def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: dict):
+    log = cluster.log
+    node_config = node.get_config()
+    node_name = node.get_node_name()
+    defer = node.new_defer()
 
     join_config: dict = {
-        'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
+        'apiVersion': cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'JoinConfiguration',
         'discovery': {
             'bootstrapToken': {
-                'apiServerEndpoint': group.cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
+                'apiServerEndpoint': cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
                 'token': join_dict['token'],
                 'caCertHashes': [
                     join_dict['discovery-token-ca-cert-hash']
@@ -378,17 +381,16 @@ def join_control_plane(group, node, join_dict):
         'controlPlane': {
             'certificateKey': join_dict['certificate-key'],
             'localAPIEndpoint': {
-                'advertiseAddress': node['internal_address'],
+                'advertiseAddress': node_config['internal_address'],
             }
         }
     }
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
         join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
-
-    if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
+    if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
         join_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
@@ -396,64 +398,65 @@ def join_control_plane(group, node, join_dict):
             }
         }
 
-    if 'worker' in node['roles']:
+    if 'worker' in node_config['roles']:
         join_config.setdefault('nodeRegistration', {})['taints'] = []
 
-    configure_container_runtime(group.cluster, join_config)
+    configure_container_runtime(cluster, join_config)
 
-    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(join_config, default_flow_style=False)
+    config = get_kubeadm_config(cluster.inventory) + "---\n" + yaml.dump(join_config, default_flow_style=False)
 
-    utils.dump_file(group.cluster, config, 'join-config_%s.yaml' % node['name'])
+    utils.dump_file(cluster, config, 'join-config_%s.yaml' % node_name)
 
-    log.debug("Uploading init config to control-plane '%s'..." % node['name'])
-    node['connection'].sudo("mkdir -p /etc/kubernetes")
-    node['connection'].put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
+    log.debug("Uploading init config to control-plane '%s'..." % node_name)
+    node.sudo("mkdir -p /etc/kubernetes")
+    node.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
     # put control-plane patches
-    create_kubeadm_patches_for_node(group.cluster, node)
+    create_kubeadm_patches_for_node(cluster, node)
 
     # copy admission config to control-plane
-    admission.copy_pss(node['connection'])
+    admission.copy_pss(node)
 
     # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
-    log.debug('Joining control-plane \'%s\'...' % node['name'])
+    log.debug('Joining control-plane \'%s\'...' % node_name)
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     # and only "else" branch remains
-    if "v1.21" in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        node['connection'].sudo("kubeadm join "
-                            " --config=/etc/kubernetes/join-config.yaml"
-                            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-                            " --v=5",
-                            is_async=False, hide=False)
+    if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+        node.sudo(
+            "kubeadm join "
+            " --config=/etc/kubernetes/join-config.yaml"
+            " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+            " --v=5",
+            hide=False)
 
-        log.debug("Patching apiServer bind-address for control-plane %s" % node['name'])
+        log.debug("Patching apiServer bind-address for control-plane %s" % node_name)
 
-        with RemoteExecutor(group.cluster):
-            node['connection'].sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
-                                    "/etc/kubernetes/manifests/kube-apiserver.yaml" % node['internal_address'])
-            node['connection'].sudo("systemctl restart kubelet")
-            copy_admin_config(log, node['connection'])
+        defer.sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
+                   "/etc/kubernetes/manifests/kube-apiserver.yaml" % node_config['internal_address'])
+        defer.sudo("systemctl restart kubelet")
+        copy_admin_config(log, defer)
+        defer.flush()
     else:
-        node['connection'].sudo("kubeadm join "
-                           " --config=/etc/kubernetes/join-config.yaml "
-                           " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-                            " --v=5",
-                            is_async=False, hide=False)
-        with RemoteExecutor(group.cluster):
-            node['connection'].sudo("systemctl restart kubelet")
-            copy_admin_config(log, node['connection'])
-       
+        node.sudo(
+            "kubeadm join "
+            " --config=/etc/kubernetes/join-config.yaml "
+            " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+            " --v=5",
+            hide=False)
+        defer.sudo("systemctl restart kubelet")
+        copy_admin_config(log, defer)
+        defer.flush()
 
-    wait_for_any_pods(group.cluster, node['connection'], apply_filter=node['name'])
+    wait_for_any_pods(cluster, node, apply_filter=node_name)
 
 
 @contextmanager
-def local_admin_config(node: NodeGroup) -> ContextManager[str]:
+def local_admin_config(node: NodeGroup) -> Iterator[str]:
     temp_filepath = "/tmp/%s" % uuid.uuid4().hex
 
     cluster_name = node.cluster.inventory['cluster_name']
-    internal_address = node.get_first_member(provide_node_configs=True)['internal_address']
+    internal_address = node.get_config()['internal_address']
     if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
         internal_address = f"[{internal_address}]"
 
@@ -465,18 +468,19 @@ def local_admin_config(node: NodeGroup) -> ContextManager[str]:
         node.sudo(f'rm -f {temp_filepath}')
 
 
-def copy_admin_config(log, nodes):
-    log.debug("Setting up admin-config...")
-    nodes.sudo("mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config")
+def copy_admin_config(logger: log.EnhancedLogger, nodes: AbstractGroup[RunResult]) -> None:
+    logger.debug("Setting up admin-config...")
+    command = "mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config"
+    nodes.sudo(command)
 
 
 def fetch_admin_config(cluster: KubernetesCluster) -> str:
     log = cluster.log
 
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
-    log.debug(f"Downloading kubeconfig from node {first_control_plane['name']!r}...")
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    log.debug(f"Downloading kubeconfig from node {first_control_plane.get_node_name()!r}...")
 
-    kubeconfig = list(first_control_plane['connection'].sudo('cat /root/.kube/config').values())[0].stdout
+    kubeconfig = list(first_control_plane.sudo('cat /root/.kube/config').values())[0].stdout
 
     # Replace cluster FQDN with ip
     public_cluster_ip = cluster.inventory.get('public_cluster_ip')
@@ -493,9 +497,10 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
     return kubeconfig_filename
 
 
-def get_join_dict(group):
-    first_control_plane = group.cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
-    token_result = first_control_plane['connection'].sudo("kubeadm token create --print-join-command", hide=False)
+def get_join_dict(group: NodeGroup) -> dict:
+    cluster: KubernetesCluster = group.cluster
+    first_control_plane = cluster.nodes["control-plane"].get_first_member()
+    token_result = first_control_plane.sudo("kubeadm token create --print-join-command", hide=False)
     join_strings = list(token_result.values())[0].stdout.rstrip("\n")
 
     join_dict = {"worker_join_command": join_strings}
@@ -505,31 +510,33 @@ def get_join_dict(group):
         if "--" in current_string:
             join_dict[current_string.lstrip("--")] = join_array[idx + 1]
 
-    cert_key_result = first_control_plane['connection'].sudo("kubeadm init phase upload-certs --upload-certs")
+    cert_key_result = first_control_plane.sudo("kubeadm init phase upload-certs --upload-certs")
     cert_key = list(cert_key_result.values())[0].stdout.split("Using certificate key:\n")[1].rstrip("\n")
     join_dict["certificate-key"] = cert_key
     return join_dict
 
 
-def init_first_control_plane(group):
-    log = group.cluster.log
+def init_first_control_plane(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    first_control_plane = group.get_first_member(provide_node_configs=True)
-    first_control_plane_group = first_control_plane["connection"]
+    first_control_plane = group.get_first_member()
+    node_config = first_control_plane.get_config()
+    node_name = first_control_plane.get_node_name()
 
     init_config: dict = {
-        'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
+        'apiVersion': cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
-            'advertiseAddress': first_control_plane['internal_address']
+            'advertiseAddress': node_config['internal_address']
         }
     }
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
         init_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
-    if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
+    if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
         init_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
@@ -537,40 +544,41 @@ def init_first_control_plane(group):
             }
         }
 
-    if 'worker' in first_control_plane['roles']:
+    if 'worker' in node_config['roles']:
         init_config.setdefault('nodeRegistration', {})['taints'] = []
 
-    configure_container_runtime(group.cluster, init_config)
+    configure_container_runtime(cluster, init_config)
 
-    config = get_kubeadm_config(group.cluster.inventory) + "---\n" + yaml.dump(init_config, default_flow_style=False)
+    config = get_kubeadm_config(cluster.inventory) + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
-    utils.dump_file(group.cluster, config, 'init-config_%s.yaml' % first_control_plane['name'])
+    utils.dump_file(cluster, config, 'init-config_%s.yaml' % node_name)
 
     log.debug("Uploading init config to initial control_plane...")
-    first_control_plane_group.sudo("mkdir -p /etc/kubernetes")
-    first_control_plane_group.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
+    first_control_plane.sudo("mkdir -p /etc/kubernetes")
+    first_control_plane.put(io.StringIO(config), '/etc/kubernetes/init-config.yaml', sudo=True)
 
     # put control-plane patches
-    create_kubeadm_patches_for_node(group.cluster, first_control_plane)
+    create_kubeadm_patches_for_node(cluster, first_control_plane)
 
     # copy admission config to first control-plane
-    first_control_plane_group.call(admission.copy_pss)
+    first_control_plane.call(admission.copy_pss)
 
     log.debug("Initializing first control_plane...")
-    result = first_control_plane_group.sudo("kubeadm init"
-                                     " --upload-certs"
-                                     " --config=/etc/kubernetes/init-config.yaml"
-                                     " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-                                     " --v=5",
-                                     hide=False)
+    result = first_control_plane.sudo(
+        "kubeadm init"
+        " --upload-certs"
+        " --config=/etc/kubernetes/init-config.yaml"
+        " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+        " --v=5",
+        hide=False)
 
-    copy_admin_config(log, first_control_plane_group)
+    copy_admin_config(log, first_control_plane)
 
-    kubeconfig_filepath = fetch_admin_config(group.cluster)
-    summary.schedule_report(group.cluster.context, summary.SummaryItem.KUBECONFIG, kubeconfig_filepath)
+    kubeconfig_filepath = fetch_admin_config(cluster)
+    summary.schedule_report(cluster.context, summary.SummaryItem.KUBECONFIG, kubeconfig_filepath)
 
     # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
-    first_control_plane_group.call(admission.apply_admission)
+    first_control_plane.call(admission.apply_admission)
 
     # Preparing join_dict to init other nodes
     control_plane_lines = list(result.values())[0].stdout. \
@@ -588,19 +596,14 @@ def init_first_control_plane(group):
         if len(key_val) > 1:
             join_dict[key_val[0].strip()] = key_val[1].strip()
     join_dict["worker_join_command"] = worker_join_command
-    group.cluster.context["join_dict"] = join_dict
+    cluster.context["join_dict"] = join_dict
 
-    wait_for_any_pods(group.cluster, first_control_plane_group, apply_filter=first_control_plane['name'])
+    wait_for_any_pods(cluster, first_control_plane, apply_filter=node_name)
     # refresh cluster installation status in cluster context
-    is_cluster_installed(group.cluster)
+    is_cluster_installed(cluster)
 
 
-
-def wait_for_any_pods(cluster, connection, apply_filter=None):
-    if isinstance(cluster, NodeGroup):
-        # cluster is a group, not a cluster
-        cluster = cluster.cluster
-
+def wait_for_any_pods(cluster: KubernetesCluster, connection: NodeGroup, apply_filter: str = None) :
     plugins.expect_pods(cluster, [
         'kube-apiserver',
         'kube-controller-manager',
@@ -618,15 +621,16 @@ def wait_uncordon(node: NodeGroup):
     # This forces to use local API server and waits till it is up.
     with local_admin_config(node) as kubeconfig:
         utils.wait_command_successful(node, f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()}",
-                                      is_async=False, hide=False,
+                                      hide=False,
                                       timeout=timeout_config['timeout'],
                                       retries=timeout_config['retries'])
 
 
 def wait_for_nodes(group: NodeGroup):
-    log = group.cluster.log
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    first_control_plane = group.cluster.nodes["control-plane"].get_first_member()
+    first_control_plane = cluster.nodes["control-plane"].get_first_member()
     node_names = group.get_nodes_names()
 
     wait_conditions = {
@@ -638,8 +642,8 @@ def wait_for_nodes(group: NodeGroup):
     else:
         status_cmd = "kubectl get nodes %s -o jsonpath='{.status.conditions[?(@.type==\"%s\")].status}'"
 
-    timeout = int(group.cluster.inventory['globals']['nodes']['ready']['timeout'])
-    retries = int(group.cluster.inventory['globals']['nodes']['ready']['retries'])
+    timeout = int(cluster.inventory['globals']['nodes']['ready']['timeout'])
+    retries = int(cluster.inventory['globals']['nodes']['ready']['retries'])
     log.debug("Waiting for new kubernetes nodes to become ready, %s retries every %s seconds" % (retries, timeout))
     while retries > 0:
         correct_conditions = 0
@@ -669,15 +673,16 @@ def wait_for_nodes(group: NodeGroup):
     raise Exception("Nodes did not become ready in the expected time, %s retries every %s seconds. Try to increase node.ready.retries parameter in globals: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#globals" % (retries, timeout))
 
 
-def init_workers(group):
-    join_dict = group.cluster.context.get("join_dict", get_join_dict(group))
+def init_workers(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    join_dict = cluster.context.get("join_dict", get_join_dict(group))
 
     join_config = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
         'kind': 'JoinConfiguration',
         'discovery': {
             'bootstrapToken': {
-                'apiServerEndpoint': group.cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
+                'apiServerEndpoint': cluster.inventory["services"]["kubeadm"]['controlPlaneEndpoint'],
                 'token': join_dict['token'],
                 'caCertHashes': [
                     join_dict['discovery-token-ca-cert-hash']
@@ -687,11 +692,10 @@ def init_workers(group):
     }
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in group.cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
+    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
         join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
-
-    if group.cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
+    if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
         join_config['nodeRegistration'] = {
             'kubeletExtraArgs': {
@@ -699,78 +703,81 @@ def init_workers(group):
             }
         }
 
-    configure_container_runtime(group.cluster, join_config)
+    configure_container_runtime(cluster, join_config)
 
     config = yaml.dump(join_config, default_flow_style=False)
 
-    utils.dump_file(group.cluster, config, 'join-config-workers.yaml')
+    utils.dump_file(cluster, config, 'join-config-workers.yaml')
 
     group.sudo("mkdir -p /etc/kubernetes")
     group.put(io.StringIO(config), '/etc/kubernetes/join-config.yaml', sudo=True)
 
     # put control-plane patches
-    for node in group.get_ordered_members_list(provide_node_configs=True):
-        create_kubeadm_patches_for_node(group.cluster, node)
+    for node in group.get_ordered_members_list():
+        create_kubeadm_patches_for_node(cluster, node)
 
-    group.cluster.log.debug('Joining workers...')
+    cluster.log.debug('Joining workers...')
 
-    return group.sudo(
+    for node in group.get_ordered_members_list():
+        node.sudo(
             "kubeadm join --config=/etc/kubernetes/join-config.yaml"
-            " --ignore-preflight-errors='" + group.cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+            " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
             " --v=5",
-            is_async=False, hide=False)
+            hide=False)
 
-def apply_labels(group):
-    log = group.cluster.log
+
+def apply_labels(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
     log.debug("Applying additional labels for nodes")
     # TODO: Add "--overwrite-labels" switch
     # TODO: Add labels validation after applying
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+    control_plane = cluster.nodes["control-plane"].get_first_member()
+    with control_plane.new_executor() as exe:
+        for node in group.get_ordered_members_configs_list():
             if "labels" not in node:
                 log.verbose("No additional labels found for %s" % node['name'])
                 continue
             log.verbose("Found additional labels for %s: %s" % (node['name'], node['labels']))
             for key, value in node["labels"].items():
-                group.cluster.nodes["control-plane"].get_first_member() \
-                    .sudo("kubectl label node %s %s=%s" % (node["name"], key, value))
+                exe.group.sudo("kubectl label node %s %s=%s" % (node["name"], key, value))
 
     log.debug("Successfully applied additional labels")
 
-    return group.cluster.nodes["control-plane"].get_first_member() \
-        .sudo("kubectl get nodes --show-labels")
+    return control_plane.sudo("kubectl get nodes --show-labels")
     # TODO: Add wait for pods on worker nodes
 
 
-def apply_taints(group):
-    log = group.cluster.log
+def apply_taints(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
     log.debug("Applying additional taints for nodes")
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+    control_plane = cluster.nodes["control-plane"].get_first_member()
+    with control_plane.new_executor() as exe:
+        for node in group.get_ordered_members_configs_list():
             if "taints" not in node:
                 log.verbose("No additional taints found for %s" % node['name'])
                 continue
             log.verbose("Found additional taints for %s: %s" % (node['name'], node['taints']))
             for taint in node["taints"]:
-                group.cluster.nodes["control-plane"].get_first_member() \
-                    .sudo("kubectl taint node %s %s" % (node["name"], taint))
+                exe.group.sudo("kubectl taint node %s %s" % (node["name"], taint))
 
     log.debug("Successfully applied additional taints")
 
-    return group.cluster.nodes["control-plane"].get_first_member() \
-        .sudo("kubectl get nodes -o=jsonpath="
-              "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'", hide=True)
+    return control_plane.sudo(
+        "kubectl get nodes -o=jsonpath="
+        "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'")
 
 
-def is_cluster_installed(cluster):
+def is_cluster_installed(cluster: KubernetesCluster):
     cluster.log.verbose('Searching for already installed cluster...')
     try:
-        result = cluster.nodes['control-plane'].sudo('kubectl cluster-info', warn=True, timeout=15)
-        for conn, result in result.items():
+        results = cluster.nodes['control-plane'].sudo('kubectl cluster-info', warn=True, timeout=15)
+        for host, result in results.items():
             if 'is running at' in result.stdout:
-                cluster.log.verbose('Detected running Kubernetes cluster on %s' % conn.host)
+                cluster.log.verbose('Detected running Kubernetes cluster on %s' % host)
                 for line in result.stdout.split("\n"):
                     if 'Kubernetes control plane' in line:
                         cluster.context['controlplain_uri'] = line.split('at ')[1]
@@ -782,7 +789,7 @@ def is_cluster_installed(cluster):
     return False
 
 
-def get_kubeadm_config(inventory):
+def get_kubeadm_config(inventory: dict):
     kubeadm_kubelet = yaml.dump(inventory["services"]["kubeadm_kubelet"], default_flow_style=False)
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
     return f'{kubeadm_kubelet}---\n{kubeadm}'
@@ -790,13 +797,14 @@ def get_kubeadm_config(inventory):
 
 def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    node_name = first_control_plane.get_node_name()
 
-    if not upgrade_group.has_node(first_control_plane['name']):
-        cluster.log.debug("First control-plane \"%s\" upgrade is not required" % first_control_plane['name'])
+    if not upgrade_group.has_node(node_name):
+        cluster.log.debug("First control-plane \"%s\" upgrade is not required" % node_name)
         return
 
-    cluster.log.debug("Upgrading first control-plane \"%s\"" % first_control_plane)
+    cluster.log.debug("Upgrading first control-plane \"%s\"" % node_name)
 
     # put control-plane patches
     create_kubeadm_patches_for_node(cluster, first_control_plane)
@@ -811,45 +819,47 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     if patch_kubeadm_configmap(first_control_plane, cluster):
         flags += " --config /tmp/kubeadm_config.yaml"
 
-    drain_cmd = prepare_drain_command(cluster, first_control_plane['name'], **drain_kwargs)
-    first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
+    drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
+    first_control_plane.sudo(drain_cmd, hide=False)
 
-    upgrade_cri_if_required(first_control_plane['connection'])
+    upgrade_cri_if_required(first_control_plane)
 
     # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
     fix_flag_kubelet(cluster, first_control_plane)
 
-    first_control_plane['connection'].sudo(f"sudo kubeadm upgrade apply {version} {flags} && "
-                                    f"sudo kubectl uncordon {first_control_plane['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+    first_control_plane.sudo(
+        f"sudo kubeadm upgrade apply {version} {flags} && "
+        f"sudo kubectl uncordon {node_name} && "
+        f"sudo systemctl restart kubelet", hide=False)
 
-    copy_admin_config(cluster.log, first_control_plane['connection'])
+    copy_admin_config(cluster.log, first_control_plane)
 
-    expect_kubernetes_version(cluster, version, apply_filter=first_control_plane['name'])
-    wait_for_any_pods(cluster, first_control_plane['connection'], apply_filter=first_control_plane['name'])
-    exclude_node_from_upgrade_list(first_control_plane['connection'], first_control_plane['name'])
+    expect_kubernetes_version(cluster, version, apply_filter=node_name)
+    wait_for_any_pods(cluster, first_control_plane, apply_filter=node_name)
+    exclude_node_from_upgrade_list(first_control_plane, node_name)
 
 
 def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
-    for node in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
-        if node['name'] != first_control_plane['name']:
+    for node in cluster.nodes['control-plane'].get_ordered_members_list():
+        node_name = node.get_node_name()
+        if node_name != first_control_plane.get_node_name():
 
-            if not upgrade_group.has_node(node['name']):
-                cluster.log.debug("Control-plane \"%s\" upgrade is not required" % node['name'])
+            if not upgrade_group.has_node(node_name):
+                cluster.log.debug("Control-plane \"%s\" upgrade is not required" % node_name)
                 continue
 
-            cluster.log.debug("Upgrading control-plane \"%s\"" % node['name'])
+            cluster.log.debug("Upgrading control-plane \"%s\"" % node_name)
 
             # put control-plane patches
             create_kubeadm_patches_for_node(cluster, node)
 
-            drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
-            node['connection'].sudo(drain_cmd, is_async=False, hide=False)
+            drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
+            node.sudo(drain_cmd, hide=False)
 
-            upgrade_cri_if_required(node['connection'])
+            upgrade_cri_if_required(node)
 
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
             fix_flag_kubelet(cluster, node)
@@ -857,30 +867,34 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
             # and only "else" branch remains
             if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-                node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true && "
-                                    f"sudo sed -i 's/--bind-address=.*$/--bind-address={node['internal_address']}/' "
-                                    f"/etc/kubernetes/manifests/kube-apiserver.yaml && "
-                                    f"sudo kubectl uncordon {node['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+                node.sudo(
+                    f"sudo kubeadm upgrade node --certificate-renewal=true && "
+                    f"sudo sed -i 's/--bind-address=.*$/--bind-address={node.get_config()['internal_address']}/' "
+                    f"/etc/kubernetes/manifests/kube-apiserver.yaml && "
+                    f"sudo kubectl uncordon {node_name} && "
+                    f"sudo systemctl restart kubelet",
+                    hide=False)
             else:
-                node['connection'].sudo(f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-                                    f"sudo kubectl uncordon {node['name']} && "
-                                    f"sudo systemctl restart kubelet", is_async=False, hide=False)
+                node.sudo(
+                    f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
+                    f"sudo kubectl uncordon {node_name} && "
+                    f"sudo systemctl restart kubelet",
+                    hide=False)
 
-            expect_kubernetes_version(cluster, version, apply_filter=node['name'])
-            copy_admin_config(cluster.log, node['connection'])
-            wait_for_any_pods(cluster, node['connection'], apply_filter=node['name'])
-            exclude_node_from_upgrade_list(first_control_plane, node['name'])
+            expect_kubernetes_version(cluster, version, apply_filter=node_name)
+            copy_admin_config(cluster.log, node)
+            wait_for_any_pods(cluster, node, apply_filter=node_name)
+            exclude_node_from_upgrade_list(first_control_plane, node_name)
 
 
-def patch_kubeadm_configmap(first_control_plane, cluster):
+def patch_kubeadm_configmap(first_control_plane: NodeGroup, cluster: KubernetesCluster):
     '''
     Checks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
     '''
     # TODO: get rid of this method after k8s 1.21 support stop
     current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-    kubeadm_config_map = first_control_plane["connection"].sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
+    kubeadm_config_map = first_control_plane.sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
     ryaml = ruamel.yaml.YAML()
     config_map = ryaml.load(kubeadm_config_map)
@@ -907,34 +921,35 @@ def patch_kubeadm_configmap(first_control_plane, cluster):
 
     cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
-    kubelet_config = first_control_plane["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
+    kubelet_config = first_control_plane.sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
     result_config = kubelet_config + "---\n" + updated_config.getvalue()
-    first_control_plane["connection"].put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
+    first_control_plane.put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
 
     return True
 
 
 def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs):
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
 
-    for node in cluster.nodes.get('worker').exclude_group(cluster.nodes['control-plane']).get_ordered_members_list(
-            provide_node_configs=True):
+    for node in cluster.nodes['worker'].exclude_group(cluster.nodes['control-plane'])\
+            .get_ordered_members_list():
+        node_name = node.get_node_name()
 
-        if not upgrade_group.has_node(node['name']):
-            cluster.log.debug("Worker \"%s\" upgrade is not required" % node['name'])
+        if not upgrade_group.has_node(node_name):
+            cluster.log.debug("Worker \"%s\" upgrade is not required" % node_name)
             continue
 
-        cluster.log.debug("Upgrading worker \"%s\"" % node['name'])
+        cluster.log.debug("Upgrading worker \"%s\"" % node_name)
 
         # put control-plane patches
         create_kubeadm_patches_for_node(cluster, node)
 
-        drain_cmd = prepare_drain_command(cluster, node['name'], **drain_kwargs)
-        first_control_plane['connection'].sudo(drain_cmd, is_async=False, hide=False)
+        drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
+        first_control_plane.sudo(drain_cmd, hide=False)
 
-        upgrade_cri_if_required(node['connection'])
+        upgrade_cri_if_required(node)
 
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
         fix_flag_kubelet(cluster, node)
@@ -942,17 +957,19 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
         # and only "else" branch remains
         if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-            node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true && "
-                                "sudo systemctl restart kubelet")
+            node.sudo(
+                "kubeadm upgrade node --certificate-renewal=true && "
+                "sudo systemctl restart kubelet")
         else:
-           node['connection'].sudo("kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-                                "sudo systemctl restart kubelet")
+            node.sudo(
+                "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
+                "sudo systemctl restart kubelet")
 
-        first_control_plane['connection'].sudo("kubectl uncordon %s" % node['name'], is_async=False, hide=False)
+        first_control_plane.sudo("kubectl uncordon %s" % node_name, hide=False)
 
-        expect_kubernetes_version(cluster, version, apply_filter=node['name'])
+        expect_kubernetes_version(cluster, version, apply_filter=node_name)
         # workers do not have system pods to wait for their start
-        exclude_node_from_upgrade_list(first_control_plane, node['name'])
+        exclude_node_from_upgrade_list(first_control_plane, node_name)
 
 
 def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
@@ -961,7 +978,7 @@ def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
                           drain_timeout: int = None, grace_period: int = None):
     drain_globals = static.GLOBALS['nodes']['drain']
     if drain_timeout is None:
-        drain_timeout = recalculate_proper_timeout(cluster.nodes, drain_globals['timeout'])
+        drain_timeout = recalculate_proper_timeout(cluster, drain_globals['timeout'])
 
     if grace_period is None:
         grace_period = drain_globals['grace_period']
@@ -975,7 +992,7 @@ def prepare_drain_command(cluster: KubernetesCluster, node_name: str,
 
 def upgrade_cri_if_required(group: NodeGroup):
     # currently it is invoked only for single node
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
 
@@ -993,17 +1010,17 @@ def upgrade_cri_if_required(group: NodeGroup):
         log.debug(f"{cri_impl} upgrade is not required")
 
 
-def verify_upgrade_versions(cluster):
-    first_control_plane = cluster.nodes['control-plane'].get_first_member(provide_node_configs=True)
+def verify_upgrade_versions(cluster: KubernetesCluster):
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
     upgrade_version = cluster.context["upgrade_version"]
 
     k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['control-plane'])
-    for node in k8s_nodes_group.get_ordered_members_list(provide_node_configs=True):
-        cluster.log.debug(f"Verifying current k8s version for node {node['name']}")
-        result = first_control_plane['connection'].sudo("kubectl get nodes "
-                                                 f"{node['name']}"
-                                                 " -o custom-columns='VERSION:.status.nodeInfo.kubeletVersion' "
-                                                 "| grep -vw ^VERSION ")
+    for node in k8s_nodes_group.get_ordered_members_list():
+        cluster.log.debug(f"Verifying current k8s version for node {node.get_node_name()}")
+        result = first_control_plane.sudo("kubectl get nodes "
+                                          f"{node.get_node_name()}"
+                                          " -o custom-columns='VERSION:.status.nodeInfo.kubeletVersion' "
+                                          "| grep -vw ^VERSION ")
         curr_version = list(result.values())[0].stdout
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
@@ -1038,7 +1055,8 @@ def verify_supported_version(target_version: str, logger: log.EnhancedLogger) ->
         logger.warning(f"Specified target Kubernetes version {target_version!r} - is not supported!")
 
 
-def expect_kubernetes_version(cluster, version, timeout=None, retries=None, node=None, apply_filter=None):
+def expect_kubernetes_version(cluster: KubernetesCluster, version: str,
+                              timeout=None, retries=None, node: NodeGroup = None, apply_filter: str = None):
     if timeout is None:
         timeout = cluster.globals['nodes']['expect']['kubernetes_version']['timeout']
     if retries is None:
@@ -1105,15 +1123,15 @@ def test_version_upgrade_possible(old: str, new: str, skip_equal=False):
         raise Exception(ERROR_MINOR_RANGE_EXCEEDED % (versions_unchanged['old'], versions_unchanged['new']))
 
 
-def recalculate_proper_timeout(nodes, timeout):
+def recalculate_proper_timeout(cluster: KubernetesCluster, timeout: int):
     try:
-        amount_str = nodes['control-plane'].get_first_member().sudo('kubectl get pods -A | wc -l').get_simple_out()
+        amount_str = cluster.nodes['control-plane'].get_first_member().sudo('kubectl get pods -A | wc -l').get_simple_out()
         return timeout * int(amount_str)
     except Exception:
-        return timeout * 10 * nodes['all'].nodes_amount()
+        return timeout * 10 * cluster.nodes['all'].nodes_amount()
 
 
-def configure_container_runtime(cluster, kubeadm_config):
+def configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict):
     if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
         if 'nodeRegistration' not in kubeadm_config:
             kubeadm_config['nodeRegistration'] = {}
@@ -1130,13 +1148,11 @@ def configure_container_runtime(cluster, kubeadm_config):
             'unix:///run/containerd/containerd.sock'
 
 
-def exclude_node_from_upgrade_list(first_control_plane, node_name):
-    if isinstance(first_control_plane, dict):
-        first_control_plane = first_control_plane['connection']
+def exclude_node_from_upgrade_list(first_control_plane: NodeGroup, node_name: str):
     return first_control_plane.sudo('sed -i \'/%s/d\' /etc/kubernetes/nodes-k8s-versions.txt' % node_name, warn=True)
 
 
-def autodetect_non_upgraded_nodes(cluster, future_version) -> List[str]:
+def autodetect_non_upgraded_nodes(cluster: KubernetesCluster, future_version: str) -> List[str]:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     try:
         nodes_list_result = first_control_plane.sudo('[ ! -f /etc/kubernetes/nodes-k8s-versions.txt ] && '
@@ -1154,7 +1170,7 @@ def autodetect_non_upgraded_nodes(cluster, future_version) -> List[str]:
             .get_simple_out()
         cluster.log.verbose("Remote response with nodes description:\n%s" % nodes_list_result)
     except Exception as e:
-        cluster.log.warn("Failed to detect cluster status before upgrade. All nodes will be scheduled for upgrade.")
+        cluster.log.warning("Failed to detect cluster status before upgrade. All nodes will be scheduled for upgrade.")
         cluster.log.verbose(e)
         return cluster.nodes['all'].get_nodes_names()
 
@@ -1183,7 +1199,7 @@ def autodetect_non_upgraded_nodes(cluster, future_version) -> List[str]:
     return upgrade_list
 
 
-def get_group_for_upgrade(cluster, ignore_cache=False):
+def get_group_for_upgrade(cluster: KubernetesCluster, ignore_cache=False) -> NodeGroup:
 
     if cluster.context.get('upgrade_group') and not ignore_cache:
         return cluster.context['upgrade_group']
@@ -1217,37 +1233,39 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     :return: String results from all nodes in presented group.
     """
 
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    if not group_size:
+    if group_size is None:
         group_size = cluster.procedure_inventory.get('prepull_group_size')
 
-    if not group_size:
+    if group_size is None:
         log.verbose("Group size is not set in procedure inventory, a default one will be used")
-        group_size = cluster.globals.get('prepull_group_size')
+        group_size = cluster.globals['prepull_group_size']
 
-    nodes = group.get_ordered_members_list()
+    nodes_amount = group.nodes_amount()
 
     # group_size should be greater than 0
-    if len(nodes) != 0 and len(nodes) < group_size:
-        group_size = len(nodes)
+    if nodes_amount != 0 and nodes_amount < group_size:
+        group_size = nodes_amount
 
-    groups_amount = math.ceil(len(nodes) / group_size)
+    groups_amount = math.ceil(nodes_amount / group_size)
 
-    log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (len(nodes), group_size, groups_amount))
-    with RemoteExecutor(cluster) as exe:
+    log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (nodes_amount, group_size, groups_amount))
+    tokens = []
+    with group.new_executor() as exe:
+        nodes = exe.group.get_ordered_members_list()
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
-                if node_i < len(nodes):
-                    images_prepull(nodes[node_i])
+                if node_i < nodes_amount:
+                    tokens.append(images_prepull(nodes[node_i]))
 
-    return exe.get_last_results_str()
+    return exe.get_merged_runners_result(tokens)
 
 
-def images_prepull(group: NodeGroup):
+def images_prepull(group: DeferredGroup) -> Token:
     """
     Prepull kubeadm images on group.
     :param group: NodeGroup where prepull should be performed.
@@ -1305,7 +1323,7 @@ def get_nodes_description(cluster: KubernetesCluster) -> dict:
 
 
 def get_actual_roles(nodes_description: dict) -> Dict[str, List[str]]:
-    result = {}
+    result: Dict[str, List[str]] = {}
     for node_description in nodes_description['items']:
         node_name = node_description['metadata']['name']
         labels = node_description['metadata']['labels']
@@ -1323,7 +1341,7 @@ def get_nodes_conditions(nodes_description: dict) -> Dict[str, Dict[str, dict]]:
     result = {}
     for node_description in nodes_description['items']:
         node_name = node_description['metadata']['name']
-        conditions_by_type = {}
+        conditions_by_type: Dict[str, dict] = {}
         result[node_name] = conditions_by_type
         for condition in node_description['status']['conditions']:
             conditions_by_type[condition['type']] = condition
@@ -1331,7 +1349,7 @@ def get_nodes_conditions(nodes_description: dict) -> Dict[str, Dict[str, dict]]:
     return result
 
 # function to get dictionary of flags to be patched for a given control plane item and a given node
-def get_patched_flags_for_control_plane_item(inventory, control_plane_item, node):
+def get_patched_flags_for_control_plane_item(inventory: dict, control_plane_item: str, node: NodeConfig):
     flags = {}
 
     for n in inventory['services']['kubeadm_patches'][control_plane_item]:
@@ -1350,10 +1368,11 @@ def get_patched_flags_for_control_plane_item(inventory, control_plane_item, node
 
     return flags
 
+
 # function to create kubeadm patches and put them to a node
-def create_kubeadm_patches_for_node(cluster, node):
-    cluster.log.verbose(f"Create and upload kubeadm patches to %s..." % node['name'])
-    node['connection'].sudo('sudo rm -rf /etc/kubernetes/patches ; sudo mkdir -p /etc/kubernetes/patches', warn=True)
+def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup):
+    cluster.log.verbose(f"Create and upload kubeadm patches to %s..." % node.get_node_name())
+    node.sudo('sudo rm -rf /etc/kubernetes/patches ; sudo mkdir -p /etc/kubernetes/patches', warn=True)
 
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
@@ -1369,8 +1388,9 @@ def create_kubeadm_patches_for_node(cluster, node):
     }
 
     # read patches content from inventory and upload patch files to a node
+    node_config = node.get_config()
     for control_plane_item in cluster.inventory['services']['kubeadm_patches']:
-        patched_flags = get_patched_flags_for_control_plane_item(cluster.inventory, control_plane_item, node)
+        patched_flags = get_patched_flags_for_control_plane_item(cluster.inventory, control_plane_item, node_config)
         if patched_flags:
             if control_plane_item == 'kubelet':
                 template_filename = 'templates/patches/kubelet.yaml.j2'
@@ -1378,14 +1398,14 @@ def create_kubeadm_patches_for_node(cluster, node):
                 template_filename = 'templates/patches/control-plane-pod.json.j2'
 
             control_plane_patch = Template(utils.read_internal(template_filename)).render(flags=patched_flags)
-            node['connection'].put(io.StringIO(control_plane_patch + "\n"), '/etc/kubernetes/patches/' +
-                                 control_plane_patch_files[control_plane_item], sudo=True)
-            node['connection'].sudo('chmod 644 /etc/kubernetes/patches/' +
-                                 control_plane_patch_files[control_plane_item])
+            patch_file = '/etc/kubernetes/patches/' + control_plane_patch_files[control_plane_item]
+            node.put(io.StringIO(control_plane_patch + "\n"), patch_file, sudo=True)
+            node.sudo(f'chmod 644 {patch_file}')
 
     return
 
-def fix_flag_kubelet(cluster: KubernetesCluster, node: dict):
+
+def fix_flag_kubelet(cluster: KubernetesCluster, node: NodeGroup):
     #Deprecated flag removal function for kubelet
     kubeadm_file = "/var/lib/kubelet/kubeadm-flags.env"
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
@@ -1394,7 +1414,7 @@ def fix_flag_kubelet(cluster: KubernetesCluster, node: dict):
         # Target version is lower than v1.27.0. Flag is actual and should not be removed.
         return
 
-    kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_file}", is_async=False).get_simple_out()
+    kubeadm_flags = node.sudo(f"cat {kubeadm_file}").get_simple_out()
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-        node['connection'].put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
+        node.put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)

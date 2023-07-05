@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from typing import Dict
 
-import fabric, os
+import fabric  # type: ignore[import]
 
 from kubemarine.core.environment import Environment
 
@@ -31,7 +31,7 @@ class ConnectionPool:
         conn = self._connections.get(ip)
         if conn is None:
             for node in self._env.inventory['nodes']:
-                if node.get('address') == ip or node.get('internal_address') == ip or node.get('connect_to') == ip:
+                if node.get('connect_to') == ip:
                     conn = self._create_connection(ip, node)
 
             if conn is None:
@@ -41,7 +41,9 @@ class ConnectionPool:
 
         return conn
 
-    def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
+    def _create_connection_from_details(self, ip: str, conn_details: dict,
+                                        gateway: fabric.connection.Connection = None,
+                                        inline_ssh_env: bool = True) -> fabric.connection.Connection:
         # fabric / invoke use default encoding of deployer.
         # We need to use encoding of remote nodes to correctly encode output of remote commands.
         # Currently remote nodes are always Linux, so hard-code 'utf-8'.

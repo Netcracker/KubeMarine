@@ -13,23 +13,26 @@
 # limitations under the License.
 
 import json
+from typing import Dict
 
 from kubemarine import system
+from kubemarine.core import log
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
-def get_status(group):
+def get_status(group: NodeGroup) -> Dict[str, dict]:
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")
     parsed_result = {}
     if result:
-        for connection, node_result in result.items():
-            log.verbose('Parsing status for %s...' % connection.host)
-            parsed_result[connection] = parse_status(node_result.stdout)
+        for host, node_result in result.items():
+            log.verbose('Parsing status for %s...' % host)
+            parsed_result[host] = parse_status(node_result.stdout)
     print_status(log, parsed_result)
     return parsed_result
 
 
-def parse_status(result_stdout):
+def parse_status(result_stdout: str) -> dict:
     result = {}
     parsed_data = json.loads(result_stdout)
     modes_set = set()
@@ -44,16 +47,16 @@ def parse_status(result_stdout):
     return result
 
 
-def print_status(log, parsed_result):
+def print_status(logger: log.EnhancedLogger, parsed_result: dict) -> None:
     res = "AppArmor Status:"
     for state in parsed_result.keys():
         res += "\n  Profiles in %s mode:" % state
         for profile in parsed_result[state]:
             res += "\n    - %s" % profile
-    log.verbose(res)
+    logger.verbose(res)
 
 
-def is_state_valid(group, expected_profiles):
+def is_state_valid(group: NodeGroup, expected_profiles: dict) -> bool:
     log = group.cluster.log
 
     log.verbose('Verifying Apparmor modes...')
@@ -61,7 +64,7 @@ def is_state_valid(group, expected_profiles):
     parsed_result = get_status(group)
     valid = True
 
-    for connection, status in parsed_result.items():
+    for host, status in parsed_result.items():
         for state, profiles in expected_profiles.items():
             if not profiles:
                 continue
@@ -70,31 +73,32 @@ def is_state_valid(group, expected_profiles):
                     for remote_profiles in status.values():
                         if profile in remote_profiles:
                             valid = False
-                            log.verbose('Mode %s is enabled on remote host %s' % (state, connection.host))
+                            log.verbose('Mode %s is enabled on remote host %s' % (state, host))
                             break
             else:
                 if not status.get(state):
                     valid = False
-                    log.verbose('Mode %s is not presented on remote host %s' % (state, connection.host))
+                    log.verbose('Mode %s is not presented on remote host %s' % (state, host))
                     break
                 # check if all 'cluster.yaml' settings reflect on particular node
                 for profile in profiles:
                     if profile not in status[state]:
                         valid = False
-                        log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, connection.host))
+                        log.verbose('Profile %s is not enabled in %s mode on remote host %s' % (profile, state, host))
                         break
 
-    return valid, parsed_result
+    return valid
+
 
 # TODO: describe what the purpose of that method is
-def convert_profile(profile):
+def convert_profile(profile: str) -> str:
     profile = profile.replace('/', '.')
     if profile[0] == '.':
         profile = profile[1:]
     return profile
 
 
-def configure_apparmor(group, expected_profiles):
+def configure_apparmor(group: NodeGroup, expected_profiles: dict) -> RunnersGroupResult:
     cmd = ''
     for profile in expected_profiles.get('enforce', []):
         profile = convert_profile(profile)
@@ -109,7 +113,7 @@ def configure_apparmor(group, expected_profiles):
     return group.sudo(cmd)
 
 
-def setup_apparmor(group):
+def setup_apparmor(group: NodeGroup) -> None:
     log = group.cluster.log
 
     if group.get_nodes_os() != 'debian':
@@ -117,7 +121,7 @@ def setup_apparmor(group):
         return
 
     expected_profiles = group.cluster.inventory['services']['kernel_security'].get('apparmor', {})
-    valid, parsed_result = is_state_valid(group, expected_profiles)
+    valid = is_state_valid(group, expected_profiles)
 
     if valid:
         log.debug("Skipped - Apparmor already correctly configured")

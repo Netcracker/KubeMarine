@@ -41,7 +41,7 @@ class TestUnexpectedErrors(unittest.TestCase):
 
         results = cluster.nodes['master'].get_any_member().sudo('kubectl describe nodes')
 
-        for conn, result in results.items():
+        for result in results.values():
             self.assertIn('is running', result.stdout, msg="After an unsuccessful attempt, the workaround mechanism "
                                                            "should have worked and got the right result, but it seems "
                                                            "something went wrong")
@@ -66,7 +66,7 @@ class TestUnexpectedErrors(unittest.TestCase):
 
         results = cluster.nodes['master'].get_any_member().sudo('kubectl describe nodes')
 
-        for conn, result in results.items():
+        for result in results.values():
             self.assertIn('is running', result.stdout, msg="After an unsuccessful attempt, the workaround mechanism "
                                                            "should have worked and got the right result, but it seems "
                                                            "something went wrong")

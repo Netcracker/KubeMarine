@@ -16,21 +16,21 @@ import hashlib
 import io
 import random
 import time
+from typing import Optional, List
 
 from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
 
 
-def autodetect_interface(cluster: KubernetesCluster, name):
+def autodetect_interface(cluster: KubernetesCluster, name: str) -> Optional[str]:
     for node in cluster.inventory['nodes']:
         if node['name'] == name:
             address = cluster.get_access_address_from_node(node)
-            interface = cluster.context['nodes'].get(address, {}).get('active_interface')
+            interface: str = cluster.context['nodes'].get(address, {})['active_interface']
             if interface:
                 return interface
     if cluster.context['initial_procedure'] == 'remove_node':
@@ -40,7 +40,7 @@ def autodetect_interface(cluster: KubernetesCluster, name):
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
-def enrich_inventory_apply_defaults(inventory, cluster):
+def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -107,7 +107,7 @@ def enrich_inventory_apply_defaults(inventory, cluster):
     return inventory
 
 
-def get_default_node_names(inventory):
+def get_default_node_names(inventory: dict) -> List[str]:
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
@@ -119,7 +119,7 @@ def get_default_node_names(inventory):
     return list(set(default_names))
 
 
-def enrich_inventory_calculate_nodegroup(inventory, cluster):
+def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster) -> dict:
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
         return inventory
@@ -134,24 +134,22 @@ def enrich_inventory_calculate_nodegroup(inventory, cluster):
     # it is important to remove duplicates
     names = list(set(names))
 
-    filtered_members = cluster.nodes['all'].get_ordered_members_list(provide_node_configs=False, apply_filter={
+    # create new group where keepalived will be installed
+    cluster.nodes['keepalived'] = cluster.nodes['all'].new_group(apply_filter={
         'name': names
     })
-
-    # create new group where keepalived will be installed
-    cluster.nodes['keepalived'] = cluster.make_group(filtered_members)
 
     # create new role
     cluster.roles.append('keepalived')
 
     # fill in ips
-    cluster.ips['keepalived'] = list(cluster.nodes['keepalived'].nodes.keys())
+    cluster.ips['keepalived'] = cluster.nodes['keepalived'].get_hosts()
 
     return inventory
 
 
-def install(group: NodeGroup):
-    cluster = group.cluster
+def install(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
     # todo why check and try to install all keepalives but finally filter out only new nodes?
@@ -182,46 +180,46 @@ def install(group: NodeGroup):
     return installation_result
 
 
-def install_haproxy_check_script(group: NodeGroup):
+def install_haproxy_check_script(group: NodeGroup) -> None:
     script = utils.read_internal("./resources/scripts/check_haproxy.sh")
     group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
 
-def uninstall(group):
+def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include='keepalived')
 
 
-def restart(group: NodeGroup):
-    cluster = group.cluster
+def restart(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting keepalived in all group...")
-    with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.restart_service(node['connection'], name=service_name)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'service_name')
+            system.restart_service(node, name=service_name)
 
     cluster.log.debug("Sleep while keepalived comes-up...")
     time.sleep(static.GLOBALS['keepalived']['restart_wait'])
 
 
-def enable(group: NodeGroup):
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.enable_service(node['connection'], name=service_name, now=True)
+def enable(group: NodeGroup) -> None:
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = exe.cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'service_name')
+            system.enable_service(node, name=service_name, now=True)
 
 
-def disable(group: NodeGroup):
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            service_name = group.cluster.get_package_association_for_node(
-                node['connect_to'], 'keepalived', 'service_name')
-            system.disable_service(node['connection'], name=service_name)
+def disable(group: NodeGroup) -> None:
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = exe.cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'service_name')
+            system.disable_service(node, name=service_name)
 
 
-def generate_config(inventory, node):
+def generate_config(inventory: dict, node: NodeConfig) -> str:
     config = ''
 
     for i, item in enumerate(inventory['vrrp_ips']):
@@ -257,24 +255,24 @@ def generate_config(inventory, node):
     return config
 
 
-def configure(group: NodeGroup) -> NodeGroupResult:
-    log = group.cluster.log
-    group_members = group.get_ordered_members_list(provide_node_configs=True)
+def configure(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
 
-    with RemoteExecutor(group.cluster):
-        for node in group_members:
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node_name = node.get_node_name()
+            log.debug("Configuring keepalived on '%s'..." % node_name)
 
-            log.debug("Configuring keepalived on '%s'..." % node['name'])
-
-            package_associations = group.cluster.get_associations_for_node(node['connect_to'], 'keepalived')
+            package_associations = cluster.get_associations_for_node(node.get_host(), 'keepalived')
             configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-            group.sudo('mkdir -p %s' % configs_directory, hide=True)
+            exe.group.sudo('mkdir -p %s' % configs_directory)
 
-            config = generate_config(group.cluster.inventory, node)
-            utils.dump_file(group.cluster, config, 'keepalived_%s.conf' % node['name'])
+            config = generate_config(cluster.inventory, node.get_config())
+            utils.dump_file(cluster, config, 'keepalived_%s.conf' % node_name)
 
-            node['connection'].put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node.put(io.StringIO(config), package_associations['config_location'], sudo=True)
 
     log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
 

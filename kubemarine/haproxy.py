@@ -14,14 +14,14 @@
 
 import io
 import time
+from typing import List, Optional
 
 from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, NodeConfig, DeferredGroup, RunResult, AbstractGroup
 
 ERROR_VRRP_IS_NOT_CONFIGURED = \
     'Balancer is combined with other role, but there is no VRRP IP configured for node \'%s\'.'
@@ -37,16 +37,16 @@ def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
                 .get('haproxy', {}).get('maintenance_mode', False))
 
 
-def _get_associations_for_node(node: dict) -> dict:
-    conn: NodeGroup = node['connection']
-    return conn.cluster.get_associations_for_node(node['connect_to'], 'haproxy')
+def _get_associations_for_node(node: AbstractGroup[RunResult]) -> dict:
+    return node.cluster.get_associations_for_node(node.get_host(), 'haproxy')
 
 
-def _is_vrrp_not_bind(vrrp_item: dict):
-    return vrrp_item.get('params', {}).get('maintenance-type', '') == 'not bind'
+def _is_vrrp_not_bind(vrrp_item: dict) -> bool:
+    maintenance_type: str = vrrp_item.get('params', {}).get('maintenance-type', '')
+    return maintenance_type == 'not bind'
 
 
-def _get_bindings(inventory: dict, node: dict, *, maintenance: bool):
+def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> List[str]:
     # bindings list for common config and maintenance should be different
     if not maintenance and len(node['roles']) == 1:
         return ["0.0.0.0", '::']
@@ -73,7 +73,7 @@ def _get_bindings(inventory: dict, node: dict, *, maintenance: bool):
     return list(set(bindings))
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     for node in inventory["nodes"]:
         if 'balancer' not in node['roles']:
@@ -96,10 +96,10 @@ def enrich_inventory(inventory, cluster):
             raise Exception("Haproxy maintenance mode should be used when and only when "
                             "there is at least one VRRP IP with 'maintenance-type: not bind'")
 
-        group: NodeGroup = node["connection"]
+        group = cluster.make_group([node['connect_to']])
         os_family = group.get_nodes_os()
         if is_mntc_mode and os_family not in ('unknown', 'unsupported'):
-            config_location = _get_associations_for_node(node)['config_location']
+            config_location = _get_associations_for_node(group)['config_location']
             mntc_config_location = inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
             # if 'maintenance_mode' is True then maintenance config and default config must be stored in different files'
             if mntc_config_location == config_location:
@@ -108,87 +108,89 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def get_config_path(group: NodeGroup) -> NodeGroupResult:
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+def get_config_path(group: NodeGroup) -> RunnersGroupResult:
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             package_associations = _get_associations_for_node(node)
             cmd = f"systemctl show -p MainPID {package_associations['service_name']} " \
                   f"| cut -d '=' -f2 " \
                   f"| xargs -I PID sudo cat /proc/PID/environ " \
                   f"| tr '\\0' '\\n' | grep CONFIG | cut -d \"=\" -f2 | tr -d '\\n'"
-            node['connection'].sudo(cmd)
+            node.sudo(cmd)
 
-    return exe.get_merged_result()
+    return exe.get_merged_runners_result()
 
 
-def install(group: NodeGroup):
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            package_associations = _get_associations_for_node(node)
-            node['connection'].sudo("%s -v" % package_associations['executable_name'], warn=True)
+def install(group: NodeGroup) -> RunnersGroupResult:
+    cluster = group.cluster
+    defer = group.new_defer()
+    for node in defer.get_ordered_members_list():
+        package_associations = _get_associations_for_node(node)
+        node.sudo("%s -v" % package_associations['executable_name'], warn=True)
 
-    haproxy_installed = True
-    for host, host_results in exe.get_last_results().items():
-        if list(host_results.values())[0].exited != 0:
-            haproxy_installed = False
+    defer.flush()
+    installation_result = defer.executor.get_merged_runners_result()
 
-    if haproxy_installed:
-        group.cluster.log.debug("HAProxy already installed, nothing to install")
-        installation_result = exe.get_last_results_str()
+    if not installation_result.is_any_failed():
+        cluster.log.debug("HAProxy already installed, nothing to install")
     else:
-        with RemoteExecutor(group.cluster) as exe:
-            for node in group.get_ordered_members_list(provide_node_configs=True):
-                package_associations = _get_associations_for_node(node)
-                packages.install(node["connection"], include=package_associations['package_name'])
+        for node in defer.get_ordered_members_list():
+            package_associations = _get_associations_for_node(node)
+            packages.install(node, include=package_associations['package_name'])
 
-        installation_result = exe.get_last_results_str()
+        defer.flush()
+        installation_result = defer.executor.get_merged_runners_result()
 
-    service_name = package_associations['service_name']
-    patch_path = "./resources/drop_ins/haproxy.conf"
-    group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
-    enable(group)
+    for node in defer.get_ordered_members_list():
+        package_associations = _get_associations_for_node(node)
+        service_name = package_associations['service_name']
+        patch_path = "./resources/drop_ins/haproxy.conf"
+        node.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
+        enable(node)
+
+    defer.flush()
     return installation_result
 
 
-def uninstall(group):
+def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include=['haproxy', 'rh-haproxy18'])
 
 
-def restart(group: NodeGroup):
-    cluster = group.cluster
+def restart(group: NodeGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting haproxy in all group...")
-    with RemoteExecutor(cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
-            system.restart_service(node['connection'], name=service_name)
+            system.restart_service(node, name=service_name)
 
     cluster.log.debug("Sleep while haproxy comes-up...")
     time.sleep(static.GLOBALS['haproxy']['restart_wait'])
 
 
-def disable(group):
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
+def disable(group: NodeGroup) -> None:
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']
-            system.disable_service(node['connection'], name=service_name)
+            system.disable_service(node, name=service_name)
 
 
-def enable(group):
-    with RemoteExecutor(group.cluster):
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            service_name = _get_associations_for_node(node)['service_name']
-            system.enable_service(node['connection'], name=service_name,
-                                  now=True)
+def enable(node: DeferredGroup) -> None:
+    # currently it is invoked only for single node
+    service_name = _get_associations_for_node(node)['service_name']
+    system.enable_service(node, name=service_name, now=True)
 
 
-def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance=False) -> str:
+def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[NodeConfig],
+               maintenance: bool = False) -> str:
 
     inventory = cluster.inventory
     bindings = _get_bindings(inventory, node, maintenance=maintenance)
 
-    config_options = inventory['services']['loadbalancer']['haproxy']
-    if config_options.get('config'):
-        return inventory['services']['loadbalancer']['haproxy']['config']
+    config_options: dict = inventory['services']['loadbalancer']['haproxy']
+    config_string: Optional[str] = config_options.get('config')
+    if config_string is not None:
+        return config_string
 
     # todo support custom template for maintenance mode
     if not maintenance and config_options.get('config_file'):
@@ -201,33 +203,35 @@ def get_config(cluster: KubernetesCluster, node: dict, future_nodes, maintenance
                                           config_options=config_options)
 
 
-def configure(group: NodeGroup):
-    cluster = group.cluster
-    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_list(provide_node_configs=True)
+def configure(group: DeferredGroup) -> None:
+    cluster: KubernetesCluster = group.cluster
+    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_configs_list()
 
-    for node in group.get_ordered_members_list(provide_node_configs=True):
+    for node in group.get_ordered_members_list():
+        node_config = node.get_config()
+        node_name = node.get_node_name()
         package_associations = _get_associations_for_node(node)
         configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
-        cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node['name'])
-        config = get_config(cluster, node, all_nodes_configs)
-        utils.dump_file(cluster, config, 'haproxy_%s.cfg' % node['name'])
-        node['connection'].sudo('mkdir -p %s' % configs_directory)
-        node['connection'].put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
-        node['connection'].sudo('ls -la %s' % package_associations['config_location'])
+        cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node_name)
+        config = get_config(cluster, node_config, all_nodes_configs)
+        utils.dump_file(cluster, config, 'haproxy_%s.cfg' % node_name)
+        node.sudo('mkdir -p %s' % configs_directory)
+        node.put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
+        node.sudo('ls -la %s' % package_associations['config_location'])
 
         # add maintenance config to balancer if 'maintenance_mode' is True
         if is_maintenance_mode(cluster):
             mntc_config_location = cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
-            cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node['name'])
-            mntc_config = get_config(cluster, node, all_nodes_configs, True)
-            utils.dump_file(cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node['name'])
-            node['connection'].sudo('mkdir -p %s' % configs_directory)
-            node['connection'].put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True)
-            node['connection'].sudo('ls -la %s' % mntc_config_location)
+            cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node_name)
+            mntc_config = get_config(cluster, node_config, all_nodes_configs, True)
+            utils.dump_file(cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node_name)
+            node.sudo('mkdir -p %s' % configs_directory)
+            node.put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True)
+            node.sudo('ls -la %s' % mntc_config_location)
 
 
-def override_haproxy18(group: NodeGroup):
+def override_haproxy18(group: DeferredGroup) -> None:
     rhel_nodes = group.get_subgroup_with_os('rhel')
     if rhel_nodes.is_empty():
         group.cluster.log.debug('Haproxy18 override is not required')
@@ -237,5 +241,7 @@ def override_haproxy18(group: NodeGroup):
     any_host = rhel_nodes.get_first_member().get_host()
     package_associations = group.cluster.get_associations_for_node(any_host, 'haproxy')
     # TODO: Do not replace the whole file, replace only parameter
-    return group.put(io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
-                     '/etc/sysconfig/%s' % package_associations['service_name'], backup=True, sudo=True)
+    group.put(
+        io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
+        '/etc/sysconfig/%s' % package_associations['service_name'],
+        backup=True, sudo=True)

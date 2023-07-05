@@ -17,7 +17,7 @@ import sys
 import time
 from collections import OrderedDict
 import re
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import yaml
 import ruamel.yaml
@@ -27,6 +27,7 @@ import uuid
 from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeConfig, NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static
@@ -34,7 +35,7 @@ from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.coredns import generate_configmap
-from deepdiff import DeepDiff
+from deepdiff import DeepDiff  # type: ignore[import]
 
 
 def services_status(cluster: KubernetesCluster, service_type: str):
@@ -47,13 +48,13 @@ def services_status(cluster: KubernetesCluster, service_type: str):
 
         group = cluster.nodes['all']
         if service_type == 'haproxy':
-            group = cluster.nodes.get('balancer', {})
+            group = cluster.make_group_from_roles(['balancer'])
         elif service_type == 'keepalived':
-            group = cluster.nodes.get('keepalived', {})
+            group = cluster.make_group_from_roles(['keepalived'])
         elif service_type == 'docker' or service_type == "containerd" or service_type == 'kubelet':
-            group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker'))
+            group = cluster.make_group_from_roles(['control-plane', 'worker'])
 
-        if not group or group.is_empty():
+        if group.is_empty():
             raise TestWarn("No nodes to check service status",
                            hint="The node group to check the service is empty. Check skipped.")
 
@@ -64,27 +65,27 @@ def services_status(cluster: KubernetesCluster, service_type: str):
 
         statuses = []
         failed = False
-        for connection, node_result in result.items():
+        for host, node_result in result.items():
             if node_result.return_code == 4:
                 statuses.append('service is missing')
                 failed = True
                 cluster.log.debug('%s is not presented on host %s, skipped'
-                                  % (service_type.capitalize(), connection.host))
+                                  % (service_type.capitalize(), host))
                 continue
             matches = re.findall(status_regexp, node_result.stdout)
             if matches:
                 status = matches[0][0].strip()
                 cluster.log.debug(
-                    '%s status is \"%s\" at host %s' % (service_type.capitalize(), status, connection.host))
+                    '%s status is \"%s\" at host %s' % (service_type.capitalize(), status, host))
                 if status != 'active (running)':
                     statuses.append(status)
                     failed = True
             elif node_result.return_code != 0:
                 failed = True
                 cluster.log.error('%s status has bad exit code \"%s\" at host %s'
-                                  % (service_type.capitalize(), node_result.return_code, connection.host))
+                                  % (service_type.capitalize(), node_result.return_code, host))
             else:
-                raise Exception('Failed to detect status for \"%s\"' % connection.host)
+                raise Exception('Failed to detect status for \"%s\"' % host)
 
         statuses = list(set(statuses))
 
@@ -173,7 +174,7 @@ def mandatory_packages_versions(cluster: KubernetesCluster):
     """
     with TestCase(cluster, '205', "Services", "Mandatory package versions") as tc:
         _check_same_os(cluster)
-        hosts_to_packages = {}
+        hosts_to_packages: Dict[str, List[str]] = {}
         group = cluster.nodes['all']
         for package in cluster.inventory["services"]["packages"]['mandatory'].keys():
             packages = pckgs.get_association_hosts_to_packages(group, cluster.inventory, package)
@@ -199,7 +200,7 @@ def generic_packages_versions(cluster: KubernetesCluster):
         return check_packages_versions(cluster, tc, hosts_to_packages, warn_on_bad_result=True)
 
 
-def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]],
+def check_packages_versions(cluster: KubernetesCluster, tc: TestCase, hosts_to_packages: Dict[str, List[str]],
                             warn_on_bad_result=False, raise_successful=True):
     """
     Verifies that all packages are installed on required nodes and have equal versions
@@ -241,11 +242,11 @@ def check_packages_versions(cluster, tc, hosts_to_packages: Dict[str, List[str]]
         tc.success("all packages have correct versions")
 
 
-def get_nodes_description(cluster):
+def get_nodes_description(cluster: KubernetesCluster):
     return kubernetes.get_nodes_description(cluster)
 
 
-def kubelet_version(cluster):
+def kubelet_version(cluster: KubernetesCluster):
     with TestCase(cluster, '203', "Services", "Kubelet Version",
                   default_results=cluster.inventory['services']['kubeadm']['kubernetesVersion']):
         nodes_description = get_nodes_description(cluster)
@@ -264,7 +265,7 @@ def kubelet_version(cluster):
                                    "versions." % cluster.inventory['services']['kubeadm']['kubernetesVersion'])
 
 
-def thirdparties_hashes(cluster):
+def thirdparties_hashes(cluster: KubernetesCluster):
     """
     Task which is used to verify configured thirdparties hashes agains actual hashes on nodes.
     If thirdparty is an archive, then archive files hashes are also verified.
@@ -278,6 +279,7 @@ def thirdparties_hashes(cluster):
 
         #Create tmp dir for loading thirdparty without default sha
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
+        first_control_plane_host = first_control_plane.get_host()
 
         for path, config in cluster.inventory['services']['thirdparties'].items():
             group = cluster.create_group_from_groups_nodes_names(config.get('groups', []), config.get('nodes', []))
@@ -301,25 +303,27 @@ def thirdparties_hashes(cluster):
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
                 # Load thirdparty to temporary dir
                 remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
-                results = first_control_plane.sudo(remote_commands, hide=True, warn=True)
-                host, result = list(results.items())[0]
-                if result.failed:
-                    broken.append(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
-                    cluster.log.verbose(f"Can`t download thirdparty {path} on {host.host} for getting sha: {result.stderr}")
+                results = first_control_plane.sudo(remote_commands, warn=True)
+                if results.is_any_failed():
+                    host = first_control_plane_host
+                    msg = f"Can`t download thirdparty {path} on {host} for getting sha: {results[host].stderr}"
+                    broken.append(msg)
+                    cluster.log.verbose(msg)
                 else:
                     # Get temporary thirdparty sha
                     cluster.log.verbose(f"Get temporary thirdparty sha for {path}...")
                     results = first_control_plane.sudo(f'openssl sha1 {random_path} | sed "s/^.* //"', warn=True)
-                    host, result = list(results.items())[0]
-                    if result.failed:
-                        broken.append(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
-                        cluster.log.verbose(f'failed to get sha for temporary file {random_path} on {host.host}: {result.stderr}')
+                    if results.is_any_failed():
+                        host = first_control_plane_host
+                        msg = f'failed to get sha for temporary file {random_path} on {host}: {results[host].stderr}'
+                        broken.append(msg)
+                        cluster.log.verbose(msg)
                     else:
-                        expected_sha = result.stdout.strip()
+                        expected_sha = results.get_simple_out().strip()
                         cluster.log.verbose(f"Expected sha was got for {path}: {expected_sha}")
                 # Remove temporary dir in any case
                 cluster.log.verbose(f"Remove temporary dir {random_dir}...")
-                first_control_plane.sudo(final_commands, hide=True, warn=True)
+                first_control_plane.sudo(final_commands, warn=True)
 
             recommended_sha = thirdparties.get_thirdparty_recommended_sha(path, cluster)
             if recommended_sha is not None and recommended_sha != expected_sha:
@@ -336,20 +340,20 @@ def thirdparties_hashes(cluster):
                 continue
 
             results = group.sudo(f'openssl sha1 {path} | sed "s/^.* //"', warn=True)
-            actual_sha = None
-            first_host = None
+            actual_sha: Optional[str] = None
+            first_host: Optional[str] = None
             # Searching actual SHA, if possible
             for host, result in results.items():
                 if result.failed:
-                    broken.append(f'failed to get {path} sha {host.host}: {result.stderr}')
+                    broken.append(f'failed to get {path} sha {host}: {result.stderr}')
                     continue
 
                 found_sha = result.stdout.strip()
                 if actual_sha is None:
                     actual_sha = found_sha
-                    first_host = host.host
+                    first_host = host
                 elif actual_sha != found_sha:
-                    broken.append(f'got inconsistent sha for {path}: {found_sha} on host {host.host}, '
+                    broken.append(f'got inconsistent sha for {path}: {found_sha} on host {host}, '
                                   f'different from first host {first_host} sha {actual_sha}')
                     actual_sha = None
                     break
@@ -383,19 +387,19 @@ def thirdparties_hashes(cluster):
                 for host, result in res.items():
                     if result.failed:
                         broken.append(f'can not verify files SHA for archive {path} '
-                                      f'on host {host.host}, unpacked to {unpack_dir}')
+                                      f'on host {host}, unpacked to {unpack_dir}')
                         continue
                     files_results = result.stdout.strip().split('\n')
                     for file_result in files_results:
                         result_parts = file_result.split()
                         if len(result_parts) != 3:
                             broken.append(f'can not verify files SHA for archive {path} '
-                                          f'on host {host.host}, unpacked to {unpack_dir}')
+                                          f'on host {host}, unpacked to {unpack_dir}')
                             continue
                         filename, archive_hash, fs_hash = result_parts[0], result_parts[1], result_parts[2]
                         if archive_hash != fs_hash:
                             broken.append(f'hash for file {filename} from archive {path} '
-                                          f'on host {host.host} is not equal to hash for file unpacked to {unpack_dir}')
+                                          f'on host {host} is not equal to hash for file unpacked to {unpack_dir}')
 
         if broken:
             raise TestFailure('Found inconsistent hashes', hint=yaml.safe_dump(broken))
@@ -404,7 +408,7 @@ def thirdparties_hashes(cluster):
         tc.success('All found hashes are correct')
 
 
-def find_hosts_missing_thirdparty(group, path) -> List[str]:
+def find_hosts_missing_thirdparty(group: NodeGroup, path: str) -> List[str]:
     """
     Search group for a list of hosts where thirdparty is missing
     :param group: group of hosts where to search thirdparty
@@ -415,11 +419,11 @@ def find_hosts_missing_thirdparty(group, path) -> List[str]:
     missing = []
     for host, result in results.items():
         if result.failed:
-            missing.append(host.host)
+            missing.append(host)
     return missing
 
 
-def kubernetes_nodes_existence(cluster):
+def kubernetes_nodes_existence(cluster: KubernetesCluster):
     with TestCase(cluster, '209', "Kubernetes", "Nodes Existence",
                   default_results="All nodes presented"):
         nodes_description = get_nodes_description(cluster)
@@ -466,7 +470,7 @@ def kubernetes_nodes_roles(cluster: KubernetesCluster):
                                    "inventory were detected. The configuration of these nodes should be fixed.")
 
 
-def kubernetes_nodes_condition(cluster, condition_type):
+def kubernetes_nodes_condition(cluster: KubernetesCluster, condition_type: str):
     with TestCase(cluster, '211', "Kubernetes", "Nodes Condition - %s" % condition_type) as tc:
         nodes_description = get_nodes_description(cluster)
         expected_status = 'False'
@@ -498,7 +502,7 @@ def kubernetes_nodes_condition(cluster, condition_type):
         tc.success(results="%s" % ', '.join(positive_conditions))
 
 
-def get_not_running_pods(cluster):
+def get_not_running_pods(cluster: KubernetesCluster):
     # Completed pods should be excluded from the list as well
     get_pods_cmd = 'kubectl get pods -A --field-selector status.phase!=Running | awk \'{ print $1" "$2" "$4 }\' | grep -vw Completed || true'
     result = cluster.nodes['control-plane'].get_any_member().sudo(get_pods_cmd)
@@ -506,7 +510,7 @@ def get_not_running_pods(cluster):
     return list(result.values())[0].stdout.strip()
 
 
-def kubernetes_pods_condition(cluster):
+def kubernetes_pods_condition(cluster: KubernetesCluster):
     system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default"]
     critical_states = cluster.globals['pods']['critical_states']
     with TestCase(cluster, '207', "Kubernetes", "Pods Condition") as tc:
@@ -538,7 +542,7 @@ def kubernetes_pods_condition(cluster):
             tc.success(results="All pods are running")
 
 
-def kubernetes_dashboard_status(cluster):
+def kubernetes_dashboard_status(cluster: KubernetesCluster):
     with TestCase(cluster, '208', "Plugins", "Dashboard Availability") as tc:
         retries = 10
         test_succeeded = False
@@ -572,27 +576,28 @@ def kubernetes_dashboard_status(cluster):
                               hint=f"Please verify the following Kubernetes Dashboard status and fix this issue:\n{status}")
 
 
-def nodes_pid_max(cluster):
+def nodes_pid_max(cluster: KubernetesCluster):
     with TestCase(cluster, '202', "Nodes", "Nodes pid_max correctly installed") as tc:
         control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
-        for node in cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
+            node_name = node.get_node_name()
 
-            node_info = control_plane.sudo("kubectl get node %s -o yaml" % node["name"]).get_simple_out()
+            node_info = control_plane.sudo("kubectl get node %s -o yaml" % node_name).get_simple_out()
             config = yaml.load(node_info)
             max_pods = int(config['status']['capacity']['pods'])
 
-            kubelet_config = node["connection"].sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
+            kubelet_config = node.sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
             config = yaml.load(kubelet_config)
             pod_pids_limit = int(config['podPidsLimit'])
 
-            pid_max = int(node["connection"].sudo("cat /proc/sys/kernel/pid_max").get_simple_out())
+            pid_max = int(node.sudo("cat /proc/sys/kernel/pid_max").get_simple_out())
             required_pid_max = max_pods * pod_pids_limit + 2048
             cluster.log.debug("Current values:\n maxPods = %s \n podPidsLimit = %s \n pid_max = %s"
                               % (max_pods, pod_pids_limit, pid_max))
             cluster.log.debug("Required pid_max for current kubelet configuration is %s for node '%s'"
-                              % (required_pid_max, node["name"]))
+                              % (required_pid_max, node_name))
             if cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
                 inventory_pid_max = cluster.inventory['services']['sysctl'].get("kernel.pid_max")
                 if pid_max != inventory_pid_max:
@@ -600,13 +605,14 @@ def nodes_pid_max(cluster):
                                    "but 'kernel.pid_max', which defined in cluster.yaml = %s"
                                    % (pid_max, inventory_pid_max))
             if pid_max < required_pid_max:
-                nodes_failed_pid_max_check[node["name"]] = [pid_max, required_pid_max]
+                nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
 
         if nodes_failed_pid_max_check:
             output = "The requirement for the 'pid_max' value is not met for nodes:\n"
-            for node in nodes_failed_pid_max_check:
+            for node_name in nodes_failed_pid_max_check:
                 output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
-                           % (node, nodes_failed_pid_max_check[node][0], nodes_failed_pid_max_check[node][1]))
+                           % (node_name, nodes_failed_pid_max_check[node_name][0],
+                              nodes_failed_pid_max_check[node_name][1]))
             raise TestFailure(output)
         tc.success(results="pid_max correctly installed on all nodes")
 
@@ -633,17 +639,17 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
         enforcing_ips = []
         permissive_ips = []
         bad_ips = []
-        for conn, results in selinux_parsed_result.items():
+        for host, results in selinux_parsed_result.items():
             if results.get('status', '') != 'disabled':
                 if results['mode'] == 'enforcing':
-                    enforcing_ips.append(conn.host)
+                    enforcing_ips.append(host)
                 elif results['mode'] == 'permissive' and cluster.inventory.get('services', {})\
                         .get('kernel_security', {}).get('selinux', {}).get('state') == 'permissive':
-                    permissive_ips.append(conn.host)
+                    permissive_ips.append(host)
                 else:
-                    bad_ips.append([conn.host, results['mode']])
+                    bad_ips.append([host, results['mode']])
             else:
-                bad_ips.append([conn.host, 'disabled'])
+                bad_ips.append([host, 'disabled'])
 
         if group.nodes_amount() == len(enforcing_ips):
             tc.success(results='enforcing')
@@ -730,7 +736,7 @@ def verify_time_sync(cluster: KubernetesCluster) -> None:
         cluster.log.verbose('Time difference: %s' % time_diff)
         cluster.log.verbose('Nodes time details:')
         for host, timestamp in nodes_timestamp.items():
-            cluster.log.verbose(' - %s: %s' % (host.host, timestamp))
+            cluster.log.verbose(' - %s: %s' % (host, timestamp))
 
         if time_diff > cluster.globals['nodes']['max_time_difference']:
             raise TestWarn("%sms" % time_diff,
@@ -782,7 +788,7 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
                                    f"manually what the differences are and make changes on the appropriate nodes.")
 
 
-def etcd_health_status(cluster):
+def etcd_health_status(cluster: KubernetesCluster):
     """
     This method is a test, check ETCD health
     :param cluster: KubernetesCluster object
@@ -800,43 +806,42 @@ def etcd_health_status(cluster):
         tc.success(results='healthy')
 
 
-def control_plane_configuration_status(cluster):
+def control_plane_configuration_status(cluster: KubernetesCluster):
     '''
     This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`
     :param cluster: KubernetesCluster object
     :return: None
     '''
     with TestCase(cluster, '220', "Control plane", "configuration status") as tc:
-        results = []
+        results: List[dict] = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
                             'kube-scheduler': 'scheduler'}
         static_pods_content = []
         not_presented_static_pods = []
-        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list():
             for static_pod_name, value in static_pod_names.items():
-                result = control_plane['connection'].sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
-                exit_code = list(result.values())[0].exited
-                result = result.get_simple_out()
+                static_pod_result = control_plane.sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
+                exit_code = list(static_pod_result.values())[0].exited
                 if exit_code == 0:
-                    result = yaml.safe_load(result)
-                    result[static_pod_name] = value
-                    static_pods_content.append(result)
+                    static_pod = yaml.safe_load(static_pod_result.get_simple_out())
+                    static_pod[static_pod_name] = value
+                    static_pods_content.append(static_pod)
                 else:
                     not_presented_static_pods.append(static_pod_name)
             for not_presented_static_pod in not_presented_static_pods:
                 del static_pod_names[not_presented_static_pod]
 
-            result = dict()
-            result['name'] = control_plane['name']
+            result: dict = {'name': control_plane.get_node_name()}
             version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
 
+            node_config = control_plane.get_config()
             for static_pod in static_pods_content:
-                result[static_pod['metadata']['name']] = dict()
+                result[static_pod['metadata']['name']] = {}
                 result[static_pod['metadata']['name']]['correct_version'] = \
                     version in static_pod["spec"]["containers"][0].get("image", "")
                 result[static_pod['metadata']['name']]['correct_properties'] = \
-                    check_extra_args(cluster, static_pod, control_plane)
+                    check_extra_args(cluster, static_pod, node_config)
                 result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
             results.append(result)
 
@@ -858,7 +863,7 @@ def control_plane_configuration_status(cluster):
             raise TestFailure('invalid', hint=message)
 
 
-def check_extra_args(cluster, static_pod, node):
+def check_extra_args(cluster: KubernetesCluster, static_pod: dict, node: NodeConfig):
     static_pod_name = static_pod[static_pod['metadata']['name']]
     for arg, value in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraArgs", {}).items():
         if arg == "bind-address":
@@ -876,7 +881,7 @@ def check_extra_args(cluster, static_pod, node):
     return True
 
 
-def check_extra_volumes(cluster, static_pod):
+def check_extra_volumes(cluster: KubernetesCluster, static_pod: dict):
     static_pod_name = static_pod[static_pod['metadata']['name']]
     #for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
     for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}):
@@ -905,7 +910,7 @@ def check_extra_volumes(cluster, static_pod):
     return True
 
 
-def control_plane_health_status(cluster):
+def control_plane_health_status(cluster: KubernetesCluster):
     '''
     This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`
     :param cluster: KubernetesCluster object
@@ -915,18 +920,17 @@ def control_plane_health_status(cluster):
         static_pods = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
         static_pod_names = []
 
-        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):
+        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list():
             for static_pod in static_pods:
-                static_pod_names.append(static_pod + '-' + control_plane['name'])
+                static_pod_names.append(static_pod + '-' + control_plane.get_node_name())
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_found_pod = []
         for static_pod_name in static_pod_names:
-            result = first_control_plane.sudo(f"kubectl get pod -n kube-system -oyaml {static_pod_name}", warn=True)
-            exit_code = list(result.values())[0].exited
+            results = first_control_plane.sudo(f"kubectl get pod -n kube-system -oyaml {static_pod_name}", warn=True)
+            exit_code = list(results.values())[0].exited
             if exit_code == 0:
-                result = result.get_simple_out()
-                result = yaml.safe_load(result)
+                result = yaml.safe_load(results.get_simple_out())
                 if result['status']['containerStatuses'][0]['state'].get('running'):
                     break
             not_found_pod.append(static_pod_name)
@@ -937,7 +941,7 @@ def control_plane_health_status(cluster):
             raise TestFailure('invalid', hint=f"{not_found_pod} pods doesn't running")
 
 
-def default_services_configuration_status(cluster):
+def default_services_configuration_status(cluster: KubernetesCluster):
     '''
     In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
     :param cluster: KubernetesCluster object
@@ -945,10 +949,9 @@ def default_services_configuration_status(cluster):
     '''
     with TestCase(cluster, '222', "Default services", "configuration status") as tc:
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
-        original_coredns_cm = generate_configmap(cluster.inventory)
-        original_coredns_cm = yaml.safe_load(original_coredns_cm)
-        coredns_cm = first_control_plane.sudo('kubectl get cm coredns -n kube-system -oyaml').get_simple_out()
-        coredns_cm = yaml.safe_load(coredns_cm)
+        original_coredns_cm = yaml.safe_load(generate_configmap(cluster.inventory))
+        result = first_control_plane.sudo('kubectl get cm coredns -n kube-system -oyaml')
+        coredns_cm = yaml.safe_load(result.get_simple_out())
         ddiff = DeepDiff(coredns_cm['data'], original_coredns_cm['data'], ignore_order=True)
         coredns_result = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
 
@@ -973,8 +976,8 @@ def default_services_configuration_status(cluster):
                             if service_name == "ingress-nginx-controller":
                                 if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
-                            content = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml").get_simple_out()
-                            content = yaml.safe_load(content)
+                            result = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml")
+                            content = yaml.safe_load(result.get_simple_out())
                             if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
                                 results[service_name] = True
                             else:
@@ -989,7 +992,7 @@ def default_services_configuration_status(cluster):
             tc.success(results='valid')
 
 
-def default_services_health_status(cluster):
+def default_services_health_status(cluster: KubernetesCluster):
     '''
     This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
     :param cluster: KubernetesCluster object
@@ -1026,7 +1029,7 @@ def default_services_health_status(cluster):
             raise TestFailure('invalid', hint=f"{not_ready_entities} pods doesn't ready")
 
 
-def calico_config_check(cluster):
+def calico_config_check(cluster: KubernetesCluster):
     '''
     This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
     :param cluster: KubernetesCluster object
@@ -1037,9 +1040,8 @@ def calico_config_check(cluster):
         correct_config = True
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         result = first_control_plane.sudo(f"kubectl get DaemonSet calico-node -n kube-system -oyaml")
-        result = result.get_simple_out()
-        result = yaml.safe_load(result)
-        for env in result["spec"]["template"]["spec"]["containers"][0]["env"]:
+        calico_daemonset = yaml.safe_load(result.get_simple_out())
+        for env in calico_daemonset["spec"]["template"]["spec"]["containers"][0]["env"]:
             if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
                 if "value" in env.keys() and not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
                     correct_config = False
@@ -1048,20 +1050,20 @@ def calico_config_check(cluster):
         if not correct_config:
             message += "calico-node env configuration is outdated\n"
 
-        result = first_control_plane.sudo(f"kubectl get cm calico-config -n kube-system -oyaml").get_simple_out()
-        result = yaml.safe_load(result)
-        result = yaml.safe_load(result["data"]["cni_network_config"])
+        result = first_control_plane.sudo(f"kubectl get cm calico-config -n kube-system -oyaml")
+        calico_config = yaml.safe_load(result.get_simple_out())
+        cni_network_config = yaml.safe_load(calico_config["data"]["cni_network_config"])
         ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
         if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv4"]
         else:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv6"]
-        ddiff = DeepDiff(ipam_config, result["plugins"][0]["ipam"], ignore_order=True)
+        ddiff = DeepDiff(ipam_config, cni_network_config["plugins"][0]["ipam"], ignore_order=True)
         if ddiff:
             message += f"calico cm is outdated: {ddiff.to_dict()}\n"
 
-        result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'").get_simple_out()
-        if int(result) > 0:
+        result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'")
+        if int(result.get_simple_out()) > 0:
             message += "ipam check indicates some problems," \
                        " for more info you can use `calicoctl ipam check --show-problem-ips`"
         if message:
@@ -1070,7 +1072,7 @@ def calico_config_check(cluster):
             tc.success(results='valid')
 
 
-def kubernetes_admission_status(cluster):
+def kubernetes_admission_status(cluster: KubernetesCluster):
     """
     The method checks status of Pod Security Admissions, default Pod Security Profile,
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
@@ -1091,8 +1093,8 @@ def kubernetes_admission_status(cluster):
         admission_path = ""
         for item in ext_args:
             if item.startswith("--"):
-                key = re.split('=',item)[0]
-                value = re.search('=(.*)$', item).group(1)
+                key = item.split('=')[0]
+                value = item[len(key) + 1:]
                 if key == "--admission-control-config-file":
                     admission_path = value
                     adm_result = first_control_plane.sudo("cat %s" % admission_path)
@@ -1128,7 +1130,7 @@ def kubernetes_admission_status(cluster):
             tc.success(results='disabled')
 
 
-def geo_check(cluster):
+def geo_check(cluster: KubernetesCluster):
     """
     This test checks connectivity between clusters in geo schemas using paas-geo-monitor service.
     This test only work if "procedure.yaml" has "geo-monitor" section filled.
@@ -1137,12 +1139,10 @@ def geo_check(cluster):
         cluster.log.debug("Geo connectivity check is skipped, no configuration provided")
         return
 
-    collected_results = {
-        "statusCollected": False,
-        "dnsStatus": {"failed": []},
-        "svcStatus": {"failed": [], "skipped": []},
-        "podStatus": {"failed": [], "skipped": []}
-    }
+    status_collected = False
+    dns_status: Dict[str, List[str]] = {"failed": []}
+    svc_status: Dict[str, List[str]] = {"failed": [], "skipped": []}
+    pod_status: Dict[str, List[str]] = {"failed": [], "skipped": []}
 
     # Here we actually collect information about all statuses, but report information about DNS only.
     # Other statuses are reported in other TestCases below. This is done for better UX.
@@ -1173,47 +1173,47 @@ def geo_check(cluster):
             if not status["dnsStatus"]["resolved"]:
                 error = f'FAILED DNS resolving for peer ({peer["name"]}) service ' \
                         f'name: {status["name"]}, error: {status["dnsStatus"]["error"]}'
-                collected_results["dnsStatus"]["failed"].append(error)
-                collected_results["svcStatus"]["skipped"].append(error)
-                collected_results["podStatus"]["skipped"].append(error)
+                dns_status["failed"].append(error)
+                svc_status["skipped"].append(error)
+                pod_status["skipped"].append(error)
                 continue
             if not status["svcStatus"]["available"]:
                 error = f'FAILED ping service for peer ({peer["name"]}), ' \
                         f'address: {status["svcStatus"]["address"]}, error: {status["svcStatus"]["error"]}'
-                collected_results["svcStatus"]["failed"].append(error)
-                collected_results["podStatus"]["skipped"].append(error)
+                svc_status["failed"].append(error)
+                pod_status["skipped"].append(error)
                 continue
             if not status["podStatus"]["available"]:
                 error = f'FAILED ping pod for peer ({peer["name"]}), ' \
                         f'address: {status["podStatus"]["address"]}, error: {status["podStatus"]["error"]}'
-                collected_results["podStatus"]["failed"].append(error)
+                pod_status["failed"].append(error)
                 continue
 
-        collected_results["statusCollected"] = True
-        if collected_results["dnsStatus"]["failed"]:
-            raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(collected_results["dnsStatus"]["failed"]))
+        status_collected = True
+        if dns_status["failed"]:
+            raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(dns_status["failed"]))
         tc_dns.success("all peer names resolved")
 
     with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
-        if not collected_results["statusCollected"]:
+        if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
-        if collected_results["svcStatus"]["failed"]:
+        if svc_status["failed"]:
             raise TestFailure("found unavailable peer services",
-                              hint=yaml.safe_dump(collected_results["svcStatus"]["failed"]+collected_results["svcStatus"]["skipped"]))
-        if collected_results["svcStatus"]["skipped"]:
-            raise TestWarn("found skipped peer services", hint=yaml.safe_dump(collected_results["svcStatus"]["skipped"]))
+                              hint=yaml.safe_dump(svc_status["failed"] + svc_status["skipped"]))
+        if svc_status["skipped"]:
+            raise TestWarn("found skipped peer services", hint=yaml.safe_dump(svc_status["skipped"]))
         tc_svc.success("all peer services available")
 
     with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
-        if not collected_results["statusCollected"]:
+        if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
-        if collected_results["podStatus"]["failed"]:
+        if pod_status["failed"]:
             raise TestFailure("found unavailable peer pod",
-                              hint=yaml.safe_dump(collected_results["podStatus"]["failed"]+collected_results["podStatus"]["skipped"]))
-        if collected_results["podStatus"]["skipped"]:
-            raise TestWarn("found skipped peer pods", hint=yaml.safe_dump(collected_results["podStatus"]["skipped"]))
+                              hint=yaml.safe_dump(pod_status["failed"] + pod_status["skipped"]))
+        if pod_status["skipped"]:
+            raise TestWarn("found skipped peer pods", hint=yaml.safe_dump(pod_status["skipped"]))
         tc_pod.success("all peer pods available")
 
 
@@ -1230,15 +1230,15 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
         group = cluster.nodes['all'].get_accessible_nodes()
         results = group.sudo("aa-enabled")
-        enabled_nodes = []
-        invalid_nodes = []
-        for connection, item in results.items():
+        enabled_nodes: List[str] = []
+        invalid_nodes: List[str] = []
+        for host, item in results.items():
             apparmor_status = item.stdout
-            cluster.log.warning(f"Apparmor on node: {connection.host} enabled: {apparmor_status}")
+            cluster.log.warning(f"Apparmor on node: {host} enabled: {apparmor_status}")
             if apparmor_status ==  "Yes":
-                enabled_nodes.append(connection.host)
+                enabled_nodes.append(host)
             else:
-                enabled_nodes.append(connection.host)
+                enabled_nodes.append(host)
         if group.nodes_amount() == len(enabled_nodes):
             tc.success(results='enabled')
         else:
@@ -1259,7 +1259,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:
-            apparmor_configured, result = apparmor.is_state_valid(group, expected_profiles)
+            apparmor_configured = apparmor.is_state_valid(group, expected_profiles)
             if apparmor_configured:
                 cluster.log.verbose(f"Apparmor is configured properly on cluster")
                 tc.success(results='valid')

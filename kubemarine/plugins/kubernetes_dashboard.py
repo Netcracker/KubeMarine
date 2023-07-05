@@ -18,7 +18,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
-def schedule_summary_report(cluster: KubernetesCluster):
+def schedule_summary_report(cluster: KubernetesCluster) -> None:
     plugin_item = cluster.inventory['plugins']['kubernetes-dashboard']
     hostname = plugin_item['hostname']
     # Currently we declare that Dashboard UI is available only via HTTPS
@@ -27,7 +27,7 @@ def schedule_summary_report(cluster: KubernetesCluster):
 
 class DashboardManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
-                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
         super().__init__(logger, inventory, 'kubernetes-dashboard', original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
@@ -55,14 +55,14 @@ class DashboardManifestProcessor(Processor):
             self.enrich_deployment_dashboard_metrics_scraper,
         ]
 
-    def enrich_namespace_kubernetes_dashboard(self, manifest: Manifest):
+    def enrich_namespace_kubernetes_dashboard(self, manifest: Manifest) -> None:
         key = "Namespace_kubernetes-dashboard"
         rbac = self.inventory['rbac']
         if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
                 and rbac['pss']['defaults']['enforce'] == 'restricted':
             self.assign_default_pss_labels(manifest, key, 'baseline')
 
-    def enrich_deployment_kubernetes_dashboard(self, manifest: Manifest):
+    def enrich_deployment_kubernetes_dashboard(self, manifest: Manifest) -> None:
         key = "Deployment_kubernetes-dashboard"
         self.enrich_image_for_container(manifest, key,
             plugin_service='dashboard', container_name='kubernetes-dashboard', is_init_container=False)
@@ -70,7 +70,7 @@ class DashboardManifestProcessor(Processor):
         self.enrich_node_selector(manifest, key, plugin_service='dashboard')
         self.enrich_tolerations(manifest, key, plugin_service='dashboard', override=True)
 
-    def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest):
+    def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest) -> None:
         key = "Deployment_dashboard-metrics-scraper"
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
@@ -80,10 +80,7 @@ class DashboardManifestProcessor(Processor):
 
 
 class V2_5_X_DashboardManifestProcessor(DashboardManifestProcessor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest):
+    def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest) -> None:
         key = "Deployment_dashboard-metrics-scraper"
         source_yaml = manifest.get_obj(key, patch=True)
         template_spec: dict = source_yaml['spec']['template']['spec']
@@ -92,8 +89,10 @@ class V2_5_X_DashboardManifestProcessor(DashboardManifestProcessor):
         super().enrich_deployment_dashboard_metrics_scraper(manifest)
 
 
-def get_dashboard_manifest_processor(logger: log.VerboseLogger, inventory: dict, **kwargs):
+def get_dashboard_manifest_processor(logger: log.VerboseLogger, inventory: dict,
+                                     yaml_path: Optional[str] = None, destination: Optional[str] = None) -> Processor:
     version: str = inventory['plugins']['kubernetes-dashboard']['version']
+    kwargs = {'original_yaml_path': yaml_path, 'destination_name': destination}
     if utils.minor_version(version) == 'v2.5':
         return V2_5_X_DashboardManifestProcessor(logger, inventory, **kwargs)
 

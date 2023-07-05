@@ -12,14 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import io
+import os
+import tempfile
 import unittest
 import random
 
-import fabric
-
 from kubemarine import demo
+from kubemarine.core.group import GroupException
 from kubemarine.demo import FakeKubernetesCluster
 
 
@@ -33,10 +33,10 @@ class TestGroupCreation(unittest.TestCase):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get('worker').nodes.keys())[1:])
-        filtered_group = cluster.nodes.get('worker').new_group(apply_filter=lambda node: 'master' not in node['roles'])
+        expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
+        filtered_group = cluster.nodes['worker'].new_group(apply_filter=lambda node: 'master' not in node['roles'])
 
-        self.assertDictEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
+        self.assertEqual(expected_group.nodes, filtered_group.nodes, msg="Filtered groups do not match")
 
     def test_exclude_group(self):
         inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
@@ -44,16 +44,16 @@ class TestGroupCreation(unittest.TestCase):
 
         result_group = cluster.nodes['all'].exclude_group(cluster.nodes['balancer'])
 
-        self.assertDictEqual(cluster.nodes['master'].nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(cluster.nodes['master'].nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_exclude_group_2(self):
         multirole_inventory = demo.generate_inventory(balancer=0, master=1, worker=['master-1', 'worker-1'])
         cluster = demo.new_cluster(multirole_inventory)
 
-        expected_group = cluster.make_group(list(cluster.nodes.get('worker').nodes.keys())[1:])
-        result_group = cluster.nodes.get('worker').exclude_group(cluster.nodes['master'])
+        expected_group = cluster.make_group(cluster.nodes['worker'].get_hosts()[1:])
+        result_group = cluster.nodes['worker'].exclude_group(cluster.nodes['master'])
 
-        self.assertDictEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(expected_group.nodes, result_group.nodes, msg="Final groups do not match")
 
     def test_include_group(self):
         inventory = demo.generate_inventory(balancer=2, master=2, worker=0)
@@ -61,7 +61,7 @@ class TestGroupCreation(unittest.TestCase):
 
         result_group = cluster.nodes['balancer'].include_group(cluster.nodes['master'])
 
-        self.assertDictEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
+        self.assertEqual(cluster.nodes['all'].nodes, result_group.nodes, msg="Final groups do not match")
 
 
 class TestGroupCall(unittest.TestCase):
@@ -73,26 +73,26 @@ class TestGroupCall(unittest.TestCase):
 
     def tearDown(self):
         TestGroupCall.cluster.fake_shell.reset()
+        TestGroupCall.cluster.fake_fs.reset()
 
     def test_run_empty_group(self):
         # bug reproduces inside _do(), that is why it is necessary to use real cluster
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
         empty_group = cluster.nodes["worker"].new_group(apply_filter=lambda node: 'xxx' in node['roles'])
         # if there no nodes in empty group - an exception should not be produced - empty result should be returned
-        empty_group.run('whoami', is_async=True)
-        empty_group.run('whoami', is_async=False)
+        empty_group.run('whoami')
 
     def test_GroupException_one_node_failed(self):
         all_nodes = TestGroupCall.cluster.nodes["all"]
         results = demo.create_hosts_result(all_nodes.get_hosts(), stdout='example result')
-        results[random.choice(list(all_nodes.nodes.keys()))] = Exception('Some error')
+        results[random.choice(all_nodes.get_hosts())] = Exception('Some error')
 
         TestGroupCall.cluster.fake_shell.add(results, "run", ['some command'])
 
         exception = None
         try:
             all_nodes.run('some command')
-        except fabric.group.GroupException as e:
+        except GroupException as e:
             exception = e
 
         self.assertIsNotNone(exception, msg="GroupException should be raised")
@@ -103,6 +103,35 @@ class TestGroupCall(unittest.TestCase):
                 self.assertEqual('Some error', result.args[0], msg="Unexpected exception message")
 
         self.assertEqual(1, nested_exc, msg="One wrapped exception should happen")
+
+    def test_write_stream(self):
+        expected_data = 'hello\nworld'
+        self.cluster.nodes['master'].put(io.StringIO(expected_data), '/tmp/test/file.txt')
+        actual_data_group = self.cluster.fake_fs.read_all(self.cluster.nodes['master'].get_hosts(), '/tmp/test/file.txt')
+
+        for host, actual_data in actual_data_group.items():
+            self.assertEqual(expected_data, actual_data, msg="Written and read data are not equal for node %s" % host)
+
+    def test_write_large_stream(self):
+        self.cluster.fake_fs.emulate_latency = True
+        all_nodes = self.cluster.nodes["all"]
+        all_nodes.put(io.StringIO('a' * 100000), '/fake/path')
+
+        for host in all_nodes.get_hosts():
+            self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
+
+    def test_write_large_file(self):
+        self.cluster.fake_fs.emulate_latency = True
+        with tempfile.TemporaryDirectory() as tempdir:
+            file = os.path.join(tempdir, 'file.txt')
+            with open(file, 'w') as f:
+                f.write('a' * 100000)
+
+            all_nodes = self.cluster.nodes["all"]
+            all_nodes.put(file, '/fake/path')
+
+            for host in all_nodes.get_hosts():
+                self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
 
 
 if __name__ == '__main__':
