@@ -27,12 +27,11 @@ from kubemarine.core import flow
 from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
-def system_prepare_thirdparties(cluster):
+def system_prepare_thirdparties(cluster: KubernetesCluster):
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
@@ -40,14 +39,14 @@ def system_prepare_thirdparties(cluster):
     install.system_prepare_thirdparties(cluster)
 
 
-def prepull_images(cluster):
+def prepull_images(cluster: KubernetesCluster):
     cluster.log.debug("Prepulling Kubernetes images...")
     fix_cri_socket(cluster)
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
 
-def kubernetes_upgrade(cluster):
+def kubernetes_upgrade(cluster: KubernetesCluster):
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
@@ -72,7 +71,7 @@ def kubernetes_upgrade(cluster):
     cluster.context['cached_nodes_versions_cleaned'] = True
 
 
-def kubernetes_cleanup_nodes_versions(cluster):
+def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster):
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
@@ -89,7 +88,7 @@ def upgrade_packages(cluster: KubernetesCluster):
         install.manage_custom_packages(cluster.nodes['all'])
 
 
-def upgrade_plugins(cluster):
+def upgrade_plugins(cluster: KubernetesCluster):
     upgrade_version = cluster.context["upgrade_version"]
 
     # upgrade_candidates is a source of upgradeable plugins, not list of plugins to upgrade.
@@ -148,20 +147,19 @@ def upgrade_containerd(cluster: KubernetesCluster):
                                         is_async=False).get_simple_out()
                 updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}")
                 node['connection'].put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-                
 
-            with RemoteExecutor(cluster) as exe:
-                for node in cluster.nodes['control-plane'].include_group(
-                        cluster.nodes.get('worker')).get_ordered_members_list(
-                        provide_node_configs=True):
-                    os_specific_associations = cluster.get_associations_for_node(node['connect_to'], 'containerd')
-                    node['connection'].put(StringIO(config_string), os_specific_associations['config_location'],
-                                           backup=True,
-                                           sudo=True, mkdir=True)
-                    node['connection'].sudo(f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                                            f"systemctl status {os_specific_associations['service_name']}")
-                    node['connection'].sudo("systemctl restart kubelet")
-            return exe.get_last_results_str()
+            kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
+            tokens = []
+            with kubernetes_nodes.new_executor() as exe:
+                for node in exe.group.get_ordered_members_list():
+                    os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
+                    node.put(StringIO(config_string), os_specific_associations['config_location'],
+                             backup=True, sudo=True, mkdir=True)
+                    tokens.append(node.sudo(
+                        f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                        f"systemctl status {os_specific_associations['service_name']}"))
+                    tokens.append(node.sudo("systemctl restart kubelet"))
+            return exe.get_merged_runners_result(tokens)
 
 
 tasks = OrderedDict({
@@ -181,13 +179,13 @@ tasks = OrderedDict({
 
 class UpgradeFlow(flow.Flow):
     def __init__(self):
-        self.target_version = None
+        self.target_version = "not supported"
 
     def _run(self, resources: DynamicResources):
         logger = resources.logger()
 
         previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
-        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        upgrade_plan = resources.procedure_inventory()['upgrade_plan']
         upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
         logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
 
@@ -248,22 +246,21 @@ def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
     return upgrade_plan
 
 
-def fix_cri_socket(cluster):
+def fix_cri_socket(cluster: KubernetesCluster):
     """
     This method fixs the issue with 'kubeadm.alpha.kubernetes.io/cri-socket' node annotation
     and delete the docker socket if it exists
     """
 
     if cluster.inventory["services"]["cri"]["containerRuntime"] == "containerd":
-        control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
-        control_plane["connection"].sudo(f"sudo kubectl annotate nodes --all \
-                                     --overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock"
-                                         , is_async=False, hide=True)
+        control_plane = cluster.nodes["control-plane"].get_first_member()
+        control_plane.sudo(f"sudo kubectl annotate nodes --all "
+                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
 
 
-def kubernetes_apply_taints(cluster):
+def kubernetes_apply_taints(cluster: KubernetesCluster):
     # Apply taints after upgrade
     group = cluster.nodes['control-plane']
     kubernetes.apply_taints(group)

@@ -14,7 +14,7 @@
 from kubemarine.core.cluster import KubernetesCluster
 
 
-def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster):
+def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     """
     Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
     The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
@@ -33,7 +33,7 @@ def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def controlplane_finalize_inventory(cluster, inventory):
+def controlplane_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
     """
     Delete 'control-plane' and 'master' roles before inventory saving if they are not set in 'cluster.yaml'
     """

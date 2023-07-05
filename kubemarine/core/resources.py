@@ -13,7 +13,7 @@
 # limitations under the License.
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, cast, Iterator, Type
 
 import yaml
 import ruamel.yaml
@@ -23,7 +23,7 @@ from kubemarine.core.yaml_merger import default_merger
 
 
 class DynamicResources:
-    def __init__(self, context: dict, silent=False):
+    def __init__(self, context: dict, silent: bool = False) -> None:
         self.context = context
         """
         Context holding execution arguments and other auxiliary parameters which manage the execution flow.
@@ -37,11 +37,11 @@ class DynamicResources:
 
         self._silent = silent
         self._logger: Optional[log.EnhancedLogger] = None
-        self._raw_inventory = None
-        self._formatted_inventory = None
-        self._procedure_inventory = None
+        self._raw_inventory: Optional[dict] = None
+        self._formatted_inventory: Optional[dict] = None
+        self._procedure_inventory: Optional[dict] = None
 
-        self._nodes_context = None
+        self._nodes_context: Optional[dict] = None
         """
         The nodes_context variable should hold node specific information that is not changed during Kubemarine run.
         The variable should be initialized on demand and only once.
@@ -50,13 +50,13 @@ class DynamicResources:
         self._cluster: Optional[c.KubernetesCluster] = None
 
         args: dict = context['execution_arguments']
-        self.inventory_filepath = args['config']
-        self.procedure_inventory_filepath = args.get('procedure_config')
+        self.inventory_filepath: Optional[str] = args['config']
+        self.procedure_inventory_filepath: Optional[str] = args.get('procedure_config')
 
-    def logger_if_initialized(self):
+    def logger_if_initialized(self) -> Optional[log.EnhancedLogger]:
         return self._logger
 
-    def logger(self):
+    def logger(self) -> log.EnhancedLogger:
         if self._logger is None:
             self._logger = self._create_logger()
 
@@ -67,22 +67,27 @@ class DynamicResources:
         if self._raw_inventory is None:
             self._load_inventory()
 
-        return self._raw_inventory
+        return cast(dict, self._raw_inventory)
 
     def formatted_inventory(self) -> dict:
         """Returns raw inventory with preserved comments/quotes, to be modified and later recreated."""
         if self._formatted_inventory is None:
             self._load_inventory()
 
-        return self._formatted_inventory
+        return cast(dict, self._formatted_inventory)
 
-    def procedure_inventory(self):
-        if self._procedure_inventory is None and self.procedure_inventory_filepath:
-            self._procedure_inventory = utils.load_yaml(self.procedure_inventory_filepath)
+    def procedure_inventory(self) -> dict:
+        if self._procedure_inventory is None:
+            if self.procedure_inventory_filepath:
+                self._procedure_inventory = utils.load_yaml(self.procedure_inventory_filepath)
+            else:
+                self._procedure_inventory = {}
 
         return self._procedure_inventory
 
-    def _load_inventory(self):
+    def _load_inventory(self) -> None:
+        if not self.inventory_filepath:
+            raise Exception("Path to inventory is not defined")
         logger = self._logger
         if not self._silent:
             msg = "Loading inventory file '%s'" % self.inventory_filepath
@@ -98,10 +103,10 @@ class DynamicResources:
         except (yaml.YAMLError, ruamel.yaml.YAMLError) as exc:
             utils.do_fail("Failed to load inventory file", exc, log=logger)
 
-    def make_final_inventory(self):
+    def make_final_inventory(self) -> None:
         self._formatted_inventory = utils.get_final_inventory(self.cluster(), initial_inventory=self.formatted_inventory())
 
-    def recreate_inventory(self):
+    def recreate_inventory(self) -> None:
         """
         Recreates initial inventory file using DynamicResources.formatted_inventory and resets all dynamic resources.
 
@@ -119,7 +124,9 @@ class DynamicResources:
         # should not clear working_context as it can be inspected after execution.
         self._cluster = None
 
-    def _store_inventory(self):
+    def _store_inventory(self) -> None:
+        if not self.inventory_filepath:
+            raise Exception("Path to inventory is not defined")
         # replace initial inventory file with changed inventory
         with utils.open_external(self.inventory_filepath, "w+") as stream:
             utils.yaml_structure_preserver().dump(self.formatted_inventory(), stream)
@@ -135,7 +142,7 @@ class DynamicResources:
 
         return self._cluster
 
-    def create_deviated_cluster(self, deviated_context: dict):
+    def create_deviated_cluster(self, deviated_context: dict) -> c.KubernetesCluster:
         """
         Create new cluster instance with specified deviation of context params.
         The method work should minimize work with network and avoid RW work with filesystem.
@@ -154,7 +161,7 @@ class DynamicResources:
         return self._create_cluster(sample_context)
 
     @contextmanager
-    def _handle_enrichment_error(self):
+    def _handle_enrichment_error(self) -> Iterator[None]:
         try:
             yield
         except errors.FailException:
@@ -162,7 +169,7 @@ class DynamicResources:
         except Exception as exc:
             raise errors.FailException("Failed to proceed inventory file", exc)
 
-    def _create_cluster(self, context):
+    def _create_cluster(self, context: dict) -> c.KubernetesCluster:
         log = self.logger()
         context['nodes'] = deepcopy(self.get_nodes_context())
         with self._handle_enrichment_error():
@@ -182,7 +189,7 @@ class DynamicResources:
 
         return cluster
 
-    def get_nodes_context(self):
+    def get_nodes_context(self) -> dict:
         if self._nodes_context is None:
             with self._handle_enrichment_error():
                 # temporary cluster instance to detect initial nodes context.
@@ -193,15 +200,13 @@ class DynamicResources:
         return self._nodes_context
 
     def _new_cluster_instance(self, context: dict) -> c.KubernetesCluster:
-        return _provide_cluster(self.raw_inventory(), context,
-                                procedure_inventory=self.procedure_inventory(),
-                                logger=self.logger())
+        from kubemarine.core import flow
+        cluster_class = c.KubernetesCluster
+        if flow.DEFAULT_CLUSTER_OBJ is not None:
+            cluster_class = flow.DEFAULT_CLUSTER_OBJ
+        return cluster_class(self.raw_inventory(), context,
+                             procedure_inventory=self.procedure_inventory(),
+                             logger=self.logger())
 
-    def _create_logger(self):
+    def _create_logger(self) -> log.EnhancedLogger:
         return log.init_log_from_context_args(static.GLOBALS, self.context, self.raw_inventory()).logger
-
-
-def _provide_cluster(*args, **kw):
-    from kubemarine.core import flow
-    return flow.DEFAULT_CLUSTER_OBJ(*args, **kw) if flow.DEFAULT_CLUSTER_OBJ is not None \
-        else c.KubernetesCluster(*args, **kw)

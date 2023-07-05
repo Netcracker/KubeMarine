@@ -58,3 +58,14 @@ jobs:
       - run: |
           radon cc kubemarine scripts -a
           xenon -a A kubemarine scripts
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      # Install kubemarine with all dependencies except ansible but including mypy and library stubs.
+      # Then uninstall only kubemarine to avoid ambiguity and to surely run mypy on sources.
+      - run: pip install .[mypy] && pip uninstall -y kubemarine
+      - run: mypy

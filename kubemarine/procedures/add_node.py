@@ -15,8 +15,11 @@
 
 
 import copy
+import typing
 
 from collections import OrderedDict
+from typing import Any
+
 from kubemarine import kubernetes, packages
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
@@ -25,9 +28,9 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
-def deploy_kubernetes_join(cluster):
+def deploy_kubernetes_join(cluster: KubernetesCluster):
 
-    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_new_nodes()
+    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_new_nodes()
 
     if group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
@@ -36,7 +39,7 @@ def deploy_kubernetes_join(cluster):
     cluster.nodes['control-plane'].get_new_nodes().call(kubernetes.join_new_control_plane)
 
     if "worker" in cluster.nodes:
-        cluster.nodes["worker"].get_new_nodes().new_group(apply_filter=lambda node: 'control-plane' not in node['roles']) \
+        cluster.nodes['worker'].get_new_nodes().exclude_group(cluster.nodes['control-plane']) \
             .call(kubernetes.init_workers)
 
     group.call_batch([
@@ -49,21 +52,21 @@ def deploy_kubernetes_join(cluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def add_node_finalize_inventory(cluster, inventory_to_finalize):
+def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
     new_nodes = cluster.nodes['all'].get_new_nodes()
 
     # add nodes to inventory if they in new nodes
-    for new_node in new_nodes.get_ordered_members_list(provide_node_configs=True):
+    for new_node in new_nodes.get_ordered_members_list():
+        new_node_name = new_node.get_node_name()
         new_node_found = False
         for i, node in enumerate(inventory_to_finalize['nodes']):
-            if node['name'] == new_node['name']:
+            if node['name'] == new_node_name:
                 # new node already presented in final inventory - ok, just remove label
                 if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
                     inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
-                    cluster.inventory['nodes'][i]['roles'].remove('add_node')
                 new_node_found = True
                 break
 
@@ -74,7 +77,7 @@ def add_node_finalize_inventory(cluster, inventory_to_finalize):
             # search for new node config in procedure inventory
             if cluster.procedure_inventory.get('nodes', {}):
                 for node_from_procedure in cluster.procedure_inventory['nodes']:
-                    if node_from_procedure['name'] == new_node['name']:
+                    if node_from_procedure['name'] == new_node_name:
                         node_config = node_from_procedure
                         break
             # maybe new nodes from other places?
@@ -99,7 +102,7 @@ def cache_installed_packages(cluster: KubernetesCluster):
     packages.cache_package_versions(cluster, cluster.inventory, by_initial_nodes=True)
 
 
-tasks = OrderedDict(copy.deepcopy(install.tasks))
+tasks: typing.OrderedDict[str, Any] = OrderedDict(copy.deepcopy(install.tasks))
 del tasks["deploy"]["plugins"]
 del tasks["deploy"]["accounts"]
 tasks["deploy"]["kubernetes"]["init"] = deploy_kubernetes_join

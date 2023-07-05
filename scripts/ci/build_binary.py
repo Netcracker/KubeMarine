@@ -15,12 +15,12 @@
 import fileinput
 import subprocess
 import sys
-
+from typing import List
 
 PYINSTALLER_VERSION = "5.12.0"
 
 
-def call(args):
+def call(args: List[str]) -> None:
     return_code = subprocess.call(args)
     if return_code != 0:
         exit(return_code)

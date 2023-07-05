@@ -18,11 +18,13 @@ from collections import OrderedDict
 
 import io
 import uuid
+from typing import List, Callable
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow, utils
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
@@ -30,7 +32,7 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine import packages
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
 
@@ -39,7 +41,7 @@ def enrich_inventory(inventory, cluster):
         raise Exception("Migration of CRI is possible only for cluster "
                         "with all nodes having the same and supported OS family")
 
-    enrichment_functions = [
+    enrichment_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
         _prepare_yum_repos,
         _prepare_packages,
         _configure_containerd_on_nodes,
@@ -121,7 +123,7 @@ def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def _merge_containerd(cluster, inventory, finalization=False):
+def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization=False):
     if not inventory["services"].get("cri", {}):
         inventory["services"]["cri"] = {}
 
@@ -132,13 +134,13 @@ def _merge_containerd(cluster, inventory, finalization=False):
     return inventory
 
 
-def migrate_cri(cluster):
+def migrate_cri(cluster: KubernetesCluster):
     _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"])
-                 .get_ordered_members_list(provide_node_configs=True))
-    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list(provide_node_configs=True))
+                 .get_ordered_members_list())
+    _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list())
 
 
-def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
+def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
     """
     Migrate CRI from docker to already installed containerd.
     This method works node-by-node, configuring kubelet to use containerd.
@@ -147,22 +149,24 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
     """
 
     for node in node_group:
-        if "control-plane" in node["roles"]:
+        node_config = node.get_config()
+        node_name = node.get_node_name()
+        is_control_plane = "control-plane" in node_config["roles"]
+        if is_control_plane:
             control_plane = node
         else:
-            control_plane = cluster.nodes["control-plane"].get_first_member(provide_node_configs=True)
+            control_plane = cluster.nodes["control-plane"].get_first_member()
 
-        cluster.log.debug(f'Updating thirdparties for node "{node["connect_to"]}..."')
-        thirdparties.install_all_thirparties(node["connection"])
+        cluster.log.debug(f'Updating thirdparties for node "{node_name}"...')
+        thirdparties.install_all_thirparties(node)
 
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-        cluster.log.debug("Migrating \"%s\"..." % node["name"])
-        drain_cmd = kubernetes.prepare_drain_command(cluster, node['name'], disable_eviction=True)
-        control_plane["connection"].sudo(drain_cmd, is_async=False, hide=False)
+        cluster.log.debug("Migrating \"%s\"..." % node_name)
+        drain_cmd = kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=True)
+        control_plane.sudo(drain_cmd, hide=False)
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
-        kubeadm_flags = node["connection"].sudo(f"cat {kubeadm_flags_file}",
-                                                is_async=False).get_simple_out()
+        kubeadm_flags = node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
 
         #Removing the --network-plugin=cni switch after the cri migration procedure that was used to run Docker on the cluster.
         #Support for this key has been removed in kubernetes 1.24.
@@ -171,57 +175,60 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
 
         kubeadm_flags = edit_config(kubeadm_flags)
 
-        node["connection"].put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+        node.put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
 
-        node["connection"].sudo("systemctl stop kubelet")
-        docker.prune(node["connection"])
+        node.sudo("systemctl stop kubelet")
+        docker.prune(node)
 
-        docker_associations = cluster.get_associations_for_node(node['connect_to'], 'docker')
-        node["connection"].sudo(f"systemctl disable {docker_associations['service_name']} --now; "
-                                 "sudo sh -c 'rm -rf /var/lib/docker/*'")
+        docker_associations = cluster.get_associations_for_node(node.get_host(), 'docker')
+        node.sudo(f"systemctl disable {docker_associations['service_name']} --now; "
+                  "sudo sh -c 'rm -rf /var/lib/docker/*'")
 
         cluster.log.debug('Reinstalling CRI...')
-        cri.install(node["connection"])
-        cri.configure(node["connection"])
+        cri.install(node)
+        cri.configure(node)
 
-        cluster.log.debug(f'CRI configured! Restoring pods on node "{node["connect_to"]}"')
+        cluster.log.debug(f'CRI configured! Restoring pods on node "{node_name}"')
 
         # if there is a disk for docker in "/etc/fstab", then use this disk for containerd
-        docker_disk_result = node["connection"].sudo("cat /etc/fstab | grep ' /var/lib/docker '", warn=True)
+        docker_disk_result = node.sudo("cat /etc/fstab | grep ' /var/lib/docker '", warn=True)
         docker_disk = list(docker_disk_result.values())[0].stdout.strip()
         if docker_disk:
-            node['connection'].sudo("umount /var/lib/docker && "
-                                    "sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
-                                    "sudo sh -c 'rm -rf /var/lib/containerd/*' && "
-                                    "sudo mount -a && "
-                                    "sudo systemctl restart containerd")
+            node.sudo(
+                "umount /var/lib/docker && "
+                "sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
+                "sudo sh -c 'rm -rf /var/lib/containerd/*' && "
+                "sudo mount -a && "
+                "sudo systemctl restart containerd")
 
         # flushing iptables to delete old cri's rules,
         # existence of those rules could lead to services unreachable
-        node["connection"].sudo("sudo iptables -t nat -F && "
-                                "sudo iptables -t raw -F && "
-                                "sudo iptables -t filter -F && "
-                                # hotfix for Ubuntu 22.04
-                                "sudo systemctl stop kubepods-burstable.slice || true && "
-                                "sudo systemctl restart containerd && "
-                                # start kubelet
-                                "sudo systemctl restart kubelet")
+        node.sudo(
+            "sudo iptables -t nat -F && "
+            "sudo iptables -t raw -F && "
+            "sudo iptables -t filter -F && "
+            # hotfix for Ubuntu 22.04
+            "sudo systemctl stop kubepods-burstable.slice || true && "
+            "sudo systemctl restart containerd && "
+            # start kubelet
+            "sudo systemctl restart kubelet")
 
-        if "control-plane" in node["roles"]:
-            kubernetes.wait_uncordon(node["connection"])
+        if is_control_plane:
+            kubernetes.wait_uncordon(node)
         else:
-            control_plane["connection"].sudo(f"kubectl uncordon {node['name']}", is_async=False, hide=False)
+            control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
 
-        if "control-plane" in node["roles"]:
+        if is_control_plane:
             # hotfix for Ubuntu 22.04 and Kubernetes v1.21.2
             if version == "v1.21.2":
-                node['connection'].sudo("sleep 30 && "
-                                        "sudo kubectl -n kube-system  delete pod "
-                                        "$(sudo kubectl -n kube-system get pod --field-selector='status.phase=Pending' | "
-                                        "grep 'kube-proxy' | awk '{ print $1 }') || true")
-            kubernetes.wait_for_any_pods(cluster, node["connection"], apply_filter=node["name"])
+                node.sudo(
+                    "sleep 30 && "
+                    "sudo kubectl -n kube-system  delete pod "
+                    "$(sudo kubectl -n kube-system get pod --field-selector='status.phase=Pending' | "
+                    "grep 'kube-proxy' | awk '{ print $1 }') || true")
+            kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
             # check ETCD health
-            etcd.wait_for_health(cluster, node["connection"])
+            etcd.wait_for_health(cluster, node)
 
         packages_list = []
         for package_name in docker_associations['package_name']:
@@ -229,18 +236,17 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: dict):
                 packages_list.append(package_name)
         cluster.log.warning("The following packages will be removed: %s" % packages_list)
         if packages_list:
-            packages.remove(node["connection"], include=packages_list, warn=True, hide=False)
+            packages.remove(node, include=packages_list, warn=True, hide=False)
 
         # change annotation for cri-socket
-        control_plane["connection"].sudo(f"sudo kubectl annotate node {node['name']} "
-                                  f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock",
-                                  is_async=False, hide=True)
+        control_plane.sudo(f"sudo kubectl annotate node {node_name} "
+                           f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
 
         # delete docker socket
-        node["connection"].sudo("rm -rf /var/run/docker.sock", hide=False)
+        node.sudo("rm -rf /var/run/docker.sock", hide=False)
 
 
-def release_calico_leaked_ips(cluster):
+def release_calico_leaked_ips(cluster: KubernetesCluster):
     """
     During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
     For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
@@ -250,26 +256,27 @@ def release_calico_leaked_ips(cluster):
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
-    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", is_async=False, hide=False)
+    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
     leaked_ips = result.get_simple_out()
     leaked_ips_count = leaked_ips.count('leaked')
     cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
     if leaked_ips_count != 0:
-        first_control_plane.sudo(f"calicoctl ipam release --from-report={random_report_name} --force", is_async=False, hide=False)
+        first_control_plane.sudo(f"calicoctl ipam release --from-report={random_report_name} --force", hide=False)
         cluster.log.debug("Leaked ips was released")
-    first_control_plane.sudo(f"rm {random_report_name}", is_async=False, hide=False)
-    
+    first_control_plane.sudo(f"rm {random_report_name}", hide=False)
 
-def edit_config(kubeadm_flags):
+
+def edit_config(kubeadm_flags: str):
     kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--container-runtime=remote")
     return kubernetes._config_changer(kubeadm_flags,
                            "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
 
 
-def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
+
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory_to_finalize
-    finalize_functions = [
+    finalize_functions: List[Callable[[KubernetesCluster, dict, bool], dict]] = [
         _prepare_yum_repos,
         _prepare_packages,
         _prepare_crictl,
@@ -277,7 +284,7 @@ def migrate_cri_finalize_inventory(cluster, inventory_to_finalize):
     ]
     for finalize_fn in finalize_functions:
         cluster.log.verbose('Calling fn "%s"' % finalize_fn.__qualname__)
-        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, finalization=True)
+        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, True)
 
     return inventory_to_finalize
 

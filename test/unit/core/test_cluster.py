@@ -43,20 +43,9 @@ class KubernetesClusterTest(unittest.TestCase):
         actual_group = self.cluster.make_group([balancer, masters])
         self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to merged group")
 
-    def test_make_group_from_connections(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_group = self.cluster.nodes['master']
-        actual_group = self.cluster.make_group([
-            all_nodes_group['10.101.1.2'],
-            all_nodes_group['10.101.1.3'],
-            all_nodes_group['10.101.1.4']
-        ])
-        self.assertEqual(expected_group, actual_group, msg="Created group is not equivalent to all masters group")
-
     def test_make_group_from_mixed_types(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
         actual_group = self.cluster.make_group([
-            all_nodes_group['10.101.1.1'],
+            '10.101.1.1',
             self.cluster.nodes['master'],
             '10.101.1.5',
             '10.101.1.6',

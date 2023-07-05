@@ -14,54 +14,59 @@
 
 import configparser
 import io
-
-import fabric
+from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
-from kubemarine.core.group import NodeGroupResult, NodeGroup
+from kubemarine.core.executor import RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 
 
-def ls_repofiles(group, **kwargs):
-    return group.sudo('ls -la /etc/yum.repos.d', **kwargs)
+def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
+    return group.sudo('ls -la /etc/yum.repos.d')
 
 
-def backup_repo(group, repo_filename="*", **kwargs):
+def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
-        return
+        return None
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
-    return group.sudo("find /etc/yum.repos.d/ -type f -name '%s.repo' | "
-                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % repo_filename, **kwargs)
+    return group.sudo("find /etc/yum.repos.d/ -type f -name '*.repo' | "
+                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak")
 
 
-def add_repo(group, repo_data="", repo_filename="predefined", **kwargs):
-    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
-    return group.sudo('yum clean all && sudo yum updateinfo', **kwargs)
+def add_repo(group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult:
+    create_repo_file(group, repo_data, get_repo_file_name())
+    return group.sudo('yum clean all && sudo yum updateinfo')
 
 
-def get_repo_file_name(repo_filename="predefined"):
-    return '/etc/yum.repos.d/%s.repo' % repo_filename
+def get_repo_file_name() -> str:
+    return '/etc/yum.repos.d/predefined.repo'
 
 
-def create_repo_file(group, repo_data, repo_file):
+def create_repo_file(group: AbstractGroup[RunResult],
+                     repo_data: Union[List[str], Dict[str, dict], str],
+                     repo_file: str) -> None:
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
         for repo_id, data in repo_data.items():
             config[repo_id] = data
-        repo_data = io.StringIO()
-        config.write(repo_data)
+        repo_data_stream = io.StringIO()
+        config.write(repo_data_stream)
+    elif isinstance(repo_data, list):
+        raise Exception("Not supported repositories format for yum package manager")
     else:
-        repo_data = io.StringIO(utils.read_external(repo_data))
-    group.put(repo_data, repo_file, sudo=True)
+        repo_data_stream = io.StringIO(utils.read_external(repo_data))
+
+    group.put(repo_data_stream, repo_file, sudo=True)
 
 
-def clean(group, mode="all", **kwargs):
-    return group.sudo("yum clean %s" % mode, **kwargs)
+def clean(group: NodeGroup) -> RunnersGroupResult:
+    return group.sudo("yum clean all")
 
 
-def get_install_cmd(include: str or list, exclude=None) -> str:
+def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str]] = None) -> str:
     if isinstance(include, list):
         include = ' '.join(include)
     command = 'yum install -y %s' % include
@@ -77,16 +82,19 @@ def get_install_cmd(include: str or list, exclude=None) -> str:
     return command
 
 
-def install(group, include=None, exclude=None, **kwargs):
+def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to install')
 
     command = get_install_cmd(include, exclude)
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command)
 
 
-def remove(group, include=None, exclude=None, **kwargs):
+def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+           exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to remove')
 
@@ -99,10 +107,11 @@ def remove(group, include=None, exclude=None, **kwargs):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, warn=warn, hide=hide)
 
 
-def upgrade(group, include=None, exclude=None, **kwargs):
+def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to upgrade')
 
@@ -115,22 +124,23 @@ def upgrade(group, include=None, exclude=None, **kwargs):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command)
 
 
-def no_changes_found(action: callable, result: fabric.runners.Result) -> bool:
-    if action is install:
+def no_changes_found(action: str, result: RunnersResult) -> bool:
+    if action == 'install':
         return "Nothing to do" in result.stdout
-    elif action is upgrade:
+    elif action == 'upgrade':
         return "No packages marked for update" in result.stdout
-    elif action is remove:
+    elif action == 'remove':
         return "No Packages marked for removal" in result.stdout
     else:
         raise Exception(f"Unknown action {action}")
 
 
-def search(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
+def search(group: DeferredGroup, package: str) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
     command = 'yum list %s || echo "Package is unavailable"' % package
-    return group.sudo(command, **kwargs)
+
+    return group.sudo(command)

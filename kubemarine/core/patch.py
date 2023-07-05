@@ -32,7 +32,7 @@ class _Priority(enum.Enum):
     Changes in the inventory are possible, but they should not affect the software upgrade procedure.
     """
 
-    def __lt__(self, other):
+    def __lt__(self, other: '_Priority') -> bool:
         return self.value < other.value
 
 

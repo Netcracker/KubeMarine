@@ -16,8 +16,7 @@
 
 import unittest
 
-import fabric
-
+from kubemarine.core.executor import RunnersResult
 from kubemarine.core.group import NodeGroup, NodeGroupResult
 from kubemarine import demo
 
@@ -25,7 +24,7 @@ from kubemarine import demo
 class NodeGroupResultsTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
+        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
 
     def test_nodegroup_result_to_str(self):
         expected_results_str = '''	10.101.1.2: code=1
@@ -68,141 +67,94 @@ class NodeGroupResultsTest(unittest.TestCase):
         self.assertEqual(masters_group, group_from_results, msg="Group from nodegroup is not the same as manual group")
 
     def test_any_failed_via_bad_code(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': fabric.runners.Result(stderr='error', exited=1, connection=all_nodes_group['10.101.1.2']),
-            '10.101.1.3': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.3'])
+            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.2': RunnersResult(stderr='error', exited=1),
+            '10.101.1.3': RunnersResult(stdout='ok', exited=0)
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         self.assertTrue(results.is_any_failed(), msg="Failed to identify at least one failed node")
-
-    def test_any_failed_via_exception(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.3'])
-        }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        print(results)
-        self.assertTrue(results.is_any_failed(), msg="Failed to identify at least one failed node")
-        pass
 
     def test_nobody_failed(self):
         results = demo.create_nodegroup_result(self.cluster.nodes['all'], code=0, stdout='foo bar')
         self.assertFalse(results.is_any_failed(), msg="Non-failed node was identified as failed")
 
     def test_get_exited_nodes_list(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_exited_nodes_list = [
-            all_nodes_group['10.101.1.1'],
-            all_nodes_group['10.101.1.3']
+        expected_exited_hosts_list = [
+            '10.101.1.1',
+            '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
+            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
             '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.3'])
+            '10.101.1.3': RunnersResult(stdout='ok', exited=0)
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_nodes_list = results.get_exited_nodes_list()
-        self.assertEqual(expected_exited_nodes_list, actual_nodes_list,
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
+        actual_hosts_list = results.get_exited_hosts_list()
+        self.assertEqual(expected_exited_hosts_list, actual_hosts_list,
                          msg="Actual nodes list contains different nodes than expected")
 
     def test_get_exited_nodes_group(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
         expected_exited_group = self.cluster.make_group(['10.101.1.1', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
+            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
             '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.3'])
+            '10.101.1.3': RunnersResult(stdout='error', exited=1)
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         actual_group = results.get_exited_nodes_group()
         self.assertEqual(expected_exited_group, actual_group, msg="Actual group contains different nodes than expected")
 
     def test_get_excepted_nodes_list(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_excepted_nodes_list = [
-            all_nodes_group['10.101.1.2'],
-            all_nodes_group['10.101.1.3']
+        expected_excepted_hosts_list = [
+            '10.101.1.2',
+            '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
+            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
             '10.101.1.2': Exception('Something failed here'),
             '10.101.1.3': Exception('And there')
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_nodes_list = results.get_excepted_nodes_list()
-        self.assertEqual(expected_excepted_nodes_list, actual_nodes_list,
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
+        actual_hosts_list = results.get_excepted_hosts_list()
+        self.assertEqual(expected_excepted_hosts_list, actual_hosts_list,
                          msg="Actual nodes list contains different nodes than expected")
 
     def test_get_excepted_nodes_group(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
         expected_excepted_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
+            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
             '10.101.1.2': Exception('Something failed here'),
             '10.101.1.3': Exception('And there')
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         actual_group = results.get_excepted_nodes_group()
         self.assertEqual(expected_excepted_group, actual_group, msg="Actual group contains different nodes than expected")
 
     def test_get_failed_nodes_list(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_failed_nodes_list = [
-            all_nodes_group['10.101.1.2'],
-            all_nodes_group['10.101.1.3']
+        expected_nonzero_hosts_list = [
+            '10.101.1.1',
+            '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.3'])
+            '10.101.1.1': RunnersResult(stdout='error', exited=1),
+            '10.101.1.2': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.3': RunnersResult(stdout='error', exited=1)
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_nodes_list = results.get_failed_nodes_list()
-        self.assertEqual(expected_failed_nodes_list, actual_nodes_list,
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
+        actual_hosts_list = results.get_failed_hosts_list()
+        self.assertEqual(expected_nonzero_hosts_list, actual_hosts_list,
                          msg="Actual nodes list contains different nodes than expected")
 
     def test_get_failed_nodes_group(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_failed_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3'])
-        host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.3'])
-        }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_group = results.get_failed_nodes_group()
-        self.assertEqual(expected_failed_group, actual_group, msg="Actual group contains different nodes than expected")
-
-    def test_get_nonzero_nodes_list(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
-        expected_nonzero_nodes_list = [
-            all_nodes_group['10.101.1.1'],
-            all_nodes_group['10.101.1.3']
-        ]
-        host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.2']),
-            '10.101.1.3': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.3'])
-        }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_nodes_list = results.get_nonzero_nodes_list()
-        self.assertEqual(expected_nonzero_nodes_list, actual_nodes_list,
-                         msg="Actual nodes list contains different nodes than expected")
-
-    def test_get_nonzero_nodes_group(self):
-        all_nodes_group = self.cluster.nodes['all'].nodes
         expected_nonzero_group = self.cluster.make_group(['10.101.1.1', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.1']),
-            '10.101.1.2': fabric.runners.Result(stdout='ok', exited=0, connection=all_nodes_group['10.101.1.2']),
-            '10.101.1.3': fabric.runners.Result(stdout='error', exited=1, connection=all_nodes_group['10.101.1.3'])
+            '10.101.1.1': RunnersResult(stdout='error', exited=1),
+            '10.101.1.2': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.3': RunnersResult(stdout='error', exited=1)
         }
-        results = NodeGroupResult(self.cluster, host_to_result)
-        actual_group = results.get_nonzero_nodes_group()
+        results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
+        actual_group = results.get_failed_nodes_group()
         self.assertEqual(expected_nonzero_group, actual_group, msg="Actual group contains different nodes than expected")
 
 

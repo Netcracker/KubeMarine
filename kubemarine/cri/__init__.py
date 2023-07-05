@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
+
 from kubemarine.core import static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroupResult
+from kubemarine.core.group import RunnersGroupResult, NodeGroup
 from kubemarine.cri import docker, containerd
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get("initial_procedure") == "migrate_cri":
         return inventory
 
@@ -34,14 +36,14 @@ def enrich_inventory(inventory, cluster):
 
 
 def get_initial_cri_impl(inventory: dict) -> str:
-    cri_impl = inventory.get("services", {}).get("cri", {}).get("containerRuntime")
+    cri_impl: Optional[str] = inventory.get("services", {}).get("cri", {}).get("containerRuntime")
     if cri_impl is None:
         cri_impl = static.DEFAULTS['services']['cri']['containerRuntime']
 
     return cri_impl
 
 
-def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
+def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict) -> dict:
     if inventory['services']['cri']['containerRuntime'] == 'docker':
         if inventory['services']['cri'].get('containerdConfig'):
             del inventory['services']['cri']['containerdConfig']
@@ -51,7 +53,7 @@ def remove_invalid_cri_config(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def install(group):
+def install(group: NodeGroup) -> RunnersGroupResult:
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -60,7 +62,7 @@ def install(group):
         return containerd.install(group)
 
 
-def configure(group):
+def configure(group: NodeGroup) -> RunnersGroupResult:
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
     if cri_impl == "docker":
@@ -69,14 +71,14 @@ def configure(group):
         return containerd.configure(group)
 
 
-def prune(group, all_implementations=False):
+def prune(group: NodeGroup, all_implementations: bool = False) -> RunnersGroupResult:
     cri_impl = group.cluster.inventory['services']['cri']['containerRuntime']
 
-    result = NodeGroupResult(group.cluster)
+    result = RunnersGroupResult(group.cluster, {})
     if cri_impl == "docker" or all_implementations:
-        result.update(docker.prune(group))
+        result = docker.prune(group)
 
     if cri_impl == "containerd" or all_implementations:
-        result.update(containerd.prune(group))
+        result = containerd.prune(group)
 
     return result
