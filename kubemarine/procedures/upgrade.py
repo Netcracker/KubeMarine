@@ -138,8 +138,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
 
             for node in cluster.nodes['control-plane'].include_group(
-                        cluster.nodes.get('worker')).get_ordered_members_list(
-                        provide_node_configs=True):
+                        cluster.nodes.get('worker')).get_ordered_members_list():
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
                 
