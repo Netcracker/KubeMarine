@@ -146,7 +146,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 
                 kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}",
                                         is_async=False).get_simple_out()
-                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"pause:{pause_version}",delemeter=":")
+                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}")
                 node['connection'].put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
                 
 
