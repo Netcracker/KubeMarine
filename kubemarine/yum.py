@@ -29,22 +29,24 @@ def backup_repo(group, repo_filename="*", **kwargs):
     if not group.cluster.inventory['services']['packages']['package_manager']['replace-repositories']:
         group.cluster.log.debug("Skipped - repos replacement disabled in configuration")
         return
+    dry_run = utils.check_dry_run_status_active(group.cluster)
     # all files in directory will be renamed: xxx.repo -> xxx.repo.bak
     # if there already any files with ".bak" extension, they should not be renamed to ".bak.bak"!
     return group.sudo("find /etc/yum.repos.d/ -type f -name '%s.repo' | "
-                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % repo_filename, **kwargs)
+                      "sudo xargs -t -iNAME mv -bf NAME NAME.bak" % repo_filename, dry_run=dry_run, **kwargs)
 
 
 def add_repo(group, repo_data="", repo_filename="predefined", **kwargs):
-    create_repo_file(group, repo_data, get_repo_file_name(repo_filename))
-    return group.sudo('yum clean all && sudo yum updateinfo', **kwargs)
+    dry_run = utils.check_dry_run_status_active(group.cluster)
+    create_repo_file(group, repo_data, get_repo_file_name(repo_filename), dry_run)
+    return group.sudo('yum clean all && sudo yum updateinfo', dry_run=dry_run, **kwargs)
 
 
 def get_repo_file_name(repo_filename="predefined"):
     return '/etc/yum.repos.d/%s.repo' % repo_filename
 
 
-def create_repo_file(group, repo_data, repo_file):
+def create_repo_file(group, repo_data, repo_file, dry_run=False):
     # if repo_data is dict, then convert it to string with config inside
     if isinstance(repo_data, dict):
         config = configparser.ConfigParser()
@@ -54,7 +56,7 @@ def create_repo_file(group, repo_data, repo_file):
         config.write(repo_data)
     else:
         repo_data = io.StringIO(utils.read_external(repo_data))
-    group.put(repo_data, repo_file, sudo=True)
+    group.put(repo_data, repo_file, sudo=True, dry_run=dry_run)
 
 
 def clean(group, mode="all", **kwargs):
@@ -83,7 +85,7 @@ def install(group, include=None, exclude=None, **kwargs):
 
     command = get_install_cmd(include, exclude)
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
 
 
 def remove(group, include=None, exclude=None, **kwargs):
@@ -99,7 +101,7 @@ def remove(group, include=None, exclude=None, **kwargs):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
 
 
 def upgrade(group, include=None, exclude=None, **kwargs):
@@ -115,7 +117,7 @@ def upgrade(group, include=None, exclude=None, **kwargs):
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
 
 
 def no_changes_found(action: callable, result: fabric.runners.Result) -> bool:

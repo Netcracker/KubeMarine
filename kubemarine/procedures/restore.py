@@ -110,19 +110,24 @@ def verify_backup_data(cluster):
 def stop_cluster(cluster):
     cluster.log.debug('Stopping the existing cluster...')
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
+    dry_run = utils.check_dry_run_status_active(cluster)
     if cri_impl == "docker":
-        result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
-                                              'sudo docker kill $(sudo docker ps -q); '
-                                              'sudo docker rm -f $(sudo docker ps -a -q); '
-                                              'sudo docker ps -a; '
-                                              'sudo rm -rf /var/lib/etcd; '
-                                              'sudo mkdir -p /var/lib/etcd', warn=True)
+        result = cluster.nodes['control-plane'].sudo(
+            'systemctl stop kubelet; '
+            'sudo docker kill $(sudo docker ps -q); '
+            'sudo docker rm -f $(sudo docker ps -a -q); '
+            'sudo docker ps -a; '
+            'sudo rm -rf /var/lib/etcd; '
+            'sudo mkdir -p /var/lib/etcd', warn=True,
+            dry_run=dry_run)
     else:
-        result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
-                                              'sudo crictl rm -fa; '
-                                              'sudo crictl ps -a; '
-                                              'sudo rm -rf /var/lib/etcd; '
-                                              'sudo mkdir -p /var/lib/etcd', warn=True)
+        result = cluster.nodes['control-plane'].sudo(
+            'systemctl stop kubelet; '
+            'sudo crictl rm -fa; '
+            'sudo crictl ps -a; '
+            'sudo rm -rf /var/lib/etcd; '
+            'sudo mkdir -p /var/lib/etcd', warn=True,
+            dry_run=dry_run)
     cluster.log.verbose(result)
 
 
@@ -138,9 +143,10 @@ def restore_thirdparties(cluster):
 
 
 def import_nodes(cluster):
+    dry_run = utils.check_dry_run_status_active(cluster)
     for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
         node['connection'].put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node['name']),
-                               '/tmp/kubemarine-backup.tar.gz')
+                               '/tmp/kubemarine-backup.tar.gz', dry_run=dry_run)
         cluster.log.debug('Backup \'%s\' uploaded' % node['name'])
 
     cluster.log.debug('Unpacking backup...')
@@ -149,10 +155,11 @@ def import_nodes(cluster):
         for node in cluster.nodes['all'].get_ordered_members_list(provide_node_configs=True):
             cmd = f"readlink /etc/resolv.conf ;" \
                   f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite && sudo chattr +i /etc/resolv.conf; else sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite; fi "
-            node['connection'].sudo(cmd)
-
+            node['connection'].sudo(cmd, dry_run=dry_run)
+    if dry_run:
+        return
     result = exe.get_last_results_str()
-    cluster.log.debug('%s',result)
+    cluster.log.debug('%s', result)
 
 
 def import_etcd(cluster: KubernetesCluster):
@@ -164,6 +171,7 @@ def import_etcd(cluster: KubernetesCluster):
     etcd_peer_key = etcd_all_certificates.get('peer_key', cluster.globals['etcd']['default_arguments']['peer_key'])
     etcd_peer_cacert = etcd_all_certificates.get('peer_cacert',
                                                  cluster.globals['etcd']['default_arguments']['peer_cacert'])
+    dry_run = utils.check_dry_run_status_active(cluster)
 
     etcd_image = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('image')
     if not etcd_image:
@@ -174,8 +182,12 @@ def import_etcd(cluster: KubernetesCluster):
 
     cluster.log.debug('Uploading ETCD snapshot...')
     snap_name = '/var/lib/etcd/etcd-snapshot%s.db' % int(round(time.time() * 1000))
-    cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'), snap_name, sudo=True)
-
+    cluster.nodes['control-plane'].put(os.path.join(cluster.context['backup_tmpdir'], 'etcd.db'),
+                                       snap_name, sudo=True,
+                                       dry_run=dry_run)
+    if dry_run:
+        cluster.log.verbose('ETCD cluster is healthy!')
+        return
     initial_cluster_list = []
     initial_cluster_list_without_names = []
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_list(provide_node_configs=True):

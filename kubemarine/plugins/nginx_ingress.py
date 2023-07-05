@@ -39,6 +39,7 @@ def check_job_for_nginx(cluster: KubernetesCluster):
     else:
         cluster.log.debug('There are no jobs to delete')
 
+
 def enrich_inventory(inventory, _):
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
@@ -104,6 +105,10 @@ def manage_custom_certificate(cluster):
 
     first_control_plane = cluster.nodes["control-plane"].get_first_member()
     default_cert = cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"]["default-certificate"]
+
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("[dry-run] Successfully aplied custom certificates")
+        return
 
     # first, we need to load cert and key files to first control-plane to known locations
     first_control_plane.sudo(f"mkdir -p {base_path}")

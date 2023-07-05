@@ -338,7 +338,9 @@ def reboot_nodes(cluster: KubernetesCluster):
 
 def reboot_group(group: NodeGroup, try_graceful=None):
     log = group.cluster.log
-
+    if utils.check_dry_run_status_active(group.cluster):
+        log.debug("[dry-run] Rebooting Nodes...")
+        return
     if try_graceful is None:
         if 'controlplain_uri' not in group.cluster.context.keys():
             kubernetes.is_cluster_installed(group.cluster)

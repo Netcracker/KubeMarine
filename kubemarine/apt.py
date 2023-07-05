@@ -100,7 +100,7 @@ def remove(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
 
 
 def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
@@ -117,7 +117,7 @@ def upgrade(group, include=None, exclude=None, **kwargs) -> NodeGroupResult:
             exclude = ','.join(exclude)
         command += ' --exclude=%s' % exclude
 
-    return group.sudo(command, **kwargs)
+    return group.sudo(command, dry_run=utils.check_dry_run_status_active(group.cluster), **kwargs)
 
 
 def no_changes_found(action: callable, result: fabric.runners.Result) -> bool:
