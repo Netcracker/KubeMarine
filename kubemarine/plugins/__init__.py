@@ -1068,6 +1068,4 @@ def procedure_types() -> Dict[str, Dict[str, Callable]]:
             'verify': verify_config,
             'apply': apply_config
         },
-    }
-
-    
+    } 
