@@ -1030,40 +1030,41 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
         cluster.log.debug('Apply is not required')
 
 
-procedure_types = {
-    'template': {
-        'convert': convert_template,
-        'verify': verify_template,
-        'apply': apply_template
-    },
-    'expect': {
-        'convert': convert_expect,
-        'apply': apply_expect
-    },
-    'python': {
-        'verify': verify_python,
-        'apply': apply_python
-    },
-    'thirdparty': {
-        'verify': verify_thirdparty,
-        'apply': apply_thirdparty
-    },
-    'shell': {
-        'convert': convert_shell,
-        'verify': verify_shell,
-        'apply': apply_shell
-    },
-    'ansible': {
-        'convert': convert_ansible,
-        'verify': verify_ansible,
-        'apply': apply_ansible
-    },
-    'helm': {
-        'apply': apply_helm
-    },
-    'config': {
-        'convert': convert_config,
-        'verify': verify_config,
-        'apply': apply_config
-    },
-}
+def procedure_types() -> Dict[str, Dict[str, Callable]]:
+    return {
+        'template': {
+            'convert': convert_template,
+            'verify': verify_template,
+            'apply': apply_template
+        },
+        'expect': {
+            'convert': convert_expect,
+            'apply': apply_expect
+        },
+        'python': {
+            'verify': verify_python,
+            'apply': apply_python
+        },
+        'thirdparty': {
+            'verify': verify_thirdparty,
+            'apply': apply_thirdparty
+        },
+        'shell': {
+            'convert': convert_shell,
+            'verify': verify_shell,
+            'apply': apply_shell
+        },
+        'ansible': {
+            'convert': convert_ansible,
+            'verify': verify_ansible,
+            'apply': apply_ansible
+        },
+        'helm': {
+            'apply': apply_helm
+        },
+        'config': {
+            'convert': convert_config,
+            'verify': verify_config,
+            'apply': apply_config
+        },
+    }
