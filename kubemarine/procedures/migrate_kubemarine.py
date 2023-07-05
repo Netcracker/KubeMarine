@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import re
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import List
+from typing import List, Union
 
 import yaml
 
@@ -31,12 +32,12 @@ SOFTWARE_UPGRADE_PATH = utils.get_internal_resource_path("patches/software_upgra
 
 
 class SoftwareUpgradeAction(Action, ABC):
-    def __init__(self, software_name: str, k8s_versions: List[str]):
+    def __init__(self, software_name: str, k8s_versions: List[str]) -> None:
         super().__init__(f'Upgrade {software_name}')
         self.software_name = software_name
         self.k8s_versions = k8s_versions
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         # We should not call DynamicResources.cluster() and should only access the raw inventory,
         # because otherwise enrichment will start with probably not relevant validation.
         version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
@@ -48,16 +49,16 @@ class SoftwareUpgradeAction(Action, ABC):
         res.make_final_inventory()
 
     @abstractmethod
-    def specific_run(self, res: DynamicResources):
+    def specific_run(self, res: DynamicResources) -> None:
         pass
 
 
 class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
-    def __init__(self, software_name: str, k8s_versions: List[str]):
+    def __init__(self, software_name: str, k8s_versions: List[str]) -> None:
         super().__init__(software_name, k8s_versions)
         self._destination = thirdparties.get_thirdparty_destination(self.software_name)
 
-    def specific_run(self, res: DynamicResources):
+    def specific_run(self, res: DynamicResources) -> None:
         logger = res.logger()
         cluster = res.cluster()
         if self._destination not in cluster.inventory['services']['thirdparties']:
@@ -70,7 +71,7 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
         logger.info(f"Reinstalling third-party {self._destination!r}")
         self._run(cluster)
 
-    def _run(self, cluster: KubernetesCluster):
+    def _run(self, cluster: KubernetesCluster) -> None:
         thirdparties.install_thirdparty(cluster.nodes['all'], self._destination)
 
     def prepare_context(self, context: dict) -> None:
@@ -81,11 +82,11 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
 
 
 class CriUpgradeAction(Action):
-    def __init__(self, upgrade_config: dict):
+    def __init__(self, upgrade_config: dict) -> None:
         super().__init__(f'Upgrade CRI')
         self.upgrade_config = upgrade_config
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         # Access only to raw inventory to prepare context
         cri_impl = cri.get_initial_cri_impl(res.raw_inventory())
         res.context['upgrading_package'] = cri_impl
@@ -107,13 +108,13 @@ class CriUpgradeAction(Action):
     def reset_context(self, context: dict) -> None:
         del context['upgrading_package']
 
-    def _run(self, cluster: KubernetesCluster):
+    def _run(self, cluster: KubernetesCluster) -> None:
         if 'worker' in cluster.nodes:
             self.upgrade_cri(cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"]), workers=True)
         self.upgrade_cri(cluster.nodes["control-plane"], workers=False)
 
-    def upgrade_cri(self, group: NodeGroup, workers: bool):
-        cluster = group.cluster
+    def upgrade_cri(self, group: NodeGroup, workers: bool) -> None:
+        cluster: KubernetesCluster = group.cluster
 
         drain_timeout = cluster.procedure_inventory.get('drain_timeout')
         grace_period = cluster.procedure_inventory.get('grace_period')
@@ -128,13 +129,13 @@ class CriUpgradeAction(Action):
             drain_cmd = kubernetes.prepare_drain_command(
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
-            control_plane.sudo(drain_cmd, is_async=False, hide=False)
+            control_plane.sudo(drain_cmd, hide=False)
 
             kubernetes.upgrade_cri_if_required(node)
             node.sudo('systemctl restart kubelet')
 
             if workers:
-                control_plane.sudo(f"kubectl uncordon {node_name}", is_async=False, hide=False)
+                control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
             else:
                 kubernetes.wait_uncordon(node)
 
@@ -172,12 +173,12 @@ class CriUpgradeAction(Action):
 
 
 class BalancerUpgradeAction(Action):
-    def __init__(self, upgrade_config: dict, package_name: str):
+    def __init__(self, upgrade_config: dict, package_name: str) -> None:
         super().__init__(f'Upgrade {package_name}')
         self.upgrade_config = upgrade_config
         self.package_name = package_name
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         if not self.associations_changed(res):
             return
 
@@ -189,7 +190,7 @@ class BalancerUpgradeAction(Action):
             return
 
         role = 'balancer' if self.package_name == 'haproxy' else 'keepalived'
-        group = cluster.create_group_from_groups_nodes_names([role], [])
+        group = cluster.make_group_from_roles([role])
         if group.is_empty():
             logger.info(f"No nodes to install {self.package_name!r}.")
             return
@@ -200,9 +201,9 @@ class BalancerUpgradeAction(Action):
         self._run(group)
         res.make_final_inventory()
 
-    def _run(self, group: NodeGroup):
-        cluster = group.cluster
-        packages.install(group, cluster.get_package_association(self.package_name, 'package_name'))
+    def _run(self, group: NodeGroup) -> None:
+        cluster: KubernetesCluster = group.cluster
+        packages.install(group, include=cluster.get_package_association(self.package_name, 'package_name'))
         if self.package_name == 'haproxy':
             haproxy.restart(group)
         else:
@@ -220,11 +221,11 @@ class BalancerUpgradeAction(Action):
         os_family = os_families[0]
         version_key = packages.get_compatibility_version_key(os_family)
 
-        changes_detected = self.upgrade_config['packages'][self.package_name][version_key]
+        changes_detected: Union[List[str], bool] = self.upgrade_config['packages'][self.package_name][version_key]
         if not changes_detected:
             res.logger().info(f"Patch is not relevant for {os_family!r} OS family")
 
-        return changes_detected
+        return bool(changes_detected)
 
     def prepare_context(self, context: dict) -> None:
         context['upgrading_package'] = self.package_name
@@ -234,7 +235,7 @@ class BalancerUpgradeAction(Action):
 
 
 class PluginUpgradeAction(SoftwareUpgradeAction):
-    def specific_run(self, res: DynamicResources):
+    def specific_run(self, res: DynamicResources) -> None:
         self.recreate_inventory = True
 
         cluster = res.cluster()
@@ -245,7 +246,7 @@ class PluginUpgradeAction(SoftwareUpgradeAction):
         }
         self._run(cluster, upgrade_candidates)
 
-    def _run(self, cluster: KubernetesCluster, upgrade_candidates: dict):
+    def _run(self, cluster: KubernetesCluster, upgrade_candidates: dict) -> None:
         plugins.install(cluster, upgrade_candidates)
 
     def prepare_context(self, context: dict) -> None:
@@ -260,7 +261,7 @@ class PluginUpgradeAction(SoftwareUpgradeAction):
 
 
 class ThirdpartyUpgradePatch(_SoftwareUpgradePatch):
-    def __init__(self, thirdparty_name: str, k8s_versions: List[str]):
+    def __init__(self, thirdparty_name: str, k8s_versions: List[str]) -> None:
         super().__init__(f"upgrade_{thirdparty_name}")
         self.thirdparty_name = thirdparty_name
         self.k8s_versions = k8s_versions
@@ -284,7 +285,7 @@ class ThirdpartyUpgradePatch(_SoftwareUpgradePatch):
 
 
 class CriUpgradePatch(_SoftwareUpgradePatch):
-    def __init__(self, upgrade_config: dict):
+    def __init__(self, upgrade_config: dict) -> None:
         super().__init__(f"upgrade_cri")
         self.upgrade_config = upgrade_config
 
@@ -305,7 +306,7 @@ class CriUpgradePatch(_SoftwareUpgradePatch):
 
 
 class BalancerUpgradePatch(_SoftwareUpgradePatch):
-    def __init__(self, upgrade_config: dict, package_name: str):
+    def __init__(self, upgrade_config: dict, package_name: str) -> None:
         super().__init__(f"upgrade_{package_name}")
         self.upgrade_config = upgrade_config
         self.package_name = package_name
@@ -326,7 +327,7 @@ class BalancerUpgradePatch(_SoftwareUpgradePatch):
 
 
 class PluginUpgradePatch(_SoftwareUpgradePatch):
-    def __init__(self, plugin_name: str, k8s_versions: List[str]):
+    def __init__(self, plugin_name: str, k8s_versions: List[str]) -> None:
         super().__init__(f"upgrade_{re.sub(r'-', '_', plugin_name)}")
         self.plugin_name = plugin_name
         self.k8s_versions = k8s_versions
@@ -350,7 +351,8 @@ class PluginUpgradePatch(_SoftwareUpgradePatch):
 
 def load_upgrade_config() -> dict:
     with utils.open_internal(SOFTWARE_UPGRADE_PATH) as stream:
-        return yaml.safe_load(stream)
+        upgrade_config: dict = yaml.safe_load(stream)
+        return upgrade_config
 
 
 def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
@@ -381,7 +383,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
 
     default_plugins = static.DEFAULTS['plugins']
     plugins = list(default_plugins)
-    plugins.sort(key=lambda p: default_plugins[p]['installation']['priority'])
+    plugins.sort(key=get_default_plugin_prioriry)
     for plugin_name in plugins:
         k8s_versions = upgrade_config['plugins'][plugin_name]
         if k8s_versions:
@@ -391,7 +393,12 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
     return upgrade_patches
 
 
-def verify_allowed_kubernetes_versions(kubernetes_versions: List[str]):
+def get_default_plugin_prioriry(plugin: str) -> int:
+    priority: int = static.DEFAULTS['plugins'][plugin]['installation']['priority']
+    return priority
+
+
+def verify_allowed_kubernetes_versions(kubernetes_versions: List[str]) -> None:
     not_allowed_versions = set(kubernetes_versions) - set(static.KUBERNETES_VERSIONS['compatibility_map'])
     if not_allowed_versions:
         raise Exception(f"Kubernetes versions {', '.join(map(repr, not_allowed_versions))} are not allowed.")
@@ -404,7 +411,7 @@ def load_patches() -> List[Patch]:
     return patches
 
 
-def new_parser():
+def new_parser() -> argparse.ArgumentParser:
     cli_help = '''
     Script for automated update of the environment for the current version of Kubemarine.
 
@@ -434,7 +441,7 @@ def new_parser():
     return parser
 
 
-def run(context: dict):
+def run(context: dict) -> None:
     args = context['execution_arguments']
 
     patches = load_patches()
@@ -492,7 +499,7 @@ def run(context: dict):
     flow.ActionsFlow(actions).run_flow(context)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     parser = new_parser()
     context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
     run(context)

@@ -15,7 +15,7 @@
 import os
 import tarfile
 import tempfile
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 
 from kubemarine import demo
 from kubemarine.core import static, utils, log
@@ -38,7 +38,7 @@ ERROR_SUSPICIOUS_ABA_VERSIONS = \
 
 
 class ManifestResolver:
-    def __init__(self, refresh=False):
+    def __init__(self, refresh: bool = False):
         self.refresh = refresh
 
     def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
@@ -57,7 +57,7 @@ class ManifestResolver:
 
 
 class ManifestsEnrichment:
-    def run(self, tracker: SummaryTracker):
+    def run(self, tracker: SummaryTracker) -> None:
         for k8s_version in tracker.all_k8s_versions:
             for plugin_name in list(static.GLOBALS['plugins']):
                 if tracker.is_software_changed(k8s_version, plugin_name):
@@ -117,7 +117,7 @@ class Plugins(SoftwareType):
         return compatibility_map
 
 
-def validate_plugin_versions(kubernetes_versions: dict, plugin_name: str):
+def validate_plugin_versions(kubernetes_versions: Dict[str, Dict[str, str]], plugin_name: str) -> None:
     key = utils.version_key
     k8s_versions = sorted(kubernetes_versions.keys(), key=key)
 
@@ -134,7 +134,7 @@ def validate_plugin_versions(kubernetes_versions: dict, plugin_name: str):
                 ))
 
 
-def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name):
+def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name: str) -> None:
     plugin_mapping: dict = compatibility_map.compatibility_map[plugin_name]
     k8s_versions = list(plugin_mapping)
 
@@ -199,7 +199,7 @@ def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
     return target_file
 
 
-def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_versions: dict) \
+def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_versions: Dict[str, Dict[str, str]]) \
         -> Dict[Tuple[str, str], Manifest]:
     plugin_manifests = {}
     for plugin_name in static.GLOBALS['plugins']:
@@ -300,7 +300,7 @@ def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) 
         raise Exception(f"Unsupported plugin {plugin_name!r}")
 
 
-def try_manifest_enrichment(k8s_version: str, plugin_name: str):
+def try_manifest_enrichment(k8s_version: str, plugin_name: str) -> None:
     # Generate fake cluster and run plugin manifest enrichment on it
     info(f"Trying default enrichment of {plugin_name!r} manifest for Kubernetes {k8s_version}")
 
@@ -313,7 +313,7 @@ def try_manifest_enrichment(k8s_version: str, plugin_name: str):
     cluster = demo.new_cluster(inventory, context=context)
 
     class ConsoleLogger(log.VerboseLogger):
-        def verbose(self, msg, *args, **kwargs):
+        def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
             print(msg)
 
     processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, plugin_name)

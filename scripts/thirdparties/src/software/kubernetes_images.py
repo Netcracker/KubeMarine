@@ -70,7 +70,7 @@ class KubernetesImages(SoftwareType):
 
 
 def get_k8s_images_mapping(images_resolver: KubernetesImagesResolver, k8s_versions: List[str]) -> Dict[str, Dict[str, str]]:
-    k8s_images_mapping = OrderedDict()
+    k8s_images_mapping: Dict[str, Dict[str, str]] = OrderedDict()
     for k8s_version in k8s_versions:
         images_list = images_resolver.resolve(k8s_version)
         for item in images_list:

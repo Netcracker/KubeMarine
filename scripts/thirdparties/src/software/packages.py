@@ -27,7 +27,7 @@ class UpgradePackages(UpgradeSoftware):
 
         super().prepare(summary_tracker)
 
-    def delete(self, k8s_version: str, software_name: str):
+    def delete(self, k8s_version: str, software_name: str) -> None:
         if software_name not in self.software_names:
             return
 
@@ -36,7 +36,7 @@ class UpgradePackages(UpgradeSoftware):
             if isinstance(k8s_versions, list) and k8s_version in k8s_versions:
                 k8s_versions.remove(k8s_version)
 
-    def update(self, k8s_version: str, software_name: str):
+    def update(self, k8s_version: str, software_name: str) -> None:
         # The management tool is not able to update packages compatibility map.
         return
 
@@ -95,7 +95,7 @@ def get_compatibility_version_keys(package_name: str) -> List[str]:
     return keys
 
 
-def prepare_upgrade_config_stub(upgrade_software: UpgradePackages, package_name: str):
+def prepare_upgrade_config_stub(upgrade_software: UpgradePackages, package_name: str) -> None:
     stub = False if package_name in ('haproxy', 'keepalived') else []
     version_keys = get_compatibility_version_keys(package_name)
 

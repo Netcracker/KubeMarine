@@ -15,8 +15,9 @@ import io
 import sys
 import traceback
 
-from fabric.exceptions import GroupException
 from concurrent.futures import TimeoutError
+
+from kubemarine.core import log as klog
 
 KME_DICTIONARY: dict = {
     "KME0000": {
@@ -61,27 +62,27 @@ KME_DICTIONARY: dict = {
 
 # TODO: support for more complex KME00XX objects with custom constructors
 class KME(RuntimeError):
-    def __init__(self, code, **kwargs):
+    def __init__(self, code: str, **kwargs: object):
         self.code = code
         self.kme = KME_DICTIONARY.get(self.code)
         if self.kme is None:
             raise ValueError('An error was raised with an unknown error code')
-        self.message = self.kme.get('name').format(**kwargs)
+        self.message: str = self.kme.get('name').format(**kwargs)
         super().__init__(self.message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.code + ": " + self.message
 
 
 class FailException(Exception):
-    def __init__(self, message='', reason: Exception = None, hint=''):
+    def __init__(self, message: str = '', reason: Exception = None, hint: str = '') -> None:
         super().__init__(message)
         self.message = message
         self.reason = reason
         self.hint = hint
 
 
-def pretty_print_error(reason: Exception, log=None) -> None:
+def pretty_print_error(reason: Exception = None, log: klog.EnhancedLogger = None) -> None:
     """
     Parses the passed error and nicely displays its name and structure depending on what was passed.
     The method outputs to stdout by default, but will use the logger if one is specified.
@@ -112,6 +113,7 @@ def pretty_print_error(reason: Exception, log=None) -> None:
 
             return
 
+    from kubemarine.core.group import GroupException
     if isinstance(reason, GroupException):
         description = "KME0002: Remote group exception"
 
@@ -120,11 +122,11 @@ def pretty_print_error(reason: Exception, log=None) -> None:
         else:
             sys.stderr.write(f"{description}\n")
 
-        for connection, result in reason.result.items():
+        for host, result in reason.result.items():
             if log:
-                log.critical("%s:" % connection.host)
+                log.critical("%s:" % host)
             else:
-                sys.stderr.write("\n%s:" % connection.host)
+                sys.stderr.write("\n%s:" % host)
 
             found_dictionary_code = None
             for dictionary_code, dictionary_kme in KME_DICTIONARY.items():

@@ -18,6 +18,7 @@
 import glob
 import sys
 from importlib.metadata import version
+from typing import Tuple
 
 expected_pip_version = '23.0'
 pip_version = version('pip')
@@ -29,7 +30,7 @@ assert pip_version == expected_pip_version,\
 from pip._internal.cli.main import main as pip_main
 
 
-def patch_mac_ver(mac_arch):
+def patch_mac_ver(mac_arch: str) -> None:
     """
     Patch platform.mac_ver() to return the target (in general, non-native) macOS architecture.
     Pip will choose wheels suitable for the target architecture when installing the packages.
@@ -48,8 +49,9 @@ def patch_mac_ver(mac_arch):
 
     mac_ver_orig = platform.mac_ver
 
-    def mac_ver(**kwargs):
-        result = mac_ver_orig(**kwargs)
+    def mac_ver(release: str = '', versioninfo: Tuple[str, str, str] = ('', '', ''), machine: str = '') \
+            -> Tuple[str, Tuple[str, str, str], str]:
+        result = mac_ver_orig(release, versioninfo, machine)
         return result[0], result[1], mac_arch
 
     platform.mac_ver = mac_ver

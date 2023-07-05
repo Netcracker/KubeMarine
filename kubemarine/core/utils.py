@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple
+from typing import Tuple, Callable, List, IO
 
 import yaml
 import ruamel.yaml
@@ -30,7 +30,6 @@ from collections import OrderedDict
 
 from ruamel.yaml import CommentedMap
 
-from kubemarine.core.executor import RemoteExecutor
 from kubemarine.core.errors import pretty_print_error
 
 
@@ -74,7 +73,9 @@ def prepare_dump_directory(location, reset_directory=True):
     os.makedirs(dumpdir, exist_ok=True)
 
 
-def make_ansible_inventory(location, cluster):
+def make_ansible_inventory(location, c):
+    from kubemarine.core.cluster import KubernetesCluster
+    cluster: KubernetesCluster = c
 
     inventory = get_final_inventory(cluster)
     roles = []
@@ -83,7 +84,7 @@ def make_ansible_inventory(location, cluster):
             if role not in roles:
                 roles.append(role)
 
-    config = {
+    config: dict = {
         'all': [
             'localhost ansible_connection=local'
         ],
@@ -95,7 +96,7 @@ def make_ansible_inventory(location, cluster):
     for role in roles:
         config[role] = []
         config['cluster:children'].append(role)
-        for node in cluster.nodes[role].get_final_nodes().get_ordered_members_list(provide_node_configs=True):
+        for node in cluster.nodes[role].get_final_nodes().get_ordered_members_configs_list():
             record = "%s ansible_host=%s ansible_ssh_user=%s ansible_ssh_private_key_file=%s ip=%s" % \
                      (node['name'],
                       node['connect_to'],
@@ -163,7 +164,10 @@ def get_current_timestamp_formatted():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def get_final_inventory(cluster, initial_inventory=None):
+def get_final_inventory(c, initial_inventory=None):
+    from kubemarine.core.cluster import KubernetesCluster
+    cluster: KubernetesCluster = c
+
     if initial_inventory is None:
         inventory = deepcopy(cluster.inventory)
     else:
@@ -235,12 +239,15 @@ def get_dump_filepath(context, filename):
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hide=False, is_async=True):
+def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=False):
+    from kubemarine.core.group import NodeGroup
+    group: NodeGroup = g
+
     log = group.cluster.log
 
     while retries > 0:
         log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide, is_async=is_async)
+        result = group.sudo(command, warn=warn, hide=hide)
         exit_code = list(result.values())[0].exited
         if exit_code == 0:
             log.debug("Command succeeded")
@@ -250,15 +257,15 @@ def wait_command_successful(group, command, retries=15, timeout=5, warn=True, hi
     raise Exception("Command failed")
 
 
-def open_utf8(path: str, mode='r'):
+def open_utf8(path: str, mode='r') -> IO:
     return open(path, mode + 't', encoding='utf-8')
 
 
-def open_internal(path: str, mode='r'):
+def open_internal(path: str, mode: str = 'r') -> IO:
     return open_utf8(get_internal_resource_path(path), mode)
 
 
-def open_external(path: str, mode='r'):
+def open_external(path: str, mode: str = 'r') -> IO:
     return open_utf8(get_external_resource_path(path), mode)
 
 
@@ -272,7 +279,7 @@ def read_external(path: str) -> str:
         return f.read()
 
 
-def get_external_resource_path(path):
+def get_external_resource_path(path: str) -> str:
     return os.path.abspath(path)
 
 
@@ -343,7 +350,7 @@ def yaml_structure_preserver() -> ruamel.yaml.YAML:
     return ruamel_yaml
 
 
-def is_sorted(l: list, key: callable = None) -> bool:
+def is_sorted(l: list, key: Callable = None) -> bool:
     """
     Check that the specified list is sorted.
 
@@ -356,7 +363,7 @@ def is_sorted(l: list, key: callable = None) -> bool:
     return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
 
 
-def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
+def map_sorted(map_: CommentedMap, key: Callable = None) -> CommentedMap:
     """
     Check that the specified CommentedMap is sorted, or create new sorted map from it otherwise.
 
@@ -365,14 +372,16 @@ def map_sorted(map_: CommentedMap, key: callable = None) -> CommentedMap:
     :return: the same or new sorted instance of the map
     """
     if key is None:
-        key = lambda x: x
+        _key = lambda x: x
+    else:
+        _key = key
     map_keys = list(map_)
-    if not is_sorted(map_keys, key=key):
-        map_ = CommentedMap(sorted(map_.items(), key=lambda item: key(item[0])))
+    if not is_sorted(map_keys, key=_key):
+        map_ = CommentedMap(sorted(map_.items(), key=lambda item: _key(item[0])))
 
     return map_
 
-def insert_map_sorted(map_: CommentedMap, k, v, key: callable = None) -> None:
+def insert_map_sorted(map_: CommentedMap, k, v, key: Callable = None) -> None:
     """
     Insert new item to the CommentedMap or update the value for the existing key.
     The map should be already sorted.
@@ -402,9 +411,10 @@ def load_yaml(filepath) -> dict:
             return yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
+        return {}  # unreachable
 
 
-def true_or_false(value):
+def true_or_false(value) -> str:
     """
     The method check string and boolean value
     :param value: Value that should be checked
@@ -423,7 +433,7 @@ def get_version_filepath():
     return get_internal_resource_path("version")
 
 
-def get_version():
+def get_version() -> str:
     return read_internal(get_version_filepath()).strip()
 
 
@@ -438,17 +448,19 @@ def version_key(version: str) -> Tuple[int, int, int]:
     """
     Converts vN.N.N to (N, N, N) that can be used in comparisons.
     """
-    return tuple(_test_version(version, 3))
+    v = _test_version(version, 3)
+    return v[0], v[1], v[2]
 
 
 def minor_version_key(version: str) -> Tuple[int, int]:
     """
     Converts vN.N to (N, N) that can be used in comparisons.
     """
-    return tuple(_test_version(version, 2))
+    v = _test_version(version, 2)
+    return v[0], v[1]
 
 
-def _test_version(version: str, numbers_amount: int) -> list:
+def _test_version(version: str, numbers_amount: int) -> List[int]:
     # catch version without "v" at the first symbol
     if version.startswith('v'):
         version_list: list = version[1:].split('.')
@@ -511,16 +523,17 @@ class ClusterStorage:
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
         node_group_results = self.cluster.nodes["control-plane"].get_final_nodes().sudo(command)
-        with RemoteExecutor(self.cluster):
-            for cxn, result in node_group_results.items():
-                control_plane = self.cluster.make_group([cxn.host])
+        with node_group_results.get_group().new_executor() as exe:
+            for control_plane in exe.group.get_ordered_members_list():
+                result = node_group_results[control_plane.get_host()]
                 files = result.stdout.split()
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
                     if i >= not_pack_file and i < delete_old:
                         if 'tar.gz' not in file:
-                            control_plane.sudo(f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
-                                       f'sudo rm -r {self.dir_path + file}')
+                            control_plane.sudo(
+                                f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
+                                f'sudo rm -r {self.dir_path + file}')
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
@@ -571,16 +584,14 @@ class ClusterStorage:
         archive_remote_path = f"/tmp/{archive_name}"
         log = self.cluster.log
 
-        node = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member(provide_node_configs=True)
-        control_plane = self.cluster.make_group([node['connect_to']])
+        control_plane = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member()
         data_copy_res = control_plane.sudo(f'tar -czvf {archive_remote_path} {self.dir_path}')
         log.verbose("Archive with procedures history is created:\n%s" % data_copy_res)
         control_plane.get(archive_remote_path, archive_dump_path)
 
         log.debug("Archive with procedures history is downloaded")
 
-        for new_node in new_control_planes.get_ordered_members_list(provide_node_configs=True):
-            group = self.cluster.make_group([new_node['connect_to']])
+        for group in new_control_planes.get_ordered_members_list():
             group.put(archive_dump_path, archive_remote_path, sudo=True)
             group.sudo(f'tar -C / -xzvf {archive_remote_path}')
-            log.debug(f"Archive with procedures history is uploaded to {new_node['name']!r}")
+            log.debug(f"Archive with procedures history is uploaded to {group.get_node_name()!r}")

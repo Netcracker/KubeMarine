@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-import os
+from typing import Optional
 
 import yaml
 
@@ -21,7 +21,7 @@ from kubemarine.core import utils, summary
 from kubemarine.core.cluster import KubernetesCluster
 
 
-def enrich_inventory(inventory, cluster):
+def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     rbac = inventory['rbac']
     if not rbac.get("accounts"):
         return inventory
@@ -64,7 +64,7 @@ def enrich_inventory(inventory, cluster):
     return inventory
 
 
-def install(cluster: KubernetesCluster):
+def install(cluster: KubernetesCluster) -> None:
     rbac = cluster.inventory['rbac']
     dry_run = utils.check_dry_run_status_active(cluster)
     if not rbac.get("accounts"):
@@ -97,7 +97,7 @@ def install(cluster: KubernetesCluster):
                           '$(sudo kubectl -n %s get sa %s -o \'jsonpath={.secrets[0].name}\') -o \'jsonpath={.data.token}\'' \
                           '| sudo base64 -d' % (account['namespace'], account['namespace'], account['name'])
 
-        token = []
+        token: Optional[str] = None
         retries = cluster.globals['accounts']['retries']
         if dry_run:
             token = ["dry-run"]

@@ -20,10 +20,11 @@ Using this module you can generate new sysctl configs, install and apply them.
 import io
 
 from kubemarine.core import utils
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
-def make_config(cluster):
+def make_config(cluster: KubernetesCluster) -> str:
     """
     Converts parameters from inventory['services']['sysctl'] to a string in the format of systcl.conf.
     """
@@ -61,7 +62,7 @@ def make_config(cluster):
     return config
 
 
-def configure(group: NodeGroup) -> NodeGroupResult:
+def configure(group: NodeGroup) -> RunnersGroupResult:
     """
     Generates and uploads sysctl configuration to the group.
     The configuration will be placed in sysctl daemon directory.
@@ -74,7 +75,7 @@ def configure(group: NodeGroup) -> NodeGroupResult:
     return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf', dry_run=dry_run)
 
 
-def reload(group: NodeGroup) -> NodeGroupResult:
+def reload(group: NodeGroup) -> RunnersGroupResult:
     """
     Reloads sysctl configuration in the specified group.
     """
@@ -82,7 +83,7 @@ def reload(group: NodeGroup) -> NodeGroupResult:
                       dry_run=utils.check_dry_run_status_active(group.cluster))
 
 
-def get_pid_max(inventory):
-    max_pods = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
-    pod_pids_limit = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
+def get_pid_max(inventory: dict) -> int:
+    max_pods: int = inventory["services"]["kubeadm_kubelet"].get("maxPods", 110)
+    pod_pids_limit: int = inventory["services"]["kubeadm_kubelet"].get("podPidsLimit", 4096)
     return max_pods * pod_pids_limit + 2048

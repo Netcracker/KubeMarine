@@ -33,7 +33,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
 192.168.0.3  master-3.k8s.fake.local master-3
 10.101.1.3   master-3-external.k8s.fake.local master-3-external
 '''
-        generated_hosts = system.generate_etc_hosts_config(cluster.inventory, cluster, 'etc_hosts_generated')
+        generated_hosts = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
         cluster.inventory['services'] = {
             'coredns': {
                 'configmap': {

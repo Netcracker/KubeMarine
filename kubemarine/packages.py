@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from copy import deepcopy
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Union, cast, Mapping, Set
 
-import fabric
+from typing_extensions import Protocol
 
 from kubemarine import yum, apt
 from kubemarine.core import errors, utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.executor import RunnersResult, Token
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
 from kubemarine.core.yaml_merger import default_merger
 
 
@@ -44,7 +44,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
+def enrich_inventory_associations(inventory: dict, cluster: KubernetesCluster) -> None:
     associations: dict = inventory['services']['packages']['associations']
     enriched_associations = {}
 
@@ -73,7 +73,7 @@ def enrich_inventory_associations(inventory, cluster: KubernetesCluster):
     inventory['services']['packages']['associations'] = enriched_associations
 
 
-def enrich_inventory_packages(inventory: dict, _):
+def enrich_inventory_packages(inventory: dict, _: KubernetesCluster) -> None:
     for _type in ['install', 'upgrade', 'remove']:
         packages_list = inventory['services']['packages'].get(_type)
         if isinstance(packages_list, list):
@@ -82,7 +82,7 @@ def enrich_inventory_packages(inventory: dict, _):
             }
 
 
-def enrich_inventory_apply_defaults(inventory: dict, _) -> dict:
+def enrich_inventory_apply_defaults(inventory: dict, _: KubernetesCluster) -> dict:
     kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
 
     for os_family in get_associations_os_family_keys():
@@ -100,7 +100,7 @@ def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict) 
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory.get('upgrade_plan'):
+        for version in cluster.procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
@@ -151,7 +151,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
 
 
 def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
-                                   *, enrich_global: bool):
+                                   *, enrich_global: bool) -> None:
     # pass enriched 'cluster.inventory' instead of 'inventory' that is being finalized
     upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory)
     if not upgrade_plan:
@@ -166,7 +166,7 @@ def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
         default_merger.merge(cluster_associations, upgrade_associations)
 
 
-def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict):
+def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> None:
     if cluster.context.get("initial_procedure") != "upgrade":
         return
 
@@ -190,7 +190,7 @@ def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict):
 
 
 def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
-                         packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+                         packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
     cluster_associations = deepcopy(cluster_associations)
 
     # validate all packages sections in procedure inventory
@@ -210,11 +210,11 @@ def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
 def get_default_package_names(os_family: str, package: str, kubernetes_version: str) -> List[str]:
     version_key = get_compatibility_version_key(os_family)
     compatibility = static.GLOBALS['compatibility_map']['software']
-    packages_names = static.GLOBALS['packages'][os_family][package]['package_name']
+    packages_names: List[Dict[str, str]] = static.GLOBALS['packages'][os_family][package]['package_name']
 
     package_versions = []
     for kv in packages_names:
-        package_name, software_name = list(kv.items())[0]
+        package_name, software_name = next((k, v) for k, v in kv.items())
         if software_name in ('haproxy', 'keepalived'):
             version = compatibility[software_name][version_key]
         else:
@@ -267,11 +267,11 @@ def get_system_packages_for_upgrade(cluster: KubernetesCluster, inventory: dict)
     return upgrade_required
 
 
-def _get_system_packages_support_upgrade(inventory: dict):
+def _get_system_packages_support_upgrade(inventory: dict) -> List[str]:
     return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
 
 
-def enrich_inventory_include_all(inventory: dict, _):
+def enrich_inventory_include_all(inventory: dict, _: KubernetesCluster) -> dict:
     for _type in ['upgrade', 'remove']:
         packages: dict = inventory['services']['packages'].get(_type)
         if packages is not None:
@@ -289,7 +289,7 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     return inventory
 
 
-def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes=False) -> dict:
+def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes: bool = False) -> dict:
     os_ids = cluster.get_os_identifiers()
     different_os = list(set(os_ids.values()))
     if len(different_os) > 1:
@@ -339,15 +339,15 @@ def get_all_managed_packages_for_group(group: NodeGroup, inventory: dict, ensure
     :return: List of packages for each relevant host.
     """
     packages_section = inventory['services']['packages']
-    hosts_to_packages = {}
+    hosts_to_packages: Dict[str, List[str]] = {}
     for node in group.get_ordered_members_list():
         os_family = node.get_nodes_os()
         node_associations = packages_section['associations'].get(os_family, {})
         for association_name in node_associations.keys():
-            packages = get_association_hosts_to_packages(
+            host_packages = get_association_hosts_to_packages(
                 node, inventory, association_name, ensured_association_only)
 
-            packages = next(iter(packages.values()), [])
+            packages: List[str] = next(iter(host_packages.values()), [])
             hosts_to_packages.setdefault(node.get_host(), []).extend(packages)
 
     custom_install_packages = inventory['services']['packages'].get('install', {}).get('include', [])
@@ -358,7 +358,7 @@ def get_all_managed_packages_for_group(group: NodeGroup, inventory: dict, ensure
     return hosts_to_packages
 
 
-def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, association_name: str,
+def get_association_hosts_to_packages(group: AbstractGroup[RunResult], inventory: dict, association_name: str,
                                       ensured_association_only: bool = False) \
         -> Dict[str, List[str]]:
     """
@@ -372,7 +372,7 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
     :param ensured_association_only: Specify whether to take 'cache_versions' property into account.
     :return: List of packages for each relevant host.
     """
-    cluster = group.cluster
+    cluster: KubernetesCluster = group.cluster
 
     packages_section = inventory['services']['packages']
     if not packages_section['mandatory'].get(association_name, True):
@@ -382,10 +382,10 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
 
     if association_name == 'unzip':
         from kubemarine import thirdparties
-        relevant_group = thirdparties.get_group_require_unzip(cluster, inventory)
+        relevant_group: AbstractGroup[RunResult] = thirdparties.get_group_require_unzip(cluster, inventory)
     else:
         groups = cluster.globals['packages']['common_associations'].get(association_name, {}).get('groups', [])
-        relevant_group = cluster.create_group_from_groups_nodes_names(groups, [])
+        relevant_group = cluster.make_group_from_roles(groups)
 
     if association_name in ('docker', 'containerd') \
             and association_name != inventory['services']['cri']['containerRuntime']:
@@ -412,8 +412,8 @@ def get_association_hosts_to_packages(group: NodeGroup, inventory: dict, associa
 
 
 def _cache_package_associations(group: NodeGroup, inventory: dict,
-                                detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
-    cluster = group.cluster
+                                detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool) -> None:
+    cluster: KubernetesCluster = group.cluster
     associations = inventory['services']['packages']['associations'][cluster.get_os_family()]
     for association_name, associated_params in associations.items():
         hosts_to_packages = get_association_hosts_to_packages(
@@ -434,13 +434,13 @@ def _cache_package_associations(group: NodeGroup, inventory: dict,
         # packages can contain multiple package values, like docker package
         # (it has docker-ce, docker-cli and containerd.io packages for installation)
         if len(final_packages_list) == 1:
-            final_packages_list = final_packages_list[0]
-
-        associated_params['package_name'] = final_packages_list
+            associated_params['package_name'] = final_packages_list[0]
+        else:
+            associated_params['package_name'] = final_packages_list
 
 
 def _cache_custom_packages(cluster: KubernetesCluster, inventory: dict,
-                           detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool):
+                           detected_packages: Dict[str, Dict[str, List]], ensured_association_only: bool) -> None:
     if ensured_association_only:
         return
     # packages from direct installation section
@@ -475,7 +475,7 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
         return detected_package_versions[0]
 
 
-def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict):
+def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict) -> dict:
     final_nodes = cluster.nodes['all'].get_final_nodes()
     for os_family in get_associations_os_family_keys():
         # Do not remove OS family associations section in finalized inventory if any node has this OS family.
@@ -485,7 +485,7 @@ def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: 
     return inventory
 
 
-def get_associations_os_family_keys():
+def get_associations_os_family_keys() -> Set[str]:
     return {'debian', 'rhel', 'rhel8'}
 
 
@@ -501,7 +501,37 @@ def get_compatibility_version_key(os_family: str) -> str:
         raise ValueError(f"Unsupported {os_family!r} OS family")
 
 
-def get_package_manager(group: NodeGroup) -> apt or yum:
+class PackageManager(Protocol):
+    def ls_repofiles(self, group: NodeGroup) -> RunnersGroupResult: ...
+
+    def backup_repo(self, group: NodeGroup) -> Optional[RunnersGroupResult]: ...
+
+    def add_repo(self, group: NodeGroup, repo_data: Union[List[str], Dict[str, dict], str]) -> RunnersGroupResult: ...
+
+    def get_repo_file_name(self) -> str: ...
+
+    def create_repo_file(self, group: AbstractGroup[RunResult],
+                         repo_data: Union[List[str], Dict[str, dict], str],
+                         repo_file: str) -> None: ...
+
+    def clean(self, group: NodeGroup) -> RunnersGroupResult: ...
+
+    def install(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+
+    def remove(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+               exclude: Union[str, List[str]] = None,
+               warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE: ...
+
+    def upgrade(self, group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+                exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE: ...
+
+    def no_changes_found(self, action: str, result: RunnersResult) -> bool: ...
+
+    def search(self, group: DeferredGroup, package: str) -> Token: ...
+
+
+def get_package_manager(group: AbstractGroup[GROUP_RUN_TYPE]) -> PackageManager:
     os_family = group.get_nodes_os()
 
     if os_family in ['rhel', 'rhel8']:
@@ -512,43 +542,52 @@ def get_package_manager(group: NodeGroup) -> apt or yum:
     raise Exception('Failed to return package manager for unknown or multiple OS')
 
 
-def ls_repofiles(group: NodeGroup, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).ls_repofiles(group, **kwargs)
+def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
+    return get_package_manager(group).ls_repofiles(group)
 
 
-def backup_repo(group: NodeGroup, repo_filename="*", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).backup_repo(group, repo_filename, **kwargs)
+def backup_repo(group: NodeGroup) -> Optional[RunnersGroupResult]:
+    return get_package_manager(group).backup_repo(group)
 
 
-def add_repo(group: NodeGroup, repo_data="", repo_filename="predefined", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).add_repo(group, repo_data, repo_filename, **kwargs)
+def add_repo(group: NodeGroup, repo_data: Union[List[str], dict, str]) -> RunnersGroupResult:
+    return get_package_manager(group).add_repo(group, repo_data)
 
 
-def clean(group: NodeGroup, mode="all", **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).clean(group, mode, **kwargs)
+def get_repo_filename(group: AbstractGroup[RunResult]) -> str:
+    return get_package_manager(group).get_repo_file_name()
 
 
-def install(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).install(group, include, exclude, **kwargs)
+def create_repo_file(group: AbstractGroup[RunResult], repo_data: Union[List[str], dict, str], repo_file: str) -> None:
+    get_package_manager(group).create_repo_file(group, repo_data, repo_file)
 
 
-def remove(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).remove(group, include, exclude, **kwargs)
+def clean(group: NodeGroup) -> RunnersGroupResult:
+    return get_package_manager(group).clean(group)
 
 
-def upgrade(group: NodeGroup, include=None, exclude=None, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).upgrade(group, include, exclude, **kwargs)
+def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).install(group, include, exclude)
 
 
-def no_changes_found(group: NodeGroup, action: callable, result: fabric.runners.Result) -> bool:
+def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None, exclude: Union[str, List[str]] = None,
+           warn: bool = False, hide: bool = True) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).remove(group, include, exclude, warn=warn, hide=hide)
+
+
+def upgrade(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
+            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
+    return get_package_manager(group).upgrade(group, include, exclude)
+
+
+def no_changes_found(group: NodeGroup, action: str, result: RunnersResult) -> bool:
     pkg_mgr = get_package_manager(group)
-    if action is install:
-        action = pkg_mgr.install
-    elif action is upgrade:
-        action = pkg_mgr.upgrade
-    elif action is remove:
-        action = pkg_mgr.remove
     return pkg_mgr.no_changes_found(action, result)
+
+
+def search_package(group: DeferredGroup, package: str) -> Token:
+    return get_package_manager(group).search(group, package)
 
 
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
@@ -563,7 +602,7 @@ def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
     return cmd
 
 
-def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGroupResult:
+def _detect_installed_package_version(group: DeferredGroup, package: str) -> Token:
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
@@ -583,7 +622,7 @@ def _detect_installed_package_version(group: NodeGroup, package: str) -> NodeGro
     return group.sudo(cmd)
 
 
-def _parse_node_detected_package(result: fabric.runners.Result, package: str) -> str:
+def _parse_node_detected_package(result: RunnersResult, package: str) -> str:
     node_detected_package = result.stdout.strip() + result.stderr.strip()
     # consider version, which ended with special symbol = or - as not installed
     # (it is possible in some cases to receive "containerd=" version)
@@ -594,8 +633,9 @@ def _parse_node_detected_package(result: fabric.runners.Result, package: str) ->
     return node_detected_package
 
 
-def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to_packages: Dict[str, List[str]]) \
-        -> Dict[str, Dict[str, List]]:
+def detect_installed_packages_version_hosts(
+        cluster: KubernetesCluster, hosts_to_packages: Mapping[str, Union[str, List[str]]]
+) -> Dict[str, Dict[str, List[str]]]:
     """
     Detect grouped packages versions for specified list of packages for each remote host.
 
@@ -604,30 +644,26 @@ def detect_installed_packages_version_hosts(cluster: KubernetesCluster, hosts_to
     :return: Dictionary with grouped versions for each queried package, pointing to list of hosts,
         e.g. {"foo" -> {"foo-1": [host1, host2]}, "bar" -> {"bar-1": [host1], "bar-2": [host2]}}
     """
+    hosts_to_packages_dedup = {}
     for host, packages_list in hosts_to_packages.items():
         if isinstance(packages_list, str):
             packages_list = [packages_list]
         # deduplicate
-        hosts_to_packages[host] = list(set(packages_list))
+        hosts_to_packages_dedup[host] = list(set(packages_list))
 
-    with RemoteExecutor(cluster) as exe:
-        for host, packages_list in hosts_to_packages.items():
-            node = cluster.make_group([host])
-            for package in packages_list:
+    with cluster.make_group(hosts_to_packages).new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            for package in hosts_to_packages_dedup[node.get_host()]:
                 _detect_installed_package_version(node, package)
 
     raw_result = exe.get_last_results()
-    if not raw_result:
-        return {}
-
     results: Dict[str, Dict[str, List]] = {}
 
-    for conn, multiple_results in raw_result.items():
-        multiple_results = list(multiple_results.values())
-        host = conn.host
-        packages_list = hosts_to_packages[host]
-        for i, package in enumerate(packages_list):
-            node_detected_package = _parse_node_detected_package(multiple_results[i], package)
+    for host, multiple_results in raw_result.items():
+        for i, result in enumerate(multiple_results.values()):
+            result = cast(RunnersResult, result)
+            package = hosts_to_packages_dedup[host][i]
+            node_detected_package = _parse_node_detected_package(result, package)
             results.setdefault(package, {}).setdefault(node_detected_package, []).append(host)
 
     return results
@@ -655,15 +691,3 @@ def get_package_name(os_family: str, package: str) -> str:
             package_name = package.split("=")[0]
 
     return package_name
-
-
-def search_package(group: NodeGroup, package: str, **kwargs) -> NodeGroupResult:
-    return get_package_manager(group).search(group, package, **kwargs)
-
-
-def create_repo_file(group: NodeGroup, repo_data, repo_file):
-    get_package_manager(group).create_repo_file(group, repo_data, repo_file)
-
-
-def get_repo_filename(group: NodeGroup, repo_filename="predefined"):
-    return get_package_manager(group).get_repo_file_name(repo_filename)

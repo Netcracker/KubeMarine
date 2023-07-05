@@ -16,10 +16,8 @@
 
 import unittest
 
-import fabric
-
 from kubemarine import demo, audit, packages, apt, yum
-from kubemarine.core.group import NodeGroupResult
+from kubemarine.core.executor import RunnersResult
 from kubemarine.demo import FakeKubernetesCluster
 
 
@@ -103,7 +101,6 @@ class NodeGroupResultsTest(unittest.TestCase):
 
     def test_audit_installation_when_partly_installed_for_debian(self):
         cluster = self.new_debian_cluster()
-        all_nodes_group = cluster.nodes['all'].nodes
         package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
 
         package_name = package_associations['package_name']
@@ -111,17 +108,14 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         # simulate package detection command with partly installed audit
         host_to_result = {
-            '10.101.1.2': fabric.runners.Result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
-                                                exited=0,
-                                                connection=all_nodes_group['10.101.1.2']),
-            '10.101.1.3': fabric.runners.Result(stderr='dpkg-query: no packages found matching %s' % package_name,
-                                                exited=0,
-                                                connection=all_nodes_group['10.101.1.3']),
-            '10.101.1.4': fabric.runners.Result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
-                                                exited=0,
-                                                connection=all_nodes_group['10.101.1.4'])
+            '10.101.1.2': RunnersResult(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
+                                        exited=0),
+            '10.101.1.3': RunnersResult(stderr='dpkg-query: no packages found matching %s' % package_name,
+                                        exited=0),
+            '10.101.1.4': RunnersResult(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
+                                        exited=0)
         }
-        exp_results1 = NodeGroupResult(cluster, host_to_result)
+        exp_results1 = demo.create_nodegroup_result_by_hosts(cluster, host_to_result)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
         # simulate package installation command
@@ -161,7 +155,7 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         expected_data = " \n".join(cluster.inventory['services']['audit']['rules'])
 
-        node_hostname = list(cluster.nodes['master'].nodes.keys())[0]
+        node_hostname = cluster.nodes['master'].get_hosts()[0]
         actual_data = cluster.fake_fs.read(node_hostname, config_location)
 
         self.assertEqual(expected_data, actual_data,

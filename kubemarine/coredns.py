@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Union, List, Optional
 
 import yaml
 
@@ -18,6 +19,10 @@ from kubemarine import system
 from kubemarine.core import utils
 
 import io
+
+from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import RunnersGroupResult
+
 
 def proceed_section_keyvalue(data, tabsize):
     tab = " "*tabsize
@@ -90,7 +95,7 @@ def generate_nested_sections(type, data, tabsize):
             config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
 
         elif type == 'template':
-            zones = [None]
+            zones: Union[str, List[Optional[str]]] = [None]
             if data[section['name']].get('zone'):
                 zones = data[section['name']]['zone']
                 if isinstance(zones, str):
@@ -112,7 +117,7 @@ def generate_nested_sections(type, data, tabsize):
     return config
 
 
-def generate_configmap(inventory):
+def generate_configmap(inventory: dict) -> str:
     # coredns.configmap.Hosts must exist even if it's empty
     if not inventory['services']['coredns']['configmap'].get('Hosts'):
         # Hosts must exist even if it's empty
@@ -143,10 +148,10 @@ data:'''
     return config + '\n'
 
 
-def apply_configmap(cluster, config, dry_run=False):
+def apply_configmap(cluster: KubernetesCluster, config: str, dry_run=False) -> RunnersGroupResult:
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
-    group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
+    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_final_nodes()
     group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True, dry_run=dry_run)
 
     return cluster.nodes['control-plane'].get_final_nodes().get_first_member()\
@@ -154,7 +159,7 @@ def apply_configmap(cluster, config, dry_run=False):
              'sudo kubectl rollout restart -n kube-system deployment/coredns', dry_run=dry_run)
 
 
-def apply_patch(cluster, dry_run=False):
+def apply_patch(cluster: KubernetesCluster, dry_run=False) -> Union[RunnersGroupResult, str]:
     apply_command = ''
 
     for config_type in ['deployment']:
@@ -171,7 +176,7 @@ def apply_patch(cluster, dry_run=False):
 
         utils.dump_file(cluster, config, filename)
 
-        group = cluster.nodes['control-plane'].include_group(cluster.nodes.get('worker')).get_final_nodes()
+        group = cluster.make_group_from_roles(['control-plane', 'worker']).get_final_nodes()
         group.put(io.StringIO(config), filepath, backup=True, sudo=True, dry_run=dry_run)
 
         apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)

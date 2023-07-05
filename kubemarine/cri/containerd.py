@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from io import StringIO
+from typing import Dict
 
 import toml
 import yaml
@@ -21,32 +22,30 @@ import json
 from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.executor import RemoteExecutor
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
-def install(group: NodeGroup):
+def install(group: NodeGroup) -> RunnersGroupResult:
     if utils.check_dry_run_status_active(group.cluster):
         group.cluster.log.debug("[dry-run] Installing Containerd")
         return None
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
-
-            group.cluster.log.debug("Installing latest containerd and podman on %s node" % node['name'])
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
+            exe.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
             # always install latest available containerd and podman
-            packages.install(node['connection'], include=os_specific_associations['package_name'])
+            packages.install(node, include=os_specific_associations['package_name'])
 
             # remove previous config.toml to avoid problems in case when previous config was broken
-            node['connection'].sudo("rm -f %s && sudo systemctl restart %s"
-                                    % (os_specific_associations['config_location'],
-                                       os_specific_associations['service_name']))
+            node.sudo("rm -f %s && sudo systemctl restart %s"
+                      % (os_specific_associations['config_location'],
+                         os_specific_associations['service_name']))
 
-            system.enable_service(node['connection'], os_specific_associations['service_name'], now=True)
-    return exe.get_last_results_str()
+            system.enable_service(node, os_specific_associations['service_name'], now=True)
+    return exe.get_merged_runners_result()
 
 
-def configure(group: NodeGroup):
+def configure(group: NodeGroup) -> RunnersGroupResult:
     log = group.cluster.log
 
     log.debug("Uploading crictl configuration for containerd...")
@@ -85,7 +84,7 @@ def configure(group: NodeGroup):
             if is_insecure:
                 insecure_registries.append(mirror)
     # save 'auth.json' if there are credentials for registry
-    auth_registries = {"auths": {}}
+    auth_registries: Dict[str, dict] = {"auths": {}}
     if registry.get('configs'):
         registry_configs = registry['configs']
         for auth_registry in registry_configs:
@@ -106,23 +105,25 @@ def configure(group: NodeGroup):
         group.sudo("rm -f /etc/containers/registries.conf", dry_run=dry_run)
 
     utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
+
     if dry_run:
         return None
+    tokens = []
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
+            log.debug("Uploading containerd configuration to %s node..." % node.get_node_name())
+            node.put(StringIO(config_string), os_specific_associations['config_location'],
+                     backup=True, sudo=True, mkdir=True)
+            log.debug("Restarting Containerd on %s node..." % node.get_node_name())
+            tokens.append(node.sudo(
+                f"chmod 600 {os_specific_associations['config_location']} && "
+                f"sudo systemctl restart {os_specific_associations['service_name']} && "
+                f"systemctl status {os_specific_associations['service_name']}"))
+    return exe.get_merged_runners_result(tokens)
 
-    with RemoteExecutor(group.cluster) as exe:
-        for node in group.get_ordered_members_list(provide_node_configs=True):
-            os_specific_associations = group.cluster.get_associations_for_node(node['connect_to'], 'containerd')
-            log.debug("Uploading containerd configuration to %s node..." % node['name'])
-            node['connection'].put(StringIO(config_string), os_specific_associations['config_location'], backup=True,
-                                   sudo=True, mkdir=True)
-            log.debug("Restarting Containerd on %s node..." % node['name'])
-            node['connection'].sudo(f"chmod 600 {os_specific_associations['config_location']} && "
-                                    f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                                    f"systemctl status {os_specific_associations['service_name']}")
-    return exe.get_last_results_str()
 
-
-def prune(group):
+def prune(group: NodeGroup) -> RunnersGroupResult:
     return group.sudo('crictl rm -fa; '
                       'sudo crictl rmp -fa; '
                       'sudo crictl rmi -a; '
