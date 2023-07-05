@@ -137,18 +137,16 @@ def upgrade_containerd(cluster: KubernetesCluster):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
 
-            for node in cluster.nodes['control-plane'].include_group(
-                        cluster.nodes.get('worker')).get_ordered_members_list():
+            kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
+            tokens = []
+            for node in kubernetes_nodes:
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
                 
-                kubeadm_flags = node['connection'].sudo(f"cat {kubeadm_flags_file}",
+                kubeadm_flags = node.sudo(f"cat {kubeadm_flags_file}",
                                         is_async=False).get_simple_out()
                 updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}")
-                node['connection'].put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-
-            kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
-            tokens = []
+                node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
             with kubernetes_nodes.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
