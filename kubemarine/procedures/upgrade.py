@@ -139,7 +139,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
 
             kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
             tokens = []
-            for node in kubernetes_nodes:
+            for node in kubernetes_nodes.get_ordered_members_list():
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
                 
