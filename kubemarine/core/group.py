@@ -29,6 +29,7 @@ from typing import (
 
 import invoke
 from invoke import UnexpectedExit
+import fabric
 
 from kubemarine.core import utils, log
 from kubemarine.core.executor import (
@@ -310,9 +311,10 @@ def _handle_dry_run(fn: callable) -> callable:
         if kwargs.get("dry_run"):
             if fn.__name__ == "put":
                 self.cluster.log.verbose("Local file \"%s\" is being transferred to remote file \"%s\" on nodes %s with options %s"
-                                 % (args[0], args[1], list(self.nodes.keys()), kwargs))
+                                         % (args[0], args[1], list(self.nodes), kwargs))
             else:
-                self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (fn.__name__, args[0], list(self.nodes.keys()), kwargs))
+                self.cluster.log.verbose('Performing %s %s on nodes %s with options: %s' % (
+                    fn.__name__, args[0], list(self.nodes), kwargs))
             return NodeGroupResult(self.cluster, results)
         elif "dry_run" in kwargs.keys():
             del kwargs["dry_run"]

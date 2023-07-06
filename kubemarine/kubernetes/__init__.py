@@ -348,7 +348,7 @@ def join_other_control_planes(group: NodeGroup) -> RunnersGroupResult:
     other_control_planes_group = group.get_ordered_members_list()[1:]
     dry_run = utils.check_dry_run_status_active(group.cluster)
     log = group.cluster.log
-    join_dict = group.cluster.context["join_dict"]
+    join_dict = group.cluster.context.get("join_dict")
     for node in other_control_planes_group:
         if dry_run:
             log.debug('[dry-run]Joining control-plane \'%s\'...' % node['name'])
@@ -363,7 +363,7 @@ def join_other_control_planes(group: NodeGroup) -> RunnersGroupResult:
 def join_new_control_plane(group: NodeGroup):
     dry_run = utils.check_dry_run_status_active(group.cluster)
     log = group.cluster.log
-    join_dict = get_join_dict(group)
+    join_dict = get_join_dict(group, dry_run=dry_run)
     for node in group.get_ordered_members_list():
         if dry_run:
             log.debug('[dry-run]Joining control-plane \'%s\'...' % node['name'])
@@ -1275,7 +1275,6 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     """
 
     cluster: KubernetesCluster = group.cluster
-    dry_run = utils.check_dry_run_status_active(cluster)
     log = cluster.log
 
     if group_size is None:
@@ -1300,7 +1299,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
         for group_i in range(groups_amount):
             log.verbose('Prepulling images for group #%s...' % group_i)
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
-            for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
+            for node_i in range(group_i*group_size, (group_i*group_size) + group_size):
                 if node_i < nodes_amount:
                     tokens.append(images_prepull(nodes[node_i]))
 
@@ -1313,7 +1312,7 @@ def images_prepull(group: DeferredGroup) -> Token:
     :param group: NodeGroup where prepull should be performed.
     :return: NodeGroupResult from all nodes in presented group.
     """
-
+    dry_run = utils.check_dry_run_status_active(group.cluster)
     config = get_kubeadm_config(group.cluster.inventory)
     kubeadm_init: dict = {
         'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
@@ -1323,9 +1322,9 @@ def images_prepull(group: DeferredGroup) -> Token:
     configure_container_runtime(group.cluster, kubeadm_init)
     config = f'{config}---\n{yaml.dump(kubeadm_init, default_flow_style=False)}'
 
-    group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
+    group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True, dry_run=dry_run)
 
-    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
+    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml", dry_run=dry_run)
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):

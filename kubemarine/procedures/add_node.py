@@ -102,12 +102,24 @@ def cache_installed_packages(cluster: KubernetesCluster):
     packages.cache_package_versions(cluster, cluster.inventory, by_initial_nodes=True)
 
 
+def validate_new_nodes(cluster: KubernetesCluster):
+    old_nodes = set([node['connect_to'] for node in cluster.inventory['nodes']
+                     if 'add_node' not in node['roles']])
+    new_nodes = set(cluster.nodes['add_node'].get_hosts())
+    for host in new_nodes:
+        if host in old_nodes:
+            raise Exception(f"Node {host} is already present in cluster")
+    return None
+
+
 tasks: typing.OrderedDict[str, Any] = OrderedDict(copy.deepcopy(install.tasks))
 del tasks["deploy"]["plugins"]
 del tasks["deploy"]["accounts"]
 tasks["deploy"]["kubernetes"]["init"] = deploy_kubernetes_join
 tasks["cache_packages"] = cache_installed_packages
+tasks["validate_nodes"] = validate_new_nodes
 tasks.move_to_end("cache_packages", last=False)
+tasks.move_to_end("validate_nodes", last=False)
 
 
 class AddNodeAction(Action):
