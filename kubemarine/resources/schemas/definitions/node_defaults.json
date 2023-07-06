@@ -13,6 +13,10 @@
           "type": "string",
           "description": "Absolute path to keyfile on local machine to access the remote machine(s)"
         },
+        "password": {
+          "type": "string",
+          "description": "Password for SSH-access the remote machine(s)"
+        },
         "username": {
           "type": "string",
           "default": "root",
@@ -34,7 +38,7 @@
       }
     },
     "SSHAccessCommonPropertyNames": {
-      "enum": ["keyfile", "username", "connection_port", "connection_timeout"]
+      "enum": ["keyfile", "password", "username", "connection_port", "connection_timeout"]
     },
     "CommonNodeProperties": {
       "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],

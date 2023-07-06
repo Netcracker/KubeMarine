@@ -97,11 +97,12 @@ def make_ansible_inventory(location, c):
         config[role] = []
         config['cluster:children'].append(role)
         for node in cluster.nodes[role].get_final_nodes().get_ordered_members_configs_list():
-            record = "%s ansible_host=%s ansible_ssh_user=%s ansible_ssh_private_key_file=%s ip=%s" % \
+            record = "%s ansible_host=%s ansible_ssh_user=%s ansible_ssh_pass=%s ansible_ssh_private_key_file=%s ip=%s" % \
                      (node['name'],
                       node['connect_to'],
                       node.get('username', cluster.globals['connection']['defaults']['username']),
-                      node['keyfile'],
+                      node.get('password'),
+                      node.get('keyfile'),
                       node['internal_address'])
             if node.get('address') is not None:
                 record += ' external_ip=%s' % node['address']
