@@ -140,13 +140,13 @@ def upgrade_containerd(cluster: KubernetesCluster):
 
             kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
             tokens = []
-            for node in kubernetes_nodes.get_ordered_members_list():
+            for member_node in kubernetes_nodes.get_ordered_members_list():
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
-                kubeadm_flags = node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
+                kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
                 updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}")
-                node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-            
+                member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+
             with kubernetes_nodes.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
