@@ -267,25 +267,13 @@ def release_calico_leaked_ips(cluster: KubernetesCluster):
 
 
 def edit_config(kubeadm_flags: str):
-    kubeadm_flags = _config_changer(kubeadm_flags, "--container-runtime=remote")
-    return _config_changer(kubeadm_flags,
+    kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--container-runtime=remote")
+    return kubernetes._config_changer(kubeadm_flags,
                            "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
 
 
-def _config_changer(config: str, word: str):
-    equal_pos = word.find("=") + 1
-    param_begin_pos = config.find(word[:equal_pos])
-    if param_begin_pos != -1:
-        param_end_pos = config[param_begin_pos:].find(" ")
-        if param_end_pos == -1:
-            return config[:param_begin_pos] + word + "\""
-        return config[:param_begin_pos] + word + config[param_end_pos + param_begin_pos:]
-    else:
-        param_end_pos = config.rfind("\"")
-        return config[:param_end_pos] + " " + word[:] + "\""
-
-
 def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
+
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory_to_finalize
     finalize_functions: List[Callable[[KubernetesCluster, dict, bool], dict]] = [
