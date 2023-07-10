@@ -1465,3 +1465,16 @@ def fix_flag_kubelet(cluster: KubernetesCluster, node: NodeGroup, dry_run=False)
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
         node.put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True, dry_run=dry_run)
+ 
+
+def _config_changer(config: str, word: str):
+    equal_pos = word.find("=") + 1
+    param_begin_pos = config.find(word[:equal_pos])
+    if param_begin_pos != -1:
+        param_end_pos = config[param_begin_pos:].find(" ")
+        if param_end_pos == -1:
+            return config[:param_begin_pos] + word + "\""
+        return config[:param_begin_pos] + word + config[param_end_pos + param_begin_pos:]
+    else:
+        param_end_pos = config.rfind("\"")
+        return config[:param_end_pos] + " " + word[:] + "\""

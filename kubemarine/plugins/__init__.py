@@ -828,7 +828,7 @@ def apply_helm(cluster: KubernetesCluster, config: dict, plugin_name=None):
         cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
     output = subprocess.check_output(command, shell=True)
     if utils.check_dry_run_status_active(cluster):
         cluster.log.debug("[dry-run] Successfully applied helm plugin...")
