@@ -335,10 +335,10 @@ def reboot_nodes(cluster: KubernetesCluster) -> None:
 
 def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
+    log = cluster.log
     if utils.check_dry_run_status_active(cluster):
         log.debug("[dry-run] Rebooting Nodes...")
         return
-    log = cluster.log
 
     if try_graceful is None:
         if 'controlplain_uri' not in cluster.context.keys():

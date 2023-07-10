@@ -404,6 +404,8 @@ def pack_data(cluster: KubernetesCluster):
         target = os.path.join(target, backup_filename)
 
     cluster.log.debug('Packing all data...')
+    if utils.check_dry_run_status_active(cluster):
+        return None
     with tarfile.open(target, "w:gz") as tar_handle:
         for root, dirs, files in os.walk(backup_directory):
             for file in files:
