@@ -558,6 +558,7 @@ For example, you can have the following inventory content:
 ```yaml
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
+  password: "your_password"
   username: "centos"
 
 node:
@@ -566,6 +567,7 @@ node:
     roles: ["balancer"]
   - name: "control-plane"
     keyfile: "/home/username/another.key"
+    password: "your_password"
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
@@ -577,21 +579,23 @@ node:
   - name: "lb"
     username: "centos"
     keyfile: "/home/username/.ssh/id_rsa"
+    password: "your_password"
     internal_address: "192.168.0.1"
     roles: ["balancer"]
   - name: "control-plane"
     username: "centos"
     keyfile: "/home/username/another.key"
+    password: "your_password"
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, username, connection_port, connection_timeout and gateway.
+* keyfile, password, username, connection_port, connection_timeout and gateway.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
-
 For more information about the listed parameters, refer to the following section.
 
+Note: To establish an ssh connection, you can use either a keyfile or a password.
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
@@ -601,6 +605,7 @@ The following options are supported:
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
 |keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
+|password|string|**yes**| |`password@123`|Password to access the cluster machines|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
 |name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
 |address|ip address|no| |`10.101.0.1`|External node's IP-address|
@@ -616,6 +621,7 @@ An example with parameters values is as follows:
 ```yaml
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
+  password: "password@123"
   username: "centos"
 
 nodes:
@@ -930,6 +936,7 @@ The following parameters are supported:
 |**address**|ip address|**yes**|Gateway node's IP or hostname address for connection|
 |**username**|string|**yes**|Username for SSH-access the gateway node|
 |**keyfile**|string|**yes**|**Absolute** path to keyfile on deploy node to access the gateway node|
+|**password**|string|**yes**|Password to access the gateway node|
 
 An example is as follows:
 
@@ -938,10 +945,13 @@ gateway_nodes:
   - name: k8s-gateway-1
     address: 10.102.0.1
     username: root
+    password: "password@123"
     keyfile: "/home/username/.ssh/id_rsa"
+    
   - name: k8s-gateway-2
     address: 10.102.0.2
     username: root
+    password: "password@123"
     keyfile: "/home/username/.ssh/id_rsa"
 ```
 
@@ -965,6 +975,7 @@ nodes:
 
 **Note**: If the gateway is not specified on the node, then the connection is direct.
 
+**Note**: To establish an ssh connection, you can use either a keyfile or a password.
 ### vrrp_ips
 
 *Installation task*: `deploy.loadbalancer.keepalived`
@@ -1477,10 +1488,13 @@ By default, the installer uses the following parameters:
 |podPidsLimit|4096|
 |maxPods|110|
 |cgroupDriver|systemd|
+|serializeImagePulls|false|
 
 `podPidsLimit` the default value is chosen to prevent [Fork Bomb](https://en.wikipedia.org/wiki/Fork_bomb)
 
 `cgroupDriver` field defines which cgroup driver the kubelet controls. [Configuring the kubelet cgroup driver](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/#configuring-the-kubelet-cgroup-driver).
+
+`serializeImagePulls` parameter defines whether the images will be pulled in parallel (false) or one at a time.
 
 **Warning**: If you want to change the values of variables `podPidsLimit` and `maxPods`, you have to update the value of the `pid_max` (this value should not less than result of next expression: `maxPods * podPidsLimit + 2048`), which can be done using task `prepare.system.sysctl`. To get more info about `pid_max` you can go to [sysctl](#sysctl) section.
 
