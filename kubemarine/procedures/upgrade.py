@@ -152,7 +152,6 @@ def upgrade_containerd(cluster: KubernetesCluster):
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
                     node.put(StringIO(config_string), os_specific_associations['config_location'],
                              backup=True, sudo=True, mkdir=True)
-                    print("Running !!!!!!!!!!!!!")
                     node.sudo(
                         f"sudo systemctl restart {os_specific_associations['service_name']} && "
                         f"systemctl status {os_specific_associations['service_name']} && " 
