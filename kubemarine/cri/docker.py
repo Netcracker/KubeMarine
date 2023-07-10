@@ -64,6 +64,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(group.cluster, settings_json, 'docker-daemon.json')
     if utils.check_dry_run_status_active(group.cluster):
         group.cluster.log.debug("[dry-run] Configuring Docker")
+        return
 
     tokens = []
     with group.new_executor() as exe:
@@ -81,9 +82,10 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     return exe.get_merged_runners_result(tokens)
 
 
-def prune(group: NodeGroup) -> RunnersGroupResult:
+def prune(group: NodeGroup, dry_run=False) -> RunnersGroupResult:
     return group.sudo('docker container stop $(sudo docker container ls -aq); '
                       'sudo docker container rm $(sudo docker container ls -aq); '
                       'sudo docker system prune -a -f; '
-                      # kill all containerd-shim processes, so that no orphan containers remain 
-                      'sudo pkill -9 -f "^containerd-shim"', warn=True)
+                      # kill all containerd-shim processes, so that no orphan containers remain
+                      'sudo pkill -9 -f "^containerd-shim"', warn=True,
+                      dry_run=dry_run)

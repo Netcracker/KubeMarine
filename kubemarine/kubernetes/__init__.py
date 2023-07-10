@@ -479,10 +479,10 @@ def local_admin_config(node: NodeGroup) -> Iterator[str]:
         node.sudo(f'rm -f {temp_filepath}')
 
 
-def copy_admin_config(logger: log.EnhancedLogger, nodes: AbstractGroup[RunResult]) -> None:
+def copy_admin_config(logger: log.EnhancedLogger, nodes: AbstractGroup[RunResult], dry_run=False) -> None:
     logger.debug("Setting up admin-config...")
     command = "mkdir -p /root/.kube && sudo cp -f /etc/kubernetes/admin.conf /root/.kube/config"
-    nodes.sudo(command)
+    nodes.sudo(command, dry_run=dry_run)
 
 
 def fetch_admin_config(cluster: KubernetesCluster) -> str:

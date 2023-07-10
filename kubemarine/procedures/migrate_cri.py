@@ -22,6 +22,7 @@ from typing import List, Callable
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow
+from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -147,7 +148,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
     :param cluster: main object describing a cluster
     :param node_group: group of nodes to migrate
     """
-
+    dry_run = utils.check_dry_run_status_active(cluster)
     for node in node_group:
         node_config = node.get_config()
         node_name = node.get_node_name()
@@ -163,7 +164,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
         version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
         cluster.log.debug("Migrating \"%s\"..." % node_name)
         drain_cmd = kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=True)
-        control_plane.sudo(drain_cmd, hide=False)
+        control_plane.sudo(drain_cmd, hide=False, dry_run=dry_run)
 
         kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
         kubeadm_flags = node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
@@ -175,14 +176,14 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
 
         kubeadm_flags = edit_config(kubeadm_flags)
 
-        node.put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+        node.put(io.StringIO(kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True, dry_run=dry_run)
 
-        node.sudo("systemctl stop kubelet")
-        docker.prune(node)
+        node.sudo("systemctl stop kubelet", dry_run=dry_run)
+        docker.prune(node, dry_run=dry_run)
 
         docker_associations = cluster.get_associations_for_node(node.get_host(), 'docker')
         node.sudo(f"systemctl disable {docker_associations['service_name']} --now; "
-                  "sudo sh -c 'rm -rf /var/lib/docker/*'")
+                  "sudo sh -c 'rm -rf /var/lib/docker/*'", dry_run=dry_run)
 
         cluster.log.debug('Reinstalling CRI...')
         cri.install(node)
@@ -190,6 +191,8 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
 
         cluster.log.debug(f'CRI configured! Restoring pods on node "{node_name}"')
 
+        if dry_run:
+            return
         # if there is a disk for docker in "/etc/fstab", then use this disk for containerd
         docker_disk_result = node.sudo("cat /etc/fstab | grep ' /var/lib/docker '", warn=True)
         docker_disk = list(docker_disk_result.values())[0].stdout.strip()
@@ -253,6 +256,7 @@ def release_calico_leaked_ips(cluster: KubernetesCluster):
     Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
     This task releases problem ips with force.
     """
+    dry_run = utils.check_dry_run_status_active(cluster)
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
     random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
@@ -261,9 +265,9 @@ def release_calico_leaked_ips(cluster: KubernetesCluster):
     leaked_ips_count = leaked_ips.count('leaked')
     cluster.log.debug(f"Found {leaked_ips_count} leaked ips")
     if leaked_ips_count != 0:
-        first_control_plane.sudo(f"calicoctl ipam release --from-report={random_report_name} --force", hide=False)
+        first_control_plane.sudo(f"calicoctl ipam release --from-report={random_report_name} --force", hide=False, dry_run=dry_run)
         cluster.log.debug("Leaked ips was released")
-    first_control_plane.sudo(f"rm {random_report_name}", hide=False)
+    first_control_plane.sudo(f"rm {random_report_name}", hide=False, dry_run=dry_run)
 
 
 def edit_config(kubeadm_flags: str):

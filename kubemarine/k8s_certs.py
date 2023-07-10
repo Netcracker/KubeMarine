@@ -16,12 +16,14 @@ from typing import List
 from kubemarine import kubernetes
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
+from kubemarine.core import utils
 
 
 def k8s_certs_overview(control_planes: NodeGroup) -> None:
+    dry_run = utils.check_dry_run_status_active(control_planes.cluster)
     for control_plane in control_planes.get_ordered_members_list():
         control_planes.cluster.log.debug(f"Checking certs expiration for control_plane {control_plane.get_node_name()}")
-        control_plane.sudo("kubeadm certs check-expiration", hide=False)
+        control_plane.sudo("kubeadm certs check-expiration", hide=False, dry_run=dry_run)
 
 
 def renew_verify(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -36,16 +38,16 @@ def renew_verify(inventory: dict, cluster: KubernetesCluster) -> dict:
 
 def renew_apply(control_planes: NodeGroup) -> None:
     log = control_planes.cluster.log
-
+    dry_run = utils.check_dry_run_status_active(control_planes.cluster)
     procedure = control_planes.cluster.procedure_inventory["kubernetes"]
     cert_list = procedure["cert-list"]
 
     for cert in cert_list:
-        control_planes.sudo(f"kubeadm certs renew {cert}")
+        control_planes.sudo(f"kubeadm certs renew {cert}", dry_run=dry_run)
 
     if "all" in cert_list or "admin.conf" in cert_list:
         # need to update cluster-admin config
-        kubernetes.copy_admin_config(log, control_planes)
+        kubernetes.copy_admin_config(log, control_planes, dry_run=dry_run)
 
     control_planes.call(force_renew_kubelet_serving_certs)
 
@@ -60,19 +62,20 @@ def force_restart_control_plane(control_planes: NodeGroup) -> None:
     cri_impl = control_planes.cluster.inventory['services']['cri']['containerRuntime']
     restart_containers = ["etcd", "kube-scheduler", "kube-apiserver", "kube-controller-manager"]
     c_filter = "grep -e %s" % " -e ".join(restart_containers)
-
+    dry_run = utils.check_dry_run_status_active(control_planes.cluster)
     if cri_impl == "docker":
-        control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True, dry_run=dry_run)
     else:
-        control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+        control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True, dry_run=dry_run)
 
 
 def force_renew_kubelet_serving_certs(control_planes: NodeGroup) -> None:
     # Delete *serving* kubelet cert (kubelet.crt) and restart kubelet to create new up-to-date cert.
     # Client kubelet cert (kubelet.conf) is assumed to be updated automatically by kubelet.
+    dry_run = utils.check_dry_run_status_active(control_planes.cluster)
     for control_plane in control_planes.get_ordered_members_list():
-        control_plane.sudo(f"rm -f /var/lib/kubelet/pki/kubelet.crt /var/lib/kubelet/pki/kubelet.key")
-    control_planes.sudo("systemctl restart kubelet")
+        control_plane.sudo(f"rm -f /var/lib/kubelet/pki/kubelet.crt /var/lib/kubelet/pki/kubelet.key", dry_run=dry_run)
+    control_planes.sudo("systemctl restart kubelet", dry_run=dry_run)
 
 
 def verify_all_is_absent_or_single(cert_list: List[str]) -> None:

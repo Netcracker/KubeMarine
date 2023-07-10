@@ -413,7 +413,9 @@ def expect_deployment(cluster: KubernetesCluster,
 
 def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace=None, timeout=None, retries=None,
                 node: NodeGroup = None, apply_filter: str = None):
-
+    if utils.check_dry_run_status_active(cluster):
+        cluster.log.debug("Pods are ready!")
+        return None
     if timeout is None:
         timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
     if retries is None:

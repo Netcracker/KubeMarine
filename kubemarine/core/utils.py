@@ -239,11 +239,14 @@ def get_dump_filepath(context, filename):
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=False):
+def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=False, dry_run=False):
     from kubemarine.core.group import NodeGroup
     group: NodeGroup = g
 
     log = group.cluster.log
+    if dry_run:
+        log.debug("[dry-run] Command succeeded")
+        return
 
     while retries > 0:
         log.debug("Waiting for command to succeed, %s retries left" % retries)
