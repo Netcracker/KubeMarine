@@ -237,8 +237,7 @@ def system_prepare_policy(group: NodeGroup):
                 kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
 
                 control_plane.sudo(f"kubeadm init phase control-plane apiserver "
-                                   f"--config=/etc/kubernetes/audit-on-config.yaml && "
-                                   f"sudo sed -i '/- --bind-address=*/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml")
+                                   f"--config=/etc/kubernetes/audit-on-config.yaml ")
 
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
                 control_plane.call(utils.wait_command_successful,
