@@ -1,6 +1,6 @@
 node_defaults:
   keyfile: /home/user/id_rsa
-  password: password@123     #Use either keyfile or password.
+  password: '{{ env.PASS }}'     #Either keyfile or password can be used.
   username: cloud-user
 
 vrrp_ips:

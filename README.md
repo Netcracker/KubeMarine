@@ -117,7 +117,7 @@ To install a Kubernetes cluster using Kubemarine:
    ```yaml
    node_defaults:
      keyfile: "/home/username/.ssh/id_rsa"
-     password: password@123     #Use either keyfile or password.
+     password: '{{ env.PASS }}'     #Either keyfile or password can be used.
      username: "centos"
 
    vrrp_ips:

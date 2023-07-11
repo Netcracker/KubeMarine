@@ -558,7 +558,7 @@ For example, you can have the following inventory content:
 ```yaml
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
-  password: "your_password"
+  password: '{{ env.PASS }}'
   username: "centos"
 
 node:
@@ -567,7 +567,7 @@ node:
     roles: ["balancer"]
   - name: "control-plane"
     keyfile: "/home/username/another.key"
-    password: "your_password"
+    password: '{{ env.PASS }}'
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
@@ -579,13 +579,13 @@ node:
   - name: "lb"
     username: "centos"
     keyfile: "/home/username/.ssh/id_rsa"
-    password: "your_password"
+    password: '{{ env.PASS }}'
     internal_address: "192.168.0.1"
     roles: ["balancer"]
   - name: "control-plane"
     username: "centos"
     keyfile: "/home/username/another.key"
-    password: "your_password"
+    password: '{{ env.PASS }}'
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
@@ -595,7 +595,9 @@ Following are the parameters allowed to be specified in the `node_defaults` sect
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 For more information about the listed parameters, refer to the following section.
 
-Note: To establish an ssh connection, you can use either a keyfile or a password.
+Note: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
+
+Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file.
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
@@ -604,8 +606,8 @@ The following options are supported:
 
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
-|keyfile|string|**yes**| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines|
-|password|string|**yes**| |`password@123`|Password to access the cluster machines|
+|keyfile|string|no| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
+|password|string|no| |`password@123`|Password to access the cluster machines, Either a keyfile or a password should be provided|
 |username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
 |name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
 |address|ip address|no| |`10.101.0.1`|External node's IP-address|
@@ -621,7 +623,7 @@ An example with parameters values is as follows:
 ```yaml
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
-  password: "password@123"
+  password: '{{ env.PASS }}'     #Either keyfile or password can be used.
   username: "centos"
 
 nodes:
@@ -935,8 +937,8 @@ The following parameters are supported:
 |**name**|string|**yes**|Gateway node name|
 |**address**|ip address|**yes**|Gateway node's IP or hostname address for connection|
 |**username**|string|**yes**|Username for SSH-access the gateway node|
-|**keyfile**|string|**yes**|**Absolute** path to keyfile on deploy node to access the gateway node|
-|**password**|string|**yes**|Password to access the gateway node|
+|**keyfile**|string|no|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
+|**password**|string|no|Password to access the cluster machines, Either a keyfile or a password should be provided|
 
 An example is as follows:
 
@@ -945,13 +947,13 @@ gateway_nodes:
   - name: k8s-gateway-1
     address: 10.102.0.1
     username: root
-    password: "password@123"
+    password: '{{ env.PASS }}'
     keyfile: "/home/username/.ssh/id_rsa"
     
   - name: k8s-gateway-2
     address: 10.102.0.2
     username: root
-    password: "password@123"
+    password: '{{ env.PASS }}'
     keyfile: "/home/username/.ssh/id_rsa"
 ```
 

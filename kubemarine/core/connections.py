@@ -50,7 +50,6 @@ class ConnectionPool:
             creds['key_filename'] = os.path.expanduser(conn_details['keyfile'])
         elif conn_details.get('password'):
             creds['password'] = conn_details.get('password')
-        #else:     
         cfg = fabric.Config(overrides={'run': {'encoding': "utf-8"}})
         return fabric.connection.Connection(
             host=ip,
@@ -66,7 +65,7 @@ class ConnectionPool:
 
     def _create_connection(self, ip: str, node: dict) -> fabric.connection.Connection:
         if node.get('keyfile') is None and node.get('password') is None:
-            raise Exception('There is no keyfile specified in configfile for node \'%s\'' % node['name'])
+            raise Exception('There is neither keyfile not password specified in configfile for node \'%s\'' % node['name'])
 
         gateway = None
         if 'gateway' in node:
