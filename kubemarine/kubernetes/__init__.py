@@ -333,7 +333,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
                 hostname=node.get_node_name())
             log.debug("Uploading to '%s'..." % node.get_host())
             node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-            node.sudo("chmod 644 /etc/systemd/system/kubelet.service")
+            node.sudo("chmod 600 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(exe.group)
@@ -442,8 +442,8 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             "kubeadm join "
             " --config=/etc/kubernetes/join-config.yaml "
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-            " --v=5 && "
-            " sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml",
+            " --v=5 ", # && "
+            #" sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml",
             hide=False)
         defer.sudo("systemctl restart kubelet")
         copy_admin_config(log, defer)
@@ -570,8 +570,8 @@ def init_first_control_plane(group: NodeGroup) -> None:
         " --upload-certs"
         " --config=/etc/kubernetes/init-config.yaml"
         " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-        " --v=5 && "
-        " sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml",
+        " --v=5 ",# && "
+        #" sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml",
         hide=False)
 
     copy_admin_config(log, first_control_plane)
