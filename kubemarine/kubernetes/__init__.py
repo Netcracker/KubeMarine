@@ -333,7 +333,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
                 hostname=node.get_node_name())
             log.debug("Uploading to '%s'..." % node.get_host())
             node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-            node.sudo("chmod 600 /etc/systemd/system/kubelet.service")
+            node.sudo("chmod 644 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(exe.group)
