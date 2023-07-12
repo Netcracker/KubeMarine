@@ -28,7 +28,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
             os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'docker')
             packages.install(node, include=os_specific_associations['package_name'], callback=collector)
 
-            system.enable_service(group, name=os_specific_associations['service_name'],
+            system.enable_service(node, name=os_specific_associations['service_name'],
                                   now=True, callback=collector)
 
             # remove previous daemon.json to avoid problems in case when previous config was broken
