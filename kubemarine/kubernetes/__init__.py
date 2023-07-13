@@ -427,9 +427,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             "kubeadm join "
             " --config=/etc/kubernetes/join-config.yaml"
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-            " --v=5 && "
-            " sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml && "
-            " sudo systemctl restart kubelet ",
+            " --v=5",
             hide=False)
 
         log.debug("Patching apiServer bind-address for control-plane %s" % node_name)
@@ -444,9 +442,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             "kubeadm join "
             " --config=/etc/kubernetes/join-config.yaml "
             " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-            " --v=5 && "
-            " sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml && "
-            " sudo systemctl restart kubelet ",
+            " --v=5",
             hide=False)
         defer.sudo("systemctl restart kubelet")
         copy_admin_config(log, defer)
@@ -573,9 +569,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
         " --upload-certs"
         " --config=/etc/kubernetes/init-config.yaml"
         " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-        " --v=5 && "
-        " sudo sed -i '/- kube-apiserver/a \    - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt' /etc/kubernetes/manifests/kube-apiserver.yaml && "
-        " sudo systemctl restart kubelet ",
+        " --v=5 ",
         hide=False)
 
     copy_admin_config(log, first_control_plane)
