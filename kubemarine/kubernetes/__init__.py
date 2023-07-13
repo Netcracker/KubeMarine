@@ -569,7 +569,7 @@ def init_first_control_plane(group: NodeGroup) -> None:
         " --upload-certs"
         " --config=/etc/kubernetes/init-config.yaml"
         " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-        " --v=5 ",
+        " --v=5",
         hide=False)
 
     copy_admin_config(log, first_control_plane)
