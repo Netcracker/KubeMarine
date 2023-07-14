@@ -35,7 +35,7 @@ def stub_detect_packages(cluster: demo.FakeKubernetesCluster, packages_hosts_stu
             if host in hosts_stub:
                 results[host] = demo.create_result(stdout=hosts_stub[host])
             else:
-                results[host] = demo.create_result(stdout='not installed')
+                results[host] = demo.create_result(stdout='not installed', code=1)
 
         cmd = packages.get_detect_package_version_cmd(cluster.get_os_family(), package)
         cluster.fake_shell.add(results, 'sudo', [cmd])

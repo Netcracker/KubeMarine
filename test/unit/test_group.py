@@ -19,7 +19,7 @@ import unittest
 import random
 
 from kubemarine import demo
-from kubemarine.core.group import GroupException
+from kubemarine.core.group import GroupResultException, CollectorCallback
 from kubemarine.demo import FakeKubernetesCluster
 
 
@@ -92,10 +92,10 @@ class TestGroupCall(unittest.TestCase):
         exception = None
         try:
             all_nodes.run('some command')
-        except GroupException as e:
+        except GroupResultException as e:
             exception = e
 
-        self.assertIsNotNone(exception, msg="GroupException should be raised")
+        self.assertIsNotNone(exception, msg="GroupResultException should be raised")
         nested_exc = 0
         for _, result in exception.result.items():
             if isinstance(result, Exception):
@@ -103,6 +103,57 @@ class TestGroupCall(unittest.TestCase):
                 self.assertEqual('Some error', result.args[0], msg="Unexpected exception message")
 
         self.assertEqual(1, nested_exc, msg="One wrapped exception should happen")
+
+    def test_run_with_callback(self):
+        all_nodes = self.cluster.nodes["all"]
+        results = demo.create_hosts_result(all_nodes.get_hosts(), stdout='example result')
+        self.cluster.fake_shell.add(results, "run", ['some command'])
+        callback = CollectorCallback(self.cluster)
+        all_nodes.run('some command', callback=callback)
+        for host in all_nodes.get_hosts():
+            result = callback.results.get(host, [])
+            self.assertEqual(1, len(result), "Result was not collected")
+            self.assertEqual('example result', result[0].stdout, "Result was not collected")
+
+    def test_run_failed_callback_not_collected(self):
+        all_nodes = self.cluster.nodes["all"]
+        results = demo.create_hosts_result(all_nodes.get_hosts(), stderr='command failed', code=1)
+        self.cluster.fake_shell.add(results, "run", ['some command'])
+        callback = CollectorCallback(self.cluster)
+        with self.assertRaises(GroupResultException):
+            all_nodes.run('some command', callback=callback)
+        for host in all_nodes.get_hosts():
+            result = callback.results.get(host, [])
+            self.assertEqual(0, len(result), "Result should be not collected")
+
+    def test_represent_group_exception_with_hide_false(self):
+        one_node = self.cluster.nodes["all"].get_first_member()
+        results = demo.create_hosts_result(one_node.get_hosts(), stderr='command failed', code=1)
+        self.cluster.fake_shell.add(results, "run", ['some command'])
+
+        exception = None
+        try:
+            one_node.run('some command', hide=False)
+        except GroupResultException as exc:
+            exception = exc
+
+        self.assertIsNotNone(exception, "Exception was not raised")
+        expected_results_str = ("""\
+            10.101.1.1:
+            \tEncountered a bad command exit code!
+            \t
+            \tCommand: 'some command'
+            \t
+            \tExit code: 1
+            \t
+            \t=== stderr ===
+            \talready printed
+            \t"""
+                                ).replace("""\
+            """, ""
+                                          )
+        self.assertEqual(expected_results_str, str(exception),
+                         "Unexpected textual representation of remote group exception")
 
     def test_write_stream(self):
         expected_data = 'hello\nworld'

@@ -1024,9 +1024,9 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     if apply_required:
         cluster.log.debug("Applying yaml...")
         if use_sudo:
-            apply_common_group.sudo(apply_command, logging_stream=True)
+            apply_common_group.sudo(apply_command, hide=False)
         else:
-            apply_common_group.run(apply_command, logging_stream=True)
+            apply_common_group.run(apply_command, hide=False)
     else:
         cluster.log.debug('Apply is not required')
 
