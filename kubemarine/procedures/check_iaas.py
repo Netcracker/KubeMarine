@@ -30,10 +30,9 @@ from kubemarine.core import flow, utils
 from kubemarine import system, packages
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.executor import RunnersResult
 from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
-from kubemarine.core.group import NodeConfig, GroupException, RunnersGroupResult
+from kubemarine.core.group import NodeConfig, GroupException, GroupResultException, CollectorCallback
 
 
 def connection_ssh_connectivity(cluster: KubernetesCluster):
@@ -396,7 +395,7 @@ def check_package_repositories(cluster: KubernetesCluster):
     else:
         group = cluster.make_group(hosts)
         random_repos_conf_path = "/tmp/%s.repo" % uuid.uuid4().hex
-        tokens = []
+        collector = CollectorCallback(cluster)
         with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 # Create temp repos file
@@ -404,14 +403,12 @@ def check_package_repositories(cluster: KubernetesCluster):
 
                 # Compare with existed resolv.conf
                 predefined_repos_file = packages.get_repo_filename(node)
-                compare_token = node.sudo(
+                node.sudo(
                     '[ -f %s ] && cmp --silent %s %s' %
                     (predefined_repos_file, predefined_repos_file, random_repos_conf_path),
-                    warn=True)
-                tokens.append(compare_token)
+                    warn=True, callback=collector)
 
-        results = exe.get_merged_runners_result(tokens)
-        for host, result in results.items():
+        for host, result in collector.result.items():
             nodes_context[host]["package_repos_are_actual"] = not result.failed
 
         # Remove temp .repo file
@@ -470,6 +467,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         all_group.put(io.StringIO(check_script), random_temp_path)
 
         if repository_urls:
+            collector = CollectorCallback(cluster)
             with all_group.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
@@ -480,12 +478,12 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                         continue
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     for repo_url in repository_urls:
-                        node.run('%s %s %s %s || echo "Package repository is unavailable"'
+                        node.run('%s %s %s %s'
                                  % (python_executable, random_temp_path, repo_url,
-                                    cluster.inventory['globals']['timeout_download']))
+                                    cluster.inventory['globals']['timeout_download']),
+                                 warn=True, callback=collector)
 
-            results = exe.get_last_results()
-            for host, url_results in results.items():
+            for host, url_results in collector.results.items():
                 # Check if resolv.conf is actual
                 resolv_conf_actual = cluster.context['nodes'][host]['resolv_conf_is_actual']
                 if not resolv_conf_actual:
@@ -495,9 +493,8 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
                     problem_handler = warnings
                 else:
                     problem_handler = broken
-                for i, result in enumerate(url_results.values()):
-                    result = cast(RunnersResult, result)
-                    if "Package repository is unavailable" in result.stdout:
+                for i, result in enumerate(url_results):
+                    if result.failed:
                         problem_handler.append(f"{host}, {repository_urls[i]}: {result.stderr}")
 
         # Remove file
@@ -518,6 +515,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
         warnings: List[str] = []
         group = cluster.nodes['all']
         hosts_to_packages = packages.get_all_managed_packages_for_group(group, cluster.inventory)
+        collector = CollectorCallback(cluster)
         with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
@@ -526,10 +524,10 @@ def check_access_to_packages(cluster: KubernetesCluster):
                 cluster.log.debug(f"Packages to check for node {host}: {packages_to_check}")
 
                 for package in packages_to_check:
-                    packages.search_package(node, package)
+                    packages.search_package(node, package, callback=collector)
 
         # Check packages from install section
-        for host, results in exe.get_last_results().items():
+        for host, results in collector.results.items():
             package_repos_are_actual = cluster.context['nodes'][host]["package_repos_are_actual"]
             if not package_repos_are_actual:
                 warnings.append(f"Package repositories are not installed for {host}: "
@@ -539,9 +537,8 @@ def check_access_to_packages(cluster: KubernetesCluster):
             else:
                 problem_handler = broken
             packages_to_check = hosts_to_packages[host]
-            for i, result in enumerate(results.values()):
-                result = cast(RunnersResult, result)
-                if "Package is unavailable" in result.stdout:
+            for i, result in enumerate(results):
+                if result.failed:
                     problem_handler.append(f"Package {packages_to_check[i]} is unavailable for node {host}")
 
         if broken:
@@ -587,7 +584,7 @@ def suspend_firewalld(cluster: KubernetesCluster):
         try:
             nodes_to_rollback = system.stop_service(stop_firewalld_group, "firewalld").get_group()
         except GroupException as e:
-            nodes_to_rollback = e.result.get_exited_nodes_group()
+            nodes_to_rollback = e.get_exited_nodes_group()
             raise
 
         yield
@@ -638,14 +635,14 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
             host_to_ip[host] = random_host
             i = i + 1
 
+        collector = CollectorCallback(cluster)
         with cluster.make_group(nodes).new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
-                node.sudo(existing_alias, warn=True)
+                node.sudo(existing_alias, warn=True, callback=collector)
 
-        results = exe.get_merged_runners_result()
-        for host, result in results.items():
+        for host, result in collector.result.items():
             if not result.stdout and not result.stderr and result.exited == 1:
                 # grep returned nothing, subnet is not used.
                 pass
@@ -662,7 +659,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
 
             nodes_to_rollback = cluster.make_group(nodes.keys())
         except GroupException as e:
-            nodes_to_rollback = e.result.get_exited_nodes_group()
+            nodes_to_rollback = e.get_exited_nodes_group()
             raise
 
         yield host_to_ip
@@ -820,8 +817,10 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
     skipped_nodes = {}
     nodes_to_rollback = cluster.make_group([])
     try:
+        collector = CollectorCallback(cluster)
         try:
-            with cluster.make_group(nodes).new_executor() as exe:
+            nodes_to_rollback = group = cluster.make_group(nodes)
+            with group.new_executor() as exe:
                 # Run process that LISTEN TCP port
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
@@ -829,22 +828,19 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
                     ip_version = ipaddress.ip_address(internal_ip).version
                     python_executable = cluster.context['nodes'][host]['python']['executable']
                     tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version))
-                    node.sudo(tcp_listener_cmd, warn=True)
-
-            results = exe.get_merged_runners_result()
-            nodes_to_rollback = results.get_group()
+                    node.sudo(tcp_listener_cmd, warn=True, callback=collector)
         except GroupException as e:
-            nodes_to_rollback = e.result.get_exited_nodes_group()
+            nodes_to_rollback = e.get_exited_nodes_group()
             raise
 
         port_in_use = re.compile(r'^(\d+) in use$')
-        for host, result in results.items():
+        for host, result in collector.result.items():
             matcher = port_in_use.match(result.stderr.strip())
             if matcher is not None:
                 skipped_nodes[nodes[host]["name"]] = matcher.group(1)
                 del nodes[host]
             elif result.exited != 0:
-                raise GroupException(results)
+                raise GroupResultException(collector.result)
             else:
                 cluster.log.verbose(result)
 

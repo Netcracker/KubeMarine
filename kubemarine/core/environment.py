@@ -15,7 +15,8 @@
 import os
 from abc import ABC, abstractmethod
 
-from kubemarine.core import static
+from kubemarine.core import log
+from kubemarine.core.connections import ConnectionPool
 
 
 class Environment(ABC):
@@ -25,8 +26,14 @@ class Environment(ABC):
         pass
 
     @property
-    def globals(self) -> dict:
-        return static.GLOBALS
+    @abstractmethod
+    def connection_pool(self) -> ConnectionPool:
+        pass
+
+    @property
+    @abstractmethod
+    def log(self) -> log.EnhancedLogger:
+        pass
 
     @staticmethod
     def is_deploying_from_windows() -> bool:

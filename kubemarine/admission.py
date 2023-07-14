@@ -802,6 +802,11 @@ def update_finalized_inventory(cluster: KubernetesCluster, inventory_to_finalize
     elif cluster.context.get('initial_procedure') == 'manage_psp':
         current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("psp", {})
         current_config["pod-security"] = cluster.procedure_inventory["psp"].get("pod-security", current_config.get("pod-security", "enabled"))
+    # remove PSP section from cluster_finalyzed.yaml  
+    minor_version = int(inventory_to_finalize["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    if minor_version >= 24:
+        del inventory_to_finalize["rbac"]["psp"]
+
 
     return inventory_to_finalize
 

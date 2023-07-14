@@ -17,8 +17,10 @@ import io
 from typing import Union, Optional, List, Dict
 
 from kubemarine.core import utils
-from kubemarine.core.executor import RunnersResult, Token
-from kubemarine.core.group import NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
+from kubemarine.core.executor import RunnersResult, Token, Callback
+from kubemarine.core.group import (
+    NodeGroup, RunnersGroupResult, AbstractGroup, RunResult, DeferredGroup, GROUP_RUN_TYPE
+)
 
 
 def ls_repofiles(group: NodeGroup) -> RunnersGroupResult:
@@ -83,13 +85,14 @@ def get_install_cmd(include: Union[str, List[str]], exclude: Union[str, List[str
 
 
 def install(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
-            exclude: Union[str, List[str]] = None) -> GROUP_RUN_TYPE:
+            exclude: Union[str, List[str]] = None,
+            callback: Callback = None) -> GROUP_RUN_TYPE:
     if include is None:
         raise Exception('You must specify included packages to install')
 
     command = get_install_cmd(include, exclude)
 
-    return group.sudo(command)
+    return group.sudo(command, callback=callback)
 
 
 def remove(group: AbstractGroup[GROUP_RUN_TYPE], include: Union[str, List[str]] = None,
@@ -138,9 +141,9 @@ def no_changes_found(action: str, result: RunnersResult) -> bool:
         raise Exception(f"Unknown action {action}")
 
 
-def search(group: DeferredGroup, package: str) -> Token:
+def search(group: DeferredGroup, package: str, callback: Callback = None) -> Token:
     if package is None:
         raise Exception('You must specify package to search')
-    command = 'yum list %s || echo "Package is unavailable"' % package
+    command = 'yum list %s' % package
 
-    return group.sudo(command)
+    return group.sudo(command, warn=True, callback=callback)

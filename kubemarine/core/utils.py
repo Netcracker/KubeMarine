@@ -35,26 +35,19 @@ from kubemarine.core.errors import pretty_print_error
 
 def do_fail(message='', reason: Exception = None, hint='', log=None):
 
-    if log:
-        log.critical('FAILURE!')
-        if message != "":
-            log.critical(message)
-    else:
-        sys.stderr.write("\033[91mFAILURE!")
-        if message != "":
-            sys.stderr.write(" - " + message + "\n")
+    if not log:
+        sys.stderr.write("\033[91m")
 
-    pretty_print_error(reason, log)
-
-    sys.stderr.write("\n")
+    pretty_print_error(message, reason, log)
 
     # Please do not rewrite this to logging approach:
     # hint should be visible only in stdout and without special formatting
     if hint != "":
-        sys.stderr.write(hint)
+        sys.stderr.write("\n")
+        sys.stderr.write(hint + "\n")
 
     if not log:
-        sys.stderr.write("\033[0m\n")
+        sys.stderr.write("\033[0m")
 
     sys.exit(1)
 

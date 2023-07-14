@@ -27,8 +27,10 @@ from kubemarine.core import flow
 from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import CollectorCallback
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
+
 
 
 def system_prepare_thirdparties(cluster: KubernetesCluster):
@@ -136,17 +138,26 @@ def upgrade_containerd(cluster: KubernetesCluster):
                 if isinstance(value, dict):
                     config_string += f"\n[{key}]\n{toml.dumps(value)}"
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
+
             kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
-            tokens = []
+            collector = CollectorCallback(cluster)
+            for member_node in kubernetes_nodes.get_ordered_members_list():
+                kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+                kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
+                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}")
+                member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+
             with kubernetes_nodes.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     os_specific_associations = cluster.get_associations_for_node(node.get_host(), 'containerd')
                     node.put(StringIO(config_string), os_specific_associations['config_location'],
                              backup=True, sudo=True, mkdir=True)
-                    tokens.append(node.sudo(
+                    node.sudo(
                         f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                        f"systemctl status {os_specific_associations['service_name']}"))
-            return exe.get_merged_runners_result(tokens)
+                        f"systemctl status {os_specific_associations['service_name']} && " 
+                        f"sudo systemctl restart kubelet",
+                        callback=collector)
+            return collector.result
 
 
 tasks = OrderedDict({

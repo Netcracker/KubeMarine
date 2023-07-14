@@ -16,21 +16,20 @@ from typing import Dict
 
 import fabric  # type: ignore[import]
 
-from kubemarine.core.environment import Environment
-
+from kubemarine.core import static
 
 Connections = Dict[str, fabric.connection.Connection]
 
 
 class ConnectionPool:
-    def __init__(self, env: Environment):
-        self._env = env
+    def __init__(self, inventory: dict):
+        self.inventory = inventory
         self._connections: Connections = {}
 
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
-            for node in self._env.inventory['nodes']:
+            for node in self.inventory['nodes']:
                 if node.get('connect_to') == ip:
                     conn = self._create_connection(ip, node)
 
@@ -53,12 +52,12 @@ class ConnectionPool:
         cfg = fabric.Config(overrides={'run': {'encoding': "utf-8"}})
         return fabric.connection.Connection(
             host=ip,
-            user=conn_details.get('username', self._env.globals['connection']['defaults']['username']),
+            user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
             gateway=gateway,
-            port=conn_details.get('connection_port', self._env.globals['connection']['defaults']['port']),
+            port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port']),
             config=cfg,
             connect_timeout=conn_details.get('connection_timeout',
-                                             self._env.globals['connection']['defaults']['timeout']),
+                                             static.GLOBALS['connection']['defaults']['timeout']),
             connect_kwargs=creds,
             inline_ssh_env=inline_ssh_env
         )
@@ -78,7 +77,7 @@ class ConnectionPool:
         # This is necessary to not share the same gateway connection instance in multiple threads
         gateway_conn = None
 
-        for gateway in self._env.inventory.get('gateway_nodes', []):
+        for gateway in self.inventory.get('gateway_nodes', []):
             if gateway.get('name') == name:
                 if gateway.get('address') is None:
                     raise Exception('There is no address specified in configfile for gateway \'%s\'' % name)

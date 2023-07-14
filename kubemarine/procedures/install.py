@@ -28,7 +28,7 @@ from kubemarine.core.errors import KME
 from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
     kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
 from kubemarine.core import flow, utils, summary
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 from kubemarine.core.resources import DynamicResources
 
 
@@ -310,6 +310,7 @@ def system_prepare_package_manager_manage_packages(group: NodeGroup):
 def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
 
+    collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             pkgs: List[str] = []
@@ -319,9 +320,9 @@ def manage_mandatory_packages(group: NodeGroup) -> RunnersGroupResult:
 
             if pkgs:
                 cluster.log.debug(f"Installing {pkgs} on {node.get_node_name()!r}")
-                packages.install(node, include=pkgs)
+                packages.install(node, include=pkgs, callback=collector)
 
-    return exe.get_merged_runners_result()
+    return collector.result
 
 
 def manage_custom_packages(group: NodeGroup) -> None:

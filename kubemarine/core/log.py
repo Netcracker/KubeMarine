@@ -294,6 +294,9 @@ class LoggerWriter:
         self.buf = ""
 
     def write(self, message: str) -> None:
+        # Both remote stderr and stdout are printed to local stdout
+        sys.stdout.write(message)
+
         lines = message.split('\n')
         for line in lines[:-1]:
             self.buf = self.buf + line
@@ -305,8 +308,13 @@ class LoggerWriter:
             self._log()
 
     def _log(self) -> None:
-        self.logger.log(logging.DEBUG, self.buf, extra={'real_caller': self.caller, 'prefix': self.prefix})
+        self.logger.log(logging.DEBUG, self.buf, extra={
+            'real_caller': self.caller, 'prefix': self.prefix, 'ignore_stdout': True
+        })
         self.buf = ""
+
+    def __repr__(self) -> str:
+        return f"LoggerWriter{{DEBUG,stdout}} at {hex(id(self))}"
 
 
 def parse_log_argument(argument: str) -> LogHandler:

@@ -45,7 +45,7 @@ class NodeGroupResultsTest(unittest.TestCase):
         service_name = package_associations['service_name']
 
         # simulate package detection command
-        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=0,
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=1,
                                                     stderr='package %s is not installed' % package_name)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('rhel', package_name)])
 
@@ -69,7 +69,7 @@ class NodeGroupResultsTest(unittest.TestCase):
         service_name = package_associations['service_name']
 
         # simulate package detection command
-        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=0,
+        exp_results1 = demo.create_nodegroup_result(cluster.nodes['master'], code=1,
                                                     stderr='dpkg-query: no packages found matching %s' % package_name)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])
 
@@ -108,12 +108,12 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         # simulate package detection command with partly installed audit
         host_to_result = {
-            '10.101.1.2': RunnersResult(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
-                                        exited=0),
-            '10.101.1.3': RunnersResult(stderr='dpkg-query: no packages found matching %s' % package_name,
-                                        exited=0),
-            '10.101.1.4': RunnersResult(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
-                                        exited=0)
+            '10.101.1.2': demo.create_result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
+                                             code=0),
+            '10.101.1.3': demo.create_result(stderr='dpkg-query: no packages found matching %s' % package_name,
+                                             code=1),
+            '10.101.1.4': demo.create_result(stdout='%s=1:2.8.5-2ubuntu6' % package_name,
+                                             code=0)
         }
         exp_results1 = demo.create_nodegroup_result_by_hosts(cluster, host_to_result)
         cluster.fake_shell.add(exp_results1, 'sudo', [self.get_detect_package_version_cmd('debian', package_name)])

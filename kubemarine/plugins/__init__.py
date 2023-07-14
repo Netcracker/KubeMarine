@@ -819,7 +819,7 @@ def apply_helm(cluster: KubernetesCluster, config: dict, plugin_name=None):
         cluster.log.debug("Deployed release %s is not found. Installing it..." % release)
         deployment_mode = "install"
 
-    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --debug'
+    command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 
@@ -1024,9 +1024,9 @@ def apply_source(cluster: KubernetesCluster, config: dict) -> None:
     if apply_required:
         cluster.log.debug("Applying yaml...")
         if use_sudo:
-            apply_common_group.sudo(apply_command, logging_stream=True)
+            apply_common_group.sudo(apply_command, hide=False)
         else:
-            apply_common_group.run(apply_command, logging_stream=True)
+            apply_common_group.run(apply_command, hide=False)
     else:
         cluster.log.debug('Apply is not required')
 

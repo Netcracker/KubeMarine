@@ -30,7 +30,8 @@ from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import Token
-from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup, \
+    CollectorCallback
 from kubemarine.core.errors import KME
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
@@ -333,7 +334,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
                 hostname=node.get_node_name())
             log.debug("Uploading to '%s'..." % node.get_host())
             node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
-            node.sudo("chmod 644 /etc/systemd/system/kubelet.service")
+            node.sudo("chmod 600 /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(exe.group)
@@ -1252,7 +1253,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     groups_amount = math.ceil(nodes_amount / group_size)
 
     log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (nodes_amount, group_size, groups_amount))
-    tokens = []
+    collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
         nodes = exe.group.get_ordered_members_list()
         for group_i in range(groups_amount):
@@ -1260,12 +1261,12 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size)+group_size):
                 if node_i < nodes_amount:
-                    tokens.append(images_prepull(nodes[node_i]))
+                    images_prepull(nodes[node_i], collector=collector)
 
-    return exe.get_merged_runners_result(tokens)
+    return collector.result
 
 
-def images_prepull(group: DeferredGroup) -> Token:
+def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
     """
     Prepull kubeadm images on group.
     :param group: NodeGroup where prepull should be performed.
@@ -1283,7 +1284,8 @@ def images_prepull(group: DeferredGroup) -> Token:
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
 
-    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml")
+    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml",
+                      callback=collector)
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):
@@ -1418,3 +1420,17 @@ def fix_flag_kubelet(cluster: KubernetesCluster, node: NodeGroup):
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
         node.put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
+ 
+
+def _config_changer(config: str, word: str):
+    equal_pos = word.find("=") + 1
+    param_begin_pos = config.find(word[:equal_pos])
+    if param_begin_pos != -1:
+        param_end_pos = config[param_begin_pos:].find(" ")
+        if param_end_pos == -1:
+            return config[:param_begin_pos] + word + "\""
+        return config[:param_begin_pos] + word + config[param_end_pos + param_begin_pos:]
+    else:
+        param_end_pos = config.rfind("\"")
+        return config[:param_end_pos] + " " + word[:] + "\""
+
