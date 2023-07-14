@@ -558,7 +558,6 @@ For example, you can have the following inventory content:
 ```yaml
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
-  password: '{{ env.PASS }}'
   username: "centos"
 
 node:
@@ -567,7 +566,6 @@ node:
     roles: ["balancer"]
   - name: "control-plane"
     keyfile: "/home/username/another.key"
-    password: '{{ env.PASS }}'
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
@@ -579,13 +577,11 @@ node:
   - name: "lb"
     username: "centos"
     keyfile: "/home/username/.ssh/id_rsa"
-    password: '{{ env.PASS }}'
     internal_address: "192.168.0.1"
     roles: ["balancer"]
   - name: "control-plane"
     username: "centos"
     keyfile: "/home/username/another.key"
-    password: '{{ env.PASS }}'
     internal_address: "192.168.0.2"
     roles: ["control-plane"]
 ```
@@ -597,7 +593,7 @@ For more information about the listed parameters, refer to the following section
 
 Note: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
 
-Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file.
+Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See more details about [environment variables](#environment-variables) 
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
