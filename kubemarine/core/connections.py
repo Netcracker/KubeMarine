@@ -43,9 +43,12 @@ class ConnectionPool:
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,
                                         inline_ssh_env: bool = True) -> fabric.connection.Connection:
-        # fabric / invoke use default encoding of deployer.
-        # We need to use encoding of remote nodes to correctly encode output of remote commands.
-        # Currently remote nodes are always Linux, so hard-code 'utf-8'.
+
+        creds={}
+        if conn_details.get('keyfile'):
+            creds['key_filename'] = os.path.expanduser(conn_details['keyfile'])
+        elif conn_details.get('password'):
+            creds['password'] = conn_details.get('password')
         cfg = fabric.Config(overrides={'run': {'encoding': "utf-8"}})
         return fabric.connection.Connection(
             host=ip,
@@ -55,15 +58,13 @@ class ConnectionPool:
             config=cfg,
             connect_timeout=conn_details.get('connection_timeout',
                                              static.GLOBALS['connection']['defaults']['timeout']),
-            connect_kwargs={
-                "key_filename": os.path.expanduser(conn_details['keyfile'])
-            },
+            connect_kwargs=creds,
             inline_ssh_env=inline_ssh_env
         )
 
     def _create_connection(self, ip: str, node: dict) -> fabric.connection.Connection:
-        if node.get('keyfile') is None:
-            raise Exception('There is no keyfile specified in configfile for node \'%s\'' % node['name'])
+        if node.get('keyfile') is None and node.get('password') is None:
+            raise Exception('There is neither keyfile not password specified in configfile for node \'%s\'' % node['name'])
 
         gateway = None
         if 'gateway' in node:

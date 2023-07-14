@@ -1,5 +1,6 @@
 node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
+  password: '{{ env.PASS }}'     #Either keyfile or password can be used.
   username: "centos"
 
 nodes:
