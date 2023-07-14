@@ -146,7 +146,7 @@ def enrich_inventory(inventory: dict, _):
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
-            
+
     # Validate the provided podSubnet IP address
     pod_subnet = inventory.get('services', {}).get('kubeadm', {}).get('networking', {}).get('podSubnet')
     try:
@@ -164,7 +164,7 @@ def enrich_inventory(inventory: dict, _):
             raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
     except ValueError:
         raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
-        
+
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     if "v1.21" in inventory["services"]["kubeadm"]["kubernetesVersion"]:
         # use first control plane internal address as a default bind-address
@@ -335,6 +335,7 @@ def install(group: NodeGroup) -> RunnersGroupResult:
             log.debug("Uploading to '%s'..." % node.get_host())
             node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
             node.sudo("chmod 600 /etc/systemd/system/kubelet.service")
+            node.sudo("chcon -t systemd_unit_file_t /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(exe.group)
@@ -809,7 +810,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
 
     # put control-plane patches
     create_kubeadm_patches_for_node(cluster, first_control_plane)
-    
+
     # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
     # and only "else" branch remains
     if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
@@ -1420,7 +1421,7 @@ def fix_flag_kubelet(cluster: KubernetesCluster, node: NodeGroup):
     if kubeadm_flags.find('--container-runtime=remote') != -1:
         kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
         node.put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
- 
+
 
 def _config_changer(config: str, word: str):
     equal_pos = word.find("=") + 1
@@ -1433,4 +1434,3 @@ def _config_changer(config: str, word: str):
     else:
         param_end_pos = config.rfind("\"")
         return config[:param_end_pos] + " " + word[:] + "\""
-
