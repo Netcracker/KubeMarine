@@ -504,6 +504,7 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
     group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
     group.sudo("modprobe -a %s" % raw_config)
+    group.sudo("chcon -t etc_t /etc/modules-load.d/predefined.conf")
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
