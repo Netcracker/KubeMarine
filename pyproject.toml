@@ -74,7 +74,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "0.18.2"
+current_version = "0.19.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true
