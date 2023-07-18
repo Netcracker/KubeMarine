@@ -349,6 +349,7 @@ compatibility_map:
       - os_family: 'rhel9'
         versions:
           - '9.2'
+
     rocky:
       - os_family: 'rhel8'
         versions:

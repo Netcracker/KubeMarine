@@ -598,7 +598,7 @@ def search_package(group: DeferredGroup, package: str, callback: Callback = None
 
 
 def get_detect_package_version_cmd(os_family: str, package_name: str) -> str:
-    if os_family in ["rhel", "rhel8"]:
+    if os_family in ["rhel", "rhel8", "rhel9"]:
         cmd = r"rpm -q %s" % package_name
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W %s" % package_name
