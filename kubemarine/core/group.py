@@ -267,15 +267,16 @@ RunResult = Union[RunnersGroupResult, Token]
 GROUP_RUN_TYPE = TypeVar('GROUP_RUN_TYPE', bound=RunResult, covariant=True)
 GROUP_SELF = TypeVar('GROUP_SELF', bound='AbstractGroup[Union[RunnersGroupResult, Token]]')
 
-def _handle_dry_run(fn: callable) -> callable:
+
+def _handle_dry_run(fn: Callable) -> Callable:
     """
     Method is a decorator that handles internal streaming of output (hide=False) of fabric (invoke).
     Note! This decorator should be the outermost.
     :param fn: Origin function to apply annotation to
     :return: Validation wrapper function
     """
-    def do_dry_run(self: 'NodeGroup', *args, **kwargs):
-        results = {}
+    def do_dry_run(self: NodeGroup, *args, **kwargs) -> NodeGroupResult:
+        results: Dict[str, str] = {}
 
         if kwargs.get("dry_run"):
             if fn.__name__ == "put":

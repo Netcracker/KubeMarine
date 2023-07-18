@@ -159,9 +159,11 @@ def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include=['haproxy', 'rh-haproxy18'])
 
 
-def restart(group: NodeGroup) -> None:
+def restart(group: NodeGroup, dry_run: bool = False) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug("Restarting haproxy in all group...")
+    if dry_run:
+        return
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             service_name = _get_associations_for_node(node)['service_name']

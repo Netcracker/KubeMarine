@@ -18,6 +18,7 @@ import argparse
 import sys
 from typing import Callable, List, Dict
 
+from kubemarine.core import utils
 from kubemarine.core import flow, resources
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
@@ -30,6 +31,7 @@ Script for executing shell command
 additional arguments:
     shell_command       command to execute on nodes
 """
+
 
 class CLIAction(Action):
     def __init__(self, node_group_provider: Callable[[KubernetesCluster], NodeGroup],
@@ -45,7 +47,9 @@ class CLIAction(Action):
         if executors_group.is_empty():
             print('Failed to find any of specified nodes or groups')
             sys.exit(1)
-
+        if utils.check_dry_run_status_active(cluster):
+            result = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True, dry_run=True)
+            sys.exit(0)
         result = executors_group.sudo(" ".join(self.remote_args), hide=self.no_stream, warn=True)
         if self.no_stream:
             cluster.log.debug(result)

@@ -119,7 +119,7 @@ class CriUpgradeAction(Action):
         drain_timeout = cluster.procedure_inventory.get('drain_timeout')
         grace_period = cluster.procedure_inventory.get('grace_period')
         disable_eviction = cluster.procedure_inventory.get("disable-eviction", True)
-
+        dry_run = utils.check_dry_run_status_active(cluster)
         for node in group.get_ordered_members_list():
             node_name = node.get_node_name()
             control_plane = node
@@ -129,11 +129,13 @@ class CriUpgradeAction(Action):
             drain_cmd = kubernetes.prepare_drain_command(
                 cluster, node_name,
                 disable_eviction=disable_eviction, drain_timeout=drain_timeout, grace_period=grace_period)
-            control_plane.sudo(drain_cmd, hide=False)
+            control_plane.sudo(drain_cmd, hide=False, dry_run=dry_run)
 
-            kubernetes.upgrade_cri_if_required(node)
-            node.sudo('systemctl restart kubelet')
-
+            kubernetes.upgrade_cri_if_required(node, dry_run=dry_run)
+            node.sudo('systemctl restart kubelet', dry_run=dry_run)
+            if dry_run:
+                cluster.log.debug("[dry-run] Upgraded Cri...")
+                return
             if workers:
                 control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
             else:
@@ -204,10 +206,11 @@ class BalancerUpgradeAction(Action):
     def _run(self, group: NodeGroup) -> None:
         cluster: KubernetesCluster = group.cluster
         packages.install(group, include=cluster.get_package_association(self.package_name, 'package_name'))
+        dry_run = utils.check_dry_run_status_active(cluster)
         if self.package_name == 'haproxy':
-            haproxy.restart(group)
+            haproxy.restart(group, dry_run)
         else:
-            keepalived.restart(group)
+            keepalived.restart(group, dry_run)
 
     def associations_changed(self, res: DynamicResources) -> bool:
         """
