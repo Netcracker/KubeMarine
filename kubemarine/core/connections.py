@@ -16,21 +16,20 @@ from typing import Dict
 
 import fabric  # type: ignore[import]
 
-from kubemarine.core.environment import Environment
-
+from kubemarine.core import static
 
 Connections = Dict[str, fabric.connection.Connection]
 
 
 class ConnectionPool:
-    def __init__(self, env: Environment):
-        self._env = env
+    def __init__(self, inventory: dict):
+        self.inventory = inventory
         self._connections: Connections = {}
 
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
-            for node in self._env.inventory['nodes']:
+            for node in self.inventory['nodes']:
                 if node.get('connect_to') == ip:
                     conn = self._create_connection(ip, node)
 
@@ -44,27 +43,28 @@ class ConnectionPool:
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,
                                         inline_ssh_env: bool = True) -> fabric.connection.Connection:
-        # fabric / invoke use default encoding of deployer.
-        # We need to use encoding of remote nodes to correctly encode output of remote commands.
-        # Currently remote nodes are always Linux, so hard-code 'utf-8'.
+
+        creds={}
+        if conn_details.get('keyfile'):
+            creds['key_filename'] = os.path.expanduser(conn_details['keyfile'])
+        elif conn_details.get('password'):
+            creds['password'] = conn_details.get('password')
         cfg = fabric.Config(overrides={'run': {'encoding': "utf-8"}})
         return fabric.connection.Connection(
             host=ip,
-            user=conn_details.get('username', self._env.globals['connection']['defaults']['username']),
+            user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
             gateway=gateway,
-            port=conn_details.get('connection_port', self._env.globals['connection']['defaults']['port']),
+            port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port']),
             config=cfg,
             connect_timeout=conn_details.get('connection_timeout',
-                                             self._env.globals['connection']['defaults']['timeout']),
-            connect_kwargs={
-                "key_filename": os.path.expanduser(conn_details['keyfile'])
-            },
+                                             static.GLOBALS['connection']['defaults']['timeout']),
+            connect_kwargs=creds,
             inline_ssh_env=inline_ssh_env
         )
 
     def _create_connection(self, ip: str, node: dict) -> fabric.connection.Connection:
-        if node.get('keyfile') is None:
-            raise Exception('There is no keyfile specified in configfile for node \'%s\'' % node['name'])
+        if node.get('keyfile') is None and node.get('password') is None:
+            raise Exception('There is neither keyfile not password specified in configfile for node \'%s\'' % node['name'])
 
         gateway = None
         if 'gateway' in node:
@@ -77,7 +77,7 @@ class ConnectionPool:
         # This is necessary to not share the same gateway connection instance in multiple threads
         gateway_conn = None
 
-        for gateway in self._env.inventory.get('gateway_nodes', []):
+        for gateway in self.inventory.get('gateway_nodes', []):
             if gateway.get('name') == name:
                 if gateway.get('address') is None:
                     raise Exception('There is no address specified in configfile for gateway \'%s\'' % name)

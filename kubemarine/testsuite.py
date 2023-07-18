@@ -52,10 +52,6 @@ class TestCase:
         elif type is TestWarn:
             self.warn(value)
         else:
-            if isinstance(value, GroupException):
-                self.cluster.log.debug(value.result)
-            else:
-                print_exc()
             self.exception(value)
         print(self.get_summary(show_hint=True))
         return True
@@ -93,7 +89,12 @@ class TestCase:
 
     def exception(self, results):
         self.status = TC_EXCEPTED
-        self.results = results
+        if isinstance(results, GroupException):
+            self.cluster.log.debug(results)
+            self.results = "Remote group exception"
+        else:
+            print_exc()
+            self.results = results
         return self
 
     def get_summary(self, show_description=False, show_hint=False, show_minimal=False, show_recommended=False):

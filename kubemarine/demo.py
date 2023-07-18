@@ -24,12 +24,13 @@ from copy import deepcopy
 from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO
 
 import fabric  # type: ignore[import]
-from invoke import UnexpectedExit
+import invoke
 
 from kubemarine import system
 from kubemarine.core.cluster import KubernetesCluster, _AnyConnectionTypes
-from kubemarine.core import flow, connections
-from kubemarine.core.executor import RunnersResult, GenericResult, Token
+from kubemarine.core import flow, connections, static
+from kubemarine.core.connections import ConnectionPool
+from kubemarine.core.executor import RunnersResult, GenericResult, Token, CommandTimedOut
 from kubemarine.core.group import (
     AbstractGroup, NodeGroup, NodeGroupResult, DeferredGroup, RunnersGroupResult,
     GROUP_RUN_TYPE, RemoteExecutor, RunResult
@@ -189,7 +190,13 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_shell = kwargs.pop("fake_shell", FakeShell())
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
-        self.connection_pool = FakeConnectionPool(self)
+
+    @property
+    def connection_pool(self) -> ConnectionPool:
+        if self._connection_pool is None:
+            self._connection_pool = FakeConnectionPool(self.inventory, self.fake_shell, self.fake_fs)
+
+        return self._connection_pool
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)
@@ -233,17 +240,15 @@ class FakeResources(DynamicResources):
 
 class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
-    def __init__(self, ip, cluster: FakeKubernetesCluster, **kw):
+    def __init__(self, ip, fake_shell: FakeShell, fake_fs: FakeFS, **kw):
         super().__init__(ip, **kw)
-        self.fake_shell = cluster.fake_shell
-        self.fake_fs = cluster.fake_fs
+        self.fake_shell = fake_shell
+        self.fake_fs = fake_fs
 
         command_sep = r'[=\-_]{32}'
         sep_symbol = r'\&\&|;'
         final_sep = rf" ({sep_symbol}) " \
-                    rf"echo \"({command_sep})\" \1 " \
-                    rf"echo \$\? \1 " \
-                    rf"echo \"\2\" \1 " \
+                    rf"printf \"%s\\n\$\?\\n%s\\n\" \"({command_sep})\" \"\2\" \1 " \
                     rf"echo \"\2\" 1>\&2 \1 (sudo )?"
 
         self.separator_ptrn = re.compile(final_sep)
@@ -270,11 +275,11 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
     def _do(self, do_type, *args, **kwargs) -> fabric.runners.Result:
         if do_type in ['sudo', 'run']:
             # start fake execution of commands
-            command = list(args)[0]
-            commands, sep_symbol, command_sep = self._split_command(do_type, command)
+            original_command = list(args)[0]
+            commands, sep_symbol, command_sep = self._split_command(do_type, original_command)
 
-            stdout = ""
-            stderr = ""
+            final_res = fabric.runners.Result(stdout="", stderr="", exited=None,
+                                              connection=self, command=original_command)
             prev_exited = None
             i = 0
             for command in commands:
@@ -283,32 +288,36 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                 if found_result is None:
                     raise Exception('Fake result not found for requested action type \'%s\' and command %s' % (do_type, [command]))
 
+                timeout_exception = None
                 if isinstance(found_result, Exception):
                     if i > 0:
                         raise ValueError("Exception can be thrown only for the whole command")
+                    elif isinstance(found_result, CommandTimedOut):
+                        timeout_exception = found_result
+                        found_result = found_result.result
                     else:
                         raise found_result
 
                 if i > 0:
-                    stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
-                    stderr += command_sep + '\n'
+                    final_res.stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
+                    final_res.stderr += command_sep + '\n'
                 i += 1
 
-                stdout += found_result.stdout
-                stderr += found_result.stderr
-                prev_exited = found_result.exited
-                if prev_exited != 0:
-                    if sep_symbol == ';':
-                        prev_exited = 0  # todo bug of RemoteExecutor
-                    else:
-                        # stop fake execution
-                        break
+                final_res.stdout += found_result.stdout
+                final_res.stderr += found_result.stderr
+                final_res.exited = prev_exited = found_result.exited
 
-            final_res = fabric.runners.Result(stdout=stdout, stderr=stderr, exited=prev_exited, connection=self)
+                if timeout_exception is not None:
+                    raise invoke.CommandTimedOut(final_res, timeout_exception.timeout)
+
+                if prev_exited != 0 and sep_symbol != ';':
+                    # stop fake execution
+                    break
+
             if prev_exited == 0 or kwargs.get('warn', False):
                 return final_res
 
-            raise UnexpectedExit(final_res)
+            raise invoke.UnexpectedExit(final_res)
 
         elif do_type == 'put':
             # It should return fabric.transfer.Result, but currently returns None.
@@ -374,15 +383,16 @@ class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
 
 
 class FakeConnectionPool(connections.ConnectionPool):
-    def __init__(self, cluster: FakeKubernetesCluster):
-        super().__init__(cluster)
-        self.cluster = cluster
+    def __init__(self, inventory: dict, fake_shell: FakeShell, fake_fs: FakeFS):
+        super().__init__(inventory)
+        self.fake_shell = fake_shell
+        self.fake_fs = fake_fs
 
     def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
         return FakeConnection(
-            ip, self.cluster,
-            user=conn_details.get('username', self._env.globals['connection']['defaults']['username']),
-            port=conn_details.get('connection_port', self._env.globals['connection']['defaults']['port'])
+            ip, self.fake_shell, self.fake_fs,
+            user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
+            port=conn_details.get('connection_port', static.GLOBALS['connection']['defaults']['port'])
         )
 
 
@@ -544,19 +554,25 @@ def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dic
     return {host: exception for host in hosts}
 
 
-def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout='', stderr='', code=0) -> NodeGroupResult:
-    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code)
+def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout='', stderr='',
+                            code=0, timeout: int = None) -> NodeGroupResult:
+    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code, timeout)
     return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_result(hosts: List[str], stdout='', stderr='', code=0) -> Dict[str, GenericResult]:
+def create_hosts_result(hosts: List[str], stdout='', stderr='',
+                        code=0, timeout: int = None) -> Dict[str, GenericResult]:
     # each host should have its own result instance.
-    return {host: create_result(stdout, stderr, code) for host in hosts}
+    return {host: create_result(stdout, stderr, code, timeout) for host in hosts}
 
 
-def create_result(stdout='', stderr='', code=0) -> RunnersResult:
-    # connection will be later replaced to fake
-    return RunnersResult(stdout=stdout, stderr=stderr, exited=code)
+def create_result(stdout='', stderr='', code=0, timeout: int = None) -> GenericResult:
+    # command and 'hide' option will be later replaced with actual
+    result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr)
+    if timeout is None:
+        return result
+
+    return CommandTimedOut(result, timeout)
 
 
 def empty_action(*args, **kwargs) -> None:

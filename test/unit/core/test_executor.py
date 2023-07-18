@@ -18,11 +18,9 @@ import unittest
 
 from concurrent.futures import TimeoutError
 
-from invoke import UnexpectedExit
-
 from kubemarine import demo
-from kubemarine.core.executor import RunnersResult
-from kubemarine.core.group import GroupException
+from kubemarine.core.executor import RunnersResult, UnexpectedExit
+from kubemarine.core.group import GroupException, RemoteGroupException, CollectorCallback
 
 
 class RemoteExecutorTest(unittest.TestCase):
@@ -32,11 +30,12 @@ class RemoteExecutorTest(unittest.TestCase):
     def test_get_merged_results_all_success(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        collector = CollectorCallback(self.cluster)
         with self.cluster.nodes["all"].new_executor() as exe:
-            exe.group.run("echo \"foo\"")
+            exe.group.run("echo \"foo\"", callback=collector)
             exe.flush()
 
-            for result in exe.get_merged_runners_result().values():
+            for result in collector.result.values():
                 self.assertEqual("foo\n", result.stdout)
 
     def test_flush_all_fail(self):
@@ -47,19 +46,20 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except GroupException as exc:
+            except RemoteGroupException as exc:
                 exception = exc
-            for result in exception.result.values():
-                self.assertIsInstance(result, UnexpectedExit)
+            for tokenized_results in exception.results.values():
+                self.assertIsInstance(list(tokenized_results.values())[0], UnexpectedExit)
 
     def test_get_merged_results_all_exited_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
+        collector = CollectorCallback(self.cluster)
         with self.cluster.nodes["all"].new_executor() as exe:
-            exe.group.run("false", warn=True)
+            exe.group.run("false", warn=True, callback=collector)
             exe.flush()
 
-            for result in exe.get_merged_runners_result().values():
+            for result in collector.result.values():
                 self.assertIsInstance(result, RunnersResult)
                 self.assertEqual(1, result.exited)
 
@@ -71,23 +71,24 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except GroupException as exc:
+            except RemoteGroupException as exc:
                 exception = exc
-            for result in exception.result.values():
-                self.assertIsInstance(result, TimeoutError)
+            for tokenized_results in exception.results.values():
+                self.assertIsInstance(list(tokenized_results.values())[0], TimeoutError)
 
     def test_get_merged_results_multiple_commands(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
+        collector = CollectorCallback(self.cluster)
         with self.cluster.nodes["all"].new_executor() as exe:
-            exe.group.run("echo \"foo\"")
-            exe.group.run("echo \"bar\"")
+            exe.group.run("echo \"foo\"", callback=collector)
+            exe.group.run("echo \"bar\"", callback=collector)
 
             exe.flush()
 
-            for result in exe.get_merged_runners_result().values():
+            for result in collector.result.values():
                 self.assertEqual("foo\nbar\n", result.stdout)
 
     def test_get_merged_results_filter_last_command_result(self):
@@ -95,17 +96,17 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
-        tokens = []
+        collector = CollectorCallback(self.cluster)
         with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("echo \"foo\"")
-            tokens.append(exe.group.run("echo \"bar\""))
+            exe.group.run("echo \"bar\"", callback=collector)
 
             exe.flush()
 
-            for result in exe.get_merged_runners_result(tokens).values():
+            for result in collector.result.values():
                 self.assertEqual("bar\n", result.stdout)
 
-    def test_flush_first_command_excepted_result_excepted(self):
+    def test_flush_first_command_failed_result_excepted(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n")
@@ -118,25 +119,57 @@ class RemoteExecutorTest(unittest.TestCase):
             exception = None
             try:
                 exe.flush()
-            except GroupException as exc:
+            except RemoteGroupException as exc:
                 exception = exc
 
             self.assertIsNotNone(exception, "Exception was not raised")
-            for result in exception.result.values():
-                self.assertIsInstance(result, UnexpectedExit)
+            for tokenized_results in exception.results.values():
+                self.assertIsInstance(list(tokenized_results.values())[0], UnexpectedExit)
 
             for host in self.cluster.nodes['all'].get_hosts():
                 self.assertIsNone(self.cluster.fake_fs.read(host, '/fake/path'))
+
+    def test_second_command_failed_first_collected(self):
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="bar\n", code=1)
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\" && false"])
+        with self.cluster.nodes["all"].new_executor() as exe:
+            first_token = exe.group.run("echo \"foo\"")
+            exe.group.run("echo \"bar\" && false")
+
+            exception = None
+            try:
+                exe.flush()
+            except RemoteGroupException as exc:
+                exception = exc
+
+            self.assertIsNotNone(exception, "Exception was not raised")
+            self.assertEqual(exe.group.nodes, set(exception.results), "Exception results were not collected")
+            for tokenized_results in exception.results.values():
+                self.assertEqual(2, len(tokenized_results), "Two commands should be run")
+                result = list(tokenized_results.values())[1]
+                self.assertIsInstance(result, UnexpectedExit)
+                self.assertEqual("echo \"bar\" && false", result.result.command,
+                                 "Unexpected exit should contain original command string of only failed command")
+                self.assertEqual("bar\n", result.result.stdout,
+                                 "Unexpected exit should contain stdout of only failed command")
+
+            last_results = exe.get_last_results()
+            self.assertEqual(exe.group.nodes, set(last_results), "Last results were not collected")
+            for tokenized_results in last_results.values():
+                result = tokenized_results.get(first_token)
+                self.assertIsNotNone(result, "Result of the first command was not collected")
+                self.assertEqual("echo \"foo\"", result.command,
+                                 "Unexpected command string of the first successful command")
+                self.assertEqual("foo\n", result.stdout,
+                                 "Unexpected result of the first successful command")
 
     def test_not_throw_on_failed_all_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
         self.cluster.fake_shell.add(results, "run", ["false"])
         with self.cluster.nodes["all"].new_executor() as exe:
             exe.group.run("false", warn=True)
-
-        for result in exe.get_merged_runners_result().values():
-            self.assertIsInstance(result, RunnersResult)
-            self.assertEqual(1, result.exited)
 
     def test_throw_on_failed_all_excepted(self):
         results = demo.create_exception_result(self.cluster.nodes["all"], TimeoutError())
@@ -150,9 +183,10 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_nodegroup_result(group, stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
 
-        group.run("echo \"foo\"")
+        collector = CollectorCallback(self.cluster)
+        group.run("echo \"foo\"", callback=collector)
         group.flush()
-        for result in group.executor.get_merged_runners_result().values():
+        for result in collector.result.values():
             self.assertEqual("foo\n", result.stdout)
 
     def test_execute_members_without_context(self):
@@ -160,12 +194,150 @@ class RemoteExecutorTest(unittest.TestCase):
         results = demo.create_nodegroup_result(group, stdout="foo\n")
         self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
 
+        collector = CollectorCallback(self.cluster)
         for node in group.get_ordered_members_list():
-            node.run("echo \"foo\"")
+            node.run("echo \"foo\"", callback=collector)
 
         group.flush()
-        for result in group.executor.get_merged_runners_result().values():
+        self.assertEqual(group.nodes_amount(), len(collector.result))
+        for result in collector.result.values():
             self.assertEqual("foo\n", result.stdout)
+
+    def test_collect_results_with_callback(self):
+        group = self.cluster.nodes["all"].new_defer()
+        results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        for i, host in enumerate(group.get_hosts()):
+            result = demo.create_result(stdout=f"bar{i}\n")
+            self.cluster.fake_shell.add({host: result}, "run", [f"echo \"bar{i}\""])
+
+        callback = CollectorCallback(self.cluster)
+        group.run("echo \"foo\"", callback=callback)
+        for i, node in enumerate(group.get_ordered_members_list()):
+            node.run(f"echo \"bar{i}\"", callback=callback)
+
+        group.flush()
+        for i, host in enumerate(group.get_hosts()):
+            result = callback.results.get(host, [])
+            self.assertEqual(2, len(result), "Result was not collected")
+            self.assertEqual("foo\n", result[0].stdout, "Result was not collected")
+            self.assertEqual(f"bar{i}\n", result[1].stdout, "Result was not collected")
+
+    def test_command_failed_result_not_collected_with_callback(self):
+        group = self.cluster.nodes["all"].new_defer()
+        results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_hosts_result(group.get_hosts(), code=1)
+        self.cluster.fake_shell.add(results, "run", ["false"])
+
+        callback = CollectorCallback(self.cluster)
+        group.run("echo \"foo\"", callback=callback)
+        group.run("false", callback=callback)
+        with self.assertRaises(GroupException):
+            group.flush()
+
+        for i, host in enumerate(group.get_hosts()):
+            result = callback.results.get(host, [])
+            self.assertEqual(1, len(result), "Result should be partially collected")
+            self.assertEqual("foo\n", result[0].stdout, "Result was not collected")
+
+    def test_represent_group_exception_one_command_failed(self):
+        group = self.cluster.nodes["control-plane"].new_defer()
+        results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_hosts_result(group.get_hosts(), stdout="bar\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\""])
+        results = demo.create_hosts_result(group.get_hosts(), stderr="failed\n", code=1)
+        self.cluster.fake_shell.add(results, "run", ["echo \"failed\" 2>&1 && false"])
+
+        group.run("echo \"foo\"")
+        group.run("echo \"bar\"")
+        group.get_first_member().run("echo \"failed\" 2>&1 && false")
+        group.get_ordered_members_list()[2].put(io.StringIO('test'), '/fake/path')
+
+        exception = None
+        try:
+            group.flush()
+        except RemoteGroupException as exc:
+            exception = exc
+
+        self.assertIsNotNone(exception, "Exception was not raised")
+        expected_results_str = ("""\
+            10.101.1.2: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t
+            \tEncountered a bad command exit code!
+            \t
+            \tCommand: 'echo "failed" 2>&1 && false'
+            \t
+            \tExit code: 1
+            \t
+            \t=== stderr ===
+            \tfailed
+            \t
+            10.101.1.3: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t
+            10.101.1.4: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t"""
+                                ).replace("""\
+            """, ""
+                                          )
+        self.assertEqual(expected_results_str, str(exception),
+                         "Unexpected textual representation of remote group exception")
+
+    def test_represent_group_exception_timeout(self):
+        group = self.cluster.nodes["control-plane"].new_defer()
+        results = demo.create_hosts_result(group.get_hosts(), stdout="foo\n")
+        self.cluster.fake_shell.add(results, "run", ["echo \"foo\""])
+        results = demo.create_hosts_result(group.get_hosts(), stdout="bar\n")
+        results[group.get_first_member().get_host()] = demo.create_result(stdout="bar\n", timeout=10)
+        self.cluster.fake_shell.add(results, "run", ["echo \"bar\" && sleep 10"])
+
+        group.run("echo \"foo\"", timeout=10)
+        group.run("echo \"bar\" && sleep 10", timeout=10)
+
+        exception = None
+        try:
+            group.flush()
+        except RemoteGroupException as exc:
+            exception = exc
+
+        self.assertIsNotNone(exception, "Exception was not raised")
+        expected_results_str = ("""\
+            10.101.1.2: code=0
+            \t=== stdout ===
+            \tfoo
+            \t
+            \tCommand did not complete within 10 seconds!
+            \t
+            \tCommand: 'echo "bar" && sleep 10'
+            \t
+            \t=== stdout ===
+            \tbar
+            \t
+            10.101.1.3: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t
+            10.101.1.4: code=0
+            \t=== stdout ===
+            \tfoo
+            \tbar
+            \t"""
+                                ).replace("""\
+            """, ""
+                                          )
+        self.assertEqual(expected_results_str, str(exception),
+                         "Unexpected textual representation of remote group exception")
 
     def test_write_large_stream(self):
         self.cluster.fake_fs.emulate_latency = True

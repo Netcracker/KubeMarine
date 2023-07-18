@@ -12,7 +12,15 @@
       "description": "Gateway node's IP or hostname address for connection"
     }
   },
-  "required": ["name", "address", "username", "keyfile"],
+  "required": ["name", "address", "username"],
+  "oneOf": [
+    {
+      "required": ["keyfile"]
+    },
+    {
+      "required": ["password"]
+    }
+  ],
   "propertyNames": {
     "anyOf": [
       {"$ref": "node_defaults.json#/definitions/SSHAccessCommonPropertyNames"},

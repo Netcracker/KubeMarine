@@ -23,7 +23,7 @@ from typing import Optional
 from kubemarine import system, packages
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -68,17 +68,19 @@ def install(group: NodeGroup) -> Optional[RunnersGroupResult]:
     else:
         log.debug(f'Auditd package is not installed on {not_installed_hosts}, installing...')
 
-    if utils.check_dry_run_status_active(group.cluster):
+    if utils.check_dry_run_status_active(cluster):
         return None
 
+    collector = CollectorCallback(cluster)
     with cluster.make_group(not_installed_hosts).new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             package_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'package_name')
-            packages.install(node, include=package_name)
-            service_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'service_name')
-            system.enable_service(node, name=service_name)
+            packages.install(node, include=package_name, callback=collector)
 
-    return exe.get_merged_runners_result()
+            service_name = cluster.get_package_association_for_node(node.get_host(), 'audit', 'service_name')
+            system.enable_service(node, name=service_name, callback=collector)
+
+    return collector.result
 
 
 def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
@@ -96,8 +98,8 @@ def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
 
     if utils.check_dry_run_status_active(group.cluster):
         return None
+    collector = CollectorCallback(cluster)
 
-    restart_tokens = []
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             host = node.get_host()
@@ -106,6 +108,6 @@ def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
             node.put(io.StringIO(rules_content), rules_config_location, sudo=True, backup=True)
 
             service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
-            restart_tokens.append(node.sudo(f'service {service_name} restart'))
+            node.sudo(f'service {service_name} restart', callback=collector)
 
-    return exe.get_merged_runners_result(restart_tokens)
+    return collector.result

@@ -30,7 +30,8 @@ from kubemarine import system, plugins, admission, etcd, packages
 from kubemarine.core import utils, static, summary, log, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import Token
-from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, RunResult, AbstractGroup, DeferredGroup, \
+    CollectorCallback
 from kubemarine.core.errors import KME
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
@@ -1293,7 +1294,7 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
     groups_amount = math.ceil(nodes_amount / group_size)
 
     log.verbose("Nodes amount: %s\nGroup size: %s\nGroups amount: %s" % (nodes_amount, group_size, groups_amount))
-    tokens = []
+    collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
         nodes = exe.group.get_ordered_members_list()
         for group_i in range(groups_amount):
@@ -1301,12 +1302,12 @@ def images_grouped_prepull(group: NodeGroup, group_size: int = None):
             # RemoteExecutor used for future cases, when some nodes will require another/additional actions for prepull
             for node_i in range(group_i*group_size, (group_i*group_size) + group_size):
                 if node_i < nodes_amount:
-                    tokens.append(images_prepull(nodes[node_i]))
+                    images_prepull(nodes[node_i], collector=collector)
 
-    return exe.get_merged_runners_result(tokens)
+    return collector.result
 
 
-def images_prepull(group: DeferredGroup) -> Token:
+def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
     """
     Prepull kubeadm images on group.
     :param group: NodeGroup where prepull should be performed.
@@ -1323,8 +1324,7 @@ def images_prepull(group: DeferredGroup) -> Token:
     config = f'{config}---\n{yaml.dump(kubeadm_init, default_flow_style=False)}'
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True, dry_run=dry_run)
-
-    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml", dry_run=dry_run)
+    return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml", callback=collector, dry_run=dry_run)
 
 
 def schedule_running_nodes_report(cluster: KubernetesCluster):

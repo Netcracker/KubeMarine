@@ -16,8 +16,7 @@
 
 import unittest
 
-from kubemarine.core.executor import RunnersResult
-from kubemarine.core.group import NodeGroup, NodeGroupResult
+from kubemarine.core.group import NodeGroup, NodeGroupResult, GroupResultException
 from kubemarine import demo
 
 
@@ -27,14 +26,24 @@ class NodeGroupResultsTest(unittest.TestCase):
         self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
 
     def test_nodegroup_result_to_str(self):
-        expected_results_str = '''	10.101.1.2: code=1
-		STDERR: sudo: kubectl: command not found
-	10.101.1.3: code=1
-		STDERR: sudo: kubectl: command not found
-	10.101.1.4: code=1
-		STDERR: sudo: kubectl: command not found'''
+        expected_results_str = ("""\
+            10.101.1.2: code=1
+            \t=== stderr ===
+            \tsudo: kubectl: command not found
+            \t
+            10.101.1.3: code=1
+            \t=== stderr ===
+            \tsudo: kubectl: command not found
+            \t
+            10.101.1.4: code=1
+            \t=== stderr ===
+            \tsudo: kubectl: command not found
+            \t"""
+                                ).replace("""\
+            """, ""
+                                          )
         results: NodeGroupResult = demo.create_nodegroup_result(self.cluster.nodes['master'], code=1,
-                                                                stderr='sudo: kubectl: command not found')
+                                                                stderr='sudo: kubectl: command not found\n')
         actual_results_str = str(results)
         self.assertEqual(expected_results_str, actual_results_str, msg="NodeGroupResult string generated with invalid "
                                                                        "formatting")
@@ -68,9 +77,9 @@ class NodeGroupResultsTest(unittest.TestCase):
 
     def test_any_failed_via_bad_code(self):
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
-            '10.101.1.2': RunnersResult(stderr='error', exited=1),
-            '10.101.1.3': RunnersResult(stdout='ok', exited=0)
+            '10.101.1.1': demo.create_result(stdout='ok', code=0),
+            '10.101.1.2': demo.create_result(stderr='error', code=1),
+            '10.101.1.3': demo.create_result(stdout='ok', code=0)
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         self.assertTrue(results.is_any_failed(), msg="Failed to identify at least one failed node")
@@ -85,24 +94,26 @@ class NodeGroupResultsTest(unittest.TestCase):
             '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.1': demo.create_result(stdout='ok', code=0),
             '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': RunnersResult(stdout='ok', exited=0)
+            '10.101.1.3': demo.create_result(stdout='ok', code=0)
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
-        actual_hosts_list = results.get_exited_hosts_list()
+        exception = GroupResultException(results)
+        actual_hosts_list = exception.get_exited_hosts_list()
         self.assertEqual(expected_exited_hosts_list, actual_hosts_list,
                          msg="Actual nodes list contains different nodes than expected")
 
     def test_get_exited_nodes_group(self):
         expected_exited_group = self.cluster.make_group(['10.101.1.1', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.1': demo.create_result(stdout='ok', code=0),
             '10.101.1.2': Exception('Something failed here'),
-            '10.101.1.3': RunnersResult(stdout='error', exited=1)
+            '10.101.1.3': demo.create_result(stdout='error', code=1)
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
-        actual_group = results.get_exited_nodes_group()
+        exception = GroupResultException(results)
+        actual_group = exception.get_exited_nodes_group()
         self.assertEqual(expected_exited_group, actual_group, msg="Actual group contains different nodes than expected")
 
     def test_get_excepted_nodes_list(self):
@@ -111,24 +122,26 @@ class NodeGroupResultsTest(unittest.TestCase):
             '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.1': demo.create_result(stdout='ok', code=0),
             '10.101.1.2': Exception('Something failed here'),
             '10.101.1.3': Exception('And there')
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
-        actual_hosts_list = results.get_excepted_hosts_list()
+        exception = GroupResultException(results)
+        actual_hosts_list = exception.get_excepted_hosts_list()
         self.assertEqual(expected_excepted_hosts_list, actual_hosts_list,
                          msg="Actual nodes list contains different nodes than expected")
 
     def test_get_excepted_nodes_group(self):
         expected_excepted_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='ok', exited=0),
+            '10.101.1.1': demo.create_result(stdout='ok', code=0),
             '10.101.1.2': Exception('Something failed here'),
             '10.101.1.3': Exception('And there')
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
-        actual_group = results.get_excepted_nodes_group()
+        exception = GroupResultException(results)
+        actual_group = exception.get_excepted_nodes_group()
         self.assertEqual(expected_excepted_group, actual_group, msg="Actual group contains different nodes than expected")
 
     def test_get_failed_nodes_list(self):
@@ -137,9 +150,9 @@ class NodeGroupResultsTest(unittest.TestCase):
             '10.101.1.3'
         ]
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='error', exited=1),
-            '10.101.1.2': RunnersResult(stdout='ok', exited=0),
-            '10.101.1.3': RunnersResult(stdout='error', exited=1)
+            '10.101.1.1': demo.create_result(stdout='error', code=1),
+            '10.101.1.2': demo.create_result(stdout='ok', code=0),
+            '10.101.1.3': demo.create_result(stdout='error', code=1)
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         actual_hosts_list = results.get_failed_hosts_list()
@@ -149,9 +162,9 @@ class NodeGroupResultsTest(unittest.TestCase):
     def test_get_failed_nodes_group(self):
         expected_nonzero_group = self.cluster.make_group(['10.101.1.1', '10.101.1.3'])
         host_to_result = {
-            '10.101.1.1': RunnersResult(stdout='error', exited=1),
-            '10.101.1.2': RunnersResult(stdout='ok', exited=0),
-            '10.101.1.3': RunnersResult(stdout='error', exited=1)
+            '10.101.1.1': demo.create_result(stdout='error', code=1),
+            '10.101.1.2': demo.create_result(stdout='ok', code=0),
+            '10.101.1.3': demo.create_result(stdout='error', code=1)
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         actual_group = results.get_failed_nodes_group()

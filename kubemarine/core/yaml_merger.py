@@ -42,7 +42,7 @@ def list_merger(config: Merger, path: list, base: list, nxt: list) -> list:
     return nxt
 
 
-default_merger = Merger(
+default_merger: Merger = Merger(
     [
         (list, [list_merger]),
         (dict, ["merge"])

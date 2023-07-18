@@ -22,41 +22,48 @@ import json
 from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.group import NodeGroup, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
+
     if utils.check_dry_run_status_active(group.cluster):
         group.cluster.log.debug("[dry-run] Installing Containerd")
         return None
+    collector = CollectorCallback(group.cluster)
+
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
             exe.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
             # always install latest available containerd and podman
-            packages.install(node, include=os_specific_associations['package_name'])
+            packages.install(node, include=os_specific_associations['package_name'], callback=collector)
 
             # remove previous config.toml to avoid problems in case when previous config was broken
             node.sudo("rm -f %s && sudo systemctl restart %s"
                       % (os_specific_associations['config_location'],
-                         os_specific_associations['service_name']))
+                         os_specific_associations['service_name']),
+                      callback=collector)
 
-            system.enable_service(node, os_specific_associations['service_name'], now=True)
-    return exe.get_merged_runners_result()
+            system.enable_service(node, os_specific_associations['service_name'],
+                                  now=True, callback=collector)
+    return collector.result
 
 
 def configure(group: NodeGroup) -> RunnersGroupResult:
-    log = group.cluster.log
+    cluster = group.cluster
+    log = cluster.log
 
     log.debug("Uploading crictl configuration for containerd...")
     crictl_config = yaml.dump({"runtime-endpoint": "unix:///run/containerd/containerd.sock"})
-    utils.dump_file(group.cluster, crictl_config, 'crictl.yaml')
-    dry_run = utils.check_dry_run_status_active(group.cluster)
+
+    utils.dump_file(cluster, crictl_config, 'crictl.yaml')
+    dry_run = utils.check_dry_run_status_active(cluster)
     group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True, dry_run=dry_run)
 
     config_string = ""
     # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
-    containerd_config = group.cluster.inventory["services"]["cri"]['containerdConfig']
+    containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
     runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
     if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
         containerd_config[runc_options_path]['SystemdCgroup'] = \
@@ -104,11 +111,11 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
         log.debug("Removing old podman configuration...")
         group.sudo("rm -f /etc/containers/registries.conf", dry_run=dry_run)
 
-    utils.dump_file(group.cluster, config_string, 'containerd-config.toml')
-
+    utils.dump_file(cluster, config_string, 'containerd-config.toml')
     if dry_run:
         return None
-    tokens = []
+    collector = CollectorCallback(cluster)
+
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
@@ -116,11 +123,11 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
             node.put(StringIO(config_string), os_specific_associations['config_location'],
                      backup=True, sudo=True, mkdir=True)
             log.debug("Restarting Containerd on %s node..." % node.get_node_name())
-            tokens.append(node.sudo(
+            node.sudo(
                 f"chmod 600 {os_specific_associations['config_location']} && "
                 f"sudo systemctl restart {os_specific_associations['service_name']} && "
-                f"systemctl status {os_specific_associations['service_name']}"))
-    return exe.get_merged_runners_result(tokens)
+                f"systemctl status {os_specific_associations['service_name']}", callback=collector)
+    return collector.result
 
 
 def prune(group: NodeGroup) -> RunnersGroupResult:

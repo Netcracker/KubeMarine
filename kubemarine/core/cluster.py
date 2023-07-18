@@ -16,7 +16,7 @@ from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
 
 import yaml
 
-from kubemarine.core import log, utils
+from kubemarine.core import log, utils, static
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup, NodeConfig
@@ -39,8 +39,7 @@ class KubernetesCluster(Environment):
         self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
-        # connection pool should be created every time, because it relies on partially enriched inventory
-        self.connection_pool = ConnectionPool(self)
+        self._connection_pool: Optional[ConnectionPool] = None
 
         self._logger = logger if logger is not None \
             else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
@@ -59,8 +58,21 @@ class KubernetesCluster(Environment):
         return self._inventory
 
     @property
+    def connection_pool(self) -> ConnectionPool:
+        if self._connection_pool is None:
+            # Connection pool should be created for each cluster object,
+            # because it relies on partially enriched inventory
+            self._connection_pool = ConnectionPool(self.inventory)
+
+        return self._connection_pool
+
+    @property
     def log(self) -> log.EnhancedLogger:
         return self._logger
+
+    @property
+    def globals(self) -> dict:
+        return static.GLOBALS
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> NodeGroup:
         return NodeGroup(ips, self)
