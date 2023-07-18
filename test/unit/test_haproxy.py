@@ -79,13 +79,17 @@ class TestHaproxyInstallation(unittest.TestCase):
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
         cluster.fake_shell.add(expected_results_2, 'sudo', ["mkdir -p /etc/systemd/system/rh-haproxy18-haproxy.service.d"])
 
-        # simulate systemd daemon reload
+        # simulate chcon command
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_3, 'sudo', ["systemctl daemon-reload"])
+        cluster.fake_shell.add(expected_results_3, 'sudo', ["chcon -u system_u /etc/systemd/system/rh-haproxy18-haproxy.service.d"])
+
+        # simulate systemd daemon reload
+        expected_results_4 = demo.create_nodegroup_result(cluster.nodes['balancer'])
+        cluster.fake_shell.add(expected_results_4, 'sudo', ["systemctl daemon-reload"])
 
         # simulate enable package command
-        expected_results_4 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='ok')
-        cluster.fake_shell.add(expected_results_4, 'sudo', ['systemctl enable %s --now' % package_associations['service_name']])
+        expected_results_5 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='ok')
+        cluster.fake_shell.add(expected_results_5, 'sudo', ['systemctl enable %s --now' % package_associations['service_name']])
 
         # start installation
         actual_result = haproxy.install(cluster.nodes['balancer'])
@@ -121,13 +125,17 @@ class TestHaproxyInstallation(unittest.TestCase):
         expected_results_2 = demo.create_nodegroup_result(cluster.nodes['balancer'])
         cluster.fake_shell.add(expected_results_2, 'sudo', ["mkdir -p /etc/systemd/system/rh-haproxy18-haproxy.service.d"])
 
-        # simulate systemd daemon reload
+        # simulate chcon command
         expected_results_3 = demo.create_nodegroup_result(cluster.nodes['balancer'])
-        cluster.fake_shell.add(expected_results_3, 'sudo', ["systemctl daemon-reload"])
+        cluster.fake_shell.add(expected_results_3, 'sudo', ["chcon -u system_u /etc/systemd/system/rh-haproxy18-haproxy.service.d"])
+
+        # simulate systemd daemon reload
+        expected_results_4 = demo.create_nodegroup_result(cluster.nodes['balancer'])
+        cluster.fake_shell.add(expected_results_4, 'sudo', ["systemctl daemon-reload"])
 
         # simulate enable package command
-        expected_results_4 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='ok')
-        cluster.fake_shell.add(expected_results_4, 'sudo', ['systemctl enable %s --now' % package_associations['service_name']])
+        expected_results_5 = demo.create_nodegroup_result(cluster.nodes['balancer'], stdout='ok')
+        cluster.fake_shell.add(expected_results_5, 'sudo', ['systemctl enable %s --now' % package_associations['service_name']])
 
         # start installation
         actual_result = haproxy.install(cluster.nodes['balancer'])

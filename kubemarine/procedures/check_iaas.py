@@ -426,7 +426,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
         # TODO: think about better parsing
         repository_urls: List[str] = []
         repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
-        if cluster.get_os_family() not in ['debian', 'rhel', 'rhel8']:
+        if cluster.get_os_family() not in ['debian', 'rhel', 'rhel8', 'rhel9']:
             # Skip check in case of multiply or unknown OS
             raise TestWarn("Can't check package repositories on multiply OS")
         if isinstance(repositories, list):

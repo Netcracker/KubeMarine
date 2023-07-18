@@ -19,7 +19,6 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import RunnersGroupResult, NodeGroup
 from kubemarine.cri import docker, containerd
 
-
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     cri_impl = inventory['services']['cri']['containerRuntime']
     if cluster.context.get("initial_procedure") != "migrate_cri":

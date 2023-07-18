@@ -202,6 +202,21 @@ packages:
     keepalived:
       package_name:
         - keepalived: keepalived
+  rhel9:
+    docker:
+      package_name:
+        - docker-ce: docker
+        - docker-ce-cli: docker
+        - containerd.io: containerdio
+    containerd:
+      package_name:
+        - containerd.io: containerdio
+    haproxy:
+      package_name:
+        - haproxy: haproxy
+    keepalived:
+      package_name:
+        - keepalived: keepalived
   common_associations:
     docker:
       executable_name: 'docker'
@@ -257,6 +272,7 @@ packages:
       groups: [ control-plane, worker, balancer ]
     semanage:
       groups: [ control-plane, worker, balancer ]
+
 
 compatibility_map:
   # This section is filled automatically during Kubemarine work from the following resources:
@@ -314,6 +330,9 @@ compatibility_map:
       - os_family: 'rhel8'
         versions:
           - '8.4'
+      - os_family: 'rhel9'
+        versions:
+          - '9'
     rhel:
       - os_family: 'rhel'
         versions:
@@ -328,11 +347,16 @@ compatibility_map:
           - '8.6'
           - '8.7'
           - '8.8'
+      - os_family: 'rhel9'
+        versions:
+          - '9.2'
+
     rocky:
       - os_family: 'rhel8'
         versions:
           - '8.6'
           - '8.7'
+          - '8.8'
     ubuntu:
       - os_family: 'debian'
         versions:
@@ -356,6 +380,10 @@ compatibility_map:
       - os_family: 'rhel8'
         versions:
           - '8.4'
+      - os_family: 'rhel9'
+        versions:
+          - '9.1'
+          - '9.2'
 
   network:
     connection:
