@@ -114,14 +114,16 @@ def stop_cluster(cluster: KubernetesCluster):
                                               'sudo docker rm -f $(sudo docker ps -a -q); '
                                               'sudo docker ps -a; '
                                               'sudo rm -rf /var/lib/etcd; '
-                                              'sudo mkdir -p /var/lib/etcd &&'
+                                              'sudo mkdir -p /var/lib/etcd && '
+                                              'sudo chmod 700 /var/lib/etcd && '
                                               'sudo chown etcd:etcd /var/lib/etcd', warn=True)
     else:
         result = cluster.nodes['control-plane'].sudo('systemctl stop kubelet; '
                                               'sudo crictl rm -fa; '
                                               'sudo crictl ps -a; '
                                               'sudo rm -rf /var/lib/etcd; '
-                                              'sudo mkdir -p /var/lib/etcd &&'
+                                              'sudo mkdir -p /var/lib/etcd && '
+                                              'sudo chmod 700 /var/lib/etcd && '
                                               'sudo chown etcd:etcd /var/lib/etcd', warn=True)
     cluster.log.verbose(result)
 
