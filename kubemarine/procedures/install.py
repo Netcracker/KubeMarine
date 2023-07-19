@@ -139,6 +139,19 @@ def system_prepare_system_sysctl(group: NodeGroup):
         sysctl.reload,
     ])
 
+@_applicable_for_new_nodes_with_roles('all')
+def system_prepare_add_etcd_user(group: NodeGroup):
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
+    log.debug("Checking existence of etcd user for ETCD")
+    kubernetes_nodes = cluster.make_group_from_roles(['control-plane'])
+    for member_node in kubernetes_nodes.get_ordered_members_list():
+        user_exists = member_node.sudo("id etcd", warn=True)
+        # log.debug(user_exists.stderr_contains("no such user"))
+        if user_exists.stderr_contains("no such user"):
+            log.debug("etcd user doesn't exists, creating the user")
+            member_node.sudo("adduser etcd --disabled-password --gecos ''")
+        else: log.debug("etcd user already exits")
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup):
@@ -583,6 +596,7 @@ tasks = OrderedDict({
             "disable_swap": system_prepare_system_disable_swap,
             "modprobe": system_prepare_system_modprobe,
             "sysctl": system_prepare_system_sysctl,
+            "user_add": system_prepare_add_etcd_user,
             "audit": {
                 "install": system_install_audit,
                 "configure_daemon": system_prepare_audit_daemon,
