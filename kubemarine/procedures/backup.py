@@ -23,18 +23,18 @@ import shutil
 import tarfile
 import time
 from collections import OrderedDict
-from typing import List
+from typing import List, Tuple
 
 import yaml
 
-from kubemarine.core import utils, flow
+from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 
 
-def get_default_backup_files_list(cluster: KubernetesCluster):
+def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     haproxy_service = cluster.get_package_association('haproxy', 'service_name')
     keepalived_service = cluster.get_package_association('keepalived', 'service_name')
 
@@ -67,7 +67,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster):
     return backup_files_list
 
 
-def prepare_backup_tmpdir(cluster: KubernetesCluster):
+def prepare_backup_tmpdir(cluster: KubernetesCluster) -> str:
     backup_directory = cluster.context.get('backup_tmpdir')
     if not backup_directory:
         cluster.log.verbose('Backup directory is not ready yet, preparing..')
@@ -78,20 +78,20 @@ def prepare_backup_tmpdir(cluster: KubernetesCluster):
     return backup_directory
 
 
-def verify_backup_location(cluster: KubernetesCluster):
+def verify_backup_location(cluster: KubernetesCluster) -> None:
     target = utils.get_external_resource_path(cluster.procedure_inventory.get('backup_location', 'backup.tar.gz'))
     if not os.path.isdir(target) and not os.path.isdir(os.path.abspath(os.path.join(target, os.pardir))):
         raise FileNotFoundError('Backup location directory not exists')
 
 
-def export_ansible_inventory(cluster: KubernetesCluster):
+def export_ansible_inventory(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     shutil.copyfile(cluster.context['execution_arguments']['ansible_inventory_location'],
                     os.path.join(backup_directory, 'ansible-inventory.ini'))
     cluster.log.verbose('ansible-inventory.ini exported to backup')
 
 
-def export_packages_list(cluster: KubernetesCluster):
+def export_packages_list(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         cmd = r"rpm -qa"
@@ -102,7 +102,7 @@ def export_packages_list(cluster: KubernetesCluster):
         cluster.context['backup_descriptor']['nodes']['packages'][host] = result.stdout.strip().split('\n')
 
 
-def export_hostname(cluster: KubernetesCluster):
+def export_hostname(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['hostnames'] = {}
     results = cluster.nodes['all'].sudo('hostnamectl status | head -n 1 | sed -e \'s/[a-zA-Z ]*://g\'')
     cluster.log.verbose(results)
@@ -110,7 +110,7 @@ def export_hostname(cluster: KubernetesCluster):
         cluster.context['backup_descriptor']['nodes']['hostnames'][host] = result.stdout.strip()
 
 
-def export_cluster_yaml(cluster: KubernetesCluster):
+def export_cluster_yaml(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     shutil.copyfile(utils.get_dump_filepath(cluster.context, 'cluster.yaml'),
                     os.path.join(backup_directory, 'cluster.yaml'))
@@ -119,7 +119,7 @@ def export_cluster_yaml(cluster: KubernetesCluster):
     cluster.log.verbose('cluster.yaml exported to backup')
 
 
-def export_nodes(cluster: KubernetesCluster):
+def export_nodes(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     backup_nodes_data_dir = os.path.join(backup_directory, 'nodes_data')
     os.mkdir(backup_nodes_data_dir)
@@ -152,7 +152,7 @@ def export_nodes(cluster: KubernetesCluster):
     cluster.nodes['all'].sudo('rm -f /tmp/kubemarine-backup.tar.gz')
 
 
-def export_etcd(cluster: KubernetesCluster):
+def export_etcd(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     etcd_node, is_custom_etcd_node = select_etcd_node(cluster)
     cluster.context['backup_descriptor']['etcd']['image'] = retrieve_etcd_image(cluster, etcd_node)
@@ -160,10 +160,10 @@ def export_etcd(cluster: KubernetesCluster):
     # Try to detect cluster health and other metadata like db size, leader
     etcd_status = None
     try:
-        result = etcd_node.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
-        cluster.log.verbose(result)
+        status_json = etcd_node.sudo('etcdctl endpoint status --cluster -w json').get_simple_out()
+        cluster.log.verbose(status_json)
 
-        etcd_status = json.load(io.StringIO(result.lower()))
+        etcd_status = json.load(io.StringIO(status_json.lower()))
         parsed_etcd_status = {}
         for item in etcd_status:
             # get rid of https:// and :2379
@@ -206,7 +206,7 @@ def export_etcd(cluster: KubernetesCluster):
     etcd_node.sudo('rm -f /tmp/%s' % snap_name)
 
 
-def select_etcd_node(cluster: KubernetesCluster):
+def select_etcd_node(cluster: KubernetesCluster) -> Tuple[NodeGroup, bool]:
     custom_etcd_node = cluster.procedure_inventory.get('backup_plan', {}).get('etcd', {}).get('source_node')
 
     if custom_etcd_node:
@@ -218,7 +218,7 @@ def select_etcd_node(cluster: KubernetesCluster):
         return cluster.nodes['control-plane'].get_any_member(), False
 
 
-def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup):
+def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup) -> str:
     # TODO: Detect ETCD version via /etc/kubernetes/manifests/etcd.yaml config if presented, otherwise use containers
     node_name = etcd_node.get_node_name()
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
@@ -241,12 +241,12 @@ def retrieve_etcd_image(cluster: KubernetesCluster, etcd_node: NodeGroup):
         images_json = json.loads(list(etcd_node.sudo("crictl images -v -o json").values())[0].stdout)['images']
         for image in images_json:
             if image['id'] == etcd_image_sha:
-                return image['repoTags'][0]
+                return f"{image['repoTags'][0]}"
 
     raise Exception("Unable to find etcd image on node %s" % node_name)
 
 
-def export_kubernetes_version(cluster: KubernetesCluster):
+def export_kubernetes_version(cluster: KubernetesCluster) -> None:
     control_plane = cluster.nodes['control-plane'].get_any_member()
     version = control_plane.sudo('kubectl get nodes --no-headers | head -n 1 | awk \'{print $5; exit}\'').get_simple_out()
     cluster.context['backup_descriptor']['kubernetes']['version'] = version.strip()
@@ -254,15 +254,16 @@ def export_kubernetes_version(cluster: KubernetesCluster):
 
 # There is no way to parallel resources connection via Queue or Pool:
 # the ssh connection is not possible to parallelize due to thread lock
-def download_resources(log, resources: List[str], location, control_plane: NodeGroup, namespace=None):
+def download_resources(logger: log.EnhancedLogger, resources: List[str], location: str, control_plane: NodeGroup,
+                       namespace: str = None) -> List[str]:
 
     if namespace:
-        log.debug('Downloading resources from namespace "%s"...' % namespace)
+        logger.debug('Downloading resources from namespace "%s"...' % namespace)
 
     actual_resources: List[str] = []
 
     if not resources:
-        log.debug('No resources found to download')
+        logger.debug('No resources found to download')
         return actual_resources
 
     cmd = ''
@@ -291,7 +292,7 @@ def download_resources(log, resources: List[str], location, control_plane: NodeG
     return actual_resources
 
 
-def export_kubernetes(cluster: KubernetesCluster):
+def export_kubernetes(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     control_plane = cluster.nodes['control-plane'].get_any_member()
 
@@ -383,7 +384,7 @@ def export_kubernetes(cluster: KubernetesCluster):
         cluster.context['backup_descriptor']['kubernetes']['resources']['nonnamespaced'] = nonnamespaced_resources_list
 
 
-def make_descriptor(cluster: KubernetesCluster):
+def make_descriptor(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
 
     cluster.context['backup_descriptor']['kubernetes']['thirdparties'] = cluster.inventory['services']['thirdparties']
@@ -393,7 +394,7 @@ def make_descriptor(cluster: KubernetesCluster):
         output.write(yaml.dump(cluster.context['backup_descriptor']))
 
 
-def pack_data(cluster: KubernetesCluster):
+def pack_data(cluster: KubernetesCluster) -> None:
     cluster_name = cluster.inventory['cluster_name']
     backup_directory = prepare_backup_tmpdir(cluster)
 
@@ -437,14 +438,14 @@ tasks = OrderedDict({
 
 
 class BackupAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('backup')
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
     Script for making backup of Kubernetes resources and nodes contents.
 

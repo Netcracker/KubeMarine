@@ -383,7 +383,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
 
     default_plugins = static.DEFAULTS['plugins']
     plugins = list(default_plugins)
-    plugins.sort(key=get_default_plugin_prioriry)
+    plugins.sort(key=get_default_plugin_priority)
     for plugin_name in plugins:
         k8s_versions = upgrade_config['plugins'][plugin_name]
         if k8s_versions:
@@ -393,7 +393,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
     return upgrade_patches
 
 
-def get_default_plugin_prioriry(plugin: str) -> int:
+def get_default_plugin_priority(plugin: str) -> int:
     priority: int = static.DEFAULTS['plugins'][plugin]['installation']['priority']
     return priority
 

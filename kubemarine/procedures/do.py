@@ -59,7 +59,7 @@ class CLIAction(Action):
 def main(cli_arguments: List[str] = None) -> None:
 
     if not cli_arguments:
-        cli_arguments = sys.argv
+        cli_arguments = sys.argv[1:]
 
     if '--' in cli_arguments:
         kubemarine_args = cli_arguments[:cli_arguments.index('--')]

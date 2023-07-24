@@ -27,13 +27,12 @@ from kubemarine.core import flow
 from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import CollectorCallback
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
 
-def system_prepare_thirdparties(cluster: KubernetesCluster):
+def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
         return
@@ -41,14 +40,14 @@ def system_prepare_thirdparties(cluster: KubernetesCluster):
     install.system_prepare_thirdparties(cluster)
 
 
-def prepull_images(cluster: KubernetesCluster):
+def prepull_images(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Prepulling Kubernetes images...")
     fix_cri_socket(cluster)
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     upgrade_group.call(kubernetes.images_grouped_prepull)
 
 
-def kubernetes_upgrade(cluster: KubernetesCluster):
+def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
@@ -73,7 +72,7 @@ def kubernetes_upgrade(cluster: KubernetesCluster):
     cluster.context['cached_nodes_versions_cleaned'] = True
 
 
-def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster):
+def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
@@ -82,7 +81,7 @@ def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster):
     kubernetes_apply_taints(cluster)
 
 
-def upgrade_packages(cluster: KubernetesCluster):
+def upgrade_packages(cluster: KubernetesCluster) -> None:
     upgrade_version = cluster.context["upgrade_version"]
 
     packages = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
@@ -90,7 +89,7 @@ def upgrade_packages(cluster: KubernetesCluster):
         install.manage_custom_packages(cluster.nodes['all'])
 
 
-def upgrade_plugins(cluster: KubernetesCluster):
+def upgrade_plugins(cluster: KubernetesCluster) -> None:
     upgrade_version = cluster.context["upgrade_version"]
 
     # upgrade_candidates is a source of upgradeable plugins, not list of plugins to upgrade.
@@ -104,7 +103,7 @@ def upgrade_plugins(cluster: KubernetesCluster):
     plugins.install(cluster, upgrade_candidates)
 
 
-def upgrade_containerd(cluster: KubernetesCluster):
+def upgrade_containerd(cluster: KubernetesCluster) -> None:
     """
         This function fixes the incorrect version of pause during the cluster update procedure
     """
@@ -140,7 +139,6 @@ def upgrade_containerd(cluster: KubernetesCluster):
             utils.dump_file(cluster, config_string, 'containerd-config.toml')
 
             kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
-            collector = CollectorCallback(cluster)
             for member_node in kubernetes_nodes.get_ordered_members_list():
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
@@ -155,9 +153,7 @@ def upgrade_containerd(cluster: KubernetesCluster):
                     node.sudo(
                         f"sudo systemctl restart {os_specific_associations['service_name']} && "
                         f"systemctl status {os_specific_associations['service_name']} && " 
-                        f"sudo systemctl restart kubelet",
-                        callback=collector)
-            return collector.result
+                        f"sudo systemctl restart kubelet")
 
 
 tasks = OrderedDict({
@@ -176,7 +172,7 @@ tasks = OrderedDict({
 
 
 class UpgradeFlow(flow.Flow):
-    def __init__(self):
+    def __init__(self) -> None:
         self.target_version = "not supported"
 
     def _run(self, resources: DynamicResources) -> None:
@@ -200,11 +196,11 @@ class UpgradeFlow(flow.Flow):
 
 
 class UpgradeAction(Action):
-    def __init__(self, upgrade_version: str):
+    def __init__(self, upgrade_version: str) -> None:
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
         self.upgrade_version = upgrade_version
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
@@ -213,7 +209,7 @@ class UpgradeAction(Action):
         context['dump_filename_prefix'] = self.upgrade_version
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
     Script for automated upgrade of the entire Kubernetes cluster to a new version.
 
@@ -230,7 +226,7 @@ def main(cli_arguments=None):
     kubernetes.verify_supported_version(flow_.target_version, result.logger)
 
 
-def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
+def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]) -> List[str]:
     kubernetes.verify_allowed_version(previous_version)
     for version in upgrade_plan:
         kubernetes.verify_allowed_version(version)
@@ -244,7 +240,7 @@ def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]):
     return upgrade_plan
 
 
-def fix_cri_socket(cluster: KubernetesCluster):
+def fix_cri_socket(cluster: KubernetesCluster) -> None:
     """
     This method fixs the issue with 'kubeadm.alpha.kubernetes.io/cri-socket' node annotation
     and delete the docker socket if it exists
@@ -258,7 +254,7 @@ def fix_cri_socket(cluster: KubernetesCluster):
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
 
 
-def kubernetes_apply_taints(cluster: KubernetesCluster):
+def kubernetes_apply_taints(cluster: KubernetesCluster) -> None:
     # Apply taints after upgrade
     group = cluster.nodes['control-plane']
     kubernetes.apply_taints(group)

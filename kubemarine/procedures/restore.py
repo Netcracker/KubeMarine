@@ -19,6 +19,8 @@ import re
 import tarfile
 import time
 from collections import OrderedDict
+from typing import List
+
 import yaml
 
 from kubemarine.core import utils, flow, defaults
@@ -29,15 +31,17 @@ from kubemarine.procedures import install, backup
 from kubemarine import system, kubernetes, etcd
 
 
-def missing_or_empty(file):
+def missing_or_empty(file: str) -> bool:
     if not os.path.exists(file):
         return True
     content = utils.read_external(file)
     if re.search(r'^\s*$', content):
         return True
 
+    return False
 
-def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str):
+
+def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str) -> None:
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
         with utils.open_external(procedure_inventory_filepath, 'r') as stream:
@@ -53,7 +57,7 @@ def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, conf
             tar.close()
 
 
-def unpack_data(cluster: KubernetesCluster):
+def unpack_data(cluster: KubernetesCluster) -> None:
     backup_tmp_directory = backup.prepare_backup_tmpdir(cluster)
     backup_file_source = cluster.procedure_inventory.get('backup_location')
 
@@ -87,7 +91,7 @@ def unpack_data(cluster: KubernetesCluster):
         cluster.context['backup_descriptor'] = yaml.safe_load(stream)
 
 
-def verify_backup_data(cluster: KubernetesCluster):
+def verify_backup_data(cluster: KubernetesCluster) -> None:
     if not cluster.context['backup_descriptor'].get('kubernetes', {}).get('version'):
         cluster.log.debug('Not possible to verify Kubernetes version, because descriptor do not contain such information')
         return
@@ -105,7 +109,7 @@ def verify_backup_data(cluster: KubernetesCluster):
         cluster.log.debug('Kubernetes version from backup is correct')
 
 
-def stop_cluster(cluster: KubernetesCluster):
+def stop_cluster(cluster: KubernetesCluster) -> None:
     cluster.log.debug('Stopping the existing cluster...')
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     if cri_impl == "docker":
@@ -124,7 +128,7 @@ def stop_cluster(cluster: KubernetesCluster):
     cluster.log.verbose(result)
 
 
-def restore_thirdparties(cluster: KubernetesCluster):
+def restore_thirdparties(cluster: KubernetesCluster) -> None:
     custom_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
     if custom_thirdparties:
         for name, value in custom_thirdparties.items():
@@ -135,7 +139,7 @@ def restore_thirdparties(cluster: KubernetesCluster):
     install.system_prepare_thirdparties(cluster)
 
 
-def import_nodes(cluster: KubernetesCluster):
+def import_nodes(cluster: KubernetesCluster) -> None:
     with cluster.nodes['all'].new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
@@ -154,7 +158,7 @@ def import_nodes(cluster: KubernetesCluster):
     cluster.log.debug(result)
 
 
-def import_etcd(cluster: KubernetesCluster):
+def import_etcd(cluster: KubernetesCluster) -> None:
     etcd_all_certificates = cluster.procedure_inventory.get('restore_plan', {}).get('etcd', {}).get('certificates', {})
     etcd_cert = etcd_all_certificates.get('cert', cluster.globals['etcd']['default_arguments']['cert'])
     etcd_key = etcd_all_certificates.get('key', cluster.globals['etcd']['default_arguments']['key'])
@@ -251,7 +255,7 @@ def import_etcd(cluster: KubernetesCluster):
         cluster.log.verbose('It is not possible to verify db size - descriptor do not contain such information')
 
 
-def reboot(cluster: KubernetesCluster):
+def reboot(cluster: KubernetesCluster) -> None:
     system.reboot_group(cluster.nodes['all'], try_graceful=False)
     kubernetes.wait_for_nodes(cluster.nodes['control-plane'])
 
@@ -274,14 +278,14 @@ tasks = OrderedDict({
 
 
 class RestoreAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('restore')
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
     Script for restoring Kubernetes resources and nodes contents from backup file.
 

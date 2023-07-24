@@ -16,7 +16,8 @@ import textwrap
 from traceback import *
 import csv
 from datetime import datetime
-from typing import Dict
+from types import TracebackType
+from typing import Dict, Optional, Type, Union, List
 
 from kubemarine.core import utils, log
 
@@ -40,54 +41,52 @@ badges_weights = {
 
 class TestCase:
 
-    def __enter__(self):
+    def __enter__(self) -> 'TestCase':
         return self
 
-    def __exit__(self, type, value, traceback):
-        if type is None:
+    def __exit__(self, type: Optional[Type[Exception]], value: Optional[Exception],
+                 traceback: Optional[TracebackType]) -> bool:
+        if value is None:
             if self.status is TC_UNKNOWN:
                 self.success()
-        elif type is TestFailure:
+        elif isinstance(value, TestFailure):
             self.fail(value)
-        elif type is TestWarn:
+        elif isinstance(value, TestWarn):
             self.warn(value)
         else:
             self.exception(value)
         print(self.get_summary(show_hint=True))
         return True
 
-    def __init__(self, cluster: KubernetesCluster, id, category, name, default_results=None, minimal=None, recommended=None):
+    def __init__(self, cluster: KubernetesCluster, id: str, category: str, name: str,
+                 default_results: str = None, minimal: int = None, recommended: int = None):
         self.include_in_ts(cluster.context['testsuite'])
         self.category = category
         self.id = str(id)
         self.name = name
         self.status = TC_UNKNOWN
-        self.results = default_results
+        self.results: Union[str, BaseException, None] = default_results
         self.minimal = minimal
         self.recommended = recommended
         self.cluster = cluster
 
-    def include_in_ts(self, ts):
+    def include_in_ts(self, ts: 'TestSuite') -> None:
         ts.register_tc(self)
-        return self
 
-    def success(self, results=None):
+    def success(self, results: str = None) -> None:
         if self.results is None:
             self.results = results
         self.status = TC_PASSED
-        return self
 
-    def fail(self, results):
+    def fail(self, results: BaseException) -> None:
         self.status = TC_FAILED
         self.results = results
-        return self
 
-    def warn(self, results):
+    def warn(self, results: BaseException) -> None:
         self.status = TC_WARNED
         self.results = results
-        return self
 
-    def exception(self, results):
+    def exception(self, results: BaseException) -> None:
         self.status = TC_EXCEPTED
         if isinstance(results, GroupException):
             self.cluster.log.debug(results)
@@ -95,9 +94,8 @@ class TestCase:
         else:
             print_exc()
             self.results = results
-        return self
 
-    def get_summary(self, show_description=False, show_hint=False, show_minimal=False, show_recommended=False):
+    def get_summary(self, show_hint: bool = False, show_minimal: bool = False, show_recommended: bool = False) -> str:
         output = ""
 
         output += " " * (15 - len(self.category))
@@ -159,13 +157,13 @@ class TestCase:
 
         return output
 
-    def check_color(self):
+    def check_color(self) -> bool:
         for handler in self.cluster.log.handlers:
             if isinstance(handler, log.StdoutHandler) and handler.formatter.colorize:
                 return True
         return False
 
-    def get_readable_status(self):
+    def get_readable_status(self) -> str:
         if self.is_succeeded():
             return 'ok'
         if self.is_failed():
@@ -175,61 +173,58 @@ class TestCase:
         if self.is_excepted():
             return 'exception'
 
-    def is_succeeded(self):
+        return "unknown"
+
+    def is_succeeded(self) -> bool:
         return self.status is TC_PASSED
 
-    def is_failed(self):
+    def is_failed(self) -> bool:
         return self.status is TC_FAILED
 
-    def is_warned(self):
+    def is_warned(self) -> bool:
         return self.status is TC_WARNED
 
-    def is_excepted(self):
+    def is_excepted(self) -> bool:
         return self.status is TC_EXCEPTED
 
 
 class TestCaseNegativeResult(BaseException):
 
-    def __init__(self, message, hint=None, group_result=None):
+    def __init__(self, message: str, hint: str = None):
         super().__init__(message)
         self.message = message
         self.hint = hint
-        self.group_result = group_result
 
 
 class TestFailure(TestCaseNegativeResult):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class TestWarn(TestCaseNegativeResult):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class TestSuite:
 
-    def __init__(self):
-        self.tcs = []
+    def __init__(self) -> None:
+        self.tcs: List[TestCase] = []
 
-    def register_tc(self, tc):
+    def register_tc(self, tc: TestCase) -> None:
         self.tcs.append(tc)
 
-    def is_any_test_failed(self):
+    def is_any_test_failed(self) -> bool:
         for tc in self.tcs:
             if tc.is_failed() or tc.is_excepted():
                 return True
         return False
 
-    def is_any_test_warned(self):
+    def is_any_test_warned(self) -> bool:
         for tc in self.tcs:
             if tc.is_warned():
                 return True
         return False
 
-    def get_final_summary(self, show_minimal=True, show_recommended=True):
+    def get_final_summary(self, show_minimal: bool = True, show_recommended: bool = True) -> str:
         result = "          Group    Status   ID    Test                                                               Actual result"
         if show_minimal:
             result += "        Minimal"
@@ -261,18 +256,18 @@ class TestSuite:
 
         return result
 
-    def print_final_status(self, log):
+    def print_final_status(self, logger: log.EnhancedLogger) -> None:
         if self.is_any_test_failed():
-            log.error("\nTEST FAILED"
+            logger.error("\nTEST FAILED"
                       "\nThe environment does not meet the minimal requirements. Check the test report and resolve the issues.")
             return
         if self.is_any_test_warned():
-            log.warning("\nTEST PASSED WITH WARNINGS"
+            logger.warning("\nTEST PASSED WITH WARNINGS"
                         "\nThe environment meets the minimal requirements, but is not as recommended. Try to check the test report and resolve the issues.")
             return
-        log.info("\nTEST PASSED")
+        logger.info("\nTEST PASSED")
 
-    def get_stats_data(self):
+    def get_stats_data(self) -> Dict[str, int]:
         results: Dict[str, int] = {}
         for tc in self.tcs:
             key = 'unknown'
@@ -288,7 +283,7 @@ class TestSuite:
             results[key] = value
         return results
 
-    def save_csv(self, destination_file_path, delimiter=';'):
+    def save_csv(self, destination_file_path: str, delimiter: str = ';') -> None:
         stream = io.StringIO()
 
         csv_writer = csv.writer(stream, delimiter=delimiter, quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -306,7 +301,7 @@ class TestSuite:
 
         utils.dump_file({}, stream, destination_file_path, dump_location=False)
 
-    def save_html(self, destination_file_path, check_type, append_styles=True):
+    def save_html(self, destination_file_path: str, check_type: str, append_styles: bool = True) -> None:
         stream = io.StringIO()
 
         stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
@@ -315,12 +310,12 @@ class TestSuite:
         stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
         stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
         for tc in self.tcs:
-            minimal = tc.minimal
-            if minimal is None:
-                minimal = ''
-            recommended = tc.recommended
-            if recommended is None:
-                recommended = ''
+            minimal = ''
+            if tc.minimal is not None:
+                minimal = str(tc.minimal)
+            recommended = ''
+            if tc.recommended is not None:
+                recommended = str(tc.recommended)
             stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
                          (tc.get_readable_status(),
                           tc.category.lower(),

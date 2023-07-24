@@ -68,7 +68,7 @@ def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GRO
     return roles_wrapper
 
 
-def system_prepare_check_sudoer(cluster: KubernetesCluster):
+def system_prepare_check_sudoer(cluster: KubernetesCluster) -> None:
     not_sudoers = []
     for host, node_context in cluster.context['nodes'].items():
         access_info = node_context['access']
@@ -82,7 +82,7 @@ def system_prepare_check_sudoer(cluster: KubernetesCluster):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_check_system(group: NodeGroup):
+def system_prepare_check_system(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug(system.fetch_os_versions(cluster))
     for address, context in cluster.context["nodes"].items():
@@ -102,7 +102,7 @@ def system_prepare_check_system(group: NodeGroup):
                                                        context["os"]["version"]))
 
 
-def system_prepare_check_cluster_installation(cluster: KubernetesCluster):
+def system_prepare_check_cluster_installation(cluster: KubernetesCluster) -> None:
     if kubernetes.is_cluster_installed(cluster):
         cluster.log.debug('Cluster already installed and available at %s' % cluster.context['controlplain_uri'])
     else:
@@ -110,7 +110,7 @@ def system_prepare_check_cluster_installation(cluster: KubernetesCluster):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_chrony(group: NodeGroup):
+def system_prepare_system_chrony(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if cluster.inventory['services']['ntp'].get('chrony', {}).get('servers') is None:
         cluster.log.debug("Skipped - NTP servers from chrony is not defined in config file")
@@ -119,7 +119,7 @@ def system_prepare_system_chrony(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_timesyncd(group: NodeGroup):
+def system_prepare_system_timesyncd(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if not cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('NTP') and \
             not cluster.inventory['services']['ntp'].get('timesyncd', {}).get('Time', {}).get('FallbackNTP'):
@@ -129,7 +129,7 @@ def system_prepare_system_timesyncd(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_sysctl(group: NodeGroup):
+def system_prepare_system_sysctl(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if cluster.inventory['services'].get('sysctl') is None or not cluster.inventory['services']['sysctl']:
         cluster.log.debug("Skipped - sysctl is not defined or empty in config file")
@@ -141,42 +141,42 @@ def system_prepare_system_sysctl(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_setup_selinux(group: NodeGroup):
+def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
     group.call(selinux.setup_selinux)
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_setup_apparmor(group: NodeGroup):
+def system_prepare_system_setup_apparmor(group: NodeGroup) -> None:
     group.call(apparmor.setup_apparmor)
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_disable_firewalld(group: NodeGroup):
+def system_prepare_system_disable_firewalld(group: NodeGroup) -> None:
     group.call(system.disable_firewalld)
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_disable_swap(group: NodeGroup):
+def system_prepare_system_disable_swap(group: NodeGroup) -> None:
     group.call(system.disable_swap)
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_system_modprobe(group: NodeGroup):
+def system_prepare_system_modprobe(group: NodeGroup) -> None:
     group.call(system.setup_modprobe)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_install_audit(group: NodeGroup):
+def system_install_audit(group: NodeGroup) -> None:
     group.call(audit.install)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_prepare_audit_daemon(group: NodeGroup):
+def system_prepare_audit_daemon(group: NodeGroup) -> None:
     group.call(audit.apply_audit_rules)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane')
-def system_prepare_policy(group: NodeGroup):
+def system_prepare_policy(group: NodeGroup) -> None:
     """
     Task generates rules for logging kubernetes and on audit
     """
@@ -252,7 +252,7 @@ def system_prepare_policy(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_dns_hostname(group: NodeGroup):
+def system_prepare_dns_hostname(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
@@ -261,7 +261,7 @@ def system_prepare_dns_hostname(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_dns_resolv_conf(group: NodeGroup):
+def system_prepare_dns_resolv_conf(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if cluster.inventory["services"].get("resolv.conf") is None:
         cluster.log.debug("Skipped - resolv.conf section not defined in config file")
@@ -271,7 +271,7 @@ def system_prepare_dns_resolv_conf(group: NodeGroup):
     cluster.log.debug(group.sudo("ls -la /etc/resolv.conf; sudo lsattr /etc/resolv.conf"))
 
 
-def system_prepare_dns_etc_hosts(cluster: KubernetesCluster):
+def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
     config = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
     config += system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
 
@@ -285,7 +285,7 @@ def system_prepare_dns_etc_hosts(cluster: KubernetesCluster):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_package_manager_configure(group: NodeGroup):
+def system_prepare_package_manager_configure(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     repositories = cluster.inventory['services']['packages']['package_manager'].get("repositories")
     if not repositories:
@@ -300,7 +300,7 @@ def system_prepare_package_manager_configure(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_package_manager_manage_packages(group: NodeGroup):
+def system_prepare_package_manager_manage_packages(group: NodeGroup) -> None:
     group.call_batch([
         manage_mandatory_packages,
         manage_custom_packages
@@ -374,7 +374,7 @@ def manage_custom_packages(group: NodeGroup) -> None:
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_cri_install(group: NodeGroup):
+def system_cri_install(group: NodeGroup) -> None:
     """
     Task which is used to install CRI. Could be skipped, if CRI already installed.
     """
@@ -382,7 +382,7 @@ def system_cri_install(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_cri_configure(group: NodeGroup):
+def system_cri_configure(group: NodeGroup) -> None:
     """
     Task which is used to configure CRI. Could be skipped, if CRI already configured.
     """
@@ -390,7 +390,7 @@ def system_cri_configure(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('all')
-def system_prepare_thirdparties(group: NodeGroup):
+def system_prepare_thirdparties(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     if not cluster.inventory['services'].get('thirdparties', {}):
         cluster.log.debug("Skipped - no thirdparties defined in config file")
@@ -400,11 +400,11 @@ def system_prepare_thirdparties(group: NodeGroup):
 
 
 @_applicable_for_new_nodes_with_roles('balancer')
-def deploy_loadbalancer_haproxy_install(group: NodeGroup):
+def deploy_loadbalancer_haproxy_install(group: NodeGroup) -> None:
     group.call(haproxy.install)
 
 
-def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster):
+def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
 
     if not cluster.inventory['services'].get('loadbalancer', {}) \
             .get('haproxy', {}).get('keep_configs_updated', True):
@@ -434,7 +434,7 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster):
     haproxy.restart(group)
 
 
-def deploy_loadbalancer_keepalived_install(cluster: KubernetesCluster):
+def deploy_loadbalancer_keepalived_install(cluster: KubernetesCluster) -> None:
     group = None
     if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
 
@@ -458,7 +458,7 @@ def deploy_loadbalancer_keepalived_install(cluster: KubernetesCluster):
     group.call(keepalived.install)
 
 
-def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster):
+def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster) -> None:
     group = None
     if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
 
@@ -481,23 +481,23 @@ def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster):
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def deploy_kubernetes_reset(group: NodeGroup):
+def deploy_kubernetes_reset(group: NodeGroup) -> None:
     group.call(kubernetes.reset_installation_env)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def deploy_kubernetes_install(group: NodeGroup):
+def deploy_kubernetes_install(group: NodeGroup) -> None:
     group.cluster.log.debug("Setting up Kubernetes...")
     group.call(kubernetes.install)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def deploy_kubernetes_prepull_images(group: NodeGroup):
+def deploy_kubernetes_prepull_images(group: NodeGroup) -> None:
     group.cluster.log.debug("Prepulling Kubernetes images...")
     group.call(kubernetes.images_grouped_prepull)
 
 
-def deploy_kubernetes_init(cluster: KubernetesCluster):
+def deploy_kubernetes_init(cluster: KubernetesCluster) -> None:
     cluster.nodes['control-plane'].call_batch([
         kubernetes.init_first_control_plane,
         kubernetes.join_other_control_planes
@@ -515,7 +515,7 @@ def deploy_kubernetes_init(cluster: KubernetesCluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def deploy_coredns(cluster: KubernetesCluster):
+def deploy_coredns(cluster: KubernetesCluster) -> None:
     config = coredns.generate_configmap(cluster.inventory)
 
     cluster.log.debug('Applying patch...')
@@ -525,15 +525,15 @@ def deploy_coredns(cluster: KubernetesCluster):
     cluster.log.debug(coredns.apply_configmap(cluster, config))
 
 
-def deploy_plugins(cluster: KubernetesCluster):
+def deploy_plugins(cluster: KubernetesCluster) -> None:
     plugins.install(cluster)
 
 
-def deploy_accounts(cluster: KubernetesCluster):
+def deploy_accounts(cluster: KubernetesCluster) -> None:
     kubernetes_accounts.install(cluster)
 
 
-def overview(cluster: KubernetesCluster):
+def overview(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Retrieving cluster status...")
     control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
     cluster.log.debug("\nNAMESPACES:")
@@ -644,18 +644,18 @@ cumulative_points = {
 
 
 class InstallAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('install')
         self.target_version = "not supported"
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         self.target_version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
         kubernetes.verify_supported_version(self.target_version, res.logger())
 
         flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
     Script for installing Kubernetes cluster.
 

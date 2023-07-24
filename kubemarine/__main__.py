@@ -15,6 +15,8 @@
 
 
 import sys
+import time
+import types
 from collections import OrderedDict
 from typing import Dict, List
 
@@ -44,8 +46,8 @@ for ir in ruamel.yaml.resolver.implicit_resolvers:
     if (1, 1) in ir[0] and 'tag:yaml.org,2002:float' in ir[1]:
         float_patched_resolver = (ir[1], ir[2], ir[3])
         # Globally change behaviour of yaml.safe_load and yaml.dump
-        yaml.Dumper.add_implicit_resolver(*float_patched_resolver)
-        yaml.SafeLoader.add_implicit_resolver(*float_patched_resolver)
+        yaml.Dumper.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call]
+        yaml.SafeLoader.add_implicit_resolver(*float_patched_resolver)  # type: ignore[no-untyped-call]
         break
 
 
@@ -121,7 +123,8 @@ procedures = OrderedDict({
     },
 })
 
-def main():
+
+def main() -> None:
     arguments = sys.argv[1:]
 
     if len(arguments) > 0:
@@ -157,26 +160,21 @@ Usage: kubemarine <procedure> <arguments>
     import_procedure(arguments[0]).main(arguments[1:])
 
 
-def import_procedure(name):
+def import_procedure(name: str) -> types.ModuleType:
     module_name = 'kubemarine.procedures.%s' % name
     return __import__(module_name, fromlist=['object'])
 
 
-def version():
+def version() -> None:
     from kubemarine.core import utils
 
     print('Kubemarine %s' % utils.get_version())
 
 
-def selftest():
+def selftest() -> None:
     print("Running selftest")
 
-    import time
-
     time_start = int(round(time.time() * 1000))
-
-    from collections import OrderedDict
-    import types
 
     for procedure, procedure_details in procedures.items():
         print("\nImporting %s..." % procedure)

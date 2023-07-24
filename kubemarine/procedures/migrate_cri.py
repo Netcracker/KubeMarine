@@ -32,7 +32,7 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine import packages
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
 
@@ -53,7 +53,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def _prepare_yum_repos(cluster: KubernetesCluster, inventory: dict, finalization=False):
+def _prepare_yum_repos(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
     if not cluster.procedure_inventory.get("yum", {}):
         cluster.log.debug("Skipped - no yum section defined in procedure config file")
         return inventory
@@ -74,7 +74,7 @@ def _prepare_yum_repos(cluster: KubernetesCluster, inventory: dict, finalization
     return inventory
 
 
-def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization=False):
+def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
     if not cluster.procedure_inventory.get("packages", {}):
         cluster.log.debug("Skipped - no packages defined in procedure config file")
         return inventory
@@ -100,7 +100,7 @@ def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization=
     return inventory
 
 
-def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization=False):
+def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
     if cluster.procedure_inventory.get("thirdparties", {}) \
             and cluster.procedure_inventory["thirdparties"].get("/usr/bin/crictl.tar.gz", {}):
 
@@ -115,7 +115,7 @@ def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization=Fa
         return inventory
 
 
-def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
+def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict) -> dict:
     if inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
         raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
 
@@ -123,7 +123,7 @@ def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict):
     return inventory
 
 
-def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization=False):
+def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
     if not inventory["services"].get("cri", {}):
         inventory["services"]["cri"] = {}
 
@@ -134,13 +134,13 @@ def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization=
     return inventory
 
 
-def migrate_cri(cluster: KubernetesCluster):
+def migrate_cri(cluster: KubernetesCluster) -> None:
     _migrate_cri(cluster, cluster.nodes["worker"].exclude_group(cluster.nodes["control-plane"])
                  .get_ordered_members_list())
     _migrate_cri(cluster, cluster.nodes["control-plane"].get_ordered_members_list())
 
 
-def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
+def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> None:
     """
     Migrate CRI from docker to already installed containerd.
     This method works node-by-node, configuring kubelet to use containerd.
@@ -246,7 +246,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]):
         node.sudo("rm -rf /var/run/docker.sock", hide=False)
 
 
-def release_calico_leaked_ips(cluster: KubernetesCluster):
+def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
     During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
     For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
@@ -266,13 +266,13 @@ def release_calico_leaked_ips(cluster: KubernetesCluster):
     first_control_plane.sudo(f"rm {random_report_name}", hide=False)
 
 
-def edit_config(kubeadm_flags: str):
+def edit_config(kubeadm_flags: str) -> str:
     kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--container-runtime=remote")
     return kubernetes._config_changer(kubeadm_flags,
                            "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
 
 
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
 
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory_to_finalize
@@ -297,15 +297,15 @@ tasks = OrderedDict({
 
 
 class MigrateCRIAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('migrate cri', recreate_inventory=True)
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
         res.make_final_inventory()
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
     cli_help = '''
         Script for automated migration from docker to containerd.
 
