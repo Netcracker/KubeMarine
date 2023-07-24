@@ -195,8 +195,26 @@ def merge_vrrp_ips(procedure_inventory, inventory):
         inventory.move_to_end("vrrp_ips", last=False)
 
 
+def mask_sensitive_data(data):
+    if isinstance(data, dict):
+        for key, value in list(data.items()):
+            if key == "password":
+                data[key] = "*****"
+            elif isinstance(value, (dict, list)):
+                mask_sensitive_data(value)
+    elif isinstance(data, list):
+        for item in data:
+            mask_sensitive_data(item)
+
+
 def dump_file(context, data: object, filename: str,
               *, dump_location=True):
+    try: 
+        data = yaml.safe_load(data)
+        mask_sensitive_data(data)
+        data = yaml.dump(data)
+    except:
+        print(f"Error while parsing YAML")
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
