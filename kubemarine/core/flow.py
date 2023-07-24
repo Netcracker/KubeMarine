@@ -19,7 +19,8 @@ import sys
 import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from typing import Type, Optional, List, Union, Sequence
+from types import FunctionType
+from typing import Type, Optional, List, Union, Sequence, Tuple, cast, Callable, Dict, Any
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log
 
@@ -51,18 +52,18 @@ class Flow(ABC):
         args: dict = context['execution_arguments']
 
         try:
-            if not args.get('disable_dump', True):
-                utils.prepare_dump_directory(args.get('dump_location'),
-                                             reset_directory=not args.get('disable_dump_cleanup', False))
+            if not args['disable_dump']:
+                utils.prepare_dump_directory(args['dump_location'],
+                                             reset_directory=not args['disable_dump_cleanup'])
             resources.logger()
             self._run(resources)
         except Exception as exc:
             logger = resources.logger_if_initialized()
             if isinstance(exc, errors.FailException):
-                utils.do_fail(exc.message, exc.reason, exc.hint, log=logger)
+                utils.do_fail(exc.message, exc.reason, exc.hint, logger=logger)
             else:
                 utils.do_fail(f"'{context['initial_procedure'] or 'undefined'}' procedure failed.", exc,
-                              log=logger)
+                              logger=logger)
 
         time_end = time.time()
         logger = resources.logger()
@@ -76,7 +77,7 @@ class Flow(ABC):
         return FlowResult(resources.working_context, logger)
 
     @abstractmethod
-    def _run(self, resources: res.DynamicResources):
+    def _run(self, resources: res.DynamicResources) -> None:
         pass
 
 
@@ -84,7 +85,7 @@ class ActionsFlow(Flow):
     def __init__(self, actions: List[action.Action]):
         self._actions = actions
 
-    def _run(self, resources: res.DynamicResources):
+    def _run(self, resources: res.DynamicResources) -> None:
         run_actions(resources, self._actions)
 
 
@@ -144,7 +145,7 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
 
 
 def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], context: dict,
-                                successfully_performed: list, failed=False):
+                                successfully_performed: list, failed: bool = False) -> None:
     if last_cluster is None:
         return
     try:
@@ -164,7 +165,8 @@ def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], con
                 "The option will be removed in next release.")
 
 
-def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, tasks_filter: list = None):
+def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None,
+              tasks_filter: list = None) -> None:
     """
     Filters and runs tasks.
     """
@@ -196,7 +198,7 @@ def run_tasks(resources: res.DynamicResources, tasks, cumulative_points=None, ta
                              force=args.get('force_cumulative_points', False))
 
 
-def create_empty_context(args: dict = None, procedure: str = None):
+def create_empty_context(args: dict = None, procedure: str = None) -> dict:
     if args is None:
         args = {}
     return {
@@ -208,7 +210,7 @@ def create_empty_context(args: dict = None, procedure: str = None):
     }
 
 
-def get_task_list(tasks, _task_path=''):
+def get_task_list(tasks: dict, _task_path: str = '') -> List[str]:
     result = []
     for task_name, task in tasks.items():
         __task_path = _task_path + "." + task_name if _task_path != '' else task_name
@@ -237,7 +239,7 @@ def create_context(parser: argparse.ArgumentParser, cli_arguments: Optional[list
     return context
 
 
-def filter_flow(tasks, tasks_filter: List[str], excluded_tasks: List[str]):
+def filter_flow(tasks: dict, tasks_filter: List[str], excluded_tasks: List[str]) -> Tuple[dict, List[str]]:
     # Remove any whitespaces from filters, and split by '.'
     tasks_path_filter = [tasks.split(".") for tasks in list(map(str.strip, tasks_filter))]
     excluded_path_tasks = [tasks.split(".") for tasks in list(map(str.strip, excluded_tasks))]
@@ -245,7 +247,8 @@ def filter_flow(tasks, tasks_filter: List[str], excluded_tasks: List[str]):
     return _filter_flow_internal(tasks, tasks_path_filter, excluded_path_tasks, [])
 
 
-def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: List[List[str]], _task_path: List[str]):
+def _filter_flow_internal(tasks: dict, tasks_filter: List[List[str]], excluded_tasks: List[List[str]],
+                          _task_path: List[str]) -> Tuple[dict, List[str]]:
     filtered = {}
     final_list = []
 
@@ -283,7 +286,7 @@ def _filter_flow_internal(tasks, tasks_filter: List[List[str]], excluded_tasks: 
 
 
 def run_tasks_recursive(tasks: dict, final_task_names: List[str], cluster: c.KubernetesCluster,
-                        cumulative_points: dict, _task_path: List[str]):
+                        cumulative_points: dict, _task_path: List[str]) -> None:
     for task_name, task in tasks.items():
         __task_path = _task_path + [task_name]
         __task_name = ".".join(__task_path)
@@ -400,7 +403,7 @@ def new_procedure_parser(cli_help: str, optional_config: bool = False, tasks: di
     return parser
 
 
-def parse_args(parser: argparse.ArgumentParser, arguments: list):
+def parse_args(parser: argparse.ArgumentParser, arguments: list) -> argparse.Namespace:
     args = parser.parse_args(arguments)
 
     if args.workdir != '':
@@ -409,10 +412,11 @@ def parse_args(parser: argparse.ArgumentParser, arguments: list):
     return args
 
 
-def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method) -> None:
+def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method: Callable) -> None:
     _check_within_flow(cluster)
 
-    point_fullname = point_method.__module__ + '.' + point_method.__qualname__
+    func = cast(FunctionType, point_method)
+    point_fullname = func.__module__ + '.' + func.__qualname__
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
         cluster.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
@@ -433,11 +437,11 @@ def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method) -> Non
 
 
 def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
-                             point_task_name: Union[str, object], force=False):
+                             point_task_name: Union[str, object], force: bool = False) -> Dict[str, Any]:
     _check_within_flow(cluster)
 
     if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
-        return
+        return {}
 
     scheduled_methods = cluster.context.get('scheduled_cumulative_points', [])
 
@@ -462,12 +466,12 @@ def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
     return results
 
 
-def init_tasks_flow(cluster: c.KubernetesCluster):
+def init_tasks_flow(cluster: c.KubernetesCluster) -> None:
     if 'proceeded_tasks' not in cluster.context:
         cluster.context['proceeded_tasks'] = []
 
 
-def add_task_to_proceeded_list(cluster: c.KubernetesCluster, task_path: str):
+def add_task_to_proceeded_list(cluster: c.KubernetesCluster, task_path: str) -> None:
     if not is_task_completed(cluster, task_path):
         cluster.context['proceeded_tasks'].append(task_path)
         utils.dump_file(cluster, "\n".join(cluster.context['proceeded_tasks'])+"\n", 'finished_tasks')
@@ -478,6 +482,6 @@ def is_task_completed(cluster: c.KubernetesCluster, task_path: str) -> bool:
     return task_path in cluster.context['proceeded_tasks']
 
 
-def _check_within_flow(cluster: c.KubernetesCluster, check=True):
+def _check_within_flow(cluster: c.KubernetesCluster, check: bool = True) -> None:
     if check != ('proceeded_tasks' in cluster.context):
         raise NotImplementedError(f"The method is called {'not ' if check else ''}within tasks flow execution")

@@ -179,7 +179,7 @@ class UpgradeFlow(flow.Flow):
     def __init__(self):
         self.target_version = "not supported"
 
-    def _run(self, resources: DynamicResources):
+    def _run(self, resources: DynamicResources) -> None:
         logger = resources.logger()
 
         previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())

@@ -101,7 +101,7 @@ class DynamicResources:
             # load inventory as ruamel.yaml to save original structure
             self._formatted_inventory = utils.yaml_structure_preserver().load(data)
         except (yaml.YAMLError, ruamel.yaml.YAMLError) as exc:
-            utils.do_fail("Failed to load inventory file", exc, log=logger)
+            utils.do_fail("Failed to load inventory file", exc, logger=logger)
 
     def make_final_inventory(self) -> None:
         self._formatted_inventory = utils.get_final_inventory(self.cluster(), initial_inventory=self.formatted_inventory())

@@ -41,7 +41,7 @@ def test_func(cluster: demo.FakeKubernetesCluster):
     return test_msg
 
 
-tasks = {
+tasks: dict = {
     "deploy": {
         "loadbalancer": {
             "haproxy": test_func,

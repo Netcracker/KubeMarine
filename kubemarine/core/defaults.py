@@ -14,7 +14,7 @@
 import re
 from importlib import import_module
 from copy import deepcopy
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, List
 
 import yaml
 
@@ -84,7 +84,7 @@ escaped_expression_regex = re.compile('({%[\\s*|]raw[\\s*|]%}.*?{%[\\s*|]endraw[
 jinja_query_regex = re.compile("{{ .* }}", re.M)
 
 
-def apply_defaults(inventory, cluster: KubernetesCluster):
+def apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
     recursive_apply_defaults(supported_defaults, inventory)
 
     for i, node in enumerate(inventory["nodes"]):
@@ -109,7 +109,7 @@ def apply_defaults(inventory, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_registry(inventory: dict, cluster: KubernetesCluster):
+def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     if not inventory.get('registry'):
         cluster.log.verbose('Unified registry is not used')
@@ -217,7 +217,7 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def apply_registry_endpoints(inventory: dict):
+def apply_registry_endpoints(inventory: dict) -> Tuple[str, List[str], Optional[str]]:
 
     if not inventory['registry'].get('mirror_registry'):
         inventory['registry']['mirror_registry'] = 'registry.cluster.local'
@@ -232,7 +232,7 @@ def apply_registry_endpoints(inventory: dict):
     return registry_mirror_address, containerd_endpoints, thirdparties_address
 
 
-def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
+def append_controlplain(inventory: dict, cluster: Optional[KubernetesCluster]) -> dict:
 
     if inventory.get('control_plain', {}).get('internal') and inventory.get('control_plain', {}).get('external'):
         if cluster:
@@ -307,7 +307,7 @@ def append_controlplain(inventory, cluster: Optional[KubernetesCluster]):
     return inventory
 
 
-def recursive_apply_defaults(defaults, section):
+def recursive_apply_defaults(defaults: dict, section: dict) -> None:
     for key, value in defaults.items():
         if isinstance(value, dict) and section.get(key) is not None and section[key]:
             recursive_apply_defaults(value, section[key])
@@ -335,7 +335,7 @@ def recursive_apply_defaults(defaults, section):
                     section[value][custom_key] = default_merger.merge(default_value, custom_value)
 
 
-def calculate_node_names(inventory: dict, _):
+def calculate_node_names(inventory: dict, _: KubernetesCluster) -> dict:
     roles_iterators: Dict[str, int] = {}
     for i, node in enumerate(inventory['nodes']):
         for role_name in ['control-plane', 'worker', 'balancer']:
@@ -363,7 +363,7 @@ def calculate_node_names(inventory: dict, _):
     return inventory
 
 
-def verify_node_names(inventory: dict, _):
+def verify_node_names(inventory: dict, _: KubernetesCluster) -> dict:
     known_names = []
     for i, node in enumerate(inventory['nodes']):
         node_name = node['name']
@@ -376,13 +376,13 @@ def verify_node_names(inventory: dict, _):
     return inventory
 
 
-def calculate_nodegroups(inventory: dict, cluster: KubernetesCluster):
+def calculate_nodegroups(inventory: dict, cluster: KubernetesCluster) -> dict:
     for role in cluster.ips.keys():
         cluster.nodes[role] = cluster.make_group(cluster.ips[role])
     return inventory
 
 
-def merge_defaults(inventory: dict, cluster: KubernetesCluster):
+def merge_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
     base_inventory = deepcopy(static.DEFAULTS)
 
     inventory = default_merger.merge(base_inventory, inventory)
@@ -391,7 +391,8 @@ def merge_defaults(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=True, enrichment_functions=None):
+def enrich_inventory(cluster: KubernetesCluster, inventory: dict,
+                     make_dumps: bool = True, enrichment_functions: List[str] = None) -> dict:
     if not enrichment_functions:
         enrichment_functions = DEFAULT_ENRICHMENT_FNS
 
@@ -412,7 +413,7 @@ def enrich_inventory(cluster: KubernetesCluster, inventory: dict, make_dumps=Tru
     return inventory
 
 
-def compile_inventory(inventory: dict, cluster: KubernetesCluster):
+def compile_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     # convert references in yaml to normal values
     iterations = 100
@@ -447,7 +448,7 @@ def compile_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_jinja_escapes=True) -> Any:
+def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_jinja_escapes: bool = True) -> Any:
     if isinstance(struct, list):
         new_struct = []
         for i, v in enumerate(struct):
@@ -466,7 +467,7 @@ def compile_object(logger: log.EnhancedLogger, struct: Any, root: dict, ignore_j
 
 
 def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
-                   ignore_jinja_escapes=True) -> str:
+                   ignore_jinja_escapes: bool = True) -> str:
     logger.verbose("Rendering \"%s\"" % struct)
 
     if ignore_jinja_escapes:
@@ -485,7 +486,7 @@ def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
     return struct
 
 
-def escape_jinja_characters_for_inventory(cluster: KubernetesCluster, obj):
+def escape_jinja_characters_for_inventory(cluster: KubernetesCluster, obj: Any) -> Any:
     if isinstance(obj, dict):
         for key, value in obj.items():
             obj[key] = escape_jinja_characters_for_inventory(cluster, value)
@@ -497,7 +498,7 @@ def escape_jinja_characters_for_inventory(cluster: KubernetesCluster, obj):
     return obj
 
 
-def _escape_jinja_character(value):
+def _escape_jinja_character(value: str) -> str:
     if '{{' in value and '}}' in value and re.search(jinja_query_regex, value):
         matches = re.findall(jinja_query_regex, value)
         for match in matches:
@@ -517,7 +518,7 @@ def prepare_for_dump(inventory: dict, copy: bool = True) -> dict:
     return dump_inventory
 
 
-def manage_true_false_values(inventory: dict, _):
+def manage_true_false_values(inventory: dict, _: KubernetesCluster) -> dict:
     # Check undefined values for plugin.name.install and convert it to bool
     for plugin_name, plugin_item in inventory["plugins"].items():
         # Check install value
