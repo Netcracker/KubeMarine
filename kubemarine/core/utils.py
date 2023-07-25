@@ -207,7 +207,7 @@ def mask_sensitive_data(data):
             mask_sensitive_data(item)
 
 
-def dump_file(context, data: Union[str, bytes, object], filename: str,
+def dump_file(context, data, filename: str,
               *, dump_location=True):
     try: 
         data = yaml.safe_load(data)
