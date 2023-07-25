@@ -105,65 +105,13 @@ strict_equality = true
 strict_concatenate = true
 disallow_subclassing_any = true
 disallow_untyped_decorators = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+warn_return_any = true
 
 # permissive configuration
 implicit_optional = true
 
 # https://github.com/python/mypy/issues/12664
 incremental = false
-
-# List of all modules where type annotations are maintained with references (but still with any-generics) to avoid degradation.
-[[tool.mypy.overrides]]
-module = [
-    # modules from scripts/
-    "build_binary",
-    "install_package",
-    "src.*",
-    "sync",
-    # kubemarine modules
-    "kubemarine",
-    "kubemarine.__main__",
-    "kubemarine.admission",
-    "kubemarine.apparmor",
-    "kubemarine.apt",
-    "kubemarine.audit",
-    "kubemarine.controlplane",
-    "kubemarine.core.*",
-    "kubemarine.coredns",
-    "kubemarine.cri.*",
-    "kubemarine.demo",
-    "kubemarine.etcd",
-    "kubemarine.haproxy",
-    "kubemarine.jinja",
-    "kubemarine.k8s_certs",
-    "kubemarine.keepalived",
-    "kubemarine.kubernetes.*",
-    "kubemarine.kubernetes_accounts",
-    "kubemarine.plugins.*",
-    "kubemarine.procedures.add_node",
-    "kubemarine.procedures.backup",
-    "kubemarine.procedures.cert_renew",
-    "kubemarine.procedures.check_iaas",
-    "kubemarine.procedures.check_paas",
-    "kubemarine.procedures.do",
-    "kubemarine.procedures.install",
-    "kubemarine.procedures.manage_psp",
-    "kubemarine.procedures.manage_pss",
-    "kubemarine.procedures.migrate_cri",
-    "kubemarine.procedures.migrate_kubemarine",
-    "kubemarine.procedures.reboot",
-    "kubemarine.procedures.remove_node",
-    "kubemarine.procedures.restore",
-    "kubemarine.procedures.upgrade",
-    "kubemarine.packages",
-    "kubemarine.selinux",
-    "kubemarine.sysctl",
-    "kubemarine.system",
-    "kubemarine.testsuite",
-    "kubemarine.thirdparties",
-    "kubemarine.yum",
-]
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-disallow_untyped_calls = true
-warn_return_any = true
