@@ -27,6 +27,13 @@ class ConnectionPool:
         self._gateway_nodes = gateway_nodes
         self._connections: Connections = {ip: self._create_connection(ip) for ip in hosts}
 
+    def get_node(self, ip: str) -> dict:
+        node = self._nodes.get(ip)
+        if node is None:
+            raise Exception("Failed to find suitable node to connect to by address %s" % ip)
+
+        return node
+
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
@@ -63,9 +70,7 @@ class ConnectionPool:
         )
 
     def _create_connection(self, ip: str) -> fabric.connection.Connection:
-        node = self._nodes.get(ip)
-        if node is None:
-            raise Exception("Failed to find suitable node to connect to by address %s" % ip)
+        node = self.get_node(ip)
 
         if node.get('keyfile') is None and node.get('password') is None:
             raise Exception('There is neither keyfile nor password specified in configfile for node \'%s\'' % node['name'])

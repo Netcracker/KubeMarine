@@ -22,11 +22,6 @@ from kubemarine.core.connections import ConnectionPool
 class Environment(ABC):
     @property
     @abstractmethod
-    def inventory(self) -> dict:
-        pass
-
-    @property
-    @abstractmethod
     def connection_pool(self) -> ConnectionPool:
         pass
 

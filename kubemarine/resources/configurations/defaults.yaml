@@ -16,12 +16,12 @@ globals:
     ready:
       timeout: 5
       retries: 15
-    boot:
-     timeout: 600
   timeout_download:
     60
 
-node_defaults: {}
+node_defaults:
+  boot:
+    timeout: 600
 
 nodes: []
 

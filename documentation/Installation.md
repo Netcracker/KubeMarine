@@ -535,8 +535,6 @@ globals:
     ready:
       timeout: 10
       retries: 60
-    boot:
-      timeout: 900
 ```
 
 The following parameters are supported:
@@ -551,7 +549,6 @@ The following parameters are supported:
 | `expect.pods.plugins.retries`    | int  | no        | 150           | `300`   | Number of retires to check pods readiness in `plugins`                                                             |
 | `nodes.ready.timeout`            | int  | no        | 5             | `10`    | Timeout between `nodes.ready.retries` for cluster node readiness waiting                                           |
 | `nodes.ready.retries`            | int  | no        | 15            | `60`    | Number of retries to check a cluster node readiness                                                                |
-| `nodes.boot.timeout`             | int  | no        | 600           | `900`   | Timeout for node reboot waiting                                                                                    |
 
 
 ### node_defaults
@@ -594,7 +591,7 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, password, username, connection_port, connection_timeout and gateway.
+* keyfile, password, username, connection_port, connection_timeout, gateway, and boot.timeout.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 For more information about the listed parameters, refer to the following section.
 
@@ -620,6 +617,7 @@ The following options are supported:
 |roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
 |labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
 |taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
+|boot.timeout|int|no|600|`900`|Timeout for node reboot waiting|
 
 An example with parameters values is as follows:
 
@@ -628,6 +626,8 @@ node_defaults:
   keyfile: "/home/username/.ssh/id_rsa"
   password: '{{ env.PASS }}'     #Either keyfile or password can be used.
   username: "centos"
+  boot:
+    timeout: 900
 
 nodes:
   - name: "k8s-lb"
