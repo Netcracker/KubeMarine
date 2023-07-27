@@ -557,6 +557,8 @@ plugins:
                 namespace: ingress-nginx
             pods:
               - ingress-nginx-controller
+    config_map:
+      use-proxy-protocol: "true"
     webhook:
       image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
     controller:
