@@ -30,22 +30,25 @@ class TheAction(Action):
         target_kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
         kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
         pause_version = cluster.globals['compatibility_map']['software']['pause'][target_kubernetes_version]['version']
-        sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
-        param_begin_pos = sandbox.rfind(":")
-        sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
+        if not cluster.inventory["services"]["cri"]['containerdConfig'].get(path, False):
+            return
+        if True:
+            sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
+            param_begin_pos = sandbox.rfind(":")
+            sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
 
-        cri_config = cluster.raw_inventory.get("services", {}).get("cri", {})
-        containerd_config = cri_config.get("containerdConfig", {})
-        sandbox_image = containerd_config.get(path, {}).get("sandbox_image")
-        if sandbox_image is None:
-            for member_node in kubernetes_nodes.get_ordered_members_list():
-                kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
-                kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
-                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--pod-infra-container-image=%s" %sandbox )
-                member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
-        else:
-            cluster.log.debug("Skipping the patch for Kubeadm_Flags")
-            #return
+            cri_config = cluster.raw_inventory.get("services", {}).get("cri", {})
+            containerd_config = cri_config.get("containerdConfig", {})
+            sandbox_image = containerd_config.get(path, {}).get("sandbox_image")
+            if sandbox_image is None:
+                for member_node in kubernetes_nodes.get_ordered_members_list():
+                    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+                    kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
+                    updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--pod-infra-container-image=%s" %sandbox )
+                    member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+            else:
+                cluster.log.debug("Skipping the patch for Kubeadm_Flags")
+                #return
     
 
 
