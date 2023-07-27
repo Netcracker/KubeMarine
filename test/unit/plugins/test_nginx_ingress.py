@@ -116,7 +116,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertEqual({
             "allow-snippet-annotations": "true",
             "foo": "bar",
-            "proxy-set-headers": "ingress-nginx/custom-headers"
+            "proxy-set-headers": "ingress-nginx/custom-headers",
+            "use-proxy-protocol": "true"
         }, default_cm, "Unexpected ingress-nginx-controller ConfigMap content")
 
         custom_headers = self.get_obj(manifest, "ConfigMap_custom-headers")['data']
