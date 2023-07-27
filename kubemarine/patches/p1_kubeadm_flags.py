@@ -33,15 +33,20 @@ class TheAction(Action):
         sandbox = cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"]
         param_begin_pos = sandbox.rfind(":")
         sandbox = sandbox[:param_begin_pos] + ":" + str(pause_version)
-        if "cri" in cluster.raw_inventory["services"] and "sandbox_image" in cluster.raw_inventory["services"]["cri"]["containerdConfig"][path]:
-            print("Skipping the patch for Kubeadm_Flags")
-            exit(0)
-        else :
+
+        cri_config = cluster.raw_inventory.get("services", {}).get("cri", {})
+        containerd_config = cri_config.get("containerdConfig", {})
+        sandbox_image = containerd_config.get(path, {}).get("sandbox_image")
+        if sandbox_image is None:
             for member_node in kubernetes_nodes.get_ordered_members_list():
                 kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
                 kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
-                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, f"--pod-infra-container-image={sandbox}" )
+                updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--pod-infra-container-image=%s" %sandbox )
                 member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+        else:
+            cluster.log.debug("Skipping the patch for Kubeadm_Flags")
+            #return
+    
 
 
 
