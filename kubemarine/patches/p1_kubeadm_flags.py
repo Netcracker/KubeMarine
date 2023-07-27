@@ -46,11 +46,9 @@ class TheAction(Action):
                     kubeadm_flags = member_node.sudo(f"cat {kubeadm_flags_file}").get_simple_out()
                     updated_kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--pod-infra-container-image=%s" %sandbox )
                     member_node.put(StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+                    member_node.sudo("sudo systemctl restart kubelet")
             else:
                 cluster.log.debug("Skipping the patch for Kubeadm_Flags")
-                #return
-    
-
 
 
 class KubeadmFlags(RegularPatch):
