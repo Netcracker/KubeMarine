@@ -1063,7 +1063,21 @@ def calico_config_check(cluster: KubernetesCluster):
             message += f"calico cm is outdated: {ddiff.to_dict()}\n"
 
         result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'")
-        if int(result.get_simple_out()) > 0:
+        found_problems = result.get_simple_result()
+        if 'Version mismatch' in found_problems.stderr:
+            version_mismatch_lines = found_problems.stderr.split('\n')
+
+            def calico_version(criteria: str) -> str:
+                return next(map(lambda l: l.split()[-1],
+                                filter(lambda l: criteria in l,
+                                       version_mismatch_lines),
+                                ),
+                            'unknown')
+
+            client_version = calico_version('Client Version')
+            cluster_version = calico_version('Cluster Version')
+            message += f"client version {client_version} mismatches the cluster version {cluster_version}"
+        elif int(found_problems.stdout) > 0:
             message += "ipam check indicates some problems," \
                        " for more info you can use `calicoctl ipam check --show-problem-ips`"
         if message:
