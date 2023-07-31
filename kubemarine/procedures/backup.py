@@ -18,12 +18,11 @@ import datetime
 import io
 import json
 import os
-import random
 import shutil
 import tarfile
 import time
 from collections import OrderedDict
-from typing import List, Tuple
+from typing import List, Tuple, Union, Dict, Literal
 
 import yaml
 
@@ -252,13 +251,66 @@ def export_kubernetes_version(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['kubernetes']['version'] = version.strip()
 
 
+def _load_namespaces(logger: log.EnhancedLogger, control_plane: NodeGroup) -> List[Dict[str, str]]:
+    namespaces_result = control_plane.sudo(
+        'kubectl get ns -o jsonpath=\'{range .items[*]}{.metadata.name}{"\\n"}{end}\'')
+    logger.verbose(namespaces_result)
+    parsed_namespaces = namespaces_result.get_simple_out().strip().split('\n')
+    return [{'name': name} for name in parsed_namespaces]
+
+
+def _load_resources(logger: log.EnhancedLogger, control_plane: NodeGroup, namespaced: bool) -> List[Dict[str, str]]:
+    resources_result = control_plane.sudo(f'kubectl api-resources --verbs=list --sort-by=name '
+                                          f'--namespaced{"" if namespaced else "=false"}')
+    logger.verbose(resources_result)
+    resources_table = utils.parse_aligned_table(resources_result.get_simple_out())
+
+    resources = [
+        {
+            'name': _resolve_full_resource_name(row['NAME'], row['APIVERSION']),
+            'kind': row['KIND'],
+        }
+        for row in resources_table
+    ]
+
+    return [r for r in resources if r['name'] not in ('events.events.k8s.io', 'events')]
+
+
+def _resolve_full_resource_name(name: str, apiversion: str) -> str:
+    if '/' not in apiversion:
+        return name
+
+    return name + '.' + apiversion[0:apiversion.rindex('/')]
+
+
+def _filter_resources_by_proposed(logger: log.EnhancedLogger,
+                                  loaded_resources: List[Dict[str, str]],
+                                  proposed_resources: Union[List[str], Literal['all']],
+                                  kind: str) -> List[Dict[str, str]]:
+    resources = []
+    for resource in loaded_resources:
+        name = resource['name']
+        if proposed_resources == 'all' or name in proposed_resources:
+            resources.append(resource)
+        else:
+            logger.verbose(f'{kind.capitalize()} "{name}" excluded')
+
+    if proposed_resources != 'all':
+        for proposed_resource in proposed_resources:
+            if not any(proposed_resource == resource['name'] for resource in resources):
+                raise Exception(f'Proposed {kind} "{proposed_resource}" not found in loaded cluster {kind}s')
+
+    logger.debug([r['name'] for r in resources])
+    return resources
+
+
 # There is no way to parallel resources connection via Queue or Pool:
 # the ssh connection is not possible to parallelize due to thread lock
-def download_resources(logger: log.EnhancedLogger, resources: List[str], location: str, control_plane: NodeGroup,
-                       namespace: str = None) -> List[str]:
+def download_resources(logger: log.EnhancedLogger, resources: List[Dict[str, str]],
+                       location: str, control_plane: NodeGroup, namespace: str = None) -> List[str]:
 
     if namespace:
-        logger.debug('Downloading resources from namespace "%s"...' % namespace)
+        logger.debug(f"Downloading resources from namespace {namespace!r}...")
 
     actual_resources: List[str] = []
 
@@ -266,28 +318,32 @@ def download_resources(logger: log.EnhancedLogger, resources: List[str], locatio
         logger.debug('No resources found to download')
         return actual_resources
 
-    cmd = ''
-    resource_separator = ''.join(random.choice('=-_') for _ in range(32))
+    cmd = f'sudo kubectl{" -n " + namespace if namespace else ""} get --ignore-not-found ' \
+          f'{",".join(r["name"] for r in resources)} ' \
+          f'-o yaml'
+
+    yaml_transformer = utils.yaml_structure_preserver()
+    result = control_plane.sudo(cmd)
+    logger.verbose(f"Parsing resources list{' for namespace ' + repr(namespace) if namespace else ''}...")
+    template = yaml_transformer.load(result.get_simple_out())
+    items = template.pop('items')
+
+    items_by_resource: Dict[str, List[dict]] = {}
+    for item in items:
+        resource_name = next(r['name'] for r in resources if r['kind'] == item['kind'])
+        items_by_resource.setdefault(resource_name, []).append(item)
 
     for resource in resources:
-        if cmd != '':
-            cmd += ' && echo \'\n' + resource_separator + '\n\' && '
-        if namespace:
-            cmd += 'sudo kubectl -n %s get --ignore-not-found %s -o yaml' % (namespace, resource)
-        else:
-            cmd += 'sudo kubectl get --ignore-not-found %s -o yaml' % resource
-
-    result = control_plane.sudo(cmd).get_simple_out()
-    control_plane.cluster.log.verbose(result)
-
-    found_resources_results = result.split(resource_separator)
-    for i, result in enumerate(found_resources_results):
-        resource = resources[i]
-        resource_file_path = os.path.join(location, '%s.yaml' % resource)
-        result = result.strip()
-        if result and result != '':
-            actual_resources.append(resource)
-            utils.dump_file({}, result, resource_file_path, dump_location=False)
+        resource_name = resource['name']
+        items = items_by_resource.get(resource_name)
+        if items:
+            actual_resources.append(resource_name)
+            resource_list = dict(template)
+            resource_list['items'] = items
+            resource_file_path = os.path.join(location, '%s.yaml' % resource_name)
+            logger.verbose(f"Dumping list of resource {resource_name!r}{' for namespace ' + repr(namespace) if namespace else ''}...")
+            with utils.open_utf8(resource_file_path, 'w') as file:
+                yaml_transformer.dump(resource_list, file)
 
     return actual_resources
 
@@ -295,87 +351,43 @@ def download_resources(logger: log.EnhancedLogger, resources: List[str], locatio
 def export_kubernetes(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     control_plane = cluster.nodes['control-plane'].get_any_member()
+    backup_kubernetes = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {})
+    logger = cluster.log
 
-    cluster.log.debug('Loading namespaces:')
-    namespaces_result = control_plane.sudo('kubectl get ns -o yaml')
-    cluster.log.verbose(namespaces_result)
-    namespaces_string = list(namespaces_result.values())[0].stdout.strip()
-    namespaces_yaml = yaml.safe_load(namespaces_string)
+    logger.debug('Loading namespaces:')
+    loaded_namespaces = _load_namespaces(logger, control_plane)
+    proposed_namespaces = backup_kubernetes.get('namespaced_resources', {}).get('namespaces', 'all')
+    namespaces = _filter_resources_by_proposed(logger, loaded_namespaces, proposed_namespaces, 'namespace')
 
-    proposed_namespaces = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('namespaced_resources', {}).get('namespaces', 'all')
-    namespaces = []
-    for item in namespaces_yaml['items']:
-        name = item['metadata']['name']
-        if proposed_namespaces == 'all' or name in proposed_namespaces:
-            cluster.log.verbose('Namespace "%s" added' % name)
-            namespaces.append(name)
-        else:
-            cluster.log.verbose('Namespace "%s" excluded' % name)
-
-    if proposed_namespaces != 'all':
-        for proposed_namespace in proposed_namespaces:
-            if proposed_namespace not in namespaces:
-                raise Exception('Proposed namespace "%s" not found in loaded cluster namespaces' % proposed_namespace)
-
-    cluster.log.debug(namespaces)
     kubernetes_res_dir = os.path.join(backup_directory, 'kubernetes_resources')
     os.mkdir(kubernetes_res_dir)
 
-    cluster.log.debug('Loading namespaced resources:')
-    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced -o name '
-                                   '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
-    cluster.log.verbose(resources_result)
-    parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
-    proposed_resources = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('namespaced_resources', {}).get('resources', 'all')
-
-    resources = [resource for resource in parsed_resources if proposed_resources == 'all' or resource in proposed_resources]
-
-    for resource in parsed_resources:
-        if resource not in resources:
-            cluster.log.verbose('Resource "%s" excluded' % resource)
-
-    if proposed_resources != 'all':
-        for proposed_resource in proposed_resources:
-            if proposed_resource not in resources:
-                raise Exception('Proposed resource "%s" not found in loaded cluster resources' % proposed_resource)
-
-    cluster.log.debug(resources)
+    logger.debug('Loading namespaced resources:')
+    loaded_resources = _load_resources(logger, control_plane, True)
+    proposed_resources = backup_kubernetes.get('namespaced_resources', {}).get('resources', 'all')
+    resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
     namespaced_resources_map = {}
     total_files = 0
 
-    for namespace in namespaces:
+    for resource in namespaces:
+        namespace = resource['name']
         namespace_dir = os.path.join(kubernetes_res_dir, namespace)
         os.mkdir(namespace_dir)
-        actual_resources = download_resources(cluster.log, resources, namespace_dir, control_plane, namespace)
+        actual_resources = download_resources(logger, resources, namespace_dir, control_plane, namespace)
         if actual_resources:
             total_files += len(actual_resources)
             namespaced_resources_map[namespace] = actual_resources
 
-    cluster.log.debug('Loading non-namespaced resources:')
-    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced=false -o name '
-                                   '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
-    cluster.log.verbose(resources_result)
-    parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
-    proposed_resources = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('nonnamespaced_resources', 'all')
+    logger.debug('Loading non-namespaced resources:')
+    loaded_resources = _load_resources(logger, control_plane, False)
+    proposed_resources = backup_kubernetes.get('nonnamespaced_resources', 'all')
+    resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
-    resources = [resource for resource in parsed_resources if proposed_resources == 'all' or resource in proposed_resources]
-
-    for resource in parsed_resources:
-        if resource not in resources:
-            cluster.log.verbose('Resource "%s" excluded' % resource)
-
-    if proposed_resources != 'all':
-        for proposed_resource in proposed_resources:
-            if proposed_resource not in resources:
-                raise Exception('Proposed resource "%s" not found in loaded cluster resources' % proposed_resource)
-
-    cluster.log.debug(resources)
-
-    nonnamespaced_resources_list = download_resources(cluster.log, resources, kubernetes_res_dir, control_plane)
+    nonnamespaced_resources_list = download_resources(logger, resources, kubernetes_res_dir, control_plane)
     total_files += len(nonnamespaced_resources_list)
 
-    cluster.log.verbose('Total files saved: %s' % total_files)
+    logger.verbose('Total files saved: %s' % total_files)
 
     if namespaced_resources_map:
         cluster.context['backup_descriptor']['kubernetes']['resources']['namespaced'] = namespaced_resources_map

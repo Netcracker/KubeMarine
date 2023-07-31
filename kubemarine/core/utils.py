@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict
 
 import yaml
 import ruamel.yaml
@@ -484,6 +484,35 @@ def _test_version(version: str, numbers_amount: int) -> List[int]:
 
     expected_pattern = 'v' + '.'.join('N+' for _ in range(numbers_amount))
     raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
+
+
+def parse_aligned_table(table_text: str) -> List[Dict[str, str]]:
+    """
+    Parse aligned table into the list of {header: cell} map.
+    The text with table can be initially produced, for example, by https://pkg.go.dev/text/tabwriter.
+
+    :param table_text: aligned table as string
+    :return: List of rows
+    """
+    rows = table_text.strip().split('\n')
+    headers = rows[0].split()
+    headers_num = len(headers)
+    headers_pos = [rows[0].index(h) for h in headers]
+
+    data = []
+    for row_text in rows[1:]:
+        row = {}
+        for i, header in enumerate(headers):
+            if i == headers_num - 1:
+                cell = row_text[headers_pos[i]:]
+            else:
+                cell = row_text[headers_pos[i]:headers_pos[i+1]]
+
+            row[header] = cell.strip()
+
+        data.append(row)
+
+    return data
 
 
 class ClusterStorage:
