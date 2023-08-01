@@ -3837,6 +3837,12 @@ For example:
     config_map:
       server-tokens: "False"
 ```
+Default config_map settings:
+```yaml
+  allow-snippet-annotations: "true"
+  use-proxy-protocol: "true"
+```
+**Warning**: Ingress-nginx and HAproxy use proxy protocol in the default configuration. If you are using a load balancer without a proxy protocol, it **must** also be disabled in ingress-nginx. To do this, specify `use-proxy-protocol: "false"` in configmap.
 
 * The `custom_headers` parameter sets specified custom headers before sending the traffic to backends. Before proceeding, refer to the official NGINX Ingress Controller documentation at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/).
 
