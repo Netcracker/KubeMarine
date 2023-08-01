@@ -1415,9 +1415,10 @@ def main(cli_arguments=None):
     print(testsuite.get_final_summary(show_minimal=False, show_recommended=False))
     testsuite.print_final_status(result.logger)
     check_iaas.make_reports(context)
-    if testsuite.is_any_test_failed():
-        sys.exit(1)
+    return testsuite
 
 
 if __name__ == '__main__':
-    main()
+    testsuite = main()
+    if testsuite.is_any_test_failed():
+        sys.exit(1)
