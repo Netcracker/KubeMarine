@@ -30,6 +30,11 @@
           "default": "/etc/haproxy/haproxy_mntc.cfg",
           "description": "Maintenance config flie location"
         },
+        "global": {
+          "type": "integer",
+          "default": 10000,
+          "description": "Set the total number of connections allowed, process-wide.",
+        },
         "defaults": {
           "type": "object",
           "description": "Parameters that are passed directly to the 'defaults' section of haproxy.cfg file.",
