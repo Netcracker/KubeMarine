@@ -31,9 +31,12 @@
           "description": "Maintenance config flie location"
         },
         "global": {
-          "type": "integer",
-          "default": 10000,
-          "description": "Set the total number of connections allowed, process-wide."
+          "type": "object",
+          "description": "Parameters that are passed directly to the 'global' section of haproxy.cfg file.",
+          "properties": {
+            "type": "integer",
+            "default": 10000,
+            "description": "Set the total number of connections allowed, process-wide."
         },
         "defaults": {
           "type": "object",
