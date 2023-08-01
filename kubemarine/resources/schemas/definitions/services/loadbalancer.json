@@ -33,7 +33,7 @@
         "global": {
           "type": "integer",
           "default": 10000,
-          "description": "Set the total number of connections allowed, process-wide.",
+          "description": "Set the total number of connections allowed, process-wide."
         },
         "defaults": {
           "type": "object",
