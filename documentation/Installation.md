@@ -3071,7 +3071,7 @@ services:
   loadbalancer:
     haproxy:
       global:
-         maxconn: 10000
+        maxconn: 10000
       defaults:
         timeout_connect: '10s'
         timeout_client: '1m'
