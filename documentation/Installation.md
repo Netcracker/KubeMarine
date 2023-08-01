@@ -3098,7 +3098,7 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td>global.maxconn</td>
     <td>integer</td>
     <td>10000</td>
-    <td>"maxconn" the total number of connections allowed, process-wide.</td>
+    <td>"maxconn". Set the total number of connections allowed, process-wide.</td>
   </tr>
   <tr>
     <td>defaults.timeout_connect</td>
