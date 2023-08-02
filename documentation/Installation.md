@@ -3070,6 +3070,8 @@ By default, the following configuration is used:
 services:
   loadbalancer:
     haproxy:
+      global:
+        maxconn: 10000
       defaults:
         timeout_connect: '10s'
         timeout_client: '1m'
@@ -3092,6 +3094,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
   </tr>
 </thead>
 <tbody>
+  <tr>
+    <td>global.maxconn</td>
+    <td>integer</td>
+    <td>10000</td>
+    <td>"maxconn". Set the total number of connections allowed, process-wide.</td>
+  </tr>
   <tr>
     <td>defaults.timeout_connect</td>
     <td>string</td>
