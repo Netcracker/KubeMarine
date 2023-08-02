@@ -263,10 +263,8 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
         # start fake execution of commands
         commands, sep_symbol, command_sep = self._split_command(do_type, original_command)
 
-        hide = invoke.runners.normalize_hide(  # type: ignore[no-untyped-call]
-            kwargs['hide'], kwargs['out_stream'], kwargs['err_stream'])
         final_res = fabric.runners.Result(stdout="", stderr="", exited=None,
-                                          connection=self, command=original_command, hide=hide)
+                                          connection=self, command=original_command)
         prev_exited = None
         i = 0
         for command in commands:
@@ -552,7 +550,7 @@ def create_hosts_result(hosts: List[str], stdout: str = '', stderr: str = '',
 
 def create_result(stdout: str = '', stderr: str = '', code: int = 0, timeout: int = None) -> GenericResult:
     # command and 'hide' option will be later replaced with actual
-    result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr, hide=tuple())
+    result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr)
     if timeout is None:
         return result
 

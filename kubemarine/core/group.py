@@ -21,7 +21,7 @@ import uuid
 from abc import ABC, abstractmethod
 from types import FunctionType
 from typing import (
-    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast, TextIO
+    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast
 )
 
 from kubemarine.core import utils, log, errors
@@ -301,7 +301,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         return not self == other
 
     def run(self, command: str,
-            warn: bool = False, hide: bool = True, out_stream: TextIO = None, err_stream: TextIO = None,
+            warn: bool = False, hide: bool = True,
             env: Dict[str, str] = None, timeout: int = None,
             callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
@@ -309,11 +309,10 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("run", command, caller,
-                         warn=warn, hide=hide, out_stream=out_stream, err_stream=err_stream,
-                         env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
 
     def sudo(self, command: str,
-             warn: bool = False, hide: bool = True, out_stream: TextIO = None, err_stream: TextIO = None,
+             warn: bool = False, hide: bool = True,
              env: Dict[str, str] = None, timeout: int = None,
              callback: Callback = None) -> GROUP_RUN_TYPE:
         caller: Optional[Dict[str, object]] = None
@@ -321,8 +320,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # fetching of the caller info should be at the earliest point
             caller = log.caller_info(self.cluster.log)
         return self._run("sudo", command, caller,
-                         warn=warn, hide=hide, out_stream=out_stream, err_stream=err_stream,
-                         env=env, timeout=timeout, callback=callback)
+                         warn=warn, hide=hide, env=env, timeout=timeout, callback=callback)
 
     @abstractmethod
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]],
@@ -666,20 +664,14 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         """
         The method should be called directly from run & sudo without any extra wrappers.
         """
-        logging_stream = not kwargs['hide']
-        custom_stream = kwargs['out_stream'] is not None or kwargs['err_stream'] is not None
-        if logging_stream and custom_stream:
-            raise ValueError("Ambiguous streaming configuration detected")
-        if (logging_stream or custom_stream) and len(self.nodes) > 1:
+        do_stream = not kwargs['hide']
+        if do_stream and len(self.nodes) > 1:
             raise ValueError("Streaming of output is supported only for the single node")
 
-        if logging_stream and caller is not None:
+        if do_stream and caller is not None:
             logger = self.cluster.log
             kwargs['out_stream'] = log.LoggerWriter(logger, caller, '\t')
             kwargs['err_stream'] = log.LoggerWriter(logger, caller, '\t')
-
-        # `out_stream` and `err_stream` have precedence over `hide` property. By default, hide both streams.
-        kwargs['hide'] = True
 
         results = self._do_exec(do_type, command, **kwargs)
         return self._unsafe_make_runners_result(results)
@@ -744,9 +736,8 @@ class DeferredGroup(AbstractGroup[Token]):
         self._do_queue("get", remote_file, local_file)
 
     def _run(self, do_type: str, command: str, caller: Optional[Dict[str, object]], **kwargs: object) -> Token:
-        logging_stream = not kwargs['hide']
-        custom_stream = kwargs['out_stream'] is not None or kwargs['err_stream'] is not None
-        if logging_stream or custom_stream:
+        do_stream = not kwargs['hide']
+        if do_stream:
             # To support streaming of output with use of RemoteExecutor in deferred mode, it is necessary to:
             # 1) Make sure that no two commands are executed with streaming in parallel to avoid mess in output
             # 2) Do not print output twice if error occurred.

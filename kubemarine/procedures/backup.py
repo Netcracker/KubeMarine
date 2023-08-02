@@ -338,8 +338,6 @@ class ExportKubernetesParser:
         self._task_queue: 'Queue[ParserPayload]' = Queue()
         self._lock = threading.Lock()
         self._yaml_transformer = utils.yaml_structure_preserver()
-        self._parsing_started = False
-        self._prev_namespace: Optional[str] = None
 
     def schedule(self, payload: ParserPayload) -> None:
         with self._lock:
@@ -381,23 +379,12 @@ class ExportKubernetesParser:
 
     def _handle(self, payload: ParserPayload) -> None:
         namespace = payload.namespace
-        if not self._parsing_started or namespace != self._prev_namespace:
-            if namespace:
-                self.logger.debug(f"Loading resources from namespace {namespace!r}...")
-            else:
-                self.logger.debug(f"Loading non-namespaced resources...")
-
-            self._prev_namespace = namespace
-
-        self._parsing_started = True
-
-        resource_path = payload.resource_path
         if namespace:
-            self.logger.verbose(f"Parsing resources for namespace {namespace!r} from file {resource_path}...")
+            self.logger.debug(f"Loading resources from namespace {namespace!r}...")
         else:
-            self.logger.verbose(f"Parsing non-namespaced resources from file {resource_path}...")
+            self.logger.debug(f"Loading non-namespaced resources...")
 
-        with gzip.open(resource_path, 'rt', encoding='utf-8') as file:
+        with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
             template = self._yaml_transformer.load(file)
 
         if template is None:
@@ -463,21 +450,11 @@ class DownloaderTasksQueue(Iterator[DownloaderPayload]):
         with self._lock:
             return next(self._tasks)
 
-    @staticmethod
-    def _split(resources: List[Dict[str, str]], chunk_size: int = None) -> List[List[str]]:
-        # Split resource types by chunks to reduce memory consumption.
-        return [[r['name'] for r in resources[i:(i + chunk_size)]]
-                for i in range(0, len(resources), chunk_size)]
-
     def _unsafe_tasks(self) -> Iterator[DownloaderPayload]:
-        chunk_size = 5
-        for resources in self._split(self.nonnamespaced_resources, chunk_size):
-            yield DownloaderPayload(None, resources)
+        yield DownloaderPayload(None, [r['name'] for r in self.nonnamespaced_resources])
 
-        chunk_size = 20
         for namespace in self.namespaces:
-            for resources in self._split(self.namespaced_resources, chunk_size):
-                yield DownloaderPayload(namespace['name'], resources)
+            yield DownloaderPayload(namespace['name'], [r['name'] for r in self.namespaced_resources])
 
 
 class ExportKubernetesDownloader:
