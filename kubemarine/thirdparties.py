@@ -381,19 +381,19 @@ def install_all_thirparties(group: NodeGroup) -> None:
         return
 
     for destination in cluster.inventory['services']['thirdparties'].keys():
-        skip_thirdparty = False
+        managing_plugin: Optional[str] = None
 
-        if cluster.context.get("initial_procedure") != "add_node":
-            # TODO: speed up algorithm via else/continue/break
-            for plugin_name, plugin_configs in cluster.inventory['plugins'].items():
-                for plugin_procedure in plugin_configs['installation']['procedures']:
-                    if plugin_procedure.get('thirdparty') == destination:
-                        log.verbose('Thirdparty \'%s\' should be installed with \'%s\' plugin'
-                                    % (destination, plugin_name))
-                        skip_thirdparty = True
+        # install and upgrade procedures have separate tasks for thirdparties managed by plugins
+        if cluster.context.get("initial_procedure") in ("install", "upgrade"):
+            managing_plugin = next((plugin_name
+                                    for plugin_name, plugin_configs in cluster.inventory['plugins'].items()
+                                    for plugin_procedure in plugin_configs['installation']['procedures']
+                                    if plugin_procedure.get('thirdparty') == destination),
+                                   None)
 
-        if skip_thirdparty:
-            log.verbose('Thirdparty %s installation delayed' % destination)
+        if managing_plugin is not None:
+            log.verbose('Thirdparty \'%s\' installation is delayed as it should be installed with \'%s\' plugin.'
+                        % (destination, managing_plugin))
         else:
             res = install_thirdparty(group, destination)
             if res is not None:
