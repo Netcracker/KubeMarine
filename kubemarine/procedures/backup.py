@@ -15,6 +15,7 @@
 
 
 import datetime
+import gzip
 import io
 import json
 import os
@@ -29,6 +30,7 @@ from queue import Queue
 from typing import List, Tuple, Union, Dict, Literal, Optional, Iterator
 
 import yaml
+from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
@@ -395,14 +397,14 @@ class ExportKubernetesParser:
         else:
             self.logger.verbose(f"Parsing non-namespaced resources from file {resource_path}...")
 
-        with utils.open_utf8(resource_path) as file:
+        with gzip.open(resource_path, 'rt', encoding='utf-8') as file:
             template = self._yaml_transformer.load(file)
 
         if template is None:
             # No resources found and the file is empty.
             return
 
-        items = template.pop('items')
+        items = template['items']
         resources = self.nonnamespaced_resources if namespace is None else self.namespaced_resources
         items_by_resource: Dict[str, List[dict]] = {}
         for item in items:
@@ -415,7 +417,7 @@ class ExportKubernetesParser:
             if items is None:
                 continue
 
-            resource_list = dict(template)
+            resource_list = CommentedMap(template)
             resource_list['items'] = items
 
             location = os.path.join(self.backup_directory, 'kubernetes_resources')
@@ -486,7 +488,7 @@ class ExportKubernetesDownloader:
                  parser: ExportKubernetesParser,
                  ):
         self.backup_directory = backup_directory
-        self.control_plane = control_plane
+        self.control_plane = control_plane.new_defer()
         self.tasks_queue = tasks_queue
         self.parser = parser
         self.elapsed: float = 0
@@ -504,13 +506,18 @@ class ExportKubernetesDownloader:
                     break
 
                 namespace = task.namespace
+                random = uuid.uuid4().hex
+                temp_remote_filepath = f"/tmp/{random}"
+                temp_local_filepath = os.path.join(self.backup_directory, random)
+
                 cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
                       f'{",".join(r for r in task.resources)} ' \
-                      f'-o yaml'
+                      f'-o yaml | gzip -c > {temp_remote_filepath}'
 
-                temp_local_filepath = os.path.join(self.backup_directory, uuid.uuid4().hex)
-                with utils.open_utf8(temp_local_filepath, 'w') as out:
-                    self.control_plane.sudo(cmd, out_stream=out)
+                self.control_plane.sudo(cmd)
+                self.control_plane.get(temp_remote_filepath, temp_local_filepath)
+                self.control_plane.sudo(f'rm {temp_remote_filepath}')
+                self.control_plane.flush()
 
                 self.parser.schedule(ParserPayload("do", temp_local_filepath, namespace))
         except BaseException:
