@@ -21,8 +21,11 @@ import os
 import shutil
 import tarfile
 import time
+import uuid
 from collections import OrderedDict
-from typing import List, Tuple, Union, Dict, Literal
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+from typing import List, Tuple, Union, Dict, Literal, Optional, Iterator
 
 import yaml
 
@@ -304,48 +307,177 @@ def _filter_resources_by_proposed(logger: log.EnhancedLogger,
     return resources
 
 
-# There is no way to parallel resources connection via Queue or Pool:
-# the ssh connection is not possible to parallelize due to thread lock
-def download_resources(logger: log.EnhancedLogger, resources: List[Dict[str, str]],
-                       location: str, control_plane: NodeGroup, namespace: str = None) -> List[str]:
+class ParserPayload:
+    def __init__(self, event: str, resource_path: str, namespace: Optional[str]):
+        self.event = event
+        self.resource_path = resource_path
+        self.namespace = namespace
 
-    if namespace:
-        logger.debug(f"Downloading resources from namespace {namespace!r}...")
 
-    actual_resources: List[str] = []
+class ExportKubernetesParser:
+    def __init__(self,
+                 logger: log.EnhancedLogger,
+                 backup_directory: str,
+                 namespaced_resources: List[Dict[str, str]],
+                 nonnamespaced_resources: List[Dict[str, str]]):
+        self.logger = logger
+        self.backup_directory = backup_directory
+        self.namespaced_resources = namespaced_resources
+        self.nonnamespaced_resources = nonnamespaced_resources
+        self.namespaced_resources_result_map: Dict[str, List[str]] = {}
+        self.nonnamespaced_resources_result: List[str] = []
+        self.closed = False
+        self.elapsed: float = 0
+        self.total_files = 0
+        self._task_queue: 'Queue[ParserPayload]' = Queue()
+        self._yaml_transformer = utils.yaml_structure_preserver()
+        self._parsing_started = False
+        self._prev_namespace: Optional[str] = None
 
-    if not resources:
-        logger.debug('No resources found to download')
-        return actual_resources
+    def schedule(self, task: ParserPayload) -> None:
+        self._task_queue.put(task)
 
-    cmd = f'sudo kubectl{" -n " + namespace if namespace else ""} get --ignore-not-found ' \
-          f'{",".join(r["name"] for r in resources)} ' \
-          f'-o yaml'
+    def close(self) -> None:
+        self.closed = True
 
-    yaml_transformer = utils.yaml_structure_preserver()
-    result = control_plane.sudo(cmd)
-    logger.verbose(f"Parsing resources list{' for namespace ' + repr(namespace) if namespace else ''}...")
-    template = yaml_transformer.load(result.get_simple_out())
-    items = template.pop('items')
+    def unprocessed(self) -> List[ParserPayload]:
+        if not self.closed:
+            raise Exception("Parser is still processing the resources")
 
-    items_by_resource: Dict[str, List[dict]] = {}
-    for item in items:
-        resource_name = next(r['name'] for r in resources if r['kind'] == item['kind'])
-        items_by_resource.setdefault(resource_name, []).append(item)
+        return list(self._task_queue.queue)
 
-    for resource in resources:
-        resource_name = resource['name']
-        items = items_by_resource.get(resource_name)
-        if items:
-            actual_resources.append(resource_name)
+    def run(self) -> None:
+        while True:
+            task = self._task_queue.get()
+            if task.event == 'end':
+                return
+
+            start = time.time()
+            self._handle(task)
+            os.remove(task.resource_path)
+            self.elapsed += (time.time() - start)
+
+    def _handle(self, task: ParserPayload) -> None:
+        namespace = task.namespace
+        if not self._parsing_started or namespace != self._prev_namespace:
+            if namespace:
+                self.logger.debug(f"Loading resources from namespace {namespace!r}...")
+            else:
+                self.logger.debug(f"Loading non-namespaced resources...")
+
+            self._prev_namespace = namespace
+
+        self._parsing_started = True
+
+        resource_path = task.resource_path
+        if namespace:
+            self.logger.verbose(f"Parsing resources for namespace {namespace!r} from file {resource_path}...")
+        else:
+            self.logger.verbose(f"Parsing non-namespaced resources from file {resource_path}...")
+
+        with utils.open_utf8(resource_path) as file:
+            template = self._yaml_transformer.load(file)
+
+        if template is None:
+            # No resources found and the file is empty.
+            return
+
+        items = template.pop('items')
+        resources = self.nonnamespaced_resources if namespace is None else self.namespaced_resources
+        items_by_resource: Dict[str, List[dict]] = {}
+        for item in items:
+            resource_name = next(r['name'] for r in resources if r['kind'] == item['kind'])
+            items_by_resource.setdefault(resource_name, []).append(item)
+
+        for resource in resources:
+            resource_name = resource['name']
+            items = items_by_resource.get(resource_name)
+            if items is None:
+                continue
+
             resource_list = dict(template)
             resource_list['items'] = items
-            resource_file_path = os.path.join(location, '%s.yaml' % resource_name)
-            logger.verbose(f"Dumping list of resource {resource_name!r}{' for namespace ' + repr(namespace) if namespace else ''}...")
-            with utils.open_utf8(resource_file_path, 'w') as file:
-                yaml_transformer.dump(resource_list, file)
 
-    return actual_resources
+            location = os.path.join(self.backup_directory, 'kubernetes_resources')
+            if namespace is not None:
+                location = os.path.join(location, namespace)
+
+            os.makedirs(location, exist_ok=True)
+
+            resource_file_path = os.path.join(location, '%s.yaml' % resource_name)
+            self.logger.verbose(
+                f"Dumping list of resource {resource_name!r}"
+                f"{'' if namespace is None else (' for namespace ' + repr(namespace))}...")
+            with utils.open_utf8(resource_file_path, 'w') as file:
+                self._yaml_transformer.dump(resource_list, file)
+
+            if namespace is None:
+                self.nonnamespaced_resources_result.append(resource_name)
+            else:
+                self.namespaced_resources_result_map.setdefault(namespace, []).append(resource_name)
+
+            self.total_files += 1
+
+
+class ExportKubernetesDownloader:
+    def __init__(self,
+                 backup_directory: str,
+                 control_plane: NodeGroup,
+                 parser: ExportKubernetesParser,
+                 namespaces: List[Dict[str, str]],
+                 namespaced_resources: List[Dict[str, str]],
+                 nonnamespaced_resources: List[Dict[str, str]],
+                 ):
+        self.backup_directory = backup_directory
+        self.control_plane = control_plane
+        self.parser = parser
+        self.namespaces = namespaces
+        self.namespaced_resources = namespaced_resources
+        self.nonnamespaced_resources = nonnamespaced_resources
+        self.elapsed: float = 0
+
+    @staticmethod
+    def _split(resources: List[Dict[str, str]]) -> List[List[str]]:
+        # Split resource types by chunks to reduce memory consumption.
+        chunk_size = 10
+        return [[r['name'] for r in resources[i:(i + chunk_size)]]
+                for i in range(0, len(resources), chunk_size)]
+
+    def _tasks(self) -> Iterator[Tuple[Optional[str], List[str]]]:
+        for resources in self._split(self.nonnamespaced_resources):
+            yield None, resources
+
+        for namespace in self.namespaces:
+            for resources in self._split(self.namespaced_resources):
+                yield namespace['name'], resources
+
+    def run(self) -> None:
+        start = time.time()
+        try:
+            for namespace, resources in self._tasks():
+                if self.parser.closed:
+                    # No need to continue as the parser is already closed due to error.
+                    # Remove unprocessed local temp files.
+                    for payload in self.parser.unprocessed():
+                        os.remove(payload.resource_path)
+                    return
+
+                temp_local_filepath = os.path.join(self.backup_directory, uuid.uuid4().hex)
+
+                cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
+                      f'{",".join(r for r in resources)} ' \
+                      f'-o yaml'
+
+                # There is no way to parallel resources connection via Queue or Pool:
+                # the ssh connection is not possible to parallelize due to thread lock.
+                # Though it is still potentially possible to use few connections or few control-plane nodes.
+                with utils.open_utf8(temp_local_filepath, 'w') as out:
+                    self.control_plane.sudo(cmd, out_stream=out)
+
+                self.parser.schedule(ParserPayload("do", temp_local_filepath, namespace))
+        finally:
+            self.parser.schedule(ParserPayload("end", "", None))
+            self.elapsed = time.time() - start
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
@@ -359,41 +491,65 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
     proposed_namespaces = backup_kubernetes.get('namespaced_resources', {}).get('namespaces', 'all')
     namespaces = _filter_resources_by_proposed(logger, loaded_namespaces, proposed_namespaces, 'namespace')
 
-    kubernetes_res_dir = os.path.join(backup_directory, 'kubernetes_resources')
-    os.mkdir(kubernetes_res_dir)
-
-    logger.debug('Loading namespaced resources:')
+    logger.debug('Loading namespaced resource types:')
     loaded_resources = _load_resources(logger, control_plane, True)
     proposed_resources = backup_kubernetes.get('namespaced_resources', {}).get('resources', 'all')
-    resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
+    namespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
-    namespaced_resources_map = {}
-    total_files = 0
-
-    for resource in namespaces:
-        namespace = resource['name']
-        namespace_dir = os.path.join(kubernetes_res_dir, namespace)
-        os.mkdir(namespace_dir)
-        actual_resources = download_resources(logger, resources, namespace_dir, control_plane, namespace)
-        if actual_resources:
-            total_files += len(actual_resources)
-            namespaced_resources_map[namespace] = actual_resources
-
-    logger.debug('Loading non-namespaced resources:')
+    logger.debug('Loading non-namespaced resource types:')
     loaded_resources = _load_resources(logger, control_plane, False)
     proposed_resources = backup_kubernetes.get('nonnamespaced_resources', 'all')
-    resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
+    nonnamespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
-    nonnamespaced_resources_list = download_resources(logger, resources, kubernetes_res_dir, control_plane)
-    total_files += len(nonnamespaced_resources_list)
+    logger.debug('Loading resources:')
+    start = time.time()
 
-    logger.verbose('Total files saved: %s' % total_files)
+    # Split loading of resources into downloading (mostly IO) and parsing (mostly CPU).
+    #
+    # Processing of the particular resource includes
+    #   * downloading of the `kubectl` result
+    #   * parsing and splitting it into files.
+    #
+    # Only after that the processing is considered as finished.
+    # Thus, only parser outputs the progress.
+    parser = ExportKubernetesParser(logger, backup_directory, namespaced_resources, nonnamespaced_resources)
+    downloader = ExportKubernetesDownloader(backup_directory, control_plane, parser,
+                                            namespaces, namespaced_resources, nonnamespaced_resources)
 
-    if namespaced_resources_map:
-        cluster.context['backup_descriptor']['kubernetes']['resources']['namespaced'] = namespaced_resources_map
+    with ThreadPoolExecutor(max_workers=2) as tpe:
+        downloader_async = tpe.submit(downloader.run)
+        parser_async = tpe.submit(parser.run)
 
-    if nonnamespaced_resources_list:
-        cluster.context['backup_descriptor']['kubernetes']['resources']['nonnamespaced'] = nonnamespaced_resources_list
+        try:
+            # Wait for successful parsing of resources or till exception.
+            parser_async.result()
+            parser.close()
+        except BaseException:
+            parser.close()
+            try:
+                # Wait for graceful exiting of downloader after currently running command is finished.
+                downloader_async.result()
+            except BaseException as e:
+                # If both background tasks fail, the parser exception has priority, and the other is logged.
+                logger.verbose(e)
+
+            # Parser exception has priority because it happens for the earlier chunk of resources.
+            raise
+
+        # Although parser may exit successfully, not all resources might be processed due to error in downloader.
+        downloader_async.result()
+
+    downloaded_resources_descriptor = cluster.context['backup_descriptor']['kubernetes']['resources']
+    if parser.namespaced_resources_result_map:
+        downloaded_resources_descriptor['namespaced'] = parser.namespaced_resources_result_map
+
+    if parser.nonnamespaced_resources_result:
+        downloaded_resources_descriptor['nonnamespaced'] = parser.nonnamespaced_resources_result
+
+    logger.verbose(f'Downloading elapsed: {downloader.elapsed}')
+    logger.verbose(f'Parsing elapsed: {parser.elapsed}')
+    logger.verbose(f'Total elapsed: {time.time() - start}')
+    logger.verbose(f'Total files saved: {parser.total_files}')
 
 
 def make_descriptor(cluster: KubernetesCluster) -> None:

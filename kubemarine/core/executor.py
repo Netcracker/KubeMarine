@@ -34,8 +34,8 @@ from kubemarine.core.environment import Environment
 
 
 class RunnersResult:
-    def __init__(self, commands: List[str], exit_codes: List[int], stdout: str = "", stderr: str = "",
-                 hide: bool = False) -> None:
+    def __init__(self, commands: List[str], exit_codes: List[int], stdout: str, stderr: str,
+                 hide: tuple) -> None:
         self.commands = commands
         self.stdout = stdout
         self.stderr = stderr
@@ -115,7 +115,7 @@ class RunnersResult:
         for x in ("stdout", "stderr"):
             val: str = getattr(self, x)
             if val:
-                val = 'already printed' if hide_already_printed and not self.hide else val.rstrip()
+                val = 'already printed' if hide_already_printed and x not in self.hide else val.rstrip()
                 ret.append(f"=== {x} ===\n"
                            f"{val.rstrip()}\n")
         return "\n".join(ret)
@@ -284,9 +284,6 @@ class RawExecutor:
 
     def _reparse_fabric_result(self, payloads: List[_PayloadItem],
                                result: fabric.runners.Result) -> List[RunnersResult]:
-        # unpack last action in list of payloads
-        _, _, kwargs = payloads[-1][0]
-
         stderrs = result.stderr.split(self._command_separator + '\n')
         raw_stdouts = result.stdout.split(self._command_separator + '\n')
         stdouts = []
@@ -304,7 +301,7 @@ class RawExecutor:
             action, _, _ = payloads[i]
             command: str = action[1][0]
             results.append(RunnersResult(
-                    [command], [code], stdouts[i], stderrs[i], hide=kwargs.get('hide', False)))
+                    [command], [code], stdouts[i], stderrs[i], hide=result.hide))
 
         return results
 
@@ -533,7 +530,7 @@ class RawExecutor:
                 self.logger.verbose("Command timed out at %s: %s" % (host, str(exception.result)))
                 return False
             elif isinstance(exception, UnexpectedExit):
-                # Do not str(exception) because it discards output in case of hide=False
+                # Do not str(exception) because it discards output if it is already printed
                 exception_message = str(exception.result)
             else:
                 exception_message = str(exception)
