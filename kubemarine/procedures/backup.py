@@ -20,6 +20,7 @@ import json
 import os
 import shutil
 import tarfile
+import threading
 import time
 import uuid
 from collections import OrderedDict
@@ -319,7 +320,9 @@ class ExportKubernetesParser:
                  logger: log.EnhancedLogger,
                  backup_directory: str,
                  namespaced_resources: List[Dict[str, str]],
-                 nonnamespaced_resources: List[Dict[str, str]]):
+                 nonnamespaced_resources: List[Dict[str, str]],
+                 graceful_finish_barrier: int,
+                 ):
         self.logger = logger
         self.backup_directory = backup_directory
         self.namespaced_resources = namespaced_resources
@@ -329,36 +332,53 @@ class ExportKubernetesParser:
         self.closed = False
         self.elapsed: float = 0
         self.total_files = 0
+        self._graceful_finish_barrier = graceful_finish_barrier
         self._task_queue: 'Queue[ParserPayload]' = Queue()
+        self._lock = threading.Lock()
         self._yaml_transformer = utils.yaml_structure_preserver()
         self._parsing_started = False
         self._prev_namespace: Optional[str] = None
 
-    def schedule(self, task: ParserPayload) -> None:
-        self._task_queue.put(task)
+    def schedule(self, payload: ParserPayload) -> None:
+        with self._lock:
+            if not self.closed:
+                self._task_queue.put(payload)
+            else:
+                self._clear(payload)
 
-    def close(self) -> None:
-        self.closed = True
-
-    def unprocessed(self) -> List[ParserPayload]:
-        if not self.closed:
-            raise Exception("Parser is still processing the resources")
-
-        return list(self._task_queue.queue)
+    def finish(self, graceful: bool) -> None:
+        with self._lock:
+            self._graceful_finish_barrier -= 1
+            if not self.closed and (self._graceful_finish_barrier == 0 or not graceful):
+                self._task_queue.put(ParserPayload("end", "", None))
+                self._graceful_finish_barrier = 0
 
     def run(self) -> None:
-        while True:
-            task = self._task_queue.get()
-            if task.event == 'end':
-                return
+        try:
+            while True:
+                payload = self._task_queue.get()
+                if payload.event == 'end':
+                    return
 
-            start = time.time()
-            self._handle(task)
-            os.remove(task.resource_path)
-            self.elapsed += (time.time() - start)
+                start = time.time()
+                self._handle(payload)
+                # do not clear the currently processing payload in case of exception
+                self._clear(payload)
+                self.elapsed += (time.time() - start)
+        finally:
+            with self._lock:
+                self.closed = True
+                # Queue might be not empty in case of exception. Need to clear all pending payloads
+                for payload in self._task_queue.queue:
+                    self._clear(payload)
 
-    def _handle(self, task: ParserPayload) -> None:
-        namespace = task.namespace
+    @staticmethod
+    def _clear(payload: ParserPayload) -> None:
+        if payload.event == 'do':
+            os.remove(payload.resource_path)
+
+    def _handle(self, payload: ParserPayload) -> None:
+        namespace = payload.namespace
         if not self._parsing_started or namespace != self._prev_namespace:
             if namespace:
                 self.logger.debug(f"Loading resources from namespace {namespace!r}...")
@@ -369,7 +389,7 @@ class ExportKubernetesParser:
 
         self._parsing_started = True
 
-        resource_path = task.resource_path
+        resource_path = payload.resource_path
         if namespace:
             self.logger.verbose(f"Parsing resources for namespace {namespace!r} from file {resource_path}...")
         else:
@@ -419,64 +439,86 @@ class ExportKubernetesParser:
             self.total_files += 1
 
 
+class DownloaderPayload:
+    def __init__(self, namespace: Optional[str], resources: List[str]):
+        self.namespace = namespace
+        self.resources = resources
+
+
+class DownloaderTasksQueue(Iterator[DownloaderPayload]):
+    def __init__(self,
+                 namespaces: List[Dict[str, str]],
+                 namespaced_resources: List[Dict[str, str]],
+                 nonnamespaced_resources: List[Dict[str, str]]
+                 ):
+        self.namespaces = namespaces
+        self.namespaced_resources = namespaced_resources
+        self.nonnamespaced_resources = nonnamespaced_resources
+        self._tasks = self._unsafe_tasks()
+        self._lock = threading.Lock()
+
+    def __next__(self) -> DownloaderPayload:
+        with self._lock:
+            return next(self._tasks)
+
+    @staticmethod
+    def _split(resources: List[Dict[str, str]], chunk_size: int = None) -> List[List[str]]:
+        # Split resource types by chunks to reduce memory consumption.
+        return [[r['name'] for r in resources[i:(i + chunk_size)]]
+                for i in range(0, len(resources), chunk_size)]
+
+    def _unsafe_tasks(self) -> Iterator[DownloaderPayload]:
+        chunk_size = 5
+        for resources in self._split(self.nonnamespaced_resources, chunk_size):
+            yield DownloaderPayload(None, resources)
+
+        chunk_size = 20
+        for namespace in self.namespaces:
+            for resources in self._split(self.namespaced_resources, chunk_size):
+                yield DownloaderPayload(namespace['name'], resources)
+
+
 class ExportKubernetesDownloader:
     def __init__(self,
                  backup_directory: str,
                  control_plane: NodeGroup,
+                 tasks_queue: Iterator[DownloaderPayload],
                  parser: ExportKubernetesParser,
-                 namespaces: List[Dict[str, str]],
-                 namespaced_resources: List[Dict[str, str]],
-                 nonnamespaced_resources: List[Dict[str, str]],
                  ):
         self.backup_directory = backup_directory
         self.control_plane = control_plane
+        self.tasks_queue = tasks_queue
         self.parser = parser
-        self.namespaces = namespaces
-        self.namespaced_resources = namespaced_resources
-        self.nonnamespaced_resources = nonnamespaced_resources
         self.elapsed: float = 0
-
-    @staticmethod
-    def _split(resources: List[Dict[str, str]]) -> List[List[str]]:
-        # Split resource types by chunks to reduce memory consumption.
-        chunk_size = 10
-        return [[r['name'] for r in resources[i:(i + chunk_size)]]
-                for i in range(0, len(resources), chunk_size)]
-
-    def _tasks(self) -> Iterator[Tuple[Optional[str], List[str]]]:
-        for resources in self._split(self.nonnamespaced_resources):
-            yield None, resources
-
-        for namespace in self.namespaces:
-            for resources in self._split(self.namespaced_resources):
-                yield namespace['name'], resources
 
     def run(self) -> None:
         start = time.time()
         try:
-            for namespace, resources in self._tasks():
+            while True:
                 if self.parser.closed:
                     # No need to continue as the parser is already closed due to error.
-                    # Remove unprocessed local temp files.
-                    for payload in self.parser.unprocessed():
-                        os.remove(payload.resource_path)
-                    return
+                    break
 
-                temp_local_filepath = os.path.join(self.backup_directory, uuid.uuid4().hex)
+                task = next(self.tasks_queue, None)
+                if task is None:
+                    break
 
+                namespace = task.namespace
                 cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
-                      f'{",".join(r for r in resources)} ' \
+                      f'{",".join(r for r in task.resources)} ' \
                       f'-o yaml'
 
-                # There is no way to parallel resources connection via Queue or Pool:
-                # the ssh connection is not possible to parallelize due to thread lock.
-                # Though it is still potentially possible to use few connections or few control-plane nodes.
+                temp_local_filepath = os.path.join(self.backup_directory, uuid.uuid4().hex)
                 with utils.open_utf8(temp_local_filepath, 'w') as out:
                     self.control_plane.sudo(cmd, out_stream=out)
 
                 self.parser.schedule(ParserPayload("do", temp_local_filepath, namespace))
+        except BaseException:
+            self.parser.finish(graceful=False)
+            raise
+        else:
+            self.parser.finish(graceful=True)
         finally:
-            self.parser.schedule(ParserPayload("end", "", None))
             self.elapsed = time.time() - start
 
 
@@ -504,40 +546,49 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
     logger.debug('Loading resources:')
     start = time.time()
 
-    # Split loading of resources into downloading (mostly IO) and parsing (mostly CPU).
-    #
     # Processing of the particular resource includes
-    #   * downloading of the `kubectl` result
-    #   * parsing and splitting it into files.
-    #
-    # Only after that the processing is considered as finished.
-    # Thus, only parser outputs the progress.
-    parser = ExportKubernetesParser(logger, backup_directory, namespaced_resources, nonnamespaced_resources)
-    downloader = ExportKubernetesDownloader(backup_directory, control_plane, parser,
-                                            namespaces, namespaced_resources, nonnamespaced_resources)
+    # 1. downloading of the `kubectl` result (mostly IO)
+    # 2. parsing and splitting it into files (mostly CPU)
+    control_planes = cluster.nodes['control-plane']
+    parser = ExportKubernetesParser(logger, backup_directory, namespaced_resources, nonnamespaced_resources,
+                                    control_planes.nodes_amount())
+    downloader_queue = DownloaderTasksQueue(namespaces, namespaced_resources, nonnamespaced_resources)
+    downloaders = [
+        ExportKubernetesDownloader(backup_directory, control_plane, downloader_queue, parser)
+        for control_plane in control_planes.get_ordered_members_list()
+    ]
 
-    with ThreadPoolExecutor(max_workers=2) as tpe:
-        downloader_async = tpe.submit(downloader.run)
+    logger.debug(f'Using {len(downloaders)} workers to download resources.')
+
+    with ThreadPoolExecutor(max_workers=len(downloaders) + 1) as tpe:
+        downloaders_async = [tpe.submit(downloader.run) for downloader in downloaders]
         parser_async = tpe.submit(parser.run)
+
+        def _graceful_shutdown_downloaders() -> Optional[BaseException]:
+            # Although parser may exit successfully, not all resources might be processed due to errors in downloaders.
+            # Choose any error in such case.
+            exc: Optional[BaseException] = None
+            for downloader_async in downloaders_async:
+                try:
+                    downloader_async.result()
+                except BaseException as e:
+                    logger.verbose(e)
+                    exc = e
+
+            return exc
 
         try:
             # Wait for successful parsing of resources or till exception.
             parser_async.result()
-            parser.close()
         except BaseException:
-            parser.close()
-            try:
-                # Wait for graceful exiting of downloader after currently running command is finished.
-                downloader_async.result()
-            except BaseException as e:
-                # If both background tasks fail, the parser exception has priority, and the other is logged.
-                logger.verbose(e)
-
-            # Parser exception has priority because it happens for the earlier chunk of resources.
+            # Wait for graceful exiting of downloaders after their currently running command is finished.
+            # If few background tasks fail, the parser exception has priority, and the other is logged.
+            _graceful_shutdown_downloaders()
             raise
 
-        # Although parser may exit successfully, not all resources might be processed due to error in downloader.
-        downloader_async.result()
+        downloader_exception = _graceful_shutdown_downloaders()
+        if downloader_exception is not None:
+            raise downloader_exception
 
     downloaded_resources_descriptor = cluster.context['backup_descriptor']['kubernetes']['resources']
     if parser.namespaced_resources_result_map:
@@ -546,7 +597,7 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
     if parser.nonnamespaced_resources_result:
         downloaded_resources_descriptor['nonnamespaced'] = parser.nonnamespaced_resources_result
 
-    logger.verbose(f'Downloading elapsed: {downloader.elapsed}')
+    logger.verbose(f'Downloading elapsed: {max(downloader.elapsed for downloader in downloaders)}')
     logger.verbose(f'Parsing elapsed: {parser.elapsed}')
     logger.verbose(f'Total elapsed: {time.time() - start}')
     logger.verbose(f'Total files saved: {parser.total_files}')
