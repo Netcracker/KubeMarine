@@ -18,7 +18,7 @@ import io
 import json
 import uuid
 import time
-from typing import TypeVar
+from typing import TypeVar, Optional
 
 import yaml
 
@@ -56,7 +56,7 @@ class KubernetesObject:
 
     @property
     def uid(self) -> str:
-        uid = self._obj['metadata'].get('uid')
+        uid: Optional[str] = self._obj['metadata'].get('uid')
         if uid:
             return uid
 
@@ -64,21 +64,25 @@ class KubernetesObject:
 
     @property
     def kind(self) -> str:
-        return self._obj['kind'].lower()
+        kind: str = self._obj['kind'].lower()
+        return kind
 
     @property
     def namespace(self) -> str:
-        return self._obj['metadata']['namespace'].lower()
+        namespace: str = self._obj['metadata']['namespace'].lower()
+        return namespace
 
     @property
     def name(self) -> str:
-        return self._obj['metadata']['name'].lower()
+        name: str = self._obj['metadata']['name'].lower()
+        return name
 
     def to_json(self) -> str:
         return json.dumps(self._obj)
 
     def to_yaml(self) -> str:
-        return yaml.dump(self._obj)
+        data: str = yaml.dump(self._obj)
+        return data
 
     def is_reloaded(self) -> bool:
         return self._reload_t > -1

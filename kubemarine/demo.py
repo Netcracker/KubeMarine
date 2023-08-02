@@ -21,7 +21,7 @@ import threading
 import time
 from abc import ABC
 from copy import deepcopy
-from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO
+from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO, Tuple
 
 import fabric  # type: ignore[import]
 import invoke
@@ -42,16 +42,16 @@ _ROLE_SPEC = Union[int, List[str]]
 
 
 class FakeShell:
-    def __init__(self):
+    def __init__(self) -> None:
         self.results: Dict[str, List[_ShellResult]] = {}
         self.history: Dict[str, List[_ShellResult]] = {}
         self._lock = threading.Lock()
 
-    def reset(self):
+    def reset(self) -> None:
         self.results = {}
         self.history = {}
 
-    def add(self, results: Mapping[str, GenericResult], do_type, args, usage_limit=0):
+    def add(self, results: Mapping[str, GenericResult], do_type: str, args: List[str], usage_limit: int = 0) -> None:
         args.sort()
 
         for host, result in results.items():
@@ -67,11 +67,9 @@ class FakeShell:
 
             self.results.setdefault(host, []).append(result)
 
-    def find(self, host: str, do_type, args, kwargs) -> GenericResult:
+    def find(self, host: str, do_type: str, args: List[str]) -> Optional[GenericResult]:
         # TODO: Support kwargs
         with self._lock:
-            if isinstance(args, tuple):
-                args = list(args)
             results = self.results.get(host, [])
             for i, item in enumerate(results):
                 if item['do_type'] == do_type and item['args'] == args:
@@ -88,20 +86,18 @@ class FakeShell:
             return None
 
     # covered by test.test_demo.TestFakeShell.test_calculate_calls
-    def history_find(self, host: str, do_type, args):
+    def history_find(self, host: str, do_type: str, args: List[str]) -> List[_ShellResult]:
         # TODO: Support kwargs
         result = []
-        if isinstance(args, tuple):
-            args = list(args)
         for item in self.history.get(host, []):
             if item['do_type'] == do_type and item['args'] == args:
                 result.append(item)
         return result
 
-    def is_called_each(self, hosts: List[str], do_type: str, args: list) -> bool:
+    def is_called_each(self, hosts: List[str], do_type: str, args: List[str]) -> bool:
         return all((self.is_called(host, do_type, args) for host in hosts))
 
-    def is_called(self, host: str, do_type: str, args: list) -> bool:
+    def is_called(self, host: str, do_type: str, args: List[str]) -> bool:
         """
         Returns true if the specified command has already been executed in FakeShell for the specified connection.
         :param host: host to check, for which the desirable command should have been executed.
@@ -110,26 +106,27 @@ class FakeShell:
         :return: Boolean
         """
         found_entries = self.history_find(host, do_type, args)
-        return sum(found_entry['used_times'] for found_entry in found_entries) > 0
+        total_used_times: int = sum(found_entry['used_times'] for found_entry in found_entries)
+        return total_used_times > 0
 
 
 class FakeFS:
-    def __init__(self):
+    def __init__(self) -> None:
         self.storage: Dict[str, Dict[str, str]] = {}
         self.emulate_latency = False
         self._lock = threading.Lock()
 
-    def reset(self):
+    def reset(self) -> None:
         self.storage = {}
         self.emulate_latency = False
 
-    def reset_host(self, host):
+    def reset_host(self, host: str) -> None:
         self.storage[host] = {}
 
     # covered by test.test_demo.TestFakeFS.test_put_file
     # covered by test.test_demo.TestFakeFS.test_put_bytesio
     # covered by test.test_group.TestGroupCall.test_write_stream
-    def write(self, host, filename, data):
+    def write(self, host: str, filename: str, data: Union[io.BytesIO, str]) -> None:
         if isinstance(data, io.BytesIO):
             # Emulate how fabric handles file-like objects.
             # See fabric.transfer.Transfer.put
@@ -139,11 +136,9 @@ class FakeFS:
                 text = self._transfer(data)
             finally:
                 data.seek(pointer)
-        elif isinstance(data, str):
+        else:
             with open(data, "rb") as fl:
                 text = self._transfer(fl)
-        else:
-            raise ValueError("Unsupported data type " + str(type(data)))
 
         with self._lock:
             self.storage.setdefault(host, {})[filename] = text
@@ -163,30 +158,20 @@ class FakeFS:
 
     # covered by test.test_demo.TestFakeFS.test_put_string
     # covered by test.test_demo.TestFakeFS.test_get_nonexistent
-    def read(self, host, filename):
+    def read(self, host: str, filename: str) -> Optional[str]:
         return self.storage.get(host, {}).get(filename)
 
     # covered by test.test_demo.TestFakeFS.test_write_file_to_cluster
-    def read_all(self, hosts: List[str], filename):
+    def read_all(self, hosts: List[str], filename: str) -> Dict[str, Optional[str]]:
         result = {}
         for host in hosts:
             result[host] = self.read(host, filename)
         return result
 
-    def ls(self, host, path):
-        for _path in list(self.storage.get(host, {}).keys()):
-            # TODO
-            pass
-
-    def rm(self, host, path):
-        for _path in list(self.storage.get(host, {}).keys()):
-            if path in _path:
-                del self.storage[host][_path]
-
 
 class FakeKubernetesCluster(KubernetesCluster):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         self.fake_shell = kwargs.pop("fake_shell", FakeShell())
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
@@ -201,15 +186,15 @@ class FakeKubernetesCluster(KubernetesCluster):
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)
 
-    def dump_finalized_inventory(self):
+    def dump_finalized_inventory(self) -> None:
         return
 
-    def preserve_inventory(self):
+    def preserve_inventory(self) -> None:
         return
 
 
 class FakeResources(DynamicResources):
-    def __init__(self, context, raw_inventory: dict, procedure_inventory: dict = None,
+    def __init__(self, context: dict, raw_inventory: dict, procedure_inventory: dict = None,
                  nodes_context: dict = None,
                  fake_shell: FakeShell = None, fake_fs: FakeFS = None):
         super().__init__(context, True)
@@ -240,7 +225,7 @@ class FakeResources(DynamicResources):
 
 class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
-    def __init__(self, ip, fake_shell: FakeShell, fake_fs: FakeFS, **kw):
+    def __init__(self, ip: str, fake_shell: FakeShell, fake_fs: FakeFS, **kw: Any):
         super().__init__(ip, **kw)
         self.fake_shell = fake_shell
         self.fake_fs = fake_fs
@@ -253,80 +238,73 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
 
         self.separator_ptrn = re.compile(final_sep)
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Any) -> None:
         # fabric Connection has special handling of this method. Call default behaviour for custom attributes.
         if key in ('fake_shell', 'fake_fs', 'separator_ptrn'):
             return object.__setattr__(self, key, value)
         super().__setattr__(key, value)
 
-    def run(self, command, **kwargs) -> fabric.runners.Result:
+    def run(self, command: str, **kwargs: Any) -> fabric.runners.Result:
         return self._do("run", command, **kwargs)
 
-    def sudo(self, command, **kwargs) -> fabric.runners.Result:
+    def sudo(self, command: str, **kwargs: Any) -> fabric.runners.Result:
         return self._do("sudo", command, **kwargs)
 
     # not implemented
-    def get(self, *args, **kwargs):
-        return self._do("get", *args, **kwargs)
+    def get(self, remote_file: str, local_file: str, **kwargs: Any) -> None:
+        raise NotImplementedError("Stub for fabric Connection.get() is not implemented")
 
-    def put(self, *args, **kwargs):
-        return self._do("put", *args, **kwargs)
+    def put(self, data: Union[io.BytesIO, str], filename: str, **kwargs: Any) -> None:
+        # It should return fabric.transfer.Result, but currently returns None.
+        # Transfer Result is currently never handled.
+        self.fake_fs.write(self.host, filename, data)
 
-    def _do(self, do_type, *args, **kwargs) -> fabric.runners.Result:
-        if do_type in ['sudo', 'run']:
-            # start fake execution of commands
-            original_command = list(args)[0]
-            commands, sep_symbol, command_sep = self._split_command(do_type, original_command)
+    def _do(self, do_type: str, original_command: str, **kwargs: Any) -> fabric.runners.Result:
+        # start fake execution of commands
+        commands, sep_symbol, command_sep = self._split_command(do_type, original_command)
 
-            final_res = fabric.runners.Result(stdout="", stderr="", exited=None,
-                                              connection=self, command=original_command)
-            prev_exited = None
-            i = 0
-            for command in commands:
-                found_result = self.fake_shell.find(self.host, do_type, [command], kwargs)
+        final_res = fabric.runners.Result(stdout="", stderr="", exited=None,
+                                          connection=self, command=original_command)
+        prev_exited = None
+        i = 0
+        for command in commands:
+            found_result = self.fake_shell.find(self.host, do_type, [command])
 
-                if found_result is None:
-                    raise Exception('Fake result not found for requested action type \'%s\' and command %s' % (do_type, [command]))
+            if found_result is None:
+                raise Exception('Fake result not found for requested action type \'%s\' and command %s' % (do_type, [command]))
 
-                timeout_exception = None
-                if isinstance(found_result, Exception):
-                    if i > 0:
-                        raise ValueError("Exception can be thrown only for the whole command")
-                    elif isinstance(found_result, CommandTimedOut):
-                        timeout_exception = found_result
-                        found_result = found_result.result
-                    else:
-                        raise found_result
-
+            timeout_exception = None
+            if isinstance(found_result, Exception):
                 if i > 0:
-                    final_res.stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
-                    final_res.stderr += command_sep + '\n'
-                i += 1
+                    raise ValueError("Exception can be thrown only for the whole command")
+                elif isinstance(found_result, CommandTimedOut):
+                    timeout_exception = found_result
+                    found_result = found_result.result
+                else:
+                    raise found_result
 
-                final_res.stdout += found_result.stdout
-                final_res.stderr += found_result.stderr
-                final_res.exited = prev_exited = found_result.exited
+            if i > 0:
+                final_res.stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
+                final_res.stderr += command_sep + '\n'
+            i += 1
 
-                if timeout_exception is not None:
-                    raise invoke.CommandTimedOut(final_res, timeout_exception.timeout)
+            final_res.stdout += found_result.stdout
+            final_res.stderr += found_result.stderr
+            final_res.exited = prev_exited = found_result.exited
 
-                if prev_exited != 0 and sep_symbol != ';':
-                    # stop fake execution
-                    break
+            if timeout_exception is not None:
+                raise invoke.CommandTimedOut(final_res, timeout_exception.timeout)
 
-            if prev_exited == 0 or kwargs.get('warn', False):
-                return final_res
+            if prev_exited != 0 and sep_symbol != ';':
+                # stop fake execution
+                break
 
-            raise invoke.UnexpectedExit(final_res)
+        if prev_exited == 0 or kwargs.get('warn', False):
+            return final_res
 
-        elif do_type == 'put':
-            # It should return fabric.transfer.Result, but currently returns None.
-            # Transfer Result is currently never handled.
-            return self.fake_fs.write(self.host, args[1], args[0])
+        raise invoke.UnexpectedExit(final_res)
 
-        raise Exception('Unsupported do type')
-
-    def _split_command(self, do_type, command: str):
+    def _split_command(self, do_type: str, command: str) -> Tuple[List[str], str, str]:
         """
         This is a reverse operation to the RemoteExecutor#_merge_actions
         """
@@ -345,21 +323,21 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                 self._compare_and_return(do_type, resolved_do_type, "Do types are not equal")
                 i += 3
 
-        return commands, sep_symbol, command_sep
+        return commands, sep_symbol or '', command_sep or ''
 
-    def _compare_and_return(self, one, another, msg):
+    def _compare_and_return(self, one: Optional[str], another: str, msg: str) -> str:
         if one is None or one == another:
             return another
         else:
             raise ValueError(msg)
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
 class FakeAbstractGroup(AbstractGroup[GROUP_RUN_TYPE], ABC):
     def _put_with_mv(self, local_stream: Union[io.BytesIO, str], remote_file: str,
-                     backup=False, sudo=False, mkdir=False, immutable=False):
+                     backup: bool, sudo: bool, mkdir: bool, immutable: bool) -> None:
         super()._put_with_mv(local_stream, remote_file, backup=False, sudo=False, mkdir=False, immutable=False)
 
 
@@ -388,7 +366,9 @@ class FakeConnectionPool(connections.ConnectionPool):
         self.fake_shell = fake_shell
         self.fake_fs = fake_fs
 
-    def _create_connection_from_details(self, ip: str, conn_details: dict, gateway=None, inline_ssh_env=True):
+    def _create_connection_from_details(self, ip: str, conn_details: dict,
+                                        gateway: fabric.connection.Connection = None,
+                                        inline_ssh_env: bool = True) -> fabric.connection.Connection:
         return FakeConnection(
             ip, self.fake_shell, self.fake_fs,
             user=conn_details.get('username', static.GLOBALS['connection']['defaults']['username']),
@@ -396,7 +376,8 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None, procedure='install'):
+def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None,
+                          procedure: str = 'install') -> dict:
     args = list(args) if args else []
     # todo probably increase logging level to get rid of spam in logs.
     if '--disable-dump' not in args:
@@ -411,8 +392,8 @@ def create_silent_context(args: list = None, parser: argparse.ArgumentParser = N
     return context
 
 
-def new_cluster(inventory, procedure_inventory=None, context: dict = None,
-                fake=True) -> Union[KubernetesCluster, FakeKubernetesCluster]:
+def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict = None,
+                fake: bool = True) -> Union[KubernetesCluster, FakeKubernetesCluster]:
     if context is None:
         context = create_silent_context()
 
@@ -431,7 +412,8 @@ def new_cluster(inventory, procedure_inventory=None, context: dict = None,
     return cluster
 
 
-def generate_nodes_context(inventory: dict, os_name='centos', os_version='7.9', net_interface='eth0') -> dict:
+def generate_nodes_context(inventory: dict, os_name: str = 'centos', os_version: str = '7.9',
+                           net_interface: str = 'eth0') -> dict:
     os_family = system.detect_of_family_by_name_version(os_name, os_version)
 
     context = {}
@@ -554,19 +536,19 @@ def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dic
     return {host: exception for host in hosts}
 
 
-def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout='', stderr='',
-                            code=0, timeout: int = None) -> NodeGroupResult:
+def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout: str = '', stderr: str = '',
+                            code: int = 0, timeout: int = None) -> NodeGroupResult:
     hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code, timeout)
     return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_result(hosts: List[str], stdout='', stderr='',
-                        code=0, timeout: int = None) -> Dict[str, GenericResult]:
+def create_hosts_result(hosts: List[str], stdout: str = '', stderr: str = '',
+                        code: int = 0, timeout: int = None) -> Dict[str, GenericResult]:
     # each host should have its own result instance.
     return {host: create_result(stdout, stderr, code, timeout) for host in hosts}
 
 
-def create_result(stdout='', stderr='', code=0, timeout: int = None) -> GenericResult:
+def create_result(stdout: str = '', stderr: str = '', code: int = 0, timeout: int = None) -> GenericResult:
     # command and 'hide' option will be later replaced with actual
     result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr)
     if timeout is None:
@@ -575,15 +557,7 @@ def create_result(stdout='', stderr='', code=0, timeout: int = None) -> GenericR
     return CommandTimedOut(result, timeout)
 
 
-def empty_action(*args, **kwargs) -> None:
-    """
-    A dummy method that does nothing
-    :return: None
-    """
-    pass
-
-
-def new_scheme(scheme: dict, role: str, number: int):
+def new_scheme(scheme: dict, role: str, number: int) -> dict:
     scheme = deepcopy(scheme)
     scheme[role] = number
     return scheme

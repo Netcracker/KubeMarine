@@ -31,15 +31,15 @@ from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
-from types import ModuleType
-from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set
+from types import ModuleType, FunctionType
+from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast
 
 import yaml
 import inspect
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine import jinja, thirdparties
-from kubemarine.core import utils, static, errors, os as kos
+from kubemarine.core import utils, static, errors, os as kos, log
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes.daemonset import DaemonSet
@@ -52,7 +52,7 @@ oob_plugins = list(static.DEFAULTS["plugins"].keys())
 LOADED_MODULES: Dict[str, ModuleType] = {}
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster):
+def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for plugin_name, plugin_item in inventory["plugins"].items():
         for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
@@ -62,7 +62,7 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster):
     return inventory
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster):
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for plugin_name, plugin_item in inventory["plugins"].items():
         for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
             for procedure_type, configs in step.items():
@@ -112,7 +112,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
 
 
 def _verify_upgrade_plan(raw_inventory: dict, previous_version: str,
-                         plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]):
+                         plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
     raw_plugins = deepcopy(raw_inventory.get('plugins', {}))
 
     # validate all plugin sections in procedure inventory
@@ -127,7 +127,8 @@ def _verify_upgrade_plan(raw_inventory: dict, previous_version: str,
         previous_version = version
 
 
-def verify_image_redefined(plugin_name, previous_version, next_version, raw_plugins, upgrade_plugin):
+def verify_image_redefined(plugin_name: str, previous_version: str, next_version: str,
+                           raw_plugins: Dict[str, Any], upgrade_plugin: Dict[str, Any]) -> None:
     """
     If some image in "cluster_plugin" is different from image in "base_plugin",
     i.e. redefined, then "upgrade_plugin" should have this image explicitly
@@ -167,7 +168,12 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
     return inventory
 
 
-def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None):
+def _get_plugin_priority(plugin_item: dict, default: int) -> int:
+    priority: int = plugin_item.get("installation", {}).get('priority', default)
+    return priority
+
+
+def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None) -> None:
     if plugins_ is None:
         plugins = cluster.inventory["plugins"]
     else:
@@ -181,7 +187,7 @@ def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None):
                     and plugin_item['installation']['priority'] > max_priority:
                 max_priority = plugin_item['installation']['priority']
 
-    plugins_queue.sort(key=lambda name: plugins[name].get("installation", {}).get('priority', max_priority + 1))
+    plugins_queue.sort(key=lambda name: _get_plugin_priority(plugins[name], max_priority + 1))
 
     cluster.log.debug('The following plugins will be installed:')
     for plugin_name in plugins_queue:
@@ -196,12 +202,12 @@ def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None):
         install_plugin(cluster, plugin_name, plugins[plugin_name]["installation"]['procedures'])
 
 
-def install_plugin(cluster: KubernetesCluster, plugin_name: str, installation_procedure: List[dict]):
+def install_plugin(cluster: KubernetesCluster, plugin_name: str, installation_procedure: List[dict]) -> None:
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
 
     for current_step_i, step in enumerate(installation_procedure):
         for apply_type, configs in step.items():
-            procedure_types()[apply_type]['apply'](cluster, configs, plugin_name)
+            procedure_types()[apply_type]['apply'](cluster, configs)
 
 
 def expect_daemonset(cluster: KubernetesCluster,
@@ -364,7 +370,7 @@ def expect_deployment(cluster: KubernetesCluster,
                       deployments_names: List[Union[str, Dict[str, str]]],
                       timeout: int = None,
                       retries: int = None,
-                      node: NodeGroup = None):
+                      node: NodeGroup = None) -> None:
     """
     The method waits for the configuration parameters of the given Deployments to be applied.
     :param cluster: KubernetesCluster object where method should be performed
@@ -412,8 +418,9 @@ def expect_deployment(cluster: KubernetesCluster,
     raise Exception('In the expected time, the Deployments did not become ready. Try to increase number of retries in expect.deployments: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
-def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace=None, timeout=None, retries=None,
-                node: NodeGroup = None, apply_filter: str = None):
+def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = None,
+                timeout: int = None, retries: int = None,
+                node: NodeGroup = None, apply_filter: str = None) -> None:
 
     if timeout is None:
         timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
@@ -494,7 +501,7 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace=None, tim
     raise Exception('In the expected time, the pods did not become ready')
 
 
-def is_critical_state_in_stdout(cluster: KubernetesCluster, stdout: str):
+def is_critical_state_in_stdout(cluster: KubernetesCluster, stdout: str) -> bool:
     for state in cluster.globals['pods']['critical_states']:
         if state in stdout:
             return True
@@ -503,21 +510,21 @@ def is_critical_state_in_stdout(cluster: KubernetesCluster, stdout: str):
 
 # **** TEMPLATES ****
 
-def convert_template(_, config):
+def convert_template(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     return _convert_file(config)
 
 
-def verify_template(_, config: dict):
-    return _verify_file(config, "Template")
+def verify_template(_: KubernetesCluster, config: dict) -> None:
+    _verify_file(config, "Template")
 
 
-def apply_template(cluster: KubernetesCluster, config: dict, plugin_name=None):
-    return _apply_file(cluster, config, "Template")
+def apply_template(cluster: KubernetesCluster, config: dict) -> None:
+    _apply_file(cluster, config, "Template")
 
 
 # **** EXPECT ****
 
-def convert_expect(_, config: dict):
+def convert_expect(_: KubernetesCluster, config: dict) -> dict:
     if config.get('daemonsets') is not None and isinstance(config['daemonsets'], list):
         config['daemonsets'] = {
             'list': config['daemonsets']
@@ -541,7 +548,7 @@ def convert_expect(_, config: dict):
     return config
 
 
-def apply_expect(cluster: KubernetesCluster, config: dict, plugin_name=None):
+def apply_expect(cluster: KubernetesCluster, config: dict) -> None:
     # TODO: Add support for expect services and expect nodes
 
     for expect_type, expect_conf in config.items():
@@ -574,7 +581,7 @@ def apply_expect(cluster: KubernetesCluster, config: dict, plugin_name=None):
 
 
 @no_type_check
-def get_python_module(module_path: str):
+def get_python_module(module_path: str) -> ModuleType:
     if module_path in LOADED_MODULES:
         return LOADED_MODULES[module_path]
 
@@ -588,7 +595,7 @@ def get_python_module(module_path: str):
     return module 
 
 
-def get_python_method_args(cluster: KubernetesCluster, step: dict):
+def get_python_method_args(cluster: KubernetesCluster, step: dict) -> Tuple[Callable[..., None], Dict[str, Any]]:
     module_path, _ = utils.determine_resource_absolute_file(step['module'])
     method_name = step['method']
     method_arguments = step.get('arguments', {})
@@ -614,34 +621,35 @@ def get_python_method_args(cluster: KubernetesCluster, step: dict):
     return method, method_arguments
 
 
-def verify_python(cluster: KubernetesCluster, step: dict):
+def verify_python(cluster: KubernetesCluster, step: dict) -> None:
     method, method_arguments = get_python_method_args(cluster, step)
     # Additional verification logic can be added here
 
 
-def apply_python(cluster: KubernetesCluster, step: dict, plugin_name=None):
+def apply_python(cluster: KubernetesCluster, step: dict) -> None:
     method, method_arguments = get_python_method_args(cluster, step)
 
-    cluster.log.debug("Running method %s from %s module..." % (method.__name__, method.__module__))
+    func = cast(FunctionType, method)
+    cluster.log.debug("Running method %s from %s module..." % (func.__name__, func.__module__))
     method(cluster, **method_arguments)
 
 
 # **** THIRDPARTIES ****
 
-def verify_thirdparty(cluster: KubernetesCluster, thirdparty: str):
+def verify_thirdparty(cluster: KubernetesCluster, thirdparty: str) -> None:
     defined_thirdparties = list(cluster.inventory['services'].get('thirdparties', {}).keys())
     if thirdparty not in defined_thirdparties:
         raise Exception('Specified thirdparty %s not found in thirdpartirs definition. Expected any of %s.'
                         % (thirdparty, defined_thirdparties))
 
 
-def apply_thirdparty(cluster: KubernetesCluster, thirdparty: str, plugin_name=None):
-    return thirdparties.install_thirdparty(cluster.nodes['all'], thirdparty)
+def apply_thirdparty(cluster: KubernetesCluster, thirdparty: str) -> None:
+    thirdparties.install_thirdparty(cluster.nodes['all'], thirdparty)
 
 
 # **** SHELL ****
 
-def convert_shell(_, config):
+def convert_shell(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     if isinstance(config, str):
         config = {
             'command': config
@@ -649,7 +657,7 @@ def convert_shell(_, config):
     return config
 
 
-def verify_shell(cluster: KubernetesCluster, config: dict):
+def verify_shell(cluster: KubernetesCluster, config: dict) -> None:
     out_vars = config.get('out_vars', [])
     groups = config.get('groups', [])
     nodes = config.get('nodes', [])
@@ -667,7 +675,7 @@ def verify_shell(cluster: KubernetesCluster, config: dict):
     # TODO: verify fields types and contents
 
 
-def apply_shell(cluster: KubernetesCluster, step: dict, plugin_name=None):
+def apply_shell(cluster: KubernetesCluster, step: dict) -> None:
     commands = step['command']
     sudo = step.get('sudo', False)
     groups = step.get('groups', [])
@@ -729,12 +737,10 @@ def apply_shell(cluster: KubernetesCluster, step: dict, plugin_name=None):
     else:
         cluster.log.debug(result)
 
-    return result
-
 
 # **** ANSIBLE ****
 
-def convert_ansible(_, config):
+def convert_ansible(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     if isinstance(config, str):
         config = {
             'playbook': config
@@ -746,14 +752,14 @@ def _get_absolute_playbook(config: dict) -> str:
     return utils.determine_resource_absolute_file(config['playbook'])[0]
 
 
-def verify_ansible(cluster: KubernetesCluster, config: dict):
+def verify_ansible(cluster: KubernetesCluster, config: dict) -> None:
     _get_absolute_playbook(config)
     if cluster.is_deploying_from_windows():
         raise Exception("Executing of playbooks on Windows deployer is currently not supported")
     # TODO: verify fields types and contents
 
 
-def apply_ansible(cluster: KubernetesCluster, step: dict, plugin_name=None):
+def apply_ansible(cluster: KubernetesCluster, step: dict) -> None:
     playbook_path = _get_absolute_playbook(step)
     external_vars = step.get('vars', {})
     become = step.get('become', False)
@@ -781,10 +787,8 @@ def apply_ansible(cluster: KubernetesCluster, step: dict, plugin_name=None):
     if result.returncode != 0:
         raise Exception("Failed to apply ansible plugin, see error above")
 
-    return result
 
-
-def apply_helm(cluster: KubernetesCluster, config: dict, plugin_name=None):
+def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
@@ -823,10 +827,8 @@ def apply_helm(cluster: KubernetesCluster, config: dict, plugin_name=None):
     output = subprocess.check_output(command, shell=True)
     cluster.log.debug(output.decode('utf-8'))
 
-    return output
 
-
-def process_chart_values(config: dict, local_chart_path: str):
+def process_chart_values(config: dict, local_chart_path: str) -> None:
     config_values = config.get("values")
     file_values = None
     config_values_file = config.get("values_file")
@@ -850,7 +852,7 @@ def process_chart_values(config: dict, local_chart_path: str):
     utils.dump_file({}, yaml.dump(merged_values), chart_values, dump_location=False)
 
 
-def get_local_chart_path(log, config: dict):
+def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
     chart_path = config['chart_path']
 
     is_curl = chart_path[:4] == 'http' and '://' in chart_path[4:8]
@@ -860,7 +862,7 @@ def get_local_chart_path(log, config: dict):
         remove_tree(local_chart_folder)
     mkpath(local_chart_folder)
     if is_curl:
-        log.verbose('Chart download via curl detected')
+        logger.verbose('Chart download via curl detected')
         destination = os.path.basename(chart_path)
 
         ctx = ssl.create_default_context()
@@ -873,15 +875,15 @@ def get_local_chart_path(log, config: dict):
 
         extension = destination.split('.')[-1]
         if extension == 'zip':
-            log.verbose('Unzip will be used for unpacking')
+            logger.verbose('Unzip will be used for unpacking')
             with zipfile.ZipFile(destination, 'r') as zf:
                 zf.extractall(local_chart_folder)
         else:
-            log.verbose('Tar will be used for unpacking')
+            logger.verbose('Tar will be used for unpacking')
             with tarfile.open(destination, "r:gz") as tf:
                 tf.extractall(local_chart_folder)
     else:
-        log.debug("Create copy of chart to work with")
+        logger.debug("Create copy of chart to work with")
         copy_tree(chart_path, local_chart_folder)
 
     # Find all Chart.yaml files in the chart.
@@ -893,7 +895,7 @@ def get_local_chart_path(log, config: dict):
     # Sort by number of parts in path to find outermost Chart.yaml
     chart_metadata.sort(key=lambda path: len(path.split(os.sep)))
     local_chart_folder = os.path.dirname(chart_metadata[0])
-    log.debug("Detected chart path = %s" % local_chart_folder)
+    logger.debug("Detected chart path = %s" % local_chart_folder)
 
     # Check all nested Chart.yaml are inside chart path
     for i in range(1, len(chart_metadata)):
@@ -904,19 +906,19 @@ def get_local_chart_path(log, config: dict):
     return local_chart_folder
 
 
-def convert_config(_, config):
+def convert_config(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     return _convert_file(config)
 
 
-def verify_config(_, config: dict):
-    return _verify_file(config, "Config")
+def verify_config(_: KubernetesCluster, config: dict) -> None:
+    _verify_file(config, "Config")
 
 
-def apply_config(cluster: KubernetesCluster, config: dict, plugin_name=None):
-    return _apply_file(cluster, config, "Config")
+def apply_config(cluster: KubernetesCluster, config: dict) -> None:
+    _apply_file(cluster, config, "Config")
 
 
-def _convert_file(config):
+def _convert_file(config: Union[str, dict]) -> dict:
     if isinstance(config, str):
         config = {
             'source': config
@@ -930,7 +932,7 @@ def get_source_absolute_pattern(config: dict) -> Tuple[str, bool]:
     return os.path.join(abs_dir, basename), is_external
 
 
-def _verify_file(config: dict, file_type: str):
+def _verify_file(config: dict, file_type: str) -> None:
     """
         Verifies if the path matching the config 'source' key exists and points to
         existing files.

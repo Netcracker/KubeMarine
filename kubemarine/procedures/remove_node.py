@@ -15,7 +15,7 @@
 
 
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, List
 
 from kubemarine import kubernetes, haproxy, keepalived
 from kubemarine.core import flow, summary
@@ -44,21 +44,21 @@ def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[No
     return active_nodes
 
 
-def loadbalancer_remove_haproxy(cluster: KubernetesCluster):
+def loadbalancer_remove_haproxy(cluster: KubernetesCluster) -> None:
     nodes = _get_active_nodes("balancer", cluster)
     if nodes is None:
         return
     nodes.call(haproxy.disable)
 
 
-def loadbalancer_remove_keepalived(cluster: KubernetesCluster):
+def loadbalancer_remove_keepalived(cluster: KubernetesCluster) -> None:
     nodes = _get_active_nodes("keepalived", cluster)
     if nodes is None:
         return
     nodes.call(keepalived.disable)
 
 
-def remove_kubernetes_nodes(cluster: KubernetesCluster):
+def remove_kubernetes_nodes(cluster: KubernetesCluster) -> None:
     group = cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_for_removal()
 
     if group.is_empty():
@@ -69,7 +69,7 @@ def remove_kubernetes_nodes(cluster: KubernetesCluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize):
+def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory_to_finalize
 
@@ -144,15 +144,15 @@ cumulative_points = {
 
 
 class RemoveNodeAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('remove node', recreate_inventory=True)
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
         res.make_final_inventory()
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
 
     cli_help = '''
     Script for removing node from Kubernetes cluster.

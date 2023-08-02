@@ -21,10 +21,10 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine import kubernetes
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Updpate kubeadm_flags after cri upgrade")
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         path = 'plugins."io.containerd.grpc.v1.cri"'
         target_kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
@@ -52,7 +52,7 @@ class TheAction(Action):
 
 
 class KubeadmFlags(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("kubeadm_flags")
 
     @property
