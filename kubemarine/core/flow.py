@@ -156,14 +156,6 @@ def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], con
             last_cluster.context['status'] = 'failed' if failed else 'successful'
             last_cluster.preserve_inventory()
 
-        # TODO remove in next release
-        if last_cluster.context.get('schema_errors_ignored'):
-            last_cluster.log.warning(
-                "Inventory file is failed to be validated against the schema, "
-                "that was suppressed with --ignore-schema-errors.\n"
-                "See the beginning of the logs for details.\n"
-                "The option will be removed in next release.")
-
 
 def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None,
               tasks_filter: list = None) -> None:
@@ -346,12 +338,6 @@ def new_common_parser(cli_help: str) -> argparse.ArgumentParser:
     parser.add_argument('-w', '--workdir',
                         default='',
                         help='Custom path of the workdir')
-
-    # TODO remove in next release
-    parser.add_argument('--ignore-schema-errors',
-                        action='store_true',
-                        help='Do not stop the run if validation by schema fails. '
-                             'The option will be removed in next release.')
 
     return parser
 
