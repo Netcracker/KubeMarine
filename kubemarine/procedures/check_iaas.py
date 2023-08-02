@@ -948,7 +948,7 @@ class IaasAction(Action):
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def main(cli_arguments: List[str] = None) -> TestSuite:
     cli_help = '''
     Script for checking Kubernetes cluster IAAS layer.
     

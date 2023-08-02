@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar
 
 import yaml
 import ruamel.yaml
@@ -29,10 +29,17 @@ from datetime import datetime
 from collections import OrderedDict
 
 from ruamel.yaml import CommentedMap
-from useful_types import SupportsDunderLT
+from typing_extensions import Protocol
 
 from kubemarine.core import log
 from kubemarine.core.errors import pretty_print_error
+
+
+_T_contra = TypeVar("_T_contra", contravariant=True)
+
+
+class SupportsDunderLT(Protocol[_T_contra]):
+    def __lt__(self, __other: _T_contra) -> bool: ...
 
 
 def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> None:
