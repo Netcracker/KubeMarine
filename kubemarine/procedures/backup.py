@@ -30,7 +30,6 @@ from queue import Queue
 from typing import List, Tuple, Union, Dict, Literal, Optional, Iterator
 
 import yaml
-from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
@@ -337,7 +336,6 @@ class ExportKubernetesParser:
         self._graceful_finish_barrier = graceful_finish_barrier
         self._task_queue: 'Queue[ParserPayload]' = Queue()
         self._lock = threading.Lock()
-        self._yaml_transformer = utils.yaml_structure_preserver()
 
     def schedule(self, payload: ParserPayload) -> None:
         with self._lock:
@@ -377,6 +375,13 @@ class ExportKubernetesParser:
         if payload.event == 'do':
             os.remove(payload.resource_path)
 
+    @staticmethod
+    def _parse_kind(line: str) -> str:
+        if line[2:].startswith('kind: '):
+            return line[8:len(line) - 1]
+        else:
+            return ''
+
     def _handle(self, payload: ParserPayload) -> None:
         namespace = payload.namespace
         if namespace:
@@ -384,28 +389,48 @@ class ExportKubernetesParser:
         else:
             self.logger.debug(f"Loading non-namespaced resources...")
 
-        with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
-            template = self._yaml_transformer.load(file)
-
-        if template is None:
-            # No resources found and the file is empty.
-            return
-
-        items = template['items']
         resources = self.nonnamespaced_resources if namespace is None else self.namespaced_resources
-        items_by_resource: Dict[str, List[dict]] = {}
-        for item in items:
-            resource_name = next(r['name'] for r in resources if r['kind'] == item['kind'])
+        items_by_resource: Dict[str, List[str]] = {}
+
+        def append_item(kind: str, item: str) -> None:
+            resource_name = next(r['name'] for r in resources if r['kind'] == kind)
             items_by_resource.setdefault(resource_name, []).append(item)
+
+        with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
+            header = ''
+            remainder = ''
+            item = ''
+            kind = ''
+            stage = 'header'
+            for line in file:
+                if stage == 'header':
+                    if line.startswith('- '):
+                        stage = 'items'
+                        item = line
+                        kind = self._parse_kind(line)
+                    else:
+                        header += line
+                elif stage == 'items':
+                    if line.startswith('- '):
+                        append_item(kind, item)
+                        item = line
+                        kind = self._parse_kind(line)
+                    elif not line[0].isspace():
+                        stage = 'remainder'
+                        append_item(kind, item)
+                        remainder = line
+                    else:
+                        item += line
+                        if kind == '':
+                            kind = self._parse_kind(line)
+                elif stage == 'remainder':
+                    remainder += line
 
         for resource in resources:
             resource_name = resource['name']
             items = items_by_resource.get(resource_name)
             if items is None:
                 continue
-
-            resource_list = CommentedMap(template)
-            resource_list['items'] = items
 
             location = os.path.join(self.backup_directory, 'kubernetes_resources')
             if namespace is not None:
@@ -418,7 +443,10 @@ class ExportKubernetesParser:
                 f"Dumping list of resource {resource_name!r}"
                 f"{'' if namespace is None else (' for namespace ' + repr(namespace))}...")
             with utils.open_utf8(resource_file_path, 'w') as file:
-                self._yaml_transformer.dump(resource_list, file)
+                file.write(header)
+                for item in items:
+                    file.write(item)
+                file.write(remainder)
 
             if namespace is None:
                 self.nonnamespaced_resources_result.append(resource_name)
