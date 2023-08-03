@@ -148,7 +148,7 @@ Patches that upgrade system packages have the following identifiers:
 * `upgrade_haproxy` - It upgrades the Haproxy service on all balancers.
 * `upgrade_keepalived` - It upgrades the Keepalived service on all balancers.
 
-System packages such as docker, containerd, podman, haproxy, and keepalived are upgraded automatically as required.
+System packages such as docker, containerd, haproxy, and keepalived are upgraded automatically as required.
 You can influence the system packages' upgrade using the `packages` section as follows:
 
 ```yaml
@@ -353,7 +353,7 @@ This task is executed to restore the required CoreDNS configuration.
 
 #### Packages Upgrade Section and Task
 
-This inventory section contains the configuration to upgrade custom and system packages, such as docker, containerd, and podman. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
+This inventory section contains the configuration to upgrade custom and system packages, such as docker and containerd. The system packages are upgraded by default, if necessary. You can influence the system packages' upgrade and specify custom packages for the upgrade/installation/removal using the `packages` section as follows:
 
 ```yaml
 v1.18.8:
@@ -1162,7 +1162,7 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 
 This procedure includes the following steps:
 1. Verify and merge all the specified parameters into the inventory
-2. Install and configure containerd and podman
+2. Install and configure containerd
 3. Install crictl
 4. Implement the following steps on each control-plane and worker node by node:
     1. Drain the node

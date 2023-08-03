@@ -31,8 +31,8 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         for node in exe.group.get_ordered_members_list():
             os_specific_associations = exe.cluster.get_associations_for_node(node.get_host(), 'containerd')
 
-            exe.cluster.log.debug("Installing latest containerd and podman on %s node" % node.get_node_name())
-            # always install latest available containerd and podman
+            exe.cluster.log.debug("Installing latest containerd on %s node" % node.get_node_name())
+            # always install latest available containerd
             packages.install(node, include=os_specific_associations['package_name'], callback=collector)
 
             # remove previous config.toml to avoid problems in case when previous config was broken
@@ -71,19 +71,8 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
         if isinstance(value, dict):
             config_string += f"\n[{key}]\n{toml.dumps(value)}"
 
-    # if there are any insecure registries in containerd config, then it is required to configure them for podman too
     config_toml = toml.loads(config_string)
-    insecure_registries = []
     registry = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {})
-    if registry.get('mirrors'):
-        for mirror, mirror_conf in registry['mirrors'].items():
-            is_insecure = registry.get('configs', {}).get(mirror, {}).get('tls', {}).get('insecure_skip_verify', False)
-            for endpoint in mirror_conf.get('endpoint', []):
-                if "http://" in endpoint:
-                    is_insecure = True
-                    break
-            if is_insecure:
-                insecure_registries.append(mirror)
     # save 'auth.json' if there are credentials for registry
     auth_registries: Dict[str, dict] = {"auths": {}}
     if registry.get('configs'):
@@ -95,15 +84,6 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
         auth_json = json.dumps(auth_registries)
         group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
         group.sudo("chmod 600 /etc/containers/auth.json")
-    if insecure_registries:
-        log.debug("Uploading podman configuration...")
-        podman_registries = f"[registries.insecure]\nregistries = {insecure_registries}\n"
-        utils.dump_file(cluster, podman_registries, 'podman_registries.conf')
-        group.sudo("mkdir -p /etc/containers/")
-        group.put(StringIO(podman_registries), "/etc/containers/registries.conf", backup=True, sudo=True)
-    else:
-        log.debug("Removing old podman configuration...")
-        group.sudo("rm -f /etc/containers/registries.conf")
 
     utils.dump_file(cluster, config_string, 'containerd-config.toml')
     collector = CollectorCallback(cluster)
