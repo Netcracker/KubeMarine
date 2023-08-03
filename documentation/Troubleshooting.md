@@ -18,6 +18,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kube-controller-manager` Unable to Sync Caches for Garbage Collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
   - [Etcdctl Compaction and Defragmentation](#etcdctl-compaction-and-defragmentation)
   - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
+  - [Etcd Database Corruption](#etcd-database-corruption)
   - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
   - [Garbage Collector Does Not Initialize If Convert Webhook Is Broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
@@ -464,6 +465,243 @@ Failed to defragment etcd member
 ```
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
+
+## Etcd Database Corruption
+
+**Symptoms**: The whole cluster does not work, `etcdctl` command returns errors.
+
+**Root cause**: The etcd database is corrupted.
+
+**Solution**: If you have relevant backup created by [`kubemarine backup`](/documentation/Maintenance.md#backup-procedure) procedure and it is suitable to restore the whole kubernetes cluster from it, you can use [`kubemarine restore`](/documentation/Maintenance.md#restore-procedure) procedure.
+
+If you want to restore not the whole cluster, but etcd database only, you can use `kubemarine restore` procedure with the list of required tasks:
+
+```
+kubemarine restore --config=${CLUSTER_YAML} --tasks="prepare,import.etcd,reboot ${PROCEDURE_YAML}"
+
+```
+
+*Note*: `reboot` task will reboot all the cluster nodes.
+
+
+### Manual Restoration of Etcd Database
+
+If it is not possible to use standard kubemarine procedure to restore etcd, you can do that manually.
+
+#### Manual Etcd Restoration from a Snapshot
+
+The community recommends to use snapshots to restore etcd database.
+
+A snapshot can be created at a control-plane node this way:
+
+```
+# etcdctl3 snapshot save /var/lib/etcd/snapshot.db
+
+```
+
+*Note*: etcdctl is a script which starts a container with etcd image, so path to the snapshot file should be `/var/lib/etcd`.
+
+To restore etcd database from a snapshot created as it is described above, the following steps should be applied:
+
+1. Stop kubelet at all the control-plane nodes and stop the relevant containerd/docker containers:
+
+```
+# systemctl stop kubelet
+
+# for i in "etcd" "kube-apiserver" "kube-controller-manager" "kube-scheduler" ; do crictl stop $(crictl ps -a --name $i -q) ; done
+
+# crictl ps -a | egrep "etcd|kube-apiserver|kube-controller-manager|kube-scheduler"
+30f92a80cfaa4       25f8c7f3da61c       47 minutes ago      Exited              etcd                        5                   bfa80629fe7c5
+9a20571c8e93c       595f327f224a4       47 minutes ago      Exited              kube-scheduler              7                   6465a21e0022d
+795a007ef78da       df7b72818ad2e       47 minutes ago      Exited              kube-controller-manager     8                   101d96258a856
+5840381f58a39       8fa62c12256df       47 minutes ago      Exited              kube-apiserver              4                   84a17f819840e
+
+```
+
+2. Backup the content of /var/lib/etcd and clean it up:
+
+```
+# cp -a /var/lib/etcd /var/lib/etcd.bkp
+# rm -rf /var/lib/etcd/*
+```
+
+3. Copy the snapshot from which you are going to restore to `var/lib/etcd`:
+
+```
+# cp /tmp/snapshot.db /var/lib/etcd/
+``` 
+
+4. Restore etcd database into non-default catalog, for example, into `/var/lib/etcd/tmpdir`:
+
+```
+etcdctl snapshot restore /var/lib/etcd/snapshot.db \
+            --name=${CONTROL_PLAN_NODE_NAME} \
+            --data-dir=/var/lib/etcd/tmpdir \
+            --initial-cluster=${INITIAL_CLUSTER} \
+            --initial-advertise-peer-urls=https://${CONTROL_PLAN_NODE_INTERNAL_IP}:2380 
+```
+
+where
+ - `${CONTROL_PLAN_NODE_NAME}` - the name of a node where the database is being restored
+ - `${INITIAL_CLUSTER}` - the list of etcd cluster members, for example:
+```
+cp-node-1=http://192.168.0.10:2380,cp-node-2=http://192.168.0.11:2380,cp-node-3=http://192.168.0.12:2380
+```
+ - `${CONTROL_PLAN_NODE_INTERNAL_IP}` - the internal IP address of the `${CONTROL_PLAN_NODE_NAME}` node
+
+5. Move etcd database to its default folder and delete all unnecessary data:
+
+```
+# mv /var/lib/etcd/tmpdir/member /var/lib/etcd/member && \
+  rm -rf /var/lib/etcd/tmpdir /var/lib/etcd/snapshot.db
+```
+
+6. Repeat steps 4-5 at all the control-plane nodes with etcd.
+
+7. Disable autostart of all control-plane pods except etcd and start kubelet at all the control-plane nodes:
+
+```
+# mkdir /etc/kubernetes/manifests-down
+# mv /etc/kubernetes/manifests/{kube-apiserver.yaml,kube-controller-manager.yaml,kube-scheduler.yaml} /etc/kubernetes/manifests-down/
+# systemctl start kubelet
+```
+
+8. Check that etcd has started at all the control-plane nodes and the etcd cluster looks healthy:
+
+```
+# etcdctl member list
+# etcdctl endpoint status --cluster -w table
+``` 
+
+9. If etcd cluster is healthy, start all other control-plane pods at all the control-plane nodes and check if the k8s cluster is ailve:
+
+```
+# mv /etc/kubernetes/manifests-down/{kube-apiserver.yaml,kube-controller-manager.yaml,kube-scheduler.yaml} /etc/kubernetes/manifests/
+# rmdir /etc/kubernetes/manifests-down
+# kubectl get nodes
+```
+
+#### Manualy Etcd Restoration without a Snapshot
+
+In case you have an unhealthy or fully misconfigured etcd cluster and a backup snapshot is unavailable, you can re-create it from one of the etcd cluster members.
+
+1. Define which of etcd nodes has the latest version of the database. You can check timestamp on database files by `ls -la`.
+
+2. Stop the control-plane pods and their containers at all the control-plane nodes:
+
+```
+# mkdir /etc/kubernetes/manifests-down
+
+# mv /etc/kubernetes/manifests/{etcd.yaml,kube-apiserver.yaml,kube-controller-manager.yaml,kube-scheduler.yaml} /etc/kubernetes/manifests-down/
+
+# for i in "etcd" "kube-apiserver" "kube-controller-manager" "kube-scheduler" ; do crictl stop $(crictl ps -a --name $i -q) ; done
+
+# crictl ps -a | egrep "etcd|kube-apiserver|kube-controller-manager|kube-scheduler"
+30f92a80cfaa4       25f8c7f3da61c       47 minutes ago      Exited              etcd                        5                   bfa80629fe7c5
+9a20571c8e93c       595f327f224a4       47 minutes ago      Exited              kube-scheduler              7                   6465a21e0022d
+795a007ef78da       df7b72818ad2e       47 minutes ago      Exited              kube-controller-manager     8                   101d96258a856
+5840381f58a39       8fa62c12256df       47 minutes ago      Exited              kube-apiserver              4                   84a17f819840e
+```
+
+3. Make backup of etcd data at all the control-plane nodes: 
+
+```
+cp -a /var/lib/etcd /var/lib/etcd.bkp
+```
+
+4. On the etcd cluster member with the latest database files add the `--force-new-cluster` flag to the etcd manifest:
+
+```
+# vi /etc/kubernetes/manifests-down/etcd.yaml
+...
+spec:
+  containers:
+  - command:
+    - etcd
+    ...
+    - --force-new-cluster
+...
+
+```
+
+and start etcd:
+
+```
+# mv /etc/kubernetes/manifests-down/etcd.yaml /etc/kubernetes/manifests/etcd.yaml
+# crictl ps | grep etcd
+```
+
+5. Check etcd cluster status:
+
+```
+# etcdctl member list
+# etcdctl endpoint status --cluster -w table
+``` 
+
+6. If everything looks fine, remove `--force-new-cluster` flag from /etc/kubernetes/manifests/etcd.yaml. Etcd pod will be restarted automatically.
+
+7. Add a new cluster member:
+
+```
+etcdctl --endpoints=${CP_NODE_1_INTERNAL_IP}:2379 member add ${CP_NODE_2} --peer-urls=https://${CP_NODE_2_INTERNAL_IP}:2380
+```
+
+where
+ - `${CP_NODE_1_INTERNAL_IP}` - internal IP address of the first etcd cluster member
+ - `${CP_NODE_2}` - name of the new etcd cluster member
+ - `${CP_NODE_2_INTERNAL_IP}` - internal IP address of the new etcd cluster member
+
+8. At the new cluster member clean up `/var/lib/etcd` folder:
+
+```
+# rm -rf /var/lib/etcd/*
+```
+
+9. At the new cluster member change `--initial-cluster` and `--initial=cluster-state` flags:
+
+``` 
+# vi /etc/kubernetes/manifests-down/etcd.yaml
+...
+spec:
+  containers:
+  - command:
+    - etcd
+    ...
+    - --initial-cluster=${CP_NODE_1}=https://${CP_NODE_1_INTERNAL_IP}:2380,${CP_NODE_2}=https://${CP_NODE_2_INTERNAL_IP}:2380
+    - --initial-cluster-state=existing
+...
+```
+
+where
+ - `${CP_NODE_1}` - the name of the first etcd cluster member
+ - `${CP_NODE_1_INTERNAL_IP}` - the internal IP address of the first etcd cluster member
+ - `${CP_NODE_2}` - the name of the added etcd cluster member
+ - `${CP_NODE_2_INTERNAL_IP}` - the internal IP address of the added etcd cluster member
+
+and restart etcd:
+
+```
+# mv /etc/kubernetes/manifests-down/etcd.yaml /etc/kubernetes/manifests/etcd.yaml
+```
+
+10. Check etcd cluster status:
+
+```
+# etcdctl member list
+# etcdctl endpoint status --cluster -w table
+```
+
+11. Repeat steps 7-10 for other remained etcd cluster members.
+
+12. If etcd cluster is healthy, start all other control-plane pods at all the control-plane nodes and check if the k8s cluster is ailve:
+
+```
+# mv /etc/kubernetes/manifests-down/{kube-apiserver.yaml,kube-controller-manager.yaml,kube-scheduler.yaml} /etc/kubernetes/manifests/
+# rmdir /etc/kubernetes/manifests-down
+# kubectl get nodes
+```
+
+
 
 ## HTTPS Ingress Doesn't Work
 
