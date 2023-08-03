@@ -510,21 +510,11 @@ class ExportKubernetesDownloader:
                 if task is None:
                     break
 
-                namespace = task.namespace
                 random = uuid.uuid4().hex
-                temp_remote_filepath = f"/tmp/{random}"
                 temp_local_filepath = os.path.join(self.backup_directory, random)
+                self._download(task, temp_local_filepath)
 
-                cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
-                      f'{",".join(r for r in task.resources)} ' \
-                      f'-o yaml | gzip -c > {temp_remote_filepath}'
-
-                self.control_plane.sudo(cmd)
-                self.control_plane.get(temp_remote_filepath, temp_local_filepath)
-                self.control_plane.sudo(f'rm {temp_remote_filepath}')
-                self.control_plane.flush()
-
-                self.parser.schedule(ParserPayload("do", temp_local_filepath, namespace))
+                self.parser.schedule(ParserPayload("do", temp_local_filepath, task.namespace))
         except BaseException:
             self.parser.finish(graceful=False)
             raise
@@ -532,6 +522,19 @@ class ExportKubernetesDownloader:
             self.parser.finish(graceful=True)
         finally:
             self.elapsed = time.time() - start
+
+    def _download(self, task: DownloaderPayload, temp_local_filepath: str) -> None:
+        namespace = task.namespace
+        temp_remote_filepath = f"/tmp/{os.path.basename(temp_local_filepath)}"
+
+        cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
+              f'{",".join(r for r in task.resources)} ' \
+              f'-o yaml | gzip -c > {temp_remote_filepath}'
+
+        self.control_plane.sudo(cmd)
+        self.control_plane.get(temp_remote_filepath, temp_local_filepath)
+        self.control_plane.sudo(f'rm {temp_remote_filepath}')
+        self.control_plane.flush()
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
@@ -676,7 +679,7 @@ class BackupAction(Action):
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for making backup of Kubernetes resources and nodes contents.
 
@@ -701,6 +704,11 @@ def main(cli_arguments: List[str] = None) -> None:
         }
     }
 
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([BackupAction()]).run_flow(context)
 
 
