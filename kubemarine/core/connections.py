@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import threading
 from typing import Dict
 
 import fabric  # type: ignore[import]
@@ -25,20 +26,31 @@ class ConnectionPool:
     def __init__(self, inventory: dict):
         self.inventory = inventory
         self._connections: Connections = {}
+        self._lock = threading.Lock()
 
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
-            for node in self.inventory['nodes']:
-                if node.get('connect_to') == ip:
-                    conn = self._create_connection(ip, node)
+            with self._lock:
+                conn = self._connections.get(ip)
+                if conn is None:
+                    for node in self.inventory['nodes']:
+                        if node.get('connect_to') == ip:
+                            conn = self._create_connection(ip, node)
 
-            if conn is None:
-                raise Exception("Failed to find suitable node to connect to by address %s" % ip)
+                    if conn is None:
+                        raise Exception("Failed to find suitable node to connect to by address %s" % ip)
 
-            self._connections[ip] = conn
+                    self._connections[ip] = conn
 
         return conn
+
+    def close(self) -> None:
+        with self._lock:
+            for conn in self._connections.values():
+                conn.close()
+
+            self._connections.clear()
 
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,

@@ -176,12 +176,8 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
 
-    @property
-    def connection_pool(self) -> ConnectionPool:
-        if self._connection_pool is None:
-            self._connection_pool = FakeConnectionPool(self.inventory, self.fake_shell, self.fake_fs)
-
-        return self._connection_pool
+    def create_connection_pool(self) -> ConnectionPool:
+        return FakeConnectionPool(self.inventory, self.fake_shell, self.fake_fs)
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)

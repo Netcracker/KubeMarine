@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 from copy import deepcopy
 from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
 
@@ -39,6 +40,7 @@ class KubernetesCluster(Environment):
         self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
+        self._lock = threading.Lock()
         self._connection_pool: Optional[ConnectionPool] = None
 
         self._logger = logger if logger is not None \
@@ -60,11 +62,16 @@ class KubernetesCluster(Environment):
     @property
     def connection_pool(self) -> ConnectionPool:
         if self._connection_pool is None:
-            # Connection pool should be created for each cluster object,
-            # because it relies on partially enriched inventory
-            self._connection_pool = ConnectionPool(self.inventory)
+            with self._lock:
+                if self._connection_pool is None:
+                    # Connection pool should be created for each cluster object,
+                    # because it relies on partially enriched inventory
+                    self._connection_pool = self.create_connection_pool()
 
         return self._connection_pool
+
+    def create_connection_pool(self) -> ConnectionPool:
+        return ConnectionPool(self.inventory)
 
     @property
     def log(self) -> log.EnhancedLogger:

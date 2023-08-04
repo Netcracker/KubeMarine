@@ -34,7 +34,8 @@ import yaml
 from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.connections import ConnectionPool
+from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 
 
@@ -499,11 +500,13 @@ class ExportKubernetesDownloader:
     def __init__(self,
                  backup_directory: str,
                  control_plane: NodeGroup,
+                 connection_pool: ConnectionPool,
                  tasks_queue: Iterator[DownloaderPayload],
                  parser: ExportKubernetesParser,
                  ):
         self.backup_directory = backup_directory
-        self.control_plane = control_plane.new_defer()
+        self.control_plane = control_plane
+        self.connection_pool = connection_pool
         self.tasks_queue = tasks_queue
         self.parser = parser
         self.elapsed: float = 0
@@ -532,6 +535,7 @@ class ExportKubernetesDownloader:
             self.parser.finish(graceful=True)
         finally:
             self.elapsed = time.time() - start
+            self.connection_pool.close()
 
     def _download(self, task: DownloaderPayload, temp_local_filepath: str) -> None:
         namespace = task.namespace
@@ -543,10 +547,12 @@ class ExportKubernetesDownloader:
               f'{",".join(r for r in task.resources)} ' \
               f'-o yaml | gzip -c) > {temp_remote_filepath}'
 
-        self.control_plane.run(cmd)
-        self.control_plane.get(temp_remote_filepath, temp_local_filepath)
-        self.control_plane.sudo(f'rm {temp_remote_filepath}')
-        self.control_plane.flush()
+        # Use own connection instance to run commands
+        with RemoteExecutor(self.control_plane, self.connection_pool) as exe:
+            group = exe.group
+            group.run(cmd)
+            group.get(temp_remote_filepath, temp_local_filepath)
+            group.sudo(f'rm {temp_remote_filepath}')
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
@@ -575,13 +581,18 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
 
     # Processing of the particular resource includes
     # 1. downloading of the `kubectl` result (mostly IO)
-    # 2. parsing and splitting it into files (mostly CPU)
+    # 2. parsing and splitting it into files (can potentially consume CPU)
     control_planes = cluster.nodes['control-plane']
+    downloaders_per_control_plane = 2
+
     parser = ExportKubernetesParser(logger, backup_directory, namespaced_resources, nonnamespaced_resources,
-                                    control_planes.nodes_amount())
+                                    control_planes.nodes_amount() * downloaders_per_control_plane)
     downloader_queue = DownloaderTasksQueue(namespaces, namespaced_resources, nonnamespaced_resources)
     downloaders = [
-        ExportKubernetesDownloader(backup_directory, control_plane, downloader_queue, parser)
+        ExportKubernetesDownloader(backup_directory, control_plane,
+                                   cluster.create_connection_pool(),
+                                   downloader_queue, parser)
+        for _ in range(downloaders_per_control_plane)
         for control_plane in control_planes.get_ordered_members_list()
     ]
 
