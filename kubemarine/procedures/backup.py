@@ -537,11 +537,13 @@ class ExportKubernetesDownloader:
         namespace = task.namespace
         temp_remote_filepath = f"/tmp/{os.path.basename(temp_local_filepath)}"
 
-        cmd = f'kubectl{"" if namespace is None else (" -n " + namespace)} get --ignore-not-found ' \
+        cmd = f'(set -o pipefail && sudo kubectl ' \
+              f'{"" if namespace is None else ("-n " + namespace + " ")}' \
+              f'get --ignore-not-found ' \
               f'{",".join(r for r in task.resources)} ' \
-              f'-o yaml | gzip -c > {temp_remote_filepath}'
+              f'-o yaml | gzip -c) > {temp_remote_filepath}'
 
-        self.control_plane.sudo(cmd)
+        self.control_plane.run(cmd)
         self.control_plane.get(temp_remote_filepath, temp_local_filepath)
         self.control_plane.sudo(f'rm {temp_remote_filepath}')
         self.control_plane.flush()
