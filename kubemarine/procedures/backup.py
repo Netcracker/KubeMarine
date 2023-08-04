@@ -274,6 +274,7 @@ def _load_resources(logger: log.EnhancedLogger, control_plane: NodeGroup, namesp
         {
             'name': _resolve_full_resource_name(row['NAME'], row['APIVERSION']),
             'kind': row['KIND'],
+            'apiVersion': row['APIVERSION'],
         }
         for row in resources_table
     ]
@@ -375,12 +376,22 @@ class ExportKubernetesParser:
         if payload.event == 'do':
             os.remove(payload.resource_path)
 
+    def _parse_identity(self, line: str, api_version: str, kind: str) -> Tuple[str, str]:
+        if kind == '':
+            kind = self._parse_single_line_property(line, 'kind')
+        if api_version == '':
+            api_version = self._parse_single_line_property(line, 'apiVersion')
+
+        return api_version, kind
+
     @staticmethod
-    def _parse_kind(line: str) -> str:
-        if line[2:].startswith('kind: '):
-            return line[8:len(line) - 1]
-        else:
-            return ''
+    def _parse_single_line_property(line: str, key: str) -> str:
+        item_prop = line[2:]
+        val = ''
+        if item_prop.startswith(f'{key}:'):
+            val = yaml.safe_load(item_prop)[key]
+
+        return val
 
     def _handle(self, payload: ParserPayload) -> None:
         namespace = payload.namespace
@@ -392,37 +403,36 @@ class ExportKubernetesParser:
         resources = self.nonnamespaced_resources if namespace is None else self.namespaced_resources
         items_by_resource: Dict[str, List[str]] = {}
 
-        def append_item(kind: str, item: str) -> None:
-            resource_name = next(r['name'] for r in resources if r['kind'] == kind)
+        def append_item(api_version: str, kind: str, item: str) -> None:
+            resource_name = next(r['name'] for r in resources if r['apiVersion'] == api_version and r['kind'] == kind)
             items_by_resource.setdefault(resource_name, []).append(item)
 
         with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
             header = ''
             remainder = ''
             item = ''
-            kind = ''
+            api_version, kind = '', ''
             stage = 'header'
             for line in file:
                 if stage == 'header':
                     if line.startswith('- '):
                         stage = 'items'
                         item = line
-                        kind = self._parse_kind(line)
+                        api_version, kind = self._parse_identity(line, '', '')
                     else:
                         header += line
                 elif stage == 'items':
                     if line.startswith('- '):
-                        append_item(kind, item)
+                        append_item(api_version, kind, item)
                         item = line
-                        kind = self._parse_kind(line)
+                        api_version, kind = self._parse_identity(line, '', '')
                     elif not line[0].isspace():
                         stage = 'remainder'
-                        append_item(kind, item)
+                        append_item(api_version, kind, item)
                         remainder = line
                     else:
                         item += line
-                        if kind == '':
-                            kind = self._parse_kind(line)
+                        api_version, kind = self._parse_identity(line, api_version, kind)
                 elif stage == 'remainder':
                     remainder += line
 
