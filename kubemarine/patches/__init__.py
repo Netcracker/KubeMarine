@@ -23,9 +23,11 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_kubeadm_flags import KubeadmFlags
+from kubemarine.patches.p2_update_etcdctl_thirdparty import EtcdctlThirdparty
 
 patches: List[Patch] = [
   KubeadmFlags(),
+  EtcdctlThirdparty()
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

@@ -63,7 +63,6 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   if [ -n "$ETCD_ENDPOINTS" ]; then
     USER_ARGS+=("--endpoints=$ETCD_ENDPOINTS")
   fi
-
 	ctr image pull ${ETCD_IMAGE} > /dev/null 2&>1
 	ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl \
 	  etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
