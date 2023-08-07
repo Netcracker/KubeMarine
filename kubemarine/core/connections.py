@@ -31,6 +31,12 @@ class ConnectionPool:
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
+            # Each connection is not thread-safe, and should not be accessed from multiple threads simultaneously.
+            # But ConnectionPool is thread-safe, and can be access from multiple threads to connect to different nodes.
+            #
+            # The lock below does not guard anything in reality,
+            # as attempt to get the same connection should not happen in parallel.
+            # It is left only to follow best practices of writing of thread-safe classes.
             with self._lock:
                 conn = self._connections.get(ip)
                 if conn is None:
