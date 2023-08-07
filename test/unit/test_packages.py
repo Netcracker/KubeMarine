@@ -172,7 +172,7 @@ class AssociationsEnrichment(unittest.TestCase):
     def test_propagate_global_section_to_os_specific(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs_1 = 'docker-ce'
-        expected_pkgs_2 = ['podman', 'containerd=1.5.*']
+        expected_pkgs_2 = ['containerd=1.5.*']
         package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs_1
         package_associations(inventory, None, 'containerd')['package_name'] = expected_pkgs_2
         cluster = new_debian_cluster(inventory)
@@ -347,7 +347,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(cluster.inventory, 'debian', 'audit')['package_name'],
@@ -360,7 +360,7 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(finalized_inventory, 'debian', 'audit')['package_name'],
@@ -374,7 +374,7 @@ class CacheVersions(unittest.TestCase):
     def test_cache_versions_global_off(self):
         expected_containerd = 'containerd=1.5.9-0ubuntu1~20.04.4'
         expected_kmod = 'kmod=27-1ubuntu2.1'
-        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
+        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name']
         default_kmod = get_compiled_defaults()['debian']['kmod']['package_name']
         self.assertNotEqual(expected_containerd, default_containerd)
         self.assertNotEqual(expected_kmod, default_kmod)
@@ -389,7 +389,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be default because caching versions is off")
         self.assertEqual(default_kmod,
                          package_associations(cluster.inventory, 'debian', 'kmod')['package_name'],
@@ -397,14 +397,14 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(expected_containerd,
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual(expected_kmod,
                          package_associations(finalized_inventory, 'debian', 'kmod')['package_name'],
                          "kmod was not detected")
 
     def test_cache_versions_specific_off(self):
-        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
+        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name']
         default_haproxy = get_compiled_defaults()['debian']['haproxy']['package_name']
         default_curl = get_compiled_defaults()['debian']['curl']['package_name']
 
@@ -422,7 +422,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be default because caching versions is off")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(cluster.inventory, 'debian', 'audit')['package_name'],
@@ -436,7 +436,7 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(finalized_inventory, 'debian', 'audit')['package_name'],
@@ -529,7 +529,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be detected by initial nodes")
         self.assertEqual('conntrack=1:1.4.5-2',
                          package_associations(cluster.inventory, 'debian', 'conntrack')['package_name'],
@@ -552,7 +552,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('conntrack=1:1.4.5-2',
                          package_associations(cluster.inventory, 'debian', 'conntrack')['package_name'],
@@ -560,14 +560,14 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual('containerd=1.5.9-0ubuntu1~20.04.4',
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd was not detected")
         self.assertEqual('conntrack=1:1.4.5-2',
                          package_associations(finalized_inventory, 'debian', 'conntrack')['package_name'],
                          "conntrack was not detected")
 
     def test_finalize_inventory_different_package_versions(self):
-        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
+        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name']
         default_kmod = get_compiled_defaults()['debian']['kmod']['package_name']
 
         self._packages_install(self.inventory).extend(['curl2=7.*', 'unzip2=6.*'])
@@ -597,7 +597,7 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(default_containerd,
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         [package_associations(finalized_inventory, 'debian', 'containerd')['package_name']],
                          "containerd should be default because multiple versions are installed")
         self.assertEqual('auditd=1:2.8.5-2ubuntu6',
                          package_associations(finalized_inventory, 'debian', 'audit')['package_name'],
@@ -609,7 +609,7 @@ class CacheVersions(unittest.TestCase):
                          "Custom packages versions should be partially detected in finalized inventory")
 
     def test_not_cache_versions_if_multiple_os_family_versions(self):
-        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name'][0]
+        default_containerd = get_compiled_defaults()['debian']['containerd']['package_name']
         default_kmod = get_compiled_defaults()['debian']['kmod']['package_name']
 
         self.context['nodes'][self.new_host]['os']['version'] = '22.04'
@@ -627,7 +627,7 @@ class CacheVersions(unittest.TestCase):
         cache_installed_packages(cluster)
 
         self.assertEqual(default_containerd,
-                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(cluster.inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be default because multiple OS versions are detected")
         self.assertEqual(default_kmod,
                          package_associations(cluster.inventory, 'debian', 'kmod')['package_name'],
@@ -635,7 +635,7 @@ class CacheVersions(unittest.TestCase):
 
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(default_containerd,
-                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'][0],
+                         package_associations(finalized_inventory, 'debian', 'containerd')['package_name'],
                          "containerd should be default because multiple OS versions are detected")
         self.assertEqual(default_kmod,
                          package_associations(finalized_inventory, 'debian', 'kmod')['package_name'],
