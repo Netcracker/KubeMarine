@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -495,10 +496,24 @@ def parse_aligned_table(table_text: str) -> List[Dict[str, str]]:
     :return: List of rows
     """
     rows = table_text.strip().split('\n')
-    headers = rows[0].split()
-    headers_num = len(headers)
-    headers_pos = [rows[0].index(h) for h in headers]
 
+    # Parse headers and their positions. No leading or trailing spaces are expected in the line.
+    headers_line = rows[0]
+    headers = []
+    headers_pos = []
+    pos = 0
+    for match in re.finditer(r'\s+', headers_line):
+        headers_pos.append(pos)
+        span = match.span()
+        headers.append(headers_line[pos:span[0]])
+        pos = span[1]
+
+    headers_pos.append(pos)
+    headers.append(headers_line[pos:len(headers_line)])
+
+    # Parse each row in the table,
+    # provided that the columns start at the same positions as the headers
+    headers_num = len(headers)
     data = []
     for row_text in rows[1:]:
         row = {}
