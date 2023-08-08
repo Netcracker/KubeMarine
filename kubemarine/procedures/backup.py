@@ -496,6 +496,12 @@ class DownloaderTasksQueue(Iterator[DownloaderPayload]):
             yield DownloaderPayload(namespace['name'], [r['name'] for r in self.namespaced_resources])
 
 
+class DownloadException(Exception):
+    def __init__(self, task: DownloaderPayload, reason: BaseException):
+        self.task = task
+        self.reason = reason
+
+
 class ExportKubernetesDownloader:
     def __init__(self,
                  backup_directory: str,
@@ -513,6 +519,7 @@ class ExportKubernetesDownloader:
 
     def run(self) -> None:
         start = time.time()
+        task: Optional[DownloaderPayload] = None
         try:
             while True:
                 if self.parser.closed:
@@ -528,9 +535,12 @@ class ExportKubernetesDownloader:
                 self._download(task, temp_local_filepath)
 
                 self.parser.schedule(ParserPayload("do", temp_local_filepath, task.namespace))
-        except BaseException:
+        except BaseException as e:
             self.parser.finish(graceful=False)
-            raise
+            if task is not None:
+                raise DownloadException(task, e)
+            else:
+                raise
         else:
             self.parser.finish(graceful=True)
         finally:
@@ -610,7 +620,11 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
                     downloader_async.result()
                 except BaseException as e:
                     logger.verbose(e)
-                    exc = e
+                    if isinstance(e, DownloadException):
+                        logger.error(f"Failed to download resources {','.join(e.task.resources)} for namespace {e.task.namespace}")
+                        exc = e.reason
+                    else:
+                        exc = e
 
             return exc
 
