@@ -183,7 +183,7 @@ def import_etcd(cluster: KubernetesCluster):
         initial_cluster_list_without_names.append(control_plane["internal_address"] + ":2379")
     initial_cluster = ','.join(initial_cluster_list)
 
-    container_name = uuid.uuid4().hex
+    container_name = f'etcd-{uuid.uuid4().hex}'
 
     etcd_instances = 0
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():

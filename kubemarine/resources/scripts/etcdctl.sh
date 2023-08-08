@@ -63,8 +63,9 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   if [ -n "$ETCD_ENDPOINTS" ]; then
     USER_ARGS+=("--endpoints=$ETCD_ENDPOINTS")
   fi
+  container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
 	ctr image pull ${ETCD_IMAGE} > /dev/null 2&>1
-	ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} etcdctl \
+	ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
 	  etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   exit $?
 fi
