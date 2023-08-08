@@ -176,8 +176,8 @@ class FakeKubernetesCluster(KubernetesCluster):
         self.fake_fs = kwargs.pop("fake_fs", FakeFS())
         super().__init__(*args, **kwargs)
 
-    def create_connection_pool(self) -> ConnectionPool:
-        return FakeConnectionPool(self.inventory, self.fake_shell, self.fake_fs)
+    def create_connection_pool(self, hosts: List[str]) -> ConnectionPool:
+        return FakeConnectionPool(self.inventory, hosts, self.fake_shell, self.fake_fs)
 
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)
@@ -357,10 +357,10 @@ class FakeDeferredGroup(DeferredGroup, FakeAbstractGroup[Token]):
 
 
 class FakeConnectionPool(connections.ConnectionPool):
-    def __init__(self, inventory: dict, fake_shell: FakeShell, fake_fs: FakeFS):
-        super().__init__(inventory)
+    def __init__(self, inventory: dict, hosts: List[str], fake_shell: FakeShell, fake_fs: FakeFS):
         self.fake_shell = fake_shell
         self.fake_fs = fake_fs
+        super().__init__(inventory, hosts)
 
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,

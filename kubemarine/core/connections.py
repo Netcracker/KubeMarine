@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import threading
-from typing import Dict
+from typing import Dict, List
 
 import fabric  # type: ignore[import]
 
@@ -23,40 +22,22 @@ Connections = Dict[str, fabric.connection.Connection]
 
 
 class ConnectionPool:
-    def __init__(self, inventory: dict):
+    def __init__(self, inventory: dict, hosts: List[str]):
         self.inventory = inventory
-        self._connections: Connections = {}
-        self._lock = threading.Lock()
+        self._connections: Connections = {ip: self._create_connection(ip) for ip in hosts}
 
     def get_connection(self, ip: str) -> fabric.connection.Connection:
         conn = self._connections.get(ip)
         if conn is None:
-            # Each connection is not thread-safe, and should not be accessed from multiple threads simultaneously.
-            # But ConnectionPool is thread-safe, and can be access from multiple threads to connect to different nodes.
-            #
-            # The lock below does not guard anything in reality,
-            # as attempt to get the same connection should not happen in parallel.
-            # It is left only to follow best practices of writing of thread-safe classes.
-            with self._lock:
-                conn = self._connections.get(ip)
-                if conn is None:
-                    for node in self.inventory['nodes']:
-                        if node.get('connect_to') == ip:
-                            conn = self._create_connection(ip, node)
-
-                    if conn is None:
-                        raise Exception("Failed to find suitable node to connect to by address %s" % ip)
-
-                    self._connections[ip] = conn
+            raise Exception(f'Connection for {ip} is not registered')
 
         return conn
 
     def close(self) -> None:
-        with self._lock:
-            for conn in self._connections.values():
-                conn.close()
+        for conn in self._connections.values():
+            conn.close()
 
-            self._connections.clear()
+        self._connections.clear()
 
     def _create_connection_from_details(self, ip: str, conn_details: dict,
                                         gateway: fabric.connection.Connection = None,
@@ -80,9 +61,15 @@ class ConnectionPool:
             inline_ssh_env=inline_ssh_env
         )
 
-    def _create_connection(self, ip: str, node: dict) -> fabric.connection.Connection:
+    def _create_connection(self, ip: str) -> fabric.connection.Connection:
+        for node in self.inventory.get('nodes', []):
+            if node.get('connect_to') == ip:
+                break
+        else:
+            raise Exception("Failed to find suitable node to connect to by address %s" % ip)
+
         if node.get('keyfile') is None and node.get('password') is None:
-            raise Exception('There is neither keyfile not password specified in configfile for node \'%s\'' % node['name'])
+            raise Exception('There is neither keyfile nor password specified in configfile for node \'%s\'' % node['name'])
 
         gateway = None
         if 'gateway' in node:
@@ -111,3 +98,6 @@ class ConnectionPool:
             raise Exception('Requested gateway \'%s\' is not found in configfile' % name)
 
         return gateway_conn
+
+
+EMPTY_POOL = ConnectionPool({}, [])

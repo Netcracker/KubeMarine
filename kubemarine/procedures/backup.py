@@ -506,7 +506,7 @@ class ExportKubernetesDownloader:
                  ):
         self.backup_directory = backup_directory
         self.control_plane = control_plane
-        self.connection_pool = cluster.create_connection_pool()
+        self.connection_pool = cluster.create_connection_pool(control_plane.get_hosts())
         self.tasks_queue = tasks_queue
         self.parser = parser
         self.elapsed: float = 0
