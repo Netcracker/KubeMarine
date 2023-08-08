@@ -82,6 +82,7 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
             if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
                 auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
         auth_json = json.dumps(auth_registries)
+        group.sudo("mkdir -p /etc/containers/")
         group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
         group.sudo("chmod 600 /etc/containers/auth.json")
 
