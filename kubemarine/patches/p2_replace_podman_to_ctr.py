@@ -18,20 +18,29 @@ from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine.thirdparties import install_thirdparty
+from kubemarine.cri.containerd import configure_ctr_flags
+
 
 class TheAction(Action):
     def __init__(self):
-        super().__init__("Reinstall /usr/bin/etcdctl thirdparty")
+        super().__init__("Replace podman to ctr")
 
     def run(self, res: DynamicResources):
         cluster = res.cluster()
-        thirdparty = '/usr/bin/etcdctl'
-        install_thirdparty(cluster.nodes['all'], thirdparty)
+
+        if cluster.inventory["services"]["cri"]['containerRuntime'] != 'containerd':
+            cluster.log.info("Used not containerd cri: migration to ctr is not needed")
+            return
+        cluster.log.info("Load ctr options file")
+        configure_ctr_flags(cluster.make_group_from_roles(["control-plane", "worker"]))
+
+        cluster.log.info("Update /usr/bin/etcdctl thirdparty")
+        install_thirdparty(cluster.nodes['all'], '/usr/bin/etcdctl')
 
 
-class EtcdctlThirdparty(RegularPatch):
+class ReplacePodmanToCtr(RegularPatch):
     def __init__(self):
-        super().__init__("etcdctl_thirdparty")
+        super().__init__("replace_podman_to_ctr")
 
     @property
     def action(self) -> Action:
@@ -41,6 +50,8 @@ class EtcdctlThirdparty(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            Reinstall /usr/bin/etcdctl thirdparty to use ctr tool inside
+            This patch does following changes for containerd cri:
+            1. Load ctr options file to control-plane and worker nodes
+            2. Reinstall /usr/bin/etcdctl thirdparty to use ctr tool inside
             """.rstrip()
         )
