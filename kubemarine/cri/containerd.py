@@ -13,11 +13,10 @@
 # limitations under the License.
 
 from io import StringIO
-from typing import Dict
 
 import toml
 import yaml
-import json
+import base64
 
 from distutils.util import strtobool
 from kubemarine import system, packages
@@ -46,6 +45,55 @@ def install(group: NodeGroup) -> RunnersGroupResult:
     return collector.result
 
 
+def convert_toml_dict_to_str(config: dict) -> str:
+    config_string = ''
+    # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
+    for key, value in config.items():
+        # first we process all "simple" `key: value` pairs
+        if not isinstance(value, dict):
+            config_string += f"{toml.dumps({key: value})}"
+    for key, value in config.items():
+        # next we process all "complex" `key: dict_value` pairs, representing named sections
+        if isinstance(value, dict):
+            config_string += f"\n[{key}]\n{toml.dumps(value)}"
+    return config_string
+
+
+def configure_ctr_flags(group: NodeGroup):
+    cluster = group.cluster
+    log = cluster.log
+    containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
+    config_string = convert_toml_dict_to_str(containerd_config)
+    config_toml = toml.loads(config_string)
+
+    # Calculate ctr options for image pull
+    registry = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {})
+    ctr_pull_options_str = ""
+    for registry_name in set().union(registry.get('mirrors', {}).keys(), registry.get('configs', {}).keys()):
+        options = []
+        # Add plain-http flag for http endpoint
+        if any("http://" in endpoint for endpoint in
+               registry.get('mirrors', {}).get(registry_name, {}).get('endpoint', [])):
+            options.append('--plain-http')
+        # Add skip-verify flag in case of insecure tls connection
+        if registry.get('configs', {}).get(registry_name, {}).get('tls', {}).get('insecure_skip_verify', False):
+            options.append('--skip-verify')
+        # Add user flag if authorization required
+        registry_auth = registry.get('configs', {}).get(registry_name, {}).get('auth', {})
+        if registry_auth.get('auth'):
+            options.append(f'--user {base64.b64decode(registry_auth["auth"]).decode("utf-8")}')
+
+        elif registry_auth.get('username'):
+            options.append(f'--user {registry_auth["username"]}' +
+                           f':{registry_auth["password"]}' if registry_auth.get("password") else '')
+        ctr_pull_options_str += f'{registry_name}={" ".join(options)}\n'
+
+    # Save ctr pull options
+    log.debug("Uploading ctr flags configuration...")
+    group.put(StringIO(ctr_pull_options_str), "/etc/ctr/kubenarine_ctr_flags.conf", backup=True, sudo=True, mkdir=True)
+    group.sudo("chmod 600 /etc/ctr/kubenarine_ctr_flags.conf")
+
+
 def configure(group: NodeGroup) -> RunnersGroupResult:
     cluster = group.cluster
     log = cluster.log
@@ -55,37 +103,14 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(cluster, crictl_config, 'crictl.yaml')
     group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True)
 
-    config_string = ""
-    # double loop is used to make sure that no "simple" `key: value` pairs are accidentally assigned to sections
     containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
     runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
     if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
         containerd_config[runc_options_path]['SystemdCgroup'] = \
             bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
-    for key, value in containerd_config.items():
-        # first we process all "simple" `key: value` pairs
-        if not isinstance(value, dict):
-            config_string += f"{toml.dumps({key: value})}"
-    for key, value in containerd_config.items():
-        # next we process all "complex" `key: dict_value` pairs, representing named sections
-        if isinstance(value, dict):
-            config_string += f"\n[{key}]\n{toml.dumps(value)}"
+    configure_ctr_flags(group)
 
-    config_toml = toml.loads(config_string)
-    registry = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {})
-    # save 'auth.json' if there are credentials for registry
-    auth_registries: Dict[str, dict] = {"auths": {}}
-    if registry.get('configs'):
-        registry_configs = registry['configs']
-        for auth_registry in registry_configs:
-            auth_registries['auths'][auth_registry] = {}
-            if registry_configs[auth_registry].get('auth', {}).get('auth', ''):
-                auth_registries['auths'][auth_registry]['auth'] = registry_configs[auth_registry]['auth']['auth']
-        auth_json = json.dumps(auth_registries)
-        group.sudo("mkdir -p /etc/containers/")
-        group.put(StringIO(auth_json), "/etc/containers/auth.json", backup=True, sudo=True)
-        group.sudo("chmod 600 /etc/containers/auth.json")
-
+    config_string = convert_toml_dict_to_str(containerd_config)
     utils.dump_file(cluster, config_string, 'containerd-config.toml')
     collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
