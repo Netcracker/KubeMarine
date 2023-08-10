@@ -158,7 +158,7 @@ def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], con
 
 
 def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None,
-              tasks_filter: list = None) -> None:
+              tasks_filter: List[str] = None) -> None:
     """
     Filters and runs tasks.
     """

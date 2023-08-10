@@ -643,6 +643,10 @@ cumulative_points = {
 }
 
 
+def run_tasks(res: DynamicResources, tasks_filter: List[str] = None) -> None:
+    flow.run_tasks(res, tasks, cumulative_points=cumulative_points, tasks_filter=tasks_filter)
+
+
 class InstallAction(Action):
     def __init__(self) -> None:
         super().__init__('install')
@@ -652,7 +656,7 @@ class InstallAction(Action):
         self.target_version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
         kubernetes.verify_supported_version(self.target_version, res.logger())
 
-        flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
+        run_tasks(res)
 
 
 def main(cli_arguments: List[str] = None) -> None:
