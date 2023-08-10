@@ -75,8 +75,8 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
     ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
     ctr_pull_opts=$(cat /etc/ctr/kubenarine_ctr_flags.conf |  grep "^${ETCD_REGISTRY}=" | sed "s/^${ETCD_REGISTRY}=//;")
     container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
-	  ctr image pull ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
-	  ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
+    ctr image pull ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
+    ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
 	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   else
     docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \

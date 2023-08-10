@@ -212,7 +212,8 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--name={control_plane["name"]} '
             f'--data-dir=/var/lib/etcd/snapshot '
             f'--initial-cluster={initial_cluster} '
-            f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380')
+            f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380',
+            hide=False)
 
         _ = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
@@ -235,7 +236,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--peer-client-cert-auth=true '
             f'--peer-cert-file={etcd_peer_cert} '
             f'--peer-key-file={etcd_peer_key} '
-            f'--peer-trusted-ca-file={etcd_peer_cacert} ', hide=False).get_simple_out().strip()
+            f'--peer-trusted-ca-file={etcd_peer_cacert} ').get_simple_out().strip()
 
         etcd_instances += 1
 
