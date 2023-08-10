@@ -59,7 +59,7 @@ def convert_toml_dict_to_str(config: dict) -> str:
     return config_string
 
 
-def configure_ctr_flags(group: NodeGroup):
+def configure_ctr_flags(group: NodeGroup) -> None:
     cluster = group.cluster
     log = cluster.log
     containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
