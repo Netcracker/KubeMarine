@@ -64,6 +64,18 @@ jobs:
           name: package
           path: ./dist
 
+      # Remove the step after https://github.com/actions/setup-python/issues/713 is solved
+      - name: Fix broken pip installation
+        if: ${{ matrix.target.os == 'macos-11' }}
+        run: |
+          SITE_PACKAGES="/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages"
+          PIP_VERSION=$(cat $SITE_PACKAGES/pip/__init__.py | grep __version__ | sed 's/["=]//g' | awk '{print $2}')
+          for dist_info in $(find $SITE_PACKAGES -name 'pip-*.dist-info'); do
+              if [[ $(basename "$dist_info") != "pip-$PIP_VERSION.dist-info" ]]; then
+                  echo "Removing broken pip installation $dist_info"
+                  rm -rf $dist_info
+              fi
+          done
       - name: Build
         run: ${{ matrix.build_cmd }}
       - name: Run Selftest
