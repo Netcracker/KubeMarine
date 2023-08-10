@@ -64,6 +64,7 @@ jobs:
           name: package
           path: ./dist
 
+      # Remove the step after https://github.com/actions/setup-python/issues/713 is solved
       - name: Fix broken pip installation
         if: ${{ matrix.target.os == 'macos-11' }}
         run: |
