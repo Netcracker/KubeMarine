@@ -1,15 +1,15 @@
-- [Kubemarine patches](#kubemarine-patches)
-  - [How to write your own patch](#how-to-write-your-own-patch)
-  - [Software upgrade patches](#software-upgrade-patches)
+- [Kubemarine Patches](#kubemarine-patches)
+  - [How to Write Your Own Patch](#how-to-write-your-own-patch)
+  - [Software Upgrade Patches](#software-upgrade-patches)
   - [Examples](#examples)
     - [Installation Task](#installation-task)
     - [Reinstall Predefined Plugin](#reinstall-predefined-plugin)
-    - [Change Default Behaviour](#change-default-behaviour)
+    - [Change Default Behavior](#change-default-behavior)
 
-# Kubemarine patches
+# Kubemarine Patches
 
-Patch is an automatic action, that is needed to migrate the cluster, that is managed by Kubemarine, from one Kubemarine release to another.  
-Patches are needed when we update Kubemarine 3rd parties, specific kubernetes parameters, Kubemarine procedures/features, etc.  
+Patch is an automatic action that is needed to migrate a cluster managed by Kubemarine from one Kubemarine release to another.  
+Patches are needed when we update Kubemarine 3rd parties, specific Kubernetes parameters, Kubemarine procedures/features, and so on.  
 Patches are installed during specific [Kubemarine migration procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
 
 ## How to write your own patch
@@ -17,31 +17,31 @@ Patches are installed during specific [Kubemarine migration procedure](/document
 Patches are registered in a special folder [/kubemarine/patches](/kubemarine/patches).  
 
 Every patch should inherit one of:
-* `kubemarine.core.patch.InventoryOnlyPatch`.
-   Only changes the inventory.
+* `kubemarine.core.patch.InventoryOnlyPatch`
+   This only changes the inventory.
    Running of enrichment is prohibited.
    Patches if this type are executed first.
-* `kubemarine.core.patch.RegularPatch`. Accesses and makes some operations on the cluster.
+* `kubemarine.core.patch.RegularPatch`. This accesses and makes some operations on the cluster.
    These patches should not upgrade software, and should not affect the upgrade procedure.
    Patches if this type are executed last.
 
-See also inline pydoc in [`kubemarine.core.patch`](/kubemarine/core/patch.py).
+Also see the inline pydoc in [`kubemarine.core.patch`](/kubemarine/core/patch.py).
 
 In addition, each patch has one field and two methods to implement:
-* **identifier** is a unique name of patch, that is used to recognize it and call if needed;
-* **description** is a method that returns text description of the patch. This method is used in `migrate_kubemarine --describe <patch identifier>` operation;
-* **action** is a method that returns special implementation of [`kubemarine.core.action.Action`](/kubemarine/core/action.py) class that contains main code of patch.
+* **identifier** is a unique name of a patch that is used to recognize it and call if needed.
+* **description** is a method that returns text description of a patch. This method is used in the `migrate_kubemarine --describe <patch identifier>` operation.
+* **action** is a method that returns special implementation of the [`kubemarine.core.action.Action`](/kubemarine/core/action.py) class that contains the main code of a patch.
 
-To enable the patch, you should add it to the [`kubemarine.patches.__init__`](/kubemarine/patches/__init__.py#L26).
-Patches that have the same type, are executed in the order that is declared there.
+To enable a patch, you should add it to [`kubemarine.patches.__init__`](/kubemarine/patches/__init__.py#L26).
+Patches that have the same type are executed in the order that is declared there.
 
-## Software upgrade patches
+## Software Upgrade Patches
 
-There is one more type of patches that upgrade different types of software.
-Such patches are executed after patches of type `InventoryOnlyPatch` and before patches of type `RegularPatch`,
+There is one more type of patches that upgrades different types of software.
+Such patches are executed after patches of the type `InventoryOnlyPatch` and before patches of the type `RegularPatch`,
 and are registered automatically as long as the [`kubemarine/patches/software_upgrade.yaml`](/kubemarine/patches/software_upgrade.yaml) configuration is changed.
 
-See also the [design document](/documentation/design/1-upgrade-patches-registration-and-implementation.md).
+For more information, refer to the [design document](/documentation/design/1-upgrade-patches-registration-and-implementation.md).
 
 ## Examples
 
@@ -50,8 +50,8 @@ All historical patches can be viewed using the command:
 git log --oneline -- kubemarine/patches | grep -v "Delete all patches after release"
 ```
 
-Below are actual templates for `InventoryOnlyPatch` and `RegularPatch` patches.
-See also some inline comments.
+Below are the actual templates for `InventoryOnlyPatch` and `RegularPatch` patches.
+Also see the inline comments.
 <details>
   <summary>Inventory only patch</summary>
 <pre>
@@ -134,9 +134,9 @@ The following examples illustrate how to implement it in some common situations.
 
 ### Installation Task
 
-In some cases applying of patch can be effectively equal to running of some [installation task](../Installation.md#installation-tasks-description).
-For example, it can be possible to apply changes in configuration of HAProxy by simple `kubemarine install --tasks deploy.loadbalancer.haproxy.configure`.
-To do the same via patch, use the following:
+In some cases applying of a patch can be effectively equal to running of some [installation task](../Installation.md#installation-tasks-description).
+For example, it can be possible to apply changes in the configuration of HAProxy by simple `kubemarine install --tasks deploy.loadbalancer.haproxy.configure`.
+To do the same through a patch, use the following:
 
 ```python
 from kubemarine.core.action import Action
@@ -179,13 +179,13 @@ class TheAction(Action):
     def is_applicable(self, cluster: KubernetesCluster): ...
 ```
 
-### Change Default Behaviour
+### Change Default Behavior
 
-Sometimes we need to change default configuration of some services (e.g. [defaults.yaml](/kubemarine/resources/configurations/defaults.yaml))
-or to change default behaviour of Kubemarine.
-Although new version of Kubemarine follows better practices, it is possible to persist old behaviour for old clusters.
+Sometimes we need to change the default configuration of some services like [defaults.yaml](/kubemarine/resources/configurations/defaults.yaml)
+or to change the default behavior of Kubemarine.
+Although the new version of Kubemarine follows better practices, it is possible to persist the old behavior for old clusters.
 
-If old behaviour is remained configurable, we can set it in the patch.
+If the old behavior remains configurable, we can set it in the patch.
 
 ```python
 from kubemarine.core.action import Action
