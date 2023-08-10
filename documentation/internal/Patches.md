@@ -12,7 +12,7 @@ Patch is an automatic action that is needed to migrate a cluster managed by Kube
 Patches are needed when we update Kubemarine 3rd parties, specific Kubernetes parameters, Kubemarine procedures/features, and so on.  
 Patches are installed during specific [Kubemarine migration procedure](/documentation/Maintenance.md#kubemarine-migration-procedure).
 
-## How to write your own patch
+## How to Write Your Own Patch
 
 Patches are registered in a special folder [/kubemarine/patches](/kubemarine/patches).  
 
