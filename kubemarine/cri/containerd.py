@@ -103,14 +103,9 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(cluster, crictl_config, 'crictl.yaml')
     group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True)
 
-    containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-    runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-        containerd_config[runc_options_path]['SystemdCgroup'] = \
-            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
     configure_ctr_flags(group)
 
-    config_string = convert_toml_dict_to_str(containerd_config)
+    config_string = convert_toml_dict_to_str(cluster.inventory["services"]["cri"]['containerdConfig'])
     utils.dump_file(cluster, config_string, 'containerd-config.toml')
     collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
