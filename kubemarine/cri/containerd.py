@@ -90,8 +90,8 @@ def configure_ctr_flags(group: NodeGroup) -> None:
 
     # Save ctr pull options
     log.debug("Uploading ctr flags configuration...")
-    group.put(StringIO(ctr_pull_options_str), "/etc/ctr/kubenarine_ctr_flags.conf", backup=True, sudo=True, mkdir=True)
-    group.sudo("chmod 600 /etc/ctr/kubenarine_ctr_flags.conf")
+    group.put(StringIO(ctr_pull_options_str), "/etc/ctr/kubemarine_ctr_flags.conf", backup=True, sudo=True, mkdir=True)
+    group.sudo("chmod 600 /etc/ctr/kubemarine_ctr_flags.conf")
 
 
 def configure(group: NodeGroup) -> RunnersGroupResult:

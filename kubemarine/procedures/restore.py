@@ -192,7 +192,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     else:
         cont_runtime = "ctr"
     container_name = f'etcd-{uuid.uuid4().hex}'
-    network_options = '--network host -p 2379:2379 -p 2380:2380' if cont_runtime == 'docker' else '--net-host'
+    network_options = '--network host' if cont_runtime == 'docker' else '--net-host'
     mount_options = '-v /var/lib/etcd:/var/lib/etcd ' \
                     '-v /etc/kubernetes/pki:/etc/kubernetes/pki ' \
         if cont_runtime == 'docker' else \
