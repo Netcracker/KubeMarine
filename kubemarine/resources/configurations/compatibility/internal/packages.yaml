@@ -5,26 +5,6 @@
 #
 # After any change, kubemarine/patches/software_upgrade.yaml should also be manually changed.
 docker:
-  v1.21.2:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_debian: 5:20.10.*
-  v1.21.5:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_debian: 5:20.10.*
-  v1.21.12:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_debian: 5:20.10.*
-  v1.22.2:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_debian: 5:20.10.*
-  v1.22.9:
-    version_rhel: 19.03*
-    version_rhel8: 19.03*
-    version_debian: 5:20.10.*
   v1.23.1:
     version_rhel: 19.03*
     version_rhel8: 19.03*
@@ -69,17 +49,12 @@ docker:
     version_rhel: 19.03*
     version_rhel8: 19.03*
     version_debian: 5:20.10.*
+  v1.28.0-rc.0:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_debian: 5:20.10.*
+
 containerd:
-  v1.21.2:
-    version_debian: 1.5.*
-  v1.21.5:
-    version_debian: 1.5.*
-  v1.21.12:
-    version_debian: 1.5.*
-  v1.22.2:
-    version_debian: 1.5.*
-  v1.22.9:
-    version_debian: 1.5.*
   v1.23.1:
     version_debian: 1.5.*
   v1.23.6:
@@ -101,28 +76,10 @@ containerd:
   v1.26.4:
     version_debian: 1.6.*
   v1.27.1:
+    version_debian: 1.6.*
+  v1.28.0-rc.0:
     version_debian: 1.6.*
 containerdio:
-  v1.21.2:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_debian: 1.5.*
-  v1.21.5:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_debian: 1.5.*
-  v1.21.12:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_debian: 1.5.*
-  v1.22.2:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_debian: 1.5.*
-  v1.22.9:
-    version_rhel: 1.6*
-    version_rhel8: 1.6*
-    version_debian: 1.5.*
   v1.23.1:
     version_rhel: 1.6*
     version_rhel8: 1.6*
@@ -167,27 +124,12 @@ containerdio:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_debian: 1.6.*
+  v1.28.0-rc.0:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_debian: 1.6.*
+
 podman:
-  v1.21.2:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.21.5:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.21.12:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.22.2:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.22.9:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
   v1.23.1:
     version_rhel: 1.6.4*
     version_rhel8: "*"
@@ -229,6 +171,10 @@ podman:
     version_rhel8: "*"
     version_debian: "*"
   v1.27.1:
+    version_rhel: 1.6.4*
+    version_rhel8: "*"
+    version_debian: "*"
+  v1.28.0-rc.0:
     version_rhel: 1.6.4*
     version_rhel8: "*"
     version_debian: "*"
