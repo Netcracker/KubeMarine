@@ -22,10 +22,10 @@ from kubemarine.cri.containerd import configure_ctr_flags
 
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Replace podman to ctr")
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
 
         if cluster.inventory["services"]["cri"]['containerRuntime'] != 'containerd':
@@ -39,7 +39,7 @@ class TheAction(Action):
 
 
 class ReplacePodmanToCtr(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("replace_podman_to_ctr")
 
     @property
