@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import]
 
 from copy import deepcopy
-from typing import Any, List, Optional, cast, Dict
+from typing import Any, List, Optional, cast, Dict, Union
 
 VERBOSE = 5
 gelf.LEVELS.update({VERBOSE: 8})
@@ -87,7 +87,7 @@ class VerboseLogger(ABC):
 
 
 class EnhancedLogger(logging.Logger, VerboseLogger):
-    def __init__(self, name, level=logging.NOTSET):
+    def __init__(self, name: str, level: int = logging.NOTSET):
         super().__init__(name, level)
         logging.addLevelName(VERBOSE, 'VERBOSE')
 
@@ -95,7 +95,7 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
         if self.isEnabledFor(VERBOSE):
             self._log(VERBOSE, msg, args, **kwargs)
 
-    def makeRecord(self, name: str, level: int, fn: str, lno: int, msg: object, args,
+    def makeRecord(self, name: str, level: int, fn: str, lno: int, msg: object, args,  # type: ignore[no-untyped-def]
                    exc_info, func=None, extra=None,
                    sinfo=None) -> logging.LogRecord:
         record = super().makeRecord(name, level, fn, lno, msg, args, exc_info, func, extra, sinfo)
@@ -120,18 +120,19 @@ logging.setLogRecordFactory(EnhancedLogRecord)
 
 
 class LogFormatter(logging.Formatter):
-    def __init__(self, fmt=None, datefmt=None, style='%', colorize=False, correct_newlines=False):
-        super().__init__(fmt, datefmt, style)
+    def __init__(self, fmt: str = None, datefmt: str = None,
+                 colorize: bool = False, correct_newlines: bool = False):
+        super().__init__(fmt, datefmt)
         self.colorize = colorize
         self.correct_newlines = correct_newlines
 
-    def _format(self, record):
+    def _format(self, record: logging.LogRecord) -> str:
         s = super().format(record)
         if self.colorize and record.levelname in COLORS_SCHEME:
             s = COLORS[COLORS_SCHEME[record.levelname]] + s + COLORS['RESET']
         return s
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         if self.correct_newlines:
             messages = str(record.msg).split('\n')
             if len(messages) == 1:
@@ -157,7 +158,7 @@ class StdoutHandler(logging.StreamHandler):
         super().__init__(sys.stdout)
         self.formatter: LogFormatter = formatter
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         if 'ignore_stdout' in record.__dict__:
             return
         super().emit(record)
@@ -166,7 +167,8 @@ class StdoutHandler(logging.StreamHandler):
 
 
 class FileHandlerWithHeader(logging.FileHandler):
-    def __init__(self, formatter: LogFormatter, filename, header=None, mode='a', encoding=None):
+    def __init__(self, formatter: LogFormatter, filename: str, header: str = None,
+                 mode: str = 'a', encoding: str = None):
         # Store the header information.
         self.header = header
 
@@ -179,7 +181,7 @@ class FileHandlerWithHeader(logging.FileHandler):
 
         self.formatter: LogFormatter = formatter
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         # Call the parent class emit function.
         logging.FileHandler.emit(self, record)
 
@@ -195,7 +197,7 @@ class LogHandler:
                  format: str = DEFAULT_FORMAT,
                  datefmt: str = None,
                  header: str = None,
-                 **kwargs):
+                 **kwargs: Union[str, bool, int]):
 
         self._colorize = colorize
         self._correct_newlines = correct_newlines
@@ -219,7 +221,7 @@ class LogHandler:
                 raise Exception(f'Graylog port is not defined for "{kwargs["host"]}"')
             if not kwargs.get('type'):
                 raise Exception(f'Graylog type is not defined for "{kwargs["host"]}:{kwargs["port"]}"')
-            handler_options = {
+            handler_options: Dict[str, Union[str, bool, int, None]] = {
                 'host': kwargs['host'],
                 'port': kwargs['port'],
                 '_app_name': kwargs.get('appname', 'kubemarine'),
@@ -258,10 +260,10 @@ class LogHandler:
         self._level = LOGGING_LEVELS_BY_NAME[level]
         self.handler.setLevel(self._level)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'target: {self._target}, level: {LOGGING_NAMES_BY_LEVEL[self._level]}, colorize: {self._colorize}, datefmt: {self._datefmt}, format: {self._format}'
 
-    def append_to_logger(self, logger) -> None:
+    def append_to_logger(self, logger: EnhancedLogger) -> None:
         logger.addHandler(self.handler)
 
     def has_stdout_target(self) -> bool:
@@ -270,7 +272,7 @@ class LogHandler:
 
 class Log:
 
-    def __init__(self, raw_inventory, handlers: List[LogHandler]):
+    def __init__(self, raw_inventory: dict, handlers: List[LogHandler]):
         logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
         self._logger = cast(EnhancedLogger, logger)
         self._logger.setLevel(VERBOSE)
@@ -327,31 +329,37 @@ def parse_log_argument(argument: str) -> LogHandler:
     argument_parts = argument.split(';')
     if not argument_parts:
         raise Exception('Defined logger do not contain parameters')
-    parameters['target'] = argument_parts[0]
+    target = argument_parts[0]
+    level: Optional[str] = None
     for parameter in argument_parts[1:]:
         if parameter == '':
             continue
-        value: Any
+        value: Union[str, bool, int]
         key, value, *rest = parameter.split('=')
-        if key in ['colorize', 'correct_newlines', 'debug', 'compress', 'validate']:
-            value = value.lower() in ['true', '1']
-        elif key in ['chunk_size', 'timeout', 'port']:
-            value = int(value)
-        parameters[key] = value
-    if not parameters.get('level'):
-        raise Exception(f'Logging level is not set for logger "{parameters["target"]}"')
-    return LogHandler(**parameters)
+        if key == 'level':
+            level = value
+        else:
+            if key in ['colorize', 'correct_newlines', 'debug', 'compress', 'validate']:
+                value = value.lower() in ['true', '1']
+            elif key in ['chunk_size', 'timeout', 'port']:
+                value = int(value)
+
+            parameters[key] = value
+
+    if level is None:
+        raise Exception(f'Logging level is not set for logger "{target}"')
+    return LogHandler(target, level, **parameters)
 
 
 def get_dump_debug_filepath(context: dict) -> Optional[str]:
     args = context['execution_arguments']
-    if args.get('disable_dump', True):
+    if args['disable_dump']:
         return None
 
     return os.path.join(args['dump_location'], 'dump', 'debug.log')
 
 
-def init_log_from_context_args(globals, context, raw_inventory) -> Log:
+def init_log_from_context_args(globals: dict, context: dict, raw_inventory: dict) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
     :param globals: parsed globals collection

@@ -52,8 +52,11 @@ class GenericGroupResult(Mapping[str, _RESULT]):
         return iter(self._result)
 
     def get_simple_out(self) -> str:
+        return self.get_simple_result().stdout
+
+    def get_simple_result(self) -> RunnersResult:
         if len(self) != 1:
-            raise NotImplementedError("Simple output can be returned only for NodeGroupResult consisted of "
+            raise NotImplementedError("Simple result can be returned only for NodeGroupResult consisted of "
                                       "exactly one node, but %s were provided." % list(self.keys()))
 
         res = list(self.values())[0]
@@ -61,7 +64,7 @@ class GenericGroupResult(Mapping[str, _RESULT]):
             raise NotImplementedError("It does not make sense to return simple output for result of type %s"
                                       % type(res))
 
-        return res.stdout
+        return res
 
     def __str__(self) -> str:
         host_outputs = []

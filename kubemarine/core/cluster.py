@@ -82,10 +82,12 @@ class KubernetesCluster(Environment):
         Returns address which should be used to connect to the node via Fabric.
         The address also can be used as unique identifier of the node.
         """
-        address = node.get('connect_to')
-        if address is None:
-            address = node.get('address')
-        if address is None:
+        address: str
+        if node.get('connect_to') is not None:
+            address = node['connect_to']
+        elif node.get('address') is not None:
+            address = node['address']
+        else:
             address = node['internal_address']
 
         return address
@@ -204,10 +206,10 @@ class KubernetesCluster(Environment):
                             f"Check ssh credentials.")
 
     def get_os_family_for_node(self, host: str) -> str:
-        node_context = self.context['nodes'].get(host)
-        if not node_context or not node_context.get('os', {}).get('family'):
+        os_family: Optional[str] = self.context['nodes'].get(host, {}).get('os', {}).get('family')
+        if os_family is None:
             raise Exception('Node %s do not contain necessary context data' % host)
-        return node_context['os']['family']
+        return os_family
 
     def get_os_family_for_nodes(self, hosts: Iterable[str]) -> str:
         """
@@ -250,18 +252,22 @@ class KubernetesCluster(Environment):
 
         return os_ids
 
-    def get_associations(self) -> dict:
+    def _get_associations(self, os_family: str) -> Dict[str, dict]:
+        if os_family in ('unknown', 'unsupported', 'multiple'):
+            raise Exception("Failed to get associations for unsupported or multiple OS families")
+
+        associations: dict = self.inventory['services']['packages']['associations'][os_family]
+        return associations
+
+    def get_associations(self) -> Dict[str, dict]:
         """
         Returns association for all packages from inventory for the cluster.
         The method can be used only if cluster has nodes with the same and supported OS family.
         """
-        return self.inventory['services']['packages']['associations'][self.get_os_family()]
+        return self._get_associations(self.get_os_family())
 
     def _get_associations_for_os(self, os_family: str, package: str) -> dict:
-        if os_family in ('unknown', 'unsupported', 'multiple'):
-            raise Exception("Failed to get associations for unsupported or multiple OS families")
-
-        associations = self.inventory['services']['packages']['associations'][os_family].get(package)
+        associations = self._get_associations(os_family).get(package)
         if associations is None:
             raise Exception(f'Failed to get associations for package "{package}"')
 

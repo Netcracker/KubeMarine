@@ -12,13 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import collections
 import copy
-import typing
 
-from collections import OrderedDict
-from typing import Any
+from typing import Any, OrderedDict, List
 
 from kubemarine import kubernetes, packages
 from kubemarine.core import flow, utils
@@ -28,7 +25,7 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
 
-def deploy_kubernetes_join(cluster: KubernetesCluster):
+def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
 
     group = cluster.make_group_from_roles(['control-plane', 'worker']).get_new_nodes()
 
@@ -52,7 +49,7 @@ def deploy_kubernetes_join(cluster: KubernetesCluster):
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict):
+def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
@@ -93,7 +90,7 @@ def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finaliz
     return inventory_to_finalize
 
 
-def cache_installed_packages(cluster: KubernetesCluster):
+def cache_installed_packages(cluster: KubernetesCluster) -> None:
     """
     Task which is used to collect already installed packages versions on already existing nodes.
     It is called first during "add_node" procedure,
@@ -102,7 +99,7 @@ def cache_installed_packages(cluster: KubernetesCluster):
     packages.cache_package_versions(cluster, cluster.inventory, by_initial_nodes=True)
 
 
-tasks: typing.OrderedDict[str, Any] = OrderedDict(copy.deepcopy(install.tasks))
+tasks: OrderedDict[str, Any] = collections.OrderedDict(copy.deepcopy(install.tasks))
 del tasks["deploy"]["plugins"]
 del tasks["deploy"]["accounts"]
 tasks["deploy"]["kubernetes"]["init"] = deploy_kubernetes_join
@@ -111,15 +108,15 @@ tasks.move_to_end("cache_packages", last=False)
 
 
 class AddNodeAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('add node', recreate_inventory=True)
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks, cumulative_points=install.cumulative_points)
         res.make_final_inventory()
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> None:
 
     cli_help = '''
     Script for adding node to Kubernetes cluster.

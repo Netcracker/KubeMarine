@@ -42,7 +42,7 @@ dependencies = [
     "cryptography==39.0.*",
     "paramiko==2.11.*",
     "jsonschema==4.17.*",
-    "typing_extensions==4.6.*",
+    "typing_extensions==4.7.*",
 ]
 requires-python = ">=3.7"
 
@@ -74,7 +74,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "0.19.0"
+current_version = "0.20.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true
@@ -104,82 +104,13 @@ strict_equality = true
 strict_concatenate = true
 disallow_subclassing_any = true
 disallow_untyped_decorators = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+warn_return_any = true
 
 # permissive configuration
 implicit_optional = true
 
 # https://github.com/python/mypy/issues/12664
 incremental = false
-
-# List of all modules where type annotations are maintained with references (but still with any-generics) to avoid degradation.
-[[tool.mypy.overrides]]
-module = [
-    # modules from scripts/
-    "build_binary",
-    "install_package",
-    "src.*",
-    "sync",
-    # kubemarine modules
-    "kubemarine",
-    "kubemarine.apparmor",
-    "kubemarine.apt",
-    "kubemarine.audit",
-    "kubemarine.controlplane",
-    "kubemarine.core",
-    "kubemarine.core.action",
-    "kubemarine.core.annotations",
-    "kubemarine.core.connections",
-    "kubemarine.core.environment",
-    "kubemarine.core.errors",
-    "kubemarine.core.executor",
-    "kubemarine.core.group",
-    "kubemarine.core.os",
-    "kubemarine.core.patch",
-    "kubemarine.core.schema",
-    "kubemarine.core.static",
-    "kubemarine.core.summary",
-    "kubemarine.core.yaml_merger",
-    "kubemarine.cri.*",
-    "kubemarine.etcd",
-    "kubemarine.haproxy",
-    "kubemarine.jinja",
-    "kubemarine.k8s_certs",
-    "kubemarine.keepalived",
-    "kubemarine.kubernetes.daemonset",
-    "kubemarine.kubernetes.deployment",
-    "kubemarine.kubernetes.replicaset",
-    "kubemarine.kubernetes.statefulset",
-    "kubemarine.kubernetes_accounts",
-    "kubemarine.plugins.builtin",
-    "kubemarine.plugins.calico",
-    "kubemarine.plugins.kubernetes_dashboard",
-    "kubemarine.plugins.local_path_provisioner",
-    "kubemarine.plugins.manifest",
-    "kubemarine.plugins.nginx_ingress",
-    "kubemarine.procedures.cert_renew",
-    "kubemarine.procedures.do",
-    "kubemarine.procedures.manage_psp",
-    "kubemarine.procedures.manage_pss",
-    "kubemarine.procedures.migrate_kubemarine",
-    "kubemarine.procedures.reboot",
-    "kubemarine.packages",
-    "kubemarine.selinux",
-    "kubemarine.sysctl",
-    "kubemarine.system",
-    "kubemarine.thirdparties",
-    "kubemarine.yum",
-]
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-disallow_untyped_calls = true
-warn_return_any = true
-
-# List of all modules where type annotations are self maintained to avoid degradation.
-[[tool.mypy.overrides]]
-module = [
-    "kubemarine.core.cluster",
-    "kubemarine.core.resources",
-    "kubemarine.kubernetes.object",
-]
-disallow_incomplete_defs = true
-disallow_untyped_defs = true

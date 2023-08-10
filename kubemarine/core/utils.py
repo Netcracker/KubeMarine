@@ -20,7 +20,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, IO
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar
 
 import yaml
 import ruamel.yaml
@@ -29,16 +29,25 @@ from datetime import datetime
 from collections import OrderedDict
 
 from ruamel.yaml import CommentedMap
+from typing_extensions import Protocol
 
+from kubemarine.core import log
 from kubemarine.core.errors import pretty_print_error
 
 
-def do_fail(message='', reason: Exception = None, hint='', log=None):
+_T_contra = TypeVar("_T_contra", contravariant=True)
 
-    if not log:
+
+class SupportsDunderLT(Protocol[_T_contra]):
+    def __lt__(self, __other: _T_contra) -> bool: ...
+
+
+def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> None:
+
+    if not logger:
         sys.stderr.write("\033[91m")
 
-    pretty_print_error(message, reason, log)
+    pretty_print_error(message, reason, logger)
 
     # Please do not rewrite this to logging approach:
     # hint should be visible only in stdout and without special formatting
@@ -46,29 +55,29 @@ def do_fail(message='', reason: Exception = None, hint='', log=None):
         sys.stderr.write("\n")
         sys.stderr.write(hint + "\n")
 
-    if not log:
+    if not logger:
         sys.stderr.write("\033[0m")
 
     sys.exit(1)
 
 
-def get_elapsed_string(start, end):
+def get_elapsed_string(start: float, end: float) -> str:
     elapsed = end - start
     hours, remainder = divmod(elapsed, 3600)
     minutes, seconds = divmod(remainder, 60)
     return '{:02}h {:02}m {:02}s'.format(int(hours), int(minutes), int(seconds))
 
 
-def prepare_dump_directory(location, reset_directory=True):
+def prepare_dump_directory(location: str, reset_directory: bool = True) -> None:
     dumpdir = os.path.join(location, 'dump')
     if reset_directory and os.path.exists(dumpdir) and os.path.isdir(dumpdir):
         shutil.rmtree(dumpdir)
     os.makedirs(dumpdir, exist_ok=True)
 
 
-def make_ansible_inventory(location, c):
+def make_ansible_inventory(location: str, c: object) -> None:
     from kubemarine.core.cluster import KubernetesCluster
-    cluster: KubernetesCluster = c
+    cluster = cast(KubernetesCluster, c)
 
     inventory = get_final_inventory(cluster)
     roles = []
@@ -150,13 +159,13 @@ def make_ansible_inventory(location, c):
     dump_file({}, config_compiled, location, dump_location=False)
 
 
-def get_current_timestamp_formatted():
+def get_current_timestamp_formatted() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def get_final_inventory(c, initial_inventory=None):
+def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     from kubemarine.core.cluster import KubernetesCluster
-    cluster: KubernetesCluster = c
+    cluster = cast(KubernetesCluster, c)
 
     if initial_inventory is None:
         inventory = deepcopy(cluster.inventory)
@@ -185,7 +194,7 @@ def get_final_inventory(c, initial_inventory=None):
     return inventory
 
 
-def merge_vrrp_ips(procedure_inventory, inventory):
+def merge_vrrp_ips(procedure_inventory: dict, inventory: dict) -> None:
     if "vrrp_ips" in inventory and len(inventory["vrrp_ips"]) > 0:
         raise Exception("vrrp_ips section already defined, merging not supported yet")
     else:
@@ -195,43 +204,48 @@ def merge_vrrp_ips(procedure_inventory, inventory):
         inventory.move_to_end("vrrp_ips", last=False)
 
 
-def dump_file(context, data: object, filename: str,
-              *, dump_location=True):
+def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: str,
+              *, dump_location: bool = True) -> None:
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
-            cluster = context
+            from kubemarine.core.cluster import KubernetesCluster
+            cluster = cast(KubernetesCluster, context)
             context = cluster.context
 
         args = context['execution_arguments']
-        if args.get('disable_dump', True) \
+        if args['disable_dump'] \
                 and not (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
             return
 
-        prepare_dump_directory(args.get('dump_location'), reset_directory=False)
+        prepare_dump_directory(args['dump_location'], reset_directory=False)
         target_path = get_dump_filepath(context, filename)
     else:
         target_path = get_external_resource_path(filename)
 
     if isinstance(data, io.StringIO):
-        data = data.getvalue()
-    if isinstance(data, io.TextIOWrapper):
-        data = data.read()
+        text = data.getvalue()
+    elif isinstance(data, str):
+        text = data
+    else:
+        text = data.read()
 
     with open_utf8(target_path, 'w') as file:
-        file.write(data)
+        file.write(text)
 
 
-def get_dump_filepath(context, filename):
+def get_dump_filepath(context: dict, filename: str) -> str:
     if context.get("dump_filename_prefix"):
         filename = f"{context['dump_filename_prefix']}_{filename}"
 
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=False):
+def wait_command_successful(g: object, command: str,
+                            retries: int = 15, timeout: int = 5,
+                            warn: bool = True, hide: bool = False) -> None:
     from kubemarine.core.group import NodeGroup
-    group: NodeGroup = g
+    group = cast(NodeGroup, g)
 
     log = group.cluster.log
 
@@ -247,15 +261,15 @@ def wait_command_successful(g, command, retries=15, timeout=5, warn=True, hide=F
     raise Exception("Command failed")
 
 
-def open_utf8(path: str, mode='r') -> IO:
-    return open(path, mode + 't', encoding='utf-8')
+def open_utf8(path: str, mode: str = 'r') -> TextIO:
+    return cast(TextIO, open(path, mode + 't', encoding='utf-8'))
 
 
-def open_internal(path: str, mode: str = 'r') -> IO:
+def open_internal(path: str, mode: str = 'r') -> TextIO:
     return open_utf8(get_internal_resource_path(path), mode)
 
 
-def open_external(path: str, mode: str = 'r') -> IO:
+def open_external(path: str, mode: str = 'r') -> TextIO:
     return open_utf8(get_external_resource_path(path), mode)
 
 
@@ -353,7 +367,7 @@ def is_sorted(l: list, key: Callable = None) -> bool:
     return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
 
 
-def map_sorted(map_: CommentedMap, key: Callable = None) -> CommentedMap:
+def map_sorted(map_: CommentedMap, key: Callable[[str], SupportsDunderLT] = None) -> CommentedMap:
     """
     Check that the specified CommentedMap is sorted, or create new sorted map from it otherwise.
 
@@ -361,17 +375,18 @@ def map_sorted(map_: CommentedMap, key: Callable = None) -> CommentedMap:
     :param key: custom key function to customize the sort order of the map keys
     :return: the same or new sorted instance of the map
     """
-    if key is None:
-        _key = lambda x: x
-    else:
+    if key is not None:
         _key = key
+    else:
+        _key = lambda x: x
     map_keys = list(map_)
     if not is_sorted(map_keys, key=_key):
         map_ = CommentedMap(sorted(map_.items(), key=lambda item: _key(item[0])))
 
     return map_
 
-def insert_map_sorted(map_: CommentedMap, k, v, key: Callable = None) -> None:
+
+def insert_map_sorted(map_: CommentedMap, k: str, v: object, key: Callable = None) -> None:
     """
     Insert new item to the CommentedMap or update the value for the existing key.
     The map should be already sorted.
@@ -395,16 +410,17 @@ def insert_map_sorted(map_: CommentedMap, k, v, key: Callable = None) -> None:
     map_.insert(pos, k, v)
 
 
-def load_yaml(filepath) -> dict:
+def load_yaml(filepath: str) -> dict:
     try:
         with open_utf8(filepath, 'r') as stream:
-            return yaml.safe_load(stream)
+            data: dict = yaml.safe_load(stream)
+            return data
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
         return {}  # unreachable
 
 
-def true_or_false(value) -> str:
+def true_or_false(value: Union[str, bool]) -> str:
     """
     The method check string and boolean value
     :param value: Value that should be checked
@@ -419,7 +435,7 @@ def true_or_false(value) -> str:
     return result
 
 
-def get_version_filepath():
+def get_version_filepath() -> str:
     return get_internal_resource_path("version")
 
 
@@ -482,14 +498,14 @@ class ClusterStorage:
     PRESERVED_DUMP_FILES = ['procedure.yaml', 'procedure_parameters', 'cluster_precompiled.yaml',
                             'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml']
 
-    def __init__(self, cluster):
+    def __init__(self, cluster: object):
         from kubemarine.core.cluster import KubernetesCluster
-        self.cluster: KubernetesCluster = cluster
+        self.cluster = cast(KubernetesCluster, cluster)
         self.dir_path = "/etc/kubemarine/procedures/"
         self.dir_name = ''
         self.dir_location = ''
 
-    def make_dir(self):
+    def make_dir(self) -> None:
         """
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
@@ -500,7 +516,7 @@ class ClusterStorage:
         self.cluster.nodes['control-plane'].get_final_nodes().sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                                  f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
-    def rotation_file(self):
+    def rotation_file(self) -> None:
         """
         This method packs files with logs and maintains a structured storage of logs on the cluster.
         """
@@ -523,7 +539,7 @@ class ClusterStorage:
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
-    def compress_and_upload_archive(self):
+    def compress_and_upload_archive(self) -> None:
         """
         This method compose dump files and sends the collected files to the nodes.
         """
@@ -542,7 +558,7 @@ class ClusterStorage:
         self.cluster.nodes['control-plane'].get_final_nodes().sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
                                                  f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
-    def collect_procedure_info(self):
+    def collect_procedure_info(self) -> None:
         """
         This method collects information about the type of procedure and the version of the tool we are working with.
         """
@@ -557,7 +573,7 @@ class ClusterStorage:
         output = yaml.dump(out)
         dump_file(context, output, "procedure_parameters")
 
-    def upload_info_new_control_planes(self):
+    def upload_info_new_control_planes(self) -> None:
         """
         This method is used to transfer backup logs from the initial control-plane to the new control-planes.
         """

@@ -35,7 +35,7 @@ from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.core.group import NodeConfig, GroupException, GroupResultException, CollectorCallback
 
 
-def connection_ssh_connectivity(cluster: KubernetesCluster):
+def connection_ssh_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '001', 'SSH', 'Connectivity', default_results='Connected'):
         failed_nodes = []
         for node in cluster.nodes['all'].get_ordered_members_list():
@@ -53,7 +53,7 @@ def connection_ssh_connectivity(cluster: KubernetesCluster):
                                    "the access to remote nodes.")
 
 
-def connection_ssh_latency_single(cluster: KubernetesCluster):
+def connection_ssh_latency_single(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '002',  'SSH', 'Latency - Single Thread',
                   minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['critical'],
                   recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['single']['recommended']) as tc:
@@ -81,7 +81,7 @@ def connection_ssh_latency_single(cluster: KubernetesCluster):
         tc.success(results="%sms" % average_latency)
 
 
-def connection_ssh_latency_multiple(cluster: KubernetesCluster):
+def connection_ssh_latency_multiple(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '003',  'SSH', 'Latency - Multi Thread',
                   minimal=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['critical'],
                   recommended=cluster.globals['compatibility_map']['network']['connection']['latency']['multi']['recommended']) as tc:
@@ -108,7 +108,7 @@ def connection_ssh_latency_multiple(cluster: KubernetesCluster):
         tc.success(results="%sms" % average_latency)
 
 
-def connection_sudoer_access(cluster: KubernetesCluster):
+def connection_sudoer_access(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '004', 'SSH', 'Sudoer Access', default_results='Access provided'):
         non_root = []
         for host, node_context in cluster.context['nodes'].items():
@@ -123,7 +123,7 @@ def connection_sudoer_access(cluster: KubernetesCluster):
                                    "a connection user to the sudoers group.")
 
 
-def hardware_members_amount(cluster: KubernetesCluster, group_name: str):
+def hardware_members_amount(cluster: KubernetesCluster, group_name: str) -> None:
     beauty_name = group_name.capitalize()
     if group_name == 'vip':
         beauty_name = 'VIP'
@@ -164,7 +164,7 @@ def hardware_members_amount(cluster: KubernetesCluster, group_name: str):
         tc.success("%s item%s" % (amount, s))
 
 
-def hardware_cpu(cluster: KubernetesCluster, group_name: str):
+def hardware_cpu(cluster: KubernetesCluster, group_name: str) -> None:
     minimal_cpu = cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['vcpu'] \
         if group_name == 'balancer' or cluster.nodes['all'].nodes_amount() > 1 \
         else cluster.globals['compatibility_map']['hardware']['minimal']['control-plane']['vcpu']
@@ -204,7 +204,7 @@ def hardware_cpu(cluster: KubernetesCluster, group_name: str):
         tc.success(results='%s VCPU%s' % (minimal_amount, s))
 
 
-def hardware_ram(cluster: KubernetesCluster, group_name: str):
+def hardware_ram(cluster: KubernetesCluster, group_name: str) -> None:
     with TestCase(cluster, '007',  'Hardware', 'RAM Amount - %ss' % group_name.capitalize(),
                   minimal=cluster.globals['compatibility_map']['hardware']['minimal'][group_name]['ram'],
                   recommended=cluster.globals['compatibility_map']['hardware']['recommended'][group_name]['ram']) as tc:
@@ -236,7 +236,7 @@ def hardware_ram(cluster: KubernetesCluster, group_name: str):
         tc.success(results='%sGB' % minimal_amount)
 
 
-def system_distributive(cluster: KubernetesCluster):
+def system_distributive(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '008', 'System', 'Distibutive') as tc:
         supported_distributives = cluster.globals['compatibility_map']['distributives'].keys()
 
@@ -288,7 +288,7 @@ def system_distributive(cluster: KubernetesCluster):
         tc.success(results=", ".join(detected_supported_os))
 
 
-def check_kernel_version(cluster: KubernetesCluster):
+def check_kernel_version(cluster: KubernetesCluster) -> None:
     """
     This method compares the linux kernel version with the bad version
     """
@@ -317,7 +317,7 @@ def check_kernel_version(cluster: KubernetesCluster):
             tc.success("All kernel have stable versions")
 
 
-def check_access_to_thirdparties(cluster: KubernetesCluster):
+def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '012', 'Software', 'Thirdparties Availability') as tc:
         detect_preinstalled_python(cluster)
         broken = []
@@ -354,11 +354,11 @@ def check_access_to_thirdparties(cluster: KubernetesCluster):
             raise TestFailure('Required thirdparties are unavailable', hint=yaml.safe_dump(broken))
         if nodes_without_python:
             raise TestWarn("Can't detect python version for some nodes, procedure can't be performed for them",
-                           hint=list(nodes_without_python))
+                           hint=yaml.safe_dump(list(nodes_without_python)))
         tc.success('All thirdparties are available')
 
 
-def check_resolv_conf(cluster: KubernetesCluster):
+def check_resolv_conf(cluster: KubernetesCluster) -> None:
     nodes_context = cluster.context['nodes']
     hosts = [host for host, node_context in nodes_context.items() if 'resolv_conf_is_actual' not in node_context]
     group = cluster.make_group(hosts)
@@ -384,7 +384,7 @@ def check_resolv_conf(cluster: KubernetesCluster):
         group.run("rm %s" % random_resolv_conf_path)
 
 
-def check_package_repositories(cluster: KubernetesCluster):
+def check_package_repositories(cluster: KubernetesCluster) -> None:
     nodes_context = cluster.context['nodes']
     hosts = [host for host, node_context in nodes_context.items() if 'package_repos_are_actual' not in node_context]
 
@@ -415,7 +415,7 @@ def check_package_repositories(cluster: KubernetesCluster):
         group.sudo("rm %s" % random_repos_conf_path)
 
 
-def check_access_to_package_repositories(cluster: KubernetesCluster):
+def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '013', 'Software', 'Package Repositories') as tc:
         detect_preinstalled_python(cluster)
         check_resolv_conf(cluster)
@@ -508,7 +508,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster):
         tc.success('All package repositories are correct and available')
 
 
-def check_access_to_packages(cluster: KubernetesCluster):
+def check_access_to_packages(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '014', 'Software', 'Package Availability') as tc:
         check_package_repositories(cluster)
         broken: List[str] = []
@@ -548,7 +548,7 @@ def check_access_to_packages(cluster: KubernetesCluster):
         tc.success('All packages are available')
 
 
-def detect_preinstalled_python(cluster: KubernetesCluster):
+def detect_preinstalled_python(cluster: KubernetesCluster) -> None:
     version_pattern = r'^Python{space}([2-3])(\.[0-9]+){{0,2}}$'
     bash_version_pattern = version_pattern.format(space='[[:space:]]')
     python_version_pattern = version_pattern.format(space=' ')
@@ -575,7 +575,7 @@ def detect_preinstalled_python(cluster: KubernetesCluster):
 
 
 @contextmanager
-def suspend_firewalld(cluster: KubernetesCluster):
+def suspend_firewalld(cluster: KubernetesCluster) -> Iterator[None]:
     firewalld_statuses = system.fetch_firewalld_status(cluster.nodes["all"])
     stop_firewalld_group = firewalld_statuses.get_nodes_group_where_value_in_stdout("active (running)")
 
@@ -605,7 +605,7 @@ def _get_not_balancers(cluster: KubernetesCluster) -> Dict[str, NodeConfig]:
 
 
 @contextmanager
-def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], subnet) -> Iterator[Dict[str, Any]]:
+def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], subnet: str) -> Iterator[Dict[str, Any]]:
     inet = ipaddress.ip_network(subnet)
     net_mask = str(inet.netmask)
     prefix = str(inet.prefixlen)
@@ -676,7 +676,7 @@ def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], 
                        f"Use check_paas procedure if you already have installed cluster.")
 
 
-def pod_subnet_connectivity(cluster: KubernetesCluster):
+def pod_subnet_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '009', 'Network', 'PodSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
@@ -692,7 +692,7 @@ def pod_subnet_connectivity(cluster: KubernetesCluster):
                                        f"on nodes: {failed_nodes}.")
 
 
-def service_subnet_connectivity(cluster: KubernetesCluster):
+def service_subnet_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
         service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
@@ -708,7 +708,7 @@ def service_subnet_connectivity(cluster: KubernetesCluster):
                                        f"on nodes: {failed_nodes}.")
 
 
-def cmd_for_ports(ports, query):
+def cmd_for_ports(ports: List[str], query: str) -> str:
     result = ""
     for port in ports:
         result += f" && echo 'port: {port}' && ( {query % port} ) "
@@ -716,7 +716,7 @@ def cmd_for_ports(ports, query):
 
 
 def tcp_connect(cluster: KubernetesCluster, node_from: NodeConfig, node_to: NodeConfig,
-                tcp_ports: List[str], host_to_ip: Dict[str, Any], mtu):
+                tcp_ports: List[str], host_to_ip: Dict[str, Any], mtu: int) -> None:
     # 40 bites for headers
     mtu -= 40
     cluster.log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
@@ -725,7 +725,7 @@ def tcp_connect(cluster: KubernetesCluster, node_from: NodeConfig, node_to: Node
     group.sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
 
 
-def get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version):
+def get_start_tcp_listener_cmd(python_executable: str, tcp_listener: str, ip_version: int) -> str:
     # 1. Create anonymous pipe
     # 2. Create python tcp listener process in background and redirect output to pipe
     # 3. Wait till the listener successfully binds the port, or till it fails and exits.
@@ -749,14 +749,14 @@ def get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version):
            "exit 1"
 
 
-def get_stop_tcp_listener_cmd(tcp_listener):
+def get_stop_tcp_listener_cmd(tcp_listener: str) -> str:
     identify_pid = "ps aux | grep \" %s ${port} \" | grep -v grep | grep -v nohup | awk '{print $2}'" % tcp_listener
     return f"port=%s;pid=$({identify_pid}) " \
            "&& if [ ! -z $pid ]; then sudo kill -9 $pid; echo \"killed pid $pid for port $port\"; fi"
 
 
 def check_tcp_connect_between_all_nodes(cluster: KubernetesCluster, node_list: List[NodeConfig],
-                                        tcp_ports: List[str], host_to_ip: Dict[str, Any]):
+                                        tcp_ports: List[str], host_to_ip: Dict[str, Any]) -> List[str]:
     if len(node_list) <= 1:
         return []
 
@@ -802,7 +802,8 @@ def check_tcp_connect_between_all_nodes(cluster: KubernetesCluster, node_list: L
 
 
 @contextmanager
-def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], tcp_ports):
+def install_tcp_listener(cluster: KubernetesCluster,
+                         nodes: Dict[str, NodeConfig], tcp_ports: List[str]) -> Iterator[None]:
     detect_preinstalled_python(cluster)
     nodes_without_python = {node_config['name']: node_config for host, node_config in nodes.items()
                             if cluster.context['nodes'][host]['python'] == "Not installed"}
@@ -863,7 +864,7 @@ def install_tcp_listener(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig
         raise TestWarn(f"Cannot perform check on {list(nodes_without_python.keys())}: python doesn't exist.")
 
 
-def check_tcp_ports(cluster: KubernetesCluster):
+def check_tcp_ports(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '011', 'Network', 'TCPPorts', default_results='Connected'),\
             suspend_firewalld(cluster):
         tcp_ports = ["80", "443", "179", "5473", "6443", "8443", "2379", "2380", "9091", "9094", "10250", "10254",
@@ -880,7 +881,7 @@ def check_tcp_ports(cluster: KubernetesCluster):
                                        f"Ports that should be opened: {tcp_ports}")
 
 
-def make_reports(context: dict):
+def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
         context['testsuite'].save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
     if not context['execution_arguments'].get('disable_html_report', False):
@@ -940,14 +941,14 @@ tasks = OrderedDict({
 
 
 class IaasAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('check iaas')
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments=None):
+def main(cli_arguments: List[str] = None) -> TestSuite:
     cli_help = '''
     Script for checking Kubernetes cluster IAAS layer.
     
@@ -992,9 +993,10 @@ def main(cli_arguments=None):
     print(testsuite.get_final_summary())
     testsuite.print_final_status(result.logger)
     make_reports(context)
-    if testsuite.is_any_test_failed():
-        sys.exit(1)
+    return testsuite
 
 
 if __name__ == '__main__':
-    main()
+    testsuite = main()
+    if testsuite.is_any_test_failed():
+        sys.exit(1)

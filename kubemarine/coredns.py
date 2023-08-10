@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Any, Dict, Tuple
 
 import yaml
 
@@ -24,7 +24,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import RunnersGroupResult
 
 
-def proceed_section_keyvalue(data, tabsize):
+def proceed_section_keyvalue(data: Dict[str, Any], tabsize: int) -> str:
     tab = " "*tabsize
     config = ''
 
@@ -52,7 +52,7 @@ def proceed_section_keyvalue(data, tabsize):
     return config
 
 
-def generate_nested_sections(type, data, tabsize):
+def generate_nested_sections(type: str, data: Dict[str, Dict[str, Any]], tabsize: int) -> str:
     tab = " "*tabsize
     config = ''
 
@@ -62,7 +62,7 @@ def generate_nested_sections(type, data, tabsize):
             max_priority = section_value['priority']
 
     iterated = 0
-    sections = []
+    sections: List[Tuple[str, int]] = []
     for section_name, section_value in data.items():
         if section_value.get('priority') is None:
             iterated += 1
@@ -71,47 +71,45 @@ def generate_nested_sections(type, data, tabsize):
             section_priority = section_value['priority']
 
         if section_value.get('enabled', True) in ['1', 1, True, 'True']:
-            sections.append({
-                'name': section_name,
-                'priority': section_priority
-            })
+            sections.append((section_name, section_priority))
 
-    sections = sorted(sections, key=lambda i: i['priority'])
+    sections = sorted(sections, key=lambda i: i[1])
 
     for section in sections:
-
+        section_name, _ = section
+        section_value = data[section_name]
         if type == 'kubernetes':
             config += '\n' + tab + type
-            if data[section['name']].get('zone'):
-                if isinstance(data[section['name']]['zone'], list):
-                    data[section['name']]['zone'] = ' '.join(data[section['name']]['zone'])
-                config += ' ' + data[section['name']]['zone']
-            config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+            if section_value.get('zone'):
+                if isinstance(section_value['zone'], list):
+                    section_value['zone'] = ' '.join(section_value['zone'])
+                config += ' ' + section_value['zone']
+            config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
         elif type == 'hosts':
             config += '\n' + tab + type
-            if data[section['name']].get('file') and isinstance(data[section['name']]['file'], str):
-                config += ' ' + data[section['name']]['file']
-            config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+            if section_value.get('file') and isinstance(section_value['file'], str):
+                config += ' ' + section_value['file']
+            config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
         elif type == 'template':
             zones: Union[str, List[Optional[str]]] = [None]
-            if data[section['name']].get('zone'):
-                zones = data[section['name']]['zone']
+            if section_value.get('zone'):
+                zones = section_value['zone']
                 if isinstance(zones, str):
                     zones = [zones]
             for zone in zones:
                 config += '\n' + tab + type
-                if data[section['name']].get('class'):
-                    config += ' ' + data[section['name']]['class']
-                if data[section['name']].get('type'):
-                    config += ' ' + data[section['name']]['type']
+                if section_value.get('class'):
+                    config += ' ' + section_value['class']
+                if section_value.get('type'):
+                    config += ' ' + section_value['type']
                 if zone:
                     config += ' ' + zone
-                config += ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2) + '\n' + tab + '}'
+                config += ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2) + '\n' + tab + '}'
 
         else:
-            config += '\n' + tab + type + ' {' + proceed_section_keyvalue(data[section['name']]['data'], tabsize + 2)\
+            config += '\n' + tab + type + ' {' + proceed_section_keyvalue(section_value['data'], tabsize + 2)\
                       + '\n' + tab + '}'
 
     return config
