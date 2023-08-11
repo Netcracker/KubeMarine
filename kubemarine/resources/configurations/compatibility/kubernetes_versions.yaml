@@ -61,11 +61,11 @@ compatibility_map:
     local-path-provisioner: v0.0.24
     crictl: v1.27.1
   v1.26.3:
-    calico: v3.24.2
-    nginx-ingress-controller: v1.4.0
+    calico: v3.26.1
+    nginx-ingress-controller: v1.8.1
     kubernetes-dashboard: v2.7.0
-    local-path-provisioner: v0.0.23
-    crictl: v1.25.0
+    local-path-provisioner: v0.0.24
+    crictl: v1.27.1
   v1.26.4:
     calico: v3.26.1
     nginx-ingress-controller: v1.8.1
@@ -73,12 +73,6 @@ compatibility_map:
     local-path-provisioner: v0.0.24
     crictl: v1.27.1
   v1.27.1:
-    calico: v3.26.1
-    nginx-ingress-controller: v1.8.1
-    kubernetes-dashboard: v2.7.0
-    local-path-provisioner: v0.0.24
-    crictl: v1.27.1
-  v1.28.0-rc.0:
     calico: v3.26.1
     nginx-ingress-controller: v1.8.1
     kubernetes-dashboard: v2.7.0
