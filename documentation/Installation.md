@@ -4276,7 +4276,12 @@ The following table contains details about existing resources requests and limit
             <li><code>dashboard.resources</code></li>
             <li><code>metrics-scraper.resources</code></li>
         </ul></td>
-        <td></td>
+        <td><ul>
+            <li>dashboard requests cpu=100m memory=200Mi</li>
+            <li>dashboard limits cpu=1 memory=200Mi</li>
+            <li>metrics-scraper requests cpu=50m memory=90Mi</li>
+            <li>metrics-scraper limits cpu=200m memory=256Mi</li>
+        </ul></td>
         <td></td>
     </tr>
     <tr>
