@@ -22,7 +22,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p2_inventory_plugins_resources import PluginsResourcesPatch
+from kubemarine.patches.p1_inventory_plugins_resources import PluginsResourcesPatch
 
 patches: List[Patch] = [
   PluginsResourcesPatch(),
