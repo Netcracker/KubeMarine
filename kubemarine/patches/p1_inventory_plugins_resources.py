@@ -20,10 +20,10 @@ from kubemarine.core.resources import DynamicResources
 
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Update user inventory to keep backward-compatible resources requests/limits for plugins")
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         inventory = res.formatted_inventory()
 
         self.recreate_inventory = True
