@@ -49,7 +49,7 @@ class TheAction(Action):
 
 
 class PluginsResourcesPatch(InventoryOnlyPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("plugins_resources")
 
     @property
