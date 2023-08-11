@@ -4250,7 +4250,7 @@ There are default values, but you should adjust them accordingly to your needs.
 The following table contains details about existing resources requests and limits configuration options:
 
 <table>
-    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default requests/limits</th><th>Notes</th></tr>
+    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default requests/limits</th></tr>
     <tr>
         <td>calico</td>
         <td><ul>
@@ -4263,7 +4263,6 @@ The following table contains details about existing resources requests and limit
             <li><code>cpu=250m/None; memory=256Mi/None</code></li>
             <li><code>cpu=100m/None; memory=128Mi/None</code></li>
         </ul></td>
-        <td></td>
     </tr>
     <tr>
         <td>nginx-ingress-controller</td>
@@ -4275,7 +4274,6 @@ The following table contains details about existing resources requests and limit
             <li><code>cpu=100m/200m; memory=90Mi/256Mi</code></li>
             <li><code>cpu=10m/20m; memory=20Mi/40Mi</code></li>
         </ul></td>
-        <td></td>
     </tr>
     <tr>
         <td>kubernetes-dashboard</td>
@@ -4287,7 +4285,6 @@ The following table contains details about existing resources requests and limit
             <li><code>cpu=100m/1000m; memory=200Mi/200Mi</code></li>
             <li><code>cpu=50m/200m; memory=90Mi/200Mi</code></li>
         </ul></td>
-        <td></td>
     </tr>
     <tr>
         <td>local-host-provisioner</td>
@@ -4297,7 +4294,6 @@ The following table contains details about existing resources requests and limit
         <td><ul>
             <li><code>cpu=100m/200m; memory=128Mi/256Mi</code></li>
         </ul></td>
-        <td></td>
     </tr>
 </table>
 
