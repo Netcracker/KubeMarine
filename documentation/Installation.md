@@ -4284,7 +4284,7 @@ The following table contains details about existing resources requests and limit
         <td><ul>
             <li><code>resources</code></li>
         </ul></td>
-        <td>requests cpu=100m memory=128Mi;<\br> limits cpu=200m memory=256Mi/td>
+        <td>requests cpu=100m memory=128Mi;<br> limits cpu=200m memory=256Mi/td>
         <td></td>
     </tr>
 </table>
