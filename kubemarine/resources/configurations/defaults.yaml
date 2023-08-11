@@ -660,7 +660,7 @@ plugins:
           memory: 90Mi
         limits:
           cpu: 200m
-          memory: 256Mi
+          memory: 200Mi
     ingress:
       metadata:
         name: kubernetes-dashboard

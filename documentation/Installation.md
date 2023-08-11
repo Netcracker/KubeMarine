@@ -4250,7 +4250,7 @@ There are default values, but you should adjust them accordingly to your needs.
 The following table contains details about existing resources requests and limits configuration options:
 
 <table>
-    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default</th><th>Notes</th></tr>
+    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default requests/limits</th><th>Notes</th></tr>
     <tr>
         <td>calico</td>
         <td><ul>
@@ -4277,10 +4277,8 @@ The following table contains details about existing resources requests and limit
             <li><code>metrics-scraper.resources</code></li>
         </ul></td>
         <td><ul>
-            <li>dashboard requests cpu=100m memory=200Mi</li>
-            <li>dashboard limits cpu=1 memory=200Mi</li>
-            <li>metrics-scraper requests cpu=50m memory=90Mi</li>
-            <li>metrics-scraper limits cpu=200m memory=256Mi</li>
+            <li>dashboard requests cpu=100m/1000m memory=200Mi/200Mi</li>
+            <li>metrics-scraper requests cpu=50m/200m memory=90Mi/200Mi</li>
         </ul></td>
         <td></td>
     </tr>
@@ -4290,8 +4288,7 @@ The following table contains details about existing resources requests and limit
             <li><code>resources</code></li>
         </ul></td>
         <td><ul>
-            <li>requests cpu=100m memory=128Mi</li>
-            <li>limits cpu=200m memory=256Mi</li>
+            <li>cpu=100m/200m memory=128Mi/256Mi</li>
         </ul></td>
         <td></td>
     </tr>
