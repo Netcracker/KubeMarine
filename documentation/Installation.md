@@ -77,6 +77,7 @@ This section provides information about the inventory, features, and steps for i
         - [Plugins Installation Order](#plugins-installation-order)
         - [Node Selector](#node-selector)
         - [Tolerations](#tolerations)
+        - [Resources requets and limits](#resources-requests-and-limits)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
         - [config](#config) 
