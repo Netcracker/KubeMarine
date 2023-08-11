@@ -384,8 +384,8 @@ class Processor(ABC):
         :param plugin_service: section of plugin that contains the desirable 'resources'
         :param container_name: name of container to assign the resources in the spec
         """
-        container_pos, container = self._find_optional_container(manifest, key,
-                                                                 container_name=container_name, is_init_container=False, allow_absent=False)
+        container_pos, container = self.find_container_for_patch(manifest, key,
+                                                                 container_name=container_name, is_init_container=False)
 
         plugin_service_section = self.inventory['plugins'][self.plugin_name]
         if plugin_service:
