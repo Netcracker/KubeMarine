@@ -4254,11 +4254,15 @@ The following table contains details about existing resources requests and limit
     <tr>
         <td>calico</td>
         <td><ul>
-            <li><code>typha.resources</code></li>
             <li><code>node.resources</code></li>
+            <li><code>typha.resources</code></li>
             <li><code>kube-controllers.resources</code></li>
         </ul></td>
-        <td></td>
+        <td><ul>
+            <li><code>cpu=250m/None; memory=256Mi/None</code></li>
+            <li><code>cpu=250m/None; memory=256Mi/None</code></li>
+            <li><code>cpu=100m/None; memory=128Mi/None</code></li>
+        </ul></td>
         <td></td>
     </tr>
     <tr>
@@ -4267,7 +4271,10 @@ The following table contains details about existing resources requests and limit
             <li><code>controller.resources</code></li>
             <li><code>webhook.resources</code></li>
         </ul></td>
-        <td></td>
+        <td><ul>
+            <li><code>cpu=100m/200m; memory=90Mi/256Mi</code></li>
+            <li><code>cpu=10m/20m; memory=20Mi/40Mi</code></li>
+        </ul></td>
         <td></td>
     </tr>
     <tr>

@@ -543,7 +543,7 @@ plugins:
       resources:
         requests:
           cpu: 100m
-          memory: 126Mi
+          memory: 128Mi
     flexvol:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
