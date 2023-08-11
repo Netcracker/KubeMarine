@@ -25,6 +25,9 @@
         },
         "tolerations": {
           "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
         }
       },
       "additionalProperties": false
@@ -42,6 +45,9 @@
         },
         "tolerations": {
           "$ref": "generic_plugin.json#/definitions/CustomTolerations"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
         }
       },
       "additionalProperties": false

@@ -23,8 +23,10 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_kubeadm_flags import KubeadmFlags
+from kubemarine.patches.p2_inventory_plugins_resources import PluginsResourcesPatch
 
 patches: List[Patch] = [
+  PluginsResourcesPatch(),
   KubeadmFlags(),
 ]
 """

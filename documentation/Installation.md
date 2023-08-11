@@ -4242,6 +4242,76 @@ plugins:
           effect: NoSchedule
 ```
 
+##### Resources Requests and Limits
+
+It is recommended to set resources requests and limits for plugins. 
+There are default values, but you should adjust them accordingly to your needs. 
+
+The following table contains details about existing resources requests and limits configuration options:
+
+<table>
+    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default</th><th>Notes</th></tr>
+    <tr>
+        <td>calico</td>
+        <td><ul>
+            <li><code>typha.resources</code></li>
+            <li><code>node.resources</code></li>
+            <li><code>kube-controllers.resources</code></li>
+        </ul></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>nginx-ingress-controller</td>
+        <td><ul>
+            <li><code>controller.resources</code></li>
+            <li><code>webhook.resources</code></li>
+        </ul></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>kubernetes-dashboard</td>
+        <td><ul>
+            <li><code>dashboard.resources</code></li>
+            <li><code>metrics-scraper.resources</code></li>
+        </ul></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>local-host-provisioner</td>
+        <td><ul>
+            <li><code>resources</code></li>
+        </ul></td>
+        <td><code>    
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi</code></td>
+        <td></td>
+    </tr>
+</table>
+
+For example, if you want to customize the nginx-ingress-controller resources requests and limits, 
+you need to specify the following in your `cluster.yml` file:
+
+```yaml
+plugins:
+  nginx-ingress-controller:
+    controller:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 90Mi
+        limits:
+          cpu: 200m
+          memory: 256M
+```
+
 #### Custom Plugins Installation Procedures
 
 During the installation of plugins, certain installation procedures are performed. You can use these procedures to write your custom plugins. The procedures should be presented as a list in the `installation.procedures` section in plugin definition, where each element is a separate procedure execution.

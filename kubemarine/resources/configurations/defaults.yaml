@@ -485,6 +485,10 @@ plugins:
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
     env:
       DATASTORE_TYPE: kubernetes
       WAIT_FOR_DATASTORE: 'true'
@@ -528,10 +532,18 @@ plugins:
           type: calico-ipam
     node:
       image: 'calico/node:{{ plugins.calico.version }}'
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
     kube-controllers:
       image: 'calico/kube-controllers:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
+      resources:
+        requests:
+          cpu: 100m
+          memory: 126Mi
     flexvol:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
 
@@ -563,12 +575,28 @@ plugins:
       use-proxy-protocol: "true"
     webhook:
       image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
+      # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598
+      resources:
+        requests:
+          cpu: 10m
+          memory: 20Mi
+        limits:
+          cpu: 20m
+          memory: 40Mi
     controller:
       image: 'ingress-nginx/controller:{{ plugins["nginx-ingress-controller"].version }}'
       ssl:
         enableSslPassthrough: false
       nodeSelector:
         kubernetes.io/os: linux
+      # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L321
+      resources:
+        requests:
+          cpu: 100m
+          memory: 90Mi
+        limits:
+          cpu: 200m
+          memory: 256M
     ports:
       - name: http
         containerPort: 80
@@ -614,10 +642,25 @@ plugins:
       image: 'kubernetesui/dashboard:{{ plugins["kubernetes-dashboard"].version }}'
       nodeSelector:
         kubernetes.io/os: linux
+      # resources values are based on https://github.com/kubernetes/dashboard/blob/v2.5.1/aio/deploy/helm-chart/kubernetes-dashboard/values.yaml#L118
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 1
+          memory: 200Mi
     metrics-scraper:
       image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion]["metrics-scraper-version"] }}'
       nodeSelector:
         kubernetes.io/os: linux
+      resources:
+        requests:
+          cpu: 50m
+          memory: 90Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
     ingress:
       metadata:
         name: kubernetes-dashboard
@@ -667,6 +710,14 @@ plugins:
     volume-dir: /opt/local-path-provisioner
     image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
     helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["busybox-version"] }}'
+    # resources values are based on https://github.com/rancher/local-path-provisioner/blob/v0.0.24/deploy/chart/local-path-provisioner/values.yaml#L69
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
 
 rbac:
   account_defaults:
