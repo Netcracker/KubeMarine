@@ -394,7 +394,6 @@ class Processor(ABC):
 
         self.log.verbose(f"The {key} has been patched in "
                          f"'spec.template.spec.containers.[{container_pos}].resources' with {plugin_service_section['resources']!r}")
-        pass
 
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,
