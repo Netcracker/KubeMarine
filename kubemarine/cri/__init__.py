@@ -33,11 +33,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     # Enrich containerdConfig
     if cri_impl == "containerd":
-        containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-        runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-        if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-            containerd_config[runc_options_path]['SystemdCgroup'] = \
-                bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+        return containerd.enrich_inventory(inventory, cluster)
 
     return inventory
 

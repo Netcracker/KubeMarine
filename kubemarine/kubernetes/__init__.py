@@ -97,10 +97,8 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
 
 
 def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
-    repository = inventory['services']['kubeadm'].get('imageRepository', "")
-    if repository:
-        inventory['services']['kubeadm']['dns'] = {}
-        inventory['services']['kubeadm']['dns']['imageRepository'] = ("%s/coredns" % repository)
+    kubeadm = inventory['services']['kubeadm']
+    kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")
     # if user redefined apiServer as, string, for example?
     if not isinstance(inventory["services"]["kubeadm"].get('apiServer'), dict):
         inventory["services"]["kubeadm"]['apiServer'] = {}

@@ -20,8 +20,27 @@ import base64
 
 from distutils.util import strtobool
 from kubemarine import system, packages
-from kubemarine.core import utils
+from kubemarine.core import utils, static
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
+
+
+def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
+    containerd_config = inventory['services']['cri']['containerdConfig']
+
+    path = 'plugins."io.containerd.grpc.v1.cri"'
+    kubeadm = inventory['services']['kubeadm']
+    kubernetes_version = kubeadm['kubernetesVersion']
+    image_repository = kubeadm['imageRepository']
+    pause_version = static.GLOBALS['compatibility_map']['software']['pause'][kubernetes_version]['version']
+    containerd_config[path].setdefault('sandbox_image', f"{image_repository}/pause:{pause_version}")
+
+    runc_options_path = f'{path}.containerd.runtimes.runc.options'
+    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
+        containerd_config[runc_options_path]['SystemdCgroup'] = \
+            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+
+    return inventory
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
