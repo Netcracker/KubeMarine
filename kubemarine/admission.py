@@ -86,14 +86,21 @@ def enrich_inventory_pss(inventory: dict, _: KubernetesCluster) -> dict:
             verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
     # add extraArgs to kube-apiserver config
-    if enabled_admissions:
-        if 'PodSecurity=true' not in enabled_admissions:
+    if minor_version > 26:
+        if enabled_admissions:
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+        else:
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+    else:
+        if enabled_admissions:
+            if 'PodSecurity=true' not in enabled_admissions:
                 enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
-    else:     
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+        else:
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
+            inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
 
     return inventory
 
