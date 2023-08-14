@@ -27,25 +27,23 @@ class TheAction(Action):
         inventory = res.formatted_inventory()
 
         self.recreate_inventory = True
-        local_path_provisioner = inventory.get("plugins", {}).get("local-path-provisioner", {})
-        if local_path_provisioner.get("install", False):
-            local_path_provisioner["resources"] = {}
+        plugins = inventory.setdefault("plugins", {})
 
-        nginx_ingress = inventory.get("plugins", {}).get("nginx-ingress-controller", {})
-        if nginx_ingress.get("install", False):
-            nginx_ingress.setdefault("controller", {})["resources"] = {"requests": {"cpu": "100m", "memory": "90Mi"}}
-            nginx_ingress.setdefault("webhook", {})["resources"] = {}
+        local_path_provisioner = plugins.setdefault("local-path-provisioner", {})
+        local_path_provisioner["resources"] = {}
 
-        kubernetes_dashboard = inventory.get("plugins", {}).get("kubernetes-dashboard", {})
-        if kubernetes_dashboard.get("install", False):
-            kubernetes_dashboard.setdefault("dashboard", {})["resources"] = {}
-            kubernetes_dashboard.setdefault("metrics-scraper", {})["resources"] = {}
+        nginx_ingress = plugins.setdefault("nginx-ingress-controller", {})
+        nginx_ingress.setdefault("controller", {})["resources"] = {"requests": {"cpu": "100m", "memory": "90Mi"}}
+        nginx_ingress.setdefault("webhook", {})["resources"] = {}
 
-        calico = inventory.get("plugins", {}).get("calico", {})
-        if calico.get("install", False):
-            calico.setdefault("node", {})["resources"] = {"requests": {"cpu": "250m"}}
-            calico.setdefault("typha", {})["resources"] = {}
-            calico.setdefault("kube-controllers", {})["resources"] = {}
+        kubernetes_dashboard = plugins.setdefault("kubernetes-dashboard", {})
+        kubernetes_dashboard.setdefault("dashboard", {})["resources"] = {}
+        kubernetes_dashboard.setdefault("metrics-scraper", {})["resources"] = {}
+
+        calico = plugins.setdefault("calico", {})
+        calico.setdefault("node", {})["resources"] = {"requests": {"cpu": "250m"}}
+        calico.setdefault("typha", {})["resources"] = {}
+        calico.setdefault("kube-controllers", {})["resources"] = {}
 
 
 class PluginsResourcesPatch(InventoryOnlyPatch):
