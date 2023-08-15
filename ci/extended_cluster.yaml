@@ -9,7 +9,18 @@ nodes:
   roles: ["balancer", "control-plane", "worker"]
   labels:
     test-label: label
-
+globals:
+  expect:
+    deployments:
+      retries: 45
+      timeout: 5
+    pods:
+      kubernetes:
+        retries: 30
+        timeout: 5
+      plugins:
+        retries: 300
+        timeout: 5
 vrrp_ips:
 - ip: "172.17.1.1"
 
