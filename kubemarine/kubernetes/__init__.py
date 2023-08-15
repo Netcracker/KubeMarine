@@ -35,6 +35,7 @@ from kubemarine.core.group import (
     NodeConfig, RunnersGroupResult, RunResult, CollectorCallback
 )
 from kubemarine.core.errors import KME
+from kubemarine.cri import containerd
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
@@ -797,9 +798,7 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
     first_control_plane.sudo(drain_cmd, hide=False)
 
     upgrade_cri_if_required(first_control_plane)
-
-    # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-    fix_flag_kubelet(cluster, first_control_plane)
+    fix_flag_kubelet(first_control_plane)
 
     first_control_plane.sudo(
         f"sudo kubeadm upgrade apply {version} {flags} && "
@@ -834,9 +833,7 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             node.sudo(drain_cmd, hide=False)
 
             upgrade_cri_if_required(node)
-
-            # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-            fix_flag_kubelet(cluster, node)
+            fix_flag_kubelet(node)
 
             node.sudo(
                 f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
@@ -871,9 +868,7 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         first_control_plane.sudo(drain_cmd, hide=False)
 
         upgrade_cri_if_required(node)
-
-        # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
-        fix_flag_kubelet(cluster, node)
+        fix_flag_kubelet(node)
 
         node.sudo(
             "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
@@ -921,7 +916,13 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
         else:
             group.sudo("crictl rm -fa", warn=True)
     else:
-        log.debug(f"{cri_impl} upgrade is not required")
+        log.debug(f"{cri_impl!r} package upgrade is not required")
+
+    # upgrade of sandbox_image is currently not supported for migrate_kubemarine
+    if cri_impl == 'containerd' and cluster.context["upgrade"]["required"].get('containerdConfig', False):
+        containerd.configure_containerd(group)
+    else:
+        log.debug(f"{cri_impl!r} configuration upgrade is not required")
 
 
 def verify_upgrade_versions(cluster: KubernetesCluster) -> None:
@@ -1320,22 +1321,40 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
             node.sudo(f'chmod 644 {patch_file}')
 
 
-def fix_flag_kubelet(cluster: KubernetesCluster, node: NodeGroup) -> None:
-    # Deprecated flag removal function for kubelet
-    kubeadm_file = "/var/lib/kubelet/kubeadm-flags.env"
+def fix_flag_kubelet(group: NodeGroup) -> bool:
+    kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
+    cluster = group.cluster
     version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    sandbox_image = containerd.get_sandbox_image(cluster.inventory['services']['cri'])
+    infra_image_flag = f"--pod-infra-container-image={sandbox_image}"
+    container_runtime_flag = '--container-runtime=remote'
 
-    if utils.version_key(version) < utils.version_key("v1.27.0"):
-        # Target version is lower than v1.27.0. Flag is actual and should not be removed.
-        return
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node.sudo(f"cat {kubeadm_flags_file}", callback=collector)
 
-    kubeadm_flags = node.sudo(f"cat {kubeadm_file}").get_simple_out()
-    if kubeadm_flags.find('--container-runtime=remote') != -1:
-        kubeadm_flags = kubeadm_flags.replace('--container-runtime=remote', '')
-        node.put(io.StringIO(kubeadm_flags), kubeadm_file, backup=True, sudo=True)
- 
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            kubeadm_flags = collector.result[node.get_host()].stdout
+            updated_kubeadm_flags = kubeadm_flags
+            if utils.version_key(version) >= utils.version_key("v1.27.0"):
+                # remove the deprecated kubelet flag for versions starting from 1.27.0
+                updated_kubeadm_flags = updated_kubeadm_flags.replace(container_runtime_flag, '')
 
-def _config_changer(config: str, word: str) -> str:
+            if infra_image_flag not in updated_kubeadm_flags:
+                # patch --pod-infra-container-image with target sandbox_image
+                updated_kubeadm_flags = config_changer(updated_kubeadm_flags, infra_image_flag)
+
+            if kubeadm_flags != updated_kubeadm_flags:
+                cluster.log.debug(f"Patching {kubeadm_flags_file} on {node.get_node_name()} node...")
+                node.put(io.StringIO(updated_kubeadm_flags), kubeadm_flags_file, backup=True, sudo=True)
+
+    # If file is changed on at least one node, last results will be not empty
+    return len(exe.get_last_results()) > 0
+
+
+def config_changer(config: str, word: str) -> str:
     equal_pos = word.find("=") + 1
     param_begin_pos = config.find(word[:equal_pos])
     if param_begin_pos != -1:

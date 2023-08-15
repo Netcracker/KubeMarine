@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from io import StringIO
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 import toml
 import yaml
@@ -119,6 +119,19 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
         default_merger.merge(inventory.setdefault("services", {}).setdefault("cri", {}), upgrade_config)
 
     return inventory
+
+
+def fetch_containerd_config(group: NodeGroup) -> Dict[str, dict]:
+    cluster = group.cluster
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            config_location = cluster.get_package_association_for_node(node.get_host(),
+                                                                       'containerd', 'config_location')
+            node.sudo(f'cat {config_location}', callback=collector)
+
+    return {host: toml.loads(config_string.stdout)
+            for host, config_string in collector.result.items()}
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
