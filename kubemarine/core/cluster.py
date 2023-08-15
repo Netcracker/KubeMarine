@@ -16,7 +16,7 @@ from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
 
 import yaml
 
-from kubemarine.core import log, utils, static
+from kubemarine.core import log, utils, static, connections
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.group import NodeGroup, NodeConfig
@@ -39,7 +39,7 @@ class KubernetesCluster(Environment):
         self.context = context
         self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
 
-        self._connection_pool: Optional[ConnectionPool] = None
+        self._connection_pool: ConnectionPool = connections.EMPTY_POOL
 
         self._logger = logger if logger is not None \
             else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
@@ -53,18 +53,18 @@ class KubernetesCluster(Environment):
         self._inventory = defaults.enrich_inventory(
             self, self.raw_inventory, make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
 
+        self._connection_pool = self.create_connection_pool(self.ips['all'])
+
     @property
     def inventory(self) -> dict:
         return self._inventory
 
     @property
     def connection_pool(self) -> ConnectionPool:
-        if self._connection_pool is None:
-            # Connection pool should be created for each cluster object,
-            # because it relies on partially enriched inventory
-            self._connection_pool = ConnectionPool(self.inventory)
-
         return self._connection_pool
+
+    def create_connection_pool(self, hosts: List[str]) -> ConnectionPool:
+        return ConnectionPool(self.inventory, hosts)
 
     @property
     def log(self) -> log.EnhancedLogger:

@@ -388,7 +388,7 @@ logging:
       format: "%(asctime)s %(levelname)s %(message)s"
     dump:
       level: verbose
-      format: "%(asctime)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"
+      format: "%(asctime)s %(thread)s %(levelname)s [%(module)s.%(funcName)s] %(message)s"
       colorize: False
       correct_newlines: True
 

@@ -15,12 +15,13 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict
 
 import yaml
 import ruamel.yaml
@@ -484,6 +485,49 @@ def _test_version(version: str, numbers_amount: int) -> List[int]:
 
     expected_pattern = 'v' + '.'.join('N+' for _ in range(numbers_amount))
     raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
+
+
+def parse_aligned_table(table_text: str) -> List[Dict[str, str]]:
+    """
+    Parse aligned table into the list of {header: cell} map.
+    The text with table can be initially produced, for example, by https://pkg.go.dev/text/tabwriter.
+
+    :param table_text: aligned table as string
+    :return: List of rows
+    """
+    rows = table_text.strip().split('\n')
+
+    # Parse headers and their positions. No leading or trailing spaces are expected in the line.
+    headers_line = rows[0]
+    headers = []
+    headers_pos = []
+    pos = 0
+    for match in re.finditer(r'\s+', headers_line):
+        headers_pos.append(pos)
+        span = match.span()
+        headers.append(headers_line[pos:span[0]])
+        pos = span[1]
+
+    headers_pos.append(pos)
+    headers.append(headers_line[pos:len(headers_line)])
+
+    # Parse each row in the table,
+    # provided that the columns start at the same positions as the headers
+    headers_num = len(headers)
+    data = []
+    for row_text in rows[1:]:
+        row = {}
+        for i, header in enumerate(headers):
+            if i == headers_num - 1:
+                cell = row_text[headers_pos[i]:]
+            else:
+                cell = row_text[headers_pos[i]:headers_pos[i+1]]
+
+            row[header] = cell.strip()
+
+        data.append(row)
+
+    return data
 
 
 class ClusterStorage:

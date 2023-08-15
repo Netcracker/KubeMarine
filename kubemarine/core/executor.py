@@ -30,6 +30,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 import invoke
 
 from kubemarine.core import log, static
+from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 
 
@@ -192,9 +193,12 @@ _T = TypeVar('_T', bound='RawExecutor')
 
 class RawExecutor:
 
-    def __init__(self, cluster: Environment, timeout: int = None) -> None:
+    def __init__(self, cluster: Environment, connection_pool: ConnectionPool = None, timeout: int = None) -> None:
         self.logger = cluster.log
-        self.connection_pool = cluster.connection_pool
+        if connection_pool is not None:
+            self.connection_pool = connection_pool
+        else:
+            self.connection_pool = cluster.connection_pool
         self.inventory = cluster.inventory
         self.timeout = timeout
         if timeout is None:
