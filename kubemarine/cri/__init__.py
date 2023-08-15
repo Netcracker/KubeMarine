@@ -21,17 +21,15 @@ from kubemarine.cri import docker, containerd
 
 
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get("initial_procedure") == "migrate_cri":
-        return inventory
-
     cri_impl = inventory['services']['cri']['containerRuntime']
-    if cri_impl == "docker":
-        forbidden_cri_sections = {"containerd": "containerdConfig"}
-    else:
-        forbidden_cri_sections = {"docker": "dockerConfig"}
-    for key, value in forbidden_cri_sections.items():
-        if value in cluster.raw_inventory.get('services', {}).get('cri', {}):
-            raise Exception(f"{key} is not used, please remove {value} config from `services.cri` section")
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        if cri_impl == "docker":
+            forbidden_cri_sections = {"containerd": "containerdConfig"}
+        else:
+            forbidden_cri_sections = {"docker": "dockerConfig"}
+        for key, value in forbidden_cri_sections.items():
+            if value in cluster.raw_inventory.get('services', {}).get('cri', {}):
+                raise Exception(f"{key} is not used, please remove {value} config from `services.cri` section")
 
     # Enrich containerdConfig
     if cri_impl == "containerd":
