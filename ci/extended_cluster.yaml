@@ -7,8 +7,6 @@ nodes:
   address: "172.17.0.1"
   internal_address: "172.17.0.1"
   roles: ["balancer", "control-plane", "worker"]
-  labels:
-    test-label: label
 vrrp_ips:
 - ip: "172.17.1.1"
 
@@ -26,13 +24,6 @@ plugins:
     install: true
   nginx-ingress-controller:
     install: true
-    controller:
-      nodeSelector:
-        test-label: label
-      tolerations:
-      - key: node-role.kubernetes.io/test-example
-        operator: Exists
-        effect: NoSchedule
   local-path-provisioner:
     install: true
   calico:
