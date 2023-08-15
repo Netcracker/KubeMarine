@@ -17,6 +17,7 @@ import sys
 import time
 from collections import OrderedDict
 import re
+from textwrap import dedent
 from typing import List, Dict, Optional
 
 import yaml
@@ -29,6 +30,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
 from kubemarine.core.resources import DynamicResources
+from kubemarine.cri import containerd
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -844,6 +846,43 @@ def etcd_health_status(cluster: KubernetesCluster) -> None:
         tc.success(results='healthy')
 
 
+def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
+    cri_impl: str = cluster.inventory['services']['cri']['containerRuntime']
+    with TestCase(cluster, '204', "Services", f"{cri_impl.capitalize()} Configuration Check") as tc:
+        if cluster.inventory['services']['cri']['containerRuntime'] != 'containerd':
+            # Check for docker is not yet implemented
+            return tc.success(results='valid')
+
+        expected_config = containerd.get_containerd_config_as_toml(cluster)
+        kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
+        actual_configs = containerd.fetch_containerd_config(kubernetes_nodes)
+
+        success = True
+        for node in kubernetes_nodes.get_ordered_members_list():
+            actual_config = actual_configs[node.get_host()]
+            diff = DeepDiff(actual_config, expected_config)
+            if diff:
+                cluster.log.debug(f"Configuration of containerd is not actual on {node.get_node_name()} node")
+                # Extra transformation to JSON is necessary,
+                # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
+                cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                success = False
+
+        if not success:
+            message = dedent(
+                """\
+                The configuration of the container runtime does not match
+                the effectively resolved configuration from the inventory.
+                Check DEBUG logs for details.
+                To have the check passed, you may need to call
+                `kubemarine install --tasks prepare.cri.configure`
+                or change the inventory file accordingly.
+                """.rstrip())
+            raise TestFailure('invalid', hint=message)
+        else:
+            tc.success(results='valid')
+
+
 def control_plane_configuration_status(cluster: KubernetesCluster) -> None:
     '''
     This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`
@@ -1360,6 +1399,7 @@ tasks = OrderedDict({
         'container_runtime': {
             'status': lambda cluster:
                 services_status(cluster, cluster.inventory['services']['cri']['containerRuntime']),
+            'configuration': container_runtime_configuration_check,
         },
         'kubelet': {
             'status': lambda cluster: services_status(cluster, 'kubelet'),
