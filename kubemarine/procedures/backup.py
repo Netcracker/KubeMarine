@@ -27,14 +27,14 @@ import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
-from typing import List, Tuple, Union, Dict, Literal, Optional, Iterator
+from typing import List, Tuple, Union, Dict, Optional, Iterator
+from typing_extensions import Literal
 
 import yaml
 
 from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 
