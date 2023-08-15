@@ -38,6 +38,28 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    cri_impl = inventory['services']['cri']['containerRuntime']
+    if cri_impl == "containerd":
+        return containerd.enrich_upgrade_inventory(inventory, cluster)
+
+    return inventory
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
+    if cri_impl == "containerd":
+        return containerd.upgrade_finalize_inventory(cluster, inventory)
+
+    return inventory
+
+
 def get_initial_cri_impl(inventory: dict) -> str:
     cri_impl: Optional[str] = inventory.get("services", {}).get("cri", {}).get("containerRuntime")
     if cri_impl is None:

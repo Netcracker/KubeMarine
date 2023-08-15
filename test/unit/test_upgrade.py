@@ -226,7 +226,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
                         cluster = self._new_cluster()
                         self.assertEqual(expected_upgrade_required,
-                                         cri in cluster.context['packages']['upgrade_required'],
+                                         cri in cluster.context["upgrade"]["required"]['packages'],
                                          f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
@@ -254,7 +254,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
                 cluster = self._new_cluster()
                 self.assertEqual(expected_upgrade_required,
-                                 'containerd' in cluster.context['packages']['upgrade_required'],
+                                 'containerd' in cluster.context["upgrade"]["required"]['packages'],
                                  f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def test_procedure_inventory_upgrade_required_inventory_redefined(self):
@@ -271,7 +271,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
                 cluster = self._new_cluster()
                 self.assertEqual(expected_upgrade_required,
-                                 'containerd' in cluster.context['packages']['upgrade_required'],
+                                 'containerd' in cluster.context["upgrade"]["required"]['packages'],
                                  f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def test_final_inventory_merge_packages(self):
@@ -467,6 +467,113 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         #     self._new_cluster()
 
 
+class UpgradeContainerdConfigEnrichment(unittest.TestCase):
+    def setUp(self):
+        self.old = 'v1.25.7'
+        self.new = 'v1.26.4'
+        self.inventory, self.context = generate_upgrade_environment(self.old)
+        self.context['upgrade_version'] = self.new
+        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
+                                                            os_name='ubuntu', os_version='20.04')
+        self.inventory['services']['cri'].setdefault('containerdConfig', {})\
+            .setdefault('plugins."io.containerd.grpc.v1.cri"', {})
+        set_cri(self.inventory, 'containerd')
+        self.upgrade: dict = {
+            'upgrade_plan': [self.new],
+            self.new: {
+                'cri': {
+                    'containerdConfig': {
+                        'plugins."io.containerd.grpc.v1.cri"': {},
+                    }
+                }
+            }
+        }
+
+    def _new_cluster(self):
+        return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
+                                context=self.context)
+
+    def _patch_globals(self, fake_version: str, *, equal=False):
+        package_compatibility = static.GLOBALS['compatibility_map']['software']['pause']
+        package_compatibility[self.old]["version"] = fake_version
+        if equal:
+            package_compatibility[self.new]["version"] = fake_version
+        else:
+            package_compatibility[self.new]["version"] = str(float(fake_version) + 0.1)
+
+    def _grpc_cri(self, services: dict) -> dict:
+        return services['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri"']
+
+    def test_enrich_and_finalize_inventory(self):
+        self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-redefined'
+        self._grpc_cri(self.upgrade[self.new])['sandbox_image'] = 'pause-new'
+
+        cluster = self._new_cluster()
+        sandbox_image = self._grpc_cri(cluster.inventory['services'])['sandbox_image']
+        self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
+
+        utils.stub_associations_packages(cluster, {})
+        finalized_inventory = cluster.make_finalized_inventory()
+        sandbox_image = self._grpc_cri(finalized_inventory['services'])['sandbox_image']
+        self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
+
+        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        sandbox_image = self._grpc_cri(final_inventory['services'])['sandbox_image']
+        self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
+
+    def test_require_sandbox_image_redefinition(self):
+        self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-redefined'
+        with utils.backup_globals(), \
+                utils.assert_raises_kme(self, "KME0013", previous_version_spec='.*', next_version_spec='.*'):
+            self._patch_globals('1.2', equal=True)
+            self._new_cluster()
+
+    def test_containerd_config_simple_upgrade_required(self):
+        with utils.backup_globals():
+            self._patch_globals('1.2', equal=False)
+            cluster = self._new_cluster()
+            self.assertEqual(True,
+                             cluster.context["upgrade"]["required"]['containerdConfig'],
+                             "Containerd config was not scheduled for upgrade")
+
+    def test_procedure_inventory_upgrade_required_inventory_default(self):
+        for procedure_version, expected_upgrade_required in (
+                ('1.2', False),
+                ('1.3', True),
+                ('1.4', True),
+        ):
+            with self.subTest(f"upgrade to {procedure_version}: {expected_upgrade_required}"), \
+                    utils.backup_globals():
+                self._patch_globals('1.2', equal=False)
+
+                self.setUp()
+                self._grpc_cri(self.upgrade[self.new])['sandbox_image'] = f'registry.k8s.io/pause:{procedure_version}'
+
+                cluster = self._new_cluster()
+                self.assertEqual(expected_upgrade_required,
+                                 cluster.context["upgrade"]["required"]['containerdConfig'],
+                                 f"Containerd config was {'not' if expected_upgrade_required else 'unexpectedly'} "
+                                 f"scheduled for upgrade")
+
+    def test_procedure_inventory_upgrade_required_inventory_redefined(self):
+        for procedure_pause, expected_upgrade_required in (
+                ('pause-inventory', False),
+                ('pause-redefined', True)
+        ):
+            with self.subTest(f"upgrade: {expected_upgrade_required}"), utils.backup_globals():
+                self._patch_globals('1.2', equal=True)
+
+                self.setUp()
+                self._grpc_cri(self.inventory['services'])['sandbox_image'] = 'pause-inventory'
+                self._grpc_cri(self.upgrade[self.new])['sandbox_image'] = procedure_pause
+
+                cluster = self._new_cluster()
+                self.assertEqual(expected_upgrade_required,
+                                 cluster.context["upgrade"]["required"]['containerdConfig'],
+                                 f"Containerd config was {'not' if expected_upgrade_required else 'unexpectedly'} "
+                                 f"scheduled for upgrade")
+
+
 class InventoryRecreation(unittest.TestCase):
     def prepare_inventory(self, upgrade_plan: List[str]):
         self.old = 'v1.24.2'
@@ -484,6 +591,10 @@ class InventoryRecreation(unittest.TestCase):
     def package_names(self, services: dict, package: str, package_names) -> None:
         services.setdefault('packages', {}).setdefault('associations', {}) \
             .setdefault(package, {})['package_name'] = package_names
+
+    def sandbox_image(self, services: dict, sandbox_image: str) -> None:
+        services.setdefault('cri', {}).setdefault('containerdConfig', {})\
+            .setdefault('plugins."io.containerd.grpc.v1.cri"', {})['sandbox_image'] = sandbox_image
 
     def run_actions(self):
         self.resources = demo.FakeResources(self.context, self.inventory,
@@ -529,6 +640,19 @@ class InventoryRecreation(unittest.TestCase):
                          "Source of /usr/bin/calicoctl was not redefined in recreated inventory.")
         self.assertEqual('fake-sha1', actual_thirdparty['sha1'],
                          "sha1 of /usr/bin/calicoctl was not redefined in recreated inventory.")
+
+    def test_iterative_sandbox_image_redefinition(self):
+        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        set_cri(self.inventory, 'containerd')
+        self.sandbox_image(self.upgrade['v1.25.2'], 'A')
+        self.sandbox_image(self.upgrade['v1.25.7'], 'B')
+
+        self.run_actions()
+
+        actual_image = self.resources.stored_inventory['services']['cri']['containerdConfig']\
+            ['plugins."io.containerd.grpc.v1.cri"']['sandbox_image']
+        self.assertEqual('B', actual_image,
+                         "Containerd config was not redefined in recreated inventory.")
 
 
 if __name__ == '__main__':

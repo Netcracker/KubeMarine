@@ -910,7 +910,7 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
     log = cluster.log
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
 
-    if cri_impl in cluster.context["packages"]["upgrade_required"]:
+    if cri_impl in cluster.context["upgrade"]["required"]['packages']:
         cri_packages = cluster.get_package_association_for_node(group.get_host(), cri_impl, 'package_name')
 
         log.debug(f"Installing {cri_packages} on node: {group.get_node_name()}")

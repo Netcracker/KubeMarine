@@ -144,7 +144,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
     _verify_upgrade_plan(cluster_associations, previous_version, packages_verify, upgrade_plan)
 
     upgrade_required = get_system_packages_for_upgrade(cluster, inventory)
-    context["packages"] = {"upgrade_required": upgrade_required}
+    context.setdefault("upgrade", {}).setdefault('required', {})['packages'] = upgrade_required
 
     # Merge procedure associations with the OS family specific section of associations in the inventory.
     upgrade_inventory_associations(cluster, inventory, enrich_global=False)
