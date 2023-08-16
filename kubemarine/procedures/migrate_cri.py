@@ -218,6 +218,11 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         else:
             control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
 
+        if is_control_plane:
+            kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
+            # check ETCD health
+            etcd.wait_for_health(cluster, node)
+
         packages_list = []
         for package_name in docker_associations['package_name']:
             if not package_name.startswith('containerd'):
