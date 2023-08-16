@@ -46,7 +46,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
             upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version])
 
     def test_incorrect_inventory_high_range(self):
-        old_kubernetes_version = 'v1.22.9'
+        old_kubernetes_version = 'v1.23.6'
         new_kubernetes_version = 'v1.24.2'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
@@ -54,7 +54,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_incorrect_inventory_downgrade(self):
         old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.22.9'
+        new_kubernetes_version = 'v1.23.6'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])

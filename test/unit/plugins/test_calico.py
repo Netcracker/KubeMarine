@@ -27,8 +27,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.commonSetUp('calico')
         # Requires calico v3.24.x
         self.k8s_latest = self.get_latest_k8s()
-        # Requires calico v3.22.x
-        self.k8s_1_21_x = self.get_latest_k8s("v1.21")
 
     def _enable_typha(self, k8s_version: str, enable: bool):
         inventory = self.inventory(k8s_version)
