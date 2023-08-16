@@ -166,16 +166,6 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
             raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
     except ValueError:
         raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
-        
-    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-    if "v1.21" in inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        # use first control plane internal address as a default bind-address
-        # for other control-planes we override it during initialization
-        # todo: use patches approach for node-specific options
-        for node in inventory["nodes"]:
-            if "control-plane" in node["roles"] and "remove_node" not in node["roles"]:
-                inventory["services"]["kubeadm"]['apiServer']['extraArgs']['bind-address'] = node['internal_address']
-                break
 
     # validate nodes in kubeadm_patches (groups are validated with JSON schema)
     for node in inventory["nodes"]:
@@ -426,33 +416,15 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
     # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
     log.debug('Joining control-plane \'%s\'...' % node_name)
 
-    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-    # and only "else" branch remains
-    if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        node.sudo(
-            "kubeadm join "
-            " --config=/etc/kubernetes/join-config.yaml"
-            " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-            " --v=5",
-            hide=False)
-
-        log.debug("Patching apiServer bind-address for control-plane %s" % node_name)
-
-        defer.sudo("sed -i 's/--bind-address=.*$/--bind-address=%s/' "
-                   "/etc/kubernetes/manifests/kube-apiserver.yaml" % node_config['internal_address'])
-        defer.sudo("systemctl restart kubelet")
-        copy_admin_config(log, defer)
-        defer.flush()
-    else:
-        node.sudo(
-            "kubeadm join "
-            " --config=/etc/kubernetes/join-config.yaml "
-            " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
-            " --v=5",
-            hide=False)
-        defer.sudo("systemctl restart kubelet")
-        copy_admin_config(log, defer)
-        defer.flush()
+    node.sudo(
+        "kubeadm join "
+        " --config=/etc/kubernetes/join-config.yaml "
+        " --ignore-preflight-errors='" + cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors'] + "'"
+        " --v=5",
+        hide=False)
+    defer.sudo("systemctl restart kubelet")
+    copy_admin_config(log, defer)
+    defer.flush()
 
     wait_for_any_pods(cluster, node, apply_filter=node_name)
 
@@ -814,13 +786,8 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
 
     # put control-plane patches
     create_kubeadm_patches_for_node(cluster, first_control_plane)
-    
-    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-    # and only "else" branch remains
-    if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s'" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
-    else:
-        flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s' --patches=/etc/kubernetes/patches" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
+
+    flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s' --patches=/etc/kubernetes/patches" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
 
     patch_kubeadm_configmap(first_control_plane, cluster)
     flags += " --config /tmp/kubeadm_config.yaml"
@@ -870,22 +837,11 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
             fix_flag_kubelet(cluster, node)
 
-            # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-            # and only "else" branch remains
-            if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-                node.sudo(
-                    f"sudo kubeadm upgrade node --certificate-renewal=true && "
-                    f"sudo sed -i 's/--bind-address=.*$/--bind-address={node.get_config()['internal_address']}/' "
-                    f"/etc/kubernetes/manifests/kube-apiserver.yaml && "
-                    f"sudo kubectl uncordon {node_name} && "
-                    f"sudo systemctl restart kubelet",
-                    hide=False)
-            else:
-                node.sudo(
-                    f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-                    f"sudo kubectl uncordon {node_name} && "
-                    f"sudo systemctl restart kubelet",
-                    hide=False)
+            node.sudo(
+                f"sudo kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
+                f"sudo kubectl uncordon {node_name} && "
+                f"sudo systemctl restart kubelet",
+                hide=False)
 
             expect_kubernetes_version(cluster, version, apply_filter=node_name)
             copy_admin_config(cluster.log, node)
@@ -958,16 +914,9 @@ def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drai
         # The procedure for removing the deprecated kubelet flag for versions older than 1.27.0
         fix_flag_kubelet(cluster, node)
 
-        # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-        # and only "else" branch remains
-        if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-            node.sudo(
-                "kubeadm upgrade node --certificate-renewal=true && "
-                "sudo systemctl restart kubelet")
-        else:
-            node.sudo(
-                "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
-                "sudo systemctl restart kubelet")
+        node.sudo(
+            "kubeadm upgrade node --certificate-renewal=true --patches=/etc/kubernetes/patches && "
+            "sudo systemctl restart kubelet")
 
         first_control_plane.sudo("kubectl uncordon %s" % node_name, hide=False)
 
@@ -1385,11 +1334,6 @@ def get_patched_flags_for_control_plane_item(inventory: dict, control_plane_item
 def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup) -> None:
     cluster.log.verbose(f"Create and upload kubeadm patches to %s..." % node.get_node_name())
     node.sudo('sudo rm -rf /etc/kubernetes/patches ; sudo mkdir -p /etc/kubernetes/patches', warn=True)
-
-    # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-    if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        # do nothing, patches are supported since v1.22
-        return
 
     control_plane_patch_files = {
         'apiServer' : 'kube-apiserver+json.json',

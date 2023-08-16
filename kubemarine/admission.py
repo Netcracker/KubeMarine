@@ -86,7 +86,7 @@ def enrich_inventory_pss(inventory: dict, _: KubernetesCluster) -> dict:
             verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
     # add extraArgs to kube-apiserver config
-    if minor_version > 26:
+    if minor_version > 27:
         if enabled_admissions:
             inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
             inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path

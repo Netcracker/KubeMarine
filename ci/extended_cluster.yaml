@@ -9,6 +9,7 @@ nodes:
   roles: ["balancer", "control-plane", "worker"]
   labels:
     test-label: label
+
 vrrp_ips:
 - ip: "172.17.1.1"
 
