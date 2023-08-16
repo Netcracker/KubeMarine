@@ -206,38 +206,26 @@ def system_prepare_policy(group: NodeGroup) -> None:
             node_config = control_plane.get_config()
             config_new = kubernetes.get_kubeadm_config(cluster.inventory)
 
-            # TODO: when k8s v1.21 is excluded from Kubemarine, this condition should be removed
-            # and only "else" branch remains
-            if "v1.21" in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-                control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-
-                control_plane.sudo(
-                    f"kubeadm init phase control-plane apiserver "
-                    f"--config=/etc/kubernetes/audit-on-config.yaml && "
-                    f"sudo sed -i 's/--bind-address=.*$/--bind-address="
-                    f"{node_config['internal_address']}/' "
-                    f"/etc/kubernetes/manifests/kube-apiserver.yaml")
-            else:
-                # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
-                init_config = {
-                    'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
-                    'kind': 'InitConfiguration',
-                    'localAPIEndpoint': {
-                        'advertiseAddress': node_config['internal_address']
-                    },
-                    'patches': {
-                        'directory': '/etc/kubernetes/patches'
-                    }
+            # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
+            init_config = {
+                'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
+                'kind': 'InitConfiguration',
+                'localAPIEndpoint': {
+                    'advertiseAddress': node_config['internal_address']
+                },
+                'patches': {
+                    'directory': '/etc/kubernetes/patches'
                 }
+            }
 
-                config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
+            config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
-                control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+            control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
 
-                kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
+            kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
 
-                control_plane.sudo(f"kubeadm init phase control-plane apiserver "
-                                   f"--config=/etc/kubernetes/audit-on-config.yaml ")
+            control_plane.sudo(f"kubeadm init phase control-plane apiserver "
+                                f"--config=/etc/kubernetes/audit-on-config.yaml ")
 
             if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
                 control_plane.call(utils.wait_command_successful,

@@ -854,8 +854,6 @@ def patch_kubeadm_configmap(first_control_plane: NodeGroup, cluster: KubernetesC
     Checks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
     and the corresponding version of the CoreDNS path to the image.
     '''
-    # TODO: get rid of this method after k8s 1.21 support stop
-    current_kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
     kubeadm_config_map = first_control_plane.sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
         .get_simple_out()
     ryaml = ruamel.yaml.YAML()
@@ -863,25 +861,10 @@ def patch_kubeadm_configmap(first_control_plane: NodeGroup, cluster: KubernetesC
     cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
     cluster_config = ryaml.load(cluster_configuration_yaml)
 
-    if not cluster_config.get("dns"):
-        cluster_config["dns"] = {}
-
     updated_config = io.StringIO()
 
     cluster_config["apiServer"]["extraArgs"]["audit-log-path"] = \
         cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
-
-    if cluster.context.get('patch_image_repo', False):
-        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace('/k8s.gcr.io', '')
-
-    new_image_repo_port = cluster.context.get('patch_image_repo_port', '')
-    old_image_repo_port = cluster.context.get('old_image_repo_port', '')
-    if new_image_repo_port and old_image_repo_port:
-        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace('/k8s.gcr.io', '')
-        cluster_config["imageRepository"] = cluster_config["imageRepository"].replace(old_image_repo_port,
-                                                                                      new_image_repo_port)
-
-    cluster_config['dns']['imageRepository'] = "%s/coredns" % cluster_config["imageRepository"]
 
     kubelet_config = first_control_plane.sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
     ryaml.dump(cluster_config, updated_config)
