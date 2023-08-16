@@ -131,13 +131,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                                      f"calico for should have {expected_num_resources} typha resources")
 
     def test_daemonset_calico_node_specific_images(self):
-        inventory = self._inventory_custom_registry(self.k8s_1_21_x)
-        cluster = demo.new_cluster(inventory)
-        manifest = self.enrich_yaml(cluster)
-        init_containers = self.get_obj(manifest, "DaemonSet_calico-node")['spec']['template']['spec']['initContainers']
-        expected_image = f"example.registry/calico/pod2daemon-flexvol:{self.expected_image_tag(self.k8s_1_21_x, 'version')}"
-        self.assertTrue(any(1 for c in init_containers if c['name'] == 'flexvol-driver' and c['image'] == expected_image),
-                        f"flexvol-driver init container with {expected_image} image is not found")
 
         inventory = self._inventory_custom_registry(self.k8s_latest)
         cluster = demo.new_cluster(inventory)
@@ -287,8 +280,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def test_all_images_contain_registry(self):
         for k8s_version, typha_enabled, expected_num_images in (
-            (self.k8s_1_21_x, False, 4),
-            (self.k8s_1_21_x, True, 5),
             (self.k8s_latest, False, 3),
             (self.k8s_latest, True, 4),
         ):

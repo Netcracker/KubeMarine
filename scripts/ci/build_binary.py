@@ -29,7 +29,7 @@ def call(args: List[str]) -> None:
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.
 # https://github.com/pypa/pip/blob/23.0/docs/html/user_guide.rst#using-pip-from-your-program
-call([sys.executable, '-m', 'pip', 'install', 'pip==23.0'])
+call([sys.executable, '-m', 'pip', 'install', 'pip==23.2.1'])
 
 target_arch = None
 if len(sys.argv) > 1:
