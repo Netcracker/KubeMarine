@@ -124,10 +124,6 @@ def upgrade_containerd(cluster: KubernetesCluster) -> None:
             cluster.inventory["services"]["cri"]['containerdConfig'][path]["sandbox_image"] = sandbox
             config_string = ""
             containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-            runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-            if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-                containerd_config[runc_options_path]['SystemdCgroup'] = \
-                    bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
             for key, value in containerd_config.items():
                 # first we process all "simple" `key: value` pairs
                 if not isinstance(value, dict):

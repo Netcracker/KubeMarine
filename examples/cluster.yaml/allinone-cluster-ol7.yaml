@@ -66,8 +66,7 @@ services:
     associations:
       containerd:
         package_name:
-          - 'containerd.io-1.4.6*'    
-          - 'podman-1.4.4*'
+          - 'containerd.io-1.4.6*'
         
 rbac:
   accounts:

@@ -167,7 +167,7 @@ class SynchronizationTest(unittest.TestCase):
                             f"Kubernetes versions for {k8s_image!r} are not sorted")
 
     def _check_added_packages(self, ver: str, from_ver: str):
-        for package in ('docker', 'containerd', 'containerdio', 'podman'):
+        for package in ('docker', 'containerd', 'containerdio'):
             software_mapping = self.compatibility.stored['packages.yaml'][package]
             actual_mapping = software_mapping.get(ver, {})
             original_mapping = ORIGINAL_COMPATIBILITY_MAPS['packages.yaml'][package][from_ver]
