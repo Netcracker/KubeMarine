@@ -15,22 +15,27 @@
 
 
 import datetime
+import gzip
 import io
 import json
 import os
-import random
 import shutil
 import tarfile
+import threading
 import time
+import uuid
 from collections import OrderedDict
-from typing import List, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+from typing import List, Tuple, Union, Dict, Optional, Iterator
+from typing_extensions import Literal
 
 import yaml
 
 from kubemarine.core import utils, flow, log
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
+from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.core.resources import DynamicResources
 
 
@@ -252,136 +257,401 @@ def export_kubernetes_version(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['kubernetes']['version'] = version.strip()
 
 
-# There is no way to parallel resources connection via Queue or Pool:
-# the ssh connection is not possible to parallelize due to thread lock
-def download_resources(logger: log.EnhancedLogger, resources: List[str], location: str, control_plane: NodeGroup,
-                       namespace: str = None) -> List[str]:
+def _load_namespaces(logger: log.EnhancedLogger, control_plane: NodeGroup) -> List[Dict[str, str]]:
+    namespaces_result = control_plane.sudo(
+        'kubectl get ns -o jsonpath=\'{range .items[*]}{.metadata.name}{"\\n"}{end}\'')
+    logger.verbose(namespaces_result)
+    parsed_namespaces = namespaces_result.get_simple_out().strip().split('\n')
+    return [{'name': name} for name in parsed_namespaces]
 
-    if namespace:
-        logger.debug('Downloading resources from namespace "%s"...' % namespace)
 
-    actual_resources: List[str] = []
+def _load_resources(logger: log.EnhancedLogger, control_plane: NodeGroup, namespaced: bool) -> List[Dict[str, str]]:
+    resources_result = control_plane.sudo(f'kubectl api-resources --verbs=list --sort-by=name '
+                                          f'--namespaced{"" if namespaced else "=false"}')
+    logger.verbose(resources_result)
+    resources_table = utils.parse_aligned_table(resources_result.get_simple_out())
 
-    if not resources:
-        logger.debug('No resources found to download')
-        return actual_resources
+    resources = [
+        {
+            'name': _resolve_full_resource_name(row['NAME'], row['APIVERSION']),
+            'kind': row['KIND'],
+            'apiVersion': row['APIVERSION'],
+        }
+        for row in resources_table
+    ]
 
-    cmd = ''
-    resource_separator = ''.join(random.choice('=-_') for _ in range(32))
+    return [r for r in resources if r['name'] not in ('events.events.k8s.io', 'events')]
 
-    for resource in resources:
-        if cmd != '':
-            cmd += ' && echo \'\n' + resource_separator + '\n\' && '
-        if namespace:
-            cmd += 'sudo kubectl -n %s get --ignore-not-found %s -o yaml' % (namespace, resource)
+
+def _resolve_full_resource_name(name: str, apiversion: str) -> str:
+    if '/' not in apiversion:
+        return name
+
+    return name + '.' + apiversion[0:apiversion.rindex('/')]
+
+
+def _filter_resources_by_proposed(logger: log.EnhancedLogger,
+                                  loaded_resources: List[Dict[str, str]],
+                                  proposed_resources: Union[List[str], Literal['all']],
+                                  kind: str) -> List[Dict[str, str]]:
+    resources = []
+    for resource in loaded_resources:
+        name = resource['name']
+        if proposed_resources == 'all' or name in proposed_resources:
+            resources.append(resource)
         else:
-            cmd += 'sudo kubectl get --ignore-not-found %s -o yaml' % resource
+            logger.verbose(f'{kind.capitalize()} "{name}" excluded')
 
-    result = control_plane.sudo(cmd).get_simple_out()
-    control_plane.cluster.log.verbose(result)
+    if proposed_resources != 'all':
+        for proposed_resource in proposed_resources:
+            if not any(proposed_resource == resource['name'] for resource in resources):
+                raise Exception(f'Proposed {kind} "{proposed_resource}" not found in loaded cluster {kind}s')
 
-    found_resources_results = result.split(resource_separator)
-    for i, result in enumerate(found_resources_results):
-        resource = resources[i]
-        resource_file_path = os.path.join(location, '%s.yaml' % resource)
-        result = result.strip()
-        if result and result != '':
-            actual_resources.append(resource)
-            utils.dump_file({}, result, resource_file_path, dump_location=False)
+    logger.debug([r['name'] for r in resources])
+    return resources
 
-    return actual_resources
+
+class ParserPayload:
+    def __init__(self, event: str, resource_path: str, namespace: Optional[str]):
+        self.event = event
+        self.resource_path = resource_path
+        self.namespace = namespace
+
+
+class ExportKubernetesParser:
+    def __init__(self,
+                 logger: log.EnhancedLogger,
+                 backup_directory: str,
+                 namespaced_resources: List[Dict[str, str]],
+                 nonnamespaced_resources: List[Dict[str, str]],
+                 graceful_finish_barrier: int,
+                 ):
+        self.logger = logger
+        self.backup_directory = backup_directory
+        self.namespaced_resources = namespaced_resources
+        self.nonnamespaced_resources = nonnamespaced_resources
+        self.namespaced_resources_result_map: Dict[str, List[str]] = {}
+        self.nonnamespaced_resources_result: List[str] = []
+        self.closed = False
+        self.elapsed: float = 0
+        self.total_files = 0
+        self._graceful_finish_barrier = graceful_finish_barrier
+        self._task_queue: 'Queue[ParserPayload]' = Queue()
+        self._lock = threading.Lock()
+
+    def schedule(self, payload: ParserPayload) -> None:
+        with self._lock:
+            if not self.closed:
+                self._task_queue.put(payload)
+            else:
+                self._clear(payload)
+
+    def finish(self, graceful: bool) -> None:
+        with self._lock:
+            self._graceful_finish_barrier -= 1
+            if not self.closed and (self._graceful_finish_barrier == 0 or not graceful):
+                self._task_queue.put(ParserPayload("end", "", None))
+                self._graceful_finish_barrier = 0
+
+    def run(self) -> None:
+        try:
+            while True:
+                payload = self._task_queue.get()
+                if payload.event == 'end':
+                    return
+
+                start = time.time()
+                self._handle(payload)
+                # do not clear the currently processing payload in case of exception
+                self._clear(payload)
+                self.elapsed += (time.time() - start)
+        finally:
+            with self._lock:
+                self.closed = True
+                # Queue might be not empty in case of exception. Need to clear all pending payloads
+                for payload in self._task_queue.queue:
+                    self._clear(payload)
+
+    @staticmethod
+    def _clear(payload: ParserPayload) -> None:
+        if payload.event == 'do':
+            os.remove(payload.resource_path)
+
+    def _parse_identity(self, line: str, api_version: str, kind: str) -> Tuple[str, str]:
+        if kind == '':
+            kind = self._parse_single_line_property(line, 'kind')
+        if api_version == '':
+            api_version = self._parse_single_line_property(line, 'apiVersion')
+
+        return api_version, kind
+
+    @staticmethod
+    def _parse_single_line_property(line: str, key: str) -> str:
+        item_prop = line[2:]
+        val = ''
+        if item_prop.startswith(f'{key}:'):
+            val = yaml.safe_load(item_prop)[key]
+
+        return val
+
+    def _handle(self, payload: ParserPayload) -> None:
+        namespace = payload.namespace
+        if namespace:
+            self.logger.debug(f"Loading resources from namespace {namespace!r}...")
+        else:
+            self.logger.debug(f"Loading non-namespaced resources...")
+
+        resources = self.nonnamespaced_resources if namespace is None else self.namespaced_resources
+        items_by_resource: Dict[str, List[str]] = {}
+
+        def append_item(api_version: str, kind: str, item: str) -> None:
+            resource_name = next(r['name'] for r in resources if r['apiVersion'] == api_version and r['kind'] == kind)
+            items_by_resource.setdefault(resource_name, []).append(item)
+
+        with gzip.open(payload.resource_path, 'rt', encoding='utf-8') as file:
+            header = ''
+            remainder = ''
+            item = ''
+            api_version, kind = '', ''
+            stage = 'header'
+            for line in file:
+                if stage == 'header':
+                    if line.startswith('- '):
+                        stage = 'items'
+                        item = line
+                        api_version, kind = self._parse_identity(line, '', '')
+                    else:
+                        header += line
+                elif stage == 'items':
+                    if line.startswith('- '):
+                        append_item(api_version, kind, item)
+                        item = line
+                        api_version, kind = self._parse_identity(line, '', '')
+                    elif not line[0].isspace():
+                        stage = 'remainder'
+                        append_item(api_version, kind, item)
+                        remainder = line
+                    else:
+                        item += line
+                        api_version, kind = self._parse_identity(line, api_version, kind)
+                elif stage == 'remainder':
+                    remainder += line
+
+        for resource in resources:
+            resource_name = resource['name']
+            items = items_by_resource.get(resource_name)
+            if items is None:
+                continue
+
+            location = os.path.join(self.backup_directory, 'kubernetes_resources')
+            if namespace is not None:
+                location = os.path.join(location, namespace)
+
+            os.makedirs(location, exist_ok=True)
+
+            resource_file_path = os.path.join(location, '%s.yaml' % resource_name)
+            self.logger.verbose(
+                f"Dumping list of resource {resource_name!r}"
+                f"{'' if namespace is None else (' for namespace ' + repr(namespace))}...")
+            with utils.open_utf8(resource_file_path, 'w') as file:
+                file.write(header)
+                for item in items:
+                    file.write(item)
+                file.write(remainder)
+
+            if namespace is None:
+                self.nonnamespaced_resources_result.append(resource_name)
+            else:
+                self.namespaced_resources_result_map.setdefault(namespace, []).append(resource_name)
+
+            self.total_files += 1
+
+
+class DownloaderPayload:
+    def __init__(self, namespace: Optional[str], resources: List[str]):
+        self.namespace = namespace
+        self.resources = resources
+
+
+class DownloaderTasksQueue(Iterator[DownloaderPayload]):
+    def __init__(self,
+                 namespaces: List[Dict[str, str]],
+                 namespaced_resources: List[Dict[str, str]],
+                 nonnamespaced_resources: List[Dict[str, str]]
+                 ):
+        self.namespaces = namespaces
+        self.namespaced_resources = namespaced_resources
+        self.nonnamespaced_resources = nonnamespaced_resources
+        self._tasks = self._unsafe_tasks()
+        self._lock = threading.Lock()
+
+    def __next__(self) -> DownloaderPayload:
+        with self._lock:
+            return next(self._tasks)
+
+    def _unsafe_tasks(self) -> Iterator[DownloaderPayload]:
+        yield DownloaderPayload(None, [r['name'] for r in self.nonnamespaced_resources])
+
+        for namespace in self.namespaces:
+            yield DownloaderPayload(namespace['name'], [r['name'] for r in self.namespaced_resources])
+
+
+class DownloadException(Exception):
+    def __init__(self, task: DownloaderPayload, reason: BaseException):
+        self.task = task
+        self.reason = reason
+
+
+class ExportKubernetesDownloader:
+    def __init__(self,
+                 backup_directory: str,
+                 control_plane: NodeGroup,
+                 cluster: KubernetesCluster,
+                 tasks_queue: Iterator[DownloaderPayload],
+                 parser: ExportKubernetesParser,
+                 ):
+        self.backup_directory = backup_directory
+        self.control_plane = control_plane
+        self.connection_pool = cluster.create_connection_pool(control_plane.get_hosts())
+        self.tasks_queue = tasks_queue
+        self.parser = parser
+        self.elapsed: float = 0
+
+    def run(self) -> None:
+        start = time.time()
+        task: Optional[DownloaderPayload] = None
+        try:
+            while True:
+                if self.parser.closed:
+                    # No need to continue as the parser is already closed due to error.
+                    break
+
+                task = next(self.tasks_queue, None)
+                if task is None:
+                    break
+
+                random = uuid.uuid4().hex
+                temp_local_filepath = os.path.join(self.backup_directory, random)
+                self._download(task, temp_local_filepath)
+
+                self.parser.schedule(ParserPayload("do", temp_local_filepath, task.namespace))
+        except BaseException as e:
+            self.parser.finish(graceful=False)
+            if task is not None:
+                raise DownloadException(task, e)
+            else:
+                raise
+        else:
+            self.parser.finish(graceful=True)
+        finally:
+            self.elapsed = time.time() - start
+            self.connection_pool.close()
+
+    def _download(self, task: DownloaderPayload, temp_local_filepath: str) -> None:
+        namespace = task.namespace
+        temp_remote_filepath = f"/tmp/{os.path.basename(temp_local_filepath)}"
+
+        cmd = f'(set -o pipefail && sudo kubectl ' \
+              f'{"" if namespace is None else ("-n " + namespace + " ")}' \
+              f'get --ignore-not-found ' \
+              f'{",".join(r for r in task.resources)} ' \
+              f'-o yaml | gzip -c) > {temp_remote_filepath}'
+
+        # Use own connection instance to run commands
+        with RemoteExecutor(self.control_plane, self.connection_pool) as exe:
+            group = exe.group
+            group.run(cmd)
+            group.get(temp_remote_filepath, temp_local_filepath)
+            group.sudo(f'rm {temp_remote_filepath}')
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
     backup_directory = prepare_backup_tmpdir(cluster)
     control_plane = cluster.nodes['control-plane'].get_any_member()
+    backup_kubernetes = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {})
+    logger = cluster.log
 
-    cluster.log.debug('Loading namespaces:')
-    namespaces_result = control_plane.sudo('kubectl get ns -o yaml')
-    cluster.log.verbose(namespaces_result)
-    namespaces_string = list(namespaces_result.values())[0].stdout.strip()
-    namespaces_yaml = yaml.safe_load(namespaces_string)
+    logger.debug('Loading namespaces:')
+    loaded_namespaces = _load_namespaces(logger, control_plane)
+    proposed_namespaces = backup_kubernetes.get('namespaced_resources', {}).get('namespaces', 'all')
+    namespaces = _filter_resources_by_proposed(logger, loaded_namespaces, proposed_namespaces, 'namespace')
 
-    proposed_namespaces = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('namespaced_resources', {}).get('namespaces', 'all')
-    namespaces = []
-    for item in namespaces_yaml['items']:
-        name = item['metadata']['name']
-        if proposed_namespaces == 'all' or name in proposed_namespaces:
-            cluster.log.verbose('Namespace "%s" added' % name)
-            namespaces.append(name)
-        else:
-            cluster.log.verbose('Namespace "%s" excluded' % name)
+    logger.debug('Loading namespaced resource types:')
+    loaded_resources = _load_resources(logger, control_plane, True)
+    proposed_resources = backup_kubernetes.get('namespaced_resources', {}).get('resources', 'all')
+    namespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
-    if proposed_namespaces != 'all':
-        for proposed_namespace in proposed_namespaces:
-            if proposed_namespace not in namespaces:
-                raise Exception('Proposed namespace "%s" not found in loaded cluster namespaces' % proposed_namespace)
+    logger.debug('Loading non-namespaced resource types:')
+    loaded_resources = _load_resources(logger, control_plane, False)
+    proposed_resources = backup_kubernetes.get('nonnamespaced_resources', 'all')
+    nonnamespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
-    cluster.log.debug(namespaces)
-    kubernetes_res_dir = os.path.join(backup_directory, 'kubernetes_resources')
-    os.mkdir(kubernetes_res_dir)
+    logger.debug('Loading resources:')
+    start = time.time()
 
-    cluster.log.debug('Loading namespaced resources:')
-    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced -o name '
-                                   '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
-    cluster.log.verbose(resources_result)
-    parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
-    proposed_resources = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('namespaced_resources', {}).get('resources', 'all')
+    # Processing of the particular resource includes
+    # 1. downloading of the `kubectl` result (mostly IO)
+    # 2. parsing and splitting it into files (can potentially consume CPU)
+    control_planes = cluster.nodes['control-plane']
+    downloaders_per_control_plane = 2
 
-    resources = [resource for resource in parsed_resources if proposed_resources == 'all' or resource in proposed_resources]
+    parser = ExportKubernetesParser(logger, backup_directory, namespaced_resources, nonnamespaced_resources,
+                                    control_planes.nodes_amount() * downloaders_per_control_plane)
+    downloader_queue = DownloaderTasksQueue(namespaces, namespaced_resources, nonnamespaced_resources)
+    downloaders = [
+        ExportKubernetesDownloader(backup_directory, control_plane, cluster,
+                                   downloader_queue, parser)
+        for _ in range(downloaders_per_control_plane)
+        for control_plane in control_planes.get_ordered_members_list()
+    ]
 
-    for resource in parsed_resources:
-        if resource not in resources:
-            cluster.log.verbose('Resource "%s" excluded' % resource)
+    logger.debug(f'Using {len(downloaders)} workers to download resources.')
 
-    if proposed_resources != 'all':
-        for proposed_resource in proposed_resources:
-            if proposed_resource not in resources:
-                raise Exception('Proposed resource "%s" not found in loaded cluster resources' % proposed_resource)
+    with ThreadPoolExecutor(max_workers=len(downloaders) + 1) as tpe:
+        downloaders_async = [tpe.submit(downloader.run) for downloader in downloaders]
+        parser_async = tpe.submit(parser.run)
 
-    cluster.log.debug(resources)
+        def _graceful_shutdown_downloaders() -> Optional[BaseException]:
+            # Although parser may exit successfully, not all resources might be processed due to errors in downloaders.
+            # Choose any error in such case.
+            exc: Optional[BaseException] = None
+            for downloader_async in downloaders_async:
+                try:
+                    downloader_async.result()
+                except BaseException as e:
+                    logger.verbose(e)
+                    if isinstance(e, DownloadException):
+                        logger.error(f"Failed to download resources {','.join(e.task.resources)} for namespace {e.task.namespace}")
+                        exc = e.reason
+                    else:
+                        exc = e
 
-    namespaced_resources_map = {}
-    total_files = 0
+            return exc
 
-    for namespace in namespaces:
-        namespace_dir = os.path.join(kubernetes_res_dir, namespace)
-        os.mkdir(namespace_dir)
-        actual_resources = download_resources(cluster.log, resources, namespace_dir, control_plane, namespace)
-        if actual_resources:
-            total_files += len(actual_resources)
-            namespaced_resources_map[namespace] = actual_resources
+        try:
+            # Wait for successful parsing of resources or till exception.
+            parser_async.result()
+        except BaseException:
+            # Wait for graceful exiting of downloaders after their currently running command is finished.
+            # If few background tasks fail, the parser exception has priority, and the other is logged.
+            _graceful_shutdown_downloaders()
+            raise
 
-    cluster.log.debug('Loading non-namespaced resources:')
-    resources_result = control_plane.sudo('kubectl api-resources --verbs=list --namespaced=false -o name '
-                                   '| grep -v "events.events.k8s.io" | grep -v "events" | sort | uniq')
-    cluster.log.verbose(resources_result)
-    parsed_resources = list(resources_result.values())[0].stdout.strip().split('\n')
-    proposed_resources = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {}).get('nonnamespaced_resources', 'all')
+        downloader_exception = _graceful_shutdown_downloaders()
+        if downloader_exception is not None:
+            raise downloader_exception
 
-    resources = [resource for resource in parsed_resources if proposed_resources == 'all' or resource in proposed_resources]
+    downloaded_resources_descriptor = cluster.context['backup_descriptor']['kubernetes']['resources']
+    if parser.namespaced_resources_result_map:
+        downloaded_resources_descriptor['namespaced'] = parser.namespaced_resources_result_map
 
-    for resource in parsed_resources:
-        if resource not in resources:
-            cluster.log.verbose('Resource "%s" excluded' % resource)
+    if parser.nonnamespaced_resources_result:
+        downloaded_resources_descriptor['nonnamespaced'] = parser.nonnamespaced_resources_result
 
-    if proposed_resources != 'all':
-        for proposed_resource in proposed_resources:
-            if proposed_resource not in resources:
-                raise Exception('Proposed resource "%s" not found in loaded cluster resources' % proposed_resource)
-
-    cluster.log.debug(resources)
-
-    nonnamespaced_resources_list = download_resources(cluster.log, resources, kubernetes_res_dir, control_plane)
-    total_files += len(nonnamespaced_resources_list)
-
-    cluster.log.verbose('Total files saved: %s' % total_files)
-
-    if namespaced_resources_map:
-        cluster.context['backup_descriptor']['kubernetes']['resources']['namespaced'] = namespaced_resources_map
-
-    if nonnamespaced_resources_list:
-        cluster.context['backup_descriptor']['kubernetes']['resources']['nonnamespaced'] = nonnamespaced_resources_list
+    logger.verbose(f'Downloading elapsed: {max(downloader.elapsed for downloader in downloaders)}')
+    logger.verbose(f'Parsing elapsed: {parser.elapsed}')
+    logger.verbose(f'Total elapsed: {time.time() - start}')
+    logger.verbose(f'Total files saved: {parser.total_files}')
 
 
 def make_descriptor(cluster: KubernetesCluster) -> None:
@@ -445,7 +715,7 @@ class BackupAction(Action):
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for making backup of Kubernetes resources and nodes contents.
 
@@ -470,6 +740,11 @@ def main(cli_arguments: List[str] = None) -> None:
         }
     }
 
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([BackupAction()]).run_flow(context)
 
 

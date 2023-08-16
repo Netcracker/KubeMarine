@@ -610,7 +610,7 @@ def _detect_installed_package_version(group: DeferredGroup, package: str, collec
     """
     Detect package versions for each host on remote group
     :param group: Group of nodes, where package should be found
-    :param package: package name, which version should be detected (eg. 'podman' and 'containerd')
+    :param package: package name, which version should be detected (eg. 'containerd')
     :return: NodeGroupResults with package version on each host
 
     Method generates different package query for different OS.

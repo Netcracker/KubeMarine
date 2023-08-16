@@ -213,7 +213,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
                 ('rhel', 'rhel8', '8.7')
         ):
             for cri in ('docker', 'containerd'):
-                for package_vary in ('docker', 'containerd', 'containerdio', 'podman'):
+                for package_vary in ('docker', 'containerd', 'containerdio'):
                     expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
 
                     with self.subTest(f"{os_family}, {cri}, {package_vary}"), utils.backup_globals():
@@ -231,11 +231,10 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
         if cri == 'containerd':
-            package_names = ['podman']
             if os_family in ('rhel', 'rhel8'):
-                package_names.append('containerdio')
+                package_names = ['containerdio']
             else:
-                package_names.append('containerd')
+                package_names = ['containerd']
         else:
             package_names = ['docker', 'containerdio']
 
@@ -243,13 +242,12 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
     def test_procedure_inventory_upgrade_required_inventory_default(self):
         for procedure_associations, expected_upgrade_required in (
-                (['containerd=containerd-initial', 'podman=podman-initial'], False),
-                (['containerd=containerd-new', 'podman=podman-new'], True),
+                (['containerd=containerd-initial'], False),
+                (['containerd=containerd-new'], True),
                 ('containerd-custom', True)
         ):
             with self.subTest(f"upgrade: {expected_upgrade_required}"), utils.backup_globals():
                 self._patch_globals('containerd', 'debian', equal=False)
-                self._patch_globals('podman', 'debian', equal=False)
 
                 self.setUp()
                 self.upgrade[self.new]['packages']['associations']['containerd']['package_name'] = procedure_associations
@@ -266,7 +264,6 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         ):
             with self.subTest(f"upgrade: {expected_upgrade_required}"), utils.backup_globals():
                 self._patch_globals('containerd', 'debian', equal=True)
-                self._patch_globals('podman', 'debian', equal=True)
 
                 self.setUp()
                 self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-inventory'

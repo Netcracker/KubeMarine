@@ -5,13 +5,12 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if podman --version &> /dev/null; then
-  CONT_RUNTIME="podman"
-elif systemctl is-active --quiet docker; then
+if systemctl is-active --quiet docker; then
   CONT_RUNTIME="docker"
+elif ctr --version &> /dev/null; then
+  CONT_RUNTIME="ctr"
 else
-  echo "Neither podman nor docker are available to run container, exiting with error..."
-  exit 1
+  echo "Neither ctr nor docker are available to run container, exiting with error..."
 fi
 
 # Try to read pod yaml from kubernetes
@@ -42,7 +41,11 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
   ETCD_ENDPOINTS=$(echo "${ETCD_POD_CONFIG}" | grep '\- --initial-cluster=' | sed -e 's/\s*- --initial-cluster=//g' -e "s/[a-zA-Z0-9\.-]*=//g" -e "s/2380/2379/g")
   while IFS= read -r line; do
       volume=$(echo "${line}" | awk '{print $3; exit}')
-      ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
+      if [ "$CONT_RUNTIME" == "ctr" ]; then
+        ETCD_MOUNTS="${ETCD_MOUNTS} -mount type=bind,src=${volume},dst=${volume},options=rbind:rw"
+      else
+        ETCD_MOUNTS="${ETCD_MOUNTS} -v ${volume}:${volume}"
+      fi
   done <<< "${ETCD_MOUNTS_RAW}"
 
   # User can override some of our "default" etcdctl args (see cases).
@@ -68,28 +71,13 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
     USER_ARGS+=("--endpoints=$ETCD_ENDPOINTS")
   fi
 
-  if [ "$CONT_RUNTIME" == "podman" ]; then
-    # Check if the registry needs authentication:
-    # Match the registry from etcd image with the list of registries that assume an athentication
-    REGISTRIES=$(cat /etc/containerd/config.toml | grep '\.auth\]' | sed 's/.\+configs\."\(.\+\)"\.auth\]/\1/')
+  if [ "$CONT_RUNTIME" == "ctr" ]; then
     ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
-    IS_AUTH=$(echo "${REGISTRIES}" | grep ${ETCD_REGISTRY} | wc -l)
-    if [ $IS_AUTH -eq 1 ]; then
-      # Login into registries and pull image if the authentication file exists
-      export REGISTRY_AUTH_FILE=${REGISTRY_AUTH_FILE:-/etc/containers/auth.json}
-      if [ -e ${REGISTRY_AUTH_FILE} ]; then
-	podman login ${ETCD_REGISTRY} > /dev/null 2&>1
-	podman pull ${ETCD_IMAGE} > /dev/null 2&>1
-        podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
-		etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
-      else
-	exit 1
-      fi
-    else
-      podman pull ${ETCD_IMAGE} &> /dev/null
-      podman run --network=host --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
+    ctr_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^${ETCD_REGISTRY}=" | sed "s/^${ETCD_REGISTRY}=//;")
+    container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
+    ctr image pull ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
+    ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
 	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
-    fi
   else
     docker run --rm ${ETCD_MOUNTS} -e ETCDCTL_API=3 ${ETCD_IMAGE} \
 	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"

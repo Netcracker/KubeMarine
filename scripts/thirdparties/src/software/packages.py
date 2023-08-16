@@ -53,7 +53,7 @@ class Packages(SoftwareType):
         """
         Actualize compatibility_map of all packages.
         """
-        package_names = ['docker', 'containerd', 'containerdio', 'podman',
+        package_names = ['docker', 'containerd', 'containerdio',
                          'haproxy', 'keepalived']
         k8s_versions = summary_tracker.all_k8s_versions
 

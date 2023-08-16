@@ -18,6 +18,7 @@ import os
 import re
 import tarfile
 import time
+import uuid
 from collections import OrderedDict
 from typing import List
 
@@ -189,7 +190,16 @@ def import_etcd(cluster: KubernetesCluster) -> None:
     if "docker" == cluster.inventory['services']['cri']['containerRuntime']:
         cont_runtime = "docker"
     else:
-        cont_runtime = "podman"
+        cont_runtime = "ctr"
+    container_name = f'etcd-{uuid.uuid4().hex}'
+    network_options = '--network host' if cont_runtime == 'docker' else '--net-host'
+    mount_options = '-v /var/lib/etcd:/var/lib/etcd ' \
+                    '-v /etc/kubernetes/pki:/etc/kubernetes/pki ' \
+        if cont_runtime == 'docker' else \
+        '-mount type=bind,src=/var/lib/etcd,dst=/var/lib/etcd,options=rbind:rw ' \
+        '-mount type=bind,src=/etc/kubernetes/pki/etcd,dst=/etc/kubernetes/pki/etcd,options=rbind:rw'
+    name_option = f'--name {container_name}' if cont_runtime == 'docker' else ''
+    container_id = '' if cont_runtime == 'docker' else f'{container_name}'
 
     etcd_instances = 0
     for control_plane in cluster.nodes['control-plane'].get_ordered_members_configs_list():
@@ -205,14 +215,13 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--initial-advertise-peer-urls=https://{control_plane["internal_address"]}:2380',
             hide=False)
 
-        etcd_id = control_plane_conn.sudo(
+        _ = control_plane_conn.sudo(
             f'mv /var/lib/etcd/snapshot/member /var/lib/etcd/member && '
             f'sudo rm -rf /var/lib/etcd/snapshot {snap_name} && '
-            f'sudo {cont_runtime} run -d --network host -p 2379:2379 -p 2380:2380 '
-            f'-e ETCDCTL_API=3 '
-            f'-v /var/lib/etcd:/var/lib/etcd '
-            f'-v /etc/kubernetes/pki:/etc/kubernetes/pki '
-            f'{etcd_image} etcd '
+            f'sudo {cont_runtime} run -d {network_options} '
+            f'--env ETCDCTL_API=3 {name_option} '
+            f'{mount_options} '
+            f'{etcd_image} {container_id} etcd '
             f'--advertise-client-urls=https://{control_plane["internal_address"]}:2379 '
             f'--cert-file={etcd_cert} '
             f'--key-file={etcd_key} '
@@ -227,10 +236,8 @@ def import_etcd(cluster: KubernetesCluster) -> None:
             f'--peer-client-cert-auth=true '
             f'--peer-cert-file={etcd_peer_cert} '
             f'--peer-key-file={etcd_peer_key} '
-            f'--peer-trusted-ca-file={etcd_peer_cacert} '
-        ).get_simple_out().strip()
+            f'--peer-trusted-ca-file={etcd_peer_cacert} ').get_simple_out().strip()
 
-        control_plane_conn.sudo(f'{cont_runtime} logs {etcd_id}', hide=False)
         etcd_instances += 1
 
     # After restore check db size equal, cluster health and leader elected
@@ -253,6 +260,15 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         cluster.log.debug('DB size "%s" is correct' % expected_dbsize)
     else:
         cluster.log.verbose('It is not possible to verify db size - descriptor do not contain such information')
+
+    # Stop and remove container
+    if cont_runtime == 'docker':
+        cluster.nodes['control-plane'].sudo(f"docker stop {container_name} && "
+                                            f"sudo docker rm {container_name}")
+    else:
+        cluster.nodes['control-plane'].sudo(f"ctr task kill -s 9 {container_name} && "
+                                            f"sudo ctr task rm {container_name} && "
+                                            f"sudo ctr container rm {container_name}")
 
 
 def reboot(cluster: KubernetesCluster) -> None:

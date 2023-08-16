@@ -21,10 +21,6 @@ packages:
     version_rhel: []
     version_rhel8: []
     version_debian: []
-  podman:
-    version_rhel: []
-    version_rhel8: []
-    version_debian: []
   haproxy:
     version_rhel: false
     version_rhel8: false

@@ -196,6 +196,7 @@ class DynamicResources:
                 light_cluster = self._new_cluster_instance(deepcopy(self.context))
                 light_cluster.enrich(custom_enrichment_fns=light_cluster.get_facts_enrichment_fns())
                 self._nodes_context = light_cluster.detect_nodes_context()
+                light_cluster.connection_pool.close()
 
         return self._nodes_context
 
