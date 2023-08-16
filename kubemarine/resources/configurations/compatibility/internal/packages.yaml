@@ -137,59 +137,6 @@ containerdio:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_debian: 1.6.*
-podman:
-  v1.23.1:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.23.6:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.23.11:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.23.17:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.24.2:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.24.11:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.25.2:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.25.7:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.26.3:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.26.4:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.27.1:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.27.3:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
-  v1.28.0:
-    version_rhel: 1.6.4*
-    version_rhel8: "*"
-    version_debian: "*"
 haproxy:
   version_rhel: 1.8*
   version_rhel8: 1.8*
