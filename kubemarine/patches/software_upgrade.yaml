@@ -9,14 +9,8 @@
 
 thirdparties:
   calicoctl:
-  - v1.25.7
-  - v1.26.3
-  - v1.26.4
   - v1.27.1
   crictl:
-  - v1.25.7
-  - v1.26.3
-  - v1.26.4
   - v1.27.1
 packages:
   docker:
@@ -39,16 +33,8 @@ packages:
     version_debian: false
 plugins:
   calico:
-  - v1.25.7
-  - v1.26.3
-  - v1.26.4
   - v1.27.1
   nginx-ingress-controller:
-  - v1.25.7
-  - v1.26.3
-  - v1.26.4
   - v1.27.1
   kubernetes-dashboard: []
-  local-path-provisioner:
-  - v1.25.7
-  - v1.26.3
+  local-path-provisioner: []
