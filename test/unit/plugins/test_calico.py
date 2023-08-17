@@ -80,6 +80,9 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         calico_node = self._get_calico_node_container(manifest)
         self.assertEqual(expected_image, calico_node.get('image'), "Unexpected calico-node image")
 
+        self.assertTrue(any(1 for c in init_containers if c['name'] == 'mount-bpffs' and c['image'] == expected_image),
+                        f"mount-bpffs init container with {expected_image} image is not found")
+
     def _get_calico_node_container(self, manifest: Manifest):
         containers = self.get_obj(manifest, "DaemonSet_calico-node")['spec']['template']['spec']['containers']
         return next((c for c in containers if c['name'] == 'calico-node'), None)
@@ -129,16 +132,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                             typha_resources += 1
                     self.assertEqual(expected_num_resources, typha_resources,
                                      f"calico for should have {expected_num_resources} typha resources")
-
-    def test_daemonset_calico_node_specific_images(self):
-
-        inventory = self._inventory_custom_registry(self.k8s_latest)
-        cluster = demo.new_cluster(inventory)
-        manifest = self.enrich_yaml(cluster)
-        init_containers = self.get_obj(manifest, "DaemonSet_calico-node")['spec']['template']['spec']['initContainers']
-        expected_image = f"example.registry/calico/node:{self.expected_image_tag(self.k8s_latest, 'version')}"
-        self.assertTrue(any(1 for c in init_containers if c['name'] == 'mount-bpffs' and c['image'] == expected_image),
-                        f"mount-bpffs init container with {expected_image} image is not found")
 
     def test_calico_node_env(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -279,14 +272,15 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                                  "Rules list validation failed")
 
     def test_all_images_contain_registry(self):
-        for k8s_version, typha_enabled, expected_num_images in (
-            (self.k8s_latest, False, 3),
-            (self.k8s_latest, True, 4),
-        ):
-            with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
-                inventory = self._enable_typha(k8s_version, typha_enabled)
-                num_images = self.check_all_images_contain_registry(inventory)
-                self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
+        for k8s_version in self.latest_k8s_supporting_specific_versions.values():
+            for typha_enabled, expected_num_images in (
+                    (False, 3),
+                    (True, 4),
+            ):
+                with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
+                    inventory = self._enable_typha(k8s_version, typha_enabled)
+                    num_images = self.check_all_images_contain_registry(inventory)
+                    self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
 
 
 if __name__ == '__main__':
