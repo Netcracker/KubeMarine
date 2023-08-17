@@ -226,20 +226,6 @@ For example, specify `conntrack-tools` instead of `conntrack`.
 * You can install a version other than the recommended version, but it is not supported and can cause unpredictable consequences.
 * rh-haproxy18 (build provided by RedHat) is supported only for now.
 
-**Warning**: RHEL version 8 and RockyLinux 8 has a conflict in dependencies, that makes the `podman` and `containerd.io` 
-installation on the same OS impossible. To avoid it one should implement those steps before the installation procedure.
-1. Install `podman` from standard RHEL repository:
-```
-# yum install podman
-```
-2. Download containerd.io package of [proper version](#supported-versions) from Docker-CE repository and install it manually without dependencies, for example:
-```
-# rpm --install --nodeps --replacefiles --excludepath=/bin/runc /tmp/containerd.io-1.6.9-3.1.el8.x86_64.rpm
-# systemctl enable containerd
-```
-
-After the successful execution of the commands, it is necessary to complete the installation by excluding the **prepare.cri.install** task.
-
 **Warning**: RHEL 8 does not have Python preinstalled. For `check_iaas` to work correctly, it is required to install Python on the nodes. Execute the following step before the installation procedure.
 * Install `python 3.9` from the standard RHEL repository:
 ```
@@ -1941,7 +1927,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>containerd.io-{{k8s-version-specific}}<br/>podman-{{k8s-version-specific}}</td>
+    <td>containerd.io-{{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -2072,7 +2058,7 @@ The following associations are used by default:
   </tr>
   <tr>
     <td>package_name</td>
-    <td>containerd={{k8s-version-specific}}<br/>podman={{k8s-version-specific}}</td>
+    <td>containerd={{k8s-version-specific}}</td>
   </tr>
   <tr>
     <td>service_name</td>
@@ -2371,7 +2357,7 @@ services:
         SystemdCgroup: true
 ```
 
-**Note**: When containerd is used, `crictl` binary and `podman` package are also installed and configured as required.
+**Note**: When containerd is used, `crictl` binary is also installed and configured as required.
 
 Alternatively, it is possible to use docker as a container runtime for kubernetes by setting `docker` value for `containerRuntime` parameter.
 When docker is used as a container runtime, it is possible to additionally define the `dockerConfig` section,
@@ -5665,7 +5651,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.23.0          | v1.23.0                      | v1.23.0      | v1.23.0      | v1.23.0           | v1.23.0   | v1.23.0        | SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10          |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*          |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest         | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8            | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1            | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.21.12         | v1.21.12                     | v1.21.12     | v1.21.12     | v1.21.12          | v1.21.12  | v1.21.12       |                                                                                                            |
@@ -5696,7 +5681,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.23.0          | v1.23.0                      | v1.23.0      | v1.23.0      | v1.23.0           | v1.23.0   | v1.23.0   | SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.22.9          | v1.22.9                      | v1.22.9      | v1.22.9      | v1.22.9           | v1.22.9   | v1.22.9   |                                                                                                            |
@@ -5726,7 +5710,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.23.0          | v1.23.0                      | v1.23.0      | v1.23.0      | v1.23.0           | v1.23.0   | v1.23.0   | SHA1: 332001091d2e4523cbe8d97ab0f7bfbf4dfebda2 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.5.*        | 1.5.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.23.17         | v1.23.17                     | v1.23.17     | v1.23.17     | v1.23.17          | v1.23.17  | v1.23.17  |                                                                                                            |
@@ -5756,7 +5739,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.24.11         | v1.24.11                     | v1.24.11     | v1.24.11     | v1.24.11          | v1.24.11  | v1.24.11  |                                                                                                            |
@@ -5786,7 +5768,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.25.0          | v1.25.0                      | v1.25.0      | v1.25.0      | v1.25.0           | v1.25.0   | v1.25.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.25.7          | v1.25.7                      | v1.25.7      | v1.25.7      | v1.25.7           | v1.25.7   | v1.25.7   |                                                                                                            |
@@ -5816,7 +5797,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.27.0          | v1.27.0                      | v1.27.0      | v1.27.0      | v1.27.0           | v1.27.0   | v1.27.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.26.4          | v1.26.4                      | v1.26.4      | v1.26.4      | v1.26.4           | v1.26.4   | v1.26.4   |                                                                                                            |
@@ -5847,7 +5827,6 @@ The tables below shows the correspondence of versions that are supported and is 
 |          | crictl                                                         | v1.27.0          | v1.27.0                      | v1.27.0      | v1.27.0      | v1.27.0           | v1.27.0   | v1.27.0   | SHA1: b3a24e549ca3b4dfd105b7f4639014c0c508bea3 Required only if containerd is used as a container runtime. |
 | rpms     | docker-ce                                                      | 20.10            | 20.10                        | 20.10        | 20.10        | 20.10             | 20.10     | 20.10     |                                                                                                            |
 |          | containerd.io                                                  | 1.6.*            | 1.6.*                        | 1.6.*        | 1.6.*        | 1.6.*             | 1.6.*     | 1.6.*     |                                                                                                            |
-|          | podman                                                         | 1.6.4            | latest                       | latest       | latest       | 1.4.4             | latest    | latest    | Required only if containerd is used as a container runtime.                                                |
 |          | haproxy/rh-haproxy                                             | 1.8              | 1.8                          | 2.*          | 2.*          | 1.8               | 1.8       | 1.8       | Required only if balancers are presented in the deployment scheme.                                         |
 |          | keepalived                                                     | 1.3              | 2.1                          | 2.*          | 2.*          | 1.3               | 2.1       | 2.1       | Required only if VRRP is presented in the deployment scheme.                                               |
 | images   | k8s.gcr.io/kube-apiserver                                      | v1.27.1          | v1.27.1                      | v1.27.1      | v1.27.1      | v1.27.1           | v1.27.1   | v1.27.1   |                                                                                                            |

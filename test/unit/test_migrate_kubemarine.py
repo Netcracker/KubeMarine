@@ -148,7 +148,7 @@ class UpgradeCRI(unittest.TestCase):
         }
         self.changed_config = {
             'packages': {
-                'docker': {}, 'containerdio': {}, 'podman': {}, 'containerd': {}
+                'docker': {}, 'containerdio': {}, 'containerd': {}
             }
         }
 
@@ -206,7 +206,7 @@ class UpgradeCRI(unittest.TestCase):
                 ('rhel', 'rhel8', '8.7')
         ):
             for cri in ('docker', 'containerd'):
-                for package_vary in ('docker', 'containerd', 'containerdio', 'podman'):
+                for package_vary in ('docker', 'containerd', 'containerdio'):
                     expected_upgrade_required = package_vary in self._packages_for_cri_os_family(cri, os_family)
 
                     with self.subTest(f"{os_family}, {cri}, {package_vary}"):
@@ -218,11 +218,10 @@ class UpgradeCRI(unittest.TestCase):
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
         if cri == 'containerd':
-            package_names = ['podman']
             if os_family in ('rhel', 'rhel8'):
-                package_names.append('containerdio')
+                package_names = ['containerdio']
             else:
-                package_names.append('containerd')
+                package_names = ['containerd']
         else:
             package_names = ['docker', 'containerdio']
 

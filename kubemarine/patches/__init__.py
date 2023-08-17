@@ -22,9 +22,11 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p1_replace_podman_to_ctr import ReplacePodmanToCtr
 from kubemarine.patches.p1_inventory_plugins_resources import PluginsResourcesPatch
 
 patches: List[Patch] = [
+  ReplacePodmanToCtr(),
   PluginsResourcesPatch(),
 ]
 """

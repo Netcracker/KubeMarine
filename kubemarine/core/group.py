@@ -25,6 +25,7 @@ from typing import (
 )
 
 from kubemarine.core import utils, log, errors
+from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import (
     RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult,
 )
@@ -769,8 +770,8 @@ class DeferredGroup(AbstractGroup[Token]):
 
 
 class RemoteExecutor(RawExecutor):
-    def __init__(self, group: NodeGroup, timeout: int = None) -> None:
-        super().__init__(group.cluster, timeout)
+    def __init__(self, group: NodeGroup, connection_pool: ConnectionPool = None, timeout: int = None) -> None:
+        super().__init__(group.cluster, connection_pool, timeout)
         self.group: DeferredGroup = group._make_defer(self)
         self.cluster = group.cluster
 
