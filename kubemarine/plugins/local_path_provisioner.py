@@ -18,7 +18,21 @@ from typing import List, Optional
 import yaml
 
 from kubemarine.core import log
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
+
+
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if not inventory["plugins"]["local-path-provisioner"]["install"]:
+        return inventory
+
+    # if user defined resources himself, we should use them as is, instead of merging with our defaults
+    raw_plugin = cluster.raw_inventory.get("plugins", {}).get("local-path-provisioner", {})
+    if "resources" in raw_plugin:
+        inventory["plugins"]["local-path-provisioner"]["resources"] = raw_plugin["resources"]
+
+    return inventory
+
 
 class LocalPathProvisionerManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
@@ -65,6 +79,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             container_name='local-path-provisioner', is_init_container=False)
 
+        self.enrich_resources_for_container(manifest, key, container_name='local-path-provisioner')
         self.enrich_tolerations(manifest, key)
 
     def enrich_storageclass_local_path(self, manifest: Manifest) -> None:

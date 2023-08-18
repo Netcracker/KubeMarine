@@ -77,6 +77,7 @@ This section provides information about the inventory, features, and steps for i
         - [Plugins Installation Order](#plugins-installation-order)
         - [Node Selector](#node-selector)
         - [Tolerations](#tolerations)
+        - [Resources requets and limits](#resources-requests-and-limits)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
         - [config](#config) 
@@ -4226,6 +4227,77 @@ plugins:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
+```
+
+##### Resources Requests and Limits
+
+It is recommended to set resources requests and limits for plugins. 
+There are default values, but you should adjust them accordingly to your needs. 
+
+The following table contains details about existing resources requests and limits configuration options:
+
+<table>
+    <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default requests/limits</th></tr>
+    <tr>
+        <td>calico</td>
+        <td><ul>
+            <li><code>node.resources</code></li>
+            <li><code>typha.resources</code></li>
+            <li><code>kube-controllers.resources</code></li>
+        </ul></td>
+        <td><ul>
+            <li><code>cpu=250m/None; memory=256Mi/None</code></li>
+            <li><code>cpu=250m/None; memory=256Mi/None</code></li>
+            <li><code>cpu=100m/None; memory=128Mi/None</code></li>
+        </ul></td>
+    </tr>
+    <tr>
+        <td>nginx-ingress-controller</td>
+        <td><ul>
+            <li><code>controller.resources</code></li>
+            <li><code>webhook.resources</code></li>
+        </ul></td>
+        <td><ul>
+            <li><code>cpu=100m/200m; memory=90Mi/256Mi</code></li>
+            <li><code>cpu=10m/20m; memory=20Mi/40Mi</code></li>
+        </ul></td>
+    </tr>
+    <tr>
+        <td>kubernetes-dashboard</td>
+        <td><ul>
+            <li><code>dashboard.resources</code></li>
+            <li><code>metrics-scraper.resources</code></li>
+        </ul></td>
+        <td><ul>
+            <li><code>cpu=100m/1000m; memory=200Mi/200Mi</code></li>
+            <li><code>cpu=50m/200m; memory=90Mi/200Mi</code></li>
+        </ul></td>
+    </tr>
+    <tr>
+        <td>local-host-provisioner</td>
+        <td><ul>
+            <li><code>resources</code></li>
+        </ul></td>
+        <td><ul>
+            <li><code>cpu=100m/200m; memory=128Mi/256Mi</code></li>
+        </ul></td>
+    </tr>
+</table>
+
+For example, if you want to customize the nginx-ingress-controller resources requests and limits, 
+you need to specify the following in your `cluster.yml` file:
+
+```yaml
+plugins:
+  nginx-ingress-controller:
+    controller:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 90Mi
+        limits:
+          cpu: 200m
+          memory: 256M
 ```
 
 #### Custom Plugins Installation Procedures

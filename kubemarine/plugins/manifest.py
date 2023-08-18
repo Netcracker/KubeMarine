@@ -372,6 +372,29 @@ class Processor(ABC):
         self.log.verbose(f"The {key} has been patched in "
                          f"'spec.template.spec.{spec_containers_section}.[{container_pos}].image' with {image!r}")
 
+    def enrich_resources_for_container(self, manifest: Manifest, key: str,
+                                       *,
+                                       plugin_service: Optional[str] = None,
+                                       container_name: str) -> None:
+        """
+        The method patches the resources of the specified container.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param plugin_service: section of plugin that contains the desirable 'resources'
+        :param container_name: name of container to assign the resources in the spec
+        """
+        container_pos, container = self.find_container_for_patch(manifest, key,
+                                                                 container_name=container_name, is_init_container=False)
+
+        plugin_service_section = self.inventory['plugins'][self.plugin_name]
+        if plugin_service:
+            plugin_service_section = plugin_service_section[plugin_service]
+        container['resources'] = plugin_service_section['resources']
+
+        self.log.verbose(f"The {key} has been patched in "
+                         f"'spec.template.spec.containers.[{container_pos}].resources' with {plugin_service_section['resources']!r}")
+
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,
                              plugin_service: str) -> None:

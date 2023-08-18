@@ -30,6 +30,30 @@
       "properties": {
         "kubernetes.io/os": {"type": "string", "default": "linux"}
       }
+    },
+    "RequestsLimitsForContainer": {
+      "type": "object",
+      "description": "Set custom requests/limits for the plugin container",
+      "definitions": {
+        "ValuesForMemoryCpuStorage": {
+          "type": "object",
+          "description": "Set memory, cpu and storage values for requests/limits",
+          "properties": {
+            "memory": {"type": ["string", "integer"]},
+            "cpu": {"type": ["string", "integer"]}
+          },
+          "additionalProperties": false
+        }
+      },
+      "properties": {
+        "limits": {
+          "$ref": "#/definitions/RequestsLimitsForContainer/definitions/ValuesForMemoryCpuStorage"
+        },
+        "requests": {
+          "$ref": "#/definitions/RequestsLimitsForContainer/definitions/ValuesForMemoryCpuStorage"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

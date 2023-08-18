@@ -35,6 +35,9 @@
     "tolerations": {
       "$ref": "generic_plugin.json#/definitions/CustomTolerations"
     },
+    "resources": {
+      "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
+    },
     "helper-pod-image": {
       "type": "string"
     }
@@ -42,7 +45,7 @@
   "propertyNames": {
     "anyOf": [
       {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
-      {"enum": ["version", "image", "storage-class", "volume-dir", "tolerations", "helper-pod-image"]}
+      {"enum": ["version", "image", "storage-class", "volume-dir", "tolerations", "helper-pod-image", "resources"]}
     ]
   }
 }

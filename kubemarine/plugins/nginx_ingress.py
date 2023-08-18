@@ -37,7 +37,7 @@ def check_job_for_nginx(cluster: KubernetesCluster) -> None:
         cluster.log.debug('There are no jobs to delete')
 
 
-def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
@@ -46,6 +46,14 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
             inventory["plugins"]["nginx-ingress-controller"]['config_map'] = {}
         if not inventory["plugins"]["nginx-ingress-controller"]['config_map'].get('proxy-set-headers'):
             inventory["plugins"]["nginx-ingress-controller"]['config_map']['proxy-set-headers'] = 'ingress-nginx/custom-headers'
+
+    # if user defined resources himself, we should use them as is, instead of merging with our defaults
+    raw_controller = cluster.raw_inventory.get("plugins", {}).get("nginx-ingress-controller", {}).get("controller", {})
+    if "resources" in raw_controller:
+        inventory["plugins"]["nginx-ingress-controller"]["controller"]["resources"] = raw_controller["resources"]
+    raw_webhook = cluster.raw_inventory.get("plugins", {}).get("nginx-ingress-controller", {}).get("webhook", {})
+    if "resources" in raw_webhook:
+        inventory["plugins"]["nginx-ingress-controller"]["webhook"]["resources"] = raw_webhook["resources"]
 
     return inventory
 
@@ -229,6 +237,7 @@ class IngressNginxManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='controller', container_name='controller', is_init_container=False)
 
+        self.enrich_resources_for_container(manifest, key, container_name='controller', plugin_service="controller")
         self.enrich_node_selector(manifest, key, plugin_service='controller')
         self.enrich_tolerations(manifest, key, plugin_service='controller')
 
@@ -300,10 +309,14 @@ class IngressNginxManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='webhook', container_name='create', is_init_container=False)
 
+        self.enrich_resources_for_container(manifest, key, container_name='create', plugin_service="webhook")
+
     def enrich_job_ingress_nginx_admission_patch(self, manifest: Manifest) -> None:
         key = "Job_ingress-nginx-admission-patch"
         self.enrich_image_for_container(manifest, key,
             plugin_service='webhook', container_name='patch', is_init_container=False)
+
+        self.enrich_resources_for_container(manifest, key, container_name='patch', plugin_service="webhook")
 
     def enrich_service_ingress_nginx_controller(self, manifest: Manifest) -> None:
         # The method needs some rework in case of dual stack support

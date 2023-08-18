@@ -80,6 +80,9 @@
         },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
         }
       },
       "additionalProperties": false
@@ -124,6 +127,9 @@
         "image": {
           "type": "string",
           "description": "Calico Node image"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
         }
       },
       "additionalProperties": false
@@ -138,6 +144,9 @@
         },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
         }
       },
       "additionalProperties": false

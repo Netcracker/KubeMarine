@@ -18,6 +18,21 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if not inventory["plugins"]["kubernetes-dashboard"]["install"]:
+        return inventory
+
+    # if user defined resources himself, we should use them as is, instead of merging with our defaults
+    raw_dashboard = cluster.raw_inventory.get("plugins", {}).get("kubernetes-dashboard", {}).get("dashboard", {})
+    if "resources" in raw_dashboard:
+        inventory["plugins"]["kubernetes-dashboard"]["dashboard"]["resources"] = raw_dashboard["resources"]
+    raw_metrics_scrapper = cluster.raw_inventory.get("plugins", {}).get("kubernetes-dashboard", {}).get("metrics-scraper", {})
+    if "resources" in raw_metrics_scrapper:
+        inventory["plugins"]["kubernetes-dashboard"]["metrics-scraper"]["resources"] = raw_metrics_scrapper["resources"]
+
+    return inventory
+
+
 def schedule_summary_report(cluster: KubernetesCluster) -> None:
     plugin_item = cluster.inventory['plugins']['kubernetes-dashboard']
     hostname = plugin_item['hostname']
@@ -67,6 +82,7 @@ class DashboardManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='dashboard', container_name='kubernetes-dashboard', is_init_container=False)
 
+        self.enrich_resources_for_container(manifest, key, container_name='kubernetes-dashboard', plugin_service="dashboard")
         self.enrich_node_selector(manifest, key, plugin_service='dashboard')
         self.enrich_tolerations(manifest, key, plugin_service='dashboard', override=True)
 
@@ -75,6 +91,7 @@ class DashboardManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
 
+        self.enrich_resources_for_container(manifest, key, container_name='dashboard-metrics-scraper', plugin_service="metrics-scraper")
         self.enrich_node_selector(manifest, key, plugin_service='metrics-scraper')
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 

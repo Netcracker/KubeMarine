@@ -21,6 +21,24 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
 
 
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if not inventory["plugins"]["calico"]["install"]:
+        return inventory
+
+    # if user defined resources himself, we should use them as is, instead of merging with our defaults
+    raw_calico_node = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("node", {})
+    if "resources" in raw_calico_node:
+        inventory["plugins"]["calico"]["node"]["resources"] = raw_calico_node["resources"]
+    raw_typha = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("typha", {})
+    if "resources" in raw_typha:
+        inventory["plugins"]["calico"]["typha"]["resources"] = raw_typha["resources"]
+    raw_calico_controller = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("kube-controllers", {})
+    if "resources" in raw_calico_controller:
+        inventory["plugins"]["calico"]["kube-controllers"]["resources"] = raw_calico_controller["resources"]
+
+    return inventory
+
+
 # DEPRECATED
 def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str) -> None:
     """
@@ -93,6 +111,8 @@ class CalicoManifestProcessor(Processor):
 
         key = "Deployment_calico-kube-controllers"
         self.enrich_node_selector(manifest, key, plugin_service='kube-controllers')
+        self.enrich_resources_for_container(manifest, key,
+            plugin_service='kube-controllers', container_name='calico-kube-controllers')
         self.enrich_image_for_container(manifest, key,
             plugin_service='kube-controllers', container_name='calico-kube-controllers', is_init_container=False)
 
@@ -119,6 +139,8 @@ class CalicoManifestProcessor(Processor):
             container_name='calico-node', is_init_container=False)
 
         self.enrich_daemonset_calico_node_container_env(container_pos, container)
+        self.enrich_resources_for_container(manifest, key,
+            plugin_service='node', container_name='calico-node')
 
     def enrich_daemonset_calico_node_container_env(self, container_pos: int, container: dict) -> None:
         """
@@ -198,6 +220,9 @@ class CalicoManifestProcessor(Processor):
         self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
         self.enrich_image_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha', is_init_container=False)
+        self.enrich_resources_for_container(manifest, key,
+            plugin_service='typha', container_name='calico-typha')
+
 
     def enrich_clusterrole_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
