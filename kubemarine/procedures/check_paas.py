@@ -576,6 +576,44 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                               hint=f"Please verify the following Kubernetes Dashboard status and fix this issue:\n{status}")
 
 
+def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '229', "Kubernetes", "Audit policy configuration") as tc:
+        expected_config = cluster.inventory['services']['audit'].get('cluster_policy')
+
+        api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+        audit_file_name = api_server_extra_args['audit-policy-file']
+
+        control_planes = cluster.nodes['control-plane']
+
+        broken = []
+        result = control_planes.sudo(f"cat {audit_file_name}", warn=True)
+        for node in control_planes.get_ordered_members_list():
+            policy_result = result[node.get_host()]
+            node_name = node.get_node_name()
+            if policy_result.failed:
+                broken.append(f"{node_name}: {audit_file_name} is absent")
+            else:
+                actual_config = yaml.safe_load(policy_result.stdout)
+                diff = DeepDiff(actual_config, expected_config)
+                if diff:
+                    cluster.log.debug(f"Configuration of audit policy is not actual on {node_name} node")
+                    # Extra transformation to JSON is necessary,
+                    # because DeepDiff.to_dict() returns custom nested classes
+                    # that cannot be serialized to yaml by default.
+                    cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                    broken.append(f"{node_name}: {audit_file_name} is not actual")
+
+        if broken:
+            broken.append(
+                "Check DEBUG logs for details. "
+                "To have the check passed, you may need to call `kubemarine install --tasks deploy.kubernetes.audit` "
+                "or change the inventory file accordingly."
+            )
+            raise TestFailure('invalid', hint=yaml.safe_dump(broken))
+        else:
+            tc.success(results='valid')
+
+
 def nodes_pid_max(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '202', "Nodes", "Nodes pid_max correctly installed") as tc:
         control_plane = cluster.nodes['control-plane'].get_any_member()
@@ -1360,6 +1398,9 @@ tasks = OrderedDict({
                 "pid": lambda cluster: kubernetes_nodes_condition(cluster, 'PIDPressure'),
                 "ready": lambda cluster: kubernetes_nodes_condition(cluster, 'Ready')
             },
+        },
+        'audit': {
+            'policy': kubernetes_audit_policy_configuration,
         },
         'admission': kubernetes_admission_status,
     },

@@ -54,6 +54,7 @@ This section provides information about the Kubecheck functionality.
       - [211 Nodes Condition - DiskPressure](#211-nodes-condition---diskpressure)
       - [211 Nodes Condition - PIDPressure](#211-nodes-condition---pidpressure)
       - [211 Nodes Condition - Ready](#211-nodes-condition---ready)
+    - [212 Thirdparties Hashes](#212-thirdparties-hashes)
     - [213 Selinux security policy](#213-selinux-security-policy)
     - [214 Selinux configuration](#214-selinux-configuration)
     - [215 Firewalld status](#215-firewalld-status)
@@ -70,6 +71,7 @@ This section provides information about the Kubecheck functionality.
     - [226 Geo connectivity status](#226-geo-connectivity-status)
     - [227 Apparmor status](#227-apparmor-status)
     - [228 Apparmor configuration](#228-apparmor-configuration)
+    - [229 Audit policy configuration](#229-audit-policy-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -387,6 +389,8 @@ The task tree is as follows:
       * disk
       * pid
       * ready
+  * audit
+    * policy
   * admission
 * etcd
   * health_status
@@ -666,6 +670,13 @@ The test checks the status of AppArmor. It should be `enabled` by default.
 *Task*: `services.security.apparmor.config`
 
 The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may incude only part of the profiles.
+
+###### 229 Audit policy configuration
+
+*Task*: `kubernetes.audit.policy`
+
+This test checks that the configuration of Kubernetes audit policy is actual
+and matches the effectively resolved configuration from the inventory.
 
 ### Report File Generation
 
