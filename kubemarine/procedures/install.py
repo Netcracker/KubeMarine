@@ -171,72 +171,58 @@ def system_install_audit(group: NodeGroup) -> None:
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_prepare_audit_daemon(group: NodeGroup) -> None:
+def system_prepare_audit(group: NodeGroup) -> None:
     group.call(audit.apply_audit_rules)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane')
-def system_prepare_policy(group: NodeGroup) -> None:
+def deploy_kubernetes_audit(group: NodeGroup) -> None:
     """
     Task generates rules for logging kubernetes and on audit
     """
-    cluster: KubernetesCluster = group.cluster
-    api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
-    audit_log_dir = os.path.dirname(api_server_extra_args['audit-log-path'])
-    audit_file_name = api_server_extra_args['audit-policy-file']
-    audit_policy_dir = os.path.dirname(audit_file_name)
-    group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
-    policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
-    collect_node = group.get_ordered_members_list()
+    cluster = group.cluster
+    # kubernetes api-server is already installed with target audit configuration for install/add_node procedures.
+    if cluster.is_task_completed('deploy.kubernetes.init'):
+        cluster.log.debug("Kubernetes audit policy is already configured")
+        return
 
-    if policy_config:
-        policy_config_file = yaml.dump(policy_config)
-        utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
-        #download rules in cluster
-        for node in collect_node:
-            node.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
-        audit_config = True
-        cluster.log.debug("Audit cluster policy config")
-    else:
-        audit_config = False
-        cluster.log.debug("Audit cluster policy config is empty, nothing will be configured ")
+    kubernetes.prepare_audit_policy(group)
 
-    if kubernetes.is_cluster_installed(cluster) and audit_config is True and cluster.context['initial_procedure'] != 'add_node':
-        for control_plane in collect_node:
-            node_config = control_plane.get_config()
-            config_new = kubernetes.get_kubeadm_config(cluster.inventory)
+    for control_plane in group.get_ordered_members_list():
+        node_config = control_plane.get_config()
+        config_new = kubernetes.get_kubeadm_config(cluster.inventory)
 
-            # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
-            init_config = {
-                'apiVersion': group.cluster.inventory["services"]["kubeadm"]['apiVersion'],
-                'kind': 'InitConfiguration',
-                'localAPIEndpoint': {
-                    'advertiseAddress': node_config['internal_address']
-                },
-                'patches': {
-                    'directory': '/etc/kubernetes/patches'
-                }
+        # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
+        init_config = {
+            'apiVersion': cluster.inventory["services"]["kubeadm"]['apiVersion'],
+            'kind': 'InitConfiguration',
+            'localAPIEndpoint': {
+                'advertiseAddress': node_config['internal_address']
+            },
+            'patches': {
+                'directory': '/etc/kubernetes/patches'
             }
+        }
 
-            config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
+        config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
 
-            control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
+        control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
 
-            kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
+        kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
 
-            control_plane.sudo(f"kubeadm init phase control-plane apiserver "
-                                f"--config=/etc/kubernetes/audit-on-config.yaml ")
+        control_plane.sudo(f"kubeadm init phase control-plane apiserver "
+                           f"--config=/etc/kubernetes/audit-on-config.yaml ")
 
-            if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-                control_plane.call(utils.wait_command_successful,
-                                   command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
-            else:
-                control_plane.call(utils.wait_command_successful,
-                                   command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
-                                           " | awk '{print $1}')")
-            control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-            control_plane.sudo("kubeadm init phase upload-config kubeadm "
-                               "--config=/etc/kubernetes/audit-on-config.yaml")
+        if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
+            control_plane.call(utils.wait_command_successful,
+                               command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
+        else:
+            control_plane.call(utils.wait_command_successful,
+                               command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
+                                       " | awk '{print $1}')")
+        control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+        control_plane.sudo("kubeadm init phase upload-config kubeadm "
+                           "--config=/etc/kubernetes/audit-on-config.yaml")
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -573,8 +559,7 @@ tasks = OrderedDict({
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
-                "configure_daemon": system_prepare_audit_daemon,
-                "configure_policy": system_prepare_policy
+                "configure": system_prepare_audit,
             }
         },
         "cri": {
@@ -598,7 +583,8 @@ tasks = OrderedDict({
             "reset": deploy_kubernetes_reset,
             "install": deploy_kubernetes_install,
             "prepull_images": deploy_kubernetes_prepull_images,
-            "init": deploy_kubernetes_init
+            "init": deploy_kubernetes_init,
+            "audit": deploy_kubernetes_audit,
         },
         "admission": admission.install,
         "coredns": deploy_coredns,
