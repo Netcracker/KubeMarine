@@ -1105,6 +1105,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
         ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]
         admission_path = ""
+        minor_version = int(cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
         for item in ext_args:
             if item.startswith("--"):
                 key = item.split('=')[0]
@@ -1114,6 +1115,10 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
                     adm_result = first_control_plane.sudo("cat %s" % admission_path)
                     adm_conf = yaml.safe_load(list(adm_result.values())[0].stdout)
                     profile = adm_conf["plugins"][0]["configuration"]["defaults"]["enforce"]
+                    if minor_version >= 28:
+                        kube_admission_status = 'PSS is "enabled", default profile is "%s"' % profile
+                        cluster.log.debug(kube_admission_status)
+                        tc.success(results='enabled')
                 if key == "--feature-gates":
                     features = value
                     if "PodSecurity=false" not in features:
