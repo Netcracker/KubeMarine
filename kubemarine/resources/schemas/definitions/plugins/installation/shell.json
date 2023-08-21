@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "description": "Execute shell code on remote hosts. Can be either a command string or a dictionary with the extra parameters.",
+  "description": "Execute shell code on remote hosts. It can be either a command string or a dictionary with extra parameters.",
   "oneOf": [
     {"type": "string", "minLength": 1},
     {
       "type": "object",
       "properties": {
         "command": {
-          "description": "A shell command(s) to be executed on remote hosts. If the list of commands is provided, they will be joint with '&&'.",
+          "description": "A shell command or commands to be executed on remote hosts. If the list of commands is provided, they are joint with '&&'.",
           "oneOf": [
             {"type": "string", "minLength": 1},
             {
@@ -20,19 +20,19 @@
         "sudo": {
           "type": "boolean",
           "default": false,
-          "description": "Switch for the command execution from the sudoer"
+          "description": "Switch for the command execution from the sudoer."
         },
         "groups": {
           "$ref": "../../common/node_ref.json#/definitions/Roles",
-          "description": "List of groups on which the shell command should be executed"
+          "description": "List of groups on which the shell command should be executed."
         },
         "nodes": {
           "$ref": "../../common/node_ref.json#/definitions/Names",
-          "description": "List of nodes on which the shell command should be executed"
+          "description": "List of nodes on which the shell command should be executed."
         },
         "out_vars": {
           "type": "array",
-          "description": "List of ENV variables to export and save for later use",
+          "description": "List of ENV variables to export and save for later use.",
           "items": {
             "type": "object",
             "properties": {
@@ -49,7 +49,7 @@
         },
         "in_vars": {
           "type": "array",
-          "description": "List of ENV variables to import before command execution",
+          "description": "List of ENV variables to import before command execution.",
           "items": {
             "type": "object",
             "properties": {
