@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Change the default settings for the by-default installed 'nginx-ingress-controller' plugin",
+  "description": "Change the default settings for the by-default installed 'nginx-ingress-controller' plugin.",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "install": {
@@ -25,15 +25,15 @@
     },
     "controller": {
       "type": "object",
-      "description": "NGINX Ingress Controller configuration",
+      "description": "The NGINX Ingress Controller configuration.",
       "properties": {
         "image": {
           "type": "string",
-          "description": "Specifies the string for the NGINX Ingress Controller image"
+          "description": "Specifies the string for the NGINX Ingress Controller image."
         },
         "ssl": {
           "type": "object",
-          "description": "SSL configuration",
+          "description": "The SSL configuration.",
           "properties": {
             "enableSslPassthrough": {
               "type": "boolean",
@@ -48,7 +48,7 @@
         },
         "args": {
           "type": "array",
-          "description": "Additional arguments."
+          "description": "The additional arguments."
         },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
@@ -67,11 +67,11 @@
     },
     "config_map": {
       "type": "object",
-      "description": "Customize or fine tune NGINX behavior"
+      "description": "Customize or fine tune NGINX behavior."
     },
     "custom_headers": {
       "type": "object",
-      "description": "The parameter sets specified custom headers before sending the traffic to backends"
+      "description": "The parameter sets specified custom headers before sending the traffic to backends."
     }
   },
   "propertyNames": {
@@ -83,15 +83,15 @@
   "definitions": {
     "DefaultCertificate": {
       "type": "object",
-      "description": "Configure a custom default certificate for ingress resources",
+      "description": "Configure a custom default certificate for ingress resources.",
       "properties": {
         "data": {
           "$ref": "#/definitions/CertAndKey",
-          "description": "Provide a certificate and a key inplace in the pem format"
+          "description": "Provide a certificate and a key inplace in the pem format."
         },
         "paths": {
           "$ref": "#/definitions/CertAndKey",
-          "description": "Provide a certificate and a key as paths to the pem files"
+          "description": "Provide a certificate and a key as paths to the pem files."
         }
       },
       "minProperties": 1,
