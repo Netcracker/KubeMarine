@@ -14,7 +14,7 @@
   "definitions": {
     "OSFamilyModules": {
       "type": "array",
-      "description": "Manage Linux Kernel modules to be loaded in the host operating system",
+      "description": "Manage Linux Kernel modules to be loaded in the host operating system.",
       "items": {
         "anyOf": [
           {
