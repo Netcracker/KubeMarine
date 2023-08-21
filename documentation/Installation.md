@@ -214,12 +214,12 @@ If you have other solution, remove or switch off the IP firewall before the inst
   * ebtables
   * socat
 
-**Warning**: You have to specify packages names in "RPM format" if it is possible for you OS,
+**Warning**: You have to specify package names in "RPM format" if it is possible for your OS.
 For example, specify `conntrack-tools` instead of `conntrack`.
 
 **Note**: For an automated installation, you can use [Packages](#packages) during installation.
 
-**Preinstalled or RPM repository provided in `cluster.yaml` with the following RPMs from [Supported versions table](#supported-versions)**
+**Preinstalled or RPM repository are provided in `cluster.yaml` with the following RPMs from [Supported versions table](#supported-versions)**
 
 **Note**:
 
@@ -635,7 +635,7 @@ nodes:
 
 The example is also available in [Full Inventory Example](../examples/cluster.yaml/full-cluster.yaml).
 
-**Warning**: Please be informed that the `master` role is obsolete and will be changed by `control-plane`in the future. The 
+**Warning**: The `master` role is obsolete and will be changed by `control-plane` in the future. The 
 `control-plane` and `master` roles are interchangeable at the moment. Therefore it's possible to use the `control-plane` and 
 `master` roles in any procedure.
 
@@ -809,9 +809,9 @@ The following parameters are supported:
 
 | Parameter       | Type   | Default value            | Description                                                                                   |
 |-----------------|--------|--------------------------|-----------------------------------------------------------------------------------------------|
-| endpoints       | list   |                          | Address list of registry endpoints                                                           |
-| mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers |
-| thirdparties    | string |                          | Address for the webserver, where thirdparties hosted                                          |
+| endpoints       | list   |                          | The address list of registry endpoints.                                                           |
+| mirror_registry | string | `registry.cluster.local` | The internal address of the containerd mirror registry, which should be defined in containers. |
+| thirdparties    | string |                          | The address for the webserver, where thirdparties are hosted.                                          |
 
 Endpoint value is a string with an address (protocol, host, and port). Record format example:
 
@@ -1040,7 +1040,7 @@ vrrp_ips:
 #### maintenance type
 
 Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
-The following example discribes the type of traffic that applicable for particular IP in maintenance mode configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
+The following example describes the type of traffic that ia applicable for a particular IP in the maintenance mode configuration (`not bind` means that IP will neither receive TCP nor HTTP traffic):
 
 ```yaml
 vrrp_ips:
@@ -1178,7 +1178,7 @@ services:
         pathType: File
 ```
 
-In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an openstack is as follows:
+In this case, Kubemarine automatically initializes and joins new cluster nodes with CPP enabled. However, this is not enough for the full operation of the CPP. There are a number of manual steps required to configure the CPP before running Calico and other plugins. These steps depend directly on your Cloud Provider and its specific settings. An example of a simple setup for an Openstack is as follows:
 
 1. Prepare cloud config of your Cloud Provider with credentials and mandatory parameters required for the connection. Openstack cloud config example:
 
@@ -1883,7 +1883,7 @@ services:
 
 **Warning**: This section is specific to different OS families. Ensure that you use the proper definition format for your OS distributive - it may differ from the presented examples in this document.
 
-In the `services.packages` section, there is a `services.packages.associations` sub-section that allows you to configure predefined associations of package objects. It allows you to redefine the following knowledges:
+In the `services.packages` section, there is a `services.packages.associations` sub-section that allows you to configure predefined associations of package objects. It allows you to redefine the following knowledge:
 
 * executable_name
 * package_name
@@ -2280,7 +2280,7 @@ services:
 
 *OS specific*: No
 
-The `services.cri` section configures container runtime used for kubernetes. By default, the following parameters are used:
+The `services.cri` section configures container runtime used for Kubernetes. By default, the following parameters are used:
 
 ```yaml
 services:
@@ -2307,7 +2307,7 @@ services:
 
 **Note**: default value of `SystemdCgroup` = `true` only in case, when `cgroupDriver` from [kubelet config](#kubeadm_kubelet) is equal to `systemd`.
 
-The `containerRuntime` parameter configures a particular container runtime implementation used for kubernetes.
+The `containerRuntime` parameter configures a particular container runtime implementation used for Kubernetes.
 The available values are `docker` and `containerd`. By default `containerd` is used.
 
 When containerd is used as a container runtime, it is possible to additionally define the `containerdConfig` section,
@@ -2360,7 +2360,7 @@ services:
 
 **Note**: When containerd is used, `crictl` binary is also installed and configured as required.
 
-Alternatively, it is possible to use docker as a container runtime for kubernetes by setting `docker` value for `containerRuntime` parameter.
+Alternatively, it is possible to use docker as a container runtime for Kubernetes by setting `docker` value for `containerRuntime` parameter.
 When docker is used as a container runtime, it is possible to additionally define the `dockerConfig` section,
 which contains the parameters passed to `daemon.json`, for example:
 
@@ -2394,7 +2394,7 @@ For more information about Docker daemon parameters, refer to the official docke
 
 *OS specific*: Yes
 
-The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded(according to the IP version and OS family):
+The `services.modprobe` section manages Linux Kernel modules to be loaded in the host operating system. By default, the following modules are loaded (according to the IP version and OS family):
 
 IPv4:
 ```yaml
