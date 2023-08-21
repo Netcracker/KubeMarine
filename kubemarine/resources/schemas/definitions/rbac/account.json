@@ -5,11 +5,11 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Account name that is applied by default to items in 'configs' section"
+      "description": "Account name that is applied by default to items in the 'configs' section."
     },
     "role": {
       "type": "string",
-      "description": "Account role that is applied to ClusterRoleBinding item in 'configs' section"
+      "description": "Account role that is applied to the ClusterRoleBinding item in the 'configs' section."
     }
   },
   "required": ["name", "role"],
