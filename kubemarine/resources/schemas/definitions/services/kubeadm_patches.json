@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Override the original settings for patches of control-plane pods and kubelet",
+  "description": "Override the original settings for patches of control-plane pods and kubelet.",
   "additionalProperties": false,
   "properties": {
     "apiServer": {
@@ -23,7 +23,7 @@
   "definitions": {
     "control-plane-pod-patch": {
       "type": "array",
-      "description": "Patches for control-plane pods",
+      "description": "Patches for control-plane pods.",
       "minItems": 0,
       "items": {
         "anyOf": [
@@ -74,7 +74,7 @@
     },
     "kubelet-patch": {
       "type": "array",
-      "description": "Patches for kubelet",
+      "description": "Patches for kubelet.",
       "minItems": 0,
       "items": {
         "anyOf": [
