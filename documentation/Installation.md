@@ -5239,7 +5239,7 @@ The following is the installation tasks tree:
     * **install** - Configures Kubernetes service in the file `/etc/systemd/system/kubelet.service`
     * **prepull_images** - Prepulls Kubernetes images on all nodes using parameters from the inventory.
     * **init** - Initializes Kubernetes nodes via kubeadm with config files: `/etc/kubernetes/init-config.yaml` and `/etc/kubernetes/join-config.yaml`. For more information about parameters for this task, see [kubeadm](#kubeadm). Also apply PSS if it is enabled. For more information about PPS, see [Admission pss](#admission-pss).
-    * **audit** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy)
+    * **audit** - Configures Kubernetes audit rules. For more information about parameters for this task, see [audit-Kubernetes Policy](#audit-Kubernetes-Policy).
   * **admission** - Applies OOB and custom pod security policies. For more information about the parameters for this task, see [Admission psp](#admission-psp).
   * **coredns** - Configures CoreDNS service with [coredns](#coredns) inventory settings.
   * **plugins** - Applies plugin installation procedures. For more information about parameters for this task, see [Plugins](#plugins).
