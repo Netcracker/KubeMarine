@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Change the default settings for the by-default installed 'calico' plugin",
+  "description": "Change the default settings for the by-default installed 'calico' plugin.",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "install": {
@@ -14,12 +14,12 @@
     "mode": {
       "enum": ["ipip", "vxlan"],
       "default": "ipip",
-      "description": "Network protocol to be used in network plugin"
+      "description": "Network protocol to be used in a network plugin."
     },
     "crossSubnet": {
       "type": "boolean",
       "default": true,
-      "description": "Enables crossing subnet boundaries to improve network performance"
+      "description": "Enables crossing subnet boundaries to improve the network performance."
     },
     "natOutgoing": {
       "type": "boolean",
@@ -28,26 +28,26 @@
     "mtu": {
       "type": "integer",
       "default": 1440,
-      "description": "MTU size for Calico interface"
+      "description": "MTU size for the Calico interface."
     },
     "fullmesh": {
       "type": "boolean",
       "default": true,
-      "description": "Enable of disable full mesh BGP topology"
+      "description": "Enable of disable full mesh BGP topology."
     },
     "announceServices": {
       "type": "boolean",
       "default": false,
-      "description": "Enable announces of ClusterIP services CIDR through BGP"
+      "description": "Enable announces of ClusterIP services CIDR through BGP."
     },
     "defaultAsNumber": {
       "type": ["string", "integer"],
       "default": 64512,
-      "description": "AS Number to be used by default for this cluster"
+      "description": "AS Number to be used by default for the cluster."
     },
     "globalBgpPeers": {
       "type": "array",
-      "description": "List of global BGP Peer (IP,AS) values",
+      "description": "List of global BGP Peer (IP, AS) values.",
       "items": {
         "type": "object",
         "properties": {
@@ -60,23 +60,23 @@
     },
     "typha": {
       "type": "object",
-      "description": "Typha Daemon configuration",
+      "description": "The Typha Daemon configuration.",
       "properties": {
         "enabled": {
           "type": ["string", "boolean"],
-          "description": "Enables the Typha Daemon"
+          "description": "Enables the Typha Daemon."
         },
         "replicas": {
           "type": ["string", "integer"],
-          "description": "Number of Typha running replicas"
+          "description": "Number of Typha running replicas."
         },
         "image": {
           "type": "string",
-          "description": "Calico Typha image"
+          "description": "The Calico Typha image."
         },
         "tolerations": {
           "$ref": "generic_plugin.json#/definitions/CustomTolerations",
-          "description": "Custom toleration for calico-typha pods"
+          "description": "Custom toleration for calico-typha pods."
         },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
@@ -89,7 +89,7 @@
     },
     "env": {
       "type": "object",
-      "description": "Change the default Calico environment properties",
+      "description": "Change the default Calico environment properties.",
       "properties": {
         "FELIX_USAGEREPORTINGENABLED": {"type": ["string", "boolean"], "default": "'false'"},
         "WAIT_FOR_DATASTORE": {"type": ["string", "boolean"], "default": "'true'"},
@@ -99,11 +99,11 @@
     },
     "cni": {
       "type": "object",
-      "description": "CNI configuration",
+      "description": "The CNI configuration.",
       "properties": {
         "image": {
           "type": "string",
-          "description": "Calico CNI image"
+          "description": "The Calico CNI image."
         },
         "ipam": {
           "type": "object",
@@ -122,11 +122,11 @@
     },
     "node": {
       "type": "object",
-      "description": "Calico Node configuration",
+      "description": "The Calico Node configuration.",
       "properties": {
         "image": {
           "type": "string",
-          "description": "Calico Node image"
+          "description": "The Calico Node image."
         },
         "resources": {
           "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
@@ -136,11 +136,11 @@
     },
     "kube-controllers": {
       "type": "object",
-      "description": "Calico Kube Controllers configuration",
+      "description": "The Calico Kube Controllers configuration.",
       "properties": {
         "image": {
           "type": "string",
-          "description": "Calico Kube Controllers image"
+          "description": "The Calico Kube Controllers image."
         },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
@@ -153,11 +153,11 @@
     },
     "flexvol": {
       "type": "object",
-      "description": "Calico Flexvol configuration",
+      "description": "The Calico Flexvol configuration.",
       "properties": {
         "image": {
           "type": "string",
-          "description": "Calico Flexvol image"
+          "description": "The Calico Flexvol image."
         }
       },
       "additionalProperties": false
