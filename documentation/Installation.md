@@ -88,7 +88,7 @@ This section provides information about the inventory, features, and steps for i
         - [shell](#shell)
         - [ansible](#ansible)
         - [helm](#helm)
-  - [Advanced features](#advanced-features)
+  - [Advanced Features](#advanced-features)
     - [List Merge Strategy](#list-merge-strategy)
       - [Merge Strategy Positioning](#merge-strategy-positioning)
       - [List Merge Allowed Sections](#list-merge-allowed-sections)
@@ -96,10 +96,10 @@ This section provides information about the inventory, features, and steps for i
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
     - [Environment Variables](#environment-variables)
-  - [Installation without Internet Resources](#installation-without-internet-resources)
+  - [Installation Without Internet Resources](#installation-without-internet-resources)
 - [Installation Procedure](#installation-procedure)
   - [Installation Tasks Description](#installation-tasks-description)
-  - [Installation of Kubernetes using CLI](#installation-of-kubernetes-using-cli)
+  - [Installation of Kubernetes Using CLI](#installation-of-kubernetes-using-cli)
     - [Custom Inventory File Location](#custom-inventory-file-location)
 - [Installation Features](#installation-features)
   - [Tasks List Redefinition](#tasks-list-redefinition)
@@ -1146,7 +1146,7 @@ services:
 ```
 
 
-#### Kubernetes version
+#### Kubernetes Version
 
 By default, the `1.26.3` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
 
@@ -1551,7 +1551,7 @@ services:
 
 By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
 
-**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `kubeadm.paches`, the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `kubeadm.patches`). This behaviour persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
+**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `kubeadm.paches`, the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `kubeadm.patches`). This behavior persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
 
 #### kernel_security
 
@@ -2217,7 +2217,7 @@ This is configured in the `services.thirdparties` section. The contents of this 
 
 |Name|Mandatory|Default Value|Description|
 |---|---|---|---|
-|**source**|**yes**| |Source from where to upload the file to hosts. It can be an URL or an **absolute** path on the deployment node. For detailed description of this parameter, see [Installation without Internet Resources](#installation-without-internet-resources).|
+|**source**|**yes**| |Source from where to upload the file to hosts. It can be an URL or an **absolute** path on the deployment node. For detailed description of this parameter, see [Installation Without Internet Resources](#installation-without-internet-resources).|
 |**sha1**|no|`None`|SHA1 hash of the file. It is necessary in order to check with an existing file on the hosts and decide whether to download the file or not.|
 |**owner**|no|`root`|The owner who needs to be assigned to the file after downloading it.|
 |**mode**|no|`700`|The mode which needs to be assigned to the file after downloading it.|
@@ -2375,7 +2375,7 @@ services:
         - https://artifactory.example.com:5443
 ```
 
-For detailed description of the parameters, see [Installation without Internet Resources](#installation-without-internet-resources).
+For detailed description of the parameters, see [Installation Without Internet Resources](#installation-without-internet-resources).
 For more information about Docker daemon parameters, refer to the official docker configuration file documentation at [https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file).
 
 **Note**: After applying the parameters, the docker is restarted on all nodes in the cluster.
@@ -2960,7 +2960,7 @@ The following settings are supported:
     <td>rewrite [continue|stop]</td>
     <td>dict</td>
     <td>Not provided</td>
-    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. It is possible to use `rewrite continue` or `rewrite stop` to define the `rewrite` plugin behaviour in case of multiple rules. Refer to the [official documentation](https://coredns.io/plugins/rewrite/) for more details. </td>
+    <td>The rewrite could be used for rewriting different parts of DNS questions and answers. By default, it is not used, but it is required to use rewrite plugin in DR schema. It is possible to use `rewrite continue` or `rewrite stop` to define the `rewrite` plugin behavior in case of multiple rules. Refer to the [official documentation](https://coredns.io/plugins/rewrite/) for more details. </td>
   </tr>
   <tr>
     <td>hosts</td>
@@ -3649,14 +3649,14 @@ It is also possible to change BGP topology at the running cluster.
 **Warning**: short downtime is possible during BGP peering sessions reestablishing.
 
 To switch from "full mesh" to "route reflector" topology:
-- add the label `route-reflector: True` to the route reflector nodes manually:
+- Add the label `route-reflector: True` to the route reflector nodes manually:
 ```
 $ kubectl label node <NODENAME> route-reflector=True
 ```
-- add `fullmesh: false` parameter to the `calico` plugin section in the cluster.yaml
-- run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step.
+- Add `fullmesh: false` parameter to the `calico` plugin section in the cluster.yaml
+- Run `kubemarine install` with the `deploy.plugins` task only. Other plugins should have `install: false` in the cluster.yaml at this step.
 
-**Note**: for the topology with route reflectors the predefined value `routeReflectorClusterID=244.0.0.1` is used.
+**Note**: For the topology with route reflectors the predefined value `routeReflectorClusterID=244.0.0.1` is used.
 
 To switch from "route reflector" to "full mesh" topology:
 - change `fullmesh` parameter value to `true` in the `calico` plugin section in the cluster.yaml (it also may be removed so the default value of `fullmesh` is being used)
@@ -4065,7 +4065,7 @@ plugin_defaults:
     registry: artifactory.example.com:5443
 ```
 
-For detailed description of `registry` parameter, see [Installation without Internet Resources](#installation-without-internet-resources).
+For detailed description of `registry` parameter, see [Installation Without Internet Resources](#installation-without-internet-resources).
 
 ##### Plugins Reinstallation
 
@@ -5173,7 +5173,7 @@ plugins:
     variable: ENV_VARIABLE_VALUE
 ```
 
-## Installation without Internet Resources
+## Installation Without Internet Resources
 
 If you want to install Kubernetes in a private environment, without access to the internet, then you need to redefine the addresses of remote resources.
 Be careful with the following parameters:
@@ -5250,7 +5250,7 @@ The following is the installation tasks tree:
 
 **Note**: The task execution is strictly performed in the order as in the tree above.
 
-## Installation of Kubernetes using CLI
+## Installation of Kubernetes Using CLI
 
 Full installation using CLI can be started with the following command:
 
@@ -5304,7 +5304,7 @@ Example:
 kubemarine install --exclude="deploy.loadbalancer,deploy.kubernetes.install"
 ```
 
-The arguments can be combined. For example, when you only need to perform a deploy, but not touch the balancers.
+The arguments can be combined. For example, when you only need to perform a deployment, but not touch the balancers.
 
 Example:
 
