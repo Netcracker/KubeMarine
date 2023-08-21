@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "description": "Compile the Jinja2 template file, upload to remote hosts, and apply it. Can be either a local path to file or a dictionary with the extra parameters.",
+  "description": "Compile the Jinja2 template file, upload to remote hosts, and apply it. It can be either a local path to a file or a dictionary with extra parameters.",
   "oneOf": [
     {"type": "string"},
     {
@@ -21,12 +21,12 @@
         },
         "destination": {
           "type": "string",
-          "description": "The absolute path on the hosts where the compiled template needs to be uploaded"
+          "description": "The absolute path on the hosts where the compiled template needs to be uploaded."
         },
         "apply_required": {
           "type": "boolean",
           "default": true,
-          "description": "A switch to call the command to apply the uploaded template on remote hosts"
+          "description": "A switch to call the command to apply the uploaded template on remote hosts."
         },
         "apply_command": {
           "type": "string",
@@ -35,23 +35,23 @@
         "sudo": {
           "type": "boolean",
           "default": true,
-          "description": "A switch for the command execution from the sudoer"
+          "description": "A switch for the command execution from the sudoer."
         },
         "destination_groups": {
           "$ref": "../../common/node_ref.json#/definitions/Roles",
-          "description": "List of groups on which the compiled template needs to be uploaded"
+          "description": "List of groups on which the compiled template needs to be uploaded."
         },
         "destination_nodes": {
           "$ref": "../../common/node_ref.json#/definitions/Names",
-          "description": "List of nodes on which the compiled template needs to be uploaded"
+          "description": "List of nodes on which the compiled template needs to be uploaded."
         },
         "apply_groups": {
           "$ref": "../../common/node_ref.json#/definitions/Roles",
-          "description": "List of groups on which the template apply command needs to be executed"
+          "description": "List of groups on which the template apply command needs to be executed."
         },
         "apply_nodes": {
           "$ref": "../../common/node_ref.json#/definitions/Names",
-          "description": "List of nodes on which the template apply command needs to be executed"
+          "description": "List of nodes on which the template apply command needs to be executed."
         }
       }
     },
