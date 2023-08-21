@@ -5,11 +5,11 @@
   "properties": {
     "priority": {
       "type": "integer",
-      "description": "Parameter that defines the installation order of the plugin relative to the other plugins"
+      "description": "Parameter that defines the installation order of the plugin relative to other plugins."
     },
     "procedures": {
       "type": "array",
-      "description": "Installation procedures to perform during the installation of the plugin",
+      "description": "Installation procedures to perform during the installation of the plugin.",
       "items": {
         "type": "object",
         "properties": {
@@ -43,7 +43,7 @@
       "properties": {
         "registry": {
           "type": "string",
-          "description": "The plugin(s) container's images are loaded from this registry"
+          "description": "The plugin container's images are loaded from this registry."
         }
       }
     },
