@@ -15,7 +15,7 @@
   },
   "definitions": {
     "PackageName": {
-      "description": "Packages with versions to install if the associated service is required for the cluster",
+      "description": "Packages with versions to install if the associated service is required for the cluster.",
       "oneOf": [
         {"type": "string"},
         {
@@ -25,7 +25,7 @@
     },
     "PackageNameOnlyAssociations": {
       "type": "object",
-      "description": "Associations related to specific package",
+      "description": "Associations related to a specific package.",
       "properties": {
         "package_name": {
           "$ref": "#/definitions/PackageName"
@@ -41,7 +41,7 @@
         "cache_versions": {
           "type": "boolean",
           "default": true,
-          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure"
+          "description": "Specifies whether to install exactly the same package versions from package_name section during the add_node procedure."
         }
       }
     },
@@ -50,7 +50,7 @@
     },
     "PackageAssociations": {
       "type": "object",
-      "description": "Associations related to specific package",
+      "description": "Associations related to a specific package.",
       "allOf": [{"$ref": "#/definitions/PackageAssociationsProperties"}],
       "propertyNames": {
         "$ref": "#/definitions/PackageAssociationsPropertyNames"
@@ -58,20 +58,20 @@
     },
     "ServicePackageAssociations": {
       "type": "object",
-      "description": "Associations related to specific package",
+      "description": "Associations related to a specific package.",
       "allOf": [{"$ref": "#/definitions/PackageAssociationsProperties"}],
       "properties": {
         "executable_name": {
           "type": "string",
-          "description": "Path to or name of the associated binary executable"
+          "description": "Path to or name of the associated binary executable."
         },
         "service_name": {
           "type": "string",
-          "description": "Name of systemd service"
+          "description": "Name of the systemd service."
         },
         "config_location": {
           "type": "string",
-          "description": "Path to the configuration file of the associated service"
+          "description": "Path to the configuration file of the associated service."
         }
       },
       "propertyNames": {
@@ -83,7 +83,7 @@
     },
     "OSFamilyAssociations": {
       "type": "object",
-      "description": "Associations related to specific OS family. Specifying in this section is not required in common case, but can be necessary during operating system migration.",
+      "description": "Associations related to specific the OS family. Specifying in this section is not required in the common case, but can be necessary while operating system migration.",
       "allOf": [{"$ref": "#/definitions/Associations"}],
       "propertyNames": {
         "$ref": "#/definitions/AssociationsNames"
