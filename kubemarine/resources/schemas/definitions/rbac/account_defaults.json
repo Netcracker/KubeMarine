@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Describe parameters that needs to be applied by default to each record in the rbac.accounts section",
+  "description": "Describe parameters that needs to be applied by default to each record in the rbac.accounts section.",
   "allOf": [{"$ref": "#/definitions/CommonAccountProperties"}],
   "propertyNames": {
     "$ref": "#/definitions/CommonAccountPropertyNames"
@@ -12,11 +12,11 @@
         "namespace": {
           "type": "string",
           "default": "kube-system",
-          "description": "Namespace to apply by default to items in 'configs' section"
+          "description": "Namespace to apply by default to items in the 'configs' section."
         },
         "configs": {
           "type": "array",
-          "description": "YAML settings for ServiceAccount, ClusterRoleBinding and Secret (since Kubernetes 1.24)",
+          "description": "YAML settings for ServiceAccount, ClusterRoleBinding, and Secret (since Kubernetes 1.24).",
           "items": [
             {"$ref": "#/definitions/ServiceAccount"},
             {"$ref": "#/definitions/ClusterRoleBinding"}
