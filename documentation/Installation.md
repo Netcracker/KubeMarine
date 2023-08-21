@@ -77,7 +77,7 @@ This section provides information about the inventory, features, and steps for i
         - [Plugins Installation Order](#plugins-installation-order)
         - [Node Selector](#node-selector)
         - [Tolerations](#tolerations)
-        - [Resources requets and limits](#resources-requests-and-limits)
+        - [Resources Requests and Limits](#resources-requests-and-limits)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
         - [config](#config) 
@@ -183,7 +183,7 @@ The actual information about the supported versions can be found in `compatibili
     * 80 : HTTP
     * 179 : Calico BGP
     * 443 : HTTPS
-    * 5473 : Calico netowrking with Typha enabled
+    * 5473 : Calico networking with Typha enabled
     * 6443 : Kubernetes API server
     * 8443 : Kubernetes dashboard
     * 2379-2380 : ETCD server & client API
@@ -574,13 +574,14 @@ node:
 ```
 
 Following are the parameters allowed to be specified in the `node_defaults` section:
-* keyfile, password, username, connection_port, connection_timeout and gateway.
+* keyfile, password, username, connection_port, connection_timeout, and gateway.
 * labels, and taints - specify at global level only if the [Mini-HA Scheme](#mini-ha-scheme) is used.
 For more information about the listed parameters, refer to the following section.
 
-Note: To establish an ssh connection, you can use either a keyfile or a password. In case if you are specifying both, keyfile will be considered on priority.
+**Note**: To establish an ssh connection, you can use either a keyfile or a password. In case you are specifying both, the keyfile is considered on priority.
 
-Note: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the cluster.yaml file, specify the password field using the environment variable syntax. For instance: `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. See more details about [environment variables](#environment-variables) 
+**Note**: Set an environment variable with the desired password. For example, you can use `export PASS="your_password"`. In the **cluster.yaml** file, specify the password field using the environment variable syntax. For instance, `password: '{{ env.PASS }}'`. This syntax instructs the code to fetch the value from the PASS environment variable and substitute it into the password field when reading the configuration file. For more information, see [environment variables](#environment-variables).
+
 ### nodes
 
 In the `nodes` section, it is necessary to describe each node of the future cluster.
@@ -589,17 +590,17 @@ The following options are supported:
 
 |Name|Type|Mandatory|Default Value|Example|Description|
 |---|---|---|---|---|---|
-|keyfile|string|no| |`/home/username/.ssh/id_rsa`|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
-|password|string|no| |`password@123`|Password to access the cluster machines, Either a keyfile or a password should be provided|
-|username|string|no|`root`|`centos`|Username for SSH-access the cluster machines|
-|name|string|no| |`k8s-control-plane-1`|Cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
-|address|ip address|no| |`10.101.0.1`|External node's IP-address|
-|internal_address|ip address|**yes**| |`192.168.0.1`|Internal node's IP-address|
-|connection_port|int|no|`22`| |Port for SSH-connection to cluster node|
-|connection_timeout|int|no|10|`60`|Timeout for SSH-connection to cluster node|
-|roles|list|**yes**| |`["control-plane"]`|Cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
-|labels|map|no| |`netcracker-infra: infra`|Additional labels for node|
-|taints|list|no| |See examples below|Additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
+|keyfile|string|no| |`/home/username/.ssh/id_rsa`|The **Absolute** path to the keyfile on the local machine to access cluster machines. Either a keyfile or a password should be provided.|
+|password|string|no| |`password@123`|The password to access the cluster machines. Either a keyfile or a password should be provided.|
+|username|string|no|`root`|`centos`|The username to SSH-access the cluster machines.|
+|name|string|no| |`k8s-control-plane-1`|The cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory. Note that this leads to undefined behavior when adding or removing nodes.|
+|address|ip address|no| |`10.101.0.1`|The external node's IP-address.|
+|internal_address|ip address|**yes**| |`192.168.0.1`|The internal node's IP-address.|
+|connection_port|int|no|`22`| |The port for SSH-connection to the cluster node.|
+|connection_timeout|int|no|10|`60`|The timeout for SSH-connection to the cluster node.|
+|roles|list|**yes**| |`["control-plane"]`|The cluster member role. It can be `balancer`, `worker`, or `control-plane`.|
+|labels|map|no| |`netcracker-infra: infra`|The additional labels for a node.|
+|taints|list|no| |See examples below|The additional taints for node. **Caution**: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences.|
 
 An example with parameters values is as follows:
 
@@ -917,11 +918,11 @@ The following parameters are supported:
 
 |Parameter|Type|Mandatory|Description|
 |---|---|---|---|
-|**name**|string|**yes**|Gateway node name|
-|**address**|ip address|**yes**|Gateway node's IP or hostname address for connection|
-|**username**|string|**yes**|Username for SSH-access the gateway node|
-|**keyfile**|string|no|**Absolute** path to keyfile on local machine to access the cluster machines, Either a keyfile or a password should be provided|
-|**password**|string|no|Password to access the cluster machines, Either a keyfile or a password should be provided|
+|**name**|string|**yes**|The gateway node name.|
+|**address**|ip address|**yes**|The gateway node's IP or hostname address for connection.|
+|**username**|string|**yes**|The username to SSH-access the gateway node.|
+|**keyfile**|string|no|The **Absolute** path to keyfile on local machine to access the cluster machines. Either a keyfile or a password should be provided.|
+|**password**|string|no|The password to access the cluster machines. Either a keyfile or a password should be provided.|
 
 An example is as follows:
 
