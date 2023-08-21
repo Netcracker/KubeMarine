@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Enable and/or change default settings for 'local-path-provisioner' plugin",
+  "description": "Enable and/or change the default settings for the 'local-path-provisioner' plugin.",
   "allOf": [{"$ref": "generic_plugin.json#/definitions/Properties"}],
   "properties": {
     "version": {
@@ -12,17 +12,17 @@
     },
     "storage-class": {
       "type": "object",
-      "description": "Configuration of StorageClass resource for Local Path Provisioner",
+      "description": "Configuration of StorageClass resource for Local Path Provisioner.",
       "properties": {
         "name": {
           "type": "string",
           "default": "local-path",
-          "description": "Name of the storage class resource, which describes the class of the local volumes created by the provisioner"
+          "description": "Name of the storage class resource, which describes the class of the local volumes created by the provisioner."
         },
         "is-default": {
           "type": ["string", "boolean"],
           "default": "'false'",
-          "description": "If 'true', the created storage class is the default one"
+          "description": "If 'true', the created storage class is the default one."
         }
       },
       "additionalProperties": false
