@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "You can install or upgrade HELM chart on the Kubernetes cluster",
+  "description": "You can install or upgrade HELM chart on the Kubernetes cluster.",
   "properties": {
     "chart_path": {
       "type": "string",
@@ -14,7 +14,7 @@
     },
     "values_file": {
       "type": "string",
-      "description": "The path on local host to the file with YAML formatted values for the chart that override values from the values.yaml file from the provided chart."
+      "description": "The path on local host to the file containing YAML formatted values for the chart that override values from the values.yaml file from the provided chart."
     },
     "release": {
       "type": "string",
@@ -23,7 +23,7 @@
     "namespace": {
       "type": "string",
       "default": "default",
-      "description": "The cloud namespace where the chart should be installed"
+      "description": "The cloud namespace where the chart should be installed."
     }
   },
   "required": ["chart_path"],
