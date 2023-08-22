@@ -12,24 +12,24 @@
       "properties": {
         "name": {
           "$ref": "common/node_ref.json#/definitions/Name",
-          "description": "Cluster member name. If omitted, KubeMarine will calculate the name by the member role and position in the inventory."
+          "description": "The cluster member name. If omitted, Kubemarine calculates the name by the member role and position in the inventory."
         },
         "address": {
           "type": "string",
-          "description": "External node's IP-address"
+          "description": "The external node's IP-address."
         },
         "internal_address": {
           "type": "string",
-          "description": "Internal node's IP-address"
+          "description": "The internal node's IP-address."
         },
         "roles": {
           "$ref": "common/node_ref.json#/definitions/Roles",
-          "description": "Cluster member roles"
+          "description": "The cluster member roles."
         },
         "control_endpoint": {
           "type": "boolean",
           "default": false,
-          "description": "Parameter to help the algorithm in choosing which address to take as the control_plain"
+          "description": "The parameter to help the algorithm in choosing which address to take as the control_plain."
         },
         "connect_to": {"type": "string"}
       }
