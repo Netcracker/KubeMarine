@@ -4,7 +4,7 @@
   "properties": {
     "upgrade": {
       "type": "object",
-      "description": "Configure the parameters to upgrade different types of software",
+      "description": "Configure the parameters to upgrade different types of software.",
       "properties": {
         "plugins": {
           "$ref": "#/definitions/UpgradePlugins"
@@ -26,7 +26,7 @@
   "definitions": {
     "UpgradePlugins": {
       "type": "object",
-      "description": "Configure the parameters of the default plugins",
+      "description": "Configure the parameters of the default plugins.",
       "properties": {
         "calico": {
           "$ref": "definitions/plugins/calico.json"
@@ -45,11 +45,11 @@
     },
     "UpgradePackages": {
       "type": "object",
-      "description": "Section for packages and their management during upgrade",
+      "description": "The section for packages and their management during an upgrade.",
       "properties": {
         "associations": {
           "type": "object",
-          "description": "Configure associations of package objects to be used during upgrade",
+          "description": "Configure associations of package objects to be used during an upgrade.",
           "properties": {
             "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
             "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
@@ -63,7 +63,7 @@
     },
     "UpgradeThirdparties": {
       "type": "object",
-      "description": "Deliver files from third party sources and install them in the system",
+      "description": "Deliver files from thirdparty sources and install them in the system.",
       "properties": {
         "/usr/bin/calicoctl": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"},
         "/usr/bin/crictl.tar.gz": {"$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"}
