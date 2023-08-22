@@ -18,7 +18,7 @@
     },
     "cluster_name": {
       "type": "string",
-      "description": "Address of the cluster. On this address, the Control Plane Endpoint is raised, and it is used in the calculated parameters."
+      "description": "The address of the cluster. On this address, the Control Plane Endpoint is raised, and it is used in the calculated parameters."
     },
     "control_plain": {
       "type": "object",
@@ -26,11 +26,11 @@
       "properties": {
         "internal": {
           "type": "string",
-          "description": "Internal network address for the connection. It is to be used for all internal kubeapi traffic."
+          "description": "The internal network address for the connection. It is to be used for all internal kubeapi traffic."
         },
         "external": {
           "type": "string",
-          "description": "External network address for the connection. It is to be used for serving and balancing external traffic and external connections."
+          "description": "The external network address for the connection. It is to be used for serving and balancing external traffic and external connections."
         }
       },
       "additionalProperties": false
@@ -38,7 +38,7 @@
     "public_cluster_ip": {
       "type": "string",
       "default": "'{{ control_plain.external }}'",
-      "description": "An obsolete variable that is used if you are using Helm plugins installation."
+      "description": "An obsolete variable that is used if you are using Helm plugins' installation."
     },
     "registry": {
       "$ref": "definitions/registry.json"
@@ -52,7 +52,7 @@
     },
     "vrrp_ips": {
       "type": "array",
-      "description": "List of VRRP IPs to assign to balancers. Each item can either be a simple address string or a dictionary with the address and additional parameters.",
+      "description": "The list of VRRP IPs to assign to balancers. Each item can either be a simple address string or a dictionary with the address and additional parameters.",
       "items": {
         "$ref": "definitions/vrrp_ip.json"
       }
@@ -71,24 +71,24 @@
     },
     "procedure_history": {
       "type": "object",
-      "description": "Parameters for the inventory preservation on nodes after each procedure run.",
+      "description": "The parameters for inventory preservation on nodes after each procedure run.",
       "properties": {
         "archive_threshold": {
           "type": "integer",
           "default": 5,
-          "description": "Number of procedure runs after which the information about old runs is archived."
+          "description": "The number of procedure runs after which the information about old runs is archived."
         },
         "delete_threshold": {
           "type": "integer",
           "default": 10,
-          "description": "Number of procedure runs after which the information about old runs is deleted."
+          "description": "The number of procedure runs after which the information about old runs is deleted."
         }
       },
       "additionalProperties": false
     },
     "values": {
       "type": "object",
-      "description": "Section to hold custom variables to be used in Jinja2 templates."
+      "description": "The section to hold custom variables to be used in Jinja2 templates."
     }
   },
   "required": ["nodes", "cluster_name"],
