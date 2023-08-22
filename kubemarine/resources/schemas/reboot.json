@@ -5,11 +5,11 @@
     "graceful_reboot": {
       "type": "boolean",
       "default": false,
-      "description": "What type of reboot to perform. If specified to true, pods are drained to other nodes and the nodes are rebooted one after another."
+      "description": "The type of reboot to perform. If specified to true, pods are drained to other nodes and the nodes are rebooted one after another."
     },
     "nodes": {
       "type": "array",
-      "description": "List of node names that should be rebooted. By default, all nodes are rebooted.",
+      "description": "The list of node names that should be rebooted. By default, all nodes are rebooted.",
       "items": {
         "type": "object",
         "properties": {
