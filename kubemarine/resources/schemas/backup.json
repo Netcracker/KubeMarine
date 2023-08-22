@@ -5,15 +5,15 @@
     "backup_location": {
       "type": "string",
       "default": "backup.tar.gz",
-      "description": "Target location of the backup archive."
+      "description": "The target location of the backup archive."
     },
     "backup_plan": {
       "type": "object",
-      "description": "Backup procedure configuration.",
+      "description": "The backup procedure configuration.",
       "properties": {
         "etcd": {
           "type": "object",
-          "description": "Custom parameters for the ETCD snapshot creation task.",
+          "description": "The custom parameters for the ETCD snapshot creation task.",
           "properties": {
             "source_node": {
               "$ref": "definitions/common/node_ref.json#/definitions/Name",
@@ -35,22 +35,22 @@
           "properties": {
             "namespaced_resources": {
               "type": "object",
-              "description": "Namespaced resources to export.",
+              "description": "The namespaced resources to export.",
               "properties": {
                 "namespaces": {
                   "$ref": "#/definitions/ListOrEverything",
-                  "description": "Namespaces from which to export. Specify 'all' to export everything."
+                  "description": "The namespaces from which to export. Specify 'all' to export everything."
                 },
                 "resources": {
                   "$ref": "#/definitions/ListOrEverything",
-                  "description": "Full names of the resources to be exported. Specify 'all' to export everything."
+                  "description": "The full names of the resources to be exported. Specify 'all' to export everything."
                 }
               },
               "additionalProperties": false
             },
             "nonnamespaced_resources": {
               "$ref": "#/definitions/ListOrEverything",
-              "description": "Full names of the non-namespaced resources to be exported. Specify 'all' to export everything."
+              "description": "The full names of the non-namespaced resources to be exported. Specify 'all' to export everything."
             }
           },
           "additionalProperties": false
