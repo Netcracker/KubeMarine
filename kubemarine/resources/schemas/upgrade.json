@@ -4,7 +4,7 @@
   "properties": {
     "upgrade_plan": {
       "$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings",
-      "description": "List of new versions through which to upgrade the cluster to the last specified version"
+      "description": "The list of new versions through which to upgrade the cluster to the last specified version."
     },
     "upgrade_nodes": {
       "type": "array",
@@ -33,19 +33,19 @@
   "required": ["upgrade_plan"],
   "additionalProperties": {
     "type": "object",
-    "description": "Configuration for the upgrade to the particular version from the 'upgrade_plan'",
+    "description": "The configuration for the upgrade to a particular version from 'upgrade_plan'.",
     "properties": {
       "thirdparties": {
         "$ref": "definitions/services/thirdparties.json"
       },
       "packages": {
         "type": "object",
-        "description": "Section for packages and their management during upgrade",
+        "description": "The section for packages and their management during an upgrade.",
         "allOf": [{"$ref": "definitions/services/packages.json#/definitions/CustomPackages"}],
         "properties": {
           "associations": {
             "type": "object",
-            "description": "Configure associations of package objects to be used during upgrade",
+            "description": "Configure associations of package objects to be used during an upgrade.",
             "properties": {
               "docker": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"},
               "containerd": {"$ref": "definitions/services/packages/associations.json#/definitions/PackageNameOnlyAssociations"}
