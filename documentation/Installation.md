@@ -1067,23 +1067,23 @@ In the `services` section, you can configure the service settings. The settings 
 In `services.kubeadm` section, you can override the original settings for the kubeadm. For more information these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
-|Parameter|Default Value|
-|---|---|
-|kubernetesVersion|`v1.26.3`|
-|controlPlaneEndpoint|`{{ cluster_name }}:6443`|
-|networking.podSubnet|`10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6|
-|networking.serviceSubnet|`172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6|
-|apiServer.certSANs|List with all nodes internal IPs, external IPs and names|
-|apiServer.extraArgs.enable-admission-plugins|`NodeRestriction`|
-|apiServer.extraArgs.profiling|`false`|
-|apiServer.extraArgs.audit-log-path|`/var/log/kubernetes/audit/audit.log`|
-|apiServer.extraArgs.audit-policy-file|`/etc/kubernetes/audit-policy.yaml`|
-|apiServer.extraArgs.audit-log-maxage|`30`|
-|apiServer.extraArgs.audit-log-maxbackup|`10`|
-|apiServer.extraArgs.audit-log-maxsize|`100`|
-|scheduler.extraArgs.profiling|`false`|
-|controllerManager.extraArgs.profiling|`false`|
-|controllerManager.extraArgs.terminated-pod-gc-threshold|`1000`|
+|Parameter| Default Value                                            |
+|---|----------------------------------------------------------|
+|kubernetesVersion| `v1.26.4`                                                |
+|controlPlaneEndpoint| `{{ cluster_name }}:6443`                                |
+|networking.podSubnet| `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |
+|networking.serviceSubnet| `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |
+|apiServer.certSANs| List with all nodes internal IPs, external IPs and names |
+|apiServer.extraArgs.enable-admission-plugins| `NodeRestriction`                                        |
+|apiServer.extraArgs.profiling| `false`                                                  |
+|apiServer.extraArgs.audit-log-path| `/var/log/kubernetes/audit/audit.log`                    |
+|apiServer.extraArgs.audit-policy-file| `/etc/kubernetes/audit-policy.yaml`                      |
+|apiServer.extraArgs.audit-log-maxage| `30`                                                     |
+|apiServer.extraArgs.audit-log-maxbackup| `10`                                                     |
+|apiServer.extraArgs.audit-log-maxsize| `100`                                                    |
+|scheduler.extraArgs.profiling| `false`                                                  |
+|controllerManager.extraArgs.profiling| `false`                                                  |
+|controllerManager.extraArgs.terminated-pod-gc-threshold| `1000`                                                   |
 
 The following is an example of kubeadm defaults override:
 
@@ -1146,12 +1146,12 @@ services:
 
 #### Kubernetes version
 
-By default, the `1.26.3` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
+By default, the `1.26.4` version of the Kubernetes is installed. See the table of supported versions for details in [Supported versions section](#supported-versions). However, we recommend that you explicitly specify the version you are about to install. This version applies into all the dependent parameters - images, binaries, rpms, configurations: all these are downloaded and used according to your choice. To specify the version, use the following parameter as in example:
 
 ```yaml
 services:
   kubeadm:
-    kubernetesVersion: v1.26.3
+    kubernetesVersion: v1.26.4
 ```
 
 #### Cloud Provider Plugin
