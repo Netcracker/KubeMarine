@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Configure settings of different services",
+  "description": "Configure settings of different services.",
   "properties": {
     "kubeadm_kubelet": {
       "$ref": "services/kubeadm_kubelet.json"
@@ -11,12 +11,12 @@
     },
     "kubeadm_flags": {
       "type": "object",
-      "description": "Flags for kubeadm command line tool",
+      "description": "The flags for kubeadm command line tool.",
       "properties": {
         "ignorePreflightErrors": {
           "type": "string",
           "default": "Port-6443,CoreDNSUnsupportedPlugins",
-          "description": "Kubeadm preflight errors to be ignored for a successful deploy or upgrade"
+          "description": "The Kubeadm preflight errors to be ignored for a successful deployment or upgrade."
         }
       },
       "additionalProperties": false
@@ -55,7 +55,7 @@
       "$ref": "services/etc_hosts.json"
     },
     "etc_hosts_generated": {
-      "description": "Describes auto-generated records about nodes for /etc/hosts and coredns configmap. The key is an IP-address, the value is either a DNS name or an array of names.",
+      "description": "Describes auto-generated records about nodes for /etc/hosts and CoreDNS configmap. The key is an IP-address, the value is either a DNS name or an array of names.",
       "$ref": "services/etc_hosts.json"
     },
     "coredns": {
