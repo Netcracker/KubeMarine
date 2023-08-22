@@ -5,11 +5,11 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Gateway node name"
+      "description": "The gateway node name."
     },
     "address": {
       "type": "string",
-      "description": "Gateway node's IP or hostname address for connection"
+      "description": "The gateway node's IP or hostname address for connection."
     }
   },
   "required": ["name", "address", "username"],
