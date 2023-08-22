@@ -4,12 +4,12 @@
   "properties": {
     "cri": {
       "type": "object",
-      "description": "Specify containerRuntime: containerd and the configuration for it",
+      "description": "Specify containerRuntime: containerd and the configuration for it.",
       "properties": {
         "containerRuntime": {
           "enum": ["containerd"],
           "default": "containerd",
-          "description": "A particular container runtime implementation used for Kubernetes"
+          "description": "A particular container runtime implementation used for Kubernetes."
         },
         "containerdConfig": {
           "$ref": "definitions/services/cri.json#/definitions/ContainerdConfig"
@@ -20,11 +20,11 @@
     },
     "packages": {
       "type": "object",
-      "description": "Specify associations for containerd",
+      "description": "Specify associations for containerd.",
       "properties": {
         "associations": {
           "type": "object",
-          "description": "Specify associations for containerd",
+          "description": "Specify associations for containerd.",
           "properties": {
             "containerd": {
               "$ref": "definitions/services/packages/associations.json#/definitions/ServicePackageAssociations"
@@ -37,7 +37,7 @@
     },
     "thirdparties": {
       "type": "object",
-      "description": "The section to specify the link to a concrete version of a crictl third-party",
+      "description": "The section to specify the link to a concrete version of a crictl third-party.",
       "properties": {
         "/usr/bin/crictl.tar.gz": {
           "$ref": "definitions/services/thirdparties.json#/definitions/ThirdParty"
