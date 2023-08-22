@@ -1,20 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
-  "description": "Section for packages and their management",
+  "description": "Section for packages and their management.",
   "allOf": [{"$ref": "#/definitions/CustomPackages"}],
   "properties": {
     "package_manager": {
       "type": "object",
-      "description": "Additional package manager repositories for the cluster in closed environment",
+      "description": "Additional package manager repositories for the cluster in a closed environment.",
       "properties": {
         "replace-repositories": {
           "type": "boolean",
           "default": false,
-          "description": "Deletes old repositories on hosts and installs new ones instead"
+          "description": "Deletes old repositories on hosts and installs new ones instead."
         },
         "repositories": {
-          "description": "List of new repositories. Can be specified as path to the file containing repositories, or as list for apt repositories, or as dictionary for yum repositories.",
+          "description": "The list of new repositories. It can be specified as a path to the file containing repositories, or as a list for apt repositories, or as a dictionary for yum repositories.",
           "oneOf": [
             {"type": "string"},
             {"$ref": "#/definitions/YumRepositories"},
@@ -26,7 +26,7 @@
     },
     "mandatory": {
       "type": "object",
-      "description": "Specify whether to install or skip mandatory packages",
+      "description": "Specify whether to install or skip the mandatory packages.",
       "properties": {
         "conntrack": {"type": "boolean", "default": true},
         "iptables": {"type": "boolean", "default": true},
