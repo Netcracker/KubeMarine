@@ -32,7 +32,7 @@ from distutils.dir_util import remove_tree
 from distutils.dir_util import mkpath
 from itertools import chain
 from types import ModuleType, FunctionType
-from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast
+from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast, TextIO
 
 import yaml
 import inspect
@@ -814,7 +814,7 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
     cluster.log.verbose("Check if chart already has been installed")
     # todo probably use single command helm upgrade --install
     command = prepare_for_helm_command + 'list -q'
-    helm_existed_releases = subprocess.check_output(command, shell=True).decode('utf-8')
+    helm_existed_releases = execute_subprocess_with_logging(cluster, command, capture_stdout=True)
 
     if release in helm_existed_releases.splitlines():
         cluster.log.debug("Deployed release %s is found. Upgrading it..." % release)
@@ -824,8 +824,38 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
         deployment_mode = "install"
 
     command = prepare_for_helm_command + f'{deployment_mode} {release} {chart_path} --create-namespace --debug'
-    output = subprocess.check_output(command, shell=True)
-    cluster.log.debug(output.decode('utf-8'))
+    execute_subprocess_with_logging(cluster, command)
+
+
+def execute_subprocess_with_logging(cluster: KubernetesCluster, command: str, *, capture_stdout: bool = False) -> str:
+    """
+    :param cluster: KubernetesCluster object
+    :param command: command to run through the shell
+    :param capture_stdout: If true, log stderr and return stdout. Otherwise, log both stdout and stderr
+    :return: child process stdout if `capture_stdout`, or "" otherwise
+    """
+    process = subprocess.Popen(command, shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE if capture_stdout else subprocess.STDOUT,
+                               text=True, encoding='utf-8')
+    if capture_stdout:
+        with process:
+            stdout, stderr = process.communicate()
+            for line in stderr.splitlines():
+                cluster.log.debug(line)
+    else:
+        stdout_stream = cast(TextIO, process.stdout)
+        with stdout_stream:
+            for line in iter(stdout_stream.readline, ''):
+                cluster.log.debug(line.rstrip('\n'))
+
+        stdout = ""
+
+    retcode = process.wait()
+    if retcode:
+        raise subprocess.CalledProcessError(retcode, command)
+
+    return stdout
 
 
 def process_chart_values(config: dict, local_chart_path: str) -> None:
