@@ -84,16 +84,20 @@ def enrich_inventory_pss(inventory: dict, _: KubernetesCluster) -> dict:
     for item in inventory["rbac"]["pss"]["defaults"]:
         if item.endswith("version"):
             verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
-    enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
+
     # add extraArgs to kube-apiserver config
-    if enabled_admissions:
-        if 'PodSecurity=true' not in enabled_admissions:
+    extra_args = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]
+    if minor_version <= 27:
+        enabled_admissions = extra_args.get("feature-gates")
+        if enabled_admissions:
+            if 'PodSecurity=true' not in enabled_admissions:
                 enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
-    else:     
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
-        inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+        else:
+            enabled_admissions = "PodSecurity=true"
+
+        extra_args["feature-gates"] = enabled_admissions
+
+    extra_args["admission-control-config-file"] = admission_path
 
     return inventory
 
@@ -738,23 +742,28 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
     result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
     kubeadm_cm = yaml.load(list(result.values())[0].stdout)
     cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
-    
+    minor_version = int(cluster_config['kubernetesVersion'].split('.')[1])
+
     # update kubeadm config map with feature list
     if target_state == "enabled":
-        if "feature-gates" in cluster_config["apiServer"]["extraArgs"]:
-            enabled_admissions = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
-            if 'PodSecurity=true' not in enabled_admissions:
-                enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
-                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
-                cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
-                final_feature_list = enabled_admissions
+        if minor_version <= 27:
+            if "feature-gates" in cluster_config["apiServer"]["extraArgs"]:
+                enabled_admissions = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+                if 'PodSecurity=true' not in enabled_admissions:
+                    enabled_admissions = "%s,PodSecurity=true" % enabled_admissions
+                    cluster_config["apiServer"]["extraArgs"]["feature-gates"] = enabled_admissions
+                    cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+                    final_feature_list = enabled_admissions
+                else:
+                    cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+                    final_feature_list = enabled_admissions
             else:
+                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
                 cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
-                final_feature_list = enabled_admissions
+                final_feature_list = "PodSecurity=true"
         else:
-            cluster_config["apiServer"]["extraArgs"]["feature-gates"] = "PodSecurity=true"
             cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
-            final_feature_list = "PodSecurity=true"
+            final_feature_list = "PodSecurity deprecated in %s" % cluster_config['kubernetesVersion']
     elif target_state == "disabled":
         feature_list = cluster_config["apiServer"]["extraArgs"]["feature-gates"].replace("PodSecurity=true", "")
         final_feature_list = feature_list.replace(",,", ",")

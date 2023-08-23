@@ -1,16 +1,6 @@
 # !!!Do not change the content of the file!!!
 # This configuration is automatically generated and maintained by "scripts/thirdparties/sync.py"
 kube-apiserver:
-  v1.21.2:
-    version: v1.21.2
-  v1.21.5:
-    version: v1.21.5
-  v1.21.12:
-    version: v1.21.12
-  v1.22.2:
-    version: v1.22.2
-  v1.22.9:
-    version: v1.22.9
   v1.23.1:
     version: v1.23.1
   v1.23.6:
@@ -31,19 +21,15 @@ kube-apiserver:
     version: v1.26.3
   v1.26.4:
     version: v1.26.4
+  v1.26.7:
+    version: v1.26.7
   v1.27.1:
     version: v1.27.1
+  v1.27.4:
+    version: v1.27.4
+  v1.28.0:
+    version: v1.28.0
 kube-controller-manager:
-  v1.21.2:
-    version: v1.21.2
-  v1.21.5:
-    version: v1.21.5
-  v1.21.12:
-    version: v1.21.12
-  v1.22.2:
-    version: v1.22.2
-  v1.22.9:
-    version: v1.22.9
   v1.23.1:
     version: v1.23.1
   v1.23.6:
@@ -64,19 +50,15 @@ kube-controller-manager:
     version: v1.26.3
   v1.26.4:
     version: v1.26.4
+  v1.26.7:
+    version: v1.26.7
   v1.27.1:
     version: v1.27.1
+  v1.27.4:
+    version: v1.27.4
+  v1.28.0:
+    version: v1.28.0
 kube-scheduler:
-  v1.21.2:
-    version: v1.21.2
-  v1.21.5:
-    version: v1.21.5
-  v1.21.12:
-    version: v1.21.12
-  v1.22.2:
-    version: v1.22.2
-  v1.22.9:
-    version: v1.22.9
   v1.23.1:
     version: v1.23.1
   v1.23.6:
@@ -97,19 +79,15 @@ kube-scheduler:
     version: v1.26.3
   v1.26.4:
     version: v1.26.4
+  v1.26.7:
+    version: v1.26.7
   v1.27.1:
     version: v1.27.1
+  v1.27.4:
+    version: v1.27.4
+  v1.28.0:
+    version: v1.28.0
 kube-proxy:
-  v1.21.2:
-    version: v1.21.2
-  v1.21.5:
-    version: v1.21.5
-  v1.21.12:
-    version: v1.21.12
-  v1.22.2:
-    version: v1.22.2
-  v1.22.9:
-    version: v1.22.9
   v1.23.1:
     version: v1.23.1
   v1.23.6:
@@ -130,19 +108,15 @@ kube-proxy:
     version: v1.26.3
   v1.26.4:
     version: v1.26.4
+  v1.26.7:
+    version: v1.26.7
   v1.27.1:
     version: v1.27.1
+  v1.27.4:
+    version: v1.27.4
+  v1.28.0:
+    version: v1.28.0
 pause:
-  v1.21.2:
-    version: 3.4.1
-  v1.21.5:
-    version: 3.4.1
-  v1.21.12:
-    version: 3.4.1
-  v1.22.2:
-    version: '3.5'
-  v1.22.9:
-    version: '3.5'
   v1.23.1:
     version: '3.6'
   v1.23.6:
@@ -163,19 +137,15 @@ pause:
     version: '3.9'
   v1.26.4:
     version: '3.9'
+  v1.26.7:
+    version: '3.9'
   v1.27.1:
+    version: '3.9'
+  v1.27.4:
+    version: '3.9'
+  v1.28.0:
     version: '3.9'
 etcd:
-  v1.21.2:
-    version: 3.4.13-0
-  v1.21.5:
-    version: 3.4.13-0
-  v1.21.12:
-    version: 3.4.13-0
-  v1.22.2:
-    version: 3.5.0-0
-  v1.22.9:
-    version: 3.5.0-0
   v1.23.1:
     version: 3.5.1-0
   v1.23.6:
@@ -196,19 +166,15 @@ etcd:
     version: 3.5.6-0
   v1.26.4:
     version: 3.5.6-0
+  v1.26.7:
+    version: 3.5.6-0
   v1.27.1:
     version: 3.5.7-0
+  v1.27.4:
+    version: 3.5.7-0
+  v1.28.0:
+    version: 3.5.9-0
 coredns/coredns:
-  v1.21.2:
-    version: v1.8.0
-  v1.21.5:
-    version: v1.8.0
-  v1.21.12:
-    version: v1.8.0
-  v1.22.2:
-    version: v1.8.4
-  v1.22.9:
-    version: v1.8.4
   v1.23.1:
     version: v1.8.6
   v1.23.6:
@@ -229,5 +195,11 @@ coredns/coredns:
     version: v1.9.3
   v1.26.4:
     version: v1.9.3
+  v1.26.7:
+    version: v1.9.3
   v1.27.1:
+    version: v1.10.1
+  v1.27.4:
+    version: v1.10.1
+  v1.28.0:
     version: v1.10.1

@@ -219,13 +219,6 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
             control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
 
         if is_control_plane:
-            # hotfix for Ubuntu 22.04 and Kubernetes v1.21.2
-            if version == "v1.21.2":
-                node.sudo(
-                    "sleep 30 && "
-                    "sudo kubectl -n kube-system  delete pod "
-                    "$(sudo kubectl -n kube-system get pod --field-selector='status.phase=Pending' | "
-                    "grep 'kube-proxy' | awk '{ print $1 }') || true")
             kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
             # check ETCD health
             etcd.wait_for_health(cluster, node)

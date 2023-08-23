@@ -5,16 +5,6 @@
 # This is done for simplicity as the configuration is anyway generated, but this can be changed in the future.
 
 calico:
-  v1.21.2:
-    version: v3.22.2
-  v1.21.5:
-    version: v3.22.2
-  v1.21.12:
-    version: v3.22.2
-  v1.22.2:
-    version: v3.24.2
-  v1.22.9:
-    version: v3.24.2
   v1.23.1:
     version: v3.24.2
   v1.23.6:
@@ -35,24 +25,15 @@ calico:
     version: v3.24.2
   v1.26.4:
     version: v3.25.1
+  v1.26.7:
+    version: v3.26.1
   v1.27.1:
-    version: v3.25.1
+    version: v3.26.1
+  v1.27.4:
+    version: v3.26.1
+  v1.28.0:
+    version: v3.26.1
 nginx-ingress-controller:
-  v1.21.2:
-    version: v1.2.0
-    webhook-version: v1.1.1
-  v1.21.5:
-    version: v1.2.0
-    webhook-version: v1.1.1
-  v1.21.12:
-    version: v1.2.0
-    webhook-version: v1.1.1
-  v1.22.2:
-    version: v1.2.0
-    webhook-version: v1.1.1
-  v1.22.9:
-    version: v1.2.0
-    webhook-version: v1.1.1
   v1.23.1:
     version: v1.2.0
     webhook-version: v1.1.1
@@ -83,25 +64,19 @@ nginx-ingress-controller:
   v1.26.4:
     version: v1.7.0
     webhook-version: v20230312-helm-chart-4.5.2-28-g66a760794
+  v1.26.7:
+    version: v1.8.1
+    webhook-version: v20230407
   v1.27.1:
-    version: v1.7.0
-    webhook-version: v20230312-helm-chart-4.5.2-28-g66a760794
+    version: v1.8.1
+    webhook-version: v20230407
+  v1.27.4:
+    version: v1.8.1
+    webhook-version: v20230407
+  v1.28.0:
+    version: v1.8.1
+    webhook-version: v20230407
 kubernetes-dashboard:
-  v1.21.2:
-    version: v2.5.1
-    metrics-scraper-version: v1.0.7
-  v1.21.5:
-    version: v2.5.1
-    metrics-scraper-version: v1.0.7
-  v1.21.12:
-    version: v2.5.1
-    metrics-scraper-version: v1.0.7
-  v1.22.2:
-    version: v2.5.1
-    metrics-scraper-version: v1.0.7
-  v1.22.9:
-    version: v2.5.1
-    metrics-scraper-version: v1.0.7
   v1.23.1:
     version: v2.5.1
     metrics-scraper-version: v1.0.7
@@ -132,25 +107,19 @@ kubernetes-dashboard:
   v1.26.4:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
+  v1.26.7:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
   v1.27.1:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
+  v1.27.4:
+    version: v2.7.0
+    metrics-scraper-version: v1.0.8
+  v1.28.0:
     version: v2.7.0
     metrics-scraper-version: v1.0.8
 local-path-provisioner:
-  v1.21.2:
-    version: v0.0.22
-    busybox-version: 1.34.1
-  v1.21.5:
-    version: v0.0.22
-    busybox-version: 1.34.1
-  v1.21.12:
-    version: v0.0.22
-    busybox-version: 1.34.1
-  v1.22.2:
-    version: v0.0.22
-    busybox-version: 1.34.1
-  v1.22.9:
-    version: v0.0.22
-    busybox-version: 1.34.1
   v1.23.1:
     version: v0.0.22
     busybox-version: 1.34.1
@@ -181,6 +150,15 @@ local-path-provisioner:
   v1.26.4:
     version: v0.0.24
     busybox-version: 1.34.1
+  v1.26.7:
+    version: v0.0.24
+    busybox-version: 1.34.1
   v1.27.1:
+    version: v0.0.24
+    busybox-version: 1.34.1
+  v1.27.4:
+    version: v0.0.24
+    busybox-version: 1.34.1
+  v1.28.0:
     version: v0.0.24
     busybox-version: 1.34.1

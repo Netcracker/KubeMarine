@@ -1,9 +1,5 @@
 # This section can be changed manually, but it is also synchronized automatically with the 'compatibility_map' section below.
 kubernetes_versions:
-  v1.21:
-    supported: true
-  v1.22:
-    supported: true
   v1.23:
     supported: true
   v1.24:
@@ -14,38 +10,10 @@ kubernetes_versions:
     supported: true
   v1.27:
     supported: true
+  v1.28:
+    supported: true
 compatibility_map:
 # This section should be changed manually.
-  v1.21.2:
-    calico: v3.22.2
-    nginx-ingress-controller: v1.2.0
-    kubernetes-dashboard: v2.5.1
-    local-path-provisioner: v0.0.22
-    crictl: v1.23.0
-  v1.21.5:
-    calico: v3.22.2
-    nginx-ingress-controller: v1.2.0
-    kubernetes-dashboard: v2.5.1
-    local-path-provisioner: v0.0.22
-    crictl: v1.23.0
-  v1.21.12:
-    calico: v3.22.2
-    nginx-ingress-controller: v1.2.0
-    kubernetes-dashboard: v2.5.1
-    local-path-provisioner: v0.0.22
-    crictl: v1.23.0
-  v1.22.2:
-    calico: v3.24.2
-    nginx-ingress-controller: v1.2.0
-    kubernetes-dashboard: v2.5.1
-    local-path-provisioner: v0.0.22
-    crictl: v1.23.0
-  v1.22.9:
-    calico: v3.24.2
-    nginx-ingress-controller: v1.2.0
-    kubernetes-dashboard: v2.5.1
-    local-path-provisioner: v0.0.22
-    crictl: v1.23.0
   v1.23.1:
     calico: v3.24.2
     nginx-ingress-controller: v1.2.0
@@ -106,13 +74,30 @@ compatibility_map:
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.24
     crictl: v1.27.0
-  v1.27.1:
-    calico: v3.25.1
-    nginx-ingress-controller: v1.7.0
+  v1.26.7:
+    calico: v3.26.1
+    nginx-ingress-controller: v1.8.1
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.24
-    crictl: v1.27.0
-
+    crictl: v1.27.1
+  v1.27.1:
+    calico: v3.26.1
+    nginx-ingress-controller: v1.8.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.24
+    crictl: v1.27.1
+  v1.27.4:
+    calico: v3.26.1
+    nginx-ingress-controller: v1.8.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.24
+    crictl: v1.27.1
+  v1.28.0:
+    calico: v3.26.1
+    nginx-ingress-controller: v1.8.1
+    kubernetes-dashboard: v2.7.0
+    local-path-provisioner: v0.0.24
+    crictl: v1.27.1
 
 # After any change, please run scripts/thirdparties/sync.py
 
