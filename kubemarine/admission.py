@@ -696,7 +696,7 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
 
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-        minor_version = int(result.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
+        minor_version = int(control_plane.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
         # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
         conf = yaml.load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
