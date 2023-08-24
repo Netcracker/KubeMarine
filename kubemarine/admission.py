@@ -787,15 +787,6 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
             else:
                 del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
 
-
-
-
-
-
-
-
-
-
     buf = io.StringIO()
     yaml.dump(cluster_config, buf)
     kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
