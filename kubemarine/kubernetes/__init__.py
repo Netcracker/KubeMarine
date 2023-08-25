@@ -413,6 +413,9 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
     # copy admission config to control-plane
     admission.copy_pss(node)
 
+    # put audit-policy.yaml
+    prepare_audit_policy(node)
+
     # ! ETCD on control-planes can't be initialized in async way, that is why it is necessary to disable async mode !
     log.debug('Joining control-plane \'%s\'...' % node_name)
 
@@ -540,6 +543,9 @@ def init_first_control_plane(group: NodeGroup) -> None:
 
     # copy admission config to first control-plane
     first_control_plane.call(admission.copy_pss)
+
+    # put audit-policy.yaml
+    prepare_audit_policy(first_control_plane)
 
     log.debug("Initializing first control_plane...")
     result = first_control_plane.sudo(
@@ -789,9 +795,6 @@ def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesClu
 
     flags = "-f --certificate-renewal=true --ignore-preflight-errors='%s' --patches=/etc/kubernetes/patches" % cluster.inventory['services']['kubeadm_flags']['ignorePreflightErrors']
 
-    patch_kubeadm_configmap(first_control_plane, cluster)
-    flags += " --config /tmp/kubeadm_config.yaml"
-
     drain_cmd = prepare_drain_command(cluster, node_name, **drain_kwargs)
     first_control_plane.sudo(drain_cmd, hide=False)
 
@@ -847,29 +850,6 @@ def upgrade_other_control_planes(upgrade_group: NodeGroup, cluster: KubernetesCl
             copy_admin_config(cluster.log, node)
             wait_for_any_pods(cluster, node, apply_filter=node_name)
             exclude_node_from_upgrade_list(first_control_plane, node_name)
-
-
-def patch_kubeadm_configmap(first_control_plane: NodeGroup, cluster: KubernetesCluster) -> None:
-    '''
-    Checks and patches the Kubeadm configuration for compliance with the current imageRepository, audit log path
-    and the corresponding version of the CoreDNS path to the image.
-    '''
-    kubeadm_config_map = first_control_plane.sudo("kubectl get cm -o yaml -n kube-system kubeadm-config") \
-        .get_simple_out()
-    ryaml = ruamel.yaml.YAML()
-    config_map = ryaml.load(kubeadm_config_map)
-    cluster_configuration_yaml = config_map["data"]["ClusterConfiguration"]
-    cluster_config = ryaml.load(cluster_configuration_yaml)
-
-    updated_config = io.StringIO()
-
-    cluster_config["apiServer"]["extraArgs"]["audit-log-path"] = \
-        cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']['audit-log-path']
-
-    kubelet_config = first_control_plane.sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
-    ryaml.dump(cluster_config, updated_config)
-    result_config = kubelet_config + "---\n" + updated_config.getvalue()
-    first_control_plane.put(io.StringIO(result_config), "/tmp/kubeadm_config.yaml", sudo=True)
 
 
 def upgrade_workers(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs: Any) -> None:
@@ -1369,3 +1349,21 @@ def _config_changer(config: str, word: str) -> str:
         param_end_pos = config.rfind("\"")
         return config[:param_end_pos] + " " + word[:] + "\""
 
+
+def prepare_audit_policy(group: NodeGroup) -> None:
+    """
+    Prepare audit-policy.yaml and all necessary directories.
+    """
+    cluster: KubernetesCluster = group.cluster
+    api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+    audit_log_dir = os.path.dirname(api_server_extra_args['audit-log-path'])
+    audit_file_name = api_server_extra_args['audit-policy-file']
+    audit_policy_dir = os.path.dirname(audit_file_name)
+    group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
+
+    cluster.log.debug("Configure audit cluster policy")
+    policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+    policy_config_file = yaml.dump(policy_config)
+    utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
+    # upload rules on cluster
+    group.put(io.StringIO(policy_config_file), audit_file_name, sudo=True, backup=True)
