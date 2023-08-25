@@ -35,7 +35,7 @@
     },
     "deployment": {
       "type": "object",
-      "description": "YAML settings that are applied to CoreDNS service through a patch.,
+      "description": "YAML settings that are applied to CoreDNS service through a patch.",
       "properties": {
         "spec": {
           "type": "object",
