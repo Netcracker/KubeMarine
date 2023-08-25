@@ -696,16 +696,19 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
 
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-
+        minor_version = int(control_plane.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
         # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
         conf = yaml.load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
         if len(features_list) != 0:
-            if 'PodSecurity=true' in features_list:
-                new_command.append("--admission-control-config-file=%s" % admission_path)
+            if minor_version <= 27:
+                if 'PodSecurity=true' in features_list:
+                    new_command.append("--admission-control-config-file=%s" % admission_path)
+                else:
+                    new_command.append("--admission-control-config-file=''")
+                new_command.append("--feature-gates=%s" % features_list)
             else:
-                new_command.append("--admission-control-config-file=''")
-            new_command.append("--feature-gates=%s" % features_list)
+                new_command.append("--admission-control-config-file=%s" % admission_path)
         else:
             for item in conf["spec"]["containers"][0]["command"]:
                 if item.startswith("--"):
@@ -765,14 +768,24 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
             cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
             final_feature_list = "PodSecurity deprecated in %s" % cluster_config['kubernetesVersion']
     elif target_state == "disabled":
-        feature_list = cluster_config["apiServer"]["extraArgs"]["feature-gates"].replace("PodSecurity=true", "")
-        final_feature_list = feature_list.replace(",,", ",")
-        if len(final_feature_list) == 0:
-            del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
-            del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+        if minor_version <= 27:
+            feature_list = cluster_config["apiServer"]["extraArgs"]["feature-gates"].replace("PodSecurity=true", "")
+            final_feature_list = feature_list.replace(",,", ",")
+            if len(final_feature_list) == 0:
+                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+                del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+            else:
+                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_feature_list
+                del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
         else:
-            cluster_config["apiServer"]["extraArgs"]["feature-gates"] = final_feature_list
-            del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+            if cluster_config["apiServer"]["extraArgs"].get("feature-gates"):
+                if len(cluster_config["apiServer"]["extraArgs"]["feature-gates"]) == 0:
+                    del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+                    del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+                else:
+                    del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
+            else:
+                del cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"]
 
     buf = io.StringIO()
     yaml.dump(cluster_config, buf)
