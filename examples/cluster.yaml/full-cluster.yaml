@@ -66,7 +66,7 @@ services:
   kubeadm:
     kubernetesVersion: v1.24.0
     controlPlaneEndpoint: 'k8s.example.com:6443'
-    imageRepository: artifactory.example.com:5443/k8s.gcr.io
+    imageRepository: artifactory.example.com:5443/registry.k8s.io
     networking:
       podSubnet: 10.30.0.0/24
       serviceSubnet: 172.30.0.0/24
