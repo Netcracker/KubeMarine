@@ -52,7 +52,12 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     if minor_version >= 28:
-        update_kubeapiserver(cluster)
+        first_control_plane = cluster.nodes["control-plane"].get_first_member()
+
+        cluster.log.debug("Updating kubeadm config map")
+        final_features_list = first_control_plane.call(admission.update_kubeadm_configmap_pss, target_state="enabled")
+        cluster.log.debug("Updating kube-apiserver configs on control-planes")
+        cluster.nodes["control-plane"].call(admission.update_kubeapi_config_pss, features_list=final_features_list)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
