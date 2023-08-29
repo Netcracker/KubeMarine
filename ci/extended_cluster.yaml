@@ -21,6 +21,9 @@ services:
     - ethtool
     - ebtables
     - socat
+  etc_hosts:
+    172.17.1.1:
+      - dashboard.test-local-k8s.com
 
 plugins:
   kubernetes-dashboard:
