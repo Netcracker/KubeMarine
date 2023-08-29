@@ -30,6 +30,8 @@ plugins:
     install: true
   nginx-ingress-controller:
     install: true
+    config_map:
+      use-proxy-protocol: "false"
     controller:
       nodeSelector:
         test-label: label
