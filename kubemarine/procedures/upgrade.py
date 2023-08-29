@@ -265,4 +265,3 @@ def kubernetes_apply_taints(cluster: KubernetesCluster) -> None:
 
 if __name__ == '__main__':
     main()
-
