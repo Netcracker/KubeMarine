@@ -160,34 +160,6 @@ def upgrade_containerd(cluster: KubernetesCluster) -> None:
                         f"systemctl status {os_specific_associations['service_name']} && " 
                         f"sudo systemctl restart kubelet")
 
-def update_kubeapiserver(cluster: KubernetesCluster):
-    group = cluster.nodes['control-plane']
-    collect_node = group.get_ordered_members_list()
-    for control_plane in collect_node:
-        config_new = kubernetes.get_kubeadm_config(cluster.inventory)
-        control_plane.put(StringIO(config_new), '/etc/kubernetes/fix_1.28.yaml', sudo=True)
-
-        kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
-
-        cluster.log.debug("Updating kube-apiserver configs on control-planes")
-        control_plane.sudo(f"kubeadm init phase control-plane apiserver "
-                           f"--config=/etc/kubernetes/fix_1.28.yaml ")
-
-        if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-            control_plane.call(utils.wait_command_successful,
-                               command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
-        else:
-            control_plane.call(utils.wait_command_successful,
-                               command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
-                                       " | awk '{print $1}')")
-        control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-
-        cluster.log.debug("Updating kubeadm config map")
-        control_plane.sudo("kubeadm init phase upload-config kubeadm "
-                           "--config=/etc/kubernetes/fix_1.28.yaml")
-
-        control_plane.sudo("rm /etc/kubernetes/fix_1.28.yaml")
-
 tasks = OrderedDict({
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
@@ -293,3 +265,4 @@ def kubernetes_apply_taints(cluster: KubernetesCluster) -> None:
 
 if __name__ == '__main__':
     main()
+
