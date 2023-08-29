@@ -2,7 +2,7 @@ backup_location: /home/centos/backup.tar.gz
 
 restore_plan:
   etcd:
-    image: k8s.gcr.io/etcd:3.3.15-0
+    image: registry.k8s.io/etcd:3.3.15-0
     certificates:
       cert: /etc/kubernetes/pki/etcd/server.crt
       key: /etc/kubernetes/pki/etcd/server.key

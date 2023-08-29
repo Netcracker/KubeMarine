@@ -1192,7 +1192,7 @@ cri:
   containerRuntime: containerd
   containerdConfig:
     plugins."io.containerd.grpc.v1.cri":
-      sandbox_image: k8s.gcr.io/pause:3.2
+      sandbox_image: registry.k8s.io/pause:3.2
     plugins."io.containerd.grpc.v1.cri".registry.mirrors."artifactory.example.com:5443":
       endpoint:
       - https://artifactory.example.com:5443
