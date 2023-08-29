@@ -715,6 +715,26 @@ and restart etcd:
 
 13. If necessary, remove backup files create at the step 3.
 
+## Ingress Doesn't Work with proxy
+
+**Symptoms**: 
+  * Requests using ingresses fails with `Empty reply from server` error for http or SSL error for https. Using `--haproxy-protocol` option in curl tool fixes your problem;
+  * Following errors exists in ingress-nginx-controller pod logs: `broken header: "<...>" while reading PROXY protocol, client: <...>, server: <...>`
+
+**Root cause**: `ingress-nginx-controller` works in proxy mode, but incoming requests don't apply it. Proxy protocol is applied to requests in load-balancers. For this reason such issue may occur in the following cases:
+  * You don't use balancers and take requests directly to some node (e.g. all-in-one setup);
+  * You use external load-balancers, that don't apply proxy protocol;
+  * You have balancer node, which `balancer` role is combined with others and your request don't pass through HAProxy. It will be fixed in KubeMarine soon.
+
+**Solution**: Redeploy `ingress-nginx-controller` plugin with disabled proxy-protocol:
+```yaml
+plugins:
+  nginx-ingress-controller:
+    install: true
+    config_map:
+      use-proxy-protocol: "false"
+```
+Or, if you use external load-balancer, you can enable proxy protocol from its site.
 
 ## HTTPS Ingress Doesn't Work
 
