@@ -22,7 +22,7 @@ from typing import List
 
 import toml
 
-from kubemarine import kubernetes, plugins
+from kubemarine import kubernetes, plugins, admission
 from kubemarine.core import flow
 from kubemarine.core import utils
 from kubemarine.core.action import Action
@@ -48,7 +48,16 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
+    minor_version = int(cluster.context['upgrade_version'].split('.')[1])
+
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+    if minor_version >= 28:
+        first_control_plane = cluster.nodes["control-plane"].get_first_member()
+
+        cluster.log.debug("Updating kubeadm config map")
+        final_features_list = first_control_plane.call(admission.update_kubeadm_configmap_pss, target_state="enabled")
+        cluster.log.debug("Updating kube-apiserver configs on control-planes")
+        cluster.nodes["control-plane"].call(admission.update_kubeapi_config_pss, features_list=final_features_list)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')

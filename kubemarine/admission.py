@@ -696,7 +696,10 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
 
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-        minor_version = int(control_plane.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
+        if control_plane.cluster.context['initial_procedure'] == 'upgrade':
+            minor_version = int(control_plane.cluster.context['upgrade_version'].split('.')[1])
+        else:
+            minor_version = int(control_plane.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
         # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
         conf = yaml.load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
@@ -709,6 +712,8 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
                 new_command.append("--feature-gates=%s" % features_list)
             else:
                 new_command.append("--admission-control-config-file=%s" % admission_path)
+                if control_plane.cluster.context['initial_procedure'] == 'upgrade':
+                    new_command.remove("--feature-gates=PodSecurity=true")
         else:
             for item in conf["spec"]["containers"][0]["command"]:
                 if item.startswith("--"):
@@ -745,7 +750,10 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
     result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
     kubeadm_cm = yaml.load(list(result.values())[0].stdout)
     cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
-    minor_version = int(cluster_config['kubernetesVersion'].split('.')[1])
+    if first_control_plane.cluster.context['initial_procedure'] == 'upgrade':
+        minor_version = int(first_control_plane.cluster.context['upgrade_version'].split('.')[1])
+    else:
+        minor_version = int(cluster_config['kubernetesVersion'].split('.')[1])
 
     # update kubeadm config map with feature list
     if target_state == "enabled":
@@ -766,6 +774,8 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
                 final_feature_list = "PodSecurity=true"
         else:
             cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
+            if first_control_plane.cluster.context['initial_procedure'] == 'upgrade':
+                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
             final_feature_list = "PodSecurity deprecated in %s" % cluster_config['kubernetesVersion']
     elif target_state == "disabled":
         if minor_version <= 27:
