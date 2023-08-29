@@ -160,7 +160,6 @@ def upgrade_containerd(cluster: KubernetesCluster) -> None:
                         f"systemctl status {os_specific_associations['service_name']} && " 
                         f"sudo systemctl restart kubelet")
 
-
 tasks = OrderedDict({
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
