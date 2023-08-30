@@ -21,6 +21,8 @@ plugins:
 
   nginx-ingress-controller:
     install: true
+    config_map:
+      use-proxy-protocol: "false"
 
   kubernetes-dashboard:
     install: true

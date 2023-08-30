@@ -21,12 +21,17 @@ services:
     - ethtool
     - ebtables
     - socat
+  etc_hosts:
+    172.17.1.1:
+      - dashboard.test-local-k8s.com
 
 plugins:
   kubernetes-dashboard:
     install: true
   nginx-ingress-controller:
     install: true
+    config_map:
+      use-proxy-protocol: "false"
     controller:
       nodeSelector:
         test-label: label
