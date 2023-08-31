@@ -8,10 +8,8 @@
 # The order of upgrade of defined by the implementation.
 
 thirdparties:
-  calicoctl:
-  - v1.27.1
-  crictl:
-  - v1.27.1
+  calicoctl: []
+  crictl: []
 packages:
   docker:
     version_rhel: []
@@ -32,9 +30,7 @@ packages:
     version_rhel8: false
     version_debian: false
 plugins:
-  calico:
-  - v1.27.1
-  nginx-ingress-controller:
-  - v1.27.1
+  calico: []
+  nginx-ingress-controller: []
   kubernetes-dashboard: []
   local-path-provisioner: []
