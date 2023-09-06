@@ -22,7 +22,7 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p3_managed_sandbox_image import ManagedSandboxImage
+from kubemarine.patches.p1_managed_sandbox_image import ManagedSandboxImage
 
 patches: List[Patch] = [
     ManagedSandboxImage(),
