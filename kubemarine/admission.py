@@ -713,7 +713,8 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
             else:
                 new_command.append("--admission-control-config-file=%s" % admission_path)
                 if control_plane.cluster.context['initial_procedure'] == 'upgrade':
-                    new_command.remove("--feature-gates=PodSecurity=true")
+                    if any(argument in "--feature-gates=PodSecurity=true" for argument in new_command):
+                        new_command.remove("--feature-gates=PodSecurity=true")
         else:
             for item in conf["spec"]["containers"][0]["command"]:
                 if item.startswith("--"):
@@ -775,7 +776,8 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
         else:
             cluster_config["apiServer"]["extraArgs"]["admission-control-config-file"] = admission_path
             if first_control_plane.cluster.context['initial_procedure'] == 'upgrade':
-                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+                if cluster_config["apiServer"]["extraArgs"].get("feature-gates"):
+                    del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
             final_feature_list = "PodSecurity deprecated in %s" % cluster_config['kubernetesVersion']
     elif target_state == "disabled":
         if minor_version <= 27:
