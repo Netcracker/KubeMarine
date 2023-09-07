@@ -51,7 +51,7 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     minor_version = int(cluster.context['upgrade_version'].split('.')[1])
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-    if minor_version >= 28:
+    if minor_version >= 28 and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled':
         first_control_plane = cluster.nodes["control-plane"].get_first_member()
 
         cluster.log.debug("Updating kubeadm config map")
