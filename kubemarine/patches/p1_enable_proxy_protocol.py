@@ -53,6 +53,6 @@ class EnableProxyProtocol(RegularPatch):
             f"""\
             This patch enables proxy protocol and ingress-nginx and haproxy (by default it's enabled by kubemarine):
             1. Reconfigure HAProxy
-            2. Redeploy ingress-nginx patch
+            2. Redeploy nginx-ingress-controller plugin
             """.rstrip()
         )
