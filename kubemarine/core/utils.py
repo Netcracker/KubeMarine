@@ -173,7 +173,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     else:
         inventory = deepcopy(initial_inventory)
 
-    from kubemarine import admission, kubernetes, packages, plugins, thirdparties
+    from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
     from kubemarine.plugins import nginx_ingress
     from kubemarine.procedures import add_node, remove_node, migrate_cri
 
@@ -186,7 +186,8 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
         packages.upgrade_finalize_inventory,
         admission.finalize_inventory,
         nginx_ingress.finalize_inventory,
-        migrate_cri.migrate_cri_finalize_inventory
+        migrate_cri.migrate_cri_finalize_inventory,
+        cri.upgrade_finalize_inventory,
     }
 
     for finalize_fn in inventory_finalize_functions:

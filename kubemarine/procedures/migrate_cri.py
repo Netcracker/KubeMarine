@@ -260,9 +260,9 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
 
 
 def edit_config(kubeadm_flags: str) -> str:
-    kubeadm_flags = kubernetes._config_changer(kubeadm_flags, "--container-runtime=remote")
-    return kubernetes._config_changer(kubeadm_flags,
-                           "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
+    kubeadm_flags = kubernetes.config_changer(kubeadm_flags, "--container-runtime=remote")
+    return kubernetes.config_changer(kubeadm_flags,
+                                     "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
 
 
 def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
