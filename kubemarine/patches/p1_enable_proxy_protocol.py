@@ -51,7 +51,8 @@ class EnableProxyProtocol(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch enables proxy protocol and ingress-nginx and haproxy (by default it's enabled by kubemarine):
+            This patch enables proxy protocol in ingress-nginx and haproxy (by default it's enabled by kubemarine).
+            The patch does following steps:
             1. Reconfigure HAProxy
             2. Redeploy nginx-ingress-controller plugin
             """.rstrip()
