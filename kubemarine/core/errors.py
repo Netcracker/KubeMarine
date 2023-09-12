@@ -65,6 +65,12 @@ def get_kme_dictionary() -> dict:
         },
         "KME0012": {
             "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
+        },
+        'KME0013': {
+            "name": "Key 'plugins.\"io.containerd.grpc.v1.cri\".sandbox_image' is redefined for 'containerdConfig' "
+                    "in cluster.yaml{previous_version_spec}, "
+                    "but not present in procedure inventory{next_version_spec}. "
+                    "Please, specify required 'sandbox_image' explicitly in procedure inventory."
         }
     }
 

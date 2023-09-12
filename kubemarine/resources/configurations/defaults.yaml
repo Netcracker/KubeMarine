@@ -45,6 +45,8 @@ services:
     kind: ClusterConfiguration
     kubernetesVersion: v1.26.7
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
+    imageRepository: registry.k8s.io
+    dns: {}
     networking:
       podSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}10.128.0.0/14{% else %}fd02::/48{% endif %}'
       serviceSubnet: '{% if nodes[0]["internal_address"]|isipv4 %}172.30.0.0/16{% else %}fd03::/112{% endif %}'
@@ -123,6 +125,7 @@ services:
     containerRuntime: containerd
     containerdConfig:
       version: 2
+      plugins."io.containerd.grpc.v1.cri": {}
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc:
         runtime_type: "io.containerd.runc.v2"
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:

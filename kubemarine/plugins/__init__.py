@@ -63,6 +63,16 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
 
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/xxx:v1
+    plugins_default_registry = inventory['plugin_defaults']['installation'].get('registry')
+
+    if plugins_default_registry is not None:
+        # The following section rewrites DEFAULT plugins registries
+        # and does not touch user-defined registries in plugins
+        for plugin_name, plugin_item in cluster.inventory['plugins'].items():
+            if cluster.raw_inventory.get('plugins', {}).get(plugin_name, {}).get('installation', {}).get('registry') is None:
+                plugin_item.setdefault('installation', {})['registry'] = plugins_default_registry
+
     for plugin_name, plugin_item in inventory["plugins"].items():
         for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
             for procedure_type, configs in step.items():

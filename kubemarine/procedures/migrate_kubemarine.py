@@ -96,7 +96,7 @@ class CriUpgradeAction(Action):
 
         # Only now the cluster is initialized and full enrichment is run.
         cluster = res.cluster()
-        if cri_impl not in cluster.context['packages']['upgrade_required']:
+        if cri_impl not in cluster.context["upgrade"]["required"]['packages']:
             res.logger().info(f"Nothing has changed in associations of {cri_impl!r}. Upgrade is not required.")
             return
 
@@ -185,7 +185,7 @@ class BalancerUpgradeAction(Action):
         # Only now the cluster is initialized and full enrichment is run.
         cluster = res.cluster()
         logger = res.logger()
-        if self.package_name not in cluster.context['packages']['upgrade_required']:
+        if self.package_name not in cluster.context["upgrade"]["required"]['packages']:
             logger.info(f"Nothing has changed in associations of {self.package_name!r}. Upgrade is not required.")
             return
 

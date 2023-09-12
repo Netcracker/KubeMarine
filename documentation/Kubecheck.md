@@ -34,6 +34,7 @@ This section provides information about the Kubecheck functionality.
       - [201 Haproxy Status](#201-haproxy-status)
       - [201 Keepalived Status](#201-keepalived-status)
       - [201 Container Runtime Status](#201-container-runtime-status)
+        - [204 Container Runtime Configuration Check](#204-container-runtime-configuration-check)
       - [201 Kubelet Status](#201-kubelet-status)
         - [202 Nodes pid_max](#202-nodes-pid_max)
         - [203 Kubelet Version](#203-kubelet-version)
@@ -360,6 +361,7 @@ The task tree is as follows:
     * status
   * container_runtime
     * status
+    * configuration
   * kubelet
     * status
     * configuration
@@ -443,6 +445,13 @@ This test checks that kubelet `maxPods` and `podPidsLimit` are correctly alligne
 *Task*: `services.kubelet.version`
 
 This test checks the Kubelet version on all hosts in a cluster.
+
+##### 204 Container Runtime Configuration Check
+
+*Task*: `services.container_runtime.configuration`
+
+This test checks that the configuration of the container runtime is actual
+and matches the effectively resolved configuration from the inventory.
 
 ##### 205 System Packages Version
 

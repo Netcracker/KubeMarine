@@ -46,6 +46,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.admission.manage_enrichment",
     "kubemarine.procedures.migrate_cri.enrich_inventory",
     "kubemarine.core.defaults.apply_registry",
+    "kubemarine.cri.enrich_upgrade_inventory",
     "kubemarine.core.defaults.calculate_node_names",
     "kubemarine.core.defaults.verify_node_names",
     "kubemarine.core.defaults.apply_defaults",
@@ -79,7 +80,6 @@ supported_defaults = {
         'account_defaults': 'accounts'
     },
     'node_defaults': 'nodes',
-    'plugin_defaults': 'plugins',
 }
 
 invalid_node_name_regex = re.compile("[^a-z-.\\d]", re.M)
@@ -138,29 +138,10 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
         if inventory['registry'].get('webserver', False):
             thirdparties_address = f"{protocol}://{inventory['registry']['address']}"
 
-    # Patch kubeadm imageRepository
-    if not inventory['services']['kubeadm'].get('imageRepository'):
+    # Patch kubeadm imageRepository and plugin_defaults registry
+    if cluster.raw_inventory.get('services', {}).get('kubeadm', {}).get('imageRepository') is None:
         inventory['services']['kubeadm']["imageRepository"] = registry_mirror_address
-
-    # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/xxx:v1
-    if inventory.get('plugin_defaults') is None:
-        inventory['plugin_defaults'] = {}
-    if inventory['plugin_defaults'].get('installation') is None:
-        inventory['plugin_defaults']['installation'] = {}
-    if inventory['plugin_defaults']['installation'].get('registry') is None:
-        inventory['plugin_defaults']['installation']['registry'] = registry_mirror_address
-
-    # The following section rewrites DEFAULT plugins registries and do not touches user-defined registries in plugins
-    # This section required, because plugins defaults contains default non-docker registries and method
-    # "kubemarine.core.defaults.recursive_apply_defaults" will not overwrite this default registries, because it can not
-    # distinguish default from user-defined.
-    # Also, this part of code supports plugin_defaults inventory section and applies everything in accordance with the
-    # priority of the registries.
-    for plugin_name, plugin_params in cluster.inventory['plugins'].items():
-        if cluster.inventory['plugins'][plugin_name].get('installation') is None:
-            cluster.inventory['plugins'][plugin_name]['installation'] = {}
-        if cluster.raw_inventory.get('plugins', {}).get(plugin_name, {}).get('installation', {}).get('registry') is None:
-            cluster.inventory['plugins'][plugin_name]['installation']['registry'] = inventory['plugin_defaults']['installation']['registry']
+    inventory['plugin_defaults']['installation'].setdefault('registry', registry_mirror_address)
 
     cri_impl = inventory['services']['cri']['containerRuntime']
 
@@ -194,15 +175,6 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
             containerd_config[registry_section] = {
                 'endpoint': containerd_endpoints
             }
-
-        path = 'plugins."io.containerd.grpc.v1.cri"'
-        if not containerd_config.get(path):
-            containerd_config[path] = {}
-        if not containerd_config[path].get('sandbox_image'):
-            kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
-            pause_version = cluster.globals['compatibility_map']['software']['pause'][kubernetes_version]['version']
-            containerd_config[path]['sandbox_image'] = \
-                f"{inventory['services']['kubeadm']['imageRepository']}/pause:{pause_version}"
 
     from kubemarine import thirdparties
 
@@ -315,27 +287,17 @@ def recursive_apply_defaults(defaults: dict, section: dict) -> None:
         if isinstance(value, dict) and section.get(key) is not None and section[key]:
             recursive_apply_defaults(value, section[key])
         # check if target section exists and not empty
-        elif section.get(value) is not None and section[value]:
+        elif section.get(value) is not None:
+            for i, custom_value in enumerate(section[value]):
+                # copy defaults as new dict, to avoid problems with memory links
+                default_value = deepcopy(section[key])
 
-            if isinstance(section[value], list):
-                for i, v in enumerate(section[value]):
-                    # copy defaults as new dict, to avoid problems with memory links
-                    node_config = deepcopy(section[key])
+                # update defaults with custom-defined node configs
+                # TODO: Use deepmerge instead of update
+                default_value.update(custom_value)
 
-                    # update defaults with custom-defined node configs
-                    # TODO: Use deepmerge instead of update
-                    node_config.update(v)
-
-                    # replace old node config with merged one
-                    section[value][i] = node_config
-
-            else:
-                # deepcopy the whole section, otherwise it will break dict while replacing
-                section_copy = deepcopy(section[value])
-                for custom_key, custom_value in section_copy.items():
-                    # here section['key'] refers to default, not custom value
-                    default_value = deepcopy(section[key])
-                    section[value][custom_key] = default_merger.merge(default_value, custom_value)
+                # replace old node config with merged one
+                section[value][i] = default_value
 
 
 def calculate_node_names(inventory: dict, _: KubernetesCluster) -> dict:

@@ -62,8 +62,34 @@
       },
       "plugins": {
         "$ref": "definitions/plugins.json"
+      },
+      "cri": {
+        "type": "object",
+        "description": "Configure container runtime used for Kubernetes",
+        "properties": {
+          "containerdConfig": {
+            "$ref": "#/definitions/ContainerdConfig"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "additionalProperties": false
+  },
+  "definitions": {
+    "ContainerdConfig": {
+      "type": "object",
+      "description": "Parameters for containerd passed to config.toml",
+      "properties": {
+        "plugins.\"io.containerd.grpc.v1.cri\"": {
+          "type": "object",
+          "properties": {
+            "sandbox_image": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
   }
 }

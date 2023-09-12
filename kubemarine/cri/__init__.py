@@ -33,11 +33,29 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     # Enrich containerdConfig
     if cri_impl == "containerd":
-        containerd_config = cluster.inventory["services"]["cri"]['containerdConfig']
-        runc_options_path = 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options'
-        if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-            containerd_config[runc_options_path]['SystemdCgroup'] = \
-                bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+        return containerd.enrich_inventory(inventory, cluster)
+
+    return inventory
+
+
+def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    cri_impl = inventory['services']['cri']['containerRuntime']
+    if cri_impl == "containerd":
+        return containerd.enrich_upgrade_inventory(inventory, cluster)
+
+    return inventory
+
+
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "upgrade":
+        return inventory
+
+    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
+    if cri_impl == "containerd":
+        return containerd.upgrade_finalize_inventory(cluster, inventory)
 
     return inventory
 
