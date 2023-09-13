@@ -27,13 +27,21 @@ def get_status(group: NodeGroup) -> Dict[str, dict]:
     if result:
         for host, node_result in result.items():
             log.verbose('Parsing status for %s...' % host)
-            parsed_result[host] = parse_status(node_result.stdout)
+            parsed_result[host] = parse_status(log, node_result.stdout)
     print_status(log, parsed_result)
     return parsed_result
 
 
-def parse_status(result_stdout: str) -> dict:
+def parse_status(logger: log.EnhancedLogger, result_stdout: str) -> dict:
     result = {}
+    # Temporary workaround as long as we support OS with AppArmor from 3.0.0 to 3.0.8
+    # Ubuntu 22.04.1 has 3.0.4
+    # Malformed output is caused by false start `], ` delimiter
+    # https://gitlab.com/apparmor/apparmor/-/blob/v3.0.4/binutils/aa_status.c#L537
+    # https://gitlab.com/apparmor/apparmor/-/issues/295
+    if '"processes": {], ' in result_stdout:
+        logger.debug("Patching malformed apparmor_status --json output")
+        result_stdout = result_stdout.replace('"processes": {], ', '"processes": {')
     parsed_data = json.loads(result_stdout)
     modes_set = set()
     for mode in parsed_data['profiles'].values():
