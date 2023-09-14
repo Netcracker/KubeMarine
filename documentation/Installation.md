@@ -3167,38 +3167,38 @@ services:
   loadbalancer:
     haproxy:
       keep_configs_updated: True
-      config: "global\n\
-    log /dev/log    local0\n\
-    log /dev/log    local1 notice\n\
-    chroot /var/lib/haproxy\n\
-    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners\n\
-    stats timeout 30s\n\
-    user haproxy\n\
-    group haproxy\n\
-    daemon\n\n\
+      config: "global
+    log /dev/log    local0
+    log /dev/log    local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
 
-    ca-base /etc/ssl/certs\n\
-    crt-base /etc/ssl/private\n\
+    ca-base /etc/ssl/certs
+    crt-base /etc/ssl/private
 
-    ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384\n\
-    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256\n\
-    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets\n\n\
+    ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
 
-defaults\n\
-    log     global\n\
-    mode    http\n\
-    option  httplog\n\
-    option  dontlognull\n\
-    timeout connect 5000\n\
-    timeout client  50000\n\
-    timeout server  50000\n\
-    errorfile 400 /etc/haproxy/errors/400.http\n\
-    errorfile 403 /etc/haproxy/errors/403.http\n\
-    errorfile 408 /etc/haproxy/errors/408.http\n\
-    errorfile 500 /etc/haproxy/errors/500.http\n\
-    errorfile 502 /etc/haproxy/errors/502.http\n\
-    errorfile 503 /etc/haproxy/errors/503.http\n\
-    errorfile 504 /etc/haproxy/errors/504.http\n\"
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    timeout connect 5000
+    timeout client  50000
+    timeout server  50000
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http"
 ```
 
 Parameter `config_file` allows to specify path to Jinja-compiled template. Example:
