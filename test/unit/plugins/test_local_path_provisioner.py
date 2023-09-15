@@ -19,13 +19,13 @@ import unittest
 import yaml
 
 from kubemarine import demo
-from kubemarine.plugins.manifest import Manifest
+from kubemarine.plugins.manifest import Manifest, Identity
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def setUp(self):
-        self.commonSetUp('local-path-provisioner')
+        self.commonSetUp(Identity('local-path-provisioner'))
 
     def test_common_enrichment(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():

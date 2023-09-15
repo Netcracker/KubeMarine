@@ -19,7 +19,7 @@ import yaml
 
 from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
+from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -37,7 +37,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 class LocalPathProvisionerManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
-        super().__init__(logger, inventory, 'local-path-provisioner', original_yaml_path, destination_name)
+        super().__init__(logger, inventory, Identity('local-path-provisioner'), original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [

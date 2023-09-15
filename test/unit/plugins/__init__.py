@@ -17,12 +17,13 @@ from typing import Optional, List, Dict
 from kubemarine import demo
 from kubemarine.core import static, utils
 from kubemarine.plugins import builtin
-from kubemarine.plugins.manifest import Manifest
+from kubemarine.plugins.manifest import Manifest, Identity
 
 
 class _AbstractManifestEnrichmentTest(unittest.TestCase):
-    def commonSetUp(self, plugin_name):
-        self.plugin_name = plugin_name
+    def commonSetUp(self, manifest_identity: Identity):
+        self.manifest_identity = manifest_identity
+        self.plugin_name = manifest_identity.plugin_name
         self.k8s_versions = list(static.GLOBALS['compatibility_map']['software']['kubeadm'].keys())
         self.k8s_versions.sort(key=utils.version_key)
 
@@ -64,7 +65,7 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         #         "source": f"templates/plugins/<paste template filename>.yaml.j2"
         #     }
         #     plugins.apply_template(cluster, config)
-        processor = builtin.get_manifest_processor(cluster.log, cluster.inventory, self.plugin_name)
+        processor = builtin.get_manifest_processor(cluster.log, cluster.inventory, self.manifest_identity)
         return processor.enrich()
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:

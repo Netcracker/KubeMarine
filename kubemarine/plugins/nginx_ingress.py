@@ -19,7 +19,7 @@ from typing import Optional, List
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
+from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
 def check_job_for_nginx(cluster: KubernetesCluster) -> None:
@@ -196,7 +196,7 @@ def create_tls_secret(first_control_plane: NodeGroup, crt_path: str, key_path: s
 class IngressNginxManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
-        super().__init__(logger, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
+        super().__init__(logger, inventory, Identity('nginx-ingress-controller'), original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [

@@ -18,7 +18,7 @@ import os
 
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
+from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -59,7 +59,7 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
 class CalicoManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
-        super().__init__(logger, inventory, 'calico', original_yaml_path, destination_name)
+        super().__init__(logger, inventory, Identity('calico'), original_yaml_path, destination_name)
 
     def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
         # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'

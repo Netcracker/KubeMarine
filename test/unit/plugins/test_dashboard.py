@@ -15,13 +15,13 @@
 import unittest
 
 from kubemarine import demo
-from kubemarine.plugins.manifest import Manifest
+from kubemarine.plugins.manifest import Manifest, Identity
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def setUp(self):
-        self.commonSetUp('kubernetes-dashboard')
+        self.commonSetUp(Identity('kubernetes-dashboard'))
         # Requires kubernetes-dashboard v2.7.x
         self.k8s_latest = self.get_latest_k8s()
         # Requires kubernetes-dashboard v2.5.x

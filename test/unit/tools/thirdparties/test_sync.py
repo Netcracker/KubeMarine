@@ -24,7 +24,8 @@ import yaml
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, static
-from kubemarine.plugins.manifest import Manifest, Processor
+from kubemarine.plugins import builtin
+from kubemarine.plugins.manifest import Manifest, Processor, Identity
 from scripts.thirdparties.src.software import thirdparties, plugins
 from scripts.thirdparties.src.software.plugins import (
     ManifestResolver, ManifestsEnrichment,
@@ -266,19 +267,20 @@ class SynchronizationTest(unittest.TestCase):
 
     def test_new_unexpected_image(self):
         unexpected_image = 'unexpected/image:1.2.3'
-        for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
-            with self.subTest(plugin):
+        for test_identity in builtin.MANIFEST_PROCESSOR_PROVIDERS:
+            with self.subTest(test_identity.name):
                 class FakeManifestResolver(ManifestResolver):
-                    def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
-                        if plugin_name != plugin:
-                            return FAKE_CACHED_MANIFEST_RESOLVER.resolve(plugin_name, plugin_version)
+                    def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
+                        if manifest_identity != test_identity:
+                            return FAKE_CACHED_MANIFEST_RESOLVER._resolve(manifest_identity, plugin_version)
 
-                        manifest = FakeManifest(plugin_name, plugin_version)
+                        manifest = FakeManifest(manifest_identity, plugin_version)
                         manifest.images.append(unexpected_image)
                         return manifest
 
                 self.manifest_resolver = FakeManifestResolver()
-                with self.assertRaisesRegex(Exception, ERROR_UNEXPECTED_IMAGE.format(image=unexpected_image, plugin=plugin)):
+                with self.assertRaisesRegex(Exception, ERROR_UNEXPECTED_IMAGE.format(
+                        image=unexpected_image, manifest=test_identity.name)):
                     self.run_sync()
 
     def test_images_unexpected_registry(self):
@@ -287,11 +289,11 @@ class SynchronizationTest(unittest.TestCase):
                 super().__init__()
                 self.replace = replace
 
-            def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
-                if plugin_name != 'calico':
-                    return FAKE_CACHED_MANIFEST_RESOLVER.resolve(plugin_name, plugin_version)
+            def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
+                if manifest_identity != Identity('calico'):
+                    return FAKE_CACHED_MANIFEST_RESOLVER._resolve(manifest_identity, plugin_version)
 
-                manifest = FakeManifest(plugin_name, plugin_version)
+                manifest = FakeManifest(manifest_identity, plugin_version)
                 if self.replace:
                     for i, image in enumerate(manifest.images):
                         manifest.images[i] = image.replace('docker.io', 'k8s.gcr.io')
@@ -300,7 +302,7 @@ class SynchronizationTest(unittest.TestCase):
         self.manifest_resolver = FakeManifestResolver(False)
         self.run_sync()
         self.manifest_resolver = FakeManifestResolver(True)
-        with self.assertRaisesRegex(Exception, ERROR_UNEXPECTED_IMAGE.format(image='.*', plugin='calico')):
+        with self.assertRaisesRegex(Exception, ERROR_UNEXPECTED_IMAGE.format(image='.*', manifest="calico")):
             self.run_sync()
 
     def test_remove_intermediate_version(self):
@@ -377,11 +379,12 @@ class SynchronizationTest(unittest.TestCase):
         with self._mock_globals_load_compatibility_map(), self._mock_globals_load_kubernetes_versions(), \
                 self._mock_manifest_processor_enrich() as enrich_called:
             self.run_sync()
-            for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
+            for manifest_identity in builtin.MANIFEST_PROCESSOR_PROVIDERS:
+                plugin = manifest_identity.plugin_name
                 expected_versions = [ORIGINAL_COMPATIBILITY_MAPS['plugins.yaml'][plugin][k8s_latest]['version']]
                 self.assertEqual(expected_versions,
-                                 enrich_called.get(plugin),
-                                 f"Enrichment of {plugin!r} was not called with versions {expected_versions}")
+                                 enrich_called.get(manifest_identity),
+                                 f"Enrichment of {manifest_identity.name!r} was not called with versions {expected_versions}")
 
     def test_manifests_enrichment_update_plugin_versions(self):
         plugin = None
@@ -411,11 +414,15 @@ class SynchronizationTest(unittest.TestCase):
         with self._mock_globals_load_compatibility_map(), self._mock_globals_load_kubernetes_versions(), \
                 self._mock_manifest_processor_enrich() as enrich_called:
             self.run_sync()
-            self.assertEqual([plugin], list(enrich_called.keys()),
-                             "Enrichment is called for unexpected plugins")
-            self.assertEqual({new_plugin_version},
-                             set(enrich_called[plugin]),
-                             f"Enrichment of {plugin!r} was not called with version {new_plugin_version}")
+            plugin_identities = plugins.get_manifest_identities(plugin)
+            self.assertTrue(len(plugin_identities) >= 1,
+                            f"No manifests are detected for {plugin} plugin")
+            self.assertEqual(set(plugin_identities), set(enrich_called.keys()),
+                             "Enrichment is called for unexpected manifests")
+            for plugin_identity in plugin_identities:
+                self.assertEqual({new_plugin_version},
+                                 set(enrich_called[plugin_identity]),
+                                 f"Enrichment of {plugin_identity.name!r} was not called with version {new_plugin_version}")
 
     def test_upgrade_config_update_software(self):
         k8s_update = []
@@ -474,12 +481,12 @@ class SynchronizationTest(unittest.TestCase):
                          f"Unexpected upgrade of 'calico'")
 
     @contextmanager
-    def _mock_manifest_processor_enrich(self) -> ContextManager[Dict[str, List[str]]]:
+    def _mock_manifest_processor_enrich(self) -> ContextManager[Dict[Identity, List[str]]]:
         processor_enrich_orig = Processor.enrich
         enrich_called = {}
 
         def processor_enrich_mocked(processor: Processor):
-            enrich_called.setdefault(processor.plugin_name, []).append(processor.get_version())
+            enrich_called.setdefault(processor.manifest_identity, []).append(processor.get_version())
             return processor_enrich_orig(processor)
 
         with mock.patch.object(Processor, processor_enrich_orig.__name__, new=processor_enrich_mocked):
@@ -506,7 +513,7 @@ class SynchronizationTest(unittest.TestCase):
         with test_utils.backup_globals(), \
                 mock.patch.object(static, static.load_compatibility_map.__name__,
                                   side_effect=load_compatibility_map_mocked):
-                yield
+            yield
 
     def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
         stream = io.StringIO()

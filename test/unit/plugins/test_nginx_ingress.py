@@ -15,7 +15,7 @@ import unittest
 
 from kubemarine import demo
 from kubemarine.core import errors
-from kubemarine.plugins.manifest import Manifest
+from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.plugins.nginx_ingress import redeploy_ingress_nginx_is_needed
 from test.unit.plugins import _AbstractManifestEnrichmentTest
 
@@ -80,7 +80,7 @@ class EnrichmentValidation(unittest.TestCase):
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def setUp(self):
-        self.commonSetUp('nginx-ingress-controller')
+        self.commonSetUp(Identity('nginx-ingress-controller'))
         # Requires ingress-nginx v1.4.x
         self.k8s_latest = self.get_latest_k8s()
         # Requires ingress-nginx v1.2.x

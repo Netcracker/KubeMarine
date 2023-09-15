@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Dict, Optional
 
 from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster
@@ -20,18 +20,20 @@ from kubemarine.plugins import manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor
 from kubemarine.plugins.kubernetes_dashboard import get_dashboard_manifest_processor
 from kubemarine.plugins.local_path_provisioner import LocalPathProvisionerManifestProcessor
+from kubemarine.plugins.manifest import Identity
 from kubemarine.plugins.nginx_ingress import get_ingress_nginx_manifest_processor
 
-MANIFEST_PROCESSOR_PROVIDERS: Dict[str, manifest.PROCESSOR_PROVIDER] = {
-    "calico": CalicoManifestProcessor,
-    "nginx-ingress-controller": get_ingress_nginx_manifest_processor,
-    "kubernetes-dashboard": get_dashboard_manifest_processor,
-    "local-path-provisioner": LocalPathProvisionerManifestProcessor,
+MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
+    Identity("calico"): CalicoManifestProcessor,
+    Identity("nginx-ingress-controller"): get_ingress_nginx_manifest_processor,
+    Identity("kubernetes-dashboard"): get_dashboard_manifest_processor,
+    Identity("local-path-provisioner"): LocalPathProvisionerManifestProcessor,
 }
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for plugin_name, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
+    for manifest_identity, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
+        plugin_name = manifest_identity.plugin_name
         if not inventory["plugins"][plugin_name]["install"]:
             continue
 
@@ -44,17 +46,16 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             if config['module'] != "plugins/builtin.py" or config['method'] != "apply_yaml":
                 continue
 
-            arguments = dict(config.get('arguments', {}))
-            declared_name = arguments.pop('plugin_name', None)
+            # presence of arguments and signature of apply_yaml is validated in plugins.verify_python
+            arguments = config['arguments']
+            declared_name = arguments['plugin_name']
             if declared_name != plugin_name:
                 raise Exception(f"Unexpected 'plugin_name={declared_name}' argument "
                                 f"in {plugin_name!r} installation step {i}.")
 
-            expected_args = {'plugin_name', 'original_yaml_path', 'destination_name'}
-            declared_args = set(arguments.keys())
-            if not declared_args.issubset(expected_args):
-                raise Exception(f"Unexpected python method arguments {list(declared_args.difference(expected_args))} "
-                                f"in {plugin_name!r} installation step {i}.")
+            declared_identity = Identity(plugin_name, arguments.get('manifest_id'))
+            if manifest_identity != declared_identity:
+                continue
 
             processor = processor_provider(
                 cluster.log, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name')
@@ -62,26 +63,32 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             processor.validate_inventory()
             break
         else:
-            cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml is not found for {plugin_name!r} plugin. "
+            cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml for {manifest_identity.repr_id()} "
+                                f"is not found for {plugin_name!r} plugin. "
                                 f"Such configuration is obsolete, and support for it may be stopped in future releases.")
 
     return inventory
 
 
-def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, plugin_name: str,
-                           **arguments: str) -> manifest.Processor:
-    if plugin_name not in MANIFEST_PROCESSOR_PROVIDERS:
-        raise Exception(f"Manifest processor is not registered for {plugin_name!r} plugin.")
+def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, manifest_identity: Identity,
+                           original_yaml_path: Optional[str] = None,
+                           destination_name: Optional[str] = None) -> manifest.Processor:
+    if manifest_identity not in MANIFEST_PROCESSOR_PROVIDERS:
+        raise Exception(f"Cannot find processor of {manifest_identity.repr_id()} "
+                        f"for {manifest_identity.plugin_name!r} plugin.")
 
-    processor_provider = MANIFEST_PROCESSOR_PROVIDERS[plugin_name]
-    return processor_provider(logger, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name'))
+    processor_provider = MANIFEST_PROCESSOR_PROVIDERS[manifest_identity]
+    return processor_provider(logger, inventory, original_yaml_path, destination_name)
 
 
-def apply_yaml(cluster: KubernetesCluster, **arguments: str) -> None:
-    arguments = dict(arguments)
-    plugin_name = arguments.pop('plugin_name')
+def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
+               manifest_id: Optional[str] = None,
+               original_yaml_path: Optional[str] = None,
+               destination_name: Optional[str] = None) -> None:
+    manifest_identity = Identity(plugin_name, manifest_id)
 
-    processor = get_manifest_processor(cluster.log, cluster.inventory, plugin_name, **arguments)
+    processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity,
+                                       original_yaml_path, destination_name)
 
     manifest = processor.enrich()
     processor.apply(cluster, manifest)
