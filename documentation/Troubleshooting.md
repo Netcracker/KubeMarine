@@ -20,6 +20,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
   - [Etcd Database Corruption](#etcd-database-corruption)
     - [Manual Restoration of Etcd Database](#manual-restoration-of-etcd-database)
+  - [Ingress Doesn't Work With Proxy](#ingress-doesnt-work-with-proxy)
   - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
   - [Garbage Collector Does Not Initialize If Convert Webhook Is Broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
