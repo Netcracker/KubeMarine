@@ -22,10 +22,16 @@ from kubemarine import plugins
 
 class TheAction(Action):
     def __init__(self) -> None:
-        super().__init__("Enable proxy protocol")
+        super().__init__("Enable proxy protocol for fullHA cluster")
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
+        if all('balancer' not in node['roles'] for node in cluster.inventory['nodes']) or \
+                any(len('roles') > 1 for node in cluster.inventory['nodes'] if 'balancer' in node['roles']):
+            cluster.log.debug("Cluster doesn't contain balancers or balancer role is combined with other roles. "
+                              "Skip proxy-protocol enabling")
+            return
+
         cluster.log.info("Reconfigure haproxy")
         deploy_loadbalancer_haproxy_configure(cluster)
 
@@ -41,7 +47,7 @@ class TheAction(Action):
 
 class EnableProxyProtocol(RegularPatch):
     def __init__(self) -> None:
-        super().__init__("enable_proxy_protocol")
+        super().__init__("enable_proxy_protocol_fullha_scheme")
 
     @property
     def action(self) -> Action:
@@ -51,7 +57,8 @@ class EnableProxyProtocol(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch enables proxy protocol in ingress-nginx and haproxy (by default it's enabled by kubemarine).
+            This patch enables proxy protocol in ingress-nginx and haproxy (by default it's enabled by kubemarine),
+            if cluster is in fullHA scheme.
             The patch does following steps:
             1. Reconfigure HAProxy
             2. Redeploy nginx-ingress-controller plugin
