@@ -27,7 +27,7 @@ class TheAction(Action):
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         if all('balancer' not in node['roles'] for node in cluster.inventory['nodes']) or \
-                any(len('roles') > 1 for node in cluster.inventory['nodes'] if 'balancer' in node['roles']):
+                any(len(node['roles']) > 1 for node in cluster.inventory['nodes'] if 'balancer' in node['roles']):
             cluster.log.debug("Cluster doesn't contain balancers or balancer role is combined with other roles. "
                               "Skip proxy-protocol enabling")
             return

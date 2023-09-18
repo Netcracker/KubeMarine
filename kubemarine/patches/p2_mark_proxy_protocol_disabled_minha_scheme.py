@@ -26,7 +26,7 @@ class TheAction(Action):
         inventory = res.formatted_inventory()
         log = res.logger()
         if any('balancer' in node['roles'] for node in inventory['nodes']) and \
-                all(len('roles') == 1 for node in inventory['nodes'] if 'balancer' in node['roles']):
+                all(len(node['roles']) == 1 or 'balancer' in node['roles'] for node in inventory['nodes']):
             log.debug("Cluster contains only separate balancers. Skip marking proxy-protocol disabled")
             return
 
