@@ -104,7 +104,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
                 del inventory_to_finalize['nodes'][j]
                 break
 
-    if inventory_to_finalize['services'].get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
+    if inventory_to_finalize.get('services', {}).get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
         for node in nodes_for_removal.get_ordered_members_configs_list():
             hostnames = [node['name'], node['internal_address']]
             if node.get('address') is not None:

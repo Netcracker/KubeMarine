@@ -50,7 +50,8 @@ def _is_vrrp_not_bind(vrrp_item: dict) -> bool:
 
 def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> List[str]:
     # bindings list for common config and maintenance should be different
-    if not maintenance and len(node['roles']) == 1:
+
+    if not maintenance and len([role for role in node['roles'] if role not in ['add_node', 'remove_node']]) == 1:
         return ["0.0.0.0", '::']
 
     # If we have combination of balancer-control-plane / balancer-worker or if haproxy is in maintenance mode,
@@ -66,7 +67,7 @@ def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> Li
             if record['name'] == node['name']:
                 bindings.append(item['ip'])
 
-    if len(node['roles']) == 1:
+    if len([role for role in node['roles'] if role not in ['add_node', 'remove_node']]) == 1:
         # In maintenance mode and if balancer is not combined with some other role,
         # we can listen also own internal address of the balancer
         bindings.append(node['internal_address'])
