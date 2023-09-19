@@ -41,6 +41,11 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
         return inventory
 
+    # Change type for hostPorts because of jinja enrichment
+    for port in inventory["plugins"]["nginx-ingress-controller"].get("ports", []):
+        if "hostPort" in port and not isinstance(port['hostPort'], int):
+            port['hostPort'] = int(port['hostPort'])
+
     if inventory["plugins"]["nginx-ingress-controller"].get('custom_headers'):
         if not inventory["plugins"]["nginx-ingress-controller"].get('config_map'):
             inventory["plugins"]["nginx-ingress-controller"]['config_map'] = {}

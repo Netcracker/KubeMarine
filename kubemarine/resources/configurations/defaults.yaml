@@ -362,6 +362,9 @@ services:
         maxconn: 10000
       keep_configs_updated: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
+    target_ports:
+      http: '{% if nodes | select("is_balancer") | first %}20080{% else %}80{% endif %}'
+      https: '{% if nodes | select("is_balancer") | first %}20443{% else %}443{% endif %}'
 
   packages:
     cache_versions: true
@@ -603,11 +606,11 @@ plugins:
     ports:
       - name: http
         containerPort: 80
-        hostPort: 80
+        hostPort: '{{ services.loadbalancer.target_ports.http }}'
         protocol: TCP
       - name: https
         containerPort: 443
-        hostPort: 443
+        hostPort: '{{ services.loadbalancer.target_ports.https }}'
         protocol: TCP
       - name: prometheus
         containerPort: 10254

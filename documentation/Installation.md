@@ -3048,6 +3048,47 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 `loadbalancer` configures the balancers for the Kubernetes cluster. Currently, only the Haproxy configuration can be customized.
 
+###### target_ports
+
+This section describes the ports, which are used for http/https connections from balancer nodes to workers. 
+Those parameters are specified as backend ports in haproxy configuration and as host ports in ingress-nginx-controller plugin.
+
+Default values depend on balancer availability:  
+
+<table>
+<thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Type<br></th>
+    <th>Default value value if balancer is presented </th>
+    <th>Default value value in no-balancer clusters </th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>target_ports.http</td>
+    <td>integer</td>
+    <td>20080</td>
+    <td>80</td>
+  </tr>
+  <tr>
+    <td>target_ports.https</td>
+    <td>integer</td>
+    <td>20443</td>
+    <td>443</td>
+  </tr>
+</tbody>
+</table>
+
+If it is needed, those parameters can be overriden in `cluster.yaml`, e.g.:
+```yaml
+services:
+  loadbalancer:
+    target_ports:
+      http: 80
+      https: 443
+```
+
 ##### haproxy
 
 This section describes the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
@@ -3214,6 +3255,7 @@ This parameter use the following context options for template rendering:
 - nodes
 - bindings
 - config_options
+- target_ports
 
 As an example of a template, you can look at [default template](/kubemarine/templates/haproxy.cfg.j2).
 

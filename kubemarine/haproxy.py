@@ -195,6 +195,8 @@ def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[
     if config_string is not None:
         return config_string
 
+    target_ports: dict = inventory['services']['loadbalancer']['target_ports']
+
     # todo support custom template for maintenance mode
     if not maintenance and config_options.get('config_file'):
         config_source = utils.read_external(config_options['config_file'])
@@ -203,7 +205,8 @@ def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[
 
     return Template(config_source).render(nodes=future_nodes,
                                           bindings=bindings,
-                                          config_options=config_options)
+                                          config_options=config_options,
+                                          target_ports=target_ports)
 
 
 def configure(group: DeferredGroup) -> None:
