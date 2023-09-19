@@ -1,0 +1,34 @@
+name: Build transfer image
+on:
+  schedule:
+    - cron: '0 0 * * 5' # Runs at 00:00 every Friday
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish transfer image with binaries  to ghcr.io/netcracker/kubemarine-transfer"
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  build-docker-transfer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Archive bare repository
+        run: |
+          git clone --bare https://$GITHUB_ACTOR:${{ secrets.GITHUB_TOKEN }}@github.com/Netcracker/KubeMarine
+          zip -r repository.zip KubeMarine.git
+      - name: Build Docker Image for kubemarine-transfer
+        run: docker build -t kubemarine-transfer -f ci/Dockerfile-transfer --no-cache .
+      - name: Publish to ghcr.io
+        if: github.ref_name == 'main' || inputs.publish
+        run: |
+          GHCRIO_TAG=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
+          GHCRIO_IMAGE=ghcr.io/netcracker/kubemarine-transfer:$GHCRIO_TAG
+          
+          docker tag kubemarine-transfer $GHCRIO_IMAGE
+          
+          echo -e "\033[0;32mPushing image ${GHCRIO_IMAGE}\033[0m"
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login https://ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push $GHCRIO_IMAGE
