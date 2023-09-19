@@ -364,6 +364,33 @@ class TestInventoryValidation(unittest.TestCase):
             lambda port: port['name'] == 'https',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
 
+    def test_use_proxy_protocol_generation(self):
+        # All-in-one without balancers
+        inventory = demo.generate_inventory(balancer=0, worker=1, master=1)
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual('false', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
+        # All-in-one with balancer
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual('true', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
+
+        # MinHA
+        inventory = demo.generate_inventory(**demo.MINIHA)
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual('true', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
+        # FullHA
+        inventory = demo.generate_inventory(**demo.FULLHA)
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual('true', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
+        # FullHA without balancers
+        inventory = demo.generate_inventory(**demo.FULLHA_NOBALANCERS)
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual('false', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
 
 if __name__ == '__main__':
     unittest.main()
