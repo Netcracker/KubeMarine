@@ -416,6 +416,59 @@ class Processor(ABC):
         self.log.verbose(f"The {key} has been patched in "
                          f"'spec.template.spec.containers.[{container_pos}].resources' with {plugin_service_section['resources']!r}")
 
+    def enrich_args_for_container(self, manifest: Manifest, key: str,
+                                  *,
+                                  plugin_service: str,
+                                  container_name: str,
+                                  remove_args: List[str] = None,
+                                  extra_args: List[str] = None) -> None:
+        """
+        Add and / or remove the specified arguments to the specified container.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param plugin_service: section of plugin that contains the extra 'args'
+        :param container_name: name of container to enrich args to
+        :param remove_args: list of arguments to remove
+        :param extra_args: List of arguments to add.
+                           It is currently not possible to override original or added by Kubemarine arguments.
+        """
+        container_pos, container = self.find_container_for_patch(manifest, key,
+                                                                 container_name=container_name, is_init_container=False)
+        container_args = container['args']
+
+        if remove_args is None:
+            remove_args = []
+
+        for remove_arg in remove_args:
+            for i, container_arg in enumerate(container_args):
+                if container_arg == remove_arg or container_arg.startswith(remove_arg + "="):
+                    del container_args[i]
+                    self.log.verbose(f"The {container_arg!r} argument has been removed from "
+                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+                    break
+            else:
+                self.log.verbose(f"Not found argument {remove_arg!r} to remove from "
+                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
+        if extra_args is None:
+            extra_args = []
+
+        plugin_service_section = self.inventory['plugins'][self.plugin_name][plugin_service]
+        extra_args.extend(plugin_service_section.get('args', []))
+
+        for extra_arg in extra_args:
+            extra_arg_key = extra_arg.split('=')[0]
+            for i, container_arg in enumerate(container_args):
+                if container_arg == extra_arg_key or container_arg.startswith(extra_arg_key + "="):
+                    raise Exception(
+                        f"{extra_arg_key!r} argument is already defined in "
+                        f"'spec.template.spec.containers.[{container_pos}].args' for the {key}.")
+            else:
+                container_args.append(extra_arg)
+                self.log.verbose(f"The {extra_arg!r} argument has been added to "
+                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,
                              plugin_service: str) -> None:

@@ -104,7 +104,11 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                     'ssl': {
                         'enableSslPassthrough': True,
                         'default-certificate': {'data': {'cert': 'c', 'key': "k"}}
-                    }
+                    },
+                    'args': [
+                        "--disable-full-test",
+                        "--disable-catch-all",
+                    ]
                 }
                 cluster = demo.new_cluster(inventory)
                 manifest = self.enrich_yaml(cluster)
@@ -137,6 +141,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         self.assertIn('--watch-ingress-without-class=true', args, "Required arg not found")
         self.assertIn('--enable-ssl-passthrough', args, "Required arg not found")
         self.assertIn('--default-ssl-certificate=kube-system/default-ingress-cert', args, "Required arg not found ")
+        self.assertIn('--disable-full-test', args, "Required arg not found ")
+        self.assertIn('--disable-catch-all', args, "Required arg not found ")
 
         self.assertEqual([80, 443, 10254, 8443],
                          [item['containerPort'] for item in container['ports']],
