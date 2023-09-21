@@ -372,18 +372,6 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         ])
         return enrichment_functions
 
-    def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest) -> None:
-        key = "ConfigMap_ingress-nginx-controller"
-        source_yaml = manifest.get_obj(key, patch=True)
-        # For some reason, we took manifest for Digital Ocean, removed use-proxy-protocol: "true" property,
-        # but left service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true" annotation
-        # in ingress-nginx-controller Service.
-        # The behaviour is left as-is for compatibility.
-        # For v.1.4.0 we took the default manifest which lacks of the mentioned properties.
-        del source_yaml['data']['use-proxy-protocol']
-        self.log.verbose(f"The 'use-proxy-protocol' property has been removed from 'data' in the {key}")
-        super().enrich_configmap_ingress_nginx_controller(manifest)
-
     def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict) -> None:
         key = "Deployment_ingress-nginx-controller"
         container_args = container['args']
