@@ -102,6 +102,36 @@ def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) 
     return inventory_to_finalize
 
 
+def redeploy_ingress_nginx_is_needed(cluster: KubernetesCluster) -> bool:
+    # redeploy ingres-nginx-controller for add/remove node procedures is needed in case:
+    # 1. plugins.nginx-ingress-controller.install=true
+    # 2. any balancer node exists (including as remove_node)
+    # 3. all balancers have add_node/remove_node roles (added the first or removed the last balancer)
+    # 4. One of following is not overriden:
+    #    4.1. use-proxy-protocol
+    #    4.2. ingress-nginx-ports and some from target ports
+    ingress_nginx_plugin = cluster.inventory['plugins']['nginx-ingress-controller']
+    balancers = [balancer for balancer in cluster.inventory['nodes'] if 'balancer' in balancer['roles']]
+    if not ingress_nginx_plugin.get("install", False) or \
+            not balancers or \
+            any('add_node' not in node['roles'] and 'remove_node' not in node['roles'] for node in balancers):
+        return False
+
+    proxy_protocol_overriden = 'use-proxy-protocol' in cluster.raw_inventory.get('plugins', {})\
+        .get('nginx-ingress-controller', {})\
+        .get('config_map', {})
+    http_target_port_overriden = 'http' in cluster.raw_inventory.get('services', {})\
+        .get('loadbalancer', {})\
+        .get('target_ports', {})
+    https_target_port_overriden = 'https' in cluster.raw_inventory.get('services', {}) \
+        .get('loadbalancer', {}) \
+        .get('target_ports', {})
+    ingress_nginx_ports_overriden = 'ports' in cluster.raw_inventory.get('plugins', {})\
+        .get('nginx-ingress-controller', {})
+    return not proxy_protocol_overriden or not (ingress_nginx_ports_overriden or
+                                                (https_target_port_overriden and http_target_port_overriden))
+
+
 def manage_custom_certificate(cluster: KubernetesCluster) -> None:
     if not cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"].get("default-certificate"):
         cluster.log.debug("No custom default ingress certificate specified, skipping...")

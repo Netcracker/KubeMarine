@@ -23,7 +23,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
-from kubemarine.procedures import install
+from kubemarine.procedures import install, add_node
 
 
 def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[NodeGroup]:
@@ -129,7 +129,8 @@ tasks = OrderedDict({
     },
     "update": {
         "etc_hosts": install.system_prepare_dns_etc_hosts,
-        "coredns": install.deploy_coredns
+        "coredns": install.deploy_coredns,
+        "plugins": add_node.redeploy_plugins_if_needed,
     },
     "remove_kubernetes_nodes": remove_kubernetes_nodes,
     "overview": install.overview,

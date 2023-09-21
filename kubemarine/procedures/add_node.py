@@ -17,11 +17,12 @@ import copy
 
 from typing import Any, OrderedDict, List
 
-from kubemarine import kubernetes, packages
+from kubemarine import kubernetes, packages, plugins
 from kubemarine.core import flow, utils
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
+from kubemarine.plugins.nginx_ingress import redeploy_ingress_nginx_is_needed
 from kubemarine.procedures import install
 
 
@@ -47,6 +48,16 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Waiting for new kubernetes nodes...")
     kubernetes.wait_for_nodes(group)
     kubernetes.schedule_running_nodes_report(cluster)
+
+
+def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
+    # redeploy ingress-nginx-controller if needed
+    if redeploy_ingress_nginx_is_needed(cluster):
+        cluster.log.debug("Redeploy ingress-nginx-controller plugin")
+        plugins.install_plugin(cluster, 'nginx-ingress-controller',
+                               cluster.inventory['plugins']['nginx-ingress-controller']['installation']['procedures'])
+    else:
+        cluster.log.debug("Redeploy ingress-nginx-controller is not needed, skip it")
 
 
 def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
@@ -100,8 +111,8 @@ def cache_installed_packages(cluster: KubernetesCluster) -> None:
 
 
 tasks: OrderedDict[str, Any] = collections.OrderedDict(copy.deepcopy(install.tasks))
-del tasks["deploy"]["plugins"]
 del tasks["deploy"]["accounts"]
+tasks["deploy"]["plugins"] = redeploy_plugins_if_needed
 tasks["deploy"]["kubernetes"]["init"] = deploy_kubernetes_join
 tasks["cache_packages"] = cache_installed_packages
 tasks.move_to_end("cache_packages", last=False)
