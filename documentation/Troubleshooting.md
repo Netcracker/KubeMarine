@@ -20,7 +20,6 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
   - [Etcd Database Corruption](#etcd-database-corruption)
     - [Manual Restoration of Etcd Database](#manual-restoration-of-etcd-database)
-  - [Ingress Doesn't Work With Proxy](#ingress-doesnt-work-with-proxy)
   - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
   - [Garbage Collector Does Not Initialize If Convert Webhook Is Broken](#garbage-collector-does-not-initialize-if-convert-webhook-is-broken)
   - [Pods Stuck in "terminating" Status During Deletion](#pods-stuck-in-terminating-status-during-deletion)
@@ -716,26 +715,6 @@ and restart etcd:
 
 13. If necessary, remove backup files create at the step 3.
 
-## Ingress Doesn't Work With Proxy
-
-**Symptoms**: 
-  * Requests using ingresses fail with `Empty reply from server` error for http or SSL error for https. Using the `--haproxy-protocol` option in the curl tool fixes the problem.
-  * The following errors exist in ingress-nginx-controller pod logs: `broken header: "<...>" while reading the PROXY protocol, client: <...>, server: <...>`
-
-**Root cause**: `ingress-nginx-controller` works in the proxy mode, but the incoming requests do not apply for it. The proxy protocol is applied to requests in load-balancers. For this reason, such an issue may occur in the following cases:
-  * You do not use balancers and take requests directly to some node (for example, all-in-one setup).
-  * You use external load-balancers that do not apply the proxy protocol.
-  * You have the balancer node, which the `balancer` role is combined with others and your request does not pass through HAProxy. It will be fixed in Kubemarine soon.
-
-**Solution**: Redeploy the `ingress-nginx-controller` plugin with disabled proxy-protocol:
-```yaml
-plugins:
-  nginx-ingress-controller:
-    install: true
-    config_map:
-      use-proxy-protocol: "false"
-```
-Or if you use an external load-balancer, you can enable the proxy protocol from its site.
 
 ## HTTPS Ingress Doesn't Work
 
