@@ -1086,6 +1086,8 @@ link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
+For calico, the certificate will be updated for the Calico API server.
+
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
 ### Configuring Certificate Renew Procedure
@@ -1111,6 +1113,21 @@ nginx-ingress-controller:
 
 Similar to the plugin configuration, you can either use the data format or the paths format.
 For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubemarine Installation Procedure_.
+
+#### Configuring Certificate Renew Procedure for calico
+
+To update the certificate and key for `calico` API server, use the following configuration:
+
+```yaml
+calico:
+  apiserver:
+    renew: true
+```
+
+**Note**: The certificate update procedure follows the default Calico API server installation procedure.
+If you have custom Calico installation steps in `plugins.calico.installation.procedures` section of the `cluster.yaml`
+that in particular renew the certificate in a custom way,
+you may want to repeat the corresponding steps using [Plugins Reinstallation](Installation.md#plugins-reinstallation).
 
 #### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
 To update internal Kubernetes certificates you can use the following configuration:
@@ -1142,7 +1159,8 @@ The `cert_renew` procedure executes the following sequence of tasks:
 
 1. kubernetes
 2. nginx_ingress_controller
-3. certs_overview
+3. calico
+4. certs_overview
 
 ## Cri Migration Procedure
 

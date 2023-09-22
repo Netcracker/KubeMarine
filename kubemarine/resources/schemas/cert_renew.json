@@ -5,6 +5,26 @@
     "nginx-ingress-controller": {
       "$ref": "definitions/plugins/nginx-ingress-controller.json#/definitions/DefaultCertificate"
     },
+    "calico": {
+      "type": "object",
+      "description": "Update internal Calico certificates.",
+      "properties": {
+        "apiserver": {
+          "type": "object",
+          "description": "Manage renew process of Calico API server certificate.",
+          "properties": {
+            "renew": {
+              "type": "boolean",
+              "enum": [true]
+            }
+          },
+          "required": ["renew"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["apiserver"],
+      "additionalProperties": false
+    },
     "kubernetes": {
       "type": "object",
       "description": "Update internal Kubernetes certificates.",

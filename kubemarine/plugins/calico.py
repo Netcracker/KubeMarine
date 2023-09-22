@@ -82,11 +82,12 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
                            r'-p "{\"spec\": {\"caBundle\": \"CERT\"}}"')
 
 
-def expect_apiserver(cluster: KubernetesCluster) -> None:
+def expect_apiserver(cluster: KubernetesCluster, retries: int = 15) -> None:
     control_plane = cluster.nodes["control-plane"].get_first_member()
 
     cluster.log.debug("Waiting till Calico API server is available through Kubernetes API server")
-    control_plane.call(utils.wait_command_successful, command="kubectl get ippools.projectcalico.org")
+    control_plane.call(utils.wait_command_successful,
+                       command="kubectl get ippools.projectcalico.org", retries=retries)
 
 
 class CalicoManifestProcessor(Processor):
