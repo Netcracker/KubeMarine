@@ -32,37 +32,54 @@ MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
 }
 
 
+def get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
+    if manifest_identity not in MANIFEST_PROCESSOR_PROVIDERS:
+        raise Exception(f"Cannot find processor of {manifest_identity.repr_id()} "
+                        f"for {manifest_identity.plugin_name!r} plugin.")
+
+    plugin_name = manifest_identity.plugin_name
+    if not inventory["plugins"][plugin_name]["install"]:
+        return None
+
+    items = inventory['plugins'][plugin_name]['installation']['procedures']
+    for i, item in enumerate(items):
+        if 'python' not in item:
+            continue
+
+        config: dict = item['python']
+        if config['module'] != "plugins/builtin.py" or config['method'] != "apply_yaml":
+            continue
+
+        # presence of arguments and signature of apply_yaml is validated in plugins.verify_python
+        arguments = config['arguments']
+        declared_name = arguments['plugin_name']
+        if declared_name != plugin_name:
+            raise Exception(f"Unexpected 'plugin_name={declared_name}' argument "
+                            f"in {plugin_name!r} installation step {i}.")
+
+        declared_identity = Identity(plugin_name, arguments.get('manifest_id'))
+        if manifest_identity != declared_identity:
+            continue
+
+        return config
+
+    return None
+
+
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for manifest_identity, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
         plugin_name = manifest_identity.plugin_name
         if not inventory["plugins"][plugin_name]["install"]:
             continue
 
-        items = inventory['plugins'][plugin_name]['installation']['procedures']
-        for i, item in enumerate(items):
-            if 'python' not in item:
-                continue
-
-            config: dict = item['python']
-            if config['module'] != "plugins/builtin.py" or config['method'] != "apply_yaml":
-                continue
-
-            # presence of arguments and signature of apply_yaml is validated in plugins.verify_python
+        config = get_manifest_installation_step(inventory, manifest_identity)
+        if config is not None:
             arguments = config['arguments']
-            declared_name = arguments['plugin_name']
-            if declared_name != plugin_name:
-                raise Exception(f"Unexpected 'plugin_name={declared_name}' argument "
-                                f"in {plugin_name!r} installation step {i}.")
-
-            declared_identity = Identity(plugin_name, arguments.get('manifest_id'))
-            if manifest_identity != declared_identity:
-                continue
 
             processor = processor_provider(
                 cluster.log, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name')
             )
             processor.validate_inventory()
-            break
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml for {manifest_identity.repr_id()} "
                                 f"is not found for {plugin_name!r} plugin. "

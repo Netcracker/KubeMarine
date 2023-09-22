@@ -68,11 +68,12 @@ This section provides information about the Kubecheck functionality.
     - [222 Default services configuration status](#222-default-services-configuration-status)
     - [223 Default services health status](#223-default-services-health-status)
     - [224 Calico configuration check](#224-calico-configuration-check)
-    - [225 Pod security admission status](#225-pod-security-admission-status)
-    - [226 Geo connectivity status](#226-geo-connectivity-status)
-    - [227 Apparmor status](#227-apparmor-status)
-    - [228 Apparmor configuration](#228-apparmor-configuration)
-    - [229 Audit policy configuration](#229-audit-policy-configuration)
+    - [225 Calico API server health status](#225-calico-api-server-health-status)
+    - [226 Pod security admission status](#226-pod-security-admission-status)
+    - [227 Geo connectivity status](#227-geo-connectivity-status)
+    - [228 Apparmor status](#228-apparmor-status)
+    - [229 Apparmor configuration](#229-apparmor-configuration)
+    - [230 Audit policy configuration](#230-audit-policy-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -404,6 +405,8 @@ The task tree is as follows:
   * health_status
 * calico
   * config_check
+  * apiserver
+    * health_status
 * geo_check
 
 ##### 201 Service Status
@@ -633,13 +636,16 @@ This test verifies the health of static pods `kube-apiserver`, `kube-controller-
 
 *Task*: `default_services.configuration_status`
 
-In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`, are checked,
+and the `coredns` configmap is also checked.
 
 ###### 223 Default services health status
 
 *Task*: `default_services.health_status`
 
-This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+This test verifies the health of pods `kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`.
 
 ###### 224 Calico configuration check
 
@@ -647,13 +653,19 @@ This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `c
 
 This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
 
-###### 225 Pod security admission status
+###### 225 Calico API server health status
+
+*Task*: `calico.apiserver.health_status`
+
+This test verifies the Calico API server health.
+
+###### 226 Pod security admission status
 
 *Task*: `kubernetes.admission`
 
 The test checks status of Pod Security Admissions, default PSS(Pod Security Standards) profile and match consistance between 'cluster.yaml' and current Kubernetes configuration. Also it check consistancy between 'kube-apiserver.yaml' and 'kubeadm-config'.
 
-###### 226 Geo connectivity status
+###### 227 Geo connectivity status
 
 *Task*: `geo_check`
 
@@ -668,19 +680,19 @@ geo-monitor:
 
 For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
 
-###### 227 AppArmor status
+###### 228 AppArmor status
 
 *Task*: `services.security.apparmor.status`
 
 The test checks the status of AppArmor. It should be `enabled` by default.
 
-###### 228 AppArmor configuration
+###### 229 AppArmor configuration
 
 *Task*: `services.security.apparmor.config`
 
 The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may incude only part of the profiles.
 
-###### 229 Audit policy configuration
+###### 230 Audit policy configuration
 
 *Task*: `kubernetes.audit.policy`
 

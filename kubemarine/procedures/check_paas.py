@@ -31,11 +31,13 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
+from kubemarine.plugins import builtin, manifest
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
+from kubemarine.kubernetes.object import KubernetesObject
 from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff  # type: ignore[import]
 
@@ -579,7 +581,7 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '229', "Kubernetes", "Audit policy configuration") as tc:
+    with TestCase(cluster, '230', "Kubernetes", "Audit policy configuration") as tc:
         expected_config = cluster.inventory['services']['audit'].get('cluster_policy')
 
         api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
@@ -1020,7 +1022,10 @@ def control_plane_health_status(cluster: KubernetesCluster) -> None:
 
 def default_services_configuration_status(cluster: KubernetesCluster) -> None:
     '''
-    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`, are checked,
+    and the `coredns` configmap is also checked.
+
     :param cluster: KubernetesCluster object
     :return: None
     '''
@@ -1038,13 +1043,17 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
 
         coredns_version = first_control_plane.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
         version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
-                                                            {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
-                                             {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
+        calico_version = cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]
+        nginx_ingress_version = cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]
+        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": calico_version}},
+                                                            {"kube-proxy": {"version": version}}]},
+                                             {"Deployment": [{"calico-kube-controllers": {"version": calico_version}},
                                                              {"coredns": {"version": coredns_version}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]}}]}]}
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": nginx_ingress_version}}]}]}
+        if builtin.get_manifest_installation_step(
+                cluster.inventory, manifest.Identity('calico', 'apiserver')) is not None:
+            entities_to_check['calico-apiserver'] = [{"Deployment": [{"calico-apiserver": {"version": calico_version}}]}]
 
-        results = dict()
         for namespace, types_dict in entities_to_check.items():
             for type_dict in types_dict:
                 for type, services in type_dict.items():
@@ -1053,15 +1062,14 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                             if service_name == "ingress-nginx-controller":
                                 if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
-                            result = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml")
-                            content = yaml.safe_load(result.get_simple_out())
-                            if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
-                                results[service_name] = True
-                            else:
-                                results[service_name] = False
-        for item, condition in results.items():
-            if not condition:
-                message += f"{item} has outdated image version\n"
+                            k8s_object = KubernetesObject(cluster, type, service_name, namespace)
+                            k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
+                            if not k8s_object.is_reloaded():
+                                message += f"failed to load {service_name}: {k8s_object}\n"
+                                continue
+
+                            if properties["version"] not in k8s_object.obj["spec"]["template"]["spec"]["containers"][0].get("image", ""):
+                                message += f"{service_name} has outdated image version\n"
 
         if message:
             raise TestFailure('invalid', hint=f"{message}")
@@ -1071,7 +1079,9 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
 
 def default_services_health_status(cluster: KubernetesCluster) -> None:
     '''
-    This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+    This test verifies the health of pods `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`.
+
     :param cluster: KubernetesCluster object
     :return: None
     '''
@@ -1079,6 +1089,9 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
+        if builtin.get_manifest_installation_step(
+                cluster.inventory, manifest.Identity('calico', 'apiserver')) is not None:
+            entities_to_check['calico-apiserver'] = [{"Deployment": ["calico-apiserver"]}]
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
@@ -1163,12 +1176,40 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
             tc.success(results='valid')
 
 
+def calico_apiserver_health_status(cluster: KubernetesCluster) -> None:
+    """
+    This test verifies the Calico API server health.
+
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster, '225', "Calico", "API server health status") as tc:
+        if builtin.get_manifest_installation_step(
+                cluster.inventory, manifest.Identity('calico', 'apiserver')) is None:
+            message = dedent(
+                """\
+                The resolved inventory lacks of the Calico API server installation steps.
+                It is recommended to add the steps and re-install Calico.
+                By default if no custom steps are specified, the API server is installed.
+                """.rstrip())
+            raise TestWarn("Calico API server manifest not found", hint=message)
+
+        control_plane = cluster.nodes['control-plane'].get_any_member()
+        result = control_plane.sudo('kubectl get ippools.projectcalico.org', warn=True)
+
+        if result.is_any_failed():
+            message = "Calico API server is not ready: " + result.get_simple_result().stderr
+            raise TestFailure('invalid', hint=message)
+        else:
+            tc.success(results='valid')
+
+
 def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
     """
     The method checks status of Pod Security Admissions, default Pod Security Profile,
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
-    with TestCase(cluster, '225', "Kubernetes", "Pod Security Admissions") as tc:
+    with TestCase(cluster, '226', "Kubernetes", "Pod Security Admissions") as tc:
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         profile_inv = ""
         if cluster.inventory["rbac"]["admission"] == "pss" and \
@@ -1242,7 +1283,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
 
     # Here we actually collect information about all statuses, but report information about DNS only.
     # Other statuses are reported in other TestCases below. This is done for better UX.
-    with TestCase(cluster, '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
+    with TestCase(cluster, '227', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
         namespace = geo_monitor_inventory["namespace"]
         service = geo_monitor_inventory["service"]
@@ -1290,7 +1331,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
             raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(dns_status["failed"]))
         tc_dns.success("all peer names resolved")
 
-    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
+    with TestCase(cluster, '227', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
         if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1301,7 +1342,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
             raise TestWarn("found skipped peer services", hint=yaml.safe_dump(svc_status["skipped"]))
         tc_svc.success("all peer services available")
 
-    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
+    with TestCase(cluster, '227', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
         if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1323,7 +1364,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
         group = cluster.nodes['all'].get_accessible_nodes()
         results = group.sudo("aa-enabled")
         enabled_nodes: List[str] = []
@@ -1351,7 +1392,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '229', "Security", "Apparmor security policy") as tc:
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:
@@ -1456,7 +1497,10 @@ tasks = OrderedDict({
         "health_status": default_services_health_status
     },
     'calico': {
-        "config_check": calico_config_check
+        "config_check": calico_config_check,
+        "apiserver": {
+            "health_status": calico_apiserver_health_status,
+        }
     },
     'geo_check': geo_check,
 })
