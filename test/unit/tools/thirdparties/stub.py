@@ -84,6 +84,10 @@ class FakeManifest(Manifest):
                 f'docker.io/calico/kube-controllers:{plugin_version}',
                 f'docker.io/calico/typha:{plugin_version}'
             ]
+        elif manifest_identity == Identity('calico', 'apiserver'):
+            return [
+                f'calico/apiserver:{plugin_version}',
+            ]
         elif manifest_identity == Identity('nginx-ingress-controller'):
             return [
                 f'registry.k8s.io/ingress-nginx/controller:{plugin_version}@sha256:123',

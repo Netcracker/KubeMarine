@@ -40,6 +40,25 @@ def put_certificate(control_plane: NodeGroup, cert: io.StringIO, key: io.StringI
     control_plane.put(key, _private_key_path, sudo=True)
 
 
+def create_certificate(control_plane: NodeGroup, customization_flags: str) -> None:
+    """
+    Create new certificate and private key pair in the intermediate location.
+
+    The method should be used within `secrets.create_tls_secret_procedure` procedure.
+
+    :param control_plane: control plane node to create tls secret on
+    :param customization_flags: flags to append to the `openssl req` command to specify properties of the certificate.
+    """
+    control_plane.sudo(
+        f"openssl req -x509 -nodes "
+        f"-out {_certificate_path} -keyout {_private_key_path} "
+        f"{customization_flags}")
+
+
+def get_encoded_certificate_cmd() -> str:
+    return rf"cat {_certificate_path} | base64 | tr -d '\n'"
+
+
 def verify_certificate(control_plane: NodeGroup) -> bool:
     """
     Verify custom certificate and private key pair in the intermediate location.

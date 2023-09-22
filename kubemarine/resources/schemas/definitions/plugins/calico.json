@@ -142,6 +142,10 @@
           "type": "string",
           "description": "Calico Kube Controllers image"
         },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations",
+          "description": "Custom toleration for calico-kube-controllers pods"
+        },
         "nodeSelector": {
           "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
         },
@@ -161,6 +165,27 @@
         }
       },
       "additionalProperties": false
+    },
+    "apiserver": {
+      "type": "object",
+      "description": "Calico API server configuration",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Calico API server image"
+        },
+        "tolerations": {
+          "$ref": "generic_plugin.json#/definitions/CustomTolerations",
+          "description": "Custom toleration for calico-apiserver pods"
+        },
+        "nodeSelector": {
+          "$ref": "generic_plugin.json#/definitions/CommonNodeSelector"
+        },
+        "resources": {
+          "$ref": "generic_plugin.json#/definitions/RequestsLimitsForContainer"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "propertyNames": {
@@ -168,7 +193,7 @@
       {"$ref": "generic_plugin.json#/definitions/PropertyNames"},
       {"enum": [
         "version", "mode", "crossSubnet", "natOutgoing", "mtu", "fullmesh", "announceServices", "defaultAsNumber",
-        "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol"
+        "globalBgpPeers", "typha", "env", "cni", "node", "kube-controllers", "flexvol", "apiserver"
       ]}
     ]
   }

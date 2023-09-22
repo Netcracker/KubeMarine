@@ -243,6 +243,17 @@ def calico_extract_images(images: List[str], manifest_identity: Identity, plugin
     return {}
 
 
+def calico_apiserver_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
+    expected_images = ['calico/apiserver']
+    expected_images = [f"{image}:{plugin_version}" for image in expected_images]
+    for image in images:
+        if image in expected_images:
+            continue
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
+
+    return {}
+
+
 def nginx_ingress_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['ingress-nginx/controller']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
@@ -310,6 +321,8 @@ def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[s
     # as any new image will require to change defaults.yaml and the enrichment process.
     if manifest.identity == Identity('calico'):
         return calico_extract_images(images, manifest.identity, plugin_version)
+    elif manifest.identity == Identity('calico', 'apiserver'):
+        return calico_apiserver_extract_images(images, manifest.identity, plugin_version)
     elif manifest.identity == Identity('nginx-ingress-controller'):
         return nginx_ingress_extract_images(images, manifest.identity, plugin_version)
     elif manifest.identity == Identity('kubernetes-dashboard'):

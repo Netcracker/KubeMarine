@@ -18,6 +18,7 @@ import os
 
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
@@ -35,6 +36,9 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     raw_calico_controller = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("kube-controllers", {})
     if "resources" in raw_calico_controller:
         inventory["plugins"]["calico"]["kube-controllers"]["resources"] = raw_calico_controller["resources"]
+    raw_apiserver = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("apiserver", {})
+    if "resources" in raw_apiserver:
+        inventory["plugins"]["calico"]["apiserver"]["resources"] = raw_apiserver["resources"]
 
     return inventory
 
@@ -54,6 +58,35 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
                                         destination_name=calico_yaml)
     manifest = processor.enrich()
     processor.apply(cluster, manifest)
+
+
+def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
+    secret_name = "calico-apiserver-certs"
+    secret_namespace = "calico-apiserver"
+
+    control_plane = cluster.nodes["control-plane"].get_first_member()
+
+    cluster.log.debug("Creating or renewing the key and certificate for the Calico API server")
+
+    with secrets.create_tls_secret_procedure(control_plane):
+        control_plane.call(
+            secrets.create_certificate,
+            customization_flags='-newkey rsa:4096 -days 365 '
+                                '-subj "/" -addext "subjectAltName = DNS:calico-api.calico-apiserver.svc"')
+
+        control_plane.call(secrets.renew_tls_secret, name=secret_name, namespace=secret_namespace)
+
+        control_plane.sudo(f"{secrets.get_encoded_certificate_cmd()} "
+                           "| xargs -I CERT "
+                           "sudo kubectl patch apiservice v3.projectcalico.org "
+                           r'-p "{\"spec\": {\"caBundle\": \"CERT\"}}"')
+
+
+def expect_apiserver(cluster: KubernetesCluster) -> None:
+    control_plane = cluster.nodes["control-plane"].get_first_member()
+
+    cluster.log.debug("Waiting till Calico API server is available through Kubernetes API server")
+    control_plane.call(utils.wait_command_successful, command="kubectl get ippools.projectcalico.org")
 
 
 class CalicoManifestProcessor(Processor):
@@ -111,6 +144,7 @@ class CalicoManifestProcessor(Processor):
 
         key = "Deployment_calico-kube-controllers"
         self.enrich_node_selector(manifest, key, plugin_service='kube-controllers')
+        self.enrich_tolerations(manifest, key, plugin_service='kube-controllers')
         self.enrich_resources_for_container(manifest, key,
             plugin_service='kube-controllers', container_name='calico-kube-controllers')
         self.enrich_image_for_container(manifest, key,
@@ -223,7 +257,6 @@ class CalicoManifestProcessor(Processor):
         self.enrich_resources_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha')
 
-
     def enrich_clusterrole_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
         The method implements the enrichment procedure for Calico controller ClusterRole
@@ -235,8 +268,8 @@ class CalicoManifestProcessor(Processor):
                 self.inventory['rbac']['psp']['pod-security'] == "enabled":
             source_yaml = manifest.get_obj(key, patch=True)
             api_list = source_yaml['rules']
-            api_list.append(psp_calico_kube_controllers)
-            self.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_kube_controllers}'")
+            api_list.append(cluster_role_use_anyuid_psp)
+            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_anyuid_psp}'")
 
     def enrich_clusterrole_calico_node(self, manifest: Manifest) -> None:
         """
@@ -249,8 +282,8 @@ class CalicoManifestProcessor(Processor):
                 self.inventory['rbac']['psp']['pod-security'] == "enabled":
             source_yaml = manifest.get_obj(key, patch=True)
             api_list = source_yaml['rules']
-            api_list.append(psp_calico_node)
-            self.log.verbose(f"The {key} has been patched in 'rules' with '{psp_calico_node}'")
+            api_list.append(cluster_role_use_privileged_psp)
+            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_privileged_psp}'")
 
     def enrich_crd_felix_configuration(self, manifest: Manifest) -> None:
         """
@@ -320,14 +353,86 @@ class CalicoManifestProcessor(Processor):
         ]
 
 
-psp_calico_kube_controllers = {
+class CalicoApiServerManifestProcessor(Processor):
+    def __init__(self, logger: log.VerboseLogger, inventory: dict,
+                 original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
+        super().__init__(logger, inventory, Identity('calico', 'apiserver'), original_yaml_path, destination_name)
+
+    def get_known_objects(self) -> List[str]:
+        return [
+            "Namespace_calico-apiserver",
+            "NetworkPolicy_allow-apiserver",
+            "Service_calico-api",
+            "Deployment_calico-apiserver",
+            "ServiceAccount_calico-apiserver",
+            "APIService_v3.projectcalico.org",
+            "ClusterRole_calico-crds",
+            "ClusterRole_calico-extension-apiserver-auth-access",
+            "ClusterRole_calico-webhook-reader",
+            "ClusterRoleBinding_calico-apiserver-access-crds",
+            "ClusterRoleBinding_calico-apiserver-delegate-auth",
+            "ClusterRoleBinding_calico-apiserver-webhook-reader",
+            "ClusterRoleBinding_calico-extension-apiserver-auth-access",
+        ]
+
+    def get_enrichment_functions(self) -> List[EnrichmentFunction]:
+        return [
+            self.enrich_namespace_calico_apiserver,
+            self.enrich_deployment_calico_apiserver,
+            self.enrich_clusterrole_calico_crds,
+        ]
+
+    def enrich_namespace_calico_apiserver(self, manifest: Manifest) -> None:
+        key = "Namespace_calico-apiserver"
+        rbac = self.inventory['rbac']
+        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
+                and rbac['pss']['defaults']['enforce'] == 'restricted':
+            self.assign_default_pss_labels(manifest, key, 'baseline')
+
+    def enrich_deployment_calico_apiserver(self, manifest: Manifest) -> None:
+        key = "Deployment_calico-apiserver"
+        self.enrich_node_selector(manifest, key, plugin_service='apiserver')
+        self.enrich_tolerations(manifest, key, plugin_service='apiserver')
+        self.enrich_image_for_container(
+            manifest, key, plugin_service='apiserver', container_name='calico-apiserver', is_init_container=False)
+        self.enrich_resources_for_container(
+            manifest, key, plugin_service='apiserver', container_name='calico-apiserver')
+
+        self.enrich_deployment_calico_apiserver_container(manifest)
+
+    def enrich_deployment_calico_apiserver_container(self, manifest: Manifest) -> None:
+        key = "Deployment_calico-apiserver"
+        # By default, API server searches in the same directory as specified below,
+        # but with different file names: apiserver.crt, apiserver.key
+        # There is no real necessity to change paths
+        # except to make TLS secret creation process the same as for nginx-ingress.
+        additional_args = [
+            "--tls-cert-file=apiserver.local.config/certificates/tls.crt",
+            "--tls-private-key-file=apiserver.local.config/certificates/tls.key"
+        ]
+        # This also searches in calico.apiserver.args but it is currently not supported by JSON schema.
+        self.enrich_args_for_container(
+            manifest, key, plugin_service='apiserver', container_name='calico-apiserver',
+            extra_args=additional_args)
+
+    def enrich_clusterrole_calico_crds(self, manifest: Manifest) -> None:
+        key = "ClusterRole_calico-crds"
+        if self.inventory['rbac']['admission'] == "psp" and \
+                self.inventory['rbac']['psp']['pod-security'] == "enabled":
+            source_yaml = manifest.get_obj(key, patch=True)
+            api_list = source_yaml['rules']
+            api_list.append(cluster_role_use_anyuid_psp)
+            self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_anyuid_psp}'")
+
+
+cluster_role_use_anyuid_psp = {
         "apiGroups": ["policy"],
         "resources": ["podsecuritypolicies"],
         "verbs":     ["use"],
         "resourceNames": ["oob-anyuid-psp"]
 }
 
-psp_calico_node = {
+cluster_role_use_privileged_psp = {
         "apiGroups": ["policy"],
         "resources": ["podsecuritypolicies"],
         "verbs":     ["use"],

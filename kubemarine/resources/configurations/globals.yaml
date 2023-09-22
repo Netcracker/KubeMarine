@@ -86,6 +86,9 @@ plugins:
     manifests:
       - source:
           default: 'https://raw.githubusercontent.com/projectcalico/calico/{version}/manifests/calico-typha.yaml'
+      - id: apiserver
+        source:
+          default: 'https://raw.githubusercontent.com/projectcalico/calico/{version}/manifests/apiserver.yaml'
     requirements:
       default: 'https://docs.tigera.io/archive/{minor_version}/getting-started/kubernetes/requirements'
   nginx-ingress-controller:
