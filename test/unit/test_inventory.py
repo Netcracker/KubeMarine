@@ -303,6 +303,9 @@ class TestInventoryValidation(unittest.TestCase):
                           'worker-1', 'worker-2', 'worker-3'], names)
 
     def test_target_host_ports_generation(self):
+        # services.loadbalancer.target_ports default value depends on nodes configuration in cluster
+        # This check validates, that default value is calculated correctly for different schemas
+
         # All-in-one without balancers
         inventory = demo.generate_inventory(balancer=0, worker=1, master=1)
         cluster = demo.new_cluster(inventory)
@@ -326,7 +329,6 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertEqual(20443, int(next(filter(
             lambda port: port['name'] == 'https',
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
-
 
         # MinHA
         inventory = demo.generate_inventory(**demo.MINIHA)
@@ -365,6 +367,9 @@ class TestInventoryValidation(unittest.TestCase):
             cluster.inventory['plugins']['nginx-ingress-controller']['ports']))['hostPort']))
 
     def test_use_proxy_protocol_generation(self):
+        # plugins.nginx-ingress-controller.config_map.use-proxy-protocol default value depends on nodes configuration in cluster
+        # This check validates, that default value is calculated correctly for different schemas
+
         # All-in-one without balancers
         inventory = demo.generate_inventory(balancer=0, worker=1, master=1)
         cluster = demo.new_cluster(inventory)
@@ -374,7 +379,6 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         cluster = demo.new_cluster(inventory)
         self.assertEqual('true', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
-
 
         # MinHA
         inventory = demo.generate_inventory(**demo.MINIHA)

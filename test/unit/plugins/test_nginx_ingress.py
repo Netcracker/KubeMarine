@@ -252,6 +252,9 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
 class RedeployIfNeeded(unittest.TestCase):
     def test_add_remove_node_ingress_nginx_disabled(self):
+        # Don't need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if nginx-ingress-controller plugin is disabled at all
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -273,6 +276,9 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_ingress_no_balancers_in_cluster(self):
+        # Don't need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if no balancers are presented (in current cluster and as part of add/remove configuration)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=0)
         context = demo.create_silent_context(procedure='remove_node')
@@ -289,6 +295,8 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_not_balancer_added(self):
+        # Don't need to redeploy nginx-ingress-controller for add_node procedure,
+        # if we don't add balancers
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -298,6 +306,8 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_remove_node_not_balancer_removed(self):
+        # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
+        # if we don't remove balancers
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -306,6 +316,8 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_not_first_balancer_added(self):
+        # Don't need to redeploy nginx-ingress-controller for add_node procedure,
+        # if we add not first balancer
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
         context = demo.create_silent_context(procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -315,6 +327,8 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_remove_node_not_last_balancer_removed(self):
+        # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
+        # if we remove the last balancer from cluster
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
         context = demo.create_silent_context(procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -323,6 +337,9 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_fist_balancer_added(self):
+        # Need to redeploy nginx-ingress-controller for add_node procedure,
+        # if we add the first balancer
+        # and changed parameters are not overriden by user
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -331,24 +348,10 @@ class RedeployIfNeeded(unittest.TestCase):
         cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_node]}, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
-    def test_remove_node_flast_balancer_removed(self):
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
-        context['nodes'] = demo.generate_nodes_context(inventory)
-        remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [remove_node]}, context=context)
-        self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
-
-    def test_add_node_fist_balancer_added(self):
-        inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='add_node')
-        context['nodes'] = demo.generate_nodes_context(inventory)
-        add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
-        inventory['nodes'].remove(add_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_node]}, context=context)
-        self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
-
-    def test_remove_node_flast_balancer_removed(self):
+    def test_remove_node_last_balancer_removed(self):
+        # Need to redeploy nginx-ingress-controller for remove_node procedure,
+        # if we remove the last balancer
+        # and changed parameters are not overriden by user
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
@@ -357,6 +360,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_overriden(self):
+        # Need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # and user overrides only use-proxy-protocol (ingress ports should already be changed)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -380,6 +387,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_http_target_port_overriden(self):
+        # Need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # and user overrides only one http port (use-proxy-protocol and https port should already be changed)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -403,6 +414,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_https_target_port_overriden(self):
+        # Need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # and user overrides only one https port (use-proxy-protocol and http port should already be changed)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -426,6 +441,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_and_target_ports_overriden(self):
+        # Don't need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # but user overrides use-proxy protocol and target http/https port (constant configuration)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -457,6 +476,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_host_ports_overriden(self):
+        # Need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # and user overrides ds ports directly, that has more priority (use-proxy-protocol should already be changed)
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
@@ -486,6 +509,10 @@ class RedeployIfNeeded(unittest.TestCase):
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_and_host_ports_overriden(self):
+        # Don't need to redeploy nginx-ingress-controller for add/remove node procedure,
+        # if we add the first/ remove the last balancer
+        # and user overrides use-proxy-protocol and ds ports directly, that has more priority
+
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
         context = demo.create_silent_context(procedure='remove_node')
