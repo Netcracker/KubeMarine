@@ -39,11 +39,14 @@ def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
 
 
 def renew_calico_apiserver_certs_task(cluster: KubernetesCluster) -> None:
-    # check that renewal is required for nginx
+    # check that renewal is required for the Calico API server
     if 'calico' not in cluster.procedure_inventory:
         cluster.log.debug("Skipped: Calico API server certs renewal is not required")
         return
 
+    # Let's assume that if the user specified `calico` section in the procedure inventory,
+    # they agree with the default renew procedure.
+    # Also, it implies that the `calico` plugin is enabled and installed.
     calico.renew_apiserver_certificate(cluster)
     calico.expect_apiserver(cluster, retries=30)
 
