@@ -41,8 +41,7 @@ def new(logger: log.EnhancedLogger, recursive_compile: bool = False, root: dict 
     env.filters['minorversion'] = lambda version: ".".join(_precompile('minorversion', version).split('.')[0:2])
     env.filters['majorversion'] = lambda version: _precompile('majorversion', version).split('.')[0]
 
-    env.tests['is_balancer'] = lambda node: 'balancer' in node['roles']
-    env.tests['is_remove_node'] = lambda node: 'remove_node' in node['roles']
+    env.tests['has_role'] = lambda node, role: role in node['roles']
 
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'
