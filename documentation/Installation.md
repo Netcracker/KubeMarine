@@ -2531,6 +2531,13 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
+        # Don't log checking API access by Calico API server
+        - level: None
+          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          verbs: ["create"]
+          resources:
+            - group: "authorization.k8s.io"
+              resources: ["subjectaccessreviews"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]

@@ -198,6 +198,7 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
+        # Don't log checking API access by Calico API server
         - level: None
           users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
           verbs: ["create"]
