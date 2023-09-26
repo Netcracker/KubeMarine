@@ -3060,8 +3060,8 @@ Default values depend on balancer availability:
   <tr>
     <th>Parameter</th>
     <th>Type<br></th>
-    <th>Default value value if balancer is presented </th>
-    <th>Default value value in no-balancer clusters </th>
+    <th>Default value if balancer is presented </th>
+    <th>Default value in no-balancer clusters </th>
   </tr>
 </thead>
 <tbody>
@@ -3921,8 +3921,8 @@ Default config_map settings:
 <thead>
   <tr>
     <th>Parameter</th>
-    <th>Default value value if balancer is presented </th>
-    <th>Default value value in no-balancer clusters </th>
+    <th>Default value if balancer is presented </th>
+    <th>Default value in no-balancer clusters </th>
   </tr>
 </thead>
 <tbody>
