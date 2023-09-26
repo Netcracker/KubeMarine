@@ -24,10 +24,12 @@ from typing import List
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_override_target_ports import OverrideTargetPorts
 from kubemarine.patches.p1_install_calico_apiserver import InstallCalicoAPIServer
+from kubemarine.patches.p2_reconfigure_audit_policy import ReconfigureAuditPolicy
 
 patches: List[Patch] = [
     OverrideTargetPorts(),
     InstallCalicoAPIServer(),
+    ReconfigureAuditPolicy(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

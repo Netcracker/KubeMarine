@@ -15,6 +15,10 @@
 from deepmerge import Merger  # type: ignore[import]
 
 
+def is_list_extends(nxt: list) -> bool:
+    return any({'<<': 'merge'} == v for i, v in enumerate(nxt))
+
+
 def list_merger(config: Merger, path: list, base: list, nxt: list) -> list:
     strategy = None
     strategy_definition_position = 0
