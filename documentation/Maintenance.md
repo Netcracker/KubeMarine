@@ -17,7 +17,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Cri Migration Procedure](#cri-migration-procedure)
     - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
-    - [Procedure Execution from CLI](#procedure-execution-from-cli)
+    - [Procedure Execution From CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
     - [Inventory Preservation](#inventory-preservation)
     - [Additional Parameters](#additional-parameters)
@@ -495,7 +495,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 
 By default, no parameters are required. However, if necessary, you can specify custom.
 
-#### backup_location Parameter
+#### Backup_location Parameter
 
 By default, the backup is placed into the workdirectory. However, if you want to specify a different location, you can specify it through `backup_location` parameter.
 You can specify two types of path in it:
@@ -506,7 +506,7 @@ You can specify two types of path in it:
   /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### etcd Parameters
+#### Etcd Parameters
 
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
 
@@ -650,7 +650,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
 
 
-#### backup_location Parameter
+#### Backup_location Parameter
 
 You need to specify the required path to the file with the backup - the recovery is performed from it.
 
@@ -660,7 +660,7 @@ Example:
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### etcd Parameters
+#### Etcd Parameters
 
 By default, ETCD restore does not require additional parameters, however, if required, the following are supported:
 
@@ -1018,7 +1018,7 @@ from particular namespaces will be applied.
 * Be careful with the `exemptions` section it may cause cluster instability.
 * Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
 * The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
-'kubernetes-dashboard', and 'calico' (calico-apiserver)) will be deleted during the procedure in case of using `pod-security: disabled`
+'kubernetes-dashboard', and 'calico' (calico-apiserver)) are deleted during the procedure in case of using `pod-security: disabled`.
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
 application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
@@ -1043,7 +1043,7 @@ This procedure allows you to safely reboot all nodes in one click. By default, a
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
-#### graceful_reboot Parameter
+#### Graceful_reboot Parameter
 
 The parameter allows you to forcefully specify what type of reboot to perform. Possible values:
 
@@ -1086,7 +1086,7 @@ link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
-For calico, the certificate will be updated for the Calico API server.
+For Calico, the certificate is updated for the Calico API server.
 
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
@@ -1095,7 +1095,8 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
-#### Configuring Certificate Renew Procedure for nginx-ingress-controller
+#### Configuring Certificate Renew Procedure for Nginx-ingress-controller
+
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
 ```yaml
@@ -1114,7 +1115,7 @@ nginx-ingress-controller:
 Similar to the plugin configuration, you can either use the data format or the paths format.
 For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubemarine Installation Procedure_.
 
-#### Configuring Certificate Renew Procedure for calico
+#### Configuring Certificate Renew Procedure for Calico
 
 To update the certificate and key for `calico` API server, use the following configuration:
 
@@ -1125,11 +1126,12 @@ calico:
 ```
 
 **Note**: The certificate update procedure follows the default Calico API server installation procedure.
-If you have custom Calico installation steps in `plugins.calico.installation.procedures` section of the `cluster.yaml`
-that in particular renew the certificate in a custom way,
+If you have custom Calico installation steps in the `plugins.calico.installation.procedures` section of the `cluster.yaml`
+that in particular renews the certificate in a custom way,
 you may want to repeat the corresponding steps using [Plugins Reinstallation](Installation.md#plugins-reinstallation).
 
-#### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
+#### Configuring Certificate Renew Procedure for Kubernetes Internal Certificates
+
 To update internal Kubernetes certificates you can use the following configuration:
 ```yaml
 kubernetes:
@@ -1178,25 +1180,25 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 ### Procedure Execution Steps
 
 This procedure includes the following steps:
-1. Verify and merge all the specified parameters into the inventory
-2. Install and configure containerd
-3. Install crictl
+1. Verify and merge all the specified parameters into the inventory.
+2. Install and configure containerd.
+3. Install crictl.
 4. Implement the following steps on each control-plane and worker node by node:
-    1. Drain the node
-    2. Update configurations on the node for migration to containerd
-    3. Move the pods on the node from the docker's containers to those of containerd
-    4. Uncordon the node
+    1. Drain the node.
+    2. Update configurations on the node for migration to containerd.
+    3. Move the pods on the node from the docker's containers to those of containerd.
+    4. Uncordon the node.
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
-### migrate_cri Parameters
+### Migrate_cri Parameters
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The following sections describe the `migrate_cri` parameters.
 
-#### cri Parameter
+#### Cri Parameter
 
 In this parameter, you should specify `containerRuntime: containerd` and the configuration for it.
 
@@ -1215,7 +1217,7 @@ cri:
       - https://artifactory.example.com:5443
 ```
 
-#### yum-repositories Parameter
+#### Yum-repositories Parameter
 
 This parameter allows you to specify a new repository from where containerd could be downloaded.
 
@@ -1233,7 +1235,7 @@ yum:
       baseurl: http://example.com/misc/epel/7/x86_64/
 ```
 
-#### packages-associations Parameter
+#### Packages-associations Parameter
 
 This parameter allows you to specify an association for containerd, thus you could set a concrete version which should be installed from the allowed repositories.
 
