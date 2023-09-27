@@ -495,7 +495,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 
 By default, no parameters are required. However, if necessary, you can specify custom.
 
-#### Backup_location Parameter
+#### backup_location Parameter
 
 By default, the backup is placed into the workdirectory. However, if you want to specify a different location, you can specify it through `backup_location` parameter.
 You can specify two types of path in it:
@@ -506,7 +506,7 @@ You can specify two types of path in it:
   /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### Etcd Parameters
+#### etcd Parameters
 
 You can specify custom parameters for ETCD snapshot creation task. The following options are available:
 
@@ -520,7 +520,7 @@ backup_plan:
     source_node: control-plane-1
 ```
 
-#### Nodes Parameter
+#### nodes Parameter
 
 By default, the following files are backed up from all nodes in the cluster:
 
@@ -557,7 +557,7 @@ backup_plan:
     /etc/hosts: False
 ```
 
-#### Kubernetes Parameter
+#### kubernetes Parameter
 
 The procedure exports all available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to restrict resources for export, you can specify which ones you need.
 
@@ -650,7 +650,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 To start the procedure, you must mandatory specify `backup_location` parameter. Other parameters are optional, if necessary, you can also specify them.
 
 
-#### Backup_location Parameter
+#### backup_location Parameter
 
 You need to specify the required path to the file with the backup - the recovery is performed from it.
 
@@ -660,14 +660,14 @@ Example:
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
-#### Etcd Parameters
+#### etcd Parameters
 
 By default, ETCD restore does not require additional parameters, however, if required, the following are supported:
 
 * image - the full name of the ETCD image, including the registry address. On its basis, the restoration is performed.
 * certificates - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
 
-#### Thirdparties Parameter
+#### thirdparties Parameter
 
 The procedure recovers thirdparties based on the `cluster.yaml`. If rpm thirdparties outdated or incorrect, specify the correct ones in this section, in the same format. For example:
 
@@ -1043,7 +1043,7 @@ This procedure allows you to safely reboot all nodes in one click. By default, a
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
-#### Graceful_reboot Parameter
+#### graceful_reboot Parameter
 
 The parameter allows you to forcefully specify what type of reboot to perform. Possible values:
 
@@ -1056,7 +1056,7 @@ Example:
 graceful_reboot: False
 ```
 
-#### Nodes Parameter
+#### nodes Parameter
 
 This parameter allows you to specify which nodes should be rebooted. Other nodes are not affected. In this parameter, you must specify a list of node names, as is follows:
 
@@ -1095,7 +1095,7 @@ The `cert_renew` procedure also allows you to monitor Kubernetes internal certif
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
-#### Configuring Certificate Renew Procedure for Nginx-ingress-controller
+#### Configuring Certificate Renew Procedure for nginx-ingress-controller
 
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
@@ -1191,14 +1191,14 @@ This procedure includes the following steps:
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
-### Migrate_cri Parameters
+### migrate_cri Parameters
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 The following sections describe the `migrate_cri` parameters.
 
-#### Cri Parameter
+#### cri Parameter
 
 In this parameter, you should specify `containerRuntime: containerd` and the configuration for it.
 
@@ -1217,7 +1217,7 @@ cri:
       - https://artifactory.example.com:5443
 ```
 
-#### Yum-repositories Parameter
+#### yum-repositories Parameter
 
 This parameter allows you to specify a new repository from where containerd could be downloaded.
 
@@ -1235,7 +1235,7 @@ yum:
       baseurl: http://example.com/misc/epel/7/x86_64/
 ```
 
-#### Packages-associations Parameter
+#### packages-associations Parameter
 
 This parameter allows you to specify an association for containerd, thus you could set a concrete version which should be installed from the allowed repositories.
 
@@ -1253,7 +1253,7 @@ packages:
       config_location: '/etc/containerd/config.toml'
 ```
 
-#### Thirdparties Parameter
+#### thirdparties Parameter
 
 This parameter allows you to specify the link to a concrete version of a crictl third-party. In the absence of this parameter, crictl is downloaded from Github/registry in case you ran the procedure from CLI. 
 
