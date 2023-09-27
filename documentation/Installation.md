@@ -3531,12 +3531,12 @@ rbac:
       namespaces: ["kube-system"]
 ```
 
-There are three parts of PSS configuration. 
-* `pod-security` enables or disables the PSS installation
-* default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
-* `exemptions` describes exemptions from default rules
+There are three parts of PSS configuration: 
+* `pod-security` enables or disables the PSS installation.
+* The default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods.
+* `exemptions` describes the exemptions from default rules.
 
-The PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, `local-path-provisioner`, and `calico` (relevant only for `calico-apiserver` namespace). For instance:
+PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, `local-path-provisioner`, and `calico` (relevant only for `calico-apiserver` namespace). For instance:
 
 ```yaml
 apiVersion: v1
@@ -3769,12 +3769,12 @@ The plugin configuration supports the following parameters:
 | mode                   | string  | `ipip`                              | `ipip` / `vxlan`                                 | Network protocol to be used in network plugin                      |
 | crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to improve network performance  |
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
-| fullmesh               | boolean | true                                | true/false                                       | Enable of disable full mesh BGP topology                           |
+| fullmesh               | boolean | true                                | true/false                                       | Enable or disable full mesh BGP topology                           |
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
-| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
+| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for the cluster                  |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
 | typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
-| typha.replicas         | int     | <code>{{ (((nodes&#124;length)/50) + 2) &#124; round(1) }}</code> | Starts from 2 replicas amd increments for every 50 nodes | Number of Typha running replicas |
+| typha.replicas         | int     | <code>{{ (((nodes&#124;length)/50) + 2) &#124; round(1) }}</code> | Starts from 2 replicas and increments for every 50 nodes | Number of Typha running replicas. |
 | typha.image            | string  | `calico/typha:{calico.version}`     | Should contain both image name and version       | Calico Typha image                                                 |
 | typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of extra tolerations    | Additional custom tolerations for calico-typha pods                |
 | cni.image              | string  | `calico/cni:{calico.version}`                | Should contain both image name and version | Calico CNI image                                                |
@@ -3844,7 +3844,7 @@ For more information about the supported Calico environment variables, refer to 
 
 ###### Calico API server
 
-Kubemarine brings Calico with its API server. This requires its annual certificates renewal.
+Kubemarine brings Calico with its API server. This requires its annual certificates' renewal.
 For more information, refer to [Configuring Certificate Renew Procedure for calico](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-calico).
 
 ##### nginx-ingress-controller
