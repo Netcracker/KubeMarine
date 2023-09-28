@@ -68,12 +68,12 @@ This section provides information about the Kubecheck functionality.
     - [222 Default Services Configuration Status](#222-default-services-configuration-status)
     - [223 Default Services Health Status](#223-default-services-health-status)
     - [224 Calico Configuration Check](#224-calico-configuration-check)
-    - [225 Calico API Server Health Status](#225-calico-api-server-health-status)
-    - [226 Pod Security Admission Status](#226-pod-security-admission-status)
-    - [227 Geo Connectivity Status](#227-geo-connectivity-status)
-    - [228 Apparmor Status](#228-apparmor-status)
-    - [229 Apparmor Configuration](#229-apparmor-configuration)
-    - [230 Audit Policy Configuration](#230-audit-policy-configuration)
+      - [230 Calico API Server Health Status](#230-calico-api-server-health-status)
+    - [225 Pod Security Admission Status](#225-pod-security-admission-status)
+    - [226 Geo Connectivity Status](#226-geo-connectivity-status)
+    - [227 Apparmor Status](#227-apparmor-status)
+    - [228 Apparmor Configuration](#228-apparmor-configuration)
+    - [229 Audit Policy Configuration](#229-audit-policy-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -503,12 +503,6 @@ corresponds with cluster.yaml.
 This test checks that the configured generic packages are installed on all nodes, has equal version and this version 
 corresponds with cluster.yaml.
 
-##### 212 Thirdparties Hashes
-
-*Task*: `thirdparties.hashes`
-
-This test checks that configured thirdparties hashes are equal to actual files hashes on nodes.
-
 ##### 207 Pods Condition
 
 *Task*: `kubernetes.pods`
@@ -567,40 +561,46 @@ This test checks the condition `PIDPressure` of the Kubernetes nodes of the clus
 
 This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
 
-###### 213 Selinux Security Policy
+##### 212 Thirdparties Hashes
+
+*Task*: `thirdparties.hashes`
+
+This test checks that configured thirdparties hashes are equal to actual files hashes on nodes.
+
+##### 213 Selinux Security Policy
 
 *Task*: `services.security.selinux.status`
 
 The test checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must be explicitly specified
 in the inventory. Otherwise, the test will fail. This test is applicable only for systems of the RHEL family.
 
-###### 214 Selinux Configuration
+##### 214 Selinux Configuration
 
 *Task*: `services.security.selinux.config`
 
 The test compares the configuration of Selinux on the nodes with the configuration specified in the inventory or with the
 one by default. If the configuration does not match, the test will fail.
 
-###### 215 Firewalld Status
+##### 215 Firewalld Status
 
 *Task*: `services.security.firewalld.status`
 
 The test verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
 
-###### 216 Swap State
+##### 216 Swap State
 
 *Task*: `services.system.swap.status`
 
 The test verifies that swap is disabled on all nodes in the cluster, otherwise the test will fail.
 
-###### 217 Modprobe Rules
+##### 217 Modprobe Rules
 
 *Task*: `services.system.modprobe.rules`
 
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.
 
-###### 218 Time Difference
+##### 218 Time Difference
 
 *Task*: `services.system.time`
 
@@ -614,25 +614,25 @@ between the deployer node and all the others, or any other conditions of the env
 sure to perform latency tests: [002 Latency - Single Thread](#002-latency---single-thread) and 
 [003 Latency - Multi Thread](#003-latency---multi-thread).
 
-###### 219 Health Status ETCD
+##### 219 Health Status ETCD
 
 *Task*: `etcd.health_status`
 
 This test verifies ETCD health.
 
-###### 220 Control Plane Configuration Status
+##### 220 Control Plane Configuration Status
 
 *Task*: `control_plane.configuration_status`
 
 This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
 
-###### 221 Control Plane Health Status
+##### 221 Control Plane Health Status
 
 *Task*: `control_plane.health_status`
 
 This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
 
-###### 222 Default Services Configuration Status
+##### 222 Default Services Configuration Status
 
 *Task*: `default_services.configuration_status`
 
@@ -640,32 +640,32 @@ In this test, the versions of the images of the default services, such as `kube-
 `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller` are checked,
 and the `coredns` configmap is also checked.
 
-###### 223 Default Services Health Status
+##### 223 Default Services Health Status
 
 *Task*: `default_services.health_status`
 
 This test verifies the health of `kube-proxy`, `coredns`,
 `calico-node`, `calico-kube-controllers`, `calico-apiserver`, and `ingress-nginx-controller` pods.
 
-###### 224 Calico Configuration Check
+##### 224 Calico Configuration Check
 
 *Task*: `calico.config_check`
 
 This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
 
-###### 225 Calico API Server Health Status
+###### 230 Calico API Server Health Status
 
 *Task*: `calico.apiserver.health_status`
 
 This test verifies the Calico API server health.
 
-###### 226 Pod Security Admission Status
+##### 225 Pod Security Admission Status
 
 *Task*: `kubernetes.admission`
 
 The test checks status of Pod Security Admissions, default PSS (Pod Security Standards) profile and match consistence between 'cluster.yaml' and current Kubernetes configuration. Also it check consistency between 'kube-apiserver.yaml' and 'kubeadm-config'.
 
-###### 227 Geo Connectivity Status
+##### 226 Geo Connectivity Status
 
 *Task*: `geo_check`
 
@@ -680,19 +680,19 @@ geo-monitor:
 
 For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
 
-###### 228 AppArmor Status
+##### 227 AppArmor Status
 
 *Task*: `services.security.apparmor.status`
 
 The test checks the status of AppArmor. It should be `enabled` by default.
 
-###### 229 AppArmor Configuration
+##### 228 AppArmor Configuration
 
 *Task*: `services.security.apparmor.config`
 
 The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may include only part of the profiles.
 
-###### 230 Audit Policy Configuration
+##### 229 Audit Policy Configuration
 
 *Task*: `kubernetes.audit.policy`
 

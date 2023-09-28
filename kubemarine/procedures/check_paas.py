@@ -581,7 +581,7 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '230', "Kubernetes", "Audit policy configuration") as tc:
+    with TestCase(cluster, '229', "Kubernetes", "Audit policy configuration") as tc:
         expected_config = cluster.inventory['services']['audit'].get('cluster_policy')
 
         api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
@@ -1183,7 +1183,7 @@ def calico_apiserver_health_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster, '225', "Calico", "API server health status") as tc:
+    with TestCase(cluster, '230', "Calico", "API server health status") as tc:
         if builtin.get_manifest_installation_step(
                 cluster.inventory, manifest.Identity('calico', 'apiserver')) is None:
             message = dedent(
@@ -1209,7 +1209,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
     The method checks status of Pod Security Admissions, default Pod Security Profile,
     and 'kube-apiserver.yaml' and 'kubeadm-config' consistancy
     """
-    with TestCase(cluster, '226', "Kubernetes", "Pod Security Admissions") as tc:
+    with TestCase(cluster, '225', "Kubernetes", "Pod Security Admissions") as tc:
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         profile_inv = ""
         if cluster.inventory["rbac"]["admission"] == "pss" and \
@@ -1283,7 +1283,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
 
     # Here we actually collect information about all statuses, but report information about DNS only.
     # Other statuses are reported in other TestCases below. This is done for better UX.
-    with TestCase(cluster, '227', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - DNS resolving") as tc_dns:
         geo_monitor_inventory = cluster.procedure_inventory["geo-monitor"]
         namespace = geo_monitor_inventory["namespace"]
         service = geo_monitor_inventory["service"]
@@ -1331,7 +1331,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
             raise TestFailure("found failed DNS statuses", hint=yaml.safe_dump(dns_status["failed"]))
         tc_dns.success("all peer names resolved")
 
-    with TestCase(cluster, '227', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-service") as tc_svc:
         if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1342,7 +1342,7 @@ def geo_check(cluster: KubernetesCluster) -> None:
             raise TestWarn("found skipped peer services", hint=yaml.safe_dump(svc_status["skipped"]))
         tc_svc.success("all peer services available")
 
-    with TestCase(cluster, '227', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
+    with TestCase(cluster, '226', "Geo Monitor", "Geo check - Pod-to-pod") as tc_pod:
         if not status_collected:
             raise TestFailure("configuration error", hint="DNS check failed with error, statuses not collected")
 
@@ -1364,7 +1364,7 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
         group = cluster.nodes['all'].get_accessible_nodes()
         results = group.sudo("aa-enabled")
         enabled_nodes: List[str] = []
@@ -1392,7 +1392,7 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     if cluster.get_os_family() in ['rhel', 'rhel8']:
         return
 
-    with TestCase(cluster, '229', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
         group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:
