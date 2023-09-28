@@ -78,6 +78,22 @@
           }
         }
       }
+    },
+    "target_ports": {
+      "type": "object",
+      "description": "The section contains the information about http/https ports, which are used in connection from balancers to worker nodes",
+      "properties": {
+        "http": {
+          "type": ["string", "integer"],
+          "default": 80,
+          "description": "Target http port"
+        },
+        "https": {
+          "type": ["string", "integer"],
+          "default": 443,
+          "description": "Target https port"
+        }
+      }
     }
   },
   "additionalProperties": false

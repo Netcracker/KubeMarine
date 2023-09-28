@@ -40,6 +40,9 @@ def new(logger: log.EnhancedLogger, recursive_compile: bool = False, root: dict 
     env.filters['isipv4'] = lambda ip: ":" not in _precompile('isipv4', ip)
     env.filters['minorversion'] = lambda version: ".".join(_precompile('minorversion', version).split('.')[0:2])
     env.filters['majorversion'] = lambda version: _precompile('majorversion', version).split('.')[0]
+
+    env.tests['has_role'] = lambda node, role: role in node['roles']
+
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'
     env.filters['is_true'] = lambda v: v in ['true', 'True', 'TRUE', True]

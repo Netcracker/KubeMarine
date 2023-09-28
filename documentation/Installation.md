@@ -180,9 +180,9 @@ The actual information about the supported versions can be found in `compatibili
 * Opened TCP-ports:
   * Internal communication:
     * 22 : SSH 
-    * 80 : HTTP
+    * 80 (or 20080, if balancers are presented): HTTP
     * 179 : Calico BGP
-    * 443 : HTTPS
+    * 443 (or 20443, if balancers are presented): HTTPS
     * 5473 : Calico netowrking with Typha enabled
     * 6443 : Kubernetes API server
     * 8443 : Kubernetes dashboard
@@ -3048,6 +3048,47 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 `loadbalancer` configures the balancers for the Kubernetes cluster. Currently, only the Haproxy configuration can be customized.
 
+###### target_ports
+
+This section describes the ports, which are used for http/https connections from balancer nodes to workers. 
+Those parameters are specified as backend ports in haproxy configuration and as host ports in ingress-nginx-controller plugin.
+
+Default values depend on balancer availability:  
+
+<table>
+<thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Type<br></th>
+    <th>Default value if balancer is presented </th>
+    <th>Default value in no-balancer clusters </th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>target_ports.http</td>
+    <td>integer</td>
+    <td>20080</td>
+    <td>80</td>
+  </tr>
+  <tr>
+    <td>target_ports.https</td>
+    <td>integer</td>
+    <td>20443</td>
+    <td>443</td>
+  </tr>
+</tbody>
+</table>
+
+If it is needed, those parameters can be overriden in `cluster.yaml`, e.g.:
+```yaml
+services:
+  loadbalancer:
+    target_ports:
+      http: 80
+      https: 443
+```
+
 ##### haproxy
 
 This section describes the configuration parameters that are applied to the **haproxy.cfg** config file, and also some Kubemarine related parameters.
@@ -3214,6 +3255,7 @@ This parameter use the following context options for template rendering:
 - nodes
 - bindings
 - config_options
+- target_ports
 
 As an example of a template, you can look at [default template](/kubemarine/templates/haproxy.cfg.j2).
 
@@ -3874,10 +3916,29 @@ For example:
       server-tokens: "False"
 ```
 Default config_map settings:
-```yaml
-  allow-snippet-annotations: "true"
-  use-proxy-protocol: "true"
-```
+
+<table>
+<thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Default value if balancer is presented </th>
+    <th>Default value in no-balancer clusters </th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>allow-snippet-annotations</td>
+    <td>"true"</td>
+    <td>"true"</td>
+  </tr>
+  <tr>
+    <td>use-proxy-protocol</td>
+    <td>"true"</td>
+    <td>"false"</td>
+  </tr>
+</tbody>
+</table>
+
 **Warning**: Ingress-nginx and HAproxy use proxy protocol in the default configuration. If you are using a load balancer without a proxy protocol, it **must** also be disabled in ingress-nginx. To do this, specify `use-proxy-protocol: "false"` in configmap.
 
 * The `custom_headers` parameter sets specified custom headers before sending the traffic to backends. Before proceeding, refer to the official NGINX Ingress Controller documentation at [https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/).

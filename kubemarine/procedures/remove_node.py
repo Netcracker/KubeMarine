@@ -23,7 +23,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
-from kubemarine.procedures import install
+from kubemarine.procedures import install, add_node
 
 
 def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[NodeGroup]:
@@ -104,7 +104,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
                 del inventory_to_finalize['nodes'][j]
                 break
 
-    if inventory_to_finalize['services'].get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
+    if inventory_to_finalize.get('services', {}).get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
         for node in nodes_for_removal.get_ordered_members_configs_list():
             hostnames = [node['name'], node['internal_address']]
             if node.get('address') is not None:
@@ -129,7 +129,8 @@ tasks = OrderedDict({
     },
     "update": {
         "etc_hosts": install.system_prepare_dns_etc_hosts,
-        "coredns": install.deploy_coredns
+        "coredns": install.deploy_coredns,
+        "plugins": add_node.redeploy_plugins_if_needed,
     },
     "remove_kubernetes_nodes": remove_kubernetes_nodes,
     "overview": install.overview,

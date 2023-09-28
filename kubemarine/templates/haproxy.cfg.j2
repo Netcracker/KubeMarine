@@ -29,7 +29,7 @@ backend http_backend
     default-server      inter 2s fall 2 rise 3
 {%- for node in nodes -%}
 {% if 'worker' in node['roles'] %}
-    server {{ node['name'] }} {{ node['internal_address'] }}:80 check port 80 send-proxy
+    server {{ node['name'] }} {{ node['internal_address'] }}:{{ target_ports.http }} check port {{ target_ports.http }} send-proxy
 {%- endif %}
 {%- endfor %}
 
@@ -48,7 +48,7 @@ backend https_backend
     default-server      inter 2s fall 2 rise 3
 {%- for node in nodes -%}
 {% if 'worker' in node['roles'] %}
-    server {{ node['name'] }} {{ node['internal_address'] }}:443 check port 443 send-proxy
+    server {{ node['name'] }} {{ node['internal_address'] }}:{{ target_ports.https }} check port {{ target_ports.https }} send-proxy
 {%- endif %}
 {%- endfor %}
 

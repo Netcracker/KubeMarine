@@ -362,6 +362,9 @@ services:
         maxconn: 10000
       keep_configs_updated: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
+    target_ports:
+      http: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20080{% else %}80{% endif %}'
+      https: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20443{% else %}443{% endif %}'
 
   packages:
     cache_versions: true
@@ -575,7 +578,7 @@ plugins:
             pods:
               - ingress-nginx-controller
     config_map:
-      use-proxy-protocol: "true"
+      use-proxy-protocol: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}true{% else %}false{% endif %}'
     webhook:
       image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
       # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598
@@ -603,11 +606,11 @@ plugins:
     ports:
       - name: http
         containerPort: 80
-        hostPort: 80
+        hostPort: '{{ services.loadbalancer.target_ports.http }}'
         protocol: TCP
       - name: https
         containerPort: 443
-        hostPort: 443
+        hostPort: '{{ services.loadbalancer.target_ports.https }}'
         protocol: TCP
       - name: prometheus
         containerPort: 10254
