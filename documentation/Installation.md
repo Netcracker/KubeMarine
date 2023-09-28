@@ -180,9 +180,9 @@ The actual information about the supported versions can be found in `compatibili
 * Opened TCP-ports:
   * Internal communication:
     * 22 : SSH 
-    * 80 : HTTP
+    * 80 (or 20080, if balancers are presented): HTTP
     * 179 : Calico BGP
-    * 443 : HTTPS
+    * 443 (or 20443, if balancers are presented): HTTPS
     * 5473 : Calico netowrking with Typha enabled
     * 6443 : Kubernetes API server
     * 8443 : Kubernetes dashboard
