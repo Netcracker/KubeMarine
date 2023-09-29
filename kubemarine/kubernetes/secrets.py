@@ -19,6 +19,7 @@ from typing import Iterator
 from kubemarine.core.group import NodeGroup
 
 _custom_certs = "/etc/kubernetes/custom-certs"
+_config_path = _custom_certs + "/server.conf"
 _private_key_path = _custom_certs + "/key"
 _certificate_path = _custom_certs + "/cert"
 
@@ -54,22 +55,27 @@ def put_certificate(control_plane: NodeGroup, cert: io.StringIO, key: io.StringI
     control_plane.put(key, _private_key_path, sudo=True)
 
 
-def create_certificate(control_plane: NodeGroup, customization_flags: str) -> None:
+def create_certificate(control_plane: NodeGroup, config: str, customization_flags: str) -> None:
     """
     Create new certificate and private key pair in the intermediate location.
 
     The method should be used within `secrets.create_tls_secret_procedure` procedure.
 
     :param control_plane: control plane node to create tls secret on
+    :param config: configuration with x509 extensions
     :param customization_flags: flags to append to the `openssl req` command to specify properties of the certificate.
     """
+    control_plane.put(io.StringIO(config), _config_path, sudo=True)
     control_plane.sudo(
         f"openssl req -x509 -nodes "
-        f"-out {_certificate_path} -keyout {_private_key_path} "
+        f"-out {_certificate_path} -keyout {_private_key_path} -config {_config_path} "
         f"{customization_flags}")
 
 
 def get_encoded_certificate_cmd() -> str:
+    """
+    :return: command that produces base64-encoded certificate.
+    """
     return rf"cat {_certificate_path} | base64 | tr -d '\n'"
 
 

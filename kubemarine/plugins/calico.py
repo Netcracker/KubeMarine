@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ipaddress
+from textwrap import dedent
 from typing import Optional, List, Dict
 
 import os
@@ -69,10 +70,19 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Creating or renewing the key and certificate for the Calico API server")
 
     with secrets.create_tls_secret_procedure(control_plane):
+        config = dedent(
+            """\
+            [req]
+            distinguished_name = req
+            [v3_req]
+            basicConstraints = critical,CA:TRUE
+            subjectAltName = DNS:calico-api.calico-apiserver.svc
+            """
+        )
         control_plane.call(
             secrets.create_certificate,
-            customization_flags='-newkey rsa:4096 -days 365 '
-                                '-subj "/" -addext "subjectAltName = DNS:calico-api.calico-apiserver.svc"')
+            config=config,
+            customization_flags='-newkey rsa:4096 -days 365 -subj "/" -extensions v3_req')
 
         control_plane.call(secrets.renew_tls_secret, name=secret_name, namespace=secret_namespace)
 
