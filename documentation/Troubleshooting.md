@@ -754,7 +754,7 @@ E1202 03:28:26.861927       1 reflector.go:138] k8s.io/client-go/metadata/metada
 ```
 From this message you can find kind of CR. Use it to find broken CRD:
 ```
-# kubectl get crd -o custom-columns=CRD_Name:.metadata.name,CR_Kind:.spec.names.kind | grep exampke_kind
+# kubectl get crd -o custom-columns=CRD_Name:.metadata.name,CR_Kind:.spec.names.kind | grep example_kind
 crd_example.com                               example_kind
 ```
 Next, you need to restore this webhook, or if this is not possible, delete this CRD. After that the GC should be restored.
