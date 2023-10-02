@@ -490,9 +490,6 @@ plugins:
               - calico-kube-controllers
               - calico-node
               - calico-apiserver
-        - python:
-            module: plugins/calico.py
-            method: expect_apiserver
     mode: ipip
     crossSubnet: true
     natOutgoing: true

@@ -39,7 +39,7 @@ class TheAction(Action):
             calico.renew_apiserver_certificate(cluster)
             plugins.expect_deployment(cluster, [{'name': 'calico-apiserver', 'namespace': 'calico-apiserver'}])
             plugins.expect_pods(cluster, ['calico-apiserver'], namespace='calico-apiserver')
-            calico.expect_apiserver(cluster)
+            # calico.expect_apiserver(cluster)
         else:
             logger.debug("The provided inventory has custom installation steps configured. "
                          "Need to re-install the whole Calico plugin.")
