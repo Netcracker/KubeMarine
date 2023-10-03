@@ -17,6 +17,7 @@ from typing import Optional, List, Dict
 
 import os
 
+from kubemarine import plugins, kubernetes
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.kubernetes import secrets
@@ -61,15 +62,27 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
     processor.apply(cluster, manifest)
 
 
+def is_apiserver_enabled(inventory: dict) -> bool:
+    enabled: bool = inventory['plugins']['calico']['apiserver']['enabled']
+    return enabled
+
+
 def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
+    logger = cluster.log
+    if not is_apiserver_enabled(cluster.inventory):
+        logger.debug("Calico API server is disabled. Skip renewing of the key and certificate.")
+        return
+
+    namespace = "calico-apiserver"
     secret_name = "calico-apiserver-certs"
-    secret_namespace = "calico-apiserver"
+    deployment = "calico-apiserver"
 
-    control_plane = cluster.nodes["control-plane"].get_first_member()
+    control_planes = cluster.nodes["control-plane"]
+    first_control_plane = control_planes.get_first_member()
 
-    cluster.log.debug("Creating or renewing the key and certificate for the Calico API server")
+    with secrets.create_tls_secret_procedure(first_control_plane):
+        logger.debug("Creating or renewing of the key and certificate for the Calico API server")
 
-    with secrets.create_tls_secret_procedure(control_plane):
         config = dedent(
             """\
             [req]
@@ -79,25 +92,37 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
             subjectAltName = DNS:calico-api.calico-apiserver.svc
             """
         )
-        control_plane.call(
+        first_control_plane.call(
             secrets.create_certificate,
             config=config,
             customization_flags='-newkey rsa:4096 -days 365 -subj "/" -extensions v3_req')
 
-        control_plane.call(secrets.renew_tls_secret, name=secret_name, namespace=secret_namespace)
+        first_control_plane.call(secrets.renew_tls_secret, name=secret_name, namespace=namespace)
 
-        control_plane.sudo(f"{secrets.get_encoded_certificate_cmd()} "
-                           "| xargs -I CERT "
-                           "sudo kubectl patch apiservice v3.projectcalico.org "
-                           r'-p "{\"spec\": {\"caBundle\": \"CERT\"}}"')
+        logger.debug("Patching the APIService for the Calico API server")
 
+        first_control_plane.sudo(
+            f"{secrets.get_encoded_certificate_cmd()} "
+            "| xargs -I CERT "
+            "sudo kubectl patch apiservice v3.projectcalico.org "
+            r'-p "{\"spec\": {\"caBundle\": \"CERT\"}}"')
 
-def expect_apiserver(cluster: KubernetesCluster, retries: int = 15) -> None:
-    control_plane = cluster.nodes["control-plane"].get_first_member()
+    # Force restart the deployment instead of graceful waiting for the automatic secret propagation.
+    # This is necessary to make the procedure independent on the secret propagation timeout.
+    logger.debug("Restarting the Calico API server deployment")
+    first_control_plane.sudo(f"kubectl rollout restart -n {namespace} deployment {deployment}")
+    plugins.expect_deployment(cluster, [{'name': deployment, 'namespace': namespace}])
+    plugins.expect_pods(cluster, ['calico-apiserver'], namespace=namespace)
 
-    cluster.log.debug("Waiting till Calico API server is available through Kubernetes API server")
-    control_plane.call(utils.wait_command_successful,
-                       command="kubectl get ippools.projectcalico.org", retries=retries)
+    logger.debug("Waiting for the Calico API service availability through the Kubernetes API server")
+
+    # Try to access some projectcalico.org resource using each instance of the Kubernetes API server.
+    expect_config = cluster.inventory['plugins']['calico']['apiserver']['expect']['apiservice']
+    with kubernetes.local_admin_config(control_planes) as kubeconfig:
+        control_planes.call(utils.wait_command_successful,
+                            command=f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org",
+                            hide=True,
+                            retries=expect_config['retries'], timeout=expect_config['timeout'])
 
 
 class CalicoManifestProcessor(Processor):

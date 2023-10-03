@@ -41,6 +41,8 @@ plugins:
     install: true
   calico:
     install: true
+    apiserver:
+      enabled: true
 
 rbac:
   accounts:

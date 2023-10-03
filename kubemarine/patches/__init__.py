@@ -23,12 +23,10 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_override_target_ports import OverrideTargetPorts
-from kubemarine.patches.p2_install_calico_apiserver import InstallCalicoAPIServer
-from kubemarine.patches.p3_reconfigure_audit_policy import ReconfigureAuditPolicy
+from kubemarine.patches.p2_reconfigure_audit_policy import ReconfigureAuditPolicy
 
 patches: List[Patch] = [
     OverrideTargetPorts(),
-    InstallCalicoAPIServer(),
     ReconfigureAuditPolicy(),
 ]
 """

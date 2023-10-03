@@ -46,9 +46,8 @@ def renew_calico_apiserver_certs_task(cluster: KubernetesCluster) -> None:
 
     # Let's assume that if the user specified `calico` section in the procedure inventory,
     # they agree with the default renew procedure.
-    # Also, it implies that the `calico` plugin is enabled and installed.
+    # Also, it implies that the `calico` plugin is enabled and installed, and Calico API server is enabled.
     calico.renew_apiserver_certificate(cluster)
-    # calico.expect_apiserver(cluster, retries=30)
 
 
 def k8s_certs_renew_task(cluster: KubernetesCluster) -> None:

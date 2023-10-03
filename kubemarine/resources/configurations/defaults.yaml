@@ -443,27 +443,15 @@ plugins:
             method: apply_yaml
             arguments:
               plugin_name: calico
-        - python:
-            module: plugins/builtin.py
-            method: apply_yaml
-            arguments:
-              plugin_name: calico
-              manifest_id: apiserver
-        - python:
-            module: plugins/calico.py
-            method: renew_apiserver_certificate
         - expect:
             daemonsets:
               - calico-node
             deployments:
               - calico-kube-controllers
-              - name: calico-apiserver
-                namespace: calico-apiserver
             pods:
               - coredns
               - calico-kube-controllers
               - calico-node
-              - calico-apiserver
         - thirdparty: /usr/bin/calicoctl
         - template:
             source: templates/plugins/calicoctl.cfg.j2
@@ -483,13 +471,19 @@ plugins:
               - calico-node
             deployments:
               - calico-kube-controllers
-              - name: calico-apiserver
-                namespace: calico-apiserver
             pods:
               - coredns
               - calico-kube-controllers
               - calico-node
-              - calico-apiserver
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: calico
+              manifest_id: apiserver
+        - python:
+            module: plugins/calico.py
+            method: renew_apiserver_certificate
     mode: ipip
     crossSubnet: true
     natOutgoing: true
@@ -569,6 +563,7 @@ plugins:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
     apiserver:
       image: 'calico/apiserver:{{ plugins.calico.version }}'
+      enabled: false
       nodeSelector:
         kubernetes.io/os: linux
       resources:
@@ -578,6 +573,10 @@ plugins:
         limits:
           cpu: 100m
           memory: 200Mi
+      expect:
+        apiservice:
+          timeout: 5
+          retries: 30
 
   nginx-ingress-controller:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'

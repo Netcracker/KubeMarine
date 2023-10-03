@@ -48,6 +48,10 @@ class ReconfigureAuditPolicy(RegularPatch):
         return dedent(
             f"""\
             Disable logging of Kubernetes audit events for the Calico API server's checking API access.
+            
+            If the Calico plugin or its API server are disabled, the policy is still reconfigured,
+            but new rules do not affect anything and are only reserved for possible future extensions.
+            
             The patch is equivalent to `kubemarine install --tasks deploy.kubernetes.audit`.
             """.rstrip()
         )

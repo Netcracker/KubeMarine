@@ -254,8 +254,14 @@ def wait_command_successful(g: object, command: str,
     while retries > 0:
         log.debug("Waiting for command to succeed, %s retries left" % retries)
         result = group.sudo(command, warn=warn, hide=hide)
-        exit_code = list(result.values())[0].exited
-        if exit_code == 0:
+        if hide:
+            log.verbose(result)
+            for host in result.get_failed_hosts_list():
+                stderr = result[host].stderr.rstrip('\n')
+                if stderr:
+                    log.debug(f"{host}: {stderr}")
+
+        if not result.is_any_failed():
             log.debug("Command succeeded")
             return
         retries = retries - 1

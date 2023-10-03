@@ -16,7 +16,7 @@ from typing import Dict, Optional
 
 from kubemarine.core import log
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.plugins import manifest
+from kubemarine.plugins import calico, manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor, CalicoApiServerManifestProcessor
 from kubemarine.plugins.kubernetes_dashboard import get_dashboard_manifest_processor
 from kubemarine.plugins.local_path_provisioner import LocalPathProvisionerManifestProcessor
@@ -32,15 +32,8 @@ MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
 }
 
 
-def get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
-    if manifest_identity not in MANIFEST_PROCESSOR_PROVIDERS:
-        raise Exception(f"Cannot find processor of {manifest_identity.repr_id()} "
-                        f"for {manifest_identity.plugin_name!r} plugin.")
-
+def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
     plugin_name = manifest_identity.plugin_name
-    if not inventory["plugins"][plugin_name]["install"]:
-        return None
-
     items = inventory['plugins'][plugin_name]['installation']['procedures']
     for i, item in enumerate(items):
         if 'python' not in item:
@@ -72,7 +65,10 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
         if not inventory["plugins"][plugin_name]["install"]:
             continue
 
-        config = get_manifest_installation_step(inventory, manifest_identity)
+        if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(inventory):
+            continue
+
+        config = _get_manifest_installation_step(inventory, manifest_identity)
         if config is not None:
             arguments = config['arguments']
 
@@ -104,6 +100,9 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
                original_yaml_path: Optional[str] = None,
                destination_name: Optional[str] = None) -> None:
     manifest_identity = Identity(plugin_name, manifest_id)
+    if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(cluster.inventory):
+        cluster.log.debug("Calico API server is disabled. Skip installing of the manifest.")
+        return
 
     processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity,
                                        original_yaml_path, destination_name)

@@ -3844,8 +3844,38 @@ For more information about the supported Calico environment variables, refer to 
 
 ###### Calico API server
 
-Kubemarine brings Calico with its API server. This requires its annual certificates' renewal.
+To find details about the Calico API server, refer to the official documentation at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
+
+By default, the Calico API server is not installed. To install it during the Calico installation, specify the following:
+
+```yaml
+plugins:
+  calico:
+    apiserver:
+      enabled: true
+```
+
+**Note**: Calico API server requires its annual certificates' renewal.
 For more information, refer to [Configuring Certificate Renew Procedure for calico](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-calico).
+
+Kubemarine waits for the API server availability during the installation.
+If the default wait timeout does not fit, it can be extended in the same `apiserver` section of the `calico` plugin.
+
+```yaml
+plugins:
+  calico:
+    apiserver:
+      expect:
+        apiservice:
+          retries: 60
+```
+
+The following parameters are supported:
+
+| Name                                  | Type | Mandatory | Default Value | Example | Description                                         |
+|-------------------------------------- |------|-----------|---------------|---------|-----------------------------------------------------|
+| `apiserver.expect.apiservice.timeout` | int  | no        | 5             | `10`    | Number of retries for the API service expect check  |
+| `apiserver.expect.apiservice.retries` | int  | no        | 30            | `60`    | Timeout for the API service expect check in seconds |
 
 ##### nginx-ingress-controller
 

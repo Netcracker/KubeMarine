@@ -153,6 +153,10 @@ class EnrichmentValidation(unittest.TestCase):
                 }
                 if test_identity.manifest_id is not None:
                     arguments['manifest_id'] = test_identity.manifest_id
+
+                if test_identity == manifest.Identity("calico", "apiserver"):
+                    plugin_section.setdefault('apiserver', {})['enabled'] = True
+
                 plugin_section['installation'] = {'procedures': [{'python': {
                     'module': 'plugins/builtin.py',
                     'method': 'apply_yaml',

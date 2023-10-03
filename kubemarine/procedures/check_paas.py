@@ -31,7 +31,7 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
-from kubemarine.plugins import builtin, manifest
+from kubemarine.plugins import calico
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
@@ -1050,8 +1050,7 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                                              {"Deployment": [{"calico-kube-controllers": {"version": calico_version}},
                                                              {"coredns": {"version": coredns_version}}]}],
                              "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": nginx_ingress_version}}]}]}
-        if builtin.get_manifest_installation_step(
-                cluster.inventory, manifest.Identity('calico', 'apiserver')) is not None:
+        if calico.is_apiserver_enabled(cluster.inventory):
             entities_to_check['calico-apiserver'] = [{"Deployment": [{"calico-apiserver": {"version": calico_version}}]}]
 
         for namespace, types_dict in entities_to_check.items():
@@ -1089,8 +1088,7 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
-        if builtin.get_manifest_installation_step(
-                cluster.inventory, manifest.Identity('calico', 'apiserver')) is not None:
+        if calico.is_apiserver_enabled(cluster.inventory):
             entities_to_check['calico-apiserver'] = [{"Deployment": ["calico-apiserver"]}]
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -1184,21 +1182,19 @@ def calico_apiserver_health_status(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '230', "Calico", "API server health status") as tc:
-        if builtin.get_manifest_installation_step(
-                cluster.inventory, manifest.Identity('calico', 'apiserver')) is None:
-            message = dedent(
-                """\
-                The resolved inventory lacks of the Calico API server installation steps.
-                It is recommended to add the steps and re-install Calico.
-                By default if no custom steps are specified, the API server is installed.
-                """.rstrip())
-            raise TestWarn("Calico API server manifest not found", hint=message)
+        if not calico.is_apiserver_enabled(cluster.inventory):
+            return tc.success(results='disabled')
 
-        control_plane = cluster.nodes['control-plane'].get_any_member()
-        result = control_plane.sudo('kubectl get ippools.projectcalico.org', warn=True)
+        control_planes = cluster.nodes["control-plane"]
+        with kubernetes.local_admin_config(control_planes) as kubeconfig:
+            result = control_planes.sudo(f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org", warn=True)
 
         if result.is_any_failed():
-            message = "Calico API server is not ready: " + result.get_simple_result().stderr
+            message = "Calico API server is not ready:\n"
+            for host in result.get_failed_hosts_list():
+                stderr = result[host].stderr
+                if stderr:
+                    message += f"{host}: {stderr}"
             raise TestFailure('invalid', hint=message)
         else:
             tc.success(results='valid')
