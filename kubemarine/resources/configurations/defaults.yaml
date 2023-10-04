@@ -576,7 +576,10 @@ plugins:
       expect:
         apiservice:
           timeout: 5
-          retries: 30
+          # Sometimes the container fails the liveness probe the first time for unknown reason, and restarted.
+          # The total expect timeout is set with respect to initialDelaySeconds of the livenessProbe,
+          # and current `renew_apiserver_certificate` implementation details.
+          retries: 40
 
   nginx-ingress-controller:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'
