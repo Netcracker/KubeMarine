@@ -3844,7 +3844,7 @@ For more information about the supported Calico environment variables, refer to 
 
 ###### Calico API server
 
-To find details about the Calico API server, refer to the official documentation at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
+For details about the Calico API server, refer to the official documentation at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
 
 By default, the Calico API server is not installed. To install it during the Calico installation, specify the following:
 
@@ -3872,10 +3872,10 @@ plugins:
 
 The following parameters are supported:
 
-| Name                                  | Type | Mandatory | Default Value | Example | Description                                         |
-|-------------------------------------- |------|-----------|---------------|---------|-----------------------------------------------------|
-| `apiserver.expect.apiservice.timeout` | int  | no        | 5             | `10`    | Number of retries for the API service expect check  |
-| `apiserver.expect.apiservice.retries` | int  | no        | 30            | `60`    | Timeout for the API service expect check in seconds |
+| Name                                  | Type | Mandatory | Default Value | Example | Description                                          |
+|-------------------------------------- |------|-----------|---------------|---------|------------------------------------------------------|
+| `apiserver.expect.apiservice.timeout` | int  | no        | 5             | `10`    | Number of retries for the API service expect check.  |
+| `apiserver.expect.apiservice.retries` | int  | no        | 30            | `60`    | Timeout for the API service expect check in seconds. |
 
 ##### nginx-ingress-controller
 
