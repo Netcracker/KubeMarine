@@ -3875,7 +3875,7 @@ The following parameters are supported:
 | Name                                  | Type | Mandatory | Default Value | Example | Description                                          |
 |-------------------------------------- |------|-----------|---------------|---------|------------------------------------------------------|
 | `apiserver.expect.apiservice.timeout` | int  | no        | 5             | `10`    | Number of retries for the API service expect check.  |
-| `apiserver.expect.apiservice.retries` | int  | no        | 30            | `60`    | Timeout for the API service expect check in seconds. |
+| `apiserver.expect.apiservice.retries` | int  | no        | 40            | `60`    | Timeout for the API service expect check in seconds. |
 
 ##### nginx-ingress-controller
 
