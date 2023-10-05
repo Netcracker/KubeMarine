@@ -231,7 +231,6 @@ def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_ver
 
 def calico_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = [
-        'calico/pod2daemon-flexvol',
         'calico/typha', 'calico/cni', 'calico/node', 'calico/kube-controllers',
     ]
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
