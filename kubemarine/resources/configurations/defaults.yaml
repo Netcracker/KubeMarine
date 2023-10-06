@@ -198,13 +198,17 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
-        # Don't log checking API access by Calico API server
+        # Don't log checking access by internal services
         - level: None
-          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          userGroups:
+            - "system:serviceaccounts:calico-apiserver"
+            - "system:nodes"
           verbs: ["create"]
           resources:
             - group: "authorization.k8s.io"
               resources: ["subjectaccessreviews"]
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
         # Don't log update of ingress-controller-leader ConfigMap by ingress-nginx.
         # This reproduces only for v1.2.0 and can be removed after its support stop.
         - level: None
