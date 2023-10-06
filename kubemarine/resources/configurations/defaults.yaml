@@ -261,6 +261,45 @@ services:
           - group: "authentication.k8s.io"
             resources: ["tokenreviews"]
           - group: "authorization.k8s.io"
+          - group: "projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamconfigurations
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+              - profiles
+          - group: "crd.projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamblocks
+              - ipamconfigs
+              - ipamhandles
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
 
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'
