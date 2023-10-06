@@ -18,6 +18,8 @@ plugins:
 
   calico:
     install: true
+    apiserver:
+      enabled: true
 
   nginx-ingress-controller:
     install: true

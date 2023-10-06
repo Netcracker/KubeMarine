@@ -31,11 +31,13 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
+from kubemarine.plugins import calico
 from kubemarine.procedures import check_iaas
 from kubemarine.core import flow, static
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
+from kubemarine.kubernetes.object import KubernetesObject
 from kubemarine.coredns import generate_configmap
 from deepdiff import DeepDiff  # type: ignore[import]
 
@@ -1020,7 +1022,10 @@ def control_plane_health_status(cluster: KubernetesCluster) -> None:
 
 def default_services_configuration_status(cluster: KubernetesCluster) -> None:
     '''
-    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`, are checked,
+    and the `coredns` configmap is also checked.
+
     :param cluster: KubernetesCluster object
     :return: None
     '''
@@ -1038,13 +1043,16 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
 
         coredns_version = first_control_plane.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
         version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
-                                                            {"kube-proxy": {"version": cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]}}]},
-                                             {"Deployment": [{"calico-kube-controllers": {"version": cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]}},
+        calico_version = cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]
+        nginx_ingress_version = cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]
+        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": calico_version}},
+                                                            {"kube-proxy": {"version": version}}]},
+                                             {"Deployment": [{"calico-kube-controllers": {"version": calico_version}},
                                                              {"coredns": {"version": coredns_version}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]}}]}]}
+                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": nginx_ingress_version}}]}]}
+        if calico.is_apiserver_enabled(cluster.inventory):
+            entities_to_check['calico-apiserver'] = [{"Deployment": [{"calico-apiserver": {"version": calico_version}}]}]
 
-        results = dict()
         for namespace, types_dict in entities_to_check.items():
             for type_dict in types_dict:
                 for type, services in type_dict.items():
@@ -1053,15 +1061,14 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                             if service_name == "ingress-nginx-controller":
                                 if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
                                     break
-                            result = first_control_plane.sudo(f"kubectl get {type} {service_name} -n {namespace} -oyaml")
-                            content = yaml.safe_load(result.get_simple_out())
-                            if properties["version"] in content["spec"]["template"]["spec"]["containers"][0].get("image", ""):
-                                results[service_name] = True
-                            else:
-                                results[service_name] = False
-        for item, condition in results.items():
-            if not condition:
-                message += f"{item} has outdated image version\n"
+                            k8s_object = KubernetesObject(cluster, type, service_name, namespace)
+                            k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
+                            if not k8s_object.is_reloaded():
+                                message += f"failed to load {service_name}: {k8s_object}\n"
+                                continue
+
+                            if properties["version"] not in k8s_object.obj["spec"]["template"]["spec"]["containers"][0].get("image", ""):
+                                message += f"{service_name} has outdated image version\n"
 
         if message:
             raise TestFailure('invalid', hint=f"{message}")
@@ -1071,7 +1078,9 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
 
 def default_services_health_status(cluster: KubernetesCluster) -> None:
     '''
-    This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+    This test verifies the health of pods `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`.
+
     :param cluster: KubernetesCluster object
     :return: None
     '''
@@ -1079,6 +1088,8 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
         entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
                                              {"Deployment": ["calico-kube-controllers", "coredns"]}],
                              "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
+        if calico.is_apiserver_enabled(cluster.inventory):
+            entities_to_check['calico-apiserver'] = [{"Deployment": ["calico-apiserver"]}]
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
@@ -1158,6 +1169,32 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
             message += "ipam check indicates some problems," \
                        " for more info you can use `calicoctl ipam check --show-problem-ips`"
         if message:
+            raise TestFailure('invalid', hint=message)
+        else:
+            tc.success(results='valid')
+
+
+def calico_apiserver_health_status(cluster: KubernetesCluster) -> None:
+    """
+    This test verifies the Calico API server health.
+
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster, '230', "Calico", "API server health status") as tc:
+        if not calico.is_apiserver_enabled(cluster.inventory):
+            return tc.success(results='disabled')
+
+        control_planes = cluster.nodes["control-plane"]
+        with kubernetes.local_admin_config(control_planes) as kubeconfig:
+            result = control_planes.sudo(f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org", warn=True)
+
+        if result.is_any_failed():
+            message = "Calico API server is not ready:\n"
+            for host in result.get_failed_hosts_list():
+                stderr = result[host].stderr
+                if stderr:
+                    message += f"{host}: {stderr}"
             raise TestFailure('invalid', hint=message)
         else:
             tc.success(results='valid')
@@ -1456,7 +1493,10 @@ tasks = OrderedDict({
         "health_status": default_services_health_status
     },
     'calico': {
-        "config_check": calico_config_check
+        "config_check": calico_config_check,
+        "apiserver": {
+            "health_status": calico_apiserver_health_status,
+        }
     },
     'geo_check': geo_check,
 })

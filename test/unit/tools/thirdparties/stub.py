@@ -21,7 +21,7 @@ import yaml
 from ruamel.yaml import CommentedMap
 
 from kubemarine.core import static, utils
-from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
+from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
 from scripts.thirdparties.src.compatibility import KubernetesVersions
 from scripts.thirdparties.src.run import Synchronization
 from scripts.thirdparties.src.software import InternalCompatibility, CompatibilityMap, UpgradeConfig
@@ -69,52 +69,56 @@ class FakeKubernetesImagesResolver(KubernetesImagesResolver):
 
 
 class FakeManifest(Manifest):
-    def __init__(self, plugin_name: str, plugin_version: str):
-        super().__init__(io.StringIO())
-        self.images = self._stub_images(plugin_name, plugin_version)
+    def __init__(self, manifest_identity: Identity, plugin_version: str):
+        super().__init__(manifest_identity, io.StringIO())
+        self.images = self._stub_images(manifest_identity, plugin_version)
 
     def get_all_container_images(self) -> List[str]:
         return self.images
 
-    def _stub_images(self, plugin_name: str, plugin_version: str) -> List[str]:
-        if plugin_name == 'calico':
+    def _stub_images(self, manifest_identity: Identity, plugin_version: str) -> List[str]:
+        if manifest_identity == Identity('calico'):
             return [
                 f'docker.io/calico/node:{plugin_version}',
                 f'docker.io/calico/cni:{plugin_version}',
                 f'docker.io/calico/kube-controllers:{plugin_version}',
                 f'docker.io/calico/typha:{plugin_version}'
             ]
-        elif plugin_name == 'nginx-ingress-controller':
+        elif manifest_identity == Identity('calico', 'apiserver'):
+            return [
+                f'calico/apiserver:{plugin_version}',
+            ]
+        elif manifest_identity == Identity('nginx-ingress-controller'):
             return [
                 f'registry.k8s.io/ingress-nginx/controller:{plugin_version}@sha256:123',
                 'registry.k8s.io/ingress-nginx/kube-webhook-certgen:fake-webhook-version@sha256:123'
             ]
-        elif plugin_name == 'kubernetes-dashboard':
+        elif manifest_identity == Identity('kubernetes-dashboard'):
             return [
                 f'kubernetesui/dashboard:{plugin_version}',
                 'kubernetesui/metrics-scraper:fake-metrics-scraper-version'
             ]
-        elif plugin_name == 'local-path-provisioner':
+        elif manifest_identity == Identity('local-path-provisioner'):
             return [
                 f'rancher/local-path-provisioner:{plugin_version}'
             ]
         else:
-            raise Exception(f"Unsupported plugin {plugin_name!r}")
+            raise Exception(f"Unsupported manifest {manifest_identity.name!r}")
 
 
 class FakeCachedManifestResolver(ManifestResolver):
     def __init__(self):
         super().__init__()
-        self.registry: Dict[Tuple[str, str], Manifest] = {}
+        self.registry: Dict[Tuple[Identity, str], Manifest] = {}
 
-    def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
-        identity = (plugin_name, plugin_version)
+    def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
+        identity = (manifest_identity, plugin_version)
         if identity not in self.registry:
-            manifest_path = get_default_manifest_path(plugin_name, plugin_version)
+            manifest_path = get_default_manifest_path(manifest_identity, plugin_version)
             if os.path.exists(manifest_path):
-                manifest = super().resolve(plugin_name, plugin_version)
+                manifest = super()._resolve(manifest_identity, plugin_version)
             else:
-                manifest = FakeManifest(plugin_name, plugin_version)
+                manifest = FakeManifest(manifest_identity, plugin_version)
             self.registry[identity] = manifest
 
         return self.registry[identity]

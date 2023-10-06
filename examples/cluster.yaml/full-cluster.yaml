@@ -64,7 +64,7 @@ public_cluster_ip: "10.101.0.1"
 services:
 
   kubeadm:
-    kubernetesVersion: v1.24.0
+    kubernetesVersion: v1.24.2
     controlPlaneEndpoint: 'k8s.example.com:6443'
     imageRepository: artifactory.example.com:5443/registry.k8s.io
     networking:
@@ -150,7 +150,7 @@ services:
 
   thirdparties:
     /usr/bin/kubeadm:
-      source: 'https://example.com/kubernetes/v1.24.0/bin/linux/amd64/kubeadm'
+      source: 'https://example.com/kubernetes/v1.24.2/bin/linux/amd64/kubeadm'
       sha1: e5cdfcda337a5c8d59035da9db0c2b02913271d1
       groups:
         - control-plane
@@ -161,7 +161,7 @@ services:
       unpack: '/opt/cni/bin'
       group: control-plane
     /usr/bin/calicoctl:
-      source: 'https://example.com/calico/v3.22.2/calicoctl-linux-amd64'
+      source: 'https://example.com/calico/v3.24.2/calicoctl-linux-amd64'
 
   kernel_security:
     # For RHEL OS use selinux:
@@ -373,7 +373,7 @@ plugins:
 
   calico:
     install: true
-    version: v3.10.1
+    version: v3.24.2
     installation:
       priority: 0
     mode: ipip
@@ -383,19 +383,25 @@ plugins:
     typha:
       enabled: false
       replicas: 2
-      image: calico/typha:v3.10.1
+      image: calico/typha:v3.24.2
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
     cni:
-      image: calico/cni:v3.10.1
+      image: calico/cni:v3.24.2
     node:
-      image: calico/node:v3.10.1
+      image: calico/node:v3.24.2
     kube-controllers:
-      image: calico/kube-controllers:v3.10.1
+      image: calico/kube-controllers:v3.24.2
       nodeSelector:
-        beta.kubernetes.io/os: linux
-    flexvol:
-      image: calico/pod2daemon-flexvol:v3.10.1
+        kubernetes.io/os: linux
+    apiserver:
+      image: calico/apiserver:v3.24.2
+      enabled: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      expect:
+        apiservice:
+          retries: 60
 
   nginx-ingress-controller:
     install: true
@@ -420,11 +426,11 @@ plugins:
     dashboard:
       image: kubernetesui/dashboard:v2.0.0-rc2
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
     metrics-scraper:
       image: kubernetesui/metrics-scraper:v1.0.2
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
     ingress:
       metadata:
         name: kubernetes-dashboard

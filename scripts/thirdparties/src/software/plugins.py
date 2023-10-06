@@ -20,12 +20,12 @@ from typing import List, Tuple, Dict, Any
 from kubemarine import demo
 from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
-from kubemarine.plugins.manifest import Manifest, get_default_manifest_path
+from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoftware, UpgradeConfig
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 
-ERROR_UNEXPECTED_IMAGE = "Image '{image}' of '{plugin}' is not expected"
+ERROR_UNEXPECTED_IMAGE = "Image '{image}' for manifest '{manifest}' is not expected"
 ERROR_ASCENDING_VERSIONS = \
     "Plugins should have non-decreasing versions. " \
     "Plugin '{plugin}' has version {older_version} for Kubernetes {older_k8s_version}, " \
@@ -41,10 +41,14 @@ class ManifestResolver:
     def __init__(self, refresh: bool = False):
         self.refresh = refresh
 
-    def resolve(self, plugin_name: str, plugin_version: str) -> Manifest:
-        manifest_path = get_default_manifest_path(plugin_name, plugin_version)
+    def resolve(self, plugin_name: str, plugin_version: str) -> List[Manifest]:
+        return [self._resolve(manifest_identity, plugin_version)
+                for manifest_identity in get_manifest_identities(plugin_name)]
+
+    def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
+        manifest_path = get_default_manifest_path(manifest_identity, plugin_version)
         if not os.path.exists(manifest_path) or self.refresh:
-            manifest_local_path = resolve_local_path(plugin_name, plugin_version)
+            manifest_local_path = resolve_local_path(manifest_identity, plugin_version)
             print(f"Copying {os.path.basename(manifest_local_path)} to {manifest_path}")
             with utils.open_external(manifest_local_path, 'r') as source, \
                     utils.open_internal(manifest_path, 'w') as target:
@@ -53,15 +57,18 @@ class ManifestResolver:
             run(['git', 'add', manifest_path])
 
         with utils.open_internal(manifest_path, 'r') as stream:
-            return Manifest(stream)
+            return Manifest(manifest_identity, stream)
 
 
 class ManifestsEnrichment:
     def run(self, tracker: SummaryTracker) -> None:
         for k8s_version in tracker.all_k8s_versions:
             for plugin_name in list(static.GLOBALS['plugins']):
-                if tracker.is_software_changed(k8s_version, plugin_name):
-                    try_manifest_enrichment(k8s_version, plugin_name)
+                if not tracker.is_software_changed(k8s_version, plugin_name):
+                    continue
+
+                for manifest_identity in get_manifest_identities(plugin_name):
+                    try_manifest_enrichment(k8s_version, manifest_identity)
 
 
 class Plugins(SoftwareType):
@@ -98,12 +105,12 @@ class Plugins(SoftwareType):
                 k8s_settings = kubernetes_versions[k8s_version]
                 plugin_version = k8s_settings[plugin_name]
                 plugin_identity = (plugin_name, plugin_version)
-                manifest = plugin_manifests[plugin_identity]
+                manifests = plugin_manifests[plugin_identity]
 
                 new_settings = {
                     'version': plugin_version
                 }
-                extra_images = get_extra_images(manifest, plugin_name, plugin_version)
+                extra_images = get_extra_images(manifests, plugin_version)
                 for image_name, image_version in extra_images.items():
                     if image_name in k8s_settings:
                         image_version = k8s_settings[image_name]
@@ -163,13 +170,21 @@ def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name:
                     ))
 
 
-def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
-    filename = f"{plugin_name}-{plugin_version}"
+def get_manifest_identities(plugin_name: str) -> List[Identity]:
+    return [Identity(plugin_name, manifest_settings.get('id'))
+            for manifest_settings in static.GLOBALS['plugins'][plugin_name]['manifests']]
+
+
+def resolve_local_path(manifest_identity: Identity, plugin_version: str) -> str:
+    plugin_name = manifest_identity.plugin_name
+    filename = f"{manifest_identity.name}-{plugin_version}"
     target_file = os.path.join(SYNC_CACHE, filename)
     if os.path.exists(target_file):
         return target_file
 
-    source_settings = static.GLOBALS['plugins'][plugin_name]['source']
+    source_settings = next(manifest_settings['source']
+                           for manifest_settings in static.GLOBALS['plugins'][plugin_name]['manifests']
+                           if manifest_identity.manifest_id == manifest_settings.get('id'))
     minor_version = utils.minor_version(plugin_version)
     if plugin_version in source_settings:
         source = source_settings[plugin_version]
@@ -183,7 +198,7 @@ def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
         url = source['url']
     url = url.format(version=plugin_version)
 
-    print(f"Downloading manifest for plugin {plugin_name!r} of version {plugin_version} from {url}")
+    print(f"Downloading {manifest_identity.repr_id()} for plugin {plugin_name!r} of version {plugin_version} from {url}")
     curl(url, TEMP_FILE)
     if isinstance(source, dict) and 'extract' in source:
         extract_path = source['extract'].format(version=plugin_version)
@@ -200,7 +215,7 @@ def resolve_local_path(plugin_name: str, plugin_version: str) -> str:
 
 
 def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_versions: Dict[str, Dict[str, str]]) \
-        -> Dict[Tuple[str, str], Manifest]:
+        -> Dict[Tuple[str, str], List[Manifest]]:
     plugin_manifests = {}
     for plugin_name in static.GLOBALS['plugins']:
         for k8s_version in kubernetes_versions:
@@ -214,21 +229,31 @@ def resolve_plugin_manifests(manifest_resolver: ManifestResolver, kubernetes_ver
     return plugin_manifests
 
 
-def calico_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
+def calico_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = [
-        'calico/pod2daemon-flexvol',
         'calico/typha', 'calico/cni', 'calico/node', 'calico/kube-controllers',
     ]
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     for image in images:
         if image in expected_images:
             continue
-        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='calico'))
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
 
     return {}
 
 
-def nginx_ingress_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
+def calico_apiserver_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
+    expected_images = ['calico/apiserver']
+    expected_images = [f"{image}:{plugin_version}" for image in expected_images]
+    for image in images:
+        if image in expected_images:
+            continue
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
+
+    return {}
+
+
+def nginx_ingress_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['ingress-nginx/controller']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     extra_images = {}
@@ -239,12 +264,12 @@ def nginx_ingress_extract_images(images: List[str], plugin_version: str) -> Dict
         if image_name == 'ingress-nginx/kube-webhook-certgen':
             extra_images['webhook'] = version
         else:
-            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='nginx-ingress-controller'))
+            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
 
     return extra_images
 
 
-def dashboard_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
+def dashboard_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['kubernetesui/dashboard']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     extra_images = {}
@@ -255,23 +280,28 @@ def dashboard_extract_images(images: List[str], plugin_version: str) -> Dict[str
         if image_name == 'kubernetesui/metrics-scraper':
             extra_images['metrics-scraper'] = version
         else:
-            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='kubernetes-dashboard'))
+            raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
 
     return extra_images
 
 
-def local_path_provisioner_extract_images(images: List[str], plugin_version: str) -> Dict[str, str]:
+def local_path_provisioner_extract_images(images: List[str], manifest_identity: Identity, plugin_version: str) -> Dict[str, str]:
     expected_images = ['rancher/local-path-provisioner']
     expected_images = [f"{image}:{plugin_version}" for image in expected_images]
     for image in images:
         if image in expected_images:
             continue
-        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, plugin='local-path-provisioner'))
+        raise Exception(ERROR_UNEXPECTED_IMAGE.format(image=image, manifest=manifest_identity.name))
 
     return {'busybox': '1.34.1'}
 
 
-def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) -> Dict[str, str]:
+def get_extra_images(manifests: List[Manifest], plugin_version: str) -> Dict[str, str]:
+    return dict(item for manifest in manifests
+                for item in get_extra_manifest_images(manifest, plugin_version).items())
+
+
+def get_extra_manifest_images(manifest: Manifest, plugin_version: str) -> Dict[str, str]:
     images = []
     for image in manifest.get_all_container_images():
         image = image.split('@sha256:')[0]
@@ -279,7 +309,7 @@ def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) 
         # Currently only 'nginx-ingress-controller' contains images from GCR registry.
         # If some new image in this registry appear, we should emphasize this explicitly,
         # adopt the synchronization tool, and installation.registry of the plugin in defaults.yaml
-        if plugin_name == 'nginx-ingress-controller':
+        if manifest.identity == Identity('nginx-ingress-controller'):
             image = image.replace('k8s.gcr.io/', '')
             image = image.replace('registry.k8s.io/', '')
 
@@ -288,21 +318,23 @@ def get_extra_images(manifest: Manifest, plugin_name: str, plugin_version: str) 
     # We should verify that all images are expected.
     # If some new image in the plugin appear, we should emphasize this explicitly,
     # as any new image will require to change defaults.yaml and the enrichment process.
-    if plugin_name == 'calico':
-        return calico_extract_images(images, plugin_version)
-    elif plugin_name == 'nginx-ingress-controller':
-        return nginx_ingress_extract_images(images, plugin_version)
-    elif plugin_name == 'kubernetes-dashboard':
-        return dashboard_extract_images(images, plugin_version)
-    elif plugin_name == 'local-path-provisioner':
-        return local_path_provisioner_extract_images(images, plugin_version)
+    if manifest.identity == Identity('calico'):
+        return calico_extract_images(images, manifest.identity, plugin_version)
+    elif manifest.identity == Identity('calico', 'apiserver'):
+        return calico_apiserver_extract_images(images, manifest.identity, plugin_version)
+    elif manifest.identity == Identity('nginx-ingress-controller'):
+        return nginx_ingress_extract_images(images, manifest.identity, plugin_version)
+    elif manifest.identity == Identity('kubernetes-dashboard'):
+        return dashboard_extract_images(images, manifest.identity, plugin_version)
+    elif manifest.identity == Identity('local-path-provisioner'):
+        return local_path_provisioner_extract_images(images, manifest.identity, plugin_version)
     else:
-        raise Exception(f"Unsupported plugin {plugin_name!r}")
+        raise Exception(f"Unsupported manifest {manifest.identity.name!r}")
 
 
-def try_manifest_enrichment(k8s_version: str, plugin_name: str) -> None:
+def try_manifest_enrichment(k8s_version: str, manifest_identity: Identity) -> None:
     # Generate fake cluster and run plugin manifest enrichment on it
-    info(f"Trying default enrichment of {plugin_name!r} manifest for Kubernetes {k8s_version}")
+    info(f"Trying default enrichment of {manifest_identity.name!r} manifest for Kubernetes {k8s_version}")
 
     inventory = demo.generate_inventory(**demo.ALLINONE)
     inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
@@ -316,5 +348,5 @@ def try_manifest_enrichment(k8s_version: str, plugin_name: str) -> None:
         def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
             print(msg)
 
-    processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, plugin_name)
+    processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, manifest_identity)
     processor.enrich()

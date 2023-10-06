@@ -17,12 +17,13 @@ from __future__ import annotations
 import io
 import json
 import uuid
-import time
+from copy import deepcopy
 from typing import TypeVar, Optional
 
 import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.executor import RunnersResult
 from kubemarine.core.group import NodeGroup
 
 _T = TypeVar('_T', bound='KubernetesObject')
@@ -33,7 +34,7 @@ class KubernetesObject:
                  namespace: str = None, obj: dict = None) -> None:
 
         self._cluster = cluster
-        self._reload_t: float = -1
+        self._reload_result: Optional[RunnersResult] = None
 
         if not kind and not name and not namespace and not obj:
             raise RuntimeError('Not enough parameter values to construct the object')
@@ -52,7 +53,13 @@ class KubernetesObject:
             }
 
     def __str__(self) -> str:
+        if self._reload_result is not None and self._reload_result.failed:
+            return self._reload_result.stderr
         return self.to_yaml()
+
+    @property
+    def obj(self) -> dict:
+        return deepcopy(self._obj)
 
     @property
     def uid(self) -> str:
@@ -85,7 +92,7 @@ class KubernetesObject:
         return data
 
     def is_reloaded(self) -> bool:
-        return self._reload_t > -1
+        return bool(self._reload_result)
 
     def reload(self: _T, control_plane: NodeGroup = None, suppress_exceptions: bool = False) -> _T:
         if not control_plane:
@@ -93,9 +100,9 @@ class KubernetesObject:
         cmd = f'kubectl get {self.kind} -n {self.namespace} {self.name} -o json'
         result = control_plane.sudo(cmd, warn=suppress_exceptions)
         self._cluster.log.verbose(result)
-        if not result.is_any_has_code(1):
-            self._obj = json.loads(result.get_simple_out())
-            self._reload_t = time.time()
+        self._reload_result = result.get_simple_result()
+        if self._reload_result:
+            self._obj = json.loads(self._reload_result.stdout)
         return self
 
     def apply(self, control_plane: NodeGroup = None) -> None:

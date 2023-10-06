@@ -83,17 +83,19 @@ workaround:
 
 plugins:
   calico:
-    source:
-      v3.22:
-        url: 'https://github.com/projectcalico/calico/releases/download/{version}/release-{version}.tgz'
-        extract: 'release-{version}/manifests/calico-typha.yaml'
-      default: 'https://raw.githubusercontent.com/projectcalico/calico/{version}/manifests/calico-typha.yaml'
+    manifests:
+      - source:
+          default: 'https://raw.githubusercontent.com/projectcalico/calico/{version}/manifests/calico-typha.yaml'
+      - id: apiserver
+        source:
+          default: 'https://raw.githubusercontent.com/projectcalico/calico/{version}/manifests/apiserver.yaml'
     requirements:
       default: 'https://docs.tigera.io/archive/{minor_version}/getting-started/kubernetes/requirements'
   nginx-ingress-controller:
-    source:
-      v1.2: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/do/deploy.yaml'
-      default: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/cloud/deploy.yaml'
+    manifests:
+      - source:
+          v1.2: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/do/deploy.yaml'
+          default: 'https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-{version}/deploy/static/provider/cloud/deploy.yaml'
     requirements:
       v1.2:
         'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#support-versions-table'
@@ -101,13 +103,15 @@ plugins:
         'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#support-versions-table'
       default: 'https://github.com/kubernetes/ingress-nginx/tree/controller-{version}#supported-versions-table'
   kubernetes-dashboard:
-    source:
-      default: 'https://raw.githubusercontent.com/kubernetes/dashboard/{version}/aio/deploy/recommended.yaml'
+    manifests:
+      - source:
+          default: 'https://raw.githubusercontent.com/kubernetes/dashboard/{version}/aio/deploy/recommended.yaml'
     requirements:
       default: 'https://github.com/kubernetes/dashboard/releases/tag/{version}'
   local-path-provisioner:
-    source:
-      default: 'https://raw.githubusercontent.com/rancher/local-path-provisioner/{version}/deploy/local-path-storage.yaml'
+    manifests:
+      - source:
+          default: 'https://raw.githubusercontent.com/rancher/local-path-provisioner/{version}/deploy/local-path-storage.yaml'
     requirements:
       default: 'https://github.com/rancher/local-path-provisioner/tree/{version}#requirement'
 

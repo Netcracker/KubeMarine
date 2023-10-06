@@ -2531,6 +2531,13 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
+        # Don't log checking API access by Calico API server
+        - level: None
+          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          verbs: ["create"]
+          resources:
+            - group: "authorization.k8s.io"
+              resources: ["subjectaccessreviews"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
@@ -3524,12 +3531,12 @@ rbac:
       namespaces: ["kube-system"]
 ```
 
-There are three parts of PSS configuration. 
-* `pod-security` enables or disables the PSS installation
-* default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods
-* `exemptions` describes exemptions from default rules
+There are three parts of PSS configuration: 
+* `pod-security` enables or disables the PSS installation.
+* The default profile is described in the `defaults` section and `enforce` defines the policy standard that enforces the pods.
+* `exemptions` describes the exemptions from default rules.
 
-The PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, and `local-path-provisioner`. For instance:
+PSS enabling requires special labels for plugin namespaces such as `nginx-ingress-controller`, `kubernetes-dashboard`, `local-path-provisioner`, and `calico` (relevant only for `calico-apiserver` namespace). For instance:
 
 ```yaml
 apiVersion: v1
@@ -3679,6 +3686,7 @@ After applying the plugin configurations, the plugin installation procedure wait
 * coredns
 * calico-kube-controllers
 * calico-node
+* calico-apiserver
 
 If the pods do not have time to start at a specific timeout, then the plugin configuration is incorrect. In this case, the installation is aborted.
 
@@ -3761,18 +3769,21 @@ The plugin configuration supports the following parameters:
 | mode                   | string  | `ipip`                              | `ipip` / `vxlan`                                 | Network protocol to be used in network plugin                      |
 | crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to improve network performance  |
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
-| fullmesh               | boolean | true                                | true/false                                       | Enable of disable full mesh BGP topology                           |
+| fullmesh               | boolean | true                                | true/false                                       | Enable or disable full mesh BGP topology                           |
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
-| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for this cluster                   |
+| defaultAsNumber        | int     | 64512                               |                                                  | AS Number to be used by default for the cluster                  |
 | globalBgpPeers         | list    | []                                  | list of (IP,AS) pairs                            | List of global BGP Peer (IP,AS) values                             |
 | typha.enabled          | boolean | `true` or `false`                   | If nodes < 4 then `false` else `true`            | Enables the [Typha Daemon](https://github.com/projectcalico/typha) |
-| typha.replicas         | int     | <code>{{ (((nodes&#124;length)/50) + 2) &#124; round(1) }}</code> | Starts from 2 replicas amd increments for every 50 nodes | Number of Typha running replicas |
+| typha.replicas         | int     | <code>{{ (((nodes&#124;length)/50) + 2) &#124; round(1) }}</code> | Starts from 2 replicas and increments for every 50 nodes | Number of Typha running replicas. |
 | typha.image            | string  | `calico/typha:{calico.version}`     | Should contain both image name and version       | Calico Typha image                                                 |
-| typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of tolerations          | Additional custom tolerations for calico-typha pods                |
+| typha.tolerations      | list    | [Default Typha Tolerations](#default-typha-tolerations) | list of extra tolerations    | Additional custom tolerations for calico-typha pods                |
 | cni.image              | string  | `calico/cni:{calico.version}`                | Should contain both image name and version | Calico CNI image                                                |
 | node.image             | string  | `calico/node:{calico.version}`               | Should contain both image name and version | Calico Node image                                               |
 | kube-controllers.image | string  | `calico/kube-controllers:{calico.version}`   | Should contain both image name and version | Calico Kube Controllers image                                   |
+| kube-controllers.tolerations | list | Original kube-controllers tolerations     | list of extra tolerations                  | Additional custom toleration for calico-kube-controllers pods   |
 | flexvol.image          | string  | `calico/pod2daemon-flexvol:{calico.version}` | Should contain both image name and version | Calico Flexvol image                                            |
+| apiserver.image        | string  | `calico/apiserver:{calico.version}`          | Should contain both image name and version | Calico API server image                                         |
+| apiserver.tolerations  | list    | Original API server tolerations              | list of extra tolerations                  | Additional custom toleration for calico-apiserver pods          |
 
 ###### Default Typha Tolerations
 
@@ -3830,6 +3841,41 @@ plugins:
 **Note**: In case of you use IPv6 you have to define `CALICO_ROUTER_ID` with value `hash` in `env` section. This uses a hash of the configured nodename for the router ID.
 
 For more information about the supported Calico environment variables, refer to the official Calico documentation at [https://docs.projectcalico.org/reference/node/configuration](https://docs.projectcalico.org/reference/node/configuration).
+
+###### Calico API server
+
+For details about the Calico API server, refer to the official documentation at [https://docs.tigera.io/calico/latest/operations/install-apiserver](https://docs.tigera.io/calico/latest/operations/install-apiserver).
+
+By default, the Calico API server is not installed. To install it during the Calico installation, specify the following:
+
+```yaml
+plugins:
+  calico:
+    apiserver:
+      enabled: true
+```
+
+**Note**: Calico API server requires its annual certificates' renewal.
+For more information, refer to [Configuring Certificate Renew Procedure for calico](/documentation/Maintenance.md#configuring-certificate-renew-procedure-for-calico).
+
+Kubemarine waits for the API server availability during the installation.
+If the default wait timeout does not fit, it can be extended in the same `apiserver` section of the `calico` plugin.
+
+```yaml
+plugins:
+  calico:
+    apiserver:
+      expect:
+        apiservice:
+          retries: 60
+```
+
+The following parameters are supported:
+
+| Name                                  | Type | Mandatory | Default Value | Example | Description                                          |
+|-------------------------------------- |------|-----------|---------------|---------|------------------------------------------------------|
+| `apiserver.expect.apiservice.timeout` | int  | no        | 5             | `10`    | Number of retries for the API service expect check.  |
+| `apiserver.expect.apiservice.retries` | int  | no        | 40            | `60`    | Timeout for the API service expect check in seconds. |
 
 ##### nginx-ingress-controller
 
@@ -4231,9 +4277,10 @@ The following table contains details about existing nodeSelector configuration o
         <td><ul>
             <li><code>typha.nodeSelector</code></li>
             <li><code>kube-controllers.nodeSelector</code></li>
+            <li><code>apiserver.nodeSelector</code></li>
         </ul></td>
         <td><code>kubernetes.io/os: linux</code></td>
-        <td>nodeSelector applicable only for calico <b>typha</b> <br> and calico <b>kube-controllers</b> containers, <br> but not for ordinary calico containers, <br> which should be deployed on all nodes</td>
+        <td>nodeSelector applicable only for calico <b>typha</b> <br>, calico <b>kube-controllers</b>, and calico <b>apiserver</b> containers, <br> but not for ordinary calico containers, <br> which should be deployed on all nodes</td>
     </tr>
     <tr>
         <td>nginx-ingress-controller</td>
@@ -4249,7 +4296,7 @@ The following table contains details about existing nodeSelector configuration o
             <li><code>dashboard.nodeSelector</code></li>
             <li><code>metrics-scraper.nodeSelector</code></li>
         </ul></td>
-        <td><code>beta.kubernetes.io/os: linux</code></td>
+        <td><code>kubernetes.io/os: linux</code></td>
         <td></td>
     </tr>
 </table>
@@ -4287,12 +4334,13 @@ The following table contains details about existing tolerations configuration op
     <tr><th>Plugin</th><th>YAML path (relative)</th><th>Default</th><th>Notes</th></tr>
     <tr>
         <td>calico</td>
-        <td>-</td>
-        <td>
-            <code>- effect: NoSchedule</code><br>
-            <code>  operator: Exists</code>
-        </td>
-        <td>tolerations are not configurable for network plugins</td>
+        <td><ul>
+            <li><code>typha.tolerations</code></li>
+            <li><code>kube-controllers.tolerations</code></li>
+            <li><code>apiserver.tolerations</code></li>
+        </ul></td>
+        <td>Delegates to default Calico tolerations except for extra <a href="#default-typha-tolerations">Default Typha Tolerations</a></td>
+        <td>tolerations are not configurable for calico-node pods</td>
     </tr>
     <tr>
         <td>nginx-ingress-controller</td>
@@ -4346,11 +4394,13 @@ The following table contains details about existing resources requests and limit
             <li><code>node.resources</code></li>
             <li><code>typha.resources</code></li>
             <li><code>kube-controllers.resources</code></li>
+            <li><code>apiserver.resources</code></li>
         </ul></td>
         <td><ul>
             <li><code>cpu=250m/None; memory=256Mi/None</code></li>
             <li><code>cpu=250m/None; memory=256Mi/None</code></li>
             <li><code>cpu=100m/None; memory=128Mi/None</code></li>
+            <li><code>cpu=50m/100m; memory=100Mi/200Mi</code></li>
         </ul></td>
     </tr>
     <tr>

@@ -198,6 +198,13 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
+        # Don't log checking API access by Calico API server
+        - level: None
+          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          verbs: ["create"]
+          resources:
+            - group: "authorization.k8s.io"
+              resources: ["subjectaccessreviews"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
@@ -442,15 +449,10 @@ plugins:
             deployments:
               - calico-kube-controllers
             pods:
-              list:
-                - coredns
-                - calico-kube-controllers
-                - calico-node
+              - coredns
+              - calico-kube-controllers
+              - calico-node
         - thirdparty: /usr/bin/calicoctl
-        - shell:
-            command: mkdir -p /etc/calico
-            groups: ['control-plane']
-            sudo: true
         - template:
             source: templates/plugins/calicoctl.cfg.j2
             destination: /etc/calico/calicoctl.cfg
@@ -463,9 +465,7 @@ plugins:
         - template:
             source: templates/plugins/calico-rr.sh.j2
             destination: /tmp/calico_rr.sh
-            apply_required: true
             apply_command: /bin/sh /tmp/calico_rr.sh
-            sudo: true
         - expect:
             daemonsets:
               - calico-node
@@ -475,6 +475,15 @@ plugins:
               - coredns
               - calico-kube-controllers
               - calico-node
+        - python:
+            module: plugins/builtin.py
+            method: apply_yaml
+            arguments:
+              plugin_name: calico
+              manifest_id: apiserver
+        - python:
+            module: plugins/calico.py
+            method: renew_apiserver_certificate
     mode: ipip
     crossSubnet: true
     natOutgoing: true
@@ -552,6 +561,25 @@ plugins:
           memory: 128Mi
     flexvol:
       image: 'calico/pod2daemon-flexvol:{{ plugins.calico.version }}'
+    apiserver:
+      image: 'calico/apiserver:{{ plugins.calico.version }}'
+      enabled: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      resources:
+        requests:
+          cpu: 50m
+          memory: 100Mi
+        limits:
+          cpu: 100m
+          memory: 200Mi
+      expect:
+        apiservice:
+          timeout: 5
+          # Sometimes the container fails the liveness probe the first time for unknown reason, and restarted.
+          # The total expect timeout is set with respect to initialDelaySeconds of the livenessProbe,
+          # and current `renew_apiserver_certificate` implementation details.
+          retries: 40
 
   nginx-ingress-controller:
     version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'

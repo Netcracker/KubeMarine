@@ -17,7 +17,7 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors
-from kubemarine.plugins import manifest
+from kubemarine.plugins import manifest, builtin
 
 MOCK_SPEC = unittest.mock.MagicMock(loader=unittest.mock.MagicMock(exec_module=unittest.mock.MagicMock()))
 
@@ -140,20 +140,32 @@ class EnrichmentValidation(unittest.TestCase):
             demo.new_cluster(inventory)
 
     def test_verify_manifest_not_found(self):
-        for plugin_name in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
-            with self.subTest(plugin_name):
+        for test_identity in builtin.MANIFEST_PROCESSOR_PROVIDERS:
+            plugin_name = test_identity.plugin_name
+            with self.subTest(test_identity.name):
                 inventory = demo.generate_inventory(**demo.ALLINONE)
                 plugin_section = inventory.setdefault('plugins', {}).setdefault(plugin_name, {})
                 plugin_section['install'] = True
+
+                arguments = {
+                    'plugin_name': plugin_name,
+                    'original_yaml_path': f"{__file__}/../test_templates/template.conf"
+                }
+                if test_identity.manifest_id is not None:
+                    arguments['manifest_id'] = test_identity.manifest_id
+
+                if test_identity == manifest.Identity("calico", "apiserver"):
+                    plugin_section.setdefault('apiserver', {})['enabled'] = True
+
                 plugin_section['installation'] = {'procedures': [{'python': {
                     'module': 'plugins/builtin.py',
                     'method': 'apply_yaml',
-                    'arguments': {
-                        'plugin_name': plugin_name,
-                        'original_yaml_path': f"{__file__}/../test_templates/template.conf"
-                    }
+                    'arguments': arguments
                 }}]}
-                with self.assertRaisesRegex(Exception, manifest.ERROR_MANIFEST_NOT_FOUND % ('.*', plugin_name)):
+                manifest_ref = (f'manifest.*{test_identity.manifest_id!r}'
+                                if test_identity.manifest_id is not None else 'manifest')
+                with self.assertRaisesRegex(Exception, manifest.ERROR_MANIFEST_NOT_FOUND.format(
+                        manifest=manifest_ref, path='.*', plugin=plugin_name)):
                     demo.new_cluster(inventory)
 
 

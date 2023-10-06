@@ -28,7 +28,7 @@ This section provides information about the Kubecheck functionality.
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
-    - [015 Kernel version](#015-kernel-version)
+    - [015 Kernel Version](#015-kernel-version)
   - [PAAS Procedure](#paas-procedure)
     - [201 Service Status](#201-service-status)
       - [201 Haproxy Status](#201-haproxy-status)
@@ -38,7 +38,7 @@ This section provides information about the Kubecheck functionality.
       - [201 Kubelet Status](#201-kubelet-status)
         - [202 Nodes pid_max](#202-nodes-pid_max)
         - [203 Kubelet Version](#203-kubelet-version)
-    - [205 System packages versions](#205-system-packages-version)
+    - [205 System Packages Versions](#205-system-packages-version)
       - [205 CRI Versions](#205-cri-versions)
       - [205 HAproxy Version](#205-haproxy-version)
       - [205 Keepalived Version](#205-keepalived-version)
@@ -56,23 +56,24 @@ This section provides information about the Kubecheck functionality.
       - [211 Nodes Condition - PIDPressure](#211-nodes-condition---pidpressure)
       - [211 Nodes Condition - Ready](#211-nodes-condition---ready)
     - [212 Thirdparties Hashes](#212-thirdparties-hashes)
-    - [213 Selinux security policy](#213-selinux-security-policy)
-    - [214 Selinux configuration](#214-selinux-configuration)
-    - [215 Firewalld status](#215-firewalld-status)
-    - [216 Swap state](#216-swap-state)
-    - [217 Modprobe rules](#217-modprobe-rules)
-    - [218 Time difference](#218-time-difference)
-    - [219 Health status ETCD](#219-health-status-etcd)
-    - [220 Control plane configuration status](#220-control-plane-configuration-status)
-    - [221 Control plane health status](#221-control-plane-health-status)
-    - [222 Default services configuration status](#222-default-services-configuration-status)
-    - [223 Default services health status](#223-default-services-health-status)
-    - [224 Calico configuration check](#224-calico-configuration-check)
-    - [225 Pod security admission status](#225-pod-security-admission-status)
-    - [226 Geo connectivity status](#226-geo-connectivity-status)
-    - [227 Apparmor status](#227-apparmor-status)
-    - [228 Apparmor configuration](#228-apparmor-configuration)
-    - [229 Audit policy configuration](#229-audit-policy-configuration)
+    - [213 Selinux Security policy](#213-selinux-security-policy)
+    - [214 Selinux Configuration](#214-selinux-configuration)
+    - [215 Firewalld Status](#215-firewalld-status)
+    - [216 Swap State](#216-swap-state)
+    - [217 Modprobe Rules](#217-modprobe-rules)
+    - [218 Time Difference](#218-time-difference)
+    - [219 Health Status ETCD](#219-health-status-etcd)
+    - [220 Control Plane Configuration Status](#220-control-plane-configuration-status)
+    - [221 Control Plane Health Status](#221-control-plane-health-status)
+    - [222 Default Services Configuration Status](#222-default-services-configuration-status)
+    - [223 Default Services Health Status](#223-default-services-health-status)
+    - [224 Calico Configuration Check](#224-calico-configuration-check)
+      - [230 Calico API Server Health Status](#230-calico-api-server-health-status)
+    - [225 Pod Security Admission Status](#225-pod-security-admission-status)
+    - [226 Geo Connectivity Status](#226-geo-connectivity-status)
+    - [227 Apparmor Status](#227-apparmor-status)
+    - [228 Apparmor Configuration](#228-apparmor-configuration)
+    - [229 Audit Policy Configuration](#229-audit-policy-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -328,7 +329,7 @@ This test checks if needed package are available from nodes.
 
 *Task*: `software.kernel.version`
 
-This test checks the Linux kernel version for a `unstable kernel version`, if it is equal to a unstable one, it issues a warning
+This test checks the Linux kernel version for an `unstable kernel version`, if it is equal to a unstable one, it issues a warning
 
 `Unstable kernel version` - is a kernel with detected serious issue that affects any part of cluster, therefore it's unsupported
 
@@ -404,6 +405,8 @@ The task tree is as follows:
   * health_status
 * calico
   * config_check
+  * apiserver
+    * health_status
 * geo_check
 
 ##### 201 Service Status
@@ -438,7 +441,7 @@ This test checks the status of the Kubelet service on all hosts in the cluster w
 
 *Task*: `services.kubelet.configuration`
 
-This test checks that kubelet `maxPods` and `podPidsLimit` are correctly alligned with kernel `pid_max`.
+This test checks that kubelet `maxPods` and `podPidsLimit` are correctly aligned with kernel `pid_max`.
 
 ##### 203 Kubelet Version
 
@@ -500,12 +503,6 @@ corresponds with cluster.yaml.
 This test checks that the configured generic packages are installed on all nodes, has equal version and this version 
 corresponds with cluster.yaml.
 
-##### 212 Thirdparties hashes
-
-*Task*: `thirdparties.hashes`
-
-This test checks that configured thirdparties hashes are equal to actual files hashes on nodes.
-
 ##### 207 Pods Condition
 
 *Task*: `kubernetes.pods`
@@ -564,40 +561,46 @@ This test checks the condition `PIDPressure` of the Kubernetes nodes of the clus
 
 This test checks the condition `Ready` of the Kubernetes nodes of the cluster.
 
-###### 213 Selinux security policy
+##### 212 Thirdparties Hashes
+
+*Task*: `thirdparties.hashes`
+
+This test checks that configured thirdparties hashes are equal to actual files hashes on nodes.
+
+##### 213 Selinux Security Policy
 
 *Task*: `services.security.selinux.status`
 
 The test checks the status of Selinux. It must be `enforcing`. It may be `permissive`, but must be explicitly specified
 in the inventory. Otherwise, the test will fail. This test is applicable only for systems of the RHEL family.
 
-###### 214 Selinux configuration
+##### 214 Selinux Configuration
 
 *Task*: `services.security.selinux.config`
 
 The test compares the configuration of Selinux on the nodes with the configuration specified in the inventory or with the
 one by default. If the configuration does not match, the test will fail.
 
-###### 215 Firewalld status
+##### 215 Firewalld Status
 
 *Task*: `services.security.firewalld.status`
 
 The test verifies that the FirewallD is disabled on cluster nodes, otherwise the test will fail.
 
-###### 216 Swap state
+##### 216 Swap State
 
 *Task*: `services.system.swap.status`
 
 The test verifies that swap is disabled on all nodes in the cluster, otherwise the test will fail.
 
-###### 217 Modprobe rules
+##### 217 Modprobe Rules
 
 *Task*: `services.system.modprobe.rules`
 
 The test compares the modprobe rules on the nodes with the rules specified in the inventory or with default rules. If
 rules does not match, the test will fail.
 
-###### 218 Time difference
+##### 218 Time Difference
 
 *Task*: `services.system.time`
 
@@ -611,53 +614,62 @@ between the deployer node and all the others, or any other conditions of the env
 sure to perform latency tests: [002 Latency - Single Thread](#002-latency---single-thread) and 
 [003 Latency - Multi Thread](#003-latency---multi-thread).
 
-###### 219 Health status ETCD
+##### 219 Health Status ETCD
 
 *Task*: `etcd.health_status`
 
 This test verifies ETCD health.
 
-###### 220 Control plane configuration status
+##### 220 Control Plane Configuration Status
 
 *Task*: `control_plane.configuration_status`
 
 This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
 
-###### 221 Control plane health status
+##### 221 Control Plane Health Status
 
 *Task*: `control_plane.health_status`
 
 This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
 
-###### 222 Default services configuration status
+##### 222 Default Services Configuration Status
 
 *Task*: `default_services.configuration_status`
 
-In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`, are checked, and the `coredns` configmap is also checked.
+In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller` are checked,
+and the `coredns` configmap is also checked.
 
-###### 223 Default services health status
+##### 223 Default Services Health Status
 
 *Task*: `default_services.health_status`
 
-This test verifies the health of pods `kube-proxy`, `coredns`, `calico-node`, `calico-kube-controllers` and `ingress-nginx-controller`.
+This test verifies the health of `kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-apiserver`, and `ingress-nginx-controller` pods.
 
-###### 224 Calico configuration check
+##### 224 Calico Configuration Check
 
 *Task*: `calico.config_check`
 
 This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
 
-###### 225 Pod security admission status
+###### 230 Calico API Server Health Status
+
+*Task*: `calico.apiserver.health_status`
+
+This test verifies the Calico API server health.
+
+##### 225 Pod Security Admission Status
 
 *Task*: `kubernetes.admission`
 
-The test checks status of Pod Security Admissions, default PSS(Pod Security Standards) profile and match consistance between 'cluster.yaml' and current Kubernetes configuration. Also it check consistancy between 'kube-apiserver.yaml' and 'kubeadm-config'.
+The test checks status of Pod Security Admissions, default PSS (Pod Security Standards) profile and match consistence between 'cluster.yaml' and current Kubernetes configuration. Also it check consistency between 'kube-apiserver.yaml' and 'kubeadm-config'.
 
-###### 226 Geo connectivity status
+##### 226 Geo Connectivity Status
 
 *Task*: `geo_check`
 
-The task checks status of DNS resolving, pod-to-service and pod-to-pod connectivity between cluster in geographically
+The task checks the status of DNS resolving, pod-to-service, and pod-to-pod connectivity between clusters in geographically
 distributed schemas. This task works only if procedure config file is provided with information about `paas-geo-monitor`,
 at least service name and namespace. For example:
 ```yaml
@@ -668,19 +680,19 @@ geo-monitor:
 
 For more information about `paas-geo-monitor` service, refer to DRNavigator repository.
 
-###### 227 AppArmor status
+##### 227 AppArmor Status
 
 *Task*: `services.security.apparmor.status`
 
 The test checks the status of AppArmor. It should be `enabled` by default.
 
-###### 228 AppArmor configuration
+##### 228 AppArmor Configuration
 
 *Task*: `services.security.apparmor.config`
 
-The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may incude only part of the profiles.
+The test checks the AppArmor configuration. It has several modes: `enforce`, `complain`, and `disable`. The profiles (resources) stick to one of the modes. The `cluster.yaml` may include only part of the profiles.
 
-###### 229 Audit policy configuration
+##### 229 Audit Policy Configuration
 
 *Task*: `kubernetes.audit.policy`
 

@@ -19,7 +19,8 @@ from typing import Optional, List
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest
+from kubemarine.kubernetes import secrets
+from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
 def check_job_for_nginx(cluster: KubernetesCluster) -> None:
@@ -133,43 +134,33 @@ def redeploy_ingress_nginx_is_needed(cluster: KubernetesCluster) -> bool:
 
 
 def manage_custom_certificate(cluster: KubernetesCluster) -> None:
-    if not cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"].get("default-certificate"):
+    default_cert = cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"]\
+        .get("default-certificate")
+    if not default_cert:
         cluster.log.debug("No custom default ingress certificate specified, skipping...")
         return
 
-    base_path = "/etc/kubernetes/custom-certs"
-    certificate_path = base_path + "/cert"
-    private_key_path = base_path + "/key"
     secret_name = "default-ingress-cert"
     secret_namespace = "kube-system"
 
     first_control_plane = cluster.nodes["control-plane"].get_first_member()
-    default_cert = cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"]["default-certificate"]
 
     # first, we need to load cert and key files to first control-plane to known locations
-    first_control_plane.sudo(f"mkdir -p {base_path}")
-    try:
-        first_control_plane.call(put_custom_certificate,
-                          default_cert=default_cert,
-                          crt_path=certificate_path,
-                          key_path=private_key_path)
+    with secrets.create_tls_secret_procedure(first_control_plane):
+        first_control_plane.call(put_custom_certificate, default_cert=default_cert)
 
         # second, we need to validate cert and key using openssl
-        first_control_plane.call(verify_certificate_and_key, crt_path=certificate_path, key_path=private_key_path)
+        first_control_plane.call(verify_certificate_and_key)
 
         # third, we need to create tls secret under well-known name
         # this certificate is already configured to be used by controller
-        first_control_plane.call(create_tls_secret,
-                          crt_path=certificate_path,
-                          key_path=private_key_path,
-                          name=secret_name,
-                          namespace=secret_namespace)
-    finally:
-        # fourth, we need to remove base path dir
-        first_control_plane.sudo(f"rm -rf {base_path}")
+        first_control_plane.call(secrets.renew_tls_secret,
+                                 name=secret_name,
+                                 namespace=secret_namespace)
+    # fourth, we need to remove base path dir when the procedure is exited
 
 
-def put_custom_certificate(first_control_plane: NodeGroup, default_cert: dict, crt_path: str, key_path: str) -> None:
+def put_custom_certificate(first_control_plane: NodeGroup, default_cert: dict) -> None:
     if default_cert.get("data"):
         cert = io.StringIO(default_cert["data"]["cert"])
         key = io.StringIO(default_cert["data"]["key"])
@@ -177,26 +168,18 @@ def put_custom_certificate(first_control_plane: NodeGroup, default_cert: dict, c
         cert = io.StringIO(utils.read_external(default_cert["paths"]["cert"]))
         key = io.StringIO(utils.read_external(default_cert["paths"]["key"]))
 
-    first_control_plane.put(cert, crt_path, sudo=True)
-    first_control_plane.put(key, key_path, sudo=True)
+    secrets.put_certificate(first_control_plane, cert, key)
 
 
-def verify_certificate_and_key(first_control_plane: NodeGroup, crt_path: str, key_path: str) -> None:
-    crt_md5 = first_control_plane.sudo(f"openssl x509 -noout -modulus -in {crt_path} | openssl md5").get_simple_out()
-    key_md5 = first_control_plane.sudo(f"openssl rsa -noout -modulus -in {key_path} | openssl md5").get_simple_out()
-    if crt_md5 != key_md5:
+def verify_certificate_and_key(first_control_plane: NodeGroup) -> None:
+    if not secrets.verify_certificate(first_control_plane):
         raise Exception("Custom default ingress certificate and key are not compatible!")
-
-
-def create_tls_secret(first_control_plane: NodeGroup, crt_path: str, key_path: str, name: str, namespace: str) -> None:
-    first_control_plane.sudo(f"kubectl create secret tls {name} --key {key_path} --cert {crt_path} -n {namespace} "
-                      f"--dry-run -o yaml | sudo kubectl apply -f -", timeout=300)
 
 
 class IngressNginxManifestProcessor(Processor):
     def __init__(self, logger: log.VerboseLogger, inventory: dict,
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None) -> None:
-        super().__init__(logger, inventory, 'nginx-ingress-controller', original_yaml_path, destination_name)
+        super().__init__(logger, inventory, Identity('nginx-ingress-controller'), original_yaml_path, destination_name)
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -265,9 +248,7 @@ class IngressNginxManifestProcessor(Processor):
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
 
-        container_pos, container = self.find_container_for_patch(
-            manifest, key, container_name='controller', is_init_container=False)
-        self.enrich_deamonset_ingress_nginx_controller_container(container_pos, container)
+        self.enrich_deamonset_ingress_nginx_controller_container(manifest)
 
         self.enrich_image_for_container(manifest, key,
             plugin_service='controller', container_name='controller', is_init_container=False)
@@ -280,57 +261,38 @@ class IngressNginxManifestProcessor(Processor):
         source_yaml['kind'] = 'DaemonSet'
         self.log.verbose(f"The {key} has been patched in 'kind' with 'DaemonSet'")
 
-    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict) -> None:
+    def enrich_deamonset_ingress_nginx_controller_container(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
-        container_args = container['args']
-        for i, arg in enumerate(container_args):
-            if arg.startswith('--publish-service='):
-                del container_args[i]
-                self.log.verbose(f"The {arg!r} argument has been removed from "
-                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
-                break
-        else:
-            raise Exception("Failed to find '--publish-service' argument in ingress-nginx-controller container specification.")
 
-        extra_args: List[tuple] = [
-            ('--watch-ingress-without-class=', 'true')
+        extra_args: List[str] = [
+            '--watch-ingress-without-class=true'
         ]
         ssl_options = self.inventory['plugins']['nginx-ingress-controller']['controller']['ssl']
-        additional_args = self.inventory['plugins']['nginx-ingress-controller']['controller'].get('args')
-
-        if additional_args:
-            for arg in additional_args:
-                pars_arg = arg.split('=')
-                for i, container_arg in enumerate(container_args):
-                    if container_arg.startswith(pars_arg[0]):
-                       raise Exception(
-                           f"{pars_arg[0]!r} argument is already defined in ingress-nginx-controller container specification.")
-                else:
-                    container_args.append(arg)
-                    self.log.verbose(f"The {arg!r} argument has been added to "
-                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
 
         if ssl_options['enableSslPassthrough']:
-            extra_args.append(('--enable-ssl-passthrough',))
+            extra_args.append('--enable-ssl-passthrough')
         if ssl_options.get('default-certificate'):
-            extra_args.append(('--default-ssl-certificate=', 'kube-system/default-ingress-cert'))
+            extra_args.append('--default-ssl-certificate' + '=' + 'kube-system/default-ingress-cert')
 
-        for extra_arg in extra_args:
-            for i, arg in enumerate(container_args):
-                if arg.startswith(extra_arg[0]):
-                    raise Exception(
-                        f"{extra_arg[0]!r} argument is already defined in ingress-nginx-controller container specification.")
-            else:
-                arg = extra_arg[0]
-                if len(extra_arg) > 1:
-                    arg += extra_arg[1]
-                container_args.append(arg)
-                self.log.verbose(f"The {arg!r} argument has been added to "
-                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+        self.enrich_deamonset_ingress_nginx_controller_container_args(
+            manifest, remove_args=['--publish-service'], extra_args=extra_args)
+
+        container_pos, container = self.find_container_for_patch(
+            manifest, key, container_name='controller', is_init_container=False)
 
         container['ports'] = self.inventory['plugins']['nginx-ingress-controller']['ports']
         self.log.verbose(f"The {key} has been patched in 'spec.template.spec.containers.[{container_pos}].ports' "
                          f"with the data from 'plugins.nginx-ingress-controller.ports'")
+
+    def enrich_deamonset_ingress_nginx_controller_container_args(self, manifest: Manifest,
+                                                                 *,
+                                                                 remove_args: List[str],
+                                                                 extra_args: List[str]) -> None:
+        key = "Deployment_ingress-nginx-controller"
+        self.enrich_args_for_container(manifest, key,
+                                       plugin_service='controller', container_name='controller',
+                                       remove_args=remove_args,
+                                       extra_args=extra_args)
 
     def enrich_ingressclass_nginx(self, manifest: Manifest) -> None:
         key = "IngressClass_nginx"
@@ -372,27 +334,30 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         ])
         return enrichment_functions
 
-    def enrich_deamonset_ingress_nginx_controller_container(self, container_pos: int, container: dict) -> None:
+    def enrich_deamonset_ingress_nginx_controller_container(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
-        container_args = container['args']
-        webhook_args_remove = [
-            '--validating-webhook=',
-            '--validating-webhook-certificate=',
-            '--validating-webhook-key='
-        ]
-        for arg_remove in webhook_args_remove:
-            for i, arg in enumerate(container_args):
-                if arg.startswith(arg_remove):
-                    del container_args[i]
-                    self.log.verbose(f"The {arg!r} argument has been removed from "
-                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
-                    break
+
+        container_pos, container = self.find_container_for_patch(
+            manifest, key, container_name='controller', is_init_container=False)
 
         del container['volumeMounts']
         self.log.verbose(f"The 'volumeMounts' property has been removed "
                          f"from 'spec.template.spec.containers.[{container_pos}]' in the {key}")
 
-        super().enrich_deamonset_ingress_nginx_controller_container(container_pos, container)
+        super().enrich_deamonset_ingress_nginx_controller_container(manifest)
+
+    def enrich_deamonset_ingress_nginx_controller_container_args(self, manifest: Manifest,
+                                                                 *,
+                                                                 remove_args: List[str],
+                                                                 extra_args: List[str]) -> None:
+        webhook_args_remove = [
+            '--validating-webhook',
+            '--validating-webhook-certificate',
+            '--validating-webhook-key'
+        ]
+        remove_args = remove_args + webhook_args_remove
+        super().enrich_deamonset_ingress_nginx_controller_container_args(
+            manifest, remove_args=remove_args, extra_args=extra_args)
 
     def enrich_job_ingress_nginx_admission_create(self, manifest: Manifest) -> None:
         return

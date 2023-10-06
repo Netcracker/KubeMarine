@@ -17,7 +17,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Cri Migration Procedure](#cri-migration-procedure)
     - [Admission Migration Procedure](#admission-migration-procedure)
 - [Procedure Execution](#procedure-execution)
-    - [Procedure Execution from CLI](#procedure-execution-from-cli)
+    - [Procedure Execution From CLI](#procedure-execution-from-cli)
     - [Logging](#logging)
     - [Inventory Preservation](#inventory-preservation)
     - [Additional Parameters](#additional-parameters)
@@ -520,7 +520,7 @@ backup_plan:
     source_node: control-plane-1
 ```
 
-#### Nodes Parameter
+#### nodes Parameter
 
 By default, the following files are backed up from all nodes in the cluster:
 
@@ -557,7 +557,7 @@ backup_plan:
     /etc/hosts: False
 ```
 
-#### Kubernetes Parameter
+#### kubernetes Parameter
 
 The procedure exports all available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to restrict resources for export, you can specify which ones you need.
 
@@ -667,7 +667,7 @@ By default, ETCD restore does not require additional parameters, however, if req
 * image - the full name of the ETCD image, including the registry address. On its basis, the restoration is performed.
 * certificates - ETCD certificates for `etcdctl` connection to ETCD API. You can specify some certificates, or specify them all. Certificates should be presented on all nodes.
 
-#### Thirdparties Parameter
+#### thirdparties Parameter
 
 The procedure recovers thirdparties based on the `cluster.yaml`. If rpm thirdparties outdated or incorrect, specify the correct ones in this section, in the same format. For example:
 
@@ -1018,7 +1018,7 @@ from particular namespaces will be applied.
 * Be careful with the `exemptions` section it may cause cluster instability.
 * Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
 * The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
-'kubernetes-dashboard' etc) will be deleted during the procedure in case of using `pod-security: disabled`
+'kubernetes-dashboard', and 'calico' (calico-apiserver)) are deleted during the procedure in case of using `pod-security: disabled`.
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
 application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.
@@ -1056,7 +1056,7 @@ Example:
 graceful_reboot: False
 ```
 
-#### Nodes Parameter
+#### nodes Parameter
 
 This parameter allows you to specify which nodes should be rebooted. Other nodes are not affected. In this parameter, you must specify a list of node names, as is follows:
 
@@ -1086,6 +1086,8 @@ link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
+For Calico, the certificate is updated for the Calico API server.
+
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
 ### Configuring Certificate Renew Procedure
@@ -1094,6 +1096,7 @@ The JSON schema for procedure inventory is available by [URL](../kubemarine/reso
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
 #### Configuring Certificate Renew Procedure for nginx-ingress-controller
+
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
 ```yaml
@@ -1112,7 +1115,23 @@ nginx-ingress-controller:
 Similar to the plugin configuration, you can either use the data format or the paths format.
 For more information about these formats, refer to the [nginx-ingress-controller](Installation.md#nginx-ingress-controller) section in the _Kubemarine Installation Procedure_.
 
-#### Configuring Certificate Renew Procedure For Kubernetes Internal Certificates
+#### Configuring Certificate Renew Procedure for Calico
+
+To update the certificate and key for `calico` API server, use the following configuration:
+
+```yaml
+calico:
+  apiserver:
+    renew: true
+```
+
+**Note**: The certificate update procedure follows the default Calico API server installation procedure.
+If you have custom Calico installation steps in the `plugins.calico.installation.procedures` section of the `cluster.yaml`
+that in particular renews the certificate in a custom way,
+you may want to repeat the corresponding steps using [Plugins Reinstallation](Installation.md#plugins-reinstallation).
+
+#### Configuring Certificate Renew Procedure for Kubernetes Internal Certificates
+
 To update internal Kubernetes certificates you can use the following configuration:
 ```yaml
 kubernetes:
@@ -1142,7 +1161,8 @@ The `cert_renew` procedure executes the following sequence of tasks:
 
 1. kubernetes
 2. nginx_ingress_controller
-3. certs_overview
+3. calico
+4. certs_overview
 
 ## Cri Migration Procedure
 
@@ -1160,14 +1180,14 @@ If there is such disk, it will be **cleared** and re-mounted to `/var/lib/contai
 ### Procedure Execution Steps
 
 This procedure includes the following steps:
-1. Verify and merge all the specified parameters into the inventory
-2. Install and configure containerd
-3. Install crictl
+1. Verify and merge all the specified parameters into the inventory.
+2. Install and configure containerd.
+3. Install crictl.
 4. Implement the following steps on each control-plane and worker node by node:
-    1. Drain the node
-    2. Update configurations on the node for migration to containerd
-    3. Move the pods on the node from the docker's containers to those of containerd
-    4. Uncordon the node
+    1. Drain the node.
+    2. Update configurations on the node for migration to containerd.
+    3. Move the pods on the node from the docker's containers to those of containerd.
+    4. Uncordon the node.
 
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
@@ -1233,7 +1253,7 @@ packages:
       config_location: '/etc/containerd/config.toml'
 ```
 
-#### Thirdparties Parameter
+#### thirdparties Parameter
 
 This parameter allows you to specify the link to a concrete version of a crictl third-party. In the absence of this parameter, crictl is downloaded from Github/registry in case you ran the procedure from CLI. 
 

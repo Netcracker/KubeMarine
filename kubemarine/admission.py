@@ -45,7 +45,8 @@ provided_oob_policies = ["default", "host-network", "anyuid"]
 valid_modes = ['enforce', 'audit', 'warn']
 valid_versions_templ = r"^v1\.\d{1,2}$"
 
-baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard"} 
+baseline_plugins = {"kubernetes-dashboard": "kubernetes-dashboard",
+                    "calico": "calico-apiserver"}
 privileged_plugins = {"nginx-ingress-controller": "ingress-nginx", 
                       "local-path-provisioner": "local-path-storage"}
 

@@ -22,6 +22,7 @@ from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
+from kubemarine.plugins import calico
 
 
 def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
@@ -32,7 +33,21 @@ def renew_nginx_ingress_certs_task(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug("Starting certificate renewal for nginx ingress controller, plugin will be reinstalled")
     plugin = cluster.inventory["plugins"]["nginx-ingress-controller"]
+    # If by chance default certificate is not previously configured,
+    # the procedure reconfigures the DeamonSet as well.
     plugins.install_plugin(cluster, "nginx-ingress-controller", plugin["installation"]['procedures'])
+
+
+def renew_calico_apiserver_certs_task(cluster: KubernetesCluster) -> None:
+    # check that renewal is required for the Calico API server
+    if 'calico' not in cluster.procedure_inventory:
+        cluster.log.debug("Skipped: Calico API server certs renewal is not required")
+        return
+
+    # Let's assume that if the user specified `calico` section in the procedure inventory,
+    # they agree with the default renew procedure.
+    # Also, it implies that the `calico` plugin is enabled and installed, and Calico API server is enabled.
+    calico.renew_apiserver_certificate(cluster)
 
 
 def k8s_certs_renew_task(cluster: KubernetesCluster) -> None:
@@ -51,6 +66,7 @@ def k8s_certs_overview_task(cluster: KubernetesCluster) -> None:
 tasks = OrderedDict({
     "kubernetes": k8s_certs_renew_task,
     "nginx_ingress_controller": renew_nginx_ingress_certs_task,
+    "calico": renew_calico_apiserver_certs_task,
     "certs_overview": k8s_certs_overview_task
 })
 

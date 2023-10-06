@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+from dataclasses import dataclass
 from typing import Callable, Optional, List, IO, Tuple, cast
 
 import ruamel.yaml
@@ -25,16 +26,32 @@ from kubemarine import plugins
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 
-ERROR_MANIFEST_NOT_FOUND = "Cannot find original manifest %s for '%s' plugin"
+ERROR_MANIFEST_NOT_FOUND = "Cannot find original {manifest} {path} for {plugin!r} plugin"
 
 
-def get_default_manifest_path(plugin_name: str, version: str) -> str:
-    resource = f"plugins/yaml/{plugin_name}-{version}-original.yaml"
+@dataclass(frozen=True)
+class Identity:
+    plugin_name: str
+    manifest_id: Optional[str] = None
+
+    @property
+    def name(self) -> str:
+        return (self.plugin_name
+                if self.manifest_id is None
+                else f"{self.plugin_name}-{self.manifest_id}")
+
+    def repr_id(self) -> str:
+        return f"manifest with ID={self.manifest_id!r}" if self.manifest_id is not None else 'manifest'
+
+
+def get_default_manifest_path(manifest_identity: Identity, version: str) -> str:
+    resource = f"plugins/yaml/{manifest_identity.name}-{version}-original.yaml"
     return utils.get_internal_resource_path(resource)
 
 
 class Manifest:
-    def __init__(self, stream: IO) -> None:
+    def __init__(self, identity: Identity, stream: IO) -> None:
+        self.identity = identity
         self._patched = OrderedSet[str]()
         self._excluded = OrderedSet[str]()
         self._included = OrderedSet[str]()
@@ -113,7 +130,7 @@ class Manifest:
         for key in self.all_obj_keys():
             obj = self.get_obj(key, patch=False)
             for spec_section in ('containers', 'initContainers'):
-                containers = obj.get('spec', {}).get('template', {}).get('spec', {}).get(spec_section, [])
+                containers = (obj.get('spec') or {}).get('template', {}).get('spec', {}).get(spec_section, [])
                 for container in containers:
                     image = container['image']
                     if image not in images:
@@ -150,18 +167,19 @@ EnrichmentFunction = Callable[[Manifest], None]
 
 
 class Processor(ABC):
-    def __init__(self, logger: log.VerboseLogger, inventory: dict, plugin_name: str,
+    def __init__(self, logger: log.VerboseLogger, inventory: dict, manifest_identity: Identity,
                  original_yaml_path: Optional[str], destination_name: Optional[str]) -> None:
         """
         :param logger: VerboseLogger instance
         :param inventory: inventory of the cluster
-        :param plugin_name: name of plugin-owner
+        :param manifest_identity: A pair of (plugin_name, manifest_id) that uniquely identifies the manifest
         :param original_yaml_path: path to custom manifest
         :param destination_name: custom destination manifest file name
         """
         self.log: log.VerboseLogger = logger
         self.inventory = inventory
-        self.plugin_name = plugin_name
+        self.manifest_identity = manifest_identity
+        self.plugin_name = manifest_identity.plugin_name
         self.manifest_path = self._get_manifest_path(original_yaml_path)
         self.destination_name = self._get_destination(destination_name)
 
@@ -196,7 +214,8 @@ class Processor(ABC):
         # Check if original YAML exists
         """
         if not os.path.isfile(self.manifest_path):
-            raise Exception(ERROR_MANIFEST_NOT_FOUND % (self.manifest_path, self.plugin_name))
+            raise Exception(ERROR_MANIFEST_NOT_FOUND.format(
+                manifest=self.manifest_identity.repr_id(), path=self.manifest_path, plugin=self.plugin_name))
 
     def validate_original(self, manifest: Manifest) -> None:
         """
@@ -225,9 +244,10 @@ class Processor(ABC):
         # get original YAML and parse it into list of objects
         try:
             with utils.open_utf8(self.manifest_path, 'r') as stream:
-                manifest = Manifest(stream)
+                manifest = Manifest(self.manifest_identity, stream)
         except Exception as exc:
-            raise Exception(f"Failed to load {self.manifest_path} for {self.plugin_name!r} plugin") from exc
+            raise Exception(f"Failed to load {self.manifest_identity.repr_id()} from {self.manifest_path} "
+                            f"for {self.plugin_name!r} plugin") from exc
 
         self.validate_original(manifest)
 
@@ -259,7 +279,8 @@ class Processor(ABC):
             "do_render": False
         }
 
-        logger.debug(f"Uploading manifest enriched from {self.manifest_path} for {self.plugin_name!r} plugin...")
+        logger.debug(f"Uploading {self.manifest_identity.repr_id()} enriched from {self.manifest_path} "
+                     f"for {self.plugin_name!r} plugin...")
         logger.debug("\tDestination: %s" % destination)
 
         plugins.apply_source(cluster, config)
@@ -269,7 +290,7 @@ class Processor(ABC):
             config = {"source": custom_manifest_path}
             manifest_path, _ = plugins.get_source_absolute_pattern(config)
         else:
-            manifest_path = get_default_manifest_path(self.plugin_name, self.get_version())
+            manifest_path = get_default_manifest_path(self.manifest_identity, self.get_version())
 
         return manifest_path
 
@@ -277,7 +298,7 @@ class Processor(ABC):
         if custom_destination_name is not None:
             return custom_destination_name
 
-        return f'{self.plugin_name}-{self.get_version()}.yaml'
+        return f'{self.manifest_identity.name}-{self.get_version()}.yaml'
 
     def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str) -> None:
         source_yaml = manifest.get_obj(key, patch=True)
@@ -394,6 +415,59 @@ class Processor(ABC):
 
         self.log.verbose(f"The {key} has been patched in "
                          f"'spec.template.spec.containers.[{container_pos}].resources' with {plugin_service_section['resources']!r}")
+
+    def enrich_args_for_container(self, manifest: Manifest, key: str,
+                                  *,
+                                  plugin_service: str,
+                                  container_name: str,
+                                  remove_args: List[str] = None,
+                                  extra_args: List[str] = None) -> None:
+        """
+        Add and / or remove the specified arguments to the specified container.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param plugin_service: section of plugin that contains the extra 'args'
+        :param container_name: name of container to enrich args to
+        :param remove_args: list of arguments to remove
+        :param extra_args: List of arguments to add.
+                           It is currently not possible to override original or added by Kubemarine arguments.
+        """
+        container_pos, container = self.find_container_for_patch(manifest, key,
+                                                                 container_name=container_name, is_init_container=False)
+        container_args = container['args']
+
+        if remove_args is None:
+            remove_args = []
+
+        for remove_arg in remove_args:
+            for i, container_arg in enumerate(container_args):
+                if container_arg == remove_arg or container_arg.startswith(remove_arg + "="):
+                    del container_args[i]
+                    self.log.verbose(f"The {container_arg!r} argument has been removed from "
+                                     f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+                    break
+            else:
+                self.log.verbose(f"Not found argument {remove_arg!r} to remove from "
+                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
+        if extra_args is None:
+            extra_args = []
+
+        plugin_service_section = self.inventory['plugins'][self.plugin_name][plugin_service]
+        extra_args.extend(plugin_service_section.get('args', []))
+
+        for extra_arg in extra_args:
+            extra_arg_key = extra_arg.split('=')[0]
+            for i, container_arg in enumerate(container_args):
+                if container_arg == extra_arg_key or container_arg.startswith(extra_arg_key + "="):
+                    raise Exception(
+                        f"{extra_arg_key!r} argument is already defined in "
+                        f"'spec.template.spec.containers.[{container_pos}].args' for the {key}.")
+            else:
+                container_args.append(extra_arg)
+                self.log.verbose(f"The {extra_arg!r} argument has been added to "
+                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
 
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,

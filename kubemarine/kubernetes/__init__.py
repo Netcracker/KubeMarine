@@ -432,20 +432,24 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
 
 @contextmanager
-def local_admin_config(node: NodeGroup) -> Iterator[str]:
+def local_admin_config(nodes: NodeGroup) -> Iterator[str]:
     temp_filepath = "/tmp/%s" % uuid.uuid4().hex
 
-    cluster_name = node.cluster.inventory['cluster_name']
-    internal_address = node.get_config()['internal_address']
-    if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
-        internal_address = f"[{internal_address}]"
+    cluster_name = nodes.cluster.inventory['cluster_name']
 
     try:
-        node.sudo(f"cp /root/.kube/config {temp_filepath} "
-                  f"&& sudo sed -i 's/{cluster_name}/{internal_address}/' {temp_filepath}")
+        with nodes.new_executor() as exe:
+            for defer in exe.group.get_ordered_members_list():
+                internal_address = defer.get_config()['internal_address']
+                if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
+                    internal_address = f"[{internal_address}]"
+
+                defer.sudo(
+                    f"cp /root/.kube/config {temp_filepath} "
+                    f"&& sudo sed -i 's/{cluster_name}/{internal_address}/' {temp_filepath}")
         yield temp_filepath
     finally:
-        node.sudo(f'rm -f {temp_filepath}')
+        nodes.sudo(f'rm -f {temp_filepath}')
 
 
 def copy_admin_config(logger: log.EnhancedLogger, nodes: AbstractGroup[RunResult]) -> None:

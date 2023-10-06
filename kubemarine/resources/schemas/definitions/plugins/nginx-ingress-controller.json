@@ -47,7 +47,7 @@
           "additionalProperties": false
         },
         "args": {
-          "type": "array",
+          "$ref": "../common/utils.json#/definitions/ArrayOfStrings",
           "description": "Additional arguments."
         },
         "nodeSelector": {

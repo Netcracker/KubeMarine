@@ -60,9 +60,9 @@ from kubemarine.core.action import Action
 from kubemarine.core.patch import InventoryOnlyPatch
 from kubemarine.core.resources import DynamicResources<br><br>
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("&lt;Short description of action&gt;")<br>
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         inventory = res.formatted_inventory()<br>
         # patch_is_applicable(), do_some_changes_in_inventory() are some methods for you to implement.
         # You may also follow the different ways:
@@ -77,7 +77,7 @@ class TheAction(Action):
         # Calling of the below method is prohibited!
         # cluster = res.cluster()<br><br>
 class MyPatch(InventoryOnlyPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("&lt;patch_id&gt;")<br>
     @property
     def action(self) -> Action:
@@ -102,9 +102,9 @@ from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources<br><br>
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("&lt;Short description of action&gt;")<br>
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()<br>
         # patch_is_applicable(), do_some_changes_on_cluster() are some methods for you to implement.
         if patch_is_applicable(cluster):
@@ -112,7 +112,7 @@ class TheAction(Action):
         else:
             cluster.log.info("Nothing has changed")<br><br>
 class MyPatch(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("&lt;patch_id&gt;")<br>
     @property
     def action(self) -> Action:
@@ -146,7 +146,7 @@ from kubemarine.procedures import install
 
 
 class TheAction(Action):
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         if self.is_applicable(cluster):
             install.run_tasks(res, ['deploy.loadbalancer.haproxy.configure'])
@@ -168,7 +168,7 @@ from kubemarine.core.resources import DynamicResources
 
 
 class TheAction(Action):
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         if self.is_applicable(cluster):
             # the following example if for `calico`
@@ -193,10 +193,10 @@ from kubemarine.core.resources import DynamicResources
 
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         # note `recreate_inventory=True`
         super().__init__("Ensure backward compatibility", recreate_inventory=True)
     
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         res.formatted_inventory()['property_that_sets_previous_default_behaviour'] = True
 ```
