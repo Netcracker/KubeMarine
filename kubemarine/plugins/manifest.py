@@ -14,7 +14,7 @@
 
 import io
 from dataclasses import dataclass
-from typing import Callable, Optional, List, IO, Tuple, cast
+from typing import Callable, Optional, List, IO, Tuple, cast, Dict
 
 import ruamel.yaml
 import os
@@ -196,6 +196,12 @@ class Processor(ABC):
         """
         pass
 
+    def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
+        """
+        :return: Minimal PSS profiles for each namespace to set labels to.
+        """
+        return {}
+
     def get_version(self) -> str:
         version: str = self.inventory['plugins'][self.plugin_name]['version']
         return version
@@ -300,18 +306,21 @@ class Processor(ABC):
 
         return f'{self.manifest_identity.name}-{self.get_version()}.yaml'
 
-    def assign_default_pss_labels(self, manifest: Manifest, key: str, profile: str) -> None:
-        source_yaml = manifest.get_obj(key, patch=True)
-        labels: dict = source_yaml['metadata'].setdefault('labels', {})
-        labels.update({
-            'pod-security.kubernetes.io/enforce': profile,
-            'pod-security.kubernetes.io/enforce-version': 'latest',
-            'pod-security.kubernetes.io/audit': profile,
-            'pod-security.kubernetes.io/audit-version': 'latest',
-            'pod-security.kubernetes.io/warn': profile,
-            'pod-security.kubernetes.io/warn-version': 'latest',
-        })
-        self.log.verbose(f"The {key} has been patched in 'metadata.labels' with pss labels for {profile!r} profile")
+    def assign_default_pss_labels(self, manifest: Manifest, namespace: str) -> None:
+        key = f"Namespace_{namespace}"
+        rbac = self.inventory['rbac']
+        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled':
+            from kubemarine import admission
+
+            profile = self.get_namespace_to_necessary_pss_profiles()[namespace]
+            target_labels = admission.get_labels_to_ensure_profile(self.inventory, profile)
+            if not target_labels:
+                return
+
+            source_yaml = manifest.get_obj(key, patch=True)
+            labels: dict = source_yaml['metadata'].setdefault('labels', {})
+            labels.update(target_labels)
+            self.log.verbose(f"The {key} has been patched in 'metadata.labels' with pss labels for {profile!r} profile")
 
     def find_container_for_patch(self, manifest: Manifest, key: str,
                                  *,
