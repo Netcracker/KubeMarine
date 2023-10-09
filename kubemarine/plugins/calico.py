@@ -418,12 +418,11 @@ class CalicoApiServerManifestProcessor(Processor):
             self.enrich_clusterrole_calico_crds,
         ]
 
+    def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
+        return {'calico-apiserver': 'baseline'}
+
     def enrich_namespace_calico_apiserver(self, manifest: Manifest) -> None:
-        key = "Namespace_calico-apiserver"
-        rbac = self.inventory['rbac']
-        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
-                and rbac['pss']['defaults']['enforce'] == 'restricted':
-            self.assign_default_pss_labels(manifest, key, 'baseline')
+        self.assign_default_pss_labels(manifest, 'calico-apiserver')
 
     def enrich_deployment_calico_apiserver(self, manifest: Manifest) -> None:
         key = "Deployment_calico-apiserver"

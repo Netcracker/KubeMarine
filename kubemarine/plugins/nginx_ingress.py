@@ -14,7 +14,7 @@
 
 import io
 import ipaddress
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
@@ -216,12 +216,11 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_service_ingress_nginx_controller,
         ]
 
+    def get_namespace_to_necessary_pss_profiles(self) -> Dict[str, str]:
+        return {'ingress-nginx': 'privileged'}
+
     def enrich_namespace_ingress_nginx(self, manifest: Manifest) -> None:
-        key = "Namespace_ingress-nginx"
-        rbac = self.inventory['rbac']
-        if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled' \
-                and rbac['pss']['defaults']['enforce'] != 'privileged':
-            self.assign_default_pss_labels(manifest, key, 'privileged')
+        self.assign_default_pss_labels(manifest, 'ingress-nginx')
 
     def enrich_configmap_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "ConfigMap_ingress-nginx-controller"

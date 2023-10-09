@@ -32,6 +32,17 @@ MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
 }
 
 
+def _is_manifest_enabled(inventory: dict, manifest_identity: Identity) -> bool:
+    plugin_name = manifest_identity.plugin_name
+    if not inventory["plugins"][plugin_name]["install"]:
+        return False
+
+    if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(inventory):
+        return False
+
+    return True
+
+
 def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
     plugin_name = manifest_identity.plugin_name
     items = inventory['plugins'][plugin_name]['installation']['procedures']
@@ -61,11 +72,7 @@ def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for manifest_identity, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
-        plugin_name = manifest_identity.plugin_name
-        if not inventory["plugins"][plugin_name]["install"]:
-            continue
-
-        if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(inventory):
+        if not _is_manifest_enabled(inventory, manifest_identity):
             continue
 
         config = _get_manifest_installation_step(inventory, manifest_identity)
@@ -78,7 +85,7 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             processor.validate_inventory()
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml for {manifest_identity.repr_id()} "
-                                f"is not found for {plugin_name!r} plugin. "
+                                f"is not found for {manifest_identity.plugin_name!r} plugin. "
                                 f"Such configuration is obsolete, and support for it may be stopped in future releases.")
 
     return inventory
@@ -100,8 +107,8 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
                original_yaml_path: Optional[str] = None,
                destination_name: Optional[str] = None) -> None:
     manifest_identity = Identity(plugin_name, manifest_id)
-    if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(cluster.inventory):
-        cluster.log.debug("Calico API server is disabled. Skip installing of the manifest.")
+    if not _is_manifest_enabled(cluster.inventory, manifest_identity):
+        cluster.log.debug(f"Skip installing of the {manifest_identity.repr_id()} for {plugin_name!r} plugin.")
         return
 
     processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity,
@@ -109,3 +116,15 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
 
     manifest = processor.enrich()
     processor.apply(cluster, manifest)
+
+
+def get_namespace_to_necessary_pss_profiles(cluster: KubernetesCluster) -> Dict[str, str]:
+    result = {}
+    for manifest_identity in MANIFEST_PROCESSOR_PROVIDERS:
+        if not _is_manifest_enabled(cluster.inventory, manifest_identity):
+            continue
+
+        processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity)
+        result.update(processor.get_namespace_to_necessary_pss_profiles())
+
+    return result
