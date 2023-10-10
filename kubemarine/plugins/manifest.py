@@ -14,9 +14,8 @@
 
 import io
 from dataclasses import dataclass
-from typing import Callable, Optional, List, IO, Tuple, cast, Dict
+from typing import Callable, Optional, List, IO, Tuple, cast, Dict, Union, Mapping
 
-import ruamel.yaml
 import os
 from abc import ABC, abstractmethod
 
@@ -117,10 +116,8 @@ class Manifest:
         """
         The method implements the dumping of the list of objects to the string that includes several YAMLs inside
         """
-        yaml = ruamel.yaml.YAML()
-
         with io.StringIO() as stream:
-            yaml.dump_all(self._obj_list, stream)
+            utils.yaml_structure_preserver().dump_all(self._obj_list, stream)
             result = stream.getvalue()
 
         return result
@@ -144,9 +141,8 @@ class Manifest:
         :param stream: stream with manifest content that should be parsed
         :return: list of original objects to enrich in YAML format.
         """
-        yaml = ruamel.yaml.YAML()
         obj_list = []
-        source_yamls = yaml.load_all(stream)
+        source_yamls = utils.yaml_structure_preserver().load_all(stream)
         yaml_keys = set()
         for source_yaml in source_yamls:
             if source_yaml is None:
@@ -477,6 +473,84 @@ class Processor(ABC):
                 container_args.append(extra_arg)
                 self.log.verbose(f"The {extra_arg!r} argument has been added to "
                                  f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
+    def enrich_env_for_container(self, manifest: Manifest, key: str,
+                                 *,
+                                 plugin_service: Optional[str] = None,
+                                 container_name: str,
+                                 env_delete: List[str] = None,
+                                 env_ensure: Mapping[str, Union[str, dict]] = None) -> None:
+        """
+        Add and / or remove the specified environment variables to the specified container.
+
+        :param manifest: container to operate with manifest objects
+        :param key: 'kind' and 'name' of object
+        :param plugin_service: section of plugin that contains the extra 'env'
+        :param container_name: name of container to enrich env variables to
+        :param env_delete: List of env variables to delete.
+                           They are deleted irrespective of what is configured in 'env' section of plugin service.
+        :param env_ensure: Key-value map of env variables to insert or update.
+                           These variables and not configurable.
+        :return:
+        """
+        container_pos, container = self.find_container_for_patch(manifest, key,
+                                                                 container_name=container_name, is_init_container=False)
+
+        if env_delete is None:
+            env_delete = []
+
+        for name in env_delete:
+            for i, e in enumerate(container['env']):
+                if e['name'] == name:
+                    del container['env'][i]
+                    self.log.verbose(f"The {name!r} env variable has been removed from "
+                                     f"'spec.template.spec.containers.[{container_pos}].env' in the {key}")
+                    break
+
+        env_update: Dict[str, dict] = {}
+
+        def update_env(name: str, value: Union[str, dict]) -> None:
+            if type(value) is str:
+                env_update[name] = {'value': value}
+            elif type(value) is dict:
+                env_update[name] = {'valueFrom': value}
+            self.log.verbose(f"The {key} has been patched in "
+                             f"'spec.template.spec.containers.[{container_pos}].env.{name}' with '{value}'")
+
+        if env_ensure is None:
+            env_ensure = {}
+
+        for name, value in env_ensure.items():
+            update_env(name, value)
+
+        plugin_service_section = self.inventory['plugins'][self.plugin_name]
+        if plugin_service:
+            plugin_service_section = plugin_service_section[plugin_service]
+
+        for name, value in plugin_service_section.get('env', {}).items():
+            if name in env_delete:
+                continue
+            if name in env_ensure:
+                raise Exception(f"Environment variable {name} is currently not configurable.")
+            update_env(name, value)
+
+        for env in container['env']:
+            name = env['name']
+            if name not in env_update:
+                continue
+
+            value = env_update.pop(name)
+            keys = list(env.keys())
+            for key in keys:
+                if key != 'name' and key not in value:
+                    del env[key]
+
+            env.update(value)
+
+        for name, env in env_update.items():
+            new_env = {'name' : name}
+            new_env.update(env)
+            container['env'].append(new_env)
 
     def enrich_node_selector(self, manifest: Manifest, key: str,
                              *,

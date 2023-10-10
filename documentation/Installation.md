@@ -3790,7 +3790,7 @@ plugins:
     node:
       image: calico/node:v3.10.1
     env:
-      FELIX_USAGEREPORTINGENABLED: true
+      FELIX_USAGEREPORTINGENABLED: 'true'
 
 ```
 
@@ -3884,32 +3884,82 @@ The plugin configuration supports the following parameters:
 
 ###### Calico metrics configuration
 
-By default, no additional settings are required for metrics calico. It is enabled by default
+By default, no additional settings are required for Calico metrics. They are enabled by default.
 
-**Note**: By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
+**Note**: The following ports are opened for metrics: `calico-node` : `9091`, `calico-kube-controllers` : `9094`, and `calico-typha`: `9093`.
+The ports for `calico-node` and `calico-typha` are opened on the host.
+These ports are currently not configurable by means of Kubemarine.
 
-**Note**: If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
+**Note**: If you use [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) or its resources in your monitoring solution,
+you can use the following ServiceMonitors to collect metrics from Calico:
+
+<details>
+  <summary>Click to expand</summary>
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
+    # If you use prometheus-operator,
+    # specify the custom label corresponding to the configuration of your Prometheus.serviceMonitorSelector.
+    # The same is for the other ServiceMonitors below.
     app.kubernetes.io/component: monitoring
-  name: monitoring-calico-metrics
+  name: calico-metrics
+  namespace: kube-system
+spec:
+  endpoints:
+    # You can configure custom scraping properties, but leave `port: metrics`.
+    # The same is for the other ServiceMonitors below.
+    - interval: 30s
+      port: metrics
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: monitoring
+  name: calico-kube-controllers-metrics
   namespace: kube-system
 spec:
   endpoints:
     - interval: 30s
       port: metrics
       scrapeTimeout: 10s
-  jobLabel: node-exporter
   namespaceSelector:
     matchNames:
       - kube-system
   selector:
     matchLabels:
-      k8s-app: calico
+      k8s-app: calico-kube-controllers
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: monitoring
+  name: calico-typha-metrics
+  namespace: kube-system
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-metrics
 ```
+</details>
 
 ###### Calico Environment Properties
 
@@ -3919,7 +3969,7 @@ It is possible to change the default Calico environment properties. To do that, 
 plugins:
   calico:
     env:
-      WAIT_FOR_DATASTORE: false
+      WAIT_FOR_DATASTORE: 'false'
       FELIX_DEFAULTENDPOINTTOHOSTACTION: DENY
 ```
 

@@ -130,18 +130,22 @@ class CalicoManifestProcessor(Processor):
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
         super().__init__(logger, inventory, Identity('calico'), original_yaml_path, destination_name)
 
-    def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
-        # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
-        # in other case those objects must be excluded
+    def is_typha_enabled(self) -> bool:
         str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
         if str_value == 'false':
-            for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
-                self.exclude(manifest, key)
+            return False
         elif str_value == 'true':
-            return
+            return True
         else:
             raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
                             f"as string or boolean value")
+
+    def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
+        # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
+        # in other case those objects must be excluded
+        if not self.is_typha_enabled():
+            for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
+                self.exclude(manifest, key)
 
     def enrich_configmap_calico_config(self, manifest: Manifest) -> None:
         """
@@ -154,11 +158,7 @@ class CalicoManifestProcessor(Processor):
         val = self.inventory['plugins']['calico']['mtu']
         source_yaml['data']['veth_mtu'] = str(val)
         self.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-        str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
-        if str_value == "true":
-            val = "calico-typha"
-        elif str_value == "false":
-            val = "none"
+        val = "calico-typha" if self.is_typha_enabled() else "none"
         source_yaml['data']['typha_service_name'] = val
         self.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
         string_part = source_yaml['data']['cni_network_config']
@@ -205,20 +205,16 @@ class CalicoManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='node', container_name='calico-node', is_init_container=False)
 
-        container_pos, container = self.find_container_for_patch(manifest, key,
-            container_name='calico-node', is_init_container=False)
-
-        self.enrich_daemonset_calico_node_container_env(container_pos, container)
+        self.enrich_daemonset_calico_node_container_env(manifest)
         self.enrich_resources_for_container(manifest, key,
             plugin_service='node', container_name='calico-node')
 
-    def enrich_daemonset_calico_node_container_env(self, container_pos: int, container: dict) -> None:
+    def enrich_daemonset_calico_node_container_env(self, manifest: Manifest) -> None:
         """
         The method implements the enrichment procedure for 'calico-node' container in Calico node DaemonSet.
         The method attempts to preserve initial formatting.
 
-        :param container_pos: container position in spec
-        :param container: object describing a container
+        :param manifest: Container to operate with manifest objects
         """
         key = "DaemonSet_calico-node"
         env_delete: List[str] = []
@@ -228,45 +224,18 @@ class CalicoManifestProcessor(Processor):
                 'CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD',
                 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'
             ])
-        if utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled']) == "false":
+        if not self.is_typha_enabled():
             env_delete.append('FELIX_TYPHAK8SSERVICENAME')
 
-        for name in env_delete:
-            for i, e in enumerate(container['env']):
-                if e['name'] == name:
-                    del container['env'][i]
-                    self.log.verbose(f"The {name!r} env variable has been removed from "
-                                    f"'spec.template.spec.containers.[{container_pos}].env' in the {key}")
-                    break
+        env_ensure: Dict[str, str] = {
+            # If metrics ports are ever configurable,
+            # it makes sense to make it configurable for typha and kube-controllers as well.
+            # Metrics services should also be patched.
+            'FELIX_PROMETHEUSMETRICSPORT': '9091'
+        }
 
-        env_update: Dict[str, dict] = {}
-        for name, value in self.inventory['plugins']['calico']['env'].items():
-            if name in env_delete:
-                continue
-            if type(value) is str:
-                env_update[name] = {'value': value}
-            elif type(value) is dict:
-                env_update[name] = {'valueFrom': value}
-            self.log.verbose(f"The {key} has been patched in "
-                            f"'spec.template.spec.containers.[{container_pos}].env.{name}' with '{value}'")
-
-        for env in container['env']:
-            name = env['name']
-            if name not in env_update:
-                continue
-
-            value = env_update.pop(name)
-            keys = list(env.keys())
-            for key in keys:
-                if key != 'name' and key not in value:
-                    del env[key]
-
-            env.update(value)
-
-        for name, env in env_update.items():
-            new_env = {'name' : name}
-            new_env.update(env)
-            container['env'].append(new_env)
+        self.enrich_env_for_container(
+            manifest, key, container_name='calico-node', env_delete=env_delete, env_ensure=env_ensure)
 
     def enrich_deployment_calico_typha(self, manifest: Manifest) -> None:
         """
@@ -290,8 +259,22 @@ class CalicoManifestProcessor(Processor):
         self.enrich_tolerations(manifest, key, plugin_service='typha', extra_tolerations=default_tolerations)
         self.enrich_image_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha', is_init_container=False)
+        self.enrich_deployment_calico_typha_container_env(manifest)
         self.enrich_resources_for_container(manifest, key,
             plugin_service='typha', container_name='calico-typha')
+
+    def enrich_deployment_calico_typha_container_env(self, manifest: Manifest) -> None:
+        key = "Deployment_calico-typha"
+        env_ensure: Dict[str, str] = {
+            # If metrics ports are ever configurable, it will need to introduce new `typha.env` section.
+            # Also, it makes sense to make it configurable for calico-node and kube-controllers as well.
+            # Metrics services should also be patched.
+            'TYPHA_PROMETHEUSMETRICSENABLED': 'true',
+            'TYPHA_PROMETHEUSMETRICSPORT': '9093'
+        }
+        # This also searches in calico.typha.env but it is currently not supported by JSON schema.
+        self.enrich_env_for_container(
+            manifest, key, plugin_service='typha', container_name='calico-typha', env_ensure=env_ensure)
 
     def enrich_clusterrole_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
@@ -337,10 +320,13 @@ class CalicoManifestProcessor(Processor):
         source_yaml['spec']['versions'][0]['schema']['openAPIV3Schema']['properties']['spec']['properties'][
             'prometheusMetricsEnabled'] = api_list
 
+    def enrich_metrics(self, manifest: Manifest) -> None:
         sz = len(manifest.all_obj_keys())
-        import ruamel.yaml
-        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
-        self.include(manifest, sz, ruamel.yaml.safe_load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+        yaml = utils.yaml_structure_preserver()
+        self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
+        self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
+        if self.is_typha_enabled():
+            self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-typha-metrics.yaml')))
 
     def get_known_objects(self) -> List[str]:
         return [
@@ -386,6 +372,7 @@ class CalicoManifestProcessor(Processor):
             self.enrich_clusterrole_calico_kube_controllers,
             self.enrich_clusterrole_calico_node,
             self.enrich_crd_felix_configuration,
+            self.enrich_metrics,
         ]
 
 
