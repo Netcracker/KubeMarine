@@ -32,15 +32,18 @@ MANIFEST_PROCESSOR_PROVIDERS: Dict[Identity, manifest.PROCESSOR_PROVIDER] = {
 }
 
 
-def _is_manifest_enabled(inventory: dict, manifest_identity: Identity) -> bool:
-    plugin_name = manifest_identity.plugin_name
-    if not inventory["plugins"][plugin_name]["install"]:
+def is_manifest_installed(cluster: KubernetesCluster, manifest_identity: Identity) -> bool:
+    """
+    Checks if the manifest is (to be) installed during the regular installation procedure.
+
+    :param cluster: KubernetesCluster object
+    :param manifest_identity: A pair of (plugin_name, manifest_id) that uniquely identifies the manifest
+    :return: `true` is manifest is (to be) installed.
+    """
+    if _is_manifest_disabled(cluster.inventory, manifest_identity):
         return False
 
-    if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(inventory):
-        return False
-
-    return True
+    return _get_manifest_installation_step(cluster.inventory, manifest_identity) is not None
 
 
 def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
@@ -70,9 +73,20 @@ def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity
     return None
 
 
+def _is_manifest_disabled(inventory: dict, manifest_identity: Identity) -> bool:
+    plugin_name = manifest_identity.plugin_name
+    if not inventory["plugins"][plugin_name]["install"]:
+        return True
+
+    if manifest_identity == Identity("calico", "apiserver") and not calico.is_apiserver_enabled(inventory):
+        return True
+
+    return False
+
+
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for manifest_identity, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
-        if not _is_manifest_enabled(inventory, manifest_identity):
+        if _is_manifest_disabled(inventory, manifest_identity):
             continue
 
         config = _get_manifest_installation_step(inventory, manifest_identity)
@@ -107,7 +121,9 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
                original_yaml_path: Optional[str] = None,
                destination_name: Optional[str] = None) -> None:
     manifest_identity = Identity(plugin_name, manifest_id)
-    if not _is_manifest_enabled(cluster.inventory, manifest_identity):
+    # Since the method is called from the inventory, the installation step is certainly present.
+    # Though it can still be disabled by other inventory properties.
+    if _is_manifest_disabled(cluster.inventory, manifest_identity):
         cluster.log.debug(f"Skip installing of the {manifest_identity.repr_id()} for {plugin_name!r} plugin.")
         return
 
@@ -119,9 +135,15 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
 
 
 def get_namespace_to_necessary_pss_profiles(cluster: KubernetesCluster) -> Dict[str, str]:
+    """
+    :param cluster: KubernetesCluster object
+    :return: minimal required PSS profiles for all installed plugins' namespaces
+    """
     result = {}
     for manifest_identity in MANIFEST_PROCESSOR_PROVIDERS:
-        if not _is_manifest_enabled(cluster.inventory, manifest_identity):
+        # Use _is_manifest_disabled() instead of `not is_manifest_installed()`,
+        # because old inventories might still refer to .yaml.j2 templates where PSS was also managed automatically.
+        if _is_manifest_disabled(cluster.inventory, manifest_identity):
             continue
 
         processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity)
