@@ -22,12 +22,8 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p1_override_target_ports import OverrideTargetPorts
-from kubemarine.patches.p2_reconfigure_audit_policy import ReconfigureAuditPolicy
 
 patches: List[Patch] = [
-    OverrideTargetPorts(),
-    ReconfigureAuditPolicy(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
