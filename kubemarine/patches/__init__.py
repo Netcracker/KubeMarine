@@ -23,7 +23,7 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_enable_calico_audit import EnableCalicoAudit
-from kubemarine.patches.p4_calico_typha_metrics import EnableCalicoTyphaMetrics
+from kubemarine.patches.p2_calico_typha_metrics import EnableCalicoTyphaMetrics
 
 patches: List[Patch] = [
     EnableCalicoAudit(),
