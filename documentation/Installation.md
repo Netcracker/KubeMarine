@@ -2508,9 +2508,9 @@ services:
 
 *Can restart service*: Always yes, container kube-apiserver.
 
-*Overwrite files*: Yes, `/etc/kubernetes/audit-policy.yaml`, backup is created.
+*Overwrite files*: Yes, `/etc/kubernetes/audit-policy.yaml` backup is created.
 
-*OS specific*: No.
+*OS specific*: No
 
 For more information about Kubernetes auditing, refer to the official documentation at [https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/).
 
@@ -2520,7 +2520,7 @@ For more information about Kubernetes auditing, refer to the official documentat
 `Request` — log metadata and request body;
 `RequestResponse` - log metadata, request body and response body.
 
-**omitStages**: List of stages for which no events are created.
+**omitStages**: The list of stages for which no events are created.
 
 By default, the following policy is installed:
 
@@ -2661,7 +2661,7 @@ services:
 It is possible not only to redefine the default policy, but also to extend it. For more information, refer to [List Merge Strategy](#list-merge-strategy).
 
 For example, consider you have an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) that constantly updates some Pods' labels and some ConfigMap to maintain the leadership.
-If you do not see any benefit from logging of such events, they can be disabled by specifying the following in the `cluster.yaml`:
+If you do not see any benefit from logging of such events, they can be disabled by specifying the following in `cluster.yaml`:
 
 ```yaml
 services:
