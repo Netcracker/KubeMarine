@@ -72,14 +72,14 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     return backup_files_list
 
 
-def prepare_backup_tmpdir(cluster: KubernetesCluster) -> str:
-    backup_directory = cluster.context.get('backup_tmpdir')
+def prepare_backup_tmpdir(logger: log.EnhancedLogger, context: dict) -> str:
+    backup_directory = context.get('backup_tmpdir')
     if not backup_directory:
-        cluster.log.verbose('Backup directory is not ready yet, preparing..')
-        backup_directory = cluster.context['backup_tmpdir'] = utils.get_dump_filepath(cluster.context, 'backup')
+        logger.verbose('Backup directory is not ready yet, preparing..')
+        backup_directory = context['backup_tmpdir'] = utils.get_dump_filepath(context, 'backup')
         shutil.rmtree(backup_directory, ignore_errors=True)
         os.mkdir(backup_directory)
-        cluster.log.verbose('Backup directory prepared')
+        logger.verbose('Backup directory prepared')
     return backup_directory
 
 
@@ -90,7 +90,7 @@ def verify_backup_location(cluster: KubernetesCluster) -> None:
 
 
 def export_ansible_inventory(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     shutil.copyfile(cluster.context['execution_arguments']['ansible_inventory_location'],
                     os.path.join(backup_directory, 'ansible-inventory.ini'))
     cluster.log.verbose('ansible-inventory.ini exported to backup')
@@ -116,7 +116,7 @@ def export_hostname(cluster: KubernetesCluster) -> None:
 
 
 def export_cluster_yaml(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     shutil.copyfile(utils.get_dump_filepath(cluster.context, 'cluster.yaml'),
                     os.path.join(backup_directory, 'cluster.yaml'))
     shutil.copyfile(utils.get_external_resource_path(cluster.context['execution_arguments']['config']),
@@ -125,7 +125,7 @@ def export_cluster_yaml(cluster: KubernetesCluster) -> None:
 
 
 def export_nodes(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     backup_nodes_data_dir = os.path.join(backup_directory, 'nodes_data')
     os.mkdir(backup_nodes_data_dir)
 
@@ -158,7 +158,7 @@ def export_nodes(cluster: KubernetesCluster) -> None:
 
 
 def export_etcd(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     etcd_node, is_custom_etcd_node = select_etcd_node(cluster)
     cluster.context['backup_descriptor']['etcd']['image'] = retrieve_etcd_image(cluster, etcd_node)
 
@@ -566,7 +566,7 @@ class ExportKubernetesDownloader:
 
 
 def export_kubernetes(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
     control_plane = cluster.nodes['control-plane'].get_any_member()
     backup_kubernetes = cluster.procedure_inventory.get('backup_plan', {}).get('kubernetes', {})
     logger = cluster.log
@@ -655,7 +655,7 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
 
 
 def make_descriptor(cluster: KubernetesCluster) -> None:
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
 
     cluster.context['backup_descriptor']['kubernetes']['thirdparties'] = cluster.inventory['services']['thirdparties']
     cluster.context['backup_descriptor']['meta']['time']['finished'] = datetime.datetime.now()
@@ -666,7 +666,7 @@ def make_descriptor(cluster: KubernetesCluster) -> None:
 
 def pack_data(cluster: KubernetesCluster) -> None:
     cluster_name = cluster.inventory['cluster_name']
-    backup_directory = prepare_backup_tmpdir(cluster)
+    backup_directory = prepare_backup_tmpdir(cluster.log, cluster.context)
 
     backup_filename = 'backup-%s-%s.tar.gz' % (cluster_name, utils.get_current_timestamp_formatted())
 
@@ -675,15 +675,19 @@ def pack_data(cluster: KubernetesCluster) -> None:
         target = os.path.join(target, backup_filename)
 
     cluster.log.debug('Packing all data...')
-    with tarfile.open(target, "w:gz") as tar_handle:
-        for root, dirs, files in os.walk(backup_directory):
-            for file in files:
-                pathname = os.path.join(root, file)
-                tar_handle.add(pathname, pathname.replace(backup_directory, ''))
-        tar_handle.close()
+    pack_to_tgz(target, backup_directory)
 
     cluster.log.verbose('Cleaning up...')
     shutil.rmtree(backup_directory, ignore_errors=True)
+
+
+def pack_to_tgz(target_archive: str, source_dir: str) -> None:
+    with tarfile.open(target_archive, "w:gz") as tar_handle:
+        for root, dirs, files in os.walk(source_dir):
+            for file in files:
+                pathname = os.path.join(root, file)
+                tar_handle.add(pathname, pathname.replace(source_dir, ''))
+        tar_handle.close()
 
 
 tasks = OrderedDict({
