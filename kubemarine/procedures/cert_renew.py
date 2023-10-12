@@ -57,6 +57,7 @@ def k8s_certs_renew_task(cluster: KubernetesCluster) -> None:
 
     cluster.log.debug("Starting certificate renewal for kubernetes")
     cluster.nodes['control-plane'].call(k8s_certs.renew_apply)
+    cluster.nodes['worker'].call(k8s_certs.force_renew_kubelet_serving_certs)
 
 
 def k8s_certs_overview_task(cluster: KubernetesCluster) -> None:
