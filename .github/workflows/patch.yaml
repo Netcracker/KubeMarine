@@ -5,7 +5,7 @@ on:
 jobs:
   delete_patches_on_release:
     runs-on: ubuntu-latest
-    # Release can be done only in main branch or dedicated N.N.N_branch support branches
+    # Release can be done only in main branch or dedicated vN.N.N_branch support branches
     if: github.event.release.target_commitish == 'main' || endsWith(github.event.release.target_commitish, '_branch')
     steps:
       - uses: actions/checkout@v3
