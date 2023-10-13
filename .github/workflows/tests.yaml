@@ -9,11 +9,12 @@ env:
 jobs:
   license:
      runs-on: ubuntu-latest
+     if: github.ref_name == 'main' || endsWith(github.ref_name, '_branch')
      steps:
        - uses: actions/checkout@v3
+         with:
+           token: ${{ secrets.NCCLPLCI_PAT }}
        - run: docker run -v "${PWD}:/src" -i ghcr.io/google/addlicense -v -c "${{ env.COPYRIGHT_COMPANY }}" -y "${{ env.COPYRIGHT_YEAR }}" $(find . -type f -name "*.py" | xargs echo)
-       # This currently not works for protected branches,
-       # but all pushes to them should be done through PRs that already contain inserted license.
        - uses: stefanzweifel/git-auto-commit-action@v4
          with:
            commit_message: Auto-update license header
