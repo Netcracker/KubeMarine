@@ -266,8 +266,7 @@ def import_etcd(cluster: KubernetesCluster) -> None:
         cluster.nodes['control-plane'].sudo(f"docker stop {container_name} && "
                                             f"sudo docker rm {container_name}")
     else:
-        cluster.nodes['control-plane'].sudo(f"ctr task kill -s 9 {container_name} && "
-                                            f"sudo ctr task rm {container_name} && "
+        cluster.nodes['control-plane'].sudo(f"ctr task rm -f {container_name} && "
                                             f"sudo ctr container rm {container_name}")
 
 

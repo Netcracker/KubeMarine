@@ -786,14 +786,15 @@ with parameters.
 
 The `registry` parameter automatically completes the following parameters:
 
-|Path|Registry Type|Format|Example|Description|
-|---|---|---|---|---|
-|`services.kubeadm.imageRepository`|Docker|Address without protocol, where Kubernetes images are stored. It should be the full path to the repository.|```example.com:5443/registry.k8s.io```|Kubernetes Image Repository. The system container's images such as `kubeapi` or `etcd` is loaded from this registry.|
-|`services.cri.dockerConfig.insecure-registries`|Docker|List with addresses without a protocol.|```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it.|
-|`services.cri.dockerConfig.registry-mirrors`|Docker|List with addresses. Each address should contain a protocol.|```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for the container's images pull.|
-|`services.cri.containerdConfig.{{containerd-specific name}}`|Docker|Toml-like section with endpoints according to the containerd docs.|```https://example.com:5443```||
-|`services.thirdparties.{{ thirdparty }}.source`|Plain|Address with protocol or absolute path on deploy node. It should be the full path to the file.|```https://example.com/kubeadm/v1.22.2/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
-|`plugin_defaults.installation.registry`|Docker|Address without protocol, where plugins images are stored.|```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
+| Path                                                         |Registry Type| Format                                                                                                         |Example|Description|
+|--------------------------------------------------------------|---|----------------------------------------------------------------------------------------------------------------|---|---|
+| `services.kubeadm.imageRepository`                           |Docker| Address without protocol, where Kubernetes images are stored. It should be the full path to the repository.    |```example.com:5443/registry.k8s.io```|Kubernetes Image Repository. The system container's images such as `kubeapi` or `etcd` is loaded from this registry.|
+| `services.cri.dockerConfig.insecure-registries`              |Docker| List with addresses without a protocol.                                                                        |```example.com:5443```|Docker Insecure Registries. It is necessary for the Docker to allow the connection to addresses unknown to it.|
+| `services.cri.dockerConfig.registry-mirrors`                 |Docker| List with addresses. Each address should contain a protocol.                                                   |```https://example.com:5443```|Docker Registry Mirrors. Additional image sources for the container's images pull.|
+| `services.cri.containerdConfig.{{containerd-specific name}}` |Docker| Toml-like section with endpoints according to the containerd docs.                                             |```https://example.com:5443```||
+| `services.cri.containerdRegistriesConfig.{{registry}}`       |Docker| Toml-like section with hosts.toml content for specific registry according to the containerd docs. |```https://example.com:5443```||
+| `services.thirdparties.{{ thirdparty }}.source`              |Plain| Address with protocol or absolute path on deploy node. It should be the full path to the file.                 |```https://example.com/kubeadm/v1.22.2/bin/linux/amd64/kubeadm```|Thridparty Source. Thirdparty file, such as binary, archive and so on, is loaded from this registry.|
+| `plugin_defaults.installation.registry`                      |Docker| Address without protocol, where plugins images are stored.                                                     |```example.com:5443```|Plugins Images Registry. All plugins container's images are loaded from this registry.|
 
 **Note**: You can enter these parameters yourself, as well as override them, even if the `registry` parameter is set.
 
@@ -2275,7 +2276,8 @@ services:
 
 *Can restart service*: Always yes, `docker` or `containerd`
 
-*Overwrite files*: Yes, by default `/etc/docker/daemon.json` or `/etc/containerd/config.toml`, `/etc/crictl.yaml` and `/etc/containers/registries.conf`, backup is created
+*Overwrite files*: Yes, by default `/etc/docker/daemon.json` or `/etc/containerd/config.toml`, `/etc/crictl.yaml` and `/etc/containers/registries.conf`, backup is created. 
+Additionally, if  `plugins."io.containerd.grpc.v1.cri".registry.config_path` is defined in `services.cri.containerdConfig` specified directory will be created and filled according `services.cri.containerdRegistriesConfig`.
 
 *OS specific*: No
 
@@ -2291,6 +2293,9 @@ services:
         runtime_type: "io.containerd.runc.v2"
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
         SystemdCgroup: true
+      # This parameter is added, if no registry.mirrors and registry.configs.tls specified:
+      plugins."io.containerd.grpc.v1.cri".registry:
+        config_path: "/etc/containerd/certs.d"
     dockerConfig:
       ipv6: False
       log-driver: json-file
@@ -2319,30 +2324,68 @@ services:
     containerdConfig:
       plugins."io.containerd.grpc.v1.cri":
         sandbox_image: registry.k8s.io/pause:3.2
+```
+
+Also, it is possible to specify registries configuration in registries hosts format using `containerdRegistriesConfig` section:
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdRegistriesConfig:
+      artifactory.example.com:5443:
+        host."https://artifactory.example.com:544":
+          capabilities: [ "pull", "resolve" ]
+```
+
+If `containerdRegistriesConfig` is specified, registries hosts configuration is placed in `/etc/containerd/certs.d` directory by default.
+It's possible to override this value `plugins."io.containerd.grpc.v1.cri".registry.config_path` in `containerdConfig`:
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri".registry:
+        config_path: "/etc/containerd/registries"
+    containerdRegistriesConfig:
+      artifactory.example.com:5443:
+        host."https://artifactory.example.com:544":
+          capabilities: [ "pull", "resolve" ]
+```
+
+**Note**: it's possible to specify registries using `registry.mirrors` and `registries.configs.tls`, but it's not recommended, 
+because this approach is deprecated by containerd team since containerd v1.5.0:
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
       plugins."io.containerd.grpc.v1.cri".registry.mirrors."artifactory.example.com:5443":
         endpoint:
         - https://artifactory.example.com:5443
+      plugins."io.containerd.grpc.v1.cri".registry.configs."artifactory.example.com:5443".tls:
+        insecure_skip_verify: true
 ```
 
-When the registry requires an authentication, `containerdConfig` should be similar to the following:
+Although, `registry.mirrors` and `registries.configs` are deprecated, when the registry requires an authentication, 
+it should be specified using `registries.configs.auth`, as in following example:
 
 ```yaml
 services:
   cri:
     containerRuntime: containerd
     containerdConfig:
-      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".tls:
-        insecure_skip_verify: true
       plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".auth:
         auth: "bmMtdXNlcjperfr="
-      plugins."io.containerd.grpc.v1.cri".registry.mirrors."private-registry:5000":
-        endpoint:
-        - https://private-registry:5000
+    containerdRegistriesConfig:
+      private-registry:5000:
+        host."https://private-registry:5000":
+          capabilities: [ "pull", "resolve" ]
+          skip_verify: true
 ```
 
 Where, `auth: "bmMtdXNlcjperfr="` field is `username:password` string in base64 encoding.
 
-Note how `containerdConfig` section reflects the toml format structure.
+Note how `containerdConfig` and `containerdRegistriesConfig.<registry>` sections reflect the toml format structure.
 For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
 By default, the following parameters are used for `containerdConfig`:
 
@@ -2355,6 +2398,9 @@ services:
         runtime_type: "io.containerd.runc.v2"
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options:
         SystemdCgroup: true
+      # This parameter is added, if no registry.mirrors and registry.configs.tls specified:
+      plugins."io.containerd.grpc.v1.cri".registry:
+        config_path: "/etc/containerd/certs.d"
 ```
 
 **Note**: When containerd is used, `crictl` binary is also installed and configured as required.

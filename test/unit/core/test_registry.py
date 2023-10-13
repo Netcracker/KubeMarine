@@ -38,9 +38,15 @@ class TestRegistryEnrichment(unittest.TestCase):
         pause_version = static.GLOBALS['compatibility_map']['software']['pause'][kubernetes_version]['version']
         self.assertEqual(f'registry.k8s.io/pause:{pause_version}', containerd_config[path]['sandbox_image'])
 
-    def test_apply_custom_unified_registry(self):
+    def test_apply_custom_unified_registry_in_old_format(self):
+        # If containerdConfig contains registry properties in old format, it will be used for registry configuration
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services']['cri']['containerRuntime'] = 'containerd'
+        inventory['services']['cri']['containerdConfig'] = {
+            'plugins."io.containerd.grpc.v1.cri".registry.mirrors."some-registry:8080"': {
+                'endpoint': ['https://some-registry:8080']
+            }
+        }
         inventory['registry'] = {
             'endpoints': ['https://example.registry:443'],
             'mirror_registry': 'example.registry:443',
@@ -62,6 +68,41 @@ class TestRegistryEnrichment(unittest.TestCase):
 
         registry_section = f'{path}.registry.mirrors."example.registry:443"'
         self.assertEqual(['https://example.registry:443'], containerd_config[registry_section]['endpoint'])
+
+        for destination, config in inventory['services']['thirdparties'].items():
+            if destination != '/usr/bin/etcdctl':
+                self.assertIn('https://example.com/thirdparties/', config['source'])
+
+    def test_apply_custom_unified_registry_in_new_format(self):
+        # If containerdConfig doesn't contain registry properties in old format, it will be used for registry configuration
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services']['cri']['containerRuntime'] = 'containerd'
+        inventory['registry'] = {
+            'endpoints': ['https://example.registry:443'],
+            'mirror_registry': 'example.registry:443',
+            'thirdparties': 'https://example.com/thirdparties'
+        }
+        inventory = demo.new_cluster(inventory).inventory
+
+        self.assertEqual('example.registry:443', inventory['services']['kubeadm']['imageRepository'])
+        self.assertEqual('example.registry:443/coredns', inventory['services']['kubeadm']['dns']['imageRepository'])
+        self.assertEqual('example.registry:443', inventory['plugin_defaults']['installation']['registry'])
+        for plugin_name, plugin_params in inventory['plugins'].items():
+            self.assertEqual('example.registry:443', plugin_params['installation']['registry'])
+
+        containerd_config = inventory['services']['cri']['containerdConfig']
+        path = 'plugins."io.containerd.grpc.v1.cri"'
+        kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+        pause_version = static.GLOBALS['compatibility_map']['software']['pause'][kubernetes_version]['version']
+        self.assertEqual(f'example.registry:443/pause:{pause_version}', containerd_config[path]['sandbox_image'])
+
+        self.assertEqual(f'/etc/containerd/certs.d', containerd_config[f'{path}.registry'].get('config_path'))
+        containerd_reg_config = inventory['services']['cri']['containerdRegistriesConfig']
+        self.assertIn('example.registry:443', containerd_reg_config)
+        self.assertIn('host."https://example.registry:443"', containerd_reg_config['example.registry:443'])
+        self.assertEqual(['pull', 'resolve'],
+                         containerd_reg_config['example.registry:443']['hosts."https://example.registry:443"']
+                         .get('capabilities'))
 
         for destination, config in inventory['services']['thirdparties'].items():
             if destination != '/usr/bin/etcdctl':

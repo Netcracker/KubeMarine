@@ -23,6 +23,7 @@ from kubemarine.core.errors import KME
 from kubemarine import jinja
 from kubemarine.core import utils, static, log, os
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine.cri.containerd import contains_old_format_properties
 
 # All enrichment procedures should not connect to any node.
 # The information about nodes should be collected within KubernetesCluster#detect_nodes_context().
@@ -165,16 +166,27 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
         inventory['services']['cri']['dockerConfig']["registry-mirrors"] = list(set(registry_mirrors))
 
     elif cri_impl == "containerd":
-        registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
+        if not containerd_endpoints:
+            containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
 
-        containerd_config = inventory['services']['cri']['containerdConfig']
-        if not containerd_config.get(registry_section):
-            if not containerd_endpoints:
-                containerd_endpoints = ["%s://%s" % (protocol, registry_mirror_address)]
-
-            containerd_config[registry_section] = {
-                'endpoint': containerd_endpoints
-            }
+        old_format_result, _ = contains_old_format_properties(inventory)
+        if old_format_result:
+            # Add registry info in old format
+            registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
+            containerd_config = inventory['services']['cri']['containerdConfig']
+            if not containerd_config.get(registry_section):
+                containerd_config[registry_section] = {
+                    'endpoint': containerd_endpoints
+                }
+        else:
+            # Add registry info in new format
+            containerd_reg_config = inventory['services']['cri'].setdefault('containerdRegistriesConfig', {})
+            if not containerd_reg_config.get(registry_mirror_address):
+                containerd_reg_config[registry_mirror_address] = {}
+                for endpoint in containerd_endpoints:
+                    containerd_reg_config[registry_mirror_address][f'host."{endpoint}"'] = {
+                        'capabilities': ['pull', 'resolve']
+                    }
 
     from kubemarine import thirdparties
 

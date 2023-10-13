@@ -29,6 +29,7 @@ from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
+from pathvalidate import sanitize_filepath
 from ruamel.yaml import CommentedMap
 from typing_extensions import Protocol
 
@@ -224,6 +225,9 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
         target_path = get_dump_filepath(context, filename)
     else:
         target_path = get_external_resource_path(filename)
+    # sanitize_filepath is needed for windows/macOS, where some symbols are restricted in file path,
+    # but they can appear in target path. They will be replaced with '_'
+    target_path = sanitize_filepath(target_path, replacement_text='_')
 
     if isinstance(data, io.StringIO):
         text = data.getvalue()
