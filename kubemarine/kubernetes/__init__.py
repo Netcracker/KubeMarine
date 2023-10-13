@@ -106,7 +106,7 @@ def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
     initial_kubernetes_version = get_initial_kubernetes_version(inventory)
     backup_kubernetes_version = kubernetes_descriptor.get('version')
     if not backup_kubernetes_version:
-        logger.debug("Not possible to verify Kubernetes version, as descriptor does not contain 'kubernetes.version'")
+        logger.warning("Not possible to verify Kubernetes version, as descriptor does not contain 'kubernetes.version'")
         backup_kubernetes_version = initial_kubernetes_version
 
     if backup_kubernetes_version != initial_kubernetes_version:
