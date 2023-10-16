@@ -24,11 +24,18 @@ from kubemarine.core import utils, log, errors
 from kubemarine.core.cluster import KubernetesCluster
 
 
+ERROR_API_VERSION = \
+    "Unsupported apiVersion: {actual_version} of the inventory file{for_procedure}. " \
+    "Supported apiVersion: {supported_version}."
+
+
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     _verify_inventory_by_schema(cluster, inventory, 'cluster')
-    procedure = cluster.context.get("initial_procedure")
-    if procedure:
-        _verify_inventory_by_schema(cluster, cluster.procedure_inventory, procedure)
+    context = cluster.context
+    args: dict = context['execution_arguments']
+    # Skip validation if procedure inventory is optional and not provided
+    if args.get('procedure_config'):
+        _verify_inventory_by_schema(cluster, cluster.procedure_inventory, context["initial_procedure"])
     return inventory
 
 
@@ -39,15 +46,16 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     root_schema_path = utils.get_internal_resource_path(root_schema_resource)
     root_schema = pathlib.Path(root_schema_path)
     if not root_schema.exists():
-        if schema_name == 'cluster' or inventory:
-            raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
-        return
+        raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
 
     with utils.open_internal(root_schema_resource) as f:
         schema = json.load(f)
 
     validator_cls = jsonschema.validators.validator_for(schema)
     validator_cls.check_schema(schema)
+
+    # Early check apiVersion to fail gracefully
+    _check_api_version(inventory, schema, schema_name)
 
     root_schema_uri = root_schema.as_uri()
     resolver = jsonschema.RefResolver(base_uri=root_schema_uri, referrer=schema)
@@ -80,6 +88,22 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
 
     msg = _error_msg(validator, errs[0])
     raise errors.FailException(msg, hint=hint)
+
+
+def _check_api_version(inventory: dict, schema: dict, schema_name: str) -> None:
+    supported_version = schema['properties']['apiVersion']['enum'][0]
+    actual_version = inventory.get('apiVersion')
+    if supported_version != actual_version:
+        for_procedure = "" if schema_name == 'cluster' else f" for procedure '{schema_name}'"
+        hint = dedent(
+            f"""\
+            Check delta of major releases and their release notes to see what was changed,
+            and how to convert the schema either manually or automatically.
+            """.rstrip()
+        )
+        msg = ERROR_API_VERSION.format(for_procedure=for_procedure,
+                                       actual_version=actual_version, supported_version=supported_version)
+        raise errors.FailException(msg, hint=hint)
 
 
 def _resolve_errors(errs: List[jsonschema.ValidationError]) -> List[jsonschema.ValidationError]:

@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "API version defines the set of supported inventory sections, properties, and values.",
+      "enum": ["v1"]
+    },
     "upgrade_plan": {
       "$ref": "definitions/common/utils.json#/definitions/NonEmptySetOfStrings",
       "description": "List of new versions through which to upgrade the cluster to the last specified version"
@@ -30,7 +35,7 @@
     "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
     "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
   },
-  "required": ["upgrade_plan"],
+  "required": ["apiVersion", "upgrade_plan"],
   "additionalProperties": {
     "type": "object",
     "description": "Configuration for the upgrade to the particular version from the 'upgrade_plan'",

@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "API version defines the set of supported inventory sections, properties, and values.",
+      "enum": ["v1"]
+    },
     "upgrade": {
       "type": "object",
       "description": "Configure the parameters to upgrade different types of software",
@@ -22,6 +27,7 @@
     "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
     "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
   },
+  "required": ["apiVersion"],
   "additionalProperties": false,
   "definitions": {
     "UpgradePlugins": {

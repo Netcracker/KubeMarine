@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "API version defines the set of supported inventory sections, properties, and values.",
+      "enum": ["v1"]
+    },
     "nodes": {
       "type": "array",
       "description": "Nodes to remove. Each item can be specified in the same format as that of the installation procedure, or in short format where only the node name is present.",
@@ -19,6 +24,6 @@
     "grace_period": {"$ref": "definitions/procedures.json#/definitions/GracePeriod"},
     "drain_timeout": {"$ref": "definitions/procedures.json#/definitions/DrainTimeout"}
   },
-  "required": ["nodes"],
+  "required": ["apiVersion", "nodes"],
   "additionalProperties": false
 }
