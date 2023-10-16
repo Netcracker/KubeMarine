@@ -29,15 +29,13 @@ class EnrichmentValidation(unittest.TestCase):
                 'pod-security': 'enabled'
             }
         }
-        self.context = demo.create_silent_context(procedure='manage_pss')
-        self.manage_pss: dict = {
-            'pss': {
-                'pod-security': 'enabled',
-                'defaults': {},
-                'namespaces': [],
-                'namespaces_defaults': {}
-            }
-        }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='manage_pss')
+        self.manage_pss = demo.generate_procedure_inventory('manage_pss')
+        self.manage_pss['pss'].update({
+            'defaults': {},
+            'namespaces': [],
+            'namespaces_defaults': {}
+        })
 
     def _create_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.manage_pss),
@@ -88,14 +86,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
                 }
             }
         }
-        self.context = demo.create_silent_context(procedure='manage_pss')
-        self.manage_pss = {
-            "pss": {
-                "pod-security": "enabled",
-                "exemptions": {
-                    "namespaces": []
-                }
-            }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='manage_pss')
+        self.manage_pss = demo.generate_procedure_inventory('manage_pss')
+        self.manage_pss['pss']['exemptions'] = {
+            "namespaces": []
         }
 
     def _create_cluster(self):

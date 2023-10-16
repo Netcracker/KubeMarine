@@ -28,8 +28,7 @@ class TestEnvironmentVariables(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.context = demo.create_silent_context(['--without-act'], procedure='install',
-                                                  parser=flow.new_tasks_flow_parser("Help text", install.tasks))
+        self.context = demo.create_silent_context(['--without-act'])
         args = self.context['execution_arguments']
         args['disable_dump'] = False
         args['dump_location'] = self.tmpdir.name

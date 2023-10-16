@@ -11,4 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+import types
 
+
+def import_procedure(name: str) -> types.ModuleType:
+    module_name = 'kubemarine.procedures.%s' % name
+    return __import__(module_name, fromlist=['object'])
+
+
+def deimport_procedure(name: str) -> None:
+    del sys.modules['kubemarine.procedures.%s' % name]

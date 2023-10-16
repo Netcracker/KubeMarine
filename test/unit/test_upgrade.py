@@ -83,8 +83,7 @@ def generate_upgrade_environment(old) -> Tuple[dict, dict]:
     inventory['services']['kubeadm'] = {
         'kubernetesVersion': old
     }
-    context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='upgrade',
-                                         parser=flow.new_procedure_parser("Help text"))
+    context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='upgrade')
     return inventory, context
 
 
@@ -97,7 +96,8 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
     def prepare_inventory(self, old, new):
         self.inventory, self.context = generate_upgrade_environment(old)
         self.context['upgrade_version'] = new
-        self.upgrade: dict = {'upgrade_plan': [new]}
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [new]
 
     def _new_cluster(self):
         return demo.new_cluster(self.inventory, procedure_inventory=self.upgrade, context=self.context)
@@ -153,14 +153,13 @@ class UpgradePackagesEnrichment(unittest.TestCase):
             'containerd': {},
         }}})
         set_cri(self.inventory, 'containerd')
-        self.upgrade: dict = {
-            'upgrade_plan': [self.new],
-            self.new: {
-                'packages': {
-                    'associations': {
-                        'docker': {},
-                        'containerd': {}
-                    }
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [self.new]
+        self.upgrade[self.new] = {
+            'packages': {
+                'associations': {
+                    'docker': {},
+                    'containerd': {}
                 }
             }
         }
@@ -307,12 +306,9 @@ class UpgradePluginsEnrichment(unittest.TestCase):
         self.inventory, self.context = generate_upgrade_environment(self.old)
         self.context['upgrade_version'] = self.new
         self.inventory['plugins'] = {}
-        self.upgrade: dict = {
-            'upgrade_plan': [self.new],
-            self.new: {
-                'plugins': {}
-            }
-        }
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [self.new]
+        self.upgrade[self.new] = {'plugins': {}}
 
     def _new_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
@@ -371,12 +367,9 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         self.inventory, self.context = generate_upgrade_environment(self.old)
         self.context['upgrade_version'] = self.new
         self.inventory['services']['thirdparties'] = {}
-        self.upgrade: dict = {
-            'upgrade_plan': [self.new],
-            self.new: {
-                'thirdparties': {}
-            }
-        }
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [self.new]
+        self.upgrade[self.new] = {'thirdparties': {}}
 
     def _new_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
@@ -478,13 +471,12 @@ class UpgradeContainerdConfigEnrichment(unittest.TestCase):
         self.inventory['services']['cri'].setdefault('containerdConfig', {})\
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})
         set_cri(self.inventory, 'containerd')
-        self.upgrade: dict = {
-            'upgrade_plan': [self.new],
-            self.new: {
-                'cri': {
-                    'containerdConfig': {
-                        'plugins."io.containerd.grpc.v1.cri"': {},
-                    }
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [self.new]
+        self.upgrade[self.new] = {
+            'cri': {
+                'containerdConfig': {
+                    'plugins."io.containerd.grpc.v1.cri"': {},
                 }
             }
         }
@@ -580,7 +572,8 @@ class InventoryRecreation(unittest.TestCase):
         self.inventory, self.context = generate_upgrade_environment(self.old)
         self.inventory.setdefault('rbac', {})['admission'] = 'pss'
         self.nodes_context = demo.generate_nodes_context(self.inventory)
-        self.upgrade: dict = {'upgrade_plan': upgrade_plan}
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = upgrade_plan
         self.actions = []
         for ver in upgrade_plan:
             self.upgrade[ver] = {}

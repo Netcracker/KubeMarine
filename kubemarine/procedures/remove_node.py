@@ -153,7 +153,7 @@ class RemoveNodeAction(Action):
         res.make_final_inventory()
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
 
     cli_help = '''
     Script for removing node from Kubernetes cluster.
@@ -164,7 +164,11 @@ def main(cli_arguments: List[str] = None) -> None:
 
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='remove_node')
+    return context
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([RemoveNodeAction()]).run_flow(context)
 
 

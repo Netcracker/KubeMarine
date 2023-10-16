@@ -1510,7 +1510,7 @@ class PaasAction(Action):
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments: List[str] = None) -> TestSuite:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for checking Kubernetes cluster PAAS layer.
     
@@ -1544,6 +1544,11 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
 
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> TestSuite:
+    context = create_context(cli_arguments)
     flow_ = flow.ActionsFlow([PaasAction()])
     result = flow_.run_flow(context, print_summary=False)
 

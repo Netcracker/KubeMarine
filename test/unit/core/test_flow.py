@@ -205,8 +205,7 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(4, cluster.context["test_info"], f"Here should be 4 calls of test_func for: {final_task_names}")
 
     def test_run_tasks(self):
-        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks)
@@ -214,8 +213,7 @@ class FlowTest(unittest.TestCase):
                          "It had to be one call of test_func for deploy.loadbalancer.haproxy action")
 
     def test_force_proceed_cumulative_point_task_present(self):
-        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
             test_func: ['deploy.loadbalancer.haproxy']
@@ -226,8 +224,7 @@ class FlowTest(unittest.TestCase):
                          f"Both task and cumulative points should be run")
 
     def test_force_proceed_cumulative_point_task_absent(self):
-        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
             test_func: ['deploy.loadbalancer.haproxy']
@@ -238,8 +235,7 @@ class FlowTest(unittest.TestCase):
                          f"Cumulative point should be skipped as task is not run")
 
     def test_force_proceed_cumulative_point_end_of_tasks(self):
-        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--force-cumulative-points', '--tasks', 'deploy.loadbalancer.keepalived'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
             test_func: [flow.END_OF_TASKS]
@@ -250,8 +246,7 @@ class FlowTest(unittest.TestCase):
                          f"Cumulative point should be executed at the end of tasks")
 
     def test_scheduled_cumulative_point_task_absent(self):
-        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
         cumulative_points = {
             test_func: ['overview']
@@ -264,8 +259,7 @@ class FlowTest(unittest.TestCase):
                          f"Cumulative point should be executed despite the related task is not run")
 
     def test_scheduled_cumulative_point_end_of_tasks(self):
-        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'],
-                                             parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context(['--tasks', 'deploy.loadbalancer.haproxy'])
         inventory = demo.generate_inventory(**demo.FULLHA)
 
         def cumulative_func(cluster: demo.FakeKubernetesCluster):
@@ -288,7 +282,7 @@ class FlowTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, hosts)
-        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context()
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
         # not throws any exception during cluster initialization
         flow.run_tasks(res, tasks)
@@ -306,7 +300,7 @@ class FlowTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, [])
-        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context()
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
         flow.run_tasks(res, tasks)
         cluster = res.cluster()
@@ -325,7 +319,7 @@ class FlowTest(unittest.TestCase):
         online_hosts = [node["address"] for node in inventory["nodes"]]
         offline = online_hosts.pop(random.randrange(len(online_hosts)))
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context()
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
         exc = None
@@ -345,11 +339,11 @@ class FlowTest(unittest.TestCase):
 
         i = random.randrange(len(masters))
         online_hosts.pop(masters[i])
-        procedure_inventory = {"nodes": [{"name": inventory["nodes"][masters[i]]["name"]}]}
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory["nodes"] = [{"name": inventory["nodes"][masters[i]]["name"]}]
 
         self._stub_detect_nodes_context(inventory, online_hosts, [])
-        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node',
-                                             parser=flow.new_procedure_parser("Help text"))
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node')
         res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
                                  fake_shell=self.light_fake_shell)
 
@@ -366,7 +360,7 @@ class FlowTest(unittest.TestCase):
 
         hosts = [node["address"] for node in inventory["nodes"]]
         self._stub_detect_nodes_context(inventory, hosts, hosts)
-        context = demo.create_silent_context([], parser=flow.new_tasks_flow_parser("Help text"))
+        context = demo.create_silent_context()
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
         with test_utils.assert_raises_kme(self, "KME0008",

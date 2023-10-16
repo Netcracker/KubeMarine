@@ -62,8 +62,7 @@ def generate_environment(kubernetes_version: str, scheme=demo.MINIHA_KEEPALIVED)
     inventory['services']['kubeadm'] = {
         'kubernetesVersion': kubernetes_version
     }
-    context = demo.create_silent_context(['fake_path.yaml'], procedure='migrate_kubemarine',
-                                         parser=migrate_kubemarine.new_parser())
+    context = demo.create_silent_context(['fake_path.yaml'], procedure='migrate_kubemarine')
     return inventory, context
 
 
@@ -140,12 +139,11 @@ class UpgradeCRI(unittest.TestCase):
             'containerd': {},
         }}})
         set_cri(self.inventory, cri)
-        self.migrate_kubemarine: dict = {
-            'upgrade': {'packages': {'associations': {
-                'docker': {},
-                'containerd': {}
-            }}}
-        }
+        self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
+        self.migrate_kubemarine['upgrade'] = {'packages': {'associations': {
+            'docker': {},
+            'containerd': {}
+        }}}
         self.changed_config = {
             'packages': {
                 'docker': {}, 'containerdio': {}, 'containerd': {}
@@ -302,9 +300,8 @@ class UpgradePlugins(unittest.TestCase):
         self.inventory, self.context = generate_environment(self.kubernetes_version)
         self.nodes_context = demo.generate_nodes_context(self.inventory)
         self.inventory['plugins'] = {}
-        self.migrate_kubemarine: dict = {
-            'upgrade': {'plugins': {}}
-        }
+        self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
+        self.migrate_kubemarine['upgrade'] = {'plugins': {}}
         self.changed_config = {'plugins': {}}
 
     def test_enrich_and_finalize_inventory(self):
@@ -417,9 +414,8 @@ class UpgradeThirdparties(unittest.TestCase):
         self.inventory, self.context = generate_environment(self.kubernetes_version)
         self.nodes_context = demo.generate_nodes_context(self.inventory)
         self.inventory['services'].update({'thirdparties': {}})
-        self.migrate_kubemarine: dict = {
-            'upgrade': {'thirdparties': {}}
-        }
+        self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
+        self.migrate_kubemarine['upgrade'] = {'thirdparties': {}}
         self.changed_config = {'thirdparties': {}}
 
     def test_enrich_and_finalize_inventory(self):
@@ -551,12 +547,11 @@ class UpgradeBalancers(unittest.TestCase):
             'haproxy': {},
             'keepalived': {},
         }}})
-        self.migrate_kubemarine: dict = {
-            'upgrade': {'packages': {'associations': {
-                'haproxy': {},
-                'keepalived': {}
-            }}}
-        }
+        self.migrate_kubemarine = demo.generate_procedure_inventory('migrate_kubemarine')
+        self.migrate_kubemarine['upgrade'] = {'packages': {'associations': {
+            'haproxy': {},
+            'keepalived': {}
+        }}}
         self.changed_config = {
             'packages': {
                 'haproxy': {},

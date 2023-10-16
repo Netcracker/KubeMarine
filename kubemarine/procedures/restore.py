@@ -291,7 +291,7 @@ class RestoreAction(Action):
         res.make_final_inventory()
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for restoring Kubernetes resources and nodes contents from backup file.
 
@@ -302,6 +302,11 @@ def main(cli_arguments: List[str] = None) -> None:
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='restore')
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     args = context['execution_arguments']
 
     replace_config_from_backup_if_needed(args['procedure_config'], args['config'])

@@ -30,8 +30,8 @@ class EnrichmentValidation(unittest.TestCase):
 
     def cert_renew(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.context = demo.create_silent_context(procedure='cert_renew')
-        self.cert_renew = {}
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='cert_renew')
+        self.cert_renew = demo.generate_procedure_inventory('cert_renew')
         self.cert_config = self.cert_renew.setdefault('nginx-ingress-controller', {})
 
     def _new_cluster(self):
@@ -263,7 +263,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -271,14 +271,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 'install': False
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_ingress_no_balancers_in_cluster(self):
@@ -287,59 +291,71 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=0)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = inventory['nodes'][0]
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_not_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we don't add balancers
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_remove_node_not_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we don't remove balancers
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         remove_node = next(filter(lambda node: 'balancer' not in node['roles'], inventory['nodes']))
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_not_first_balancer_added(self):
         # Don't need to redeploy nginx-ingress-controller for add_node procedure,
         # if we add not first balancer
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_remove_node_not_last_balancer_removed(self):
         # Don't need to redeploy nginx-ingress-controller for remove_node procedure,
         # if we remove the last balancer from cluster
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=2)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_node_fist_balancer_added(self):
@@ -347,11 +363,13 @@ class RedeployIfNeeded(unittest.TestCase):
         # if we add the first balancer
         # and changed parameters are not overriden by user
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['nodes'].remove(add_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_remove_node_last_balancer_removed(self):
@@ -359,10 +377,12 @@ class RedeployIfNeeded(unittest.TestCase):
         # if we remove the last balancer
         # and changed parameters are not overriden by user
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_overriden(self):
@@ -372,7 +392,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -382,14 +402,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_http_target_port_overriden(self):
@@ -399,7 +423,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -409,14 +433,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_https_target_port_overriden(self):
@@ -426,7 +454,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['services'] = {
@@ -436,14 +464,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_and_target_ports_overriden(self):
@@ -453,7 +485,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -471,14 +503,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_host_ports_overriden(self):
@@ -488,7 +524,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -504,14 +540,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }]
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertTrue(redeploy_ingress_nginx_is_needed(cluster))
 
     def test_add_remove_node_use_proxy_protocol_and_host_ports_overriden(self):
@@ -521,7 +561,7 @@ class RedeployIfNeeded(unittest.TestCase):
 
         # Remove mode
         inventory = demo.generate_inventory(master=2, worker=['master-1', 'master-2'], balancer=1)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         add_remove_node = next(filter(lambda node: 'balancer' in node['roles'], inventory['nodes']))
         inventory['plugins'] = {
@@ -540,14 +580,18 @@ class RedeployIfNeeded(unittest.TestCase):
                 }]
             }
         }
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
         # Add node
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
         inventory['nodes'].remove(add_remove_node)
-        cluster = demo.new_cluster(inventory, procedure_inventory={'nodes': [add_remove_node]}, context=context)
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [add_remove_node]
+        cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         self.assertFalse(redeploy_ingress_nginx_is_needed(cluster))
 
 

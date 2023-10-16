@@ -26,7 +26,7 @@ from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO, Tupl
 import fabric  # type: ignore[import]
 import invoke
 
-from kubemarine import system
+from kubemarine import system, procedures
 from kubemarine.core.cluster import KubernetesCluster, _AnyConnectionTypes
 from kubemarine.core import flow, connections, static
 from kubemarine.core.connections import ConnectionPool
@@ -39,6 +39,15 @@ from kubemarine.core.resources import DynamicResources
 
 _ShellResult = Dict[str, Any]
 _ROLE_SPEC = Union[int, List[str]]
+
+_PROCEDURES_WITH_INVENTORY = [
+    'add_node', 'backup', 'cert_renew', 'check_paas', 'manage_psp', 'manage_pss',
+    'migrate_cri', 'migrate_kubemarine', 'reboot', 'remove_node', 'restore', 'upgrade'
+]
+
+_PROCEDURES_WITH_OPTIONAL_INVENTORY = [
+    'backup', 'check_paas', 'migrate_kubemarine', 'reboot'
+]
 
 
 class FakeShell:
@@ -382,18 +391,16 @@ class FakeConnectionPool(connections.ConnectionPool):
         )
 
 
-def create_silent_context(args: list = None, parser: argparse.ArgumentParser = None,
-                          procedure: str = 'install') -> dict:
+def create_silent_context(args: list = None, procedure: str = 'install') -> dict:
     args = list(args) if args else []
     # todo probably increase logging level to get rid of spam in logs.
-    if '--disable-dump' not in args:
-        args.append('--disable-dump')
 
-    if parser is None:
-        parser = flow.new_common_parser("Help text")
-    context = flow.create_context(parser, args, procedure=procedure)
-    del context['execution_arguments']['ansible_inventory_location']
+    context: dict = procedures.import_procedure(procedure).create_context(args)
     context['preserve_inventory'] = False
+
+    parsed_args: dict = context['execution_arguments']
+    parsed_args['disable_dump'] = True
+    del parsed_args['ansible_inventory_location']
 
     return context
 
@@ -448,6 +455,7 @@ def generate_nodes_context(inventory: dict, os_name: str = 'centos', os_version:
 def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker: _ROLE_SPEC = 1,
                        keepalived: _ROLE_SPEC = 0, haproxy_mntc: _ROLE_SPEC = 0) -> dict:
     inventory: dict = {
+        "apiVersion": "v1",
         'node_defaults': {
             'keyfile': '/dev/null',
             'username': 'anonymous'
@@ -527,6 +535,21 @@ def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker:
     inventory['vrrp_ips'] = vrrp_ips
 
     return inventory
+
+
+def generate_procedure_inventory(procedure: str) -> dict:
+    procedure_inventory: dict = {
+        'apiVersion': 'v1'
+    }
+    # set some commonly required properties
+    if procedure == 'manage_psp':
+        procedure_inventory['psp'] = {}
+    if procedure == 'manage_pss':
+        procedure_inventory['pss'] = {'pod-security': 'enabled'}
+    if procedure == 'migrate_cri':
+        procedure_inventory['cri'] = {'containerRuntime': 'containerd'}
+
+    return procedure_inventory
 
 
 def create_nodegroup_result_by_hosts(cluster: KubernetesCluster, results: Dict[str, GenericResult]) -> NodeGroupResult:

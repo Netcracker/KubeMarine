@@ -106,7 +106,7 @@ class TestValidExamples(unittest.TestCase):
             else:
                 self.fail(f"Unknown procedure for inventory {relpath}")
 
-            context = demo.create_silent_context(procedure=procedure)
+            context = demo.create_silent_context(['fake.yaml'], procedure=procedure)
             if procedure == 'restore':
                 context['backup_descriptor'] = {}
             inventory = demo.generate_inventory(**demo.MINIHA)

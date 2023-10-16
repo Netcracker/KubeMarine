@@ -59,7 +59,7 @@ class RebootAction(Action):
         flow.run_tasks(res, tasks)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for Kubernetes nodes graceful rebooting.
 
@@ -70,7 +70,11 @@ def main(cli_arguments: List[str] = None) -> None:
     parser = flow.new_procedure_parser(cli_help, optional_config=True, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='reboot')
+    return context
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([RebootAction()]).run_flow(context)
 
 

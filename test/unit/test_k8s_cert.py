@@ -26,11 +26,10 @@ supported_k8s_certs = ["apiserver", "apiserver-etcd-client", "apiserver-kubelet-
 class K8sCertTest(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.context = demo.create_silent_context(procedure='cert_renew')
-        self.cert_renew: dict = {
-            'kubernetes': {
-                'cert-list': []
-            }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='cert_renew')
+        self.cert_renew = demo.generate_procedure_inventory('cert_renew')
+        self.cert_renew['kubernetes'] = {
+            'cert-list': []
         }
 
     def _new_cluster(self):
