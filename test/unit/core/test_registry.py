@@ -101,7 +101,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         self.assertIn('example.registry:443', containerd_reg_config)
         self.assertIn('host."https://example.registry:443"', containerd_reg_config['example.registry:443'])
         self.assertEqual(['pull', 'resolve'],
-                         containerd_reg_config['example.registry:443']['hosts."https://example.registry:443"']
+                         containerd_reg_config['example.registry:443']['host."https://example.registry:443"']
                          .get('capabilities'))
 
         for destination, config in inventory['services']['thirdparties'].items():

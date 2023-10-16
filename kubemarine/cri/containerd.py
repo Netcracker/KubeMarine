@@ -57,7 +57,7 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     return inventory
 
 
-def contains_old_format_properties(inventory: dict) -> (bool, str):
+def contains_old_format_properties(inventory: dict) -> Tuple[bool, Optional[str]]:
     config_toml = get_config_as_toml(inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
     if "mirrors" in config_toml.get("plugins", {}).get("io.containerd.grpc.v1.cri", {}).get("registry", {}):
         return True, 'mirrors for "io.containerd.grpc.v1.cri" plugin in services.cri.containerdConfig'
@@ -68,7 +68,7 @@ def contains_old_format_properties(inventory: dict) -> (bool, str):
     return False, None
 
 
-def contains_new_format_properties(inventory: dict) -> (bool, str):
+def contains_new_format_properties(inventory: dict) -> Tuple[bool, Optional[str]]:
     config_toml = get_config_as_toml(inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
     if "config_path" in config_toml.get("plugins", {}).get("io.containerd.grpc.v1.cri", {}).get("registry", {}):
         return True, 'config_path for "io.containerd.grpc.v1.cri" plugin in services.cri.containerdConfig'
@@ -156,7 +156,7 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     return inventory
 
 
-def fetch_containerd_config(group: NodeGroup) -> (Dict[str, dict], Dict[str, dict]):
+def fetch_containerd_config(group: NodeGroup) -> Tuple[Dict[str, dict], Dict[str, dict]]:
     cluster = group.cluster
     collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
@@ -275,9 +275,10 @@ def configure_crictl(group: NodeGroup) -> None:
     group.put(StringIO(crictl_config), '/etc/crictl.yaml', backup=True, sudo=True)
 
 
-def get_config_path(inventory: dict) -> str:
-    config_toml = get_config_as_toml(inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
-    return config_toml['plugins']['io.containerd.grpc.v1.cri']['registry'].get('config_path')
+def get_config_path(inventory: dict) -> Optional[str]:
+    config_path: Optional[str] = inventory.get('containerdConfig', {}) \
+        .get('plugins."io.containerd.grpc.v1.cri".registry', {}).get('config_path')
+    return config_path
 
 
 def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
