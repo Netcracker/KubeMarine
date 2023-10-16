@@ -313,6 +313,7 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
             if config_path:
                 log.debug("Uploading containerd registries configuration to %s on %s node..." %
                           (config_path, node.get_node_name()))
+                node.sudo(f'mkdir -p {config_path}')
                 for registry, host_config in registries_config.items():
                     node.put(StringIO(host_config), f'{config_path}/{registry}/hosts.toml',
                              backup=True, sudo=True, mkdir=True)
