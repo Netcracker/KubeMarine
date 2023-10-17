@@ -124,7 +124,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
             for typha_enabled, expected_num_resources in (
                     (False, 0),
-                    (True, 3)
+                    (True, 4)
             ):
                 with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
                     cluster = demo.new_cluster(self._enable_typha(k8s_version, typha_enabled))
@@ -134,7 +134,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                         if 'typha' in key:
                             typha_resources += 1
                     self.assertEqual(expected_num_resources, typha_resources,
-                                     f"calico for should have {expected_num_resources} typha resources")
+                                     f"calico should have {expected_num_resources} typha resources")
 
     def test_calico_node_env(self):
         for k8s_version in self.latest_k8s_supporting_specific_versions.values():
@@ -158,6 +158,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
             ('CALICO_DISABLE_FILE_LOGGING', 'true'),
             ('FELIX_LOGSEVERITYSCREEN', 'info'),
             ('FELIX_USAGEREPORTINGENABLED', 'false'),
+            ('FELIX_PROMETHEUSMETRICSPORT', '9091'),
             ('NODENAME', present),
             ('FELIX_IPINIPMTU', present),
         ]
@@ -230,7 +231,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 self.assertEqual(2, target_yaml['spec']['replicas'], "Unexpected number of typha replicas")
 
                 template_spec = target_yaml['spec']['template']['spec']
-                container = template_spec['containers'][0]
+                container = self._get_calico_typha_container(manifest)
                 expected_image = f"example.registry/calico/typha:{self.expected_image_tag(k8s_version, 'version')}"
                 self.assertEqual(expected_image, container['image'], "Unexpected calico-typha image")
                 self.assertEqual({"kubernetes.io/os": "something"}, template_spec['nodeSelector'],
@@ -241,6 +242,23 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                                   {"effect": "NoSchedule"}],
                                  template_spec['tolerations'],
                                  "Unexpected calico-typha tolerations")
+
+                self._test_calico_typha_env(manifest)
+
+    def _get_calico_typha_container(self, manifest: Manifest):
+        target_yaml = self.get_obj(manifest, "Deployment_calico-typha")
+        return target_yaml['spec']['template']['spec']['containers'][0]
+
+    def _test_calico_typha_env(self, manifest: Manifest):
+        calico_typha_env = self._get_calico_typha_container(manifest)['env']
+        expected_env = [
+            ('TYPHA_PROMETHEUSMETRICSENABLED', 'true'),
+            ('TYPHA_PROMETHEUSMETRICSPORT', '9093'),
+        ]
+        name_to_value = {e['name']: e.get('valueFrom', e.get('value')) for e in calico_typha_env}
+        for expected_name, expected_value in expected_env:
+            self.assertEqual(expected_value, name_to_value.get(expected_name),
+                             f"Unexpected value for {expected_name!r} env variable")
 
     def test_clusterrole_calico_kube_controllers(self):
         k8s_1_24_x = self.get_latest_k8s("v1.24")
@@ -284,6 +302,19 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                     inventory = self._enable_typha(k8s_version, typha_enabled)
                     num_images = self.check_all_images_contain_registry(inventory)
                     self.assertEqual(expected_num_images, num_images, f"Unexpected number of images found: {num_images}")
+
+    def test_metrics_services(self):
+        for k8s_version in self.latest_k8s_supporting_specific_versions.values():
+            for typha_enabled in (False, True):
+                with self.subTest(f"{k8s_version}, typha: {typha_enabled}"):
+                    cluster = demo.new_cluster(self._enable_typha(k8s_version, typha_enabled))
+                    manifest = self.enrich_yaml(cluster)
+                    self.assertTrue(manifest.has_obj("Service_calico-metrics"),
+                                    "calico should have calico-metrics Service")
+                    self.assertTrue(manifest.has_obj("Service_calico-kube-controllers-metrics"),
+                                    "calico should have calico-kube-controllers-metrics Service")
+                    self.assertEqual(typha_enabled, manifest.has_obj('Service_calico-typha-metrics'),
+                                     f"calico should{'not ' if not typha_enabled else ''} have calico-typha-metrics Service")
 
 
 class APIServerManifestEnrichment(_AbstractManifestEnrichmentTest):
