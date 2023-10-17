@@ -41,7 +41,7 @@ class TheAction(Action):
         cluster.make_group_from_roles(['control-plane', 'worker']).call(configure_containerd)
 
 
-class OverrideTargetPorts(RegularPatch):
+class ReconfigureRegistries(RegularPatch):
     def __init__(self) -> None:
         super().__init__("reconfigure_registries")
 

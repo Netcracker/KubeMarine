@@ -2366,6 +2366,9 @@ services:
         insecure_skip_verify: true
 ```
 
+**Note**: `registry.mirrors` and `registries.configs.tls` can't be used with `config_path` or `containerdRegistriesConfig`
+because it's restricted by containerd. In that case kubemarine fails with exception during enrichment.
+
 Although, `registry.mirrors` and `registries.configs` are deprecated, when the registry requires an authentication, 
 it should be specified using `registries.configs.auth`, as in following example:
 
