@@ -2508,15 +2508,24 @@ services:
 
 *Can restart service*: Always yes, container kube-apiserver.
 
-*OS specific*: No.
+*Overwrite files*: Yes, `/etc/kubernetes/audit-policy.yaml` backup is created.
 
-*Logging level*:
+*OS specific*: No
+
+For more information about Kubernetes auditing, refer to the official documentation at [https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/).
+
+**Logging level**:
 `None` - do not log;
 `Metadata` — log request metadata: user, request time, target resource (pod, namespace, etc.), action type (verb), etc.;
 `Request` — log metadata and request body;
 `RequestResponse` - log metadata, request body and response body.
 
-*omitStages*: To skip any stages.
+**omitStages**: The list of stages for which no events are created.
+
+By default, the following policy is installed:
+
+<details>
+  <summary>Default Policy</summary>
 
 ```yaml
 services:
@@ -2531,13 +2540,26 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
-        # Don't log checking API access by Calico API server
+        # Don't log checking access by internal services
         - level: None
-          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          userGroups:
+            - "system:serviceaccounts:calico-apiserver"
+            - "system:nodes"
           verbs: ["create"]
           resources:
             - group: "authorization.k8s.io"
               resources: ["subjectaccessreviews"]
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+        # Don't log update of ingress-controller-leader ConfigMap by ingress-nginx.
+        # This reproduces only for v1.2.0 and can be removed after its support stop.
+        - level: None
+          users: ["system:serviceaccount:ingress-nginx:ingress-nginx"]
+          verbs: ["update"]
+          resources:
+            - group: ""
+              resources: ["configmaps"]
+              resourceNames: ["ingress-controller-leader"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
@@ -2594,6 +2616,69 @@ services:
           - group: "authentication.k8s.io"
             resources: ["tokenreviews"]
           - group: "authorization.k8s.io"
+          - group: "projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamconfigurations
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+              - profiles
+          - group: "crd.projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamblocks
+              - ipamconfigs
+              - ipamhandles
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+```
+</details>
+
+It is possible not only to redefine the default policy, but also to extend it. For more information, refer to [List Merge Strategy](#list-merge-strategy).
+
+For example, consider you have an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) that constantly updates some Pods' labels and some ConfigMap to maintain the leadership.
+If you do not see any benefit from logging of such events, they can be disabled by specifying the following in `cluster.yaml`:
+
+```yaml
+services:
+  audit:
+    cluster_policy:
+      rules:
+      - level: None
+        userGroups: ["system:serviceaccounts:operator-namespace"]
+        verbs: ["patch", "update"]
+        namespaces: ["operator-namespace"]
+        resources:
+        - group: ""
+          resources: [pods]
+        - group: ""
+          resources: [configmaps]
+          resourceNames: [controller-leader]
+      - '<<': merge
 ```
 
 ##### Audit Daemon

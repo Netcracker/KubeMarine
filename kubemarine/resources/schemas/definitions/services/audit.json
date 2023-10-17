@@ -51,7 +51,8 @@
             "type": "object",
             "properties": {
               "group": {"type": "string"},
-              "resources": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"}
+              "resources": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"},
+              "resourceNames": {"$ref": "../common/utils.json#/definitions/ArrayOfStrings"}
             }
           }
         }
