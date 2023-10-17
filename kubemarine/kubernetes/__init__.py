@@ -97,6 +97,35 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
     return inventory
 
 
+def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if cluster.context.get("initial_procedure") != "restore":
+        return inventory
+
+    logger = cluster.log
+    kubernetes_descriptor = cluster.context['backup_descriptor'].setdefault('kubernetes', {})
+    initial_kubernetes_version = get_initial_kubernetes_version(inventory)
+    backup_kubernetes_version = kubernetes_descriptor.get('version')
+    if not backup_kubernetes_version:
+        logger.warning("Not possible to verify Kubernetes version, as descriptor does not contain 'kubernetes.version'")
+        backup_kubernetes_version = initial_kubernetes_version
+
+    if backup_kubernetes_version != initial_kubernetes_version:
+        logger.warning('Installed kubernetes version does not match version from backup')
+        verify_allowed_version(backup_kubernetes_version)
+
+    kubernetes_descriptor['version'] = backup_kubernetes_version
+    return restore_finalize_inventory(cluster, inventory)
+
+
+def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "restore":
+        return inventory
+
+    target_kubernetes_version = cluster.context['backup_descriptor']['kubernetes']['version']
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = target_kubernetes_version
+    return inventory
+
+
 def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     kubeadm = inventory['services']['kubeadm']
     kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")

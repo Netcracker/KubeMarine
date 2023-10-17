@@ -180,6 +180,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     inventory_finalize_functions = {
         add_node.add_node_finalize_inventory,
         remove_node.remove_node_finalize_inventory,
+        kubernetes.restore_finalize_inventory,
         kubernetes.upgrade_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         plugins.upgrade_finalize_inventory,
