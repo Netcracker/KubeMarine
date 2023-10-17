@@ -152,6 +152,12 @@ jobs:
             echo -e "\033[91mGit tag does not equal to kubemarine/version\033[0m"
             exit 1
           fi
+          sudo apt install jq
+          INVENTORY_VERSION=$(jq -r '.properties.apiVersion.enum[0]' kubemarine/resources/schemas/cluster.json)
+          if [[ $(echo "$VERSION" | sed 's/\./ /' | awk '{print $1}') != "$INVENTORY_VERSION" ]]; then
+            echo -e "\033[91mInventory version does not match Kubemarine major version\033[0m"
+            exit 1
+          fi
           BRANCH_OWNERS=$(git branch -r --contains HEAD | sed 's/^[[:space:]]*origin\/\(.*\)$/\1/' | grep "^\(main\|.*_branch\)$" || true)
           if [[ -z "$BRANCH_OWNERS" || $(echo "$BRANCH_OWNERS" | wc -l) != 1 ]]; then
             echo -e "\033[91mFailed to detect the only release branch containing the HEAD commit.\033[0m"
