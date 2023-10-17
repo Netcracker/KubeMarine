@@ -30,8 +30,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
 
-        self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='restore',
-                                                  parser=flow.new_procedure_parser("Help text"))
+        self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='restore')
 
         args = self.context['execution_arguments']
         args['disable_dump'] = False
@@ -42,7 +41,8 @@ class RestoreEnrichmentTest(unittest.TestCase):
         os.mkdir(self.restore_tmpdir)
 
         self.backup_location = os.path.join(self.tmpdir.name, 'backup.tar.gz')
-        self.restore = {'backup_location': self.backup_location}
+        self.restore = demo.generate_procedure_inventory('restore')
+        self.restore['backup_location'] = self.backup_location
 
     def tearDown(self):
         logger = logging.getLogger("k8s.fake.local")
@@ -85,3 +85,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
 
         self.assertEqual('v1.27.4', resources.stored_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
+
+
+if __name__ == '__main__':
+    unittest.main()
