@@ -867,7 +867,7 @@ def install_tcp_listener(cluster: KubernetesCluster,
 def check_tcp_ports(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '011', 'Network', 'TCPPorts', default_results='Connected'),\
             suspend_firewalld(cluster):
-        tcp_ports = ["80", "443", "179", "5473", "6443", "8443", "2379", "2380", "9091", "9094", "10250", "10254",
+        tcp_ports = ["80", "443", "179", "5473", "6443", "8443", "2379", "2380", "9091", "9093", "9094", "10250", "10254",
                      "10257", "10259", "30001", "30002"]
         nodes = {node["connect_to"]: node
                  for node in cluster.inventory['nodes']}
