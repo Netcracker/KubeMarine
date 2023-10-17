@@ -41,14 +41,17 @@ Before you start any maintenance procedure, you must complete the following mand
 
    **Note**: If you provide an incorrect config file, it can cause unknown consequences.
 
-1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform. Each procedure has its own configuration format. Read documentation below to fill procedure inventory data.
-
+1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform.
+   Each procedure has its own configuration format for the currently supported [apiVersion](/documentation/Installation.md#apiversion).
+   Read documentation below to fill procedure inventory data.
 
 # Provided Procedures
 
 The information about the procedures for nodes is described in the following sections.
 
 ## Kubemarine Migration Procedure
+
+*apiVersion: v1*
 
 The Kubemarine migration procedure allows you to automatically adopt your current Kubernetes cluster and **cluster.yaml** to a newer version of Kubemarine.
 This procedure should always be considered when taking new versions of Kubemarine if it is going to be used on the existing clusters that are managed by the previous versions of Kubemarine.
@@ -197,6 +200,8 @@ The configuration format for the plugins is the same.
 
 ## Upgrade Procedure
 
+*apiVersion: v1*
+
 **Warnings**: 
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
@@ -213,6 +218,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 The upgrade procedure allows you to automatically update Kubernetes cluster and its core components to a new version. To do this, you must specify the `upgrade_plan` in the procedure config, and fill in the new version of the Kubernetes cluster you want to upgrade to. For example:
 
 ```yaml
+apiVersion: v1
 upgrade_plan:
   - v1.18.8
   - v1.19.3
@@ -424,6 +430,8 @@ The `upgrade` procedure executes the following sequence of tasks:
 
 ## Backup Procedure
 
+*apiVersion: v1*
+
 **Note**: Before starting the backup, make sure all nodes are online and accessible.
 
 The backup procedure automatically saves the following entities:
@@ -626,6 +634,8 @@ The `backup` procedure executes the following sequence of tasks:
 
 ## Restore Procedure
 
+*apiVersion: v1*
+
 **Note**: Before starting the restore, make sure that all nodes are online and accessible.
 
 **Note**: the topology of the cluster being restored must be the same as the topology of the cluster from which the backup was created. Everything should be the same, down to the names and addresses of the nodes, their amounts and roles. If they differ, then it is recommended to perform manual recovery using the backed up Kubernetes resources from your backup archive.
@@ -656,7 +666,8 @@ You need to specify the required path to the file with the backup - the recovery
 
 Example:
 
-```
+```yaml
+apiVersion: v1
 backup_location: /home/centos/backup-{cluster_name}-20201214-162731.tar.gz
 ```
 
@@ -706,6 +717,8 @@ The `restore` procedure executes the following sequence of tasks:
 
 ## Add Node Procedure
 
+*apiVersion: v1*
+
 The `add_node` procedure allows you to add new nodes to an existing Kubernetes cluster. It is possible to add several nodes at a time.
 Each node can have different combination of roles.
 
@@ -742,6 +755,7 @@ The `nodes` configuration format for specifying new nodes is the same as that of
 The following example demonstrates the configuration of two nodes for adding:
 
 ```yaml
+apiVersion: v1
 nodes:
   - name: "lb"
     internal_address: "192.168.0.1"
@@ -801,6 +815,8 @@ The `add_node` procedure executes the following sequence of tasks:
 
 ## Remove Node Procedure
 
+*apiVersion: v1*
+
 The `remove_node` procedure removes nodes from the existing Kubernetes cluster. It is possible to remove several nodes with different combination of roles at a time. 
 
 The procedure works as follows:
@@ -838,6 +854,7 @@ To remove nodes, it is possible to use the configuration format similar to insta
 For example:
 
 ```yaml
+apiVersion: v1
 nodes:
   - name: "lb"
     internal_address: "192.168.0.1"
@@ -852,6 +869,7 @@ However, it is allowed to use a simple configuration, where only the node `name`
 For example:
 
 ```yaml
+apiVersion: v1
 nodes:
   - name: "lb"
   - name: "control-plane"
@@ -894,6 +912,8 @@ To change the operating system on an already running cluster:
 
 ## Manage PSP Procedure
 
+*apiVersion: v1*
+
 The manage PSP procedure allows you to change PSP configuration on an already installed cluster. Using this procedure, you can:
 * Add/delete custom policies
 * Enable/disable OOB policies
@@ -917,6 +937,7 @@ To manage PSPs on existing cluster, use the configuration similar to PSP install
 `custom-policies` is replaced by `add-policies` and `delete-policies` as follows:
 
 ```yaml
+apiVersion: v1
 psp:
   pod-security: enabled/disabled
   oob-policies:
@@ -937,6 +958,7 @@ For example, if admission controller is disabled on existing cluster and you wan
 `host-network` OOB policy, you should specify the following in the `procedure.yaml` file:
 
 ```yaml
+apiVersion: v1
 psp:
   pod-security: enabled
   oob-policies:
@@ -960,6 +982,8 @@ The `manage_psp` procedure executes the following sequence of tasks:
 
 ## Manage PSS Procedure
 
+*apiVersion: v1*
+
 The manage PSS procedure allows:
 * enable/disable PSS
 * change default settings
@@ -974,6 +998,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
 
 ```yaml
+apiVersion: v1
 pss:
   pod-security: enabled/disabled
   defaults:
@@ -1037,6 +1062,8 @@ The `manage_pss procedure executes the following sequence of tasks:
 
 ## Reboot Procedure
 
+*apiVersion: v1*
+
 This procedure allows you to safely reboot all nodes in one click. By default, all nodes in the cluster are rebooted. Gracefully reboot is performed only if installed Kubernetes cluster is detected on nodes. You can customize the process by specifying additional parameters.
 
 ### Reboot Procedure Parameters
@@ -1062,6 +1089,7 @@ graceful_reboot: False
 This parameter allows you to specify which nodes should be rebooted. Other nodes are not affected. In this parameter, you must specify a list of node names, as is follows:
 
 ```yaml
+apiVersion: v1
 nodes:
   - name: control-plane-1
   - name: control-plane-2
@@ -1070,6 +1098,8 @@ nodes:
 
 
 ## Certificate Renew Procedure
+
+*apiVersion: v1*
 
 The `cert_renew` procedure allows you to renew some certificates on an existing Kubernetes cluster. 
 
@@ -1101,6 +1131,7 @@ For more information, see [Validation by JSON Schemas](Installation.md#validatio
 To update the certificate and key for `nginx-ingress-controller`, use the following configuration:
 
 ```yaml
+apiVersion: v1
 nginx-ingress-controller:
   data:
     cert: |
@@ -1121,6 +1152,7 @@ For more information about these formats, refer to the [nginx-ingress-controller
 To update the certificate and key for `calico` API server, use the following configuration:
 
 ```yaml
+apiVersion: v1
 calico:
   apiserver:
     renew: true
@@ -1135,6 +1167,7 @@ you may want to repeat the corresponding steps using [Plugins Reinstallation](In
 
 To update internal Kubernetes certificates you can use the following configuration:
 ```yaml
+apiVersion: v1
 kubernetes:
   cert-list:
     - apiserver
@@ -1151,6 +1184,7 @@ kubernetes:
 Above list contains all possible certificates for update. You can pick all or some of them, as you need.
 Alternatively to specifying the full list, you can use shorter form:
 ```yaml
+apiVersion: v1
 kubernetes:
   cert-list:
     - all
@@ -1166,6 +1200,8 @@ The `cert_renew` procedure executes the following sequence of tasks:
 4. certs_overview
 
 ## Cri Migration Procedure
+
+*apiVersion: v1*
 
 The `migrate_cri` procedure allows you to migrate from Docker to Containerd.
 
@@ -1208,6 +1244,7 @@ In this parameter, you should specify `containerRuntime: containerd` and the con
 Example for CLI:
 
 ```yaml
+apiVersion: v1
 cri:
   containerRuntime: containerd
   containerdConfig:
@@ -1301,6 +1338,7 @@ rbac:
 
 The example of `procedure.yaml` is the following:
 ```yaml
+apiVersion: v1
 psp:
   pod-security: disabled
 ```
@@ -1320,6 +1358,7 @@ rbac:
 6. Create the `procedure.yaml` for `migrate_pss` and fill in `namespaces` subsection in `pss` section in procedure file. The example of `procedure.yaml` is the following:
 
 ```yaml
+apiVersion: v1
 pss:
   pod-security: enabled
   namespaces:

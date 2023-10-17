@@ -18,6 +18,7 @@ This section provides information about the inventory, features, and steps for i
       - [Full-HA Scheme](#full-ha-scheme)
   - [Taints and Toleration](#taints-and-toleration)
   - [Configuration](#configuration)
+    - [apiVersion](#apiversion)
     - [globals](#globals)
     - [node_defaults](#node_defaults)
     - [nodes](#nodes)
@@ -503,10 +504,23 @@ The known IDEs that support validation are:
 
 The inventory file consists of the following sections.
 
+### apiVersion
+
+API version defines the set of supported inventory sections, properties, and values.
+The `cluster.yaml` and each procedure inventory have independent versioning.
+To find currently supported `apiVersion` for the particular procedure inventory file,
+refer to the documentation about the corresponding procedure in [Provided Procedures](/documentation/Maintenance.md#provided-procedures).
+
+The following example shows the currently supported API version for the `cluster.yaml`:
+
+```yaml
+apiVersion: v1
+```
+
 ### globals
 In the `globals` section you can describe the global parameters that can be overridden. For example:
 
-```
+```yaml
 globals:
   expect:
     pods:
