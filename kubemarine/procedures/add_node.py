@@ -127,7 +127,7 @@ class AddNodeAction(Action):
         res.make_final_inventory()
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
 
     cli_help = '''
     Script for adding node to Kubernetes cluster.
@@ -138,7 +138,11 @@ def main(cli_arguments: List[str] = None) -> None:
 
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='add_node')
+    return context
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([AddNodeAction()]).run_flow(context)
 
 

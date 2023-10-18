@@ -21,10 +21,9 @@ from kubemarine.core import errors
 class EnrichmentValidation(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.MINIHA)
-        self.context = demo.create_silent_context(procedure='check_paas')
-        self.check_paas = {
-            'geo-monitor': {}
-        }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='check_paas')
+        self.check_paas = demo.generate_procedure_inventory('check_paas')
+        self.check_paas['geo-monitor'] = {}
 
     def _new_cluster(self):
         return demo.new_cluster(self.inventory, procedure_inventory=self.check_paas, context=self.context)

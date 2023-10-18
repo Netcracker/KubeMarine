@@ -80,7 +80,7 @@ class CertRenewAction(Action):
         res.make_final_inventory()
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
 
     cli_help = '''
     Script for certificates renewal on existing Kubernetes cluster.
@@ -91,7 +91,11 @@ def main(cli_arguments: List[str] = None) -> None:
 
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='cert_renew')
+    return context
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow.ActionsFlow([CertRenewAction()]).run_flow(context)
 
 

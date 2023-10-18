@@ -25,15 +25,16 @@ def generate_migrate_cri_environment() -> (dict, dict):
     inventory['services']['cri'] = {
         'containerRuntime': 'docker'
     }
-    context = demo.create_silent_context(procedure='migrate_cri')
+    context = demo.create_silent_context(['fake.yaml'], procedure='migrate_cri')
     return inventory, context
 
 
 class EnrichmentValidation(unittest.TestCase):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.context = demo.create_silent_context(procedure='migrate_cri')
-        self.migrate_cri = {}
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='migrate_cri')
+        self.migrate_cri = demo.generate_procedure_inventory('migrate_cri')
+        del self.migrate_cri['cri']
 
     def _new_cluster(self):
         return demo.new_cluster(self.inventory, procedure_inventory=self.migrate_cri, context=self.context)
@@ -55,18 +56,15 @@ class EnrichmentValidation(unittest.TestCase):
 
 class MigrateCriPackagesEnrichment(unittest.TestCase):
     def prepare_procedure_inventory(self):
-        return {
-            'cri': {
-                'containerRuntime': 'containerd'
-            },
-            'packages': {
-                'associations': {
-                    'containerd': {
-                        'package_name': 'containerd'
-                    }
+        migrate_cri = demo.generate_procedure_inventory('migrate_cri')
+        migrate_cri['packages'] = {
+            'associations': {
+                'containerd': {
+                    'package_name': 'containerd'
                 }
             }
         }
+        return migrate_cri
 
     def test_enrich_packages_propagate_associations(self):
         inventory, context = generate_migrate_cri_environment()

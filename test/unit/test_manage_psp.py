@@ -28,12 +28,9 @@ class EnrichmentValidation(unittest.TestCase):
                 'pod-security': 'enabled'
             }
         }
-        self.context = demo.create_silent_context(procedure='manage_psp')
-        self.manage_psp: dict = {
-            'psp': {
-                'pod-security': 'enabled'
-            }
-        }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='manage_psp')
+        self.manage_psp = demo.generate_procedure_inventory('manage_psp')
+        self.manage_psp['psp']['pod-security'] = 'enabled'
 
     def _create_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.manage_psp),

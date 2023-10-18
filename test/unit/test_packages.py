@@ -202,10 +202,11 @@ class AssociationsEnrichment(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'docker-ce'
         package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
-        add_node = {'nodes': [inventory['nodes'].pop(0)]}
+        add_node = demo.generate_procedure_inventory('add_node')
+        add_node['nodes'] = [inventory['nodes'].pop(0)]
         with self.assertRaisesRegex(Exception, packages.ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS):
             demo.new_cluster(inventory, procedure_inventory=add_node, context=context)
 
@@ -213,10 +214,11 @@ class AssociationsEnrichment(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'docker-ce'
         package_associations(inventory, 'rhel', 'docker')['package_name'] = expected_pkgs
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
-        add_node = {'nodes': [inventory['nodes'].pop(0)]}
+        add_node = demo.generate_procedure_inventory('add_node')
+        add_node['nodes'] = [inventory['nodes'].pop(0)]
         # no error
         demo.new_cluster(inventory, procedure_inventory=add_node, context=context)
 
@@ -313,12 +315,13 @@ class PackagesUtilities(unittest.TestCase):
 class CacheVersions(unittest.TestCase):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
-        self.context = demo.create_silent_context(procedure='add_node')
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         self.context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.hosts = [node['address'] for node in self.inventory['nodes']]
         first_master_idx = next(i for i, node in enumerate(self.inventory['nodes']) if 'master' in node['roles'])
         self.new_host = self.inventory['nodes'][first_master_idx]['address']
-        self.procedure_inventory = {'nodes': [self.inventory['nodes'].pop(first_master_idx)]}
+        self.procedure_inventory = demo.generate_procedure_inventory('add_node')
+        self.procedure_inventory['nodes'] = [self.inventory['nodes'].pop(first_master_idx)]
         self.initial_hosts = [node['address'] for node in self.inventory['nodes']]
 
     def _new_cluster(self):

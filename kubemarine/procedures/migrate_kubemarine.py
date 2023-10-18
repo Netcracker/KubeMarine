@@ -499,9 +499,14 @@ def run(context: dict) -> None:
     flow.ActionsFlow(actions).run_flow(context)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     parser = new_parser()
     context = flow.create_context(parser, cli_arguments, procedure="migrate_kubemarine")
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     run(context)
 
 

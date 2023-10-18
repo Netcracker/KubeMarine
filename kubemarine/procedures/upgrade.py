@@ -160,7 +160,7 @@ class UpgradeAction(Action):
         context['dump_filename_prefix'] = self.upgrade_version
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for automated upgrade of the entire Kubernetes cluster to a new version.
 
@@ -171,6 +171,11 @@ def main(cli_arguments: List[str] = None) -> None:
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow_ = UpgradeFlow()
     result = flow_.run_flow(context)
 
