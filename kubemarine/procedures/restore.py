@@ -45,8 +45,9 @@ def missing_or_empty(file: str) -> bool:
 def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str) -> None:
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
-        with utils.open_external(procedure_inventory_filepath, 'r') as stream:
-            procedure = yaml.safe_load(stream)
+        procedure = utils.load_yaml(procedure_inventory_filepath)
+        if not procedure:
+            procedure = {}
         backup_location = procedure.get("backup_location")
         if not backup_location:
             raise Exception('Backup location is not specified in procedure')

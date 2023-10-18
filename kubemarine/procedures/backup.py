@@ -733,7 +733,7 @@ def create_context(cli_arguments: List[str] = None) -> dict:
 
     '''
 
-    parser = flow.new_procedure_parser(cli_help, tasks=tasks)
+    parser = flow.new_procedure_parser(cli_help, tasks=tasks, optional_config=True)
 
     context = flow.create_context(parser, cli_arguments, procedure='backup')
     context['execution_arguments']['disable_dump'] = False

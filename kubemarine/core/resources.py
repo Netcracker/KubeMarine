@@ -77,10 +77,13 @@ class DynamicResources:
         return cast(dict, self._formatted_inventory)
 
     def procedure_inventory(self) -> dict:
+        """
+        :return: parsed procedure inventory that is **not yet** validated by JSON schema
+        """
         if self._procedure_inventory is None:
             if self.procedure_inventory_filepath:
                 self._procedure_inventory = utils.load_yaml(self.procedure_inventory_filepath)
-            else:
+            if not self._procedure_inventory:
                 self._procedure_inventory = {}
 
         return self._procedure_inventory

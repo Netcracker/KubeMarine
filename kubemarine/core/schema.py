@@ -26,9 +26,11 @@ from kubemarine.core.cluster import KubernetesCluster
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     _verify_inventory_by_schema(cluster, inventory, 'cluster')
-    procedure = cluster.context.get("initial_procedure")
-    if procedure:
-        _verify_inventory_by_schema(cluster, cluster.procedure_inventory, procedure)
+    context = cluster.context
+    args: dict = context['execution_arguments']
+    # Skip validation if procedure inventory is optional and not provided
+    if args.get('procedure_config'):
+        _verify_inventory_by_schema(cluster, cluster.procedure_inventory, context["initial_procedure"])
     return inventory
 
 
@@ -39,9 +41,7 @@ def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, sch
     root_schema_path = utils.get_internal_resource_path(root_schema_resource)
     root_schema = pathlib.Path(root_schema_path)
     if not root_schema.exists():
-        if schema_name == 'cluster' or inventory:
-            raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
-        return
+        raise Exception(f"Failed to find schema to validate the inventory file{for_procedure}.")
 
     with utils.open_internal(root_schema_resource) as f:
         schema = json.load(f)
