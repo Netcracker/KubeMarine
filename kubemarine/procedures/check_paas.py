@@ -873,16 +873,13 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
                 cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
                 success = False
 
-            actual_registries_conf = actual_registries.get(node.get_host(), {})
-            for registry, expected_registry in expected_registries.items():
-                diff = DeepDiff(expected_registry, actual_registries_conf.get(registry))
-                if diff:
-                    cluster.log.debug(f"Configuration of containerd registries is not actual on {node.get_node_name()} "
-                                      f"node for {registry} registry")
-                    # Extra transformation to JSON is necessary,
-                    # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
-                    cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
-                    success = False
+            diff = DeepDiff(expected_registries, actual_registries.get(node.get_host(), {}))
+            if diff:
+                cluster.log.debug(f"Configuration of containerd registries is not actual on {node.get_node_name()} node")
+                # Extra transformation to JSON is necessary,
+                # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
+                cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                success = False
 
         if not success:
             message = dedent(

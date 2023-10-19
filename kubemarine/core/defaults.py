@@ -180,13 +180,12 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
                 }
         else:
             # Add registry info in new format
-            containerd_reg_config = inventory['services']['cri'].setdefault('containerdRegistriesConfig', {})
-            if not containerd_reg_config.get(registry_mirror_address):
-                containerd_reg_config[registry_mirror_address] = {}
-                for endpoint in containerd_endpoints:
-                    containerd_reg_config[registry_mirror_address][f'host."{endpoint}"'] = {
-                        'capabilities': ['pull', 'resolve']
-                    }
+            old_registry_config = inventory['services']['cri'].get('containerdRegistriesConfig', {})
+            inventory['services']['cri']['containerdRegistriesConfig'] = {registry_mirror_address: {
+                                     f'host."{endpoint}"': {'capabilities': ['pull', 'resolve']}
+                                     for endpoint in containerd_endpoints
+                                 }}
+            default_merger.merge(inventory['services']['cri']['containerdRegistriesConfig'], old_registry_config)
 
     from kubemarine import thirdparties
 

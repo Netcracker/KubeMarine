@@ -16,7 +16,7 @@ from textwrap import dedent
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
-from kubemarine.cri.containerd import contains_old_format_properties, configure_containerd
+from kubemarine.cri.containerd import contains_old_format_properties, configure_containerd, configure_ctr_flags
 
 
 class TheAction(Action):
@@ -38,7 +38,9 @@ class TheAction(Action):
         if result:
             logger.info("Found old format configuration, updating containerd configuration is not needed")
             return
-        cluster.make_group_from_roles(['control-plane', 'worker']).call(configure_containerd)
+        node_group = cluster.make_group_from_roles(['control-plane', 'worker'])
+        node_group.call(configure_ctr_flags)
+        node_group.call(configure_containerd)
 
 
 class ReconfigureRegistries(RegularPatch):

@@ -51,7 +51,7 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
                                    f"{old_format_field} can't be set when {new_format_field} is provided")
 
     # If no fields for old format, enrich config_path default value to new format
-    if not old_format_result:
+    if not old_format_result and 'containerdRegistriesConfig' in inventory['services']['cri']:
         containerd_config.setdefault('plugins."io.containerd.grpc.v1.cri".registry', {})\
             .setdefault('config_path', '/etc/containerd/certs.d')
     return inventory
@@ -289,19 +289,16 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
     config_toml = get_config_as_toml(cluster.inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
     config_string = toml.dumps(config_toml)
     utils.dump_file(cluster, config_string, 'containerd-config.toml')
-    config_path = config_toml['plugins']['io.containerd.grpc.v1.cri']['registry'].get('config_path')
+    config_path = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {})\
+        .get('registry', {}).get('config_path')
 
     # Dump registries configuration
     registries_config = {}
     for registry, host_config in cluster.inventory.get("services", {}).get("cri", {})\
             .get('containerdRegistriesConfig', {}).items():
-        # sanitize_filepath is needed for windows/macOS, where some symbols are restricted in file_path,
-        # but they can be used in mirror name (e.g. ':')
-        registries_dir = sanitize_filepath(f'registries/{registry}', replacement_text='_')
-        os.makedirs(utils.get_dump_filepath(cluster.context, registries_dir))
         registry_host_toml = get_config_as_toml(host_config)
         registries_config[registry] = toml.dumps(registry_host_toml)
-        utils.dump_file(cluster, registries_config[registry], sanitize_filepath(f"{registries_dir}/hosts.toml"))
+        utils.dump_file(cluster, registries_config[registry], f"registries/{registry}/hosts.toml", create_subdir=True)
 
     collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
@@ -314,7 +311,7 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
             if config_path:
                 log.debug("Uploading containerd registries configuration to %s on %s node..." %
                           (config_path, node.get_node_name()))
-                node.sudo(f'mkdir -p {config_path}')
+                node.sudo(f'mkdir -p {config_path} && sudo rm -fr {config_path}/*')
                 for registry, host_config in registries_config.items():
                     node.put(StringIO(host_config), f'{config_path}/{registry}/hosts.toml',
                              backup=True, sudo=True, mkdir=True)
