@@ -188,6 +188,7 @@ The actual information about the supported versions can be found in `compatibili
     * 8443 : Kubernetes dashboard
     * 2379-2380 : ETCD server & client API
     * 9091 - Calico metric port
+    * 9093 - Calico Typha metric port
     * 9094 - Calico kube-controller metric port
     * 10250 : Kubelet API
     * 10257 : Kube-scheduler
@@ -2557,15 +2558,24 @@ services:
 
 *Can restart service*: Always yes, container kube-apiserver.
 
-*OS specific*: No.
+*Overwrite files*: Yes, `/etc/kubernetes/audit-policy.yaml` backup is created.
 
-*Logging level*:
+*OS specific*: No
+
+For more information about Kubernetes auditing, refer to the official documentation at [https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/).
+
+**Logging level**:
 `None` - do not log;
 `Metadata` — log request metadata: user, request time, target resource (pod, namespace, etc.), action type (verb), etc.;
 `Request` — log metadata and request body;
 `RequestResponse` - log metadata, request body and response body.
 
-*omitStages*: To skip any stages.
+**omitStages**: The list of stages for which no events are created.
+
+By default, the following policy is installed:
+
+<details>
+  <summary>Default Policy</summary>
 
 ```yaml
 services:
@@ -2580,13 +2590,26 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
-        # Don't log checking API access by Calico API server
+        # Don't log checking access by internal services
         - level: None
-          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          userGroups:
+            - "system:serviceaccounts:calico-apiserver"
+            - "system:nodes"
           verbs: ["create"]
           resources:
             - group: "authorization.k8s.io"
               resources: ["subjectaccessreviews"]
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+        # Don't log update of ingress-controller-leader ConfigMap by ingress-nginx.
+        # This reproduces only for v1.2.0 and can be removed after its support stop.
+        - level: None
+          users: ["system:serviceaccount:ingress-nginx:ingress-nginx"]
+          verbs: ["update"]
+          resources:
+            - group: ""
+              resources: ["configmaps"]
+              resourceNames: ["ingress-controller-leader"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
@@ -2643,6 +2666,69 @@ services:
           - group: "authentication.k8s.io"
             resources: ["tokenreviews"]
           - group: "authorization.k8s.io"
+          - group: "projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamconfigurations
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+              - profiles
+          - group: "crd.projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamblocks
+              - ipamconfigs
+              - ipamhandles
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+```
+</details>
+
+It is possible not only to redefine the default policy, but also to extend it. For more information, refer to [List Merge Strategy](#list-merge-strategy).
+
+For example, consider you have an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) that constantly updates some Pods' labels and some ConfigMap to maintain the leadership.
+If you do not see any benefit from logging of such events, they can be disabled by specifying the following in `cluster.yaml`:
+
+```yaml
+services:
+  audit:
+    cluster_policy:
+      rules:
+      - level: None
+        userGroups: ["system:serviceaccounts:operator-namespace"]
+        verbs: ["patch", "update"]
+        namespaces: ["operator-namespace"]
+        resources:
+        - group: ""
+          resources: [pods]
+        - group: ""
+          resources: [configmaps]
+          resourceNames: [controller-leader]
+      - '<<': merge
 ```
 
 ##### Audit Daemon
@@ -3754,7 +3840,7 @@ plugins:
     node:
       image: calico/node:v3.10.1
     env:
-      FELIX_USAGEREPORTINGENABLED: true
+      FELIX_USAGEREPORTINGENABLED: 'true'
 
 ```
 
@@ -3848,32 +3934,82 @@ The plugin configuration supports the following parameters:
 
 ###### Calico metrics configuration
 
-By default, no additional settings are required for metrics calico. It is enabled by default
+By default, no additional settings are required for Calico metrics. They are enabled by default.
 
-**Note**: By default, ports are used for `calico-node` : `9091` and `calico-kube-controllers` : `9094`
+**Note**: The following ports are opened for metrics: `calico-node` : `9091`, `calico-kube-controllers` : `9094`, and `calico-typha`: `9093`.
+The ports for `calico-node` and `calico-typha` are opened on the host.
+These ports are currently not configurable by means of Kubemarine.
 
-**Note**: If you want to verify how Prometheus or VictoriaMetrics will collect metrics from Calico you can use the following ServiceMonitor. For example:
+**Note**: If you use [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) or its resources in your monitoring solution,
+you can use the following ServiceMonitors to collect metrics from Calico:
+
+<details>
+  <summary>Click to expand</summary>
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
+    # If you use prometheus-operator,
+    # specify the custom label corresponding to the configuration of your Prometheus.serviceMonitorSelector.
+    # The same is for the other ServiceMonitors below.
     app.kubernetes.io/component: monitoring
-  name: monitoring-calico-metrics
+  name: calico-metrics
+  namespace: kube-system
+spec:
+  endpoints:
+    # You can configure custom scraping properties, but leave `port: metrics`.
+    # The same is for the other ServiceMonitors below.
+    - interval: 30s
+      port: metrics
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: monitoring
+  name: calico-kube-controllers-metrics
   namespace: kube-system
 spec:
   endpoints:
     - interval: 30s
       port: metrics
       scrapeTimeout: 10s
-  jobLabel: node-exporter
   namespaceSelector:
     matchNames:
       - kube-system
   selector:
     matchLabels:
-      k8s-app: calico
+      k8s-app: calico-kube-controllers
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: monitoring
+  name: calico-typha-metrics
+  namespace: kube-system
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-metrics
 ```
+</details>
 
 ###### Calico Environment Properties
 
@@ -3883,7 +4019,7 @@ It is possible to change the default Calico environment properties. To do that, 
 plugins:
   calico:
     env:
-      WAIT_FOR_DATASTORE: false
+      WAIT_FOR_DATASTORE: 'false'
       FELIX_DEFAULTENDPOINTTOHOSTACTION: DENY
 ```
 

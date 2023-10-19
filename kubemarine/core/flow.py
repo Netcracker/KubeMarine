@@ -172,10 +172,11 @@ def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: d
         else [] if not args.get('tasks') else args['tasks'].split(",")
     excluded_tasks = [] if not args.get('exclude') else args['exclude'].split(",")
 
-    print("Excluded tasks:")
-    filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks)
+    logger = resources.logger()
+    logger.debug("Excluded tasks:")
+    filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks, logger)
     if filtered_tasks == tasks:
-        print("\tNo excluded tasks")
+        logger.debug("\tNo excluded tasks")
 
     cluster = resources.cluster()
 
@@ -220,8 +221,6 @@ def create_context(parser: argparse.ArgumentParser, cli_arguments: Optional[list
 
     if args.get('exclude_cumulative_points_methods', '').strip() != '':
         args['exclude_cumulative_points_methods'] = args['exclude_cumulative_points_methods'].strip().split(",")
-        # print('The following cumulative points methods are marked for exclusion: [ %s ]' %
-        #               ', '.join(args['exclude_cumulative_points_methods']))
     else:
         args['exclude_cumulative_points_methods'] = []
 
@@ -231,16 +230,18 @@ def create_context(parser: argparse.ArgumentParser, cli_arguments: Optional[list
     return context
 
 
-def filter_flow(tasks: dict, tasks_filter: List[str], excluded_tasks: List[str]) -> Tuple[dict, List[str]]:
+def filter_flow(tasks: dict, tasks_filter: List[str], excluded_tasks: List[str],
+                logger: log.EnhancedLogger = None) -> Tuple[dict, List[str]]:
     # Remove any whitespaces from filters, and split by '.'
     tasks_path_filter = [tasks.split(".") for tasks in list(map(str.strip, tasks_filter))]
     excluded_path_tasks = [tasks.split(".") for tasks in list(map(str.strip, excluded_tasks))]
 
-    return _filter_flow_internal(tasks, tasks_path_filter, excluded_path_tasks, [])
+    return _filter_flow_internal(tasks, tasks_path_filter, excluded_path_tasks, [], logger)
 
 
 def _filter_flow_internal(tasks: dict, tasks_filter: List[List[str]], excluded_tasks: List[List[str]],
-                          _task_path: List[str]) -> Tuple[dict, List[str]]:
+                          _task_path: List[str],
+                          logger: log.EnhancedLogger = None) -> Tuple[dict, List[str]]:
     filtered = {}
     final_list = []
 
@@ -271,8 +272,8 @@ def _filter_flow_internal(tasks: dict, tasks_filter: List[List[str]], excluded_t
                 if filtered_flow:
                     filtered[task_name] = filtered_flow
                     final_list += _final_list
-        else:
-            print("\t%s" % __task_name)
+        elif logger:
+            logger.debug("\t%s" % __task_name)
 
     return filtered, final_list
 

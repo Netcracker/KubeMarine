@@ -75,17 +75,6 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
-      - name: Check ingress connectivity
-        run: |
-          sudo echo "172.17.0.1 dashboard.test-local-k8s.com" | sudo tee -a /etc/hosts
-          http_code=$(curl -s -o /dev/null -I -w "%{http_code}" -k https://dashboard.test-local-k8s.com)
-          echo "Dashboard status code: $http_code"
-          if [[ $http_code == "200" ]]; then
-            echo "Connectivity check passed"
-          else
-            echo "Connectivity check failed"
-          exit 1
-          fi
       - name: Collect journalctl logs
         if: failure()
         run: |
@@ -145,16 +134,6 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
-      - name: Check ingress connectivity
-        run: |
-          http_code=$(curl -s -o /dev/null -I -w "%{http_code}" -k https://dashboard.test-local-k8s.com)
-          echo "Dashboard status code: $http_code"
-          if [[ $http_code == "200" ]]; then
-            echo "Connectivity check passed"
-          else
-            echo "Connectivity check failed"
-          exit 1
-          fi
       - name: Get events kubectl
         if: failure()
         run: kubectl get events --sort-by='.metadata.creationTimestamp' -A

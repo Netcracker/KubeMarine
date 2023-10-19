@@ -1018,7 +1018,8 @@ from particular namespaces will be applied.
 * Be careful with the `exemptions` section it may cause cluster instability.
 * Do not delete `kube-system` namespace from `exemptions` list without strong necessity.
 * The PSS labels in namespaces for Kubemarine supported plugins ('nginx-ingress-controller', 'local-path-provisioner', 
-'kubernetes-dashboard', and 'calico' (calico-apiserver)) are deleted during the procedure in case of using `pod-security: disabled`.
+'kubernetes-dashboard', and 'calico' (calico-apiserver)) are managed automatically.
+They are deleted during the procedure in case of using `pod-security: disabled`, and changed accordingly in case `pss.defaults.enforce` is changed.
 * Be careful with the `restart-pods: true` options it drains nodes one by one and may cause cluster instability. The best way to 
 restart pods in cluster is a manual restart according to particular application. The restart procedure should consider if the 
 application is stateless or stateful. Also shouldn't use `restart-pod: true` option if [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) is configured.

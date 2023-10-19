@@ -37,6 +37,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.controlplane.controlplane_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
     "kubemarine.kubernetes.enrich_upgrade_inventory",
+    "kubemarine.kubernetes.enrich_restore_inventory",
     "kubemarine.core.defaults.compile_inventory",
     "kubemarine.core.defaults.manage_true_false_values",
     "kubemarine.plugins.enrich_upgrade_inventory",

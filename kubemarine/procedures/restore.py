@@ -24,7 +24,7 @@ from typing import List
 
 import yaml
 
-from kubemarine.core import utils, flow, defaults
+from kubemarine.core import utils, flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -58,9 +58,11 @@ def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, conf
             tar.close()
 
 
-def unpack_data(cluster: KubernetesCluster) -> None:
-    backup_tmp_directory = backup.prepare_backup_tmpdir(cluster)
-    backup_file_source = cluster.procedure_inventory.get('backup_location')
+def unpack_data(resources: DynamicResources) -> None:
+    logger = resources.logger()
+    context = resources.context
+    backup_tmp_directory = backup.prepare_backup_tmpdir(logger, context)
+    backup_file_source = resources.procedure_inventory().get('backup_location')
 
     if not backup_file_source:
         raise Exception('Backup source not specified in procedure')
@@ -69,13 +71,13 @@ def unpack_data(cluster: KubernetesCluster) -> None:
     if not os.path.isfile(backup_file_source):
         raise FileNotFoundError('Backup file "%s" not found' % backup_file_source)
 
-    cluster.log.debug('Unpacking all data...')
+    logger.debug('Unpacking all data...')
     with tarfile.open(backup_file_source, 'r:gz') as tar:
         for member in tar:
             if member.isdir():
                 continue
             fname = os.path.join(backup_tmp_directory, member.name)
-            cluster.log.debug(fname)
+            logger.debug(fname)
             fname_parts = fname.split('/')
             if len(fname_parts) > 1:
                 fname_dir = "/".join(fname_parts[:-1])
@@ -89,25 +91,7 @@ def unpack_data(cluster: KubernetesCluster) -> None:
         raise FileNotFoundError('Descriptor not found in backup file')
 
     with utils.open_external(descriptor_filepath, 'r') as stream:
-        cluster.context['backup_descriptor'] = yaml.safe_load(stream)
-
-
-def verify_backup_data(cluster: KubernetesCluster) -> None:
-    if not cluster.context['backup_descriptor'].get('kubernetes', {}).get('version'):
-        cluster.log.debug('Not possible to verify Kubernetes version, because descriptor do not contain such information')
-        return
-
-    if cluster.context['backup_descriptor']['kubernetes']['version'] != cluster.inventory['services']['kubeadm']['kubernetesVersion']:
-        cluster.log.warning('Installed kubernetes versions do not match version from backup')
-        cluster.log.verbose('Cluster re-parse required')
-        if not cluster.raw_inventory.get('services'):
-            cluster.raw_inventory['services'] = {}
-        if not cluster.raw_inventory['services'].get('kubeadm'):
-            cluster.raw_inventory['services']['kubeadm'] = {}
-        cluster.raw_inventory['services']['kubeadm']['kubernetesVersion'] = cluster.context['backup_descriptor']['kubernetes']['version']
-        cluster._inventory = defaults.enrich_inventory(cluster, cluster.raw_inventory)
-    else:
-        cluster.log.debug('Kubernetes version from backup is correct')
+        context['backup_descriptor'] = yaml.safe_load(stream)
 
 
 def stop_cluster(cluster: KubernetesCluster) -> None:
@@ -277,8 +261,6 @@ def reboot(cluster: KubernetesCluster) -> None:
 
 tasks = OrderedDict({
     "prepare": {
-        "unpack": unpack_data,
-        "verify_backup_data": verify_backup_data,
         "stop_cluster": stop_cluster,
     },
     "restore": {
@@ -292,12 +274,19 @@ tasks = OrderedDict({
 })
 
 
+class RestoreFlow(flow.Flow):
+    def _run(self, resources: DynamicResources) -> None:
+        unpack_data(resources)
+        flow.run_actions(resources, [RestoreAction()])
+
+
 class RestoreAction(Action):
     def __init__(self) -> None:
-        super().__init__('restore')
+        super().__init__('restore', recreate_inventory=True)
 
     def run(self, res: DynamicResources) -> None:
         flow.run_tasks(res, tasks)
+        res.make_final_inventory()
 
 
 def main(cli_arguments: List[str] = None) -> None:
@@ -315,7 +304,7 @@ def main(cli_arguments: List[str] = None) -> None:
 
     replace_config_from_backup_if_needed(args['procedure_config'], args['config'])
 
-    flow.ActionsFlow([RestoreAction()]).run_flow(context)
+    RestoreFlow().run_flow(context)
 
 
 if __name__ == '__main__':

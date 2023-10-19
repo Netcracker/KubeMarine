@@ -198,13 +198,26 @@ services:
         # Don't log read-only requests
         - level: None
           verbs: ["watch", "get", "list"]
-        # Don't log checking API access by Calico API server
+        # Don't log checking access by internal services
         - level: None
-          users: ["system:serviceaccount:calico-apiserver:calico-apiserver"]
+          userGroups:
+            - "system:serviceaccounts:calico-apiserver"
+            - "system:nodes"
           verbs: ["create"]
           resources:
             - group: "authorization.k8s.io"
               resources: ["subjectaccessreviews"]
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+        # Don't log update of ingress-controller-leader ConfigMap by ingress-nginx.
+        # This reproduces only for v1.2.0 and can be removed after its support stop.
+        - level: None
+          users: ["system:serviceaccount:ingress-nginx:ingress-nginx"]
+          verbs: ["update"]
+          resources:
+            - group: ""
+              resources: ["configmaps"]
+              resourceNames: ["ingress-controller-leader"]
         # Log all other resources in core and extensions at the request level.
         - level: Metadata
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
@@ -261,6 +274,45 @@ services:
           - group: "authentication.k8s.io"
             resources: ["tokenreviews"]
           - group: "authorization.k8s.io"
+          - group: "projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamconfigurations
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
+              - profiles
+          - group: "crd.projectcalico.org"
+            resources:
+              - bgpconfigurations
+              - bgpfilters
+              - bgppeers
+              - blockaffinities
+              - caliconodestatuses
+              - clusterinformations
+              - felixconfigurations
+              - globalnetworkpolicies
+              - globalnetworksets
+              - hostendpoints
+              - ipamblocks
+              - ipamconfigs
+              - ipamhandles
+              - ippools
+              - ipreservations
+              - kubecontrollersconfigurations
+              - networkpolicies
+              - networksets
 
     rules:
       - '{% if services["cri"]["containerRuntime"] == "docker" %}-w /var/lib/docker -k docker{% endif %}'

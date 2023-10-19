@@ -91,10 +91,13 @@
       "type": "object",
       "description": "Change the default Calico environment properties",
       "properties": {
-        "FELIX_USAGEREPORTINGENABLED": {"type": ["string", "boolean"], "default": "'false'"},
-        "WAIT_FOR_DATASTORE": {"type": ["string", "boolean"], "default": "'true'"},
+        "FELIX_USAGEREPORTINGENABLED": {"type": ["string"], "default": "'false'"},
+        "WAIT_FOR_DATASTORE": {"type": ["string"], "default": "'true'"},
         "FELIX_DEFAULTENDPOINTTOHOSTACTION": {"type": "string", "default": "ACCEPT"},
         "CALICO_ROUTER_ID": {"type": "string"}
+      },
+      "additionalProperties": {
+        "type": ["string", "object"]
       }
     },
     "cni": {

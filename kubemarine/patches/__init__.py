@@ -22,9 +22,13 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p1_reconfigure_registries import ReconfigureRegistries
+from kubemarine.patches.p1_enable_calico_audit import EnableCalicoAudit
+from kubemarine.patches.p2_calico_typha_metrics import EnableCalicoTyphaMetrics
+from kubemarine.patches.p3_reconfigure_registries import ReconfigureRegistries
 
 patches: List[Patch] = [
+    EnableCalicoAudit(),
+    EnableCalicoTyphaMetrics(),
     ReconfigureRegistries()
 ]
 """
