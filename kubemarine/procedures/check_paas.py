@@ -549,16 +549,23 @@ def kubernetes_pods_condition(cluster: KubernetesCluster) -> None:
 def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '208', "Plugins", "Dashboard Availability") as tc:
         retries = 10
-        test_succeeded = False
-        i = 0
-        while not test_succeeded and i < retries:
-            i += 1
-            if cluster.inventory['plugins']['kubernetes-dashboard']['install']:
+        test_service_succeeded = False
+        test_ingress_succeeded = False
+        ingress_ip = cluster.inventory['control_plain']['internal']
+
+        if not cluster.inventory['plugins']['kubernetes-dashboard']['install']:
+            tc.success(results="skipped")
+        else:
+            # check dashboard service 
+            cluster.log.debug('Check kubernetes-dashboard service...')
+            i = 0
+            while not test_service_succeeded and i < retries:
+                i += 1
                 results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl get svc -n kubernetes-dashboard kubernetes-dashboard -o=jsonpath=\"{['spec.clusterIP']}\"", warn=True)
                 for control_plane, result in results.items():
                     if result.failed:
-                       cluster.log.debug(f'Can not resolve dashboard IP: {result.stderr} ')
-                       raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
+                        cluster.log.debug(f'Can not get dashboard service IP: {result.stderr} ')
+                        raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
                 found_url = result.stdout
                 if ipaddress.ip_address(found_url).version == 4:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443', warn=True)
@@ -567,16 +574,40 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                 status = list(check_url.values())[0].stdout
                 if '200' in status:
                     cluster.log.debug(status)
-                    test_succeeded = True
-                    tc.success(results="available")
+                    test_service_succeeded = True
                 else:
-                    cluster.log.debug(f'Dashboard is not running yet... Retries left: {retries - i}')
+                    cluster.log.debug(f'Dashboard service is not running yet... Retries left: {retries - i}')
                     time.sleep(60)
+
+            # check dashboard ingress
+            cluster.log.debug('Check kubernetes-dashboard ingress...')
+            i = 0
+            while not test_ingress_succeeded and test_service_succeeded and i < retries:
+                i += 1
+                results = cluster.nodes['control-plane'].get_first_member().sudo("kubectl -n kubernetes-dashboard get ingress kubernetes-dashboard -o=jsonpath=\"{.spec.rules[0].host}\"", warn=True)
+                for control_plane, result in results.items():
+                    if result.failed:
+                        cluster.log.debug(f'Can not get dashboard ingress hostname: {result.stderr} ')
+                        raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
+                found_url = result.stdout
+                
+                if ipaddress.ip_address(ingress_ip).version == 4:
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I --resolve {found_url}:443:{ingress_ip} https://{found_url} 2>&1', warn=True)
+                else:
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I --resolve "{found_url}:443:{ingress_ip}" https://{found_url} 2>&1', warn=True)
+                status = list(check_url.values())[0].stdout
+                if '200' in status:
+                    cluster.log.debug(status)
+                    test_ingress_succeeded = True
+                else:
+                    cluster.log.debug(f'Dashboard ingress is not running yet... Retries left: {retries - i}')
+                    time.sleep(60)
+
+            # test results
+            if test_service_succeeded and test_ingress_succeeded:
+                tc.success(results="available")
             else:
-                test_succeeded = True
-                tc.success(results="skipped")
-        if not test_succeeded:
-            raise TestFailure("not available",
+                raise TestFailure("not available",
                               hint=f"Please verify the following Kubernetes Dashboard status and fix this issue:\n{status}")
 
 
