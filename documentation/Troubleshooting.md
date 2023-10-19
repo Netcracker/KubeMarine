@@ -18,6 +18,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kube-controller-manager` Unable to Sync Caches for Garbage Collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
   - [Etcdctl Compaction and Defragmentation](#etcdctl-compaction-and-defragmentation)
   - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
+  - [Etcdserver Request Timeout](#etcdserver-request-rimeout)
   - [Etcd Database Corruption](#etcd-database-corruption)
     - [Manual Restoration of Etcd Database](#manual-restoration-of-etcd-database)
   - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
@@ -466,6 +467,45 @@ Failed to defragment etcd member
 ```
 # etcdctl defrag --endpoints=ENDPOINT_IP:2379 --command-timeout=30s
 ```
+
+## Etcdserver Request Timeout
+
+**Symptoms**: there are such error messages in the `kubelet` logs:
+
+```commandline
+Apr 23 06:32:33 node-9 kubelet: 2023-04-23 06:32:33.378 [ERROR][9428] ipam_plugin.go 309: Failed to release address ContainerID="8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" HandleID="k8s-pod-network.8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" Workload="example-workload-name" error=etcdserver: request timed out
+```
+
+In etcd logs there are such messages:
+
+```commandline
+2023-04-29 06:06:16.087641 W | etcdserver: failed to send out heartbeat on time (exceeded the 100ms timeout for 6.102899ms, to fa4ddfec63d549fc)
+```
+
+**Root Cause**: Etcd database treats requests too slowly.
+
+**Solution**: to impove etcd performance.
+
+First of all it is necessary to check that the disk under `/var/lib/etcd` satisfies [the recommendations](/documentation/Installation.md#etcd-recommendation).
+
+Then add the following flags to the `/etc/kubernetes/manifests/etcd.yaml` manifest at all the control-plane nodes:
+
+```
+--heartbeat-interval=1000
+--election-timeout=5000
+```
+
+Also it is recommended to set different `snapshot-count` values at different control-plane nodes so they persist snapshots to the disk not simultaneously.
+Default value of `snapshot-count` is `10000`, so set it to a different value at the second and the third control-plane nodes in the `/etc/kubernetes/manifests/etcd.yaml` manifest, for example:
+
+```commandline
+# second master: 
+--snapshot-count=11210
+# third master:
+--snapshot-count=12210
+```
+
+Other general etcd tuning recommendations can be found in the [official etcd documentation](https://etcd.io/docs/v3.5/tuning/). 
 
 ## Etcd Database Corruption
 
