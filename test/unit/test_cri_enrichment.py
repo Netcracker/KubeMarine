@@ -228,13 +228,11 @@ class TestContainerdCriEnrichment(unittest.TestCase):
                          containerd_config['plugins."io.containerd.grpc.v1.cri".registry']['config_path'])
 
     def test_config_path_enrichment_for_empty_configuration(self):
-        # Enrich if no format specific fields are specified
+        # Not enrich, if no containerdRegistriesConfig is not specified
         inventory = demo.generate_inventory(**demo.ALLINONE)
         cluster = self.do_successful_enrichment(inventory)
         containerd_config = cluster.inventory['services']['cri']['containerdConfig']
-        self.assertIn('config_path', containerd_config['plugins."io.containerd.grpc.v1.cri".registry'])
-        self.assertEqual('/etc/containerd/certs.d',
-                         containerd_config['plugins."io.containerd.grpc.v1.cri".registry']['config_path'])
+        self.assertNotIn('config_path', containerd_config.get('plugins."io.containerd.grpc.v1.cri".registry', {}))
 
 
 if __name__ == '__main__':
