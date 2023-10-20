@@ -114,11 +114,7 @@ def stop_cluster(cluster: KubernetesCluster) -> None:
     cluster.log.verbose(result)
 
 
-def restore_thirdparties(cluster: KubernetesCluster) -> None:
-    install.system_prepare_thirdparties(cluster)
-
-
-def import_nodes(cluster: KubernetesCluster) -> None:
+def import_nodes_data(cluster: KubernetesCluster) -> None:
     with cluster.nodes['all'].new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
@@ -126,13 +122,31 @@ def import_nodes(cluster: KubernetesCluster) -> None:
             node.put(os.path.join(cluster.context['backup_tmpdir'], 'nodes_data', '%s.tar.gz' % node_name),
                      '/tmp/kubemarine-backup.tar.gz')
 
-    cluster.log.debug('Unpacking backup...')
 
-    unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite"
+def restore_dns_resolv_conf(cluster: KubernetesCluster) -> None:
+    import_nodes_data(cluster)
+
+    unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite /etc/resolv.conf"
     result = cluster.nodes['all'].sudo(
         f"readlink /etc/resolv.conf ; "
         f"if [ $? -ne 0 ]; then sudo chattr -i /etc/resolv.conf; {unpack_cmd} && sudo chattr +i /etc/resolv.conf; "
-        f"else {unpack_cmd}; fi ")
+        f"fi ")
+
+    cluster.log.debug(result)
+
+
+def restore_thirdparties(cluster: KubernetesCluster) -> None:
+    install.system_prepare_thirdparties(cluster)
+
+
+def import_nodes(cluster: KubernetesCluster) -> None:
+    if not cluster.is_task_completed('restore.dns.resolv_conf'):
+        import_nodes_data(cluster)
+
+    cluster.log.debug('Unpacking backup...')
+
+    unpack_cmd = "sudo tar xzvf /tmp/kubemarine-backup.tar.gz -C / --overwrite --exclude /etc/resolv.conf"
+    result = cluster.nodes['all'].sudo(unpack_cmd)
 
     cluster.log.debug(result)
 
@@ -258,6 +272,9 @@ tasks = OrderedDict({
         "stop_cluster": stop_cluster,
     },
     "restore": {
+        "dns": {
+            "resolv_conf": restore_dns_resolv_conf,
+        },
         "thirdparties": restore_thirdparties,
     },
     "import": {

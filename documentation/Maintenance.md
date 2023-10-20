@@ -711,6 +711,8 @@ The `restore` procedure executes the following sequence of tasks:
 * prepare
   * stop_cluster
 * restore
+  * dns
+    * resolv_conf
   * thirdparties
 * import
   * nodes
