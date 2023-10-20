@@ -37,6 +37,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RemoteExecutor
 from kubemarine.core.resources import DynamicResources
+from kubemarine.cri import containerd
 
 
 def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
@@ -68,6 +69,11 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
     elif cri_impl == "containerd":
         backup_files_list.append("/etc/containerd/config.toml")
         backup_files_list.append("/etc/crictl.yaml")
+        backup_files_list.append("/etc/ctr/kubemarine_ctr_flags.conf")
+        config_path = containerd.get_config_path(cluster.inventory)
+        if config_path:
+            backup_files_list.append(config_path)
+
 
     return backup_files_list
 

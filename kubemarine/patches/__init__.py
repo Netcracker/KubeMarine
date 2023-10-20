@@ -24,10 +24,12 @@ from typing import List
 from kubemarine.core.patch import Patch
 from kubemarine.patches.p1_enable_calico_audit import EnableCalicoAudit
 from kubemarine.patches.p2_calico_typha_metrics import EnableCalicoTyphaMetrics
+from kubemarine.patches.p3_reconfigure_registries import ReconfigureRegistries
 
 patches: List[Patch] = [
     EnableCalicoAudit(),
     EnableCalicoTyphaMetrics(),
+    ReconfigureRegistries()
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

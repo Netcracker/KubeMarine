@@ -29,6 +29,7 @@ from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
+from pathvalidate import sanitize_filepath
 from ruamel.yaml import CommentedMap
 from typing_extensions import Protocol
 
@@ -208,7 +209,7 @@ def merge_vrrp_ips(procedure_inventory: dict, inventory: dict) -> None:
 
 
 def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: str,
-              *, dump_location: bool = True) -> None:
+              *, dump_location: bool = True, create_subdir: bool = False) -> None:
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
@@ -225,6 +226,12 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
         target_path = get_dump_filepath(context, filename)
     else:
         target_path = get_external_resource_path(filename)
+    # sanitize_filepath is needed for windows/macOS, where some symbols are restricted in file path,
+    # but they can appear in target path. They will be replaced with '_'
+    target_path = sanitize_filepath(target_path, replacement_text='_')
+
+    if create_subdir:
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     if isinstance(data, io.StringIO):
         text = data.getvalue()

@@ -886,9 +886,12 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
             # Check for docker is not yet implemented
             return tc.success(results='valid')
 
-        expected_config = containerd.get_containerd_config_as_toml(cluster)
+        expected_config = containerd.get_config_as_toml(cluster.inventory['services']['cri']['containerdConfig'])
+        expected_registries = {registry: containerd.get_config_as_toml(registry_conf)
+                               for registry, registry_conf in
+                               cluster.inventory['services']['cri'].get('containerdRegistriesConfig', {}).items()}
         kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
-        actual_configs = containerd.fetch_containerd_config(kubernetes_nodes)
+        actual_configs, actual_registries = containerd.fetch_containerd_config(kubernetes_nodes)
 
         success = True
         for node in kubernetes_nodes.get_ordered_members_list():
@@ -896,6 +899,14 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
             diff = DeepDiff(actual_config, expected_config)
             if diff:
                 cluster.log.debug(f"Configuration of containerd is not actual on {node.get_node_name()} node")
+                # Extra transformation to JSON is necessary,
+                # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
+                cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                success = False
+
+            diff = DeepDiff(actual_registries.get(node.get_host(), {}), expected_registries)
+            if diff:
+                cluster.log.debug(f"Configuration of containerd registries is not actual on {node.get_node_name()} node")
                 # Extra transformation to JSON is necessary,
                 # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
                 cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))

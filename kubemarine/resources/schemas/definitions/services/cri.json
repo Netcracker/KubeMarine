@@ -11,6 +11,9 @@
     "containerdConfig": {
       "$ref": "#/definitions/ContainerdConfig"
     },
+    "containerdRegistriesConfig": {
+      "$ref": "#/definitions/ContainerdRegistriesConfig"
+    },
     "dockerConfig": {
       "$ref": "#/definitions/DockerConfig"
     }
@@ -40,6 +43,14 @@
             "SystemdCgroup": {"type": ["string", "boolean"]}
           }
         }
+      }
+    },
+    "ContainerdRegistriesConfig": {
+      "type": "object",
+      "description": "Parameters for containerd passed to /etc/containerd/certs.d or another place, configured in config_path in config.toml",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Parameters for containerd passed to hosts.toml for specific registry"
       }
     },
     "DockerConfig": {
