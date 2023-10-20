@@ -78,6 +78,14 @@ Kubemarine applies the patches in a strict order, though it is possible to choos
 Use `migrate_kubemarine --force-apply <patches>` or `migrate_kubemarine --force-skip <patches>` correspondingly,
 where, `<patches>` are the patch identifiers separated by comma.
 
+### Kubemarine Migration Procedure Parameters
+
+The procedure accepts optional positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
+
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_kubemarine.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+
 ### Software Upgrade Patches
 
 The new Kubemarine version may have new recommended versions of different types of software in comparison to the old version.
@@ -204,6 +212,9 @@ The configuration format for the plugins is the same.
 * Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 ### Upgrade Procedure Parameters
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -488,6 +499,9 @@ backup-Jan-01-21-09-00-00.tar.gz
 
 ### Backup Procedure Parameters
 
+The procedure accepts optional positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
+
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
@@ -642,6 +656,9 @@ After recovery, the procedure reboots all cluster nodes.
 
 ### Restore Procedure Parameters
 
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
+
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
@@ -692,8 +709,6 @@ restore_plan:
 The `restore` procedure executes the following sequence of tasks:
 
 * prepare
-  * unpack
-  * verify_backup_data
   * stop_cluster
 * restore
   * thirdparties
@@ -701,7 +716,6 @@ The `restore` procedure executes the following sequence of tasks:
   * nodes
   * etcd
 * reboot
-* overview
 
 
 ## Add Node Procedure
@@ -734,6 +748,8 @@ Also pay attention to the following:
 
 ### Configuring Add Node Procedure
 
+The procedure accepts required positional argument with the path to the procedure inventory file.
+
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
 
@@ -760,26 +776,32 @@ nodes:
 
 The `add_node` procedure executes the following sequence of tasks:
 
+* cache_packages
 * prepare
   * check
     * sudoer
     * system
     * cluster_installation
   * dns
+    * hostname
     * resolv_conf
     * etc_hosts
+  * package_manager
+    * configure
+    * manage_packages
   * ntp
     * chrony
-  * package_manager
-    * configure_yum
-    * manage_packages
+    * timesyncd
   * system
     * setup_selinux
+    * setup_apparmor
     * disable_firewalld
     * disable_swap
     * modprobe
     * sysctl
     * audit
+      * install
+      * configure
   * **cri**
     * **install** 
     * **configure**
@@ -795,8 +817,12 @@ The `add_node` procedure executes the following sequence of tasks:
   * kubernetes
     * reset
     * install
+    * prepull_images
     * init (as join)
-    * wait_for_nodes
+    * audit
+  * admission
+  * coredns
+  * plugins
 * overview
 
 ## Remove Node Procedure
@@ -829,6 +855,8 @@ Removing a node from a Kubernetes cluster is done in the following order:
 **Warning**: To prevent the loss of the modified CoreDNS configuration (in case the configuration was modified by the cloud administrator and etc) - you must specify this CoreDNS configuration in the `cluster.yaml`, otherwise the configuration will be lost.
 
 ### Configuring Remove Node Procedure
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -868,7 +896,10 @@ The `remove_node` procedure executes the following sequence of tasks:
   * configure
     * haproxy
     * keepalived
-* update_etc_hosts
+* update
+  * etc_hosts
+  * coredns
+  * plugins
 * remove_kubernetes_nodes
 * overview
 
@@ -909,6 +940,8 @@ Manage PSP procedure works as follows:
 4. All Kubernetes nodes are `drain-uncordon`ed one-by-one and all daemon-sets are restarted to restart all pods (except system) in order to re-validate pods specifications.
 
 ### Configuring Manage PSP Procedure
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -952,6 +985,7 @@ To avoid this, you need to specify custom policy and bind it using `ClusterRoleB
 
 The `manage_psp` procedure executes the following sequence of tasks:
 
+1. check_inventory
 1. delete_custom
 2. add_custom
 3. reconfigure_oob
@@ -967,6 +1001,8 @@ The manage PSS procedure allows:
 * set PSS labels on namespaces
 
 ### Configure Manage PSS Procedure
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -1033,13 +1069,16 @@ The `manage_pss procedure executes the following sequence of tasks:
 1. check_inventory
 2. delete_default_pss
 3. apply_default_pss
-4. restart_pods_task
+4. restart_pods
 
 ## Reboot Procedure
 
 This procedure allows you to safely reboot all nodes in one click. By default, all nodes in the cluster are rebooted. Gracefully reboot is performed only if installed Kubernetes cluster is detected on nodes. You can customize the process by specifying additional parameters.
 
 ### Reboot Procedure Parameters
+
+The procedure accepts optional positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -1092,6 +1131,9 @@ For Calico, the certificate is updated for the Calico API server.
 The `cert_renew` procedure also allows you to monitor Kubernetes internal certificates expiration status.
 
 ### Configuring Certificate Renew Procedure
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
@@ -1193,6 +1235,9 @@ This procedure includes the following steps:
 **Warning**: Before starting the migration procedure, verify that you already have the actual cluster.yaml structure. The services.docker scheme is deprecated. 
 
 ### migrate_cri Parameters
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
 For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
