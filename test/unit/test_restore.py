@@ -16,11 +16,13 @@ import logging
 import os
 import tempfile
 import unittest
+from typing import List
+from unittest import mock
 
 import yaml
 
-from kubemarine import demo
-from kubemarine.core import utils, flow, log
+from kubemarine import demo, thirdparties
+from kubemarine.core import utils, log, static
 from kubemarine.procedures import restore, backup
 from test.unit import utils as test_utils
 
@@ -30,12 +32,8 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
 
-        self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='restore')
-
-        args = self.context['execution_arguments']
-        args['disable_dump'] = False
-        args['dump_location'] = self.tmpdir.name
-        utils.prepare_dump_directory(args['dump_location'])
+        self.context = self._create_context(['--without-act'])
+        utils.prepare_dump_directory(self.context['execution_arguments']['dump_location'])
 
         self.restore_tmpdir = os.path.join(self.tmpdir.name, 'restore_test')
         os.mkdir(self.restore_tmpdir)
@@ -50,6 +48,15 @@ class RestoreEnrichmentTest(unittest.TestCase):
             if isinstance(h, log.FileHandlerWithHeader):
                 h.close()
         self.tmpdir.cleanup()
+
+    def _create_context(self, args: List[str]) -> dict:
+        context = demo.create_silent_context(['fake_path.yaml'] + args, procedure='restore')
+
+        args = context['execution_arguments']
+        args['disable_dump'] = False
+        args['dump_location'] = self.tmpdir.name
+
+        return context
 
     def _run(self) -> demo.FakeResources:
         resources = demo.FakeResources(self.context, self.inventory,
@@ -66,7 +73,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
     def _pack_data(self):
         backup.pack_to_tgz(self.backup_location, self.restore_tmpdir)
 
-    def test_enrich_and_finalize_inventory(self):
+    def test_enrich_and_finalize_inventory_kubernetes_version(self):
         self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.28.0'
         descriptor = {'kubernetes': {'version': 'v1.27.4'}}
         self._pack_descriptor(descriptor)
@@ -85,6 +92,66 @@ class RestoreEnrichmentTest(unittest.TestCase):
 
         self.assertEqual('v1.27.4', resources.stored_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
+
+    def test_enrich_and_finalize_inventory_thirdparties(self):
+        thirdparties_section = self.inventory['services'].setdefault('thirdparties', {})
+        thirdparties_section['/usr/bin/kubectl'] = {
+            'source': 'kubectl-new',
+        }
+        thirdparties_section['/usr/bin/kubeadm'] = 'kubeadm-new'
+
+        restore_thirdparties = self.restore.setdefault('restore_plan', {}).setdefault('thirdparties', {})
+        restore_thirdparties['/usr/bin/kubectl'] = {
+            'source': 'kubectl-old',
+            'sha1': 'kubectl-sha1-old'
+        }
+        restore_thirdparties['/usr/bin/kubeadm'] = {
+            'source': 'kubeadm-old',
+        }
+        restore_thirdparties['/usr/bin/kubelet'] = {
+            'source': 'kubelet-old',
+        }
+
+        all_thirdparties = set(static.DEFAULTS['services']['thirdparties'])
+
+        self.context = self._create_context(['--tasks', 'restore.thirdparties'])
+        self._pack_descriptor({})
+        self._pack_data()
+
+        with mock.patch.object(thirdparties, thirdparties.install_thirdparty.__name__) as install_thirdparty:
+            resources = self._run()
+        cluster = resources.last_cluster
+
+        thirdparties_section = cluster.inventory['services']['thirdparties']
+        self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
+        self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])
+        self.assertEqual('kubectl-sha1-old', thirdparties_section['/usr/bin/kubectl']['sha1'])
+        self.assertEqual('kubeadm-old', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubeadm'].get('sha1'))
+        self.assertEqual('kubelet-old', thirdparties_section['/usr/bin/kubelet']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubelet'].get('sha1'))
+
+        test_utils.stub_associations_packages(cluster, {})
+        finalized_inventory = cluster.make_finalized_inventory()
+        thirdparties_section = finalized_inventory['services']['thirdparties']
+
+        self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
+        self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])
+        self.assertEqual('kubectl-sha1-old', thirdparties_section['/usr/bin/kubectl']['sha1'])
+        self.assertEqual('kubeadm-old', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubeadm'].get('sha1'))
+        self.assertEqual('kubelet-old', thirdparties_section['/usr/bin/kubelet']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubelet'].get('sha1'))
+
+        thirdparties_section = resources.stored_inventory['services']['thirdparties']
+        self.assertEqual({'/usr/bin/kubectl', '/usr/bin/kubelet', '/usr/bin/kubeadm'},
+                         set(thirdparties_section.keys()))
+        self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])
+        self.assertEqual('kubectl-sha1-old', thirdparties_section['/usr/bin/kubectl']['sha1'])
+        self.assertEqual('kubeadm-old', thirdparties_section['/usr/bin/kubeadm']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubeadm'].get('sha1'))
+        self.assertEqual('kubelet-old', thirdparties_section['/usr/bin/kubelet']['source'])
+        self.assertIsNone(thirdparties_section['/usr/bin/kubelet'].get('sha1'))
 
 
 if __name__ == '__main__':

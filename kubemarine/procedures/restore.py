@@ -115,13 +115,6 @@ def stop_cluster(cluster: KubernetesCluster) -> None:
 
 
 def restore_thirdparties(cluster: KubernetesCluster) -> None:
-    custom_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
-    if custom_thirdparties:
-        for name, value in custom_thirdparties.items():
-            cluster.inventory['services']['thirdparties'][name]['source'] = value['source']
-            if value.get('sha1'):
-                cluster.inventory['services']['thirdparties'][name]['sha1'] = value['sha1']
-
     install.system_prepare_thirdparties(cluster)
 
 
