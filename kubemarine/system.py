@@ -219,6 +219,10 @@ def update_etc_hosts(group: NodeGroup, config: str) -> None:
     group.put(io.StringIO(config), "/etc/hosts", backup=True, sudo=True)
 
 
+def service_status(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Callback = None) -> GROUP_RUN_TYPE:
+    return group.sudo('systemctl status %s' % name, warn=True, callback=callback)
+
+
 def stop_service(group: AbstractGroup[GROUP_RUN_TYPE], name: str, callback: Callback = None) -> GROUP_RUN_TYPE:
     return group.sudo('systemctl stop %s' % name, callback=callback)
 

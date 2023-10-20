@@ -384,17 +384,16 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
         cluster.log.debug('Skipped - haproxy balancers configs update manually disabled')
         return
 
-    group = None
+    balancers = cluster.make_group_from_roles(['balancer'])
+    if not cluster.make_group_from_roles(['control-plane', 'worker']).get_changed_nodes().is_empty():
+        group = balancers.get_final_nodes()
+    elif cluster.context['initial_procedure'] != 'remove_node':
+        new_nodes = cluster.nodes['all'].get_new_nodes_or_self()
+        group = balancers.intersection_group(new_nodes)
+    else:
+        group = cluster.make_group([])
 
-    if "balancer" in cluster.nodes:
-
-        if cluster.context['initial_procedure'] != 'remove_node':
-            group = cluster.nodes['balancer'].get_new_nodes_or_self()
-
-        if not cluster.make_group_from_roles(['control-plane', 'worker']).get_changed_nodes().is_empty():
-            group = cluster.nodes['balancer'].get_final_nodes()
-
-    if group is None or group.is_empty():
+    if group.is_empty():
         cluster.log.debug('Skipped - no balancers to perform')
         return
 
@@ -407,49 +406,24 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
     haproxy.restart(group)
 
 
-def deploy_loadbalancer_keepalived_install(cluster: KubernetesCluster) -> None:
-    group = None
-    if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
-
-        group = cluster.nodes['keepalived']
-
-        # if remove/add node, then reconfigure only new keepalives
-        if cluster.context['initial_procedure'] != 'install':
-            group = cluster.nodes['keepalived'].get_new_nodes()
-
-        # if balancer added or removed - reconfigure all keepalives
-        # todo The method is currently not invoked for remove node.
-        #  So why we try to install all keepalives for add_node but not touch them for remove_node?
-        if not cluster.nodes['balancer'].get_changed_nodes().is_empty():
-            group = cluster.nodes['keepalived'].get_final_nodes()
-
-    if group is None or group.is_empty():
-        cluster.log.debug('Skipped - no VRRP IPs to perform')
-        return
-
-    # add_node will impact all keepalived
+@_applicable_for_new_nodes_with_roles('keepalived')
+def deploy_loadbalancer_keepalived_install(group: NodeGroup) -> None:
     group.call(keepalived.install)
 
 
 def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster) -> None:
-    group = None
-    if 'vrrp_ips' in cluster.inventory and cluster.inventory['vrrp_ips']:
+    # For install procedure, configure all keepalives.
+    # If balancer with VRPP IP is added or removed, reconfigure all keepalives
+    keepalived_nodes = cluster.make_group_from_roles(['keepalived'])
+    if cluster.context['initial_procedure'] != 'install' and keepalived_nodes.get_changed_nodes().is_empty():
+        group = cluster.make_group([])
+    else:
+        group = keepalived_nodes.get_final_nodes()
 
-        group = cluster.nodes['keepalived'].get_final_nodes()
-
-        # if remove/add node, then reconfigure only new keepalives
-        if cluster.context['initial_procedure'] != 'install':
-            group = cluster.nodes['keepalived'].get_new_nodes()
-
-        # if balancer added or removed - reconfigure all keepalives
-        if not cluster.nodes['balancer'].get_changed_nodes().is_empty():
-            group = cluster.nodes['keepalived'].get_final_nodes()
-
-    if group is None or group.is_empty():
+    if group.is_empty():
         cluster.log.debug('Skipped - no VRRP IPs to perform')
         return
 
-    # add_node will impact all keepalived
     group.call(keepalived.configure)
 
 

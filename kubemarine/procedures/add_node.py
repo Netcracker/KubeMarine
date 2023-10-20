@@ -18,7 +18,7 @@ import copy
 from typing import Any, OrderedDict, List
 
 from kubemarine import kubernetes, packages, plugins
-from kubemarine.core import flow, utils
+from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
@@ -64,39 +64,16 @@ def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finaliz
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
-    new_nodes = cluster.nodes['all'].get_new_nodes()
+    is_finalization = any('add_node' in node['roles'] for node in inventory_to_finalize['nodes'])
 
-    # add nodes to inventory if they in new nodes
-    for new_node in new_nodes.get_ordered_members_list():
-        new_node_name = new_node.get_node_name()
-        new_node_found = False
-        for i, node in enumerate(inventory_to_finalize['nodes']):
-            if node['name'] == new_node_name:
-                # new node already presented in final inventory - ok, just remove label
-                if 'add_node' in inventory_to_finalize['nodes'][i]['roles']:
-                    inventory_to_finalize['nodes'][i]['roles'].remove('add_node')
-                new_node_found = True
-                break
+    if not is_finalization:
+        # new nodes are not presented in final inventory - let's add it original config
+        kubernetes.add_node_enrichment(inventory_to_finalize, cluster)
 
-        # new node is not presented in final inventory - let's add it original config
-        if not new_node_found:
-            node_config = None
-
-            # search for new node config in procedure inventory
-            if cluster.procedure_inventory.get('nodes', {}):
-                for node_from_procedure in cluster.procedure_inventory['nodes']:
-                    if node_from_procedure['name'] == new_node_name:
-                        node_config = node_from_procedure
-                        break
-            # maybe new nodes from other places?
-
-            if node_config is None:
-                raise Exception('Not possible to find new node config for final inventory')
-            inventory_to_finalize["nodes"].append(node_config)
-
-    # maybe merge vrrp ips only when adding?
-    if "vrrp_ips" in cluster.procedure_inventory:
-        utils.merge_vrrp_ips(cluster.procedure_inventory, inventory_to_finalize)
+    # new nodes are already presented in final inventory - ok, just remove label
+    for i, node in enumerate(inventory_to_finalize['nodes']):
+        if 'add_node' in node['roles']:
+            node['roles'].remove('add_node')
 
     return inventory_to_finalize
 

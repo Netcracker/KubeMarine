@@ -20,7 +20,7 @@ import yaml
 
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
-from kubemarine import jinja
+from kubemarine import jinja, keepalived, haproxy
 from kubemarine.core import utils, static, log, os
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.cri.containerd import contains_old_format_properties
@@ -33,6 +33,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.verify_initial_version",
     "kubemarine.admission.enrich_default_admission",
     "kubemarine.kubernetes.add_node_enrichment",
+    "kubemarine.core.defaults.calculate_node_names",
     "kubemarine.kubernetes.remove_node_enrichment",
     "kubemarine.controlplane.controlplane_node_enrichment",
     "kubemarine.core.defaults.append_controlplain",
@@ -50,7 +51,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.procedures.migrate_cri.enrich_inventory",
     "kubemarine.core.defaults.apply_registry",
     "kubemarine.cri.enrich_upgrade_inventory",
-    "kubemarine.core.defaults.calculate_node_names",
     "kubemarine.core.defaults.verify_node_names",
     "kubemarine.core.defaults.apply_defaults",
     "kubemarine.keepalived.enrich_inventory_apply_defaults",
@@ -237,17 +237,24 @@ def append_controlplain(inventory: dict, cluster: Optional[KubernetesCluster]) -
     external_address: Optional[str] = None
     external_address_source: Optional[str] = None
 
+    balancer_names = keepalived.get_all_balancer_names(inventory, final=True)
     # vrrp_ip section is not enriched yet
-    # todo what if ip is an ip of some node to remove?
-    if inventory.get('vrrp_ips'):
+    # If no VRRP IPs or no balancers are configured, Keepalived is not enabled.
+    if inventory.get('vrrp_ips') and balancer_names:
         for i, item in enumerate(inventory['vrrp_ips']):
             if isinstance(item, str):
                 if internal_address is None:
                     internal_address = item
                     internal_address_source = 'vrrp_ip[%s]' % i
-            # todo remove p1_migrate_not_bind_vrrp_fix after next release
-            elif item.get('params', {}).get('maintenance-type', False) != 'not bind' \
-                    or (cluster and not cluster.context.get('p1_migrate_not_bind_vrrp_fix', True)):
+            else:
+                if haproxy.is_vrrp_not_bind(item):
+                    continue
+                final_hosts = item.get('hosts', balancer_names)
+                # There is a small gap here.
+                # The check is invoked when inventory is not yet compiled, so checking names for equality is not fair.
+                if not any((host['name'] if isinstance(host, dict) else host) in balancer_names
+                           for host in final_hosts):
+                    continue
                 if internal_address is None or item.get('control_endpoint', False):
                     internal_address = item['ip']
                     internal_address_source = 'vrrp_ip[%s]' % i
@@ -260,20 +267,16 @@ def append_controlplain(inventory: dict, cluster: Optional[KubernetesCluster]) -
 
     if internal_address is None or external_address is None:
         # 'master' role is not deleted due to unit tests are not refactored
-        for role in ['balancer', 'master', 'control-plane']:
+        for role in ['balancer', 'control-plane', 'master']:
             # nodes are not compiled to groups yet
             for node in inventory['nodes']:
                 if role in node['roles'] and 'remove_node' not in node['roles']:
                     if internal_address is None or node.get('control_endpoint', False):
                         internal_address = node['internal_address']
-                        internal_address_source = role
-                        if node.get('name'):
-                            internal_address_source += ' \"%s\"' % node['name']
+                        internal_address_source = f"{role} \"{node['name']}\""
                     if node.get('address') and (external_address is None or node.get('control_endpoint', False)):
                         external_address = node['address']
-                        external_address_source = role
-                        if node.get('name'):
-                            external_address_source += ' \"%s\"' % node['name']
+                        external_address_source = f"{role} \"{node['name']}\""
 
     if external_address is None:
         if cluster:
@@ -314,10 +317,12 @@ def recursive_apply_defaults(defaults: dict, section: dict) -> None:
                 section[value][i] = default_value
 
 
-def calculate_node_names(inventory: dict, _: KubernetesCluster) -> dict:
+def calculate_node_names(inventory: dict, cluster: KubernetesCluster) -> dict:
     roles_iterators: Dict[str, int] = {}
     for i, node in enumerate(inventory['nodes']):
-        for role_name in ['control-plane', 'worker', 'balancer']:
+        # 'master' role is not deleted because calculate_node_names() can be run over initial inventory,
+        # that still supports the old role.
+        for role_name in ['control-plane', 'master', 'worker', 'balancer']:
             if role_name in node['roles']:
                 # The idea is this:
                 # If the name is already specified, we must skip this node,
@@ -338,7 +343,11 @@ def calculate_node_names(inventory: dict, _: KubernetesCluster) -> dict:
                 role_i = roles_iterators.get(role_name, 1)
                 roles_iterators[role_name] = role_i + 1
                 if node.get('name') is None:
-                    inventory['nodes'][i]['name'] = '%s-%s' % (role_name, role_i)
+                    if role_name == 'master':
+                        role_name = 'control-plane'
+                    new_name = '%s-%s' % (role_name, role_i)
+                    cluster.log.debug(f"Assigning name {new_name} to node {cluster.get_access_address_from_node(node)}")
+                    node['name'] = new_name
     return inventory
 
 

@@ -172,3 +172,66 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         inventory = defaults.append_controlplain(inventory, None)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
+
+    def test_controlplain_skip_vrrp_ips_no_balancers(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=0, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+
+        inventory = defaults.append_controlplain(inventory, None)
+        self.assertEqual(inventory['control_plain']['internal'], first_control_plane['internal_address'])
+        self.assertEqual(inventory['control_plain']['external'], first_control_plane['address'])
+
+    def test_controlplain_skip_vrrp_ips_assigned_not_balancer(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
+        inventory['vrrp_ips'][0] = {
+            'ip': inventory['vrrp_ips'][0],
+            'hosts': [first_control_plane['name']]
+        }
+
+        inventory = defaults.append_controlplain(inventory, None)
+        self.assertEqual(inventory['control_plain']['internal'], balancer['internal_address'])
+        self.assertEqual(inventory['control_plain']['external'], balancer['address'])
+
+    def test_controlplain_skip_vrrp_ips_and_balancer_removed_only_balancer(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
+        balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
+
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
+        remove_node = demo.generate_procedure_inventory('remove_node')
+        remove_node['nodes'] = [balancer]
+
+        cluster = demo.new_cluster(inventory, procedure_inventory=remove_node, context=context)
+        inventory = cluster.inventory
+
+        self.assertEqual(inventory['control_plain']['internal'], first_control_plane['internal_address'])
+        self.assertEqual(inventory['control_plain']['external'], first_control_plane['address'])
+
+    def test_controlplain_skip_vrrp_ips_assigned_to_removed_balancer(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=2, keepalived=2)
+        first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
+        inventory['vrrp_ips'][0] = {
+            'ip': inventory['vrrp_ips'][0],
+            'hosts': [first_balancer['name']],
+            'floating_ip': '1.1.1.1'
+        }
+        inventory['vrrp_ips'][1] = {
+            'ip': inventory['vrrp_ips'][1],
+            'floating_ip': '2.2.2.2'
+        }
+
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
+        remove_node = demo.generate_procedure_inventory('remove_node')
+        remove_node['nodes'] = [first_balancer]
+
+        cluster = demo.new_cluster(inventory, procedure_inventory=remove_node, context=context)
+        inventory = cluster.inventory
+
+        self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][1]['ip'])
+        self.assertEqual(inventory['control_plain']['external'], inventory['vrrp_ips'][1]['floating_ip'])
+
+
+if __name__ == '__main__':
+    unittest.main()

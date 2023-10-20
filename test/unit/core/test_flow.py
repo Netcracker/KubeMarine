@@ -332,15 +332,14 @@ class FlowTest(unittest.TestCase):
         self.assertIsInstance(exc, errors.FailException, msg="Exception should be raised")
         self.assertTrue(f"['{offline}'] are not reachable." in str(exc.reason))
 
-    def test_removed_node_can_be_offline(self):
-        inventory = demo.generate_inventory(**demo.FULLHA)
+    def test_any_removed_node_can_be_offline(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         online_hosts = [node["address"] for node in inventory["nodes"]]
-        masters = [i for i, node in enumerate(inventory["nodes"]) if 'master' in node['roles']]
 
-        i = random.randrange(len(masters))
-        online_hosts.pop(masters[i])
+        i = random.randrange(len(inventory["nodes"]))
+        online_hosts.pop(i)
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
-        procedure_inventory["nodes"] = [{"name": inventory["nodes"][masters[i]]["name"]}]
+        procedure_inventory["nodes"] = [{"name": inventory["nodes"][i]["name"]}]
 
         self._stub_detect_nodes_context(inventory, online_hosts, [])
         context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node')

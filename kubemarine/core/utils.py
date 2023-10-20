@@ -175,11 +175,13 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
         inventory = deepcopy(initial_inventory)
 
     from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
+    from kubemarine.core import defaults
     from kubemarine.plugins import nginx_ingress
     from kubemarine.procedures import add_node, remove_node, migrate_cri
 
-    inventory_finalize_functions = {
+    inventory_finalize_functions = [
         add_node.add_node_finalize_inventory,
+        lambda cluster, inventory: defaults.calculate_node_names(inventory, cluster),
         remove_node.remove_node_finalize_inventory,
         kubernetes.restore_finalize_inventory,
         kubernetes.upgrade_finalize_inventory,
@@ -191,7 +193,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
         nginx_ingress.finalize_inventory,
         migrate_cri.migrate_cri_finalize_inventory,
         cri.upgrade_finalize_inventory,
-    }
+    ]
 
     for finalize_fn in inventory_finalize_functions:
         inventory = finalize_fn(cluster, inventory)
@@ -200,6 +202,11 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
 
 
 def merge_vrrp_ips(procedure_inventory: dict, inventory: dict) -> None:
+    # This method is currently unused.
+    # If it is ever supported when adding and removing node,
+    # it will be necessary to more accurately install and reconfigure the keepalived on existing nodes.
+    # Also, it is desirable to change the section format, for example, as for etc_hosts.
+
     if "vrrp_ips" in inventory and len(inventory["vrrp_ips"]) > 0:
         raise Exception("vrrp_ips section already defined, merging not supported yet")
     else:
