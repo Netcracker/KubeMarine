@@ -904,7 +904,7 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
                 cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
                 success = False
 
-            diff = DeepDiff(expected_registries, actual_registries.get(node.get_host(), {}))
+            diff = DeepDiff(actual_registries.get(node.get_host(), {}), expected_registries)
             if diff:
                 cluster.log.debug(f"Configuration of containerd registries is not actual on {node.get_node_name()} node")
                 # Extra transformation to JSON is necessary,

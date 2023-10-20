@@ -238,7 +238,7 @@ def configure_ctr_flags(group: NodeGroup) -> None:
     config_toml = get_config_as_toml(cluster.inventory.get("services", {}).get("cri", {}).get('containerdConfig', {}))
     # Calculate ctr options for image pull
     registry = config_toml.get('plugins', {}).get('io.containerd.grpc.v1.cri', {}).get('registry', {})
-    сonfig_path = registry.get('config_path')
+    config_path = registry.get('config_path')
     ctr_pull_options_str = ""
     for registry_name in set().union(registry.get('mirrors', {}).keys(), registry.get('configs', {}).keys()):
         options = []
@@ -257,8 +257,8 @@ def configure_ctr_flags(group: NodeGroup) -> None:
             options.append(f'--user {registry_auth["username"]}' +
                            f':{registry_auth["password"]}' if registry_auth.get("password") else '')
         # Add hosts-dir, if it's presented
-        if сonfig_path:
-            options.append(f'--hosts-dir {сonfig_path}')
+        if config_path:
+            options.append(f'--hosts-dir {config_path}')
         ctr_pull_options_str += f'{registry_name}={" ".join(options)}\n'
 
     # Save ctr pull options
