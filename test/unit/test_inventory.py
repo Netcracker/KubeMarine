@@ -66,28 +66,31 @@ class TestInventoryValidation(unittest.TestCase):
         error_regex = r"Value should be one of \['worker', 'control-plane', 'master', 'balancer']"
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['nodes'][1]['roles'].append('add_node')
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
-        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [inventory['nodes'].pop(0)]
         with self.assertRaisesRegex(errors.FailException, error_regex):
             demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
 
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['nodes'][1]['roles'].append('remove_node')
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         context['nodes'] = demo.generate_nodes_context(inventory)
-        procedure_inventory = {'nodes': deepcopy([inventory['nodes'][0]])}
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [inventory['nodes'][0]]
         with self.assertRaisesRegex(errors.FailException, error_regex):
             demo.new_cluster(inventory, context=context, procedure_inventory=procedure_inventory)
 
     def test_remove_node_invalid_specification(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        context = demo.create_silent_context(procedure='remove_node')
-        procedure_inventory = {'nodes': [inventory['nodes'][0]['name']]}
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [inventory['nodes'][0]['name']]
         with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'\. Expected: 'object'"):
-            demo.new_cluster(deepcopy(inventory), context=deepcopy(context), procedure_inventory=procedure_inventory)
+            demo.new_cluster(deepcopy(inventory), context=deepcopy(context), procedure_inventory=deepcopy(procedure_inventory))
 
-        procedure_inventory = {'nodes': [{}]}
+        procedure_inventory['nodes'] = [{}]
         with self.assertRaisesRegex(errors.FailException, r"'name' is a required property"):
             demo.new_cluster(deepcopy(inventory), context=deepcopy(context), procedure_inventory=procedure_inventory)
 
@@ -250,12 +253,11 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         for node in inventory['nodes']:
             node.pop('address')
-        procedure_inventory = {
-            'nodes': [copy.deepcopy(inventory['nodes'][0])]
-        }
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory['nodes'] = [copy.deepcopy(inventory['nodes'][0])]
 
         # Remove node inventory
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
@@ -270,10 +272,11 @@ class TestInventoryValidation(unittest.TestCase):
             node.pop('address')
 
         # Add node inventory
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['internal_address']
         context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
-        procedure_inventory = {'nodes': [inventory['nodes'].pop(0)]}
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [inventory['nodes'].pop(0)]
         cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
@@ -394,6 +397,14 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_NOBALANCERS)
         cluster = demo.new_cluster(inventory)
         self.assertEqual('false', cluster.inventory['plugins']['nginx-ingress-controller']['config_map']['use-proxy-protocol'])
+
+    def test_allow_missed_procedure(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        for procedure in ('backup', 'check_paas', 'migrate_kubemarine', 'reboot'):
+            context = demo.create_silent_context(procedure=procedure)
+
+            # No exception should be thrown
+            demo.new_cluster(deepcopy(inventory), procedure_inventory=None, context=context)
 
 
 if __name__ == '__main__':

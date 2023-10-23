@@ -70,20 +70,22 @@ class KubernetesClusterTest(unittest.TestCase):
 
     def test_add_node_different_os_get_os_family_multiple(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        context = demo.create_silent_context(procedure='add_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
         host_different_os = inventory['nodes'][0]['address']
         context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
-        add_node = {'nodes': [inventory['nodes'].pop(0)]}
+        add_node = demo.generate_procedure_inventory('add_node')
+        add_node['nodes'] = [inventory['nodes'].pop(0)]
         cluster = demo.new_cluster(inventory, procedure_inventory=add_node, context=context)
         self.assertEqual('multiple', get_os_family(cluster),
                          msg="One node has different OS family and thus global OS family should be 'multiple'")
 
     def test_remove_node_different_os_get_os_family_single(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        context = demo.create_silent_context(procedure='remove_node')
+        context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
         host_different_os = inventory['nodes'][0]['address']
         context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
-        remove_node = {"nodes": [{"name": inventory["nodes"][0]["name"]}]}
+        remove_node = demo.generate_procedure_inventory('remove_node')
+        remove_node['nodes'] = [{"name": inventory["nodes"][0]["name"]}]
         cluster = demo.new_cluster(inventory, procedure_inventory=remove_node, context=context)
         self.assertEqual('debian', get_os_family(cluster),
                          msg="One node has different OS family and thus global OS family should be 'multiple'")

@@ -23,6 +23,8 @@ from typing import Dict, List
 import ruamel.yaml.resolver
 import yaml
 
+from kubemarine import procedures as proc
+
 # Don't remove this line. The idna encoding
 # is used by getaddrinfo when dealing with unicode hostnames,
 # and in some cases, there appears to be a race condition
@@ -157,15 +159,11 @@ Usage: kubemarine <procedure> <arguments>
 ''' % '\n'.join(descriptions_print_list))
         sys.exit(1)
 
-    result = import_procedure(arguments[0]).main(arguments[1:])
+    result = proc.import_procedure(arguments[0]).main(arguments[1:])
     if result is not None:
         from kubemarine.testsuite import TestSuite
         if isinstance(result, TestSuite) and result.is_any_test_failed():
             sys.exit(1)
-
-def import_procedure(name: str) -> types.ModuleType:
-    module_name = 'kubemarine.procedures.%s' % name
-    return __import__(module_name, fromlist=['object'])
 
 
 def version() -> None:
@@ -185,7 +183,7 @@ def selftest() -> None:
         if procedure in ['version', 'selftest']:
             continue
 
-        module = import_procedure(procedure)
+        module = proc.import_procedure(procedure)
         imports = []
 
         for attr in dir(module):
@@ -207,7 +205,7 @@ def selftest() -> None:
         print("%s OK" % procedure)
 
         del module
-        del sys.modules['kubemarine.procedures.%s' % procedure]
+        proc.deimport_procedure(procedure)
 
     print("\nTrying fake cluster...")
 
@@ -217,7 +215,7 @@ def selftest() -> None:
 
     print('\nValidating patch duplicates ...')
 
-    module = import_procedure('migrate_kubemarine')
+    module = proc.import_procedure('migrate_kubemarine')
     patches = module.load_patches()
     patch_ids = [patch.identifier for patch in patches]
     unique = set()

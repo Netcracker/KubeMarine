@@ -25,11 +25,11 @@ from test.unit import utils as test_utils
 class EnrichmentAndFinalization(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
-        self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='add_node',
-                                                  parser=flow.new_procedure_parser("Help text"))
+        self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='add_node')
         self.inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         self.nodes_context = demo.generate_nodes_context(self.inventory)
-        self.add_node = {'nodes': [self.inventory['nodes'].pop(0)]}
+        self.add_node = demo.generate_procedure_inventory('add_node')
+        self.add_node['nodes'] = [self.inventory['nodes'].pop(0)]
 
     def tearDown(self) -> None:
         self.tmpdir.cleanup()

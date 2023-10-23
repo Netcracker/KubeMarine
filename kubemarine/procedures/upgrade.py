@@ -128,7 +128,9 @@ class UpgradeFlow(flow.Flow):
         logger = resources.logger()
 
         previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
-        upgrade_plan = resources.procedure_inventory()['upgrade_plan']
+        upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
+        if not upgrade_plan:
+            raise Exception('Upgrade plan is not specified in procedure')
         upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
         logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
 
@@ -158,7 +160,7 @@ class UpgradeAction(Action):
         context['dump_filename_prefix'] = self.upgrade_version
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for automated upgrade of the entire Kubernetes cluster to a new version.
 
@@ -169,6 +171,11 @@ def main(cli_arguments: List[str] = None) -> None:
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='upgrade')
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     flow_ = UpgradeFlow()
     result = flow_.run_flow(context)
 

@@ -106,9 +106,7 @@ class TestValidExamples(unittest.TestCase):
             else:
                 self.fail(f"Unknown procedure for inventory {relpath}")
 
-            context = demo.create_silent_context(procedure=procedure)
-            if procedure == 'restore':
-                context['backup_descriptor'] = {}
+            context = demo.create_silent_context(['fake.yaml'], procedure=procedure)
             inventory = demo.generate_inventory(**demo.MINIHA)
 
             # check that enrichment is successful and the inventory is valid against the schema

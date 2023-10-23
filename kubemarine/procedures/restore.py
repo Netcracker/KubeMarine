@@ -45,8 +45,9 @@ def missing_or_empty(file: str) -> bool:
 def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str) -> None:
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
-        with utils.open_external(procedure_inventory_filepath, 'r') as stream:
-            procedure = yaml.safe_load(stream)
+        procedure = utils.load_yaml(procedure_inventory_filepath)
+        if not procedure:
+            procedure = {}
         backup_location = procedure.get("backup_location")
         if not backup_location:
             raise Exception('Backup location is not specified in procedure')
@@ -289,7 +290,7 @@ class RestoreAction(Action):
         res.make_final_inventory()
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for restoring Kubernetes resources and nodes contents from backup file.
 
@@ -300,6 +301,13 @@ def main(cli_arguments: List[str] = None) -> None:
     parser = flow.new_procedure_parser(cli_help, tasks=tasks)
 
     context = flow.create_context(parser, cli_arguments, procedure='restore')
+    context['backup_descriptor'] = {}
+
+    return context
+
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     args = context['execution_arguments']
 
     replace_config_from_backup_if_needed(args['procedure_config'], args['config'])

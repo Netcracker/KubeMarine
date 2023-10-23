@@ -19,7 +19,6 @@ from types import FunctionType
 from typing import Callable, List, Dict, cast
 
 import yaml
-import os
 import io
 
 from kubemarine.core.action import Action
@@ -633,7 +632,7 @@ class InstallAction(Action):
         run_tasks(res)
 
 
-def main(cli_arguments: List[str] = None) -> None:
+def create_context(cli_arguments: List[str] = None) -> dict:
     cli_help = '''
     Script for installing Kubernetes cluster.
 
@@ -643,7 +642,11 @@ def main(cli_arguments: List[str] = None) -> None:
 
     parser = flow.new_tasks_flow_parser(cli_help, tasks=tasks)
     context = flow.create_context(parser, cli_arguments, procedure='install')
+    return context
 
+
+def main(cli_arguments: List[str] = None) -> None:
+    context = create_context(cli_arguments)
     install = InstallAction()
     flow_ = flow.ActionsFlow([install])
     result = flow_.run_flow(context)

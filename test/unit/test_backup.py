@@ -54,7 +54,7 @@ class TestBackupTasks(unittest.TestCase):
 
     def _run(self):
         self.resources = demo.FakeResources(self.context, self.inventory,
-                                            procedure_inventory={},
+                                            procedure_inventory=demo.generate_procedure_inventory('backup'),
                                             nodes_context=demo.generate_nodes_context(self.inventory),
                                             fake_shell=self.fake_shell)
 
