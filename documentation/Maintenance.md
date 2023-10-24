@@ -1835,6 +1835,40 @@ data:
 
 11. Check that everything works properly and remove the old ippool if necessary.
 
+## Kubelet server certificate approval
+
+The `kubelet` server certificate is self-signed by default. To avoid that one should change `cluster.yaml` in the following way:
+
+```yaml
+...
+services:
+  kubeadm_kubelet:
+    serverTLSBootstrap: true
+    rotateCertificates: true
+  kubeadm:
+    apiServer:
+      extraArgs:
+        kubelet-certificate-authority: /etc/kubernetes/pki/ca.crt
+...
+```
+
+These settings enforce `kubelet` on each node of the cluster to request certificate appoval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
+
+```
+# kubectl get csr
+NAME        AGE     SIGNERNAME                                    REQUESTOR            REQUESTEDDURATION   CONDITION
+csr-2z6rv   12m     kubernetes.io/kubelet-serving                 system:node:nodename-1   <none>              Pending
+csr-424qg   89m     kubernetes.io/kubelet-serving                 system:node:nodename-2   <none>              Pending
+```
+
+Approve the particular request:
+
+```
+kubectl certificate approve csr-424qg
+```
+
+These commands might be automated by `CronJob` or the service similar the following: [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)
+
 # Common Practice
 
 You should not run any containers on worker nodes that are not managed by `kubelet` so as not to break the `kube-scheduler` precision.
