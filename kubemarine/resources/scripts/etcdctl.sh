@@ -73,9 +73,10 @@ if [ -n "${ETCD_POD_CONFIG}" ]; then
 
   if [ "$CONT_RUNTIME" == "ctr" ]; then
     ETCD_REGISTRY=$(echo ${ETCD_IMAGE} | cut -d "/" -f1)
+    ctr_default_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^*=" | sed "s/^*=//;")
     ctr_pull_opts=$(cat /etc/ctr/kubemarine_ctr_flags.conf |  grep "^${ETCD_REGISTRY}=" | sed "s/^${ETCD_REGISTRY}=//;")
     container_name="etcdctl-$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20; echo;)"
-    ctr image pull ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
+    ctr image pull ${ctr_default_pull_opts} ${ctr_pull_opts} ${ETCD_IMAGE} > /dev/null 2&>1
     ctr run --net-host --rm ${ETCD_MOUNTS} --env ETCDCTL_API=3 ${ETCD_IMAGE} $container_name \
 	    etcdctl --cert=${ETCD_CERT} --key=${ETCD_KEY} --cacert=${ETCD_CA} "${USER_ARGS[@]}"
   else
