@@ -1856,9 +1856,9 @@ These settings enforce `kubelet` on each node of the cluster to request certific
 
 ```
 # kubectl get csr
-NAME        AGE     SIGNERNAME                                    REQUESTOR            REQUESTEDDURATION   CONDITION
-csr-2z6rv   12m     kubernetes.io/kubelet-serving                 system:node:nodename-1   <none>              Pending
-csr-424qg   89m     kubernetes.io/kubelet-serving                 system:node:nodename-2   <none>              Pending
+NAME        AGE     SIGNERNAME                          REQUESTOR                 REQUESTEDDURATION    CONDITION
+csr-2z6rv   12m     kubernetes.io/kubelet-serving       system:node:nodename-1    <none>               Pending
+csr-424qg   89m     kubernetes.io/kubelet-serving       system:node:nodename-2    <none>               Pending
 ```
 
 Approve the particular request:
