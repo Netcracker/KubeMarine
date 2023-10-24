@@ -88,9 +88,7 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
         if item.get('hosts') is None:
             # Assign default list of all the balancer names. It can be an empty list.
             # Assigning of initial balancers is necessary to property calculate 'keepalived' NodeGroup.
-            # TODO assign list(initial_balancers) copy to avoid inline modification of initial_balancers list.
-            #  https://github.com/Netcracker/KubeMarine/issues/248
-            item['hosts'] = initial_balancers
+            item['hosts'] = list(initial_balancers)
             default_hosts = True
 
         for j, record in enumerate(item['hosts']):

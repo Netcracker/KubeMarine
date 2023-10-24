@@ -259,6 +259,23 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
         flow.ActionsFlow([add_node.AddNodeAction()]).run_flow(resources)
         return resources
 
+    def test_two_vrrp_different_interfaces(self):
+        scheme = demo.new_scheme(demo.ALLINONE, 'keepalived', 2)
+        inventory = demo.generate_inventory(**scheme)
+        inventory['vrrp_ips'][0] = {
+            'ip': inventory['vrrp_ips'][0],
+            'interface': 'inf1'
+        }
+        inventory['vrrp_ips'][1] = {
+            'ip': inventory['vrrp_ips'][1],
+            'interface': 'inf2'
+        }
+
+        cluster = demo.new_cluster(inventory)
+
+        self.assertEqual(cluster.inventory.get('vrrp_ips')[0]['hosts'][0]['interface'], 'inf1')
+        self.assertEqual(cluster.inventory.get('vrrp_ips')[1]['hosts'][0]['interface'], 'inf2')
+
     def test_password_enrich_exponential_float(self):
         # Make sure to execute global patches of environment / libraries
         from kubemarine import __main__
