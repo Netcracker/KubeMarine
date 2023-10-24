@@ -1198,3 +1198,24 @@ The user can analyze these files and try to find the reason for the failed insta
 sudo systemctl stop kubepods-burstable.slice
 sudo systemctl restart containerd
 ```
+
+## `kubectl logs` and `kubectl exec` fail
+
+**Symptoms**:
+
+The attempt to get pod logs and execute command inside container fail with the following errors:
+
+```
+$ kubectl -n my-namespace logs my-pod
+Error from server: Get "https://192.168.1.1:10250/containerLogs/my-namespace/my-pod/controller": remote error: tls: internal error
+```
+
+```
+$ kubectl -n my-namespace exec my-pod -- id
+Error from server: error dialing backend: remote error: tls: internal error
+```
+
+**Root cause**:
+`kubelet` server certificate is not approved whereas cluster has been configured not to use self-signed certificates for `kubelet` server.
+
+**Solution**: Perform CSR approval steps from maintenance guide: [Kubelet server certificate approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Maintenance.md#kubelet-server-certificate-approval)
