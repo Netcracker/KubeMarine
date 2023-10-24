@@ -1867,7 +1867,15 @@ Approve the particular request:
 kubectl certificate approve csr-424qg
 ```
 
-These commands might be automated by `CronJob` or the service similar the following: [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)
+These commands might be automated in several ways.
+
+### Auto approval CronJob
+
+Basically, `CronJob` runs the approval command above for every CSR according to some schedule.
+
+### Auto approval serice
+
+It's possible to install the service: [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver). That service approves CSR automatically when CSR is created according to the several settings. It's better to restrict nodes IP addresses(`providerIpPrefixes` option) and nodes FQDN templates(providerRegex). More information in official documentation.
 
 # Common Practice
 
