@@ -172,7 +172,7 @@ def apply_registry(inventory: dict, cluster: KubernetesCluster) -> dict:
 
         old_format_result, _ = contains_old_format_properties(inventory)
         # todo remove p3_reconfigure_registries after next release
-        if old_format_result or (cluster and not cluster.context.get('p3_reconfigure_registries', True)):
+        if old_format_result or not cluster.context.get('p3_reconfigure_registries', True):
             # Add registry info in old format
             registry_section = f'plugins."io.containerd.grpc.v1.cri".registry.mirrors."{registry_mirror_address}"'
             containerd_config = inventory['services']['cri']['containerdConfig']

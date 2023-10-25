@@ -277,7 +277,7 @@ def configure_crictl(group: NodeGroup) -> None:
 
 
 def get_config_path(inventory: dict) -> Optional[str]:
-    config_path: Optional[str] = inventory.get('containerdConfig', {}) \
+    config_path: Optional[str] = inventory.get('services', {}).get('cri', {}).get('containerdConfig', {}) \
         .get('plugins."io.containerd.grpc.v1.cri".registry', {}).get('config_path')
     return config_path
 
