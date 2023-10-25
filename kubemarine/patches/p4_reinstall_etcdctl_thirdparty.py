@@ -16,12 +16,12 @@ from textwrap import dedent
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
-from kubemarine.cri.containerd import contains_old_format_properties, configure_containerd, configure_ctr_flags
+from kubemarine.thirdparties import install_thirdparty
 
 
 class TheAction(Action):
     def __init__(self) -> None:
-        super().__init__("Reconfigure registries containerd configuration")
+        super().__init__("Reinstall etcdctl thirdparty")
 
     def run(self, res: DynamicResources) -> None:
         logger = res.logger()
@@ -30,22 +30,13 @@ class TheAction(Action):
             logger.info("Docker cri is used, updating containerd configuration is not needed")
             return
 
-        prev_cluster = res.create_deviated_cluster({
-            'p3_reconfigure_registries': False
-        })
-
-        if 'containerdRegistriesConfig' not in cluster.inventory['services']['cri'] or \
-                'containerdRegistriesConfig' in prev_cluster.inventory['services']['cri']:
-            logger.info("Nothing changed, updating containerd configuration is not needed")
-            return
-        node_group = cluster.make_group_from_roles(['control-plane', 'worker'])
-        node_group.call(configure_ctr_flags)
-        node_group.call(configure_containerd)
+        cluster.log.info("Update /usr/bin/etcdctl thirdparty")
+        install_thirdparty(cluster.nodes['all'], '/usr/bin/etcdctl')
 
 
-class ReconfigureRegistries(RegularPatch):
+class ReinstallEtcdctl(RegularPatch):
     def __init__(self) -> None:
-        super().__init__("reconfigure_registries")
+        super().__init__("reinstall_etcdctl")
 
     @property
     def action(self) -> Action:
@@ -55,6 +46,6 @@ class ReconfigureRegistries(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch reconfigure containerd registries configuration and migrate it to new format.
+            This patch reinstalls etcdctl thirdparty.
             """.rstrip()
         )

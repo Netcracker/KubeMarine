@@ -256,10 +256,11 @@ def configure_ctr_flags(group: NodeGroup) -> None:
         elif registry_auth.get('username'):
             options.append(f'--user {registry_auth["username"]}' +
                            f':{registry_auth["password"]}' if registry_auth.get("password") else '')
-        # Add hosts-dir, if it's presented
-        if config_path:
-            options.append(f'--hosts-dir {config_path}')
         ctr_pull_options_str += f'{registry_name}={" ".join(options)}\n'
+
+    # Add hosts-dir, if it's presented
+    if config_path:
+        ctr_pull_options_str += f'*=--hosts-dir {config_path}\n'
 
     # Save ctr pull options
     log.debug("Uploading ctr flags configuration...")
@@ -276,7 +277,7 @@ def configure_crictl(group: NodeGroup) -> None:
 
 
 def get_config_path(inventory: dict) -> Optional[str]:
-    config_path: Optional[str] = inventory.get('containerdConfig', {}) \
+    config_path: Optional[str] = inventory.get('services', {}).get('cri', {}).get('containerdConfig', {}) \
         .get('plugins."io.containerd.grpc.v1.cri".registry', {}).get('config_path')
     return config_path
 
