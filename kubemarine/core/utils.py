@@ -183,6 +183,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
         remove_node.remove_node_finalize_inventory,
         kubernetes.restore_finalize_inventory,
         kubernetes.upgrade_finalize_inventory,
+        thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         plugins.upgrade_finalize_inventory,
         packages.upgrade_finalize_inventory,

@@ -218,6 +218,27 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
     return inventory
 
 
+def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    return restore_finalize_inventory(cluster, inventory)
+
+
+def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "restore":
+        return inventory
+
+    restore_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
+    if restore_thirdparties:
+        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
+
+        for destination, value in restore_thirdparties.items():
+            config = _convert_thirdparty(thirdparties, destination)
+            config['source'] = value['source']
+            if value.get('sha1'):
+                config['sha1'] = value['sha1']
+
+    return inventory
+
+
 def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
     thirdparties: Dict[str, dict] = inventory['services'].get('thirdparties', {})
     # if thirdparties is empty, then nothing to do
