@@ -176,8 +176,9 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
 
     from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
     from kubemarine.core import defaults
+    from kubemarine.cri import containerd
     from kubemarine.plugins import nginx_ingress
-    from kubemarine.procedures import add_node, remove_node, migrate_cri
+    from kubemarine.procedures import add_node, remove_node
 
     inventory_finalize_functions = [
         add_node.add_node_finalize_inventory,
@@ -187,11 +188,13 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
         kubernetes.upgrade_finalize_inventory,
         thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
+        thirdparties.migrate_cri_finalize_inventory,
         plugins.upgrade_finalize_inventory,
         packages.upgrade_finalize_inventory,
+        packages.migrate_cri_finalize_inventory,
         admission.finalize_inventory,
         nginx_ingress.finalize_inventory,
-        migrate_cri.migrate_cri_finalize_inventory,
+        containerd.migrate_cri_finalize_inventory,
         cri.upgrade_finalize_inventory,
     ]
 

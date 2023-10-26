@@ -18,7 +18,7 @@ from collections import OrderedDict
 
 import io
 import uuid
-from typing import List, Callable
+from typing import List
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow
@@ -28,110 +28,7 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
-from kubemarine.core.yaml_merger import default_merger
 from kubemarine import packages
-
-
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    os_family = cluster.get_os_family()
-    if os_family in ('unknown', 'unsupported', 'multiple'):
-        raise Exception("Migration of CRI is possible only for cluster "
-                        "with all nodes having the same and supported OS family")
-
-    enrichment_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
-        _prepare_yum_repos,
-        _prepare_packages,
-        _configure_containerd_on_nodes,
-        _prepare_crictl
-    ]
-    for enrichment_fn in enrichment_functions:
-        cluster.log.verbose('Calling fn "%s"' % enrichment_fn.__qualname__)
-        inventory = enrichment_fn(cluster, inventory)
-    return inventory
-
-
-def _prepare_yum_repos(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
-    if not cluster.procedure_inventory.get("yum", {}):
-        cluster.log.debug("Skipped - no yum section defined in procedure config file")
-        return inventory
-
-    if not cluster.procedure_inventory["yum"].get("repositories", {}):
-        cluster.log.debug("No repositories will be added on nodes")
-        return inventory
-
-    if not inventory["services"].get("yum", {}):
-        inventory["services"]["yum"] = {}
-
-    if inventory["services"]["yum"].get("repositories", {}):
-        default_merger.merge(inventory["services"]["yum"]["repositories"],
-                             cluster.procedure_inventory["yum"]["repositories"])
-    else:
-        default_merger.merge(inventory["services"]["yum"],
-                             cluster.procedure_inventory["yum"])
-    return inventory
-
-
-def _prepare_packages(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
-    if not cluster.procedure_inventory.get("packages", {}):
-        cluster.log.debug("Skipped - no packages defined in procedure config file")
-        return inventory
-
-    if not cluster.procedure_inventory["packages"].get("associations", {}):
-        cluster.log.debug("Skipped - no associations defined in procedure config file")
-        return inventory
-
-    if finalization:
-        # Despite we enrich OS specific section inside system.enrich_upgrade_inventory,
-        # we still merge global associations section because it has priority during enrichment.
-        inventory["services"].setdefault("packages", {}).setdefault("associations", {})
-        default_merger.merge(inventory["services"]["packages"]["associations"],
-                             cluster.procedure_inventory["packages"]["associations"])
-    else:
-        # Merge OS family specific section. It is already enriched in packages.enrich_inventory_associations
-        # This effectively allows to specify only global section but not for specific OS family.
-        # This restriction is because system.enrich_upgrade_inventory goes after packages.enrich_inventory_associations,
-        # but in future the restriction can be eliminated.
-        default_merger.merge(inventory["services"]["packages"]["associations"][cluster.get_os_family()],
-                             cluster.procedure_inventory["packages"]["associations"])
-
-    return inventory
-
-
-def _prepare_crictl(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
-    if cluster.procedure_inventory.get("thirdparties", {}) \
-            and cluster.procedure_inventory["thirdparties"].get("/usr/bin/crictl.tar.gz", {}):
-
-        if not inventory["services"].get("thirdparties", {}):
-            inventory["services"]["thirdparties"] = {}
-
-        default_merger.merge(inventory["services"]["thirdparties"],
-                             cluster.procedure_inventory["thirdparties"])
-        cluster.log.debug("Third-party crictl added")
-        return inventory
-    else:
-        return inventory
-
-
-def _configure_containerd_on_nodes(cluster: KubernetesCluster, inventory: dict) -> dict:
-    if inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
-        raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
-
-    inventory = _merge_containerd(cluster, inventory)
-    return inventory
-
-
-def _merge_containerd(cluster: KubernetesCluster, inventory: dict, finalization: bool = False) -> dict:
-    if not inventory["services"].get("cri", {}):
-        inventory["services"]["cri"] = {}
-
-    if inventory["services"]["cri"].get("dockerConfig", {}):
-        del inventory["services"]["cri"]["dockerConfig"]
-
-    default_merger.merge(inventory["services"]["cri"], cluster.procedure_inventory["cri"])
-    return inventory
 
 
 def migrate_cri(cluster: KubernetesCluster) -> None:
@@ -263,23 +160,6 @@ def edit_config(kubeadm_flags: str) -> str:
     kubeadm_flags = kubernetes.config_changer(kubeadm_flags, "--container-runtime=remote")
     return kubernetes.config_changer(kubeadm_flags,
                                      "--container-runtime-endpoint=unix:///run/containerd/containerd.sock")
-
-
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
-
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory_to_finalize
-    finalize_functions: List[Callable[[KubernetesCluster, dict, bool], dict]] = [
-        _prepare_yum_repos,
-        _prepare_packages,
-        _prepare_crictl,
-        _merge_containerd
-    ]
-    for finalize_fn in finalize_functions:
-        cluster.log.verbose('Calling fn "%s"' % finalize_fn.__qualname__)
-        inventory_to_finalize = finalize_fn(cluster, inventory_to_finalize, True)
-
-    return inventory_to_finalize
 
 
 tasks = OrderedDict({

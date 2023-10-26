@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import shutil
+from copy import deepcopy
 from io import StringIO
 from typing import Dict, List, Tuple, Optional
 
@@ -26,7 +25,6 @@ from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 from kubemarine.core.yaml_merger import default_merger
-from pathvalidate import sanitize_filepath
 
 
 def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
@@ -153,6 +151,30 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     if upgrade_config:
         default_merger.merge(inventory.setdefault("services", {}).setdefault("cri", {}), upgrade_config)
 
+    return inventory
+
+
+def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    # This method should be before defaults.apply_registry
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        return inventory
+
+    if inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
+        raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
+
+    return migrate_cri_finalize_inventory(cluster, inventory)
+
+
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        return inventory
+
+    cri_section = inventory.setdefault("services", {}).setdefault("cri", {})
+
+    if cri_section.get("dockerConfig", {}):
+        del cri_section["dockerConfig"]
+
+    default_merger.merge(cri_section, deepcopy(cluster.procedure_inventory["cri"]))
     return inventory
 
 

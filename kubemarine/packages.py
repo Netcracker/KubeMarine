@@ -130,7 +130,7 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
 
     os_family = cluster.get_os_family()
     if os_family not in get_associations_os_family_keys():
-        raise errors.KME("KME0012")
+        raise errors.KME("KME0012", procedure='upgrade')
 
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
@@ -161,12 +161,8 @@ def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
         return
 
     _, upgrade_associations = upgrade_plan[0]
-    if upgrade_associations:
-        cluster_associations = inventory.setdefault("services", {}).setdefault("packages", {}) \
-            .setdefault("associations", {})
-        if not enrich_global:
-            cluster_associations = cluster_associations.setdefault(cluster.get_os_family(), {})
-        default_merger.merge(cluster_associations, upgrade_associations)
+    _enrich_inventory_procedure_associations(cluster, inventory, upgrade_associations,
+                                             enrich_global=enrich_global)
 
 
 def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> None:
@@ -274,6 +270,36 @@ def _get_system_packages_support_upgrade(inventory: dict) -> List[str]:
     return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
 
 
+def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        return inventory
+
+    os_family = cluster.get_os_family()
+    if os_family not in get_associations_os_family_keys():
+        raise errors.KME("KME0012", procedure='migrate_cri')
+
+    procedure_associations = cluster.procedure_inventory.get("packages", {}).get("associations", {})
+    # Merge OS family specific section. It is already enriched in enrich_inventory_associations()
+    # This effectively allows to specify only global section but not for specific OS family.
+    # This restriction is because enrich_migrate_cri_inventory() goes after enrich_inventory_associations(),
+    # but in future the restriction can be eliminated.
+    return _enrich_inventory_procedure_associations(cluster, inventory, procedure_associations,
+                                                    enrich_global=False)
+
+
+def _enrich_inventory_procedure_associations(cluster: KubernetesCluster, inventory: dict,
+                                             procedure_associations: dict,
+                                             *, enrich_global: bool) -> dict:
+    if procedure_associations:
+        cluster_associations = inventory.setdefault("services", {}).setdefault("packages", {}) \
+            .setdefault("associations", {})
+        if not enrich_global:
+            cluster_associations = cluster_associations.setdefault(cluster.get_os_family(), {})
+        default_merger.merge(cluster_associations, deepcopy(procedure_associations))
+
+    return inventory
+
+
 def enrich_inventory_include_all(inventory: dict, _: KubernetesCluster) -> dict:
     for _type in ['upgrade', 'remove']:
         packages: dict = inventory['services']['packages'].get(_type)
@@ -290,6 +316,17 @@ def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     upgrade_inventory_packages(cluster, inventory)
 
     return inventory
+
+
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        return inventory
+
+    procedure_associations = cluster.procedure_inventory.get("packages", {}).get("associations", {})
+    # Despite we enrich OS specific section inside enrich_migrate_cri_inventory(),
+    # we still merge global associations section because it has priority during enrichment.
+    return _enrich_inventory_procedure_associations(cluster, inventory, procedure_associations,
+                                                    enrich_global=True)
 
 
 def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes: bool = False) -> dict:

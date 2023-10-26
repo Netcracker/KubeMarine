@@ -13,6 +13,9 @@
         },
         "containerdConfig": {
           "$ref": "definitions/services/cri.json#/definitions/ContainerdConfig"
+        },
+        "containerdRegistriesConfig": {
+          "$ref": "definitions/services/cri.json#/definitions/ContainerdRegistriesConfig"
         }
       },
       "required": ["containerRuntime"],
