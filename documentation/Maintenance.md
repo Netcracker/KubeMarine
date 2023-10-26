@@ -27,6 +27,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Changing Calico Settings](#changing-calico-settings)
     - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
+    - [Kubelet server certificate approval](#kubelet-server-certificate-approval)
 - [Common Practice](#common-practice)
 
 # Prerequisites

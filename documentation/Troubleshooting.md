@@ -36,6 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
+  - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
 
@@ -1199,7 +1200,7 @@ sudo systemctl stop kubepods-burstable.slice
 sudo systemctl restart containerd
 ```
 
-## `kubectl logs` and `kubectl exec` fail
+## kubectl logs and kubectl exec fail
 
 **Symptoms**: The attempt to get pod logs and execute command inside container fail with the following errors:
 
