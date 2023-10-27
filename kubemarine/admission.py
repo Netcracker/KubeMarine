@@ -856,7 +856,7 @@ def update_finalized_inventory(cluster: KubernetesCluster, inventory_to_finalize
 
 
 def copy_pss(group: NodeGroup) -> Optional[RunnersGroupResult]:
-    if  group.cluster.inventory['rbac']['admission'] != "pss":
+    if group.cluster.inventory['rbac']['admission'] != "pss":
         return None
     if group.cluster.context.get('initial_procedure') == 'manage_pss':
         if not is_security_enabled(group.cluster.inventory) and \
@@ -875,15 +875,10 @@ def copy_pss(group: NodeGroup) -> Optional[RunnersGroupResult]:
                        .render(defaults=defaults,exemptions=exemptions)
 
     # put admission config on every control-planes
-    filename = uuid.uuid4().hex
-    remote_path = tmp_filepath_pattern % filename
-    group.cluster.log.debug("Copy admission config: %s, %s" % (remote_path, admission_path))
-    group.put(io.StringIO(admission_config), remote_path, backup=True, sudo=True)
-    group.sudo("mkdir -p %s" % admission_dir, warn=True)
-    result = group.sudo("cp %s %s" % (remote_path, admission_path), warn=True)
-    group.sudo("rm -f %s" % remote_path)
+    group.cluster.log.debug(f"Copy admission config to {admission_path}")
+    group.put(io.StringIO(admission_config), admission_path, backup=True, sudo=True, mkdir=True)
 
-    return result
+    return group.sudo(f'ls -la {admission_path}')
 
 
 def _get_default_labels(profile: str) -> Dict[str, str]:

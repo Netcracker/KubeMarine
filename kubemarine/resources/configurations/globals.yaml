@@ -273,7 +273,6 @@ packages:
     semanage:
       groups: [ control-plane, worker, balancer ]
 
-
 compatibility_map:
   # This section is filled automatically during Kubemarine work from the following resources:
   # - kubemarine/resources/configurations/compatibility/internal/kubernetes_images.yaml
@@ -356,7 +355,9 @@ compatibility_map:
         versions:
           - '8.6'
           - '8.7'
-          - '8.8'
+      - os_family: 'rhel9'
+        versions:
+          - '9.2'
     ubuntu:
       - os_family: 'debian'
         versions:
@@ -382,7 +383,6 @@ compatibility_map:
           - '8.4'
       - os_family: 'rhel9'
         versions:
-          - '9.1'
           - '9.2'
 
   network:

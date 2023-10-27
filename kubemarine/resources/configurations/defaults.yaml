@@ -498,6 +498,8 @@ services:
           package_name: 'conntrack-tools'
         semanage:
           package_name: 'policycoreutils-python-utils'
+        iptables:
+          package_name: 'iptables-nft'
 
 plugin_defaults:
   installation: {}

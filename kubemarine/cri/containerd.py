@@ -195,6 +195,7 @@ def fetch_containerd_config(group: NodeGroup) -> Tuple[Dict[str, dict], Dict[str
 
     return containerd_config, containerd_reg_config
 
+
 def install(group: NodeGroup) -> RunnersGroupResult:
     collector = CollectorCallback(group.cluster)
     with group.new_executor() as exe:

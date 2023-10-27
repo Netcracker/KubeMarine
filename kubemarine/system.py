@@ -261,9 +261,6 @@ def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source:
     group.put(io.StringIO(utils.read_internal(patch_source)),
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
               sudo=True)
-    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
-        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d")
-        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d/{service_name}.conf")
     group.sudo("systemctl daemon-reload")
 
 
@@ -507,9 +504,6 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
     utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
     group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
     group.sudo("modprobe -a %s" % raw_config)
-
-    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
-        group.sudo("chcon -u system_u -r object_r -t etc_t /etc/modules-load.d/predefined.conf")
 
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)

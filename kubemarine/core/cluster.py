@@ -215,7 +215,7 @@ class KubernetesCluster(Environment):
         """
         Returns the detected operating system family for hosts.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9" "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
         """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
         if len(os_families) > 1:
