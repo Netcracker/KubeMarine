@@ -1121,11 +1121,13 @@ For Kubernetes, most of the internal certificates could be updated, specifically
 Certificate used by `kubelet.conf` by default is updated automatically by Kubernetes, 
 link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io/docs/tasks/tls/certificate-rotation/#understanding-the-certificate-rotation-configuration.
 
-**Note**: Serving kubelet certificate `kubelet.crt` is updated forcefully by this procedure each time it runs.
+**Note**: Serving kubelet certificate `kubelet.crt` on control plane node is updated forcefully by this procedure each time it runs.
 
 **Note**: Each time you run this procedure, kubelet and all control plane containers are restarted.
 
 **Note**: CA certificates cannot be updated automatically and should be updated manually after 10 years.
+
+**Note**: The `cert_renew` procedure doesn't renew `kubelet` server certificate on workers. To avoid it, implement the changes from maintenance guide: [Kubelet server certificate approval](#kubelet-server-certificate-approval)
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
@@ -1874,7 +1876,7 @@ These commands might be automated in several ways.
 
 Basically, `CronJob` runs the approval command above for every CSR according to some schedule.
 
-### Auto approval serice
+### Auto approval service
 
 It's possible to install the service: [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver). That service approves CSR automatically when CSR is created according to the several settings. It's better to restrict nodes IP addresses(`providerIpPrefixes` option) and nodes FQDN templates(providerRegex). More information in official documentation.
 
