@@ -1416,7 +1416,7 @@ def prepare_audit_policy(group: NodeGroup) -> None:
     group.sudo(f"mkdir -p {audit_log_dir} && sudo mkdir -p {audit_policy_dir}")
 
     cluster.log.debug("Configure audit cluster policy")
-    policy_config = cluster.inventory['services']['audit'].get('cluster_policy')
+    policy_config = cluster.inventory['services']['audit']['cluster_policy']
     policy_config_file = yaml.dump(policy_config)
     utils.dump_file(cluster, policy_config_file, 'audit-policy.yaml')
     # upload rules on cluster

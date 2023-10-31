@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import difflib
 import io
 import sys
 import time
@@ -613,7 +614,7 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
 
 def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '229', "Kubernetes", "Audit policy configuration") as tc:
-        expected_config = cluster.inventory['services']['audit'].get('cluster_policy')
+        expected_config = yaml.dump(cluster.inventory['services']['audit']['cluster_policy'])
 
         api_server_extra_args = cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
         audit_file_name = api_server_extra_args['audit-policy-file']
@@ -628,14 +629,16 @@ def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
             if policy_result.failed:
                 broken.append(f"{node_name}: {audit_file_name} is absent")
             else:
-                actual_config = yaml.safe_load(policy_result.stdout)
-                diff = DeepDiff(actual_config, expected_config)
+                actual_config = policy_result.stdout
+                diff = list(difflib.unified_diff(
+                    actual_config.splitlines(),
+                    expected_config.splitlines(),
+                    fromfile=audit_file_name,
+                    tofile="inventory['services']['audit']['cluster_policy']",
+                    lineterm=''))
                 if diff:
                     cluster.log.debug(f"Configuration of audit policy is not actual on {node_name} node")
-                    # Extra transformation to JSON is necessary,
-                    # because DeepDiff.to_dict() returns custom nested classes
-                    # that cannot be serialized to yaml by default.
-                    cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                    cluster.log.debug('\n'.join(diff))
                     broken.append(f"{node_name}: {audit_file_name} is not actual")
 
         if broken:
