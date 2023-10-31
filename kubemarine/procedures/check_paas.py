@@ -29,7 +29,7 @@ import uuid
 from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeConfig, NodeGroup
+from kubemarine.core.group import NodeConfig, NodeGroup, CollectorCallback
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
 from kubemarine.plugins import calico
@@ -978,101 +978,109 @@ def control_plane_configuration_status(cluster: KubernetesCluster) -> None:
     :return: None
     '''
     with TestCase(cluster, '220', "Control plane", "configuration status") as tc:
-        results: List[dict] = []
         static_pod_names = {'kube-apiserver': 'apiServer',
                             'kube-controller-manager': 'controllerManager',
                             'kube-scheduler': 'scheduler'}
-        static_pods_content = []
-        not_presented_static_pods = []
-        for control_plane in cluster.nodes['control-plane'].get_ordered_members_list():
-            for static_pod_name, value in static_pod_names.items():
-                static_pod_result = control_plane.sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml', warn=True)
-                exit_code = list(static_pod_result.values())[0].exited
-                if exit_code == 0:
-                    static_pod = yaml.safe_load(static_pod_result.get_simple_out())
-                    static_pod[static_pod_name] = value
-                    static_pods_content.append(static_pod)
-                else:
-                    not_presented_static_pods.append(static_pod_name)
-            for not_presented_static_pod in not_presented_static_pods:
-                del static_pod_names[not_presented_static_pod]
+        defer = cluster.nodes['control-plane'].new_defer()
+        collector = CollectorCallback(cluster)
+        for control_plane in defer.get_ordered_members_list():
+            for static_pod_name in static_pod_names:
+                control_plane.sudo(f'cat /etc/kubernetes/manifests/{static_pod_name}.yaml',
+                                   warn=True, callback=collector)
 
-            result: dict = {'name': control_plane.get_node_name()}
-            version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-
-            node_config = control_plane.get_config()
-            for static_pod in static_pods_content:
-                result[static_pod['metadata']['name']] = {}
-                result[static_pod['metadata']['name']]['correct_version'] = \
-                    version in static_pod["spec"]["containers"][0].get("image", "")
-                result[static_pod['metadata']['name']]['correct_properties'] = \
-                    check_extra_args(cluster, static_pod, node_config)
-                result[static_pod['metadata']['name']]['correct_volumes'] = check_extra_volumes(cluster, static_pod)
-            results.append(result)
+        defer.flush()
 
         message = ""
-        for result in results:
-            for static_pod_name in static_pod_names:
-                if result[static_pod_name]['correct_version'] and \
-                   result[static_pod_name]['correct_properties'] and \
-                   result[static_pod_name]['correct_volumes']:
-                    cluster.log.verbose(f'Control-plane {result["name"]} has correct configuration for {static_pod_name}')
+        for control_plane in defer.get_ordered_members_list():
+            node_config = control_plane.get_config()
+            node_name = control_plane.get_node_name()
+            for i, static_pod_name in enumerate(static_pod_names):
+                kubeadm_section_name = static_pod_names[static_pod_name]
+                static_pod_result = collector.results[control_plane.get_host()][i]
+                if static_pod_result.ok:
+                    static_pod = yaml.safe_load(static_pod_result.stdout)
+                    correct_version = check_control_plane_version(cluster, static_pod_name, static_pod, node_config)
+                    correct_args = check_extra_args(cluster, static_pod_name, kubeadm_section_name, static_pod, node_config)
+                    correct_volumes = check_extra_volumes(cluster, static_pod_name, kubeadm_section_name, static_pod, node_config)
+                    if correct_version and correct_args and correct_volumes:
+                        cluster.log.verbose(
+                            f'Control-plane {node_name} has correct configuration for {static_pod_name}.')
+                    else:
+                        message += f"Control-plane {node_name} has incorrect configuration for {static_pod_name}.\n"
                 else:
-                    message += f"Control-plane {result['name']} has incorrect configuration for {static_pod_name} \n"
-        if not_presented_static_pods:
-            message += f"{not_presented_static_pods} static pods doesn't presented"
+                    message += f"{static_pod_name} static pod is not present on control-plane {node_name}.\n"
 
         if not message:
             tc.success(results='valid')
         else:
+            message += 'Check DEBUG logs for details.'
             raise TestFailure('invalid', hint=message)
 
 
-def check_extra_args(cluster: KubernetesCluster, static_pod: dict, node: NodeConfig) -> bool:
-    static_pod_name = static_pod[static_pod['metadata']['name']]
-    for arg, value in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraArgs", {}).items():
+def check_control_plane_version(cluster: KubernetesCluster, static_pod_name: str, static_pod: dict,
+                                node: NodeConfig) -> bool:
+    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    actual_image = static_pod["spec"]["containers"][0].get("image", "")
+    if version not in actual_image:
+        cluster.log.debug(f"{static_pod_name} image {actual_image} for control-plane {node['name']} "
+                          f"does not correspond to Kubernetes {version}")
+        return False
+
+    return True
+
+
+def check_extra_args(cluster: KubernetesCluster, static_pod_name: str, kubeadm_section_name: str,
+                     static_pod: dict, node: NodeConfig) -> bool:
+    result = True
+    for arg, value in cluster.inventory["services"]["kubeadm"][kubeadm_section_name].get("extraArgs", {}).items():
         if arg == "bind-address":
             # for "bind-address" we do not take default value into account, because its patched to node internal-address
             value = node["internal_address"]
-        correct_property = False
-        original_property = arg + "=" + value
+        original_property = f'--{arg}={value}'
         properties = static_pod["spec"]["containers"][0].get("command", [])
-        for property in properties:
-            if original_property in property:
-                correct_property = True
-                break
-        if not correct_property:
-            return False
-    return True
+        if original_property not in properties:
+            original_property_str = yaml.dump({arg: value}).rstrip('\n')
+            cluster.log.debug(f"{original_property_str!r} is present in services.kubeadm.{kubeadm_section_name}.extraArgs, "
+                              f"but not found in {static_pod_name} manifest for control-plane {node['name']}")
+            result = False
+
+    return result
 
 
-def check_extra_volumes(cluster: KubernetesCluster, static_pod: dict) -> bool:
-    static_pod_name = static_pod[static_pod['metadata']['name']]
-    #for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}).items():
-    for original_volume in cluster.inventory["services"]["kubeadm"][static_pod_name].get("extraVolumes", {}):
-        correct_volume = False
+def check_extra_volumes(cluster: KubernetesCluster, static_pod_name: str, kubeadm_section_name: str,
+                        static_pod: dict, node: NodeConfig) -> bool:
+    logger = cluster.log
+    result = True
+    section = f"services.kubeadm.{kubeadm_section_name}.extraVolumes"
+    for original_volume in cluster.inventory["services"]["kubeadm"][kubeadm_section_name].get("extraVolumes", []):
+        volume_name = original_volume['name']
         volume_mounts = static_pod["spec"]["containers"][0].get("volumeMounts", {})
-        for volumeMount in volume_mounts:
-            if volumeMount['mountPath'] == original_volume['mountPath'] and \
-                    volumeMount['name'] == original_volume['name'] and \
-                    volumeMount.get('readOnly', False ) == original_volume.get('readOnly', False):
-                correct_volume = True
-                break
-        if not correct_volume:
-            return False
-
-        correct_volume = False
+        volume_mount = next((vm for vm in volume_mounts if vm['name'] == volume_name), None)
+        if volume_mount is None:
+            logger.debug(f"Extra volume {volume_name!r} is present in {section}, "
+                         f"but not found among volumeMounts in {static_pod_name} manifest for control-plane {node['name']}")
+            result = False
+        elif (volume_mount['mountPath'] != original_volume['mountPath']
+              or volume_mount.get('readOnly', False) != original_volume.get('readOnly', False)):
+            logger.debug(f"Specification of extra volume {volume_name!r} in {section} "
+                         f"does not match the specification of volumeMount in {static_pod_name} manifest "
+                         f"for control-plane {node['name']}")
+            result = False
 
         volumes = static_pod["spec"].get("volumes", [])
-        for volume in volumes:
-            if volume['name'] == original_volume['name'] and \
-                    volume['hostPath']['path'] == original_volume['hostPath'] and \
-                    volume['hostPath']['type'] == original_volume['pathType']:
-                correct_volume = True
-                break
-        if not correct_volume:
-            return False
-    return True
+        volume = next((v for v in volumes if v['name'] == volume_name), None)
+        if volume is None:
+            logger.debug(f"Extra volume {volume_name!r} is present in {section}, "
+                         f"but not found among volumes in {static_pod_name} manifest for control-plane {node['name']}")
+            result = False
+        elif (volume['hostPath']['path'] != original_volume['hostPath']
+              or volume['hostPath'].get('type') != original_volume.get('pathType')):
+            logger.debug(f"Specification of extra volume {volume_name!r} in {section} "
+                         f"does not match the specification of volume in {static_pod_name} manifest "
+                         f"for control-plane {node['name']}")
+            result = False
+
+    return result
 
 
 def control_plane_health_status(cluster: KubernetesCluster) -> None:
