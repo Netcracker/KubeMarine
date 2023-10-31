@@ -333,6 +333,7 @@ compatibility_map:
         versions:
           - '8.6'
           - '8.7'
+          - '8.8'
     ubuntu:
       - os_family: 'debian'
         versions:
