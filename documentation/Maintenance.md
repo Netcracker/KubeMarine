@@ -1838,7 +1838,7 @@ data:
 
 ## Kubelet server certificate approval
 
-The `kubelet` server certificate is self-signed by default. To avoid that one should change `cluster.yaml` in the following way:
+The `kubelet` server certificate is self-signed by default, usually it's stored in `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using self-signed `kubelet` server certificate one should change `cluster.yaml` in the following way:
 
 ```yaml
 ...
