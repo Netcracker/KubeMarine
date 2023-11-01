@@ -552,6 +552,7 @@ By default, the following files are backed up from all nodes in the cluster:
 * /etc/systemd/system/{keepalived_service_name}.service.d/{keepalived_service_name}.conf
 * /usr/local/bin/check_haproxy.sh
 * /etc/yum.repos.d/
+* /etc/apt/sources.list.d/
 * /etc/modules-load.d/
 * /etc/audit/rules.d/
 * /etc/kubernetes/
