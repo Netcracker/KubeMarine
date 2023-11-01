@@ -448,10 +448,6 @@ class CalicoApiServerManifestProcessor(Processor):
             self.log.verbose(f"The {key} has been patched in 'rules' with '{cluster_role_use_anyuid_psp}'")
 
 
-def get_default_manifest_processor(cluster: KubernetesCluster) -> CalicoManifestProcessor:
-    return CalicoManifestProcessor(cluster.log, cluster.inventory)
-
-
 cluster_role_use_anyuid_psp = {
         "apiGroups": ["policy"],
         "resources": ["podsecuritypolicies"],

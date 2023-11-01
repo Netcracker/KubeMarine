@@ -1279,10 +1279,7 @@ def _check_calico_env(cluster: KubernetesCluster, manifest_: manifest.Manifest) 
     if calico.is_typha_enabled(cluster.inventory):
         entities_to_check.append(('Deployment', 'calico-typha'))
 
-    for entity in entities_to_check:
-        type_ = entity[0]
-        service_name = entity[1]
-
+    for type_, service_name in entities_to_check:
         k8s_object = KubernetesObject(cluster, type_, service_name, 'kube-system')
         k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
         if not k8s_object.is_reloaded():
