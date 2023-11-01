@@ -206,6 +206,11 @@ The configuration format for the plugins is the same.
 ## Upgrade Procedure
 
 **Warnings**: 
+* Follow Kubernetes upgrade best practises, like:
+  * Have a number of replicas configured for Application Microservices
+  * [Pod anti-affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity) rules should be configured to avoid placement of more than one pod replicas on the  same worker node
+  * [PodDisruptionBudget](https://kubernetes.io/docs/tasks/run-application/configure-pdb) is configured for desired Deployments
+  * https://kubernetes.io/docs/tasks/run-application/configure-pdb/#unhealthy-pod-eviction-policy is configured to _AlwaysAllow_
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
