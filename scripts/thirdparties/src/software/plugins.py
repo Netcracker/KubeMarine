@@ -348,5 +348,5 @@ def try_manifest_enrichment(k8s_version: str, manifest_identity: Identity) -> No
         def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
             print(msg)
 
-    processor = builtin.get_manifest_processor(ConsoleLogger(), cluster.inventory, manifest_identity)
+    processor = builtin._get_manifest_processor(ConsoleLogger(), cluster.inventory, manifest_identity)
     processor.enrich()

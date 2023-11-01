@@ -40,10 +40,34 @@ def is_manifest_installed(cluster: KubernetesCluster, manifest_identity: Identit
     :param manifest_identity: A pair of (plugin_name, manifest_id) that uniquely identifies the manifest
     :return: `true` is manifest is (to be) installed.
     """
-    if _is_manifest_disabled(cluster.inventory, manifest_identity):
-        return False
+    return get_manifest_processor(cluster, manifest_identity) is not None
 
-    return _get_manifest_installation_step(cluster.inventory, manifest_identity) is not None
+
+def get_manifest_processor(cluster: KubernetesCluster, manifest_identity: Identity) -> Optional[manifest.Processor]:
+    """
+    Return actual manifest processor if it is (to be) installed during the regular installation procedure.
+
+    :param cluster: KubernetesCluster object
+    :param manifest_identity: A pair of (plugin_name, manifest_id) that uniquely identifies the manifest
+    :return: actual manifest processor
+    """
+    if _is_manifest_disabled(cluster.inventory, manifest_identity):
+        return None
+
+    config = _get_manifest_installation_step(cluster.inventory, manifest_identity)
+    if config is None:
+        return None
+
+    return _convert_config_to_manifest_processor(cluster.log, cluster.inventory, config)
+
+
+def _convert_config_to_manifest_processor(logger: log.VerboseLogger, inventory: dict, config: dict) -> manifest.Processor:
+    arguments = config['arguments']
+    manifest_identity = Identity(arguments['plugin_name'], arguments.get('manifest_id'))
+
+    return _get_manifest_processor(
+        logger, inventory, manifest_identity,
+        arguments.get('original_yaml_path'), arguments.get('destination_name'))
 
 
 def _get_manifest_installation_step(inventory: dict, manifest_identity: Identity) -> Optional[dict]:
@@ -85,17 +109,13 @@ def _is_manifest_disabled(inventory: dict, manifest_identity: Identity) -> bool:
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for manifest_identity, processor_provider in MANIFEST_PROCESSOR_PROVIDERS.items():
+    for manifest_identity in MANIFEST_PROCESSOR_PROVIDERS:
         if _is_manifest_disabled(inventory, manifest_identity):
             continue
 
         config = _get_manifest_installation_step(inventory, manifest_identity)
         if config is not None:
-            arguments = config['arguments']
-
-            processor = processor_provider(
-                cluster.log, inventory, arguments.get('original_yaml_path'), arguments.get('destination_name')
-            )
+            processor = _convert_config_to_manifest_processor(cluster.log, inventory, config)
             processor.validate_inventory()
         else:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml for {manifest_identity.repr_id()} "
@@ -105,9 +125,9 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def get_manifest_processor(logger: log.VerboseLogger, inventory: dict, manifest_identity: Identity,
-                           original_yaml_path: Optional[str] = None,
-                           destination_name: Optional[str] = None) -> manifest.Processor:
+def _get_manifest_processor(logger: log.VerboseLogger, inventory: dict, manifest_identity: Identity,
+                            original_yaml_path: Optional[str] = None,
+                            destination_name: Optional[str] = None) -> manifest.Processor:
     if manifest_identity not in MANIFEST_PROCESSOR_PROVIDERS:
         raise Exception(f"Cannot find processor of {manifest_identity.repr_id()} "
                         f"for {manifest_identity.plugin_name!r} plugin.")
@@ -127,8 +147,8 @@ def apply_yaml(cluster: KubernetesCluster, plugin_name: str,
         cluster.log.debug(f"Skip installing of the {manifest_identity.repr_id()} for {plugin_name!r} plugin.")
         return
 
-    processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity,
-                                       original_yaml_path, destination_name)
+    processor = _get_manifest_processor(cluster.log, cluster.inventory, manifest_identity,
+                                        original_yaml_path, destination_name)
 
     manifest = processor.enrich()
     processor.apply(cluster, manifest)
@@ -146,7 +166,7 @@ def get_namespace_to_necessary_pss_profiles(cluster: KubernetesCluster) -> Dict[
         if _is_manifest_disabled(cluster.inventory, manifest_identity):
             continue
 
-        processor = get_manifest_processor(cluster.log, cluster.inventory, manifest_identity)
+        processor = _get_manifest_processor(cluster.log, cluster.inventory, manifest_identity)
         result.update(processor.get_namespace_to_necessary_pss_profiles())
 
     return result

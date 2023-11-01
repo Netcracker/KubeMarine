@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 import re
 from textwrap import dedent
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 
 import yaml
 import ruamel.yaml
@@ -32,9 +32,9 @@ from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup, CollectorCallback
 from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
-from kubemarine.plugins import calico
+from kubemarine.plugins import calico, builtin, manifest
 from kubemarine.procedures import check_iaas
-from kubemarine.core import flow, static
+from kubemarine.core import flow, static, utils
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
 from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
@@ -949,17 +949,13 @@ def container_runtime_configuration_check(cluster: KubernetesCluster) -> None:
             diff = DeepDiff(actual_config, expected_config)
             if diff:
                 cluster.log.debug(f"Configuration of containerd is not actual on {node.get_node_name()} node")
-                # Extra transformation to JSON is necessary,
-                # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
-                cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                utils.print_diff(cluster.log, diff)
                 success = False
 
             diff = DeepDiff(actual_registries.get(node.get_host(), {}), expected_registries)
             if diff:
                 cluster.log.debug(f"Configuration of containerd registries is not actual on {node.get_node_name()} node")
-                # Extra transformation to JSON is necessary,
-                # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
-                cluster.log.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+                utils.print_diff(cluster.log, diff)
                 success = False
 
         if not success:
@@ -1265,6 +1261,50 @@ def default_services_health_status(cluster: KubernetesCluster) -> None:
             raise TestFailure('invalid', hint=f"{not_ready_entities} pods doesn't ready")
 
 
+def _check_calico_env(cluster: KubernetesCluster, manifest_: manifest.Manifest) -> List[str]:
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    failed_messages = []
+
+    def get_envs(obj: dict) -> Dict[str, Union[str, dict]]:
+        raw_envs = obj["spec"]["template"]["spec"]["containers"][0]["env"]
+        envs = {}
+        for env in raw_envs:
+            envs[env['name']] = env.get('valueFrom', env.get('value', ''))
+
+        return envs
+
+    entities_to_check = [('DaemonSet', 'calico-node')]
+    if calico.is_typha_enabled(cluster.inventory):
+        entities_to_check.append(('Deployment', 'calico-typha'))
+
+    for entity in entities_to_check:
+        type_ = entity[0]
+        service_name = entity[1]
+
+        k8s_object = KubernetesObject(cluster, type_, service_name, 'kube-system')
+        k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
+        if not k8s_object.is_reloaded():
+            stderr = str(k8s_object).rstrip('\n')
+            failed_messages.append(f"failed to load {service_name}: {stderr}")
+            continue
+        else:
+            actual_env = get_envs(k8s_object.obj)
+
+        expected_obj = manifest_.get_obj(f"{type_}_{service_name}", patch=False)
+        buf = io.StringIO()
+        utils.yaml_structure_preserver().dump(expected_obj, buf)
+        expected_obj = yaml.safe_load(buf.getvalue())
+        expected_env = get_envs(expected_obj)
+
+        diff = DeepDiff(actual_env, expected_env)
+        if diff:
+            cluster.log.debug(f"{service_name!r} env configuration is outdated")
+            utils.print_diff(cluster.log, diff)
+            failed_messages.append(f"{service_name!r} env configuration is outdated. Check DEBUG logs for details.")
+
+    return failed_messages
+
+
 def calico_config_check(cluster: KubernetesCluster) -> None:
     '''
     This test checks the configuration of the `calico-node` envs, Calico's ConfigMap in case of `ipam`, and also performed `calicoctl ipam check`.
@@ -1272,20 +1312,20 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
     :return: None
     '''
     with TestCase(cluster, '224', "Calico", "configuration check") as tc:
-        message = ""
-        correct_config = True
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
-        result = first_control_plane.sudo(f"kubectl get DaemonSet calico-node -n kube-system -oyaml")
-        calico_daemonset = yaml.safe_load(result.get_simple_out())
-        for env in calico_daemonset["spec"]["template"]["spec"]["containers"][0]["env"]:
-            if cluster.inventory["plugins"]["calico"]["env"].get(env["name"]):
-                if "value" in env.keys() and not str(cluster.inventory["plugins"]["calico"]["env"].get(env["name"])) == env["value"]:
-                    correct_config = False
-                if "valueFrom" in env.keys() and len(DeepDiff(cluster.inventory["plugins"]["calico"]["env"].get(env["name"]), env["valueFrom"], ignore_order=True)) != 0:
-                    correct_config = False
-        if not correct_config:
-            message += "calico-node env configuration is outdated\n"
+        failed_messages = []
+        warn_messages = []
 
+        # Check calico-node and calico-typha env variables.
+        # Since they are relatively complex to calculate, let's use real enriched manifest.
+        processor = builtin.get_manifest_processor(cluster, manifest.Identity('calico'))
+        if processor is None:
+            warn_messages.append("Calico manifest is not installed using default procedure. "
+                                 "Cannot check configuration of env variables.")
+        else:
+            failed_messages.extend(_check_calico_env(cluster, processor.enrich()))
+
+        # Check calico ipam config of CNI config
         result = first_control_plane.sudo(f"kubectl get cm calico-config -n kube-system -oyaml")
         calico_config = yaml.safe_load(result.get_simple_out())
         cni_network_config = yaml.safe_load(calico_config["data"]["cni_network_config"])
@@ -1296,8 +1336,11 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
             ipam_config = cluster.inventory["plugins"]["calico"]["cni"]["ipam"]["ipv6"]
         ddiff = DeepDiff(ipam_config, cni_network_config["plugins"][0]["ipam"], ignore_order=True)
         if ddiff:
-            message += f"calico cm is outdated: {ddiff.to_dict()}\n"
+            cluster.log.debug("'cni_network_config.plugins[0].ipam' of calico-config ConfigMap is outdated:")
+            utils.print_diff(cluster.log, ddiff)
+            failed_messages.append("'cni_network_config.plugins[0].ipam' of calico-config ConfigMap is outdated. Check DEBUG logs for details.")
 
+        # Check calicoctl and calico version match, and check ipam problems.
         result = first_control_plane.sudo("calicoctl ipam check | grep 'found .* problems' |  tr -dc '0-9'")
         found_problems = result.get_simple_result()
         if 'Version mismatch' in found_problems.stderr:
@@ -1312,12 +1355,14 @@ def calico_config_check(cluster: KubernetesCluster) -> None:
 
             client_version = calico_version('Client Version')
             cluster_version = calico_version('Cluster Version')
-            message += f"client version {client_version} mismatches the cluster version {cluster_version}"
+            failed_messages.append(f"client version {client_version} mismatches the cluster version {cluster_version}")
         elif int(found_problems.stdout) > 0:
-            message += "ipam check indicates some problems," \
-                       " for more info you can use `calicoctl ipam check --show-problem-ips`"
-        if message:
-            raise TestFailure('invalid', hint=message)
+            failed_messages.append("ipam check indicates some problems, "
+                                   "for more info you can use `calicoctl ipam check --show-problem-ips`")
+        if failed_messages:
+            raise TestFailure('invalid', hint="\n".join(failed_messages))
+        elif warn_messages:
+            raise TestWarn('found warnings', hint="\n".join(warn_messages))
         else:
             tc.success(results='valid')
 
