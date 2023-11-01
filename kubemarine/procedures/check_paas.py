@@ -580,7 +580,8 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I https://[{found_url}]:443', warn=True)
                 status = list(check_url.values())[0].stdout
                 if '200' in status:
-                    cluster.log.debug(status)
+                    cluster.log.verbose(status)
+                    cluster.log.debug('Dashboard service is OK')
                     test_service_succeeded = True
                 else:
                     cluster.log.debug(f'Dashboard service is not running yet... Retries left: {retries - i}')
@@ -604,7 +605,8 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I --resolve "{found_url}:443:{ingress_ip}" https://{found_url} 2>&1', warn=True)
                 status = list(check_url.values())[0].stdout
                 if '200' in status:
-                    cluster.log.debug(status)
+                    cluster.log.verbose(status)
+                    cluster.log.debug('Dashboard ingress is OK')
                     test_ingress_succeeded = True
                 else:
                     cluster.log.debug(f'Dashboard ingress is not running yet... Retries left: {retries - i}')
