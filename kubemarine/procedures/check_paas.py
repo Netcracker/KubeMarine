@@ -26,7 +26,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit, plugins
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup, CollectorCallback
@@ -516,16 +516,22 @@ def get_not_running_pods(cluster: KubernetesCluster) -> str:
 
 
 def kubernetes_pods_condition(cluster: KubernetesCluster) -> None:
-    system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default"]
+    system_namespaces = ["kube-system", "ingress-nginx", "kube-public", "kubernetes-dashboard", "default",
+                         "local-path-storage", "calico-apiserver"]
     critical_states = cluster.globals['pods']['critical_states']
     with TestCase(cluster, '207', "Kubernetes", "Pods Condition") as tc:
-        pods_description = get_not_running_pods(cluster)
-        total_failed_amount = len(pods_description.split('\n')[1:])
+        pods_descriptions = get_not_running_pods(cluster).split('\n')[1:]
+        total_failed_amount = len(pods_descriptions)
+
+        if total_failed_amount > 0:
+            cluster.log.debug("Not running pods:\n" + "\n".join(pods_descriptions) + "\n")
+
         critical_system_failed_amount = 0
 
-        for pod_description in pods_description.split('\n')[1:]:
+        for pod_description in pods_descriptions:
             split_description = pod_description.split(' ')
             if split_description[0] in system_namespaces and split_description[2] in critical_states:
+                cluster.log.debug(f"Pod {split_description[1]} is in critical state {split_description[2]}")
                 critical_system_failed_amount += 1
 
         if critical_system_failed_amount > 0:
@@ -1116,8 +1122,11 @@ def control_plane_health_status(cluster: KubernetesCluster) -> None:
 
 def default_services_configuration_status(cluster: KubernetesCluster) -> None:
     '''
-    In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
-    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`, are checked,
+    In this test, the versions of the images of the default services
+    `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
+    `ingress-nginx-controller`, `local-path-provisioner`,
+    `kubernetes-dashboard`, and `dashboard-metrics-scraper` are checked,
     and the `coredns` configmap is also checked.
 
     :param cluster: KubernetesCluster object
@@ -1128,83 +1137,128 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
         original_coredns_cm = yaml.safe_load(generate_configmap(cluster.inventory))
         result = first_control_plane.sudo('kubectl get cm coredns -n kube-system -oyaml')
         coredns_cm = yaml.safe_load(result.get_simple_out())
-        ddiff = DeepDiff(coredns_cm['data'], original_coredns_cm['data'], ignore_order=True)
-        coredns_result = ddiff.to_dict().get('values_changed', {}).get("root['Corefile']", {}).get('diff')
+        diff = list(difflib.unified_diff(
+            coredns_cm['data']['Corefile'].splitlines(),
+            original_coredns_cm['data']['Corefile'].splitlines(),
+            fromfile='kube-system/configmaps/coredns/data/Corefile',
+            tofile="inventory['services']['coredns']['configmap']['Corefile']",
+            lineterm=''))
 
-        message = ""
-        if coredns_result:
-            message += f"CoreDNS config is outdated: \n {coredns_result} \n"
+        failed_messages = []
+        warn_messages = []
+        if diff:
+            diff_str = '\n'.join(diff)
+            failed_messages.append(f"CoreDNS config is outdated: \n{diff_str}")
 
-        coredns_version = first_control_plane.sudo("kubeadm config images list | grep coredns").get_simple_out().split(":")[1].rstrip()
+        software_compatibility = static.GLOBALS["compatibility_map"]["software"]
         version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
-        calico_version = cluster.globals["compatibility_map"]["software"]["calico"][version]["version"]
-        nginx_ingress_version = cluster.globals["compatibility_map"]["software"]["nginx-ingress-controller"][version]["version"]
-        entities_to_check = {"kube-system": [{"DaemonSet": [{"calico-node": {"version": calico_version}},
-                                                            {"kube-proxy": {"version": version}}]},
-                                             {"Deployment": [{"calico-kube-controllers": {"version": calico_version}},
-                                                             {"coredns": {"version": coredns_version}}]}],
-                             "ingress-nginx": [{"DaemonSet": [{"ingress-nginx-controller": {"version": nginx_ingress_version}}]}]}
-        if calico.is_apiserver_enabled(cluster.inventory):
-            entities_to_check['calico-apiserver'] = [{"Deployment": [{"calico-apiserver": {"version": calico_version}}]}]
+        coredns_version = software_compatibility["coredns/coredns"][version]["version"]
+
+        entities_to_check = {"kube-system": {"DaemonSet": {"kube-proxy": {"version": version}},
+                                             "Deployment": {"coredns": {"version": coredns_version}}}}
+
+        for plugin in plugins.oob_plugins:
+            plugin_item = cluster.inventory['plugins'][plugin]
+            if not plugin_item['install']:
+                break
+
+            recommended_version = software_compatibility[plugin][version]["version"]
+            expected_version = plugin_item['version']
+            if recommended_version != expected_version:
+                warn_messages.append(f"{plugin!r} has not recommended {expected_version} version. "
+                                     f"Recommended: {recommended_version}")
+
+            if plugin == 'calico':
+                entities_to_check["kube-system"]["DaemonSet"]["calico-node"] = {"version": expected_version}
+                entities_to_check["kube-system"]["Deployment"]["calico-kube-controllers"] = {"version": expected_version}
+                if calico.is_apiserver_enabled(cluster.inventory):
+                    entities_to_check['calico-apiserver'] = {"Deployment": {"calico-apiserver": {"version": expected_version}}}
+                if calico.is_typha_enabled(cluster.inventory):
+                    entities_to_check["kube-system"]["Deployment"]["calico-typha"] = {"version": expected_version}
+
+            if plugin == 'ingress-nginx-controller':
+                entities_to_check['ingress-nginx'] = {"DaemonSet": {"ingress-nginx-controller": {"version": expected_version}}}
+            if plugin == 'local-path-provisioner':
+                entities_to_check['local-path-storage'] = {"Deployment": {"local-path-provisioner": {"version": expected_version}}}
+            if plugin == 'kubernetes-dashboard':
+                image = plugin_item['metrics-scraper']['image']
+                image = image.split('@sha256:')[0]
+                expected_metrics_scrapper_version = image.split(':')[-1]
+                entities_to_check['kubernetes-dashboard'] = {"Deployment": {"kubernetes-dashboard": {"version": expected_version},
+                                                                            "dashboard-metrics-scraper": {"version": expected_metrics_scrapper_version}}}
 
         for namespace, types_dict in entities_to_check.items():
-            for type_dict in types_dict:
-                for type, services in type_dict.items():
-                    for service in services:
-                        for service_name, properties in service.items():
-                            if service_name == "ingress-nginx-controller":
-                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
-                                    break
-                            k8s_object = KubernetesObject(cluster, type, service_name, namespace)
-                            k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
-                            if not k8s_object.is_reloaded():
-                                message += f"failed to load {service_name}: {k8s_object}\n"
-                                continue
+            for type, services in types_dict.items():
+                for service_name, properties in services.items():
+                    k8s_object = KubernetesObject(cluster, type, service_name, namespace)
+                    k8s_object.reload(control_plane=first_control_plane, suppress_exceptions=True)
+                    if not k8s_object.is_reloaded():
+                        stderr = str(k8s_object).rstrip('\n')
+                        failed_messages.append(f"failed to load {service_name}: {stderr}")
+                        continue
 
-                            if properties["version"] not in k8s_object.obj["spec"]["template"]["spec"]["containers"][0].get("image", ""):
-                                message += f"{service_name} has outdated image version\n"
+                    if properties["version"] not in k8s_object.obj["spec"]["template"]["spec"]["containers"][0].get("image", ""):
+                        failed_messages.append(f"{service_name} has outdated image version")
 
-        if message:
-            raise TestFailure('invalid', hint=f"{message}")
+        if failed_messages:
+            raise TestFailure('invalid', hint="\n".join(failed_messages))
+        elif warn_messages:
+            raise TestWarn('found warnings', hint="\n".join(warn_messages))
         else:
             tc.success(results='valid')
 
 
 def default_services_health_status(cluster: KubernetesCluster) -> None:
     '''
-    This test verifies the health of pods `kube-proxy`, `coredns`,
-    `calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller`.
+    This test verifies the health of
+    `kube-proxy`, `coredns`,
+    `calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
+    `ingress-nginx-controller`, `local-path-provisioner`,
+    `kubernetes-dashboard`, and `dashboard-metrics-scraper` pods.
 
     :param cluster: KubernetesCluster object
     :return: None
     '''
     with TestCase(cluster, '223', "Default services", "health status") as tc:
-        entities_to_check = {"kube-system": [{"DaemonSet": ["calico-node", "kube-proxy"]},
-                                             {"Deployment": ["calico-kube-controllers", "coredns"]}],
-                             "ingress-nginx": [{"DaemonSet": ["ingress-nginx-controller"]}]}
-        if calico.is_apiserver_enabled(cluster.inventory):
-            entities_to_check['calico-apiserver'] = [{"Deployment": ["calico-apiserver"]}]
+        entities_to_check = {"kube-system": {"DaemonSet": ["kube-proxy"],
+                                             "Deployment": ["coredns"]}}
+
+        for plugin in plugins.oob_plugins:
+            plugin_item = cluster.inventory['plugins'][plugin]
+            if not plugin_item['install']:
+                break
+
+            if plugin == 'calico':
+                entities_to_check["kube-system"]["DaemonSet"].append("calico-node")
+                entities_to_check["kube-system"]["Deployment"].append("calico-kube-controllers")
+                if calico.is_apiserver_enabled(cluster.inventory):
+                    entities_to_check['calico-apiserver'] = {"Deployment": ["calico-apiserver"]}
+                if calico.is_typha_enabled(cluster.inventory):
+                    entities_to_check["kube-system"]["Deployment"].append("calico-typha")
+
+            if plugin == 'ingress-nginx-controller':
+                entities_to_check['ingress-nginx'] = {"DaemonSet": ["ingress-nginx-controller"]}
+            if plugin == 'local-path-provisioner':
+                entities_to_check['local-path-storage'] = {"Deployment": ["local-path-provisioner"]}
+            if plugin == 'kubernetes-dashboard':
+                entities_to_check['kubernetes-dashboard'] = {"Deployment": ["kubernetes-dashboard", "dashboard-metrics-scraper"]}
 
         first_control_plane = cluster.nodes['control-plane'].get_first_member()
         not_ready_entities = []
         for namespace, types_dict in entities_to_check.items():
-            for type_dict in types_dict:
-                for type, services in type_dict.items():
-                    if type == 'DaemonSet':
-                        for service in services:
-                            if service == "ingress-nginx-controller":
-                                if not cluster.inventory['plugins']['nginx-ingress-controller']['install']:
-                                    break
-                            daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
-                            ready = daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
-                            if not ready:
-                                not_ready_entities.append(service)
-                    elif type == 'Deployment':
-                        for service in services:
-                            deployment = Deployment(cluster, name=service, namespace=namespace)
-                            ready = deployment.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
-                            if not ready:
-                                not_ready_entities.append(service)
+            for type, services in types_dict.items():
+                if type == 'DaemonSet':
+                    for service in services:
+                        daemon_set = DaemonSet(cluster, name=service, namespace=namespace)
+                        ready = daemon_set.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
+                        if not ready:
+                            not_ready_entities.append(service)
+                elif type == 'Deployment':
+                    for service in services:
+                        deployment = Deployment(cluster, name=service, namespace=namespace)
+                        ready = deployment.reload(control_plane=first_control_plane, suppress_exceptions=True).is_actual_and_ready()
+                        if not ready:
+                            not_ready_entities.append(service)
         if len(not_ready_entities) == 0:
             tc.success(results='valid')
         else:

@@ -638,16 +638,22 @@ This test verifies the health of static pods `kube-apiserver`, `kube-controller-
 
 *Task*: `default_services.configuration_status`
 
-In this test, the versions of the images of the default services, such as `kube-proxy`, `coredns`,
-`calico-node`, `calico-kube-controllers`, `calico-apiserver` and `ingress-nginx-controller` are checked,
+In this test, the versions of the images of the default services
+`kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
+`ingress-nginx-controller`, `local-path-provisioner`,
+`kubernetes-dashboard`, and `dashboard-metrics-scraper` are checked,
 and the `coredns` configmap is also checked.
 
 ##### 223 Default Services Health Status
 
 *Task*: `default_services.health_status`
 
-This test verifies the health of `kube-proxy`, `coredns`,
-`calico-node`, `calico-kube-controllers`, `calico-apiserver`, and `ingress-nginx-controller` pods.
+This test verifies the health of
+`kube-proxy`, `coredns`,
+`calico-node`, `calico-kube-controllers`, `calico-typha`, `calico-apiserver`,
+`ingress-nginx-controller`, `local-path-provisioner`,
+`kubernetes-dashboard`, and `dashboard-metrics-scraper` pods.
 
 ##### 224 Calico Configuration Check
 
