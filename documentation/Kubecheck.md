@@ -74,7 +74,8 @@ This section provides information about the Kubecheck functionality.
     - [227 Apparmor Status](#227-apparmor-status)
     - [228 Apparmor Configuration](#228-apparmor-configuration)
     - [229 Audit Policy Configuration](#229-audit-policy-configuration)
-    - [231 Kernel Parameters Configuration](#231-kernel-parameters-configuration)
+    - [231 Audit Daemon Rules](#231-audit-daemon-rules)
+    - [232 Kernel Parameters Configuration](#232-kernel-parameters-configuration)
 - [Report File Generation](#report-file-generation)
   - [HTML Report](#html-report)
   - [CSV Report](#csv-report)
@@ -700,7 +701,15 @@ The test checks the AppArmor configuration. It has several modes: `enforce`, `co
 This test checks that the configuration of Kubernetes audit policy is actual
 and matches the effectively resolved configuration from the inventory.
 
-##### 231 Kernel Parameters Configuration
+##### 231 Audit Daemon Rules
+
+*Task*: `system.audit.rules`
+
+This test compares the Audit rules on the nodes
+with the rules specified in the inventory or with the default rules.
+If the configured rules are not presented, the test fails.
+
+##### 232 Kernel Parameters Configuration
 
 *Task*: `system.sysctl.config`
 

@@ -25,7 +25,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
@@ -869,7 +869,7 @@ def verify_sysctl_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    with TestCase(cluster, '231', "System", "Kernel Parameters") as tc:
+    with TestCase(cluster, '232', "System", "Kernel Parameters") as tc:
         group = cluster.nodes['all']
         sysctl_valid = sysctl.is_valid(group)
         if sysctl_valid:
@@ -878,6 +878,27 @@ def verify_sysctl_config(cluster: KubernetesCluster) -> None:
         else:
             raise TestFailure('invalid',
                               hint=f"Some configured kernel parameters are not loaded on the cluster nodes.\n"
+                                   f"Check manually what the differences are, and make changes on the appropriate nodes.")
+
+
+def verify_system_audit_rules(cluster: KubernetesCluster) -> None:
+    """
+    This test compares the Audit rules on the nodes
+    with the rules specified in the inventory or with the default rules.
+    If the configured rules are not presented, the test fails.
+
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster, '231', "System", "Audit Daemon Rules") as tc:
+        group = cluster.nodes['all']
+        rules_valid, auditctl_results = audit.audit_rules_valid(group)
+        cluster.log.debug(auditctl_results)
+        if rules_valid:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid',
+                              hint=f"Some configured Audit rules are not loaded on the cluster nodes.\n"
                                    f"Check manually what the differences are, and make changes on the appropriate nodes.")
 
 
@@ -1490,7 +1511,10 @@ tasks = OrderedDict({
             },
             'sysctl': {
                 'config': verify_sysctl_config
-            }
+            },
+            'audit': {
+                'rules': verify_system_audit_rules
+            },
         },
         'haproxy': {
             'status': lambda cluster: services_status(cluster, 'haproxy'),
