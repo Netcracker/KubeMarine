@@ -23,7 +23,7 @@ from typing import Dict, Tuple, Optional, List
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, kubernetes, apparmor
+from kubemarine import selinux, kubernetes, apparmor, sysctl
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -590,6 +590,16 @@ def verify_system(cluster: KubernetesCluster) -> None:
             raise Exception("Required kernel modules are not presented")
     else:
         log.debug('Modprobe verification skipped - origin setup task was not completed')
+
+    if cluster.is_task_completed('prepare.system.sysctl'):
+        log.debug("Verifying kernel parameters...")
+        sysctl_valid = sysctl.is_valid(group)
+        if not sysctl_valid:
+            raise Exception("Required kernel parameters are not presented")
+        else:
+            log.debug("Required kernel parameters are presented")
+    else:
+        log.debug('Kernel parameters verification skipped - origin setup task was not completed')
 
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:
