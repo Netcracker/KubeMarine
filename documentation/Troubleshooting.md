@@ -1202,7 +1202,7 @@ sudo systemctl restart containerd
 
 ## kubectl logs and kubectl exec fail
 
-**Symptoms**: The attempt to get pod logs and execute command inside container fail with the following errors:
+**Symptoms**: The attempt to get pod logs and execute a command inside the container fails with the following errors:
 
 ```
 $ kubectl -n my-namespace logs my-pod
@@ -1214,6 +1214,6 @@ $ kubectl -n my-namespace exec my-pod -- id
 Error from server: error dialing backend: remote error: tls: internal error
 ```
 
-**Root cause**: `kubelet` server certificate is not approved whereas cluster has been configured not to use self-signed certificates for `kubelet` server.
+**Root cause**: The `kubelet` server certificate is not approved, whereas the cluster has been configured not to use self-signed certificates for the `kubelet` server.
 
-**Solution**: Perform CSR approval steps from maintenance guide: [Kubelet server certificate approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Maintenance.md#kubelet-server-certificate-approval)
+**Solution**: Perform CSR approval steps from the maintenance guide. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Maintenance.md#kubelet-server-certificate-approval) section for details.
