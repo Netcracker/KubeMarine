@@ -33,9 +33,6 @@ from kubemarine.core.group import (
 )
 from kubemarine.core.annotations import restrict_empty_group
 
-ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
-        "Kernel modules are not available for the current OS family"
-
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
@@ -87,22 +84,12 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
-    
-    os_family = cluster.get_os_family()
-    if os_family in ["unknown", "unsupported"]:
-        raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
-    elif os_family in ["debian", "rhel", "rhel8", "rhel9"]:
-        modprobe = {}
-        modprobe[os_family] = inventory["services"]["modprobe"][os_family]
-        inventory["services"]["modprobe"] = modprobe
-    elif os_family == "multiple":
-        modprobe = {}
-        os_families = set()
-        for node in cluster.nodes['all'].get_final_nodes().get_hosts():
-            os_families.add(cluster.get_os_family_for_node(node))
-        for item in os_families:
-            modprobe[item] = inventory["services"]["modprobe"][item]
-        inventory["services"]["modprobe"] = modprobe
+
+    final_nodes = cluster.nodes['all'].get_final_nodes()
+    for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
+        # Remove the section for OS families if no node has these OS families.
+        if final_nodes.get_subgroup_with_os(os_family).is_empty():
+            del inventory["services"]["modprobe"][os_family]
 
     return inventory
 
@@ -149,7 +136,7 @@ def detect_os_family(cluster: KubernetesCluster) -> None:
 
         cluster.log.debug("Distribution: %s; Version: %s" % (name, version))
 
-        os_family = detect_of_family_by_name_version(name, version)
+        os_family = detect_os_family_by_name_version(name, version)
 
         cluster.log.debug("OS family: %s" % os_family)
 
@@ -160,7 +147,7 @@ def detect_os_family(cluster: KubernetesCluster) -> None:
         }
 
 
-def detect_of_family_by_name_version(name: str, version: str) -> str:
+def detect_os_family_by_name_version(name: str, version: str) -> str:
     os_family = 'unsupported'
     if name in static.GLOBALS["compatibility_map"]["distributives"]:
         os_family = 'unknown'

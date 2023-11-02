@@ -28,7 +28,10 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallba
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for host in cluster.nodes['all'].get_final_nodes().get_hosts():
+    for node in cluster.nodes['all'].get_final_nodes().get_ordered_members_list():
+        if node.get_nodes_os() in ('unknown', 'unsupported'):
+            continue
+        host = node.get_host()
         package_name = cluster.get_package_association_for_node(host, 'audit', 'package_name')
         if isinstance(package_name, str):
             package_name = [package_name]

@@ -417,7 +417,7 @@ def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict
 
 def generate_nodes_context(inventory: dict, os_name: str = 'centos', os_version: str = '7.9',
                            net_interface: str = 'eth0') -> dict:
-    os_family = system.detect_of_family_by_name_version(os_name, os_version)
+    os_family = system.detect_os_family_by_name_version(os_name, os_version)
 
     context = {}
     for node in inventory['nodes']:
