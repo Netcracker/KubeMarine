@@ -167,7 +167,7 @@ For cluster machines, ensure the following requirements are met:
   * Centos 7.5+, 8.4
   * RHEL 7.5+, 8.4, 8.6, 8.7
   * Oracle Linux 7.5+, 8.4
-  * RockyLinux 8.6, 8.7
+  * RockyLinux 8.6, 8.7, 8.8
   * Ubuntu 20.04
   * Ubuntu 22.04.1
 
