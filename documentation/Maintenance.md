@@ -27,7 +27,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Changing Calico Settings](#changing-calico-settings)
     - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
-    - [Kubelet server certificate approval](#kubelet-server-certificate-approval)
+    - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Common Practice](#common-practice)
 
 # Prerequisites
@@ -1125,7 +1125,7 @@ link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io
 
 **Note**: CA certificates cannot be updated automatically and should be updated manually after 10 years.
 
-**Note**: The `cert_renew` procedure doesn't renew `kubelet` server certificate. To avoid it, implement the changes from maintenance guide: [Kubelet server certificate approval](#kubelet-server-certificate-approval)
+**Note**: The `cert_renew` procedure does not renew the `kubelet` server certificate. To avoid this, implement the changes mentioned in the [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval) section.
 
 For nginx-ingress-controller, the config map along with the default certificate is updated with a new certificate and key. The config map update is performed by plugin re-installation.
 
@@ -1836,9 +1836,9 @@ data:
 
 11. Check that everything works properly and remove the old ippool if necessary.
 
-## Kubelet server certificate approval
+## Kubelet Server Certificate Approval
 
-The `kubelet` server certificate is self-signed by default, usually it's stored in `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using self-signed `kubelet` server certificate one should change `cluster.yaml` in the following way:
+The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
 
 ```yaml
 ...
@@ -1853,7 +1853,7 @@ services:
 ...
 ```
 
-These settings enforce `kubelet` on each node of the cluster to request certificate appoval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
+These settings enforce `kubelet` on each node of the cluster to request certificate approval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
 
 ```
 # kubectl get csr
@@ -1870,13 +1870,13 @@ kubectl certificate approve csr-424qg
 
 These commands might be automated in several ways.
 
-### Auto approval CronJob
+### Auto Approval CronJob
 
 Basically, `CronJob` runs the approval command above for every CSR according to some schedule.
 
-### Auto approval service
+### Auto Approval Service
 
-It's possible to install the service: [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver). That service approves CSR automatically when CSR is created according to the several settings. It's better to restrict nodes IP addresses(`providerIpPrefixes` option) and nodes FQDN templates(providerRegex). More information in official documentation.
+It is possible to install the kubelet-csr-approver service. For more information, refer to [[kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)](https://github.com/postfinance/kubelet-csr-approver). This service approves CSR automatically when a CSR is created according to several settings. It is better to restrict nodes' IP addresses (`providerIpPrefixes` option) and FQDN templates (providerRegex). For more information, refer to the official documentation.
 
 # Common Practice
 
