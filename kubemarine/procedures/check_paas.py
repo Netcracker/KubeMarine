@@ -849,7 +849,6 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '217', "System", "Modprobe rules") as tc:
-        _check_same_os(cluster)
         group = cluster.nodes['all']
         modprobe_valid, modprobe_result = system.is_modprobe_valid(group)
         cluster.log.debug(modprobe_result)

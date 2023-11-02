@@ -482,13 +482,9 @@ def configure_timesyncd(group: NodeGroup, retries: int = 120) -> RunnersGroupRes
 
 
 def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
-    log = group.cluster.log
-
-    os_family = group.get_nodes_os()
-    if group.cluster.inventory['services'].get('modprobe') is None \
-            or not group.cluster.inventory['services']['modprobe']:
-        log.debug('Skipped - no modprobe configs in inventory')
-        return None
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
+    group_os_family = group.get_nodes_os()
 
     is_valid, result = is_modprobe_valid(group)
 
@@ -496,21 +492,29 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
         log.debug("Skipped - all necessary kernel modules are presented")
         return result
 
-    config = ''
-    raw_config = ''
-    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        module_name = module_name.strip()
-        if module_name is not None and module_name != '':
-            config += module_name + "\n"
-            raw_config += module_name + " "
+    defer = group.new_defer()
+    for node in defer.get_ordered_members_list():
+        config = ''
+        raw_config = ''
+        for module_name in cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
+            module_name = module_name.strip()
+            if module_name is not None and module_name != '':
+                config += module_name + "\n"
+                raw_config += module_name + " "
 
-    log.debug("Uploading config...")
-    utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
-    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
-    group.sudo("modprobe -a %s" % raw_config)
+        log.debug("Uploading config...")
+        dump_filename = 'modprobe_predefined.conf'
+        if group_os_family == 'multiple':
+            dump_filename = f'modprobe_predefined_{node.get_node_name()}.conf'
 
-    group.cluster.schedule_cumulative_point(reboot_nodes)
-    group.cluster.schedule_cumulative_point(verify_system)
+        utils.dump_file(cluster, config, dump_filename)
+        node.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
+        node.sudo("modprobe -a %s" % raw_config)
+
+    defer.flush()
+
+    cluster.schedule_cumulative_point(reboot_nodes)
+    cluster.schedule_cumulative_point(verify_system)
 
     return None
 
@@ -521,9 +525,10 @@ def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     verify_results = group.sudo("lsmod", warn=True)
     is_valid = True
 
-    os_family = group.get_nodes_os()
-    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        for host, result in verify_results.items():
+    for node in group.get_ordered_members_list():
+        host = node.get_host()
+        result = verify_results[host]
+        for module_name in group.cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
             if module_name not in result.stdout:
                 log.debug('Kernel module %s not found at %s' % (module_name, host))
                 is_valid = False
