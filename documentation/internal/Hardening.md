@@ -9,7 +9,8 @@ Useful links:
 
 ## Disable anonymous authentication for `kube-apiserver`
 
-**1.2.1**
+**Kube-bench identifier**:
+* 1.2.1
 
 The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default it enables anonymous requests.
 
@@ -143,8 +144,9 @@ Besides, disabled anonymous resuests to `kube-apiserver` need changes in monitor
 
 ## Data Encryption in Kubernetes
 
-**1.2.29**
-**1.2.30**
+**Kube-bench identifier**:
+* 1.2.29
+* 1.2.30
 
 The following section describes the Kubernetes cluster capabilities to store and manipulate encrypted data.
 
@@ -365,7 +367,8 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 
 ## Kubelet Server Certificate Approval
 
-**1.2.5**
+**Kube-bench identifier**:
+* 1.2.5 
 
 The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
 
