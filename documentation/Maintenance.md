@@ -85,7 +85,7 @@ The procedure accepts optional positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_kubemarine.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 ### Software Upgrade Patches
 
@@ -207,6 +207,11 @@ The configuration format for the plugins is the same.
 ## Upgrade Procedure
 
 **Warnings**: 
+* Follow Kubernetes upgrade best practises, like:
+  * Have a number of replicas configured for Application Microservices
+  * [Pod anti-affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity) rules should be configured to avoid placement of more than one pod replicas on the  same worker node
+  * [PodDisruptionBudget](https://kubernetes.io/docs/tasks/run-application/configure-pdb) is configured for desired Deployments
+  * https://kubernetes.io/docs/tasks/run-application/configure-pdb/#unhealthy-pod-eviction-policy is configured to _AlwaysAllow_
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 * The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
@@ -218,7 +223,7 @@ The procedure accepts required positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/upgrade.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### Upgrade Plan
 
@@ -504,7 +509,7 @@ The procedure accepts optional positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/backup.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
@@ -661,7 +666,7 @@ The procedure accepts required positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/restore.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 **Note**: There are some examples located in [procedure.yaml examples](../examples/procedure.yaml).
 
@@ -754,7 +759,7 @@ Also pay attention to the following:
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/add_node.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 The `nodes` configuration format for specifying new nodes is the same as that of the installation procedure. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
@@ -867,7 +872,7 @@ Removing a node from a Kubernetes cluster is done in the following order:
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/remove_node.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 To remove nodes, it is possible to use the configuration format similar to installation or adding. For more information, refer to [Kubemarine Inventory Nodes](Installation.md#nodes) section in _Kubemarine Installation Procedure_.
 
@@ -952,7 +957,7 @@ Manage PSP procedure works as follows:
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_psp.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 To manage PSPs on existing cluster, use the configuration similar to PSP installation, except the
 `custom-policies` is replaced by `add-policies` and `delete-policies` as follows:
@@ -1013,7 +1018,7 @@ The manage PSS procedure allows:
 The procedure accepts required positional argument with the path to the procedure inventory file.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/manage_pss.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 To manage PSS on existing cluster one should configure `procedure.yaml` similar the following:
 
@@ -1089,7 +1094,7 @@ The procedure accepts optional positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reboot.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### graceful_reboot Parameter
 
@@ -1144,7 +1149,7 @@ The procedure accepts required positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/cert_renew.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 #### Configuring Certificate Renew Procedure for nginx-ingress-controller
 
@@ -1248,7 +1253,7 @@ The procedure accepts required positional argument with the path to the procedur
 You can find description and examples of the accepted parameters in the next sections.
 
 The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/migrate_cri.json?raw=1).
-For more information, see [Validation by JSON Schemas](Installation.md#validation-by-json-schemas).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
 
 The following sections describe the `migrate_cri` parameters.
 
