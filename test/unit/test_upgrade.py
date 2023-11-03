@@ -103,8 +103,8 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
         return demo.new_cluster(self.inventory, procedure_inventory=self.upgrade, context=self.context)
 
     def test_correct_inventory(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
+        old_kubernetes_version = 'v1.28.0'
+        new_kubernetes_version = 'v1.28.3'
         self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         cluster = self._new_cluster()
         self.assertEqual(new_kubernetes_version, cluster.inventory['services']['kubeadm']['kubernetesVersion'])
@@ -132,8 +132,8 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
             self._new_cluster()
 
     def test_incorrect_disable_eviction(self):
-        old_kubernetes_version = 'v1.24.2'
-        new_kubernetes_version = 'v1.24.11'
+        old_kubernetes_version = 'v1.28.0'
+        new_kubernetes_version = 'v1.28.3'
         self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         self.upgrade['disable-eviction'] = 'true'
         with self.assertRaisesRegex(errors.FailException, r"Actual instance type is 'string'\. Expected: 'boolean'\."):
@@ -142,8 +142,8 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
 class UpgradePackagesEnrichment(unittest.TestCase):
     def setUp(self):
-        self.old = 'v1.24.2'
-        self.new = 'v1.24.11'
+        self.old = 'v1.28.0'
+        self.new = 'v1.28.3'
         self.inventory, self.context = generate_upgrade_environment(self.old)
         self.context['upgrade_version'] = self.new
         self.context['nodes'] = demo.generate_nodes_context(self.inventory,

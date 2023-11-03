@@ -43,7 +43,7 @@ services:
     # for patches functionality we need v1beta3 which is available since k8s v1.22 only
     apiVersion: 'kubeadm.k8s.io/v1beta3'
     kind: ClusterConfiguration
-    kubernetesVersion: v1.26.7
+    kubernetesVersion: v1.28.3
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     imageRepository: registry.k8s.io
     dns: {}
