@@ -1,4 +1,15 @@
+## The purpose
+
+The current document discrbes manual steps or procedures that are not covered by `KubeMarine` code itself, but should be implemented to get production-ready Kubernetes cluster.
+
+`kube-bench` is a well-known open-source tool to check the Kubernetes cluster against the `CIS Kubernetes Benchmark`. The report is divided on several parts. Each check has its own unique number. The items could be identified by that number.
+
+Useful links:
+[Kube-bench](https://github.com/aquasecurity/kube-bench)
+
 ## Disable anonymous authentication for `kube-apiserver`
+
+**1.2.1**
 
 The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default it enables anonymous requests.
 
@@ -131,6 +142,9 @@ The node addition procedure affects if the control plane node is being added. Af
 Besides, disabled anonymous resuests to `kube-apiserver` need changes in monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system. 
 
 ## Data Encryption in Kubernetes
+
+**1.2.29**
+**1.2.30**
 
 The following section describes the Kubernetes cluster capabilities to store and manipulate encrypted data.
 
@@ -350,6 +364,8 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 * External services that interact with ETCD may stop working due to encryption enabling.
 
 ## Kubelet Server Certificate Approval
+
+**1.2.5**
 
 The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
 
