@@ -730,10 +730,10 @@ The procedure works as shown in the following table:
 
 |Case|Expected Result|Important Note|
 |---|---|---|
-|Add load balancer|A new load balancer is configured. If `vrrp_ip` is present, then all the Keepalived nodes are reconfigured and restarted.|Kubernetes and Keepalived installations should not start.|
+|Add load balancer|A new load balancer is configured. If `vrrp_ip` is present, then all the Keepalived nodes are reconfigured and restarted.|Kubernetes installation should not start. Keepalived installation should start only if `vrrp_ip` is present.|
 |Add load balancer + Keepalived|A new load balancer is configured. Keepalived is installed and configured on all the load balancers.|Kubernetes installation should not start.|
-|Add control-plane|Kubernetes is installed only on a new node. A new control-plane is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy installation should not start.|
-|Add worker|Kubernetes is installed only on a new node. A new worker is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy installation should not start.|
+|Add control-plane|Kubernetes is installed only on a new node. A new control-plane is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy and Keepalived installation should not start.|
+|Add worker|Kubernetes is installed only on a new node. A new worker is added to the Kubernetes cluster, and all Haproxy nodes are reconfigured and restarted.|Haproxy and Keepalived installation should not start.|
 
 Also pay attention to the following:
 
@@ -773,7 +773,10 @@ nodes:
 **Note**:
 
 * The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#nodedefaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
-* You can add the `vrrp_ips` section to **procedure.yaml** if you intend to add the new `balancer` node and have previously not configured the `vrrp_ips` section.
+* If you intend to add the new `balancer` node with VRRP IP, and have previously not configured the `vrrp_ips` section, you need to do the following preliminarily:
+  * And the section to the main `cluster.yaml`.
+  * If you already have balancers without VRRP IPs, reconfigure the balancers and DNS,
+    for example, using `kubemarine install --tasks prepare.dns.etc_hosts,deploy.loadbalancer.haproxy.configure,deploy.loadbalancer.keepalived,deploy.coredns`
 
 ### Add Node Tasks Tree
 
@@ -842,7 +845,9 @@ The procedure works as follows:
 
 Also pay attention to the following:
 
-* If `vrrp_ip` is not used by any node after nodes removal, then the `vrrp_ip` is removed from **cluster.yaml**.
+* The `vrrp_ips` section is not touched.
+  If it specifies some hosts to enable the Keepalived on, and some of these hosts no longer exist,
+  such hosts are ignored with warnings.
 * The file `/etc/hosts` is updated and uploaded to all remaining nodes in the cluster. The control plane address may change.
 * This procedure only removes nodes and does not restore nodes to their original state. Packages, configurations, and Thirdparties are also not deleted.
 

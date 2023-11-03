@@ -21,7 +21,6 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Dict, Tuple, Iterator, Any, Optional
 
-import ruamel.yaml
 import yaml
 from jinja2 import Template
 import ipaddress
@@ -54,8 +53,11 @@ def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
         node["roles"].append("add_node")
         inventory["nodes"].append(node)
 
-    if "vrrp_ips" in cluster.procedure_inventory:
-        utils.merge_vrrp_ips(cluster.procedure_inventory, inventory)
+    # If "vrrp_ips" section is ever supported when adding node,
+    # It will be necessary to more accurately install and reconfigure the keepalived on existing nodes.
+
+    # if "vrrp_ips" in cluster.procedure_inventory:
+    #     utils.merge_vrrp_ips(cluster.procedure_inventory, inventory)
 
     return inventory
 
@@ -66,9 +68,15 @@ def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     # adding role "remove_node" for all specified nodes
     node_names_to_remove = [node['name'] for node in cluster.procedure_inventory.get("nodes", [])]
-    for i, node in enumerate(inventory['nodes']):
-        if node['name'] in node_names_to_remove:
-            inventory['nodes'][i]['roles'].append('remove_node')
+    for node_remove in node_names_to_remove:
+        for i, node in enumerate(inventory['nodes']):
+            # Inventory is not compiled at this step.
+            # Expecting that the names are not jinja, or the same jinja expressions.
+            if node['name'] == node_remove:
+                node['roles'].append('remove_node')
+                break
+        else:
+            raise Exception(f"Failed to find node to remove {node_remove} among existing nodes")
 
     return inventory
 
@@ -129,33 +137,30 @@ def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
 def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     kubeadm = inventory['services']['kubeadm']
     kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")
-    # if user redefined apiServer as, string, for example?
-    if not isinstance(inventory["services"]["kubeadm"].get('apiServer'), dict):
-        inventory["services"]["kubeadm"]['apiServer'] = {}
 
-    # if user redefined apiServer.certSANs as, string, or removed it, for example?
-    if not isinstance(inventory["services"]["kubeadm"]['apiServer'].get('certSANs'), list):
-        inventory["services"]["kubeadm"]['apiServer']['certSANs'] = []
+    enriched_certsans = []
+
+    for node in inventory["nodes"]:
+        if ('balancer' in node['roles'] or 'control-plane' in node['roles']) and 'remove_node' not in node['roles']:
+            enriched_certsans.extend([node['name'], node['internal_address']])
+            if node.get('address') is not None:
+                enriched_certsans.append(node['address'])
+
+    # The VRRP IP may be actually unused, but let's add it because it is probably specified to be used in the future.
+    for item in inventory["vrrp_ips"]:
+        enriched_certsans.append(item['ip'])
+        if item.get("floating_ip"):
+            enriched_certsans.append(item["floating_ip"])
+
+    if inventory.get("public_cluster_ip"):
+        enriched_certsans.append(inventory["public_cluster_ip"])
 
     certsans = inventory["services"]["kubeadm"]['apiServer']['certSANs']
 
     # do not overwrite apiServer.certSANs, but append - may be user specified something already there?
-    for node in inventory["nodes"]:
-        if 'balancer' in node['roles'] or 'control-plane' in node['roles']:
-            inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['internal_address'])
-            inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['name'])
-            if node.get('address') is not None and node['address'] not in certsans:
-                inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(node['address'])
-
-    if inventory["vrrp_ips"] is not None:
-        for item in inventory["vrrp_ips"]:
-            inventory["services"]["kubeadm"]['apiServer']['certSANs'].append(item['ip'])
-            if item.get("floating_ip"):
-                inventory["services"]["kubeadm"]["apiServer"]["certSANs"].append(item["floating_ip"])
-
-    if inventory.get("public_cluster_ip"):
-        if inventory["public_cluster_ip"] not in inventory["services"]["kubeadm"]["apiServer"]["certSANs"]:
-            inventory["services"]["kubeadm"]["apiServer"]["certSANs"].append(inventory["public_cluster_ip"])
+    for name in enriched_certsans:
+        if name not in certsans:
+            certsans.append(name)
 
     any_worker_found = False
 
@@ -352,7 +357,6 @@ def install(group: NodeGroup) -> RunnersGroupResult:
         log.debug("Making systemd unit...")
         for node in exe.group.get_ordered_members_list():
             node.sudo('rm -rf /etc/systemd/system/kubelet*')
-            node.get_node_name()
             template = Template(utils.read_internal('templates/kubelet.service.j2')).render(
                 hostname=node.get_node_name())
             log.debug("Uploading to '%s'..." % node.get_host())

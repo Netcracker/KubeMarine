@@ -18,6 +18,7 @@ from copy import deepcopy
 
 from kubemarine import demo
 from kubemarine.core import errors, utils
+from test.unit import utils as test_utils
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -405,6 +406,25 @@ class TestInventoryValidation(unittest.TestCase):
 
             # No exception should be thrown
             demo.new_cluster(deepcopy(inventory), procedure_inventory=None, context=context)
+
+    def test_enrich_certsans_with_custom(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        first_node_name = inventory['nodes'][0]['name']
+        inventory['services'].setdefault('kubeadm', {}).setdefault('apiServer', {})['certSANs'] = [
+            first_node_name, 'custom'
+        ]
+
+        cluster = demo.new_cluster(inventory)
+        certsans = cluster.inventory["services"]["kubeadm"]['apiServer']['certSANs']
+        self.assertIn('custom', certsans)
+        self.assertEqual(1, len([san for san in certsans if san == first_node_name]))
+
+        test_utils.stub_associations_packages(cluster, {})
+        finalized_inventory = cluster.make_finalized_inventory()
+        certsans = finalized_inventory["services"]["kubeadm"]['apiServer']['certSANs']
+
+        self.assertIn('custom', certsans)
+        self.assertEqual(1, len([san for san in certsans if san == first_node_name]))
 
 
 if __name__ == '__main__':

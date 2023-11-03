@@ -23,20 +23,17 @@ from jinja2 import Template
 from kubemarine import system, packages
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult
+from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, CollectorCallback, DeferredGroup
 
 
-def autodetect_interface(cluster: KubernetesCluster, name: str) -> Optional[str]:
-    for node in cluster.inventory['nodes']:
-        if node['name'] == name:
-            address = cluster.get_access_address_from_node(node)
-            interface: str = cluster.context['nodes'].get(address, {})['active_interface']
-            if interface:
-                return interface
-    if cluster.context['initial_procedure'] == 'remove_node':
-        for node_to_remove in cluster.procedure_inventory['nodes']:
-            if node_to_remove['name'] == name:
-                return None
+def autodetect_interface(cluster: KubernetesCluster, name: str) -> str:
+    node = cluster.get_node_by_name(name)
+    if node is not None:
+        address = cluster.get_access_address_from_node(node)
+        interface: Optional[str] = cluster.context['nodes'].get(address, {}).get('active_interface')
+        if interface is not None:
+            return interface
+
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
@@ -45,11 +42,14 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     if not inventory['vrrp_ips']:
         return inventory
 
-    default_names = get_default_node_names(inventory)
+    logger = cluster.log
 
-    cluster.log.verbose("Detected default keepalived hosts: %s" % default_names)
-    if not default_names:
-        cluster.log.verbose("WARNING: Default keepalived hosts are empty: something can go wrong!")
+    initial_balancers = get_all_balancer_names(inventory, final=False)
+    final_balancers = get_all_balancer_names(inventory, final=True)
+
+    logger.verbose("Detected default keepalived hosts: %s" % initial_balancers)
+    if not final_balancers:
+        logger.warning("VRRP IPs are specified, but there are no final balancers. Keepalived will not be configured.")
 
     # iterate over each vrrp_ips item and check if any hosts defined to be used in it
     for i, item in enumerate(inventory['vrrp_ips']):
@@ -84,39 +84,46 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
             item['password'] = ("%032x" % random.getrandbits(128))[:password_size]
 
         # if nothing defined then use default names
+        default_hosts = False
         if item.get('hosts') is None:
-            # is there default names found?
-            if not default_names:
-                raise Exception('Section #%s in vrrp_ips has no hosts, but default names can\'t be found.' % i)
-            # ok, default names found, and can be used
-            inventory['vrrp_ips'][i]['hosts'] = default_names
+            # Assign default list of all the balancer names. It can be an empty list.
+            # Assigning of initial balancers is necessary to property calculate 'keepalived' NodeGroup.
+            item['hosts'] = list(initial_balancers)
+            default_hosts = True
 
         for j, record in enumerate(item['hosts']):
             if isinstance(record, str):
-                item['hosts'][j] = {
+                item['hosts'][j] = record = {
                     'name': record
                 }
-            if not item['hosts'][j].get('priority'):
-                item['hosts'][j]['priority'] = cluster.globals['keepalived']['defaults']['priority']['max_value'] - \
-                                               (j + cluster.globals['keepalived']['defaults']['priority']['step'])
-            if not item['hosts'][j].get('interface') and item.get('interface'):
-                item['hosts'][j]['interface'] = item['interface']
-            if item['hosts'][j].get('interface', 'auto') == 'auto':
-                item['hosts'][j]['interface'] = autodetect_interface(cluster, item['hosts'][j]['name'])
+            if record['name'] not in final_balancers:
+                # If default hosts are assigned,
+                # the temporarily assigned host to be removed will be removed later from finalized inventory.
+                # See remove_node.remove_node_finalize_inventory().
+                if not default_hosts:
+                    cluster.log.warning(f"Host {record['name']!r} for VRRP IP {item['ip']} is not among the balancers. "
+                                        f"This VRRP IP will not be installed on this host.")
+                continue
+            if not record.get('priority'):
+                priority_settings = static.GLOBALS['keepalived']['defaults']['priority']
+                record['priority'] = priority_settings['max_value'] - (j + priority_settings['step'])
+            if not record.get('interface') and item.get('interface'):
+                record['interface'] = item['interface']
+            if record.get('interface', 'auto') == 'auto':
+                record['interface'] = autodetect_interface(cluster, record['name'])
 
     return inventory
 
 
-def get_default_node_names(inventory: dict) -> List[str]:
+def get_all_balancer_names(inventory: dict, *, final: bool = True) -> List[str]:
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
     for i, node in enumerate(inventory['nodes']):
-        if 'balancer' in node['roles']:
+        if 'balancer' in node['roles'] and (not final or 'remove_node' not in node['roles']):
             default_names.append(node['name'])
 
-    # just in case, we remove duplicates
-    return list(set(default_names))
+    return default_names
 
 
 def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -134,8 +141,8 @@ def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesClu
     # it is important to remove duplicates
     names = list(set(names))
 
-    # create new group where keepalived will be installed
-    cluster.nodes['keepalived'] = cluster.nodes['all'].new_group(apply_filter={
+    # Create new group from balancers with Keepalived (to be) on them. This includes nodes to be removed.
+    cluster.nodes['keepalived'] = cluster.make_group_from_roles(['balancer']).new_group(apply_filter={
         'name': names
     })
 
@@ -152,35 +159,39 @@ def install(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    # todo why check and try to install all keepalives but finally filter out only new nodes?
-    group = group.get_new_nodes_or_self()
-    # todo consider probably different associations for nodes with different OS families
-    any_host = group.get_first_member().get_host()
-    package_associations = cluster.get_associations_for_node(any_host, 'keepalived')
+    defer = group.new_defer()
+    collector = CollectorCallback(cluster)
+    for node in defer.get_ordered_members_list():
+        executable_name = cluster.get_package_association_for_node(
+            node.get_host(), 'keepalived', 'executable_name')
+        node.sudo("%s -v" % executable_name, warn=True, callback=collector)
 
-    keepalived_version = group.sudo("%s -v" % package_associations['executable_name'], warn=True)
-    keepalived_installed = True
+    defer.flush()
 
-    for connection, result in keepalived_version.items():
-        if result.exited != 0:
-            keepalived_installed = False
-
-    if keepalived_installed:
+    if not collector.result.is_any_failed():
         log.debug("Keepalived already installed, nothing to install")
-        installation_result = keepalived_version
     else:
-        installation_result = packages.install(group, include=package_associations['package_name'])
+        collector = CollectorCallback(cluster)
+        for node in defer.get_ordered_members_list():
+            package_name = cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'package_name')
+            packages.install(node, include=package_name, callback=collector)
 
-    service_name = package_associations['service_name']
-    patch_path = "./resources/drop_ins/keepalived.conf"
-    group.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
-    group.call(install_haproxy_check_script)
-    enable(group)
+        defer.flush()
 
-    return installation_result
+    for node in defer.get_ordered_members_list():
+        service_name = cluster.get_package_association_for_node(
+            node.get_host(), 'keepalived', 'service_name')
+        patch_path = "./resources/drop_ins/keepalived.conf"
+        node.call(system.patch_systemd_service, service_name=service_name, patch_source=patch_path)
+        node.call(install_haproxy_check_script)
+        enable(node)
+
+    defer.flush()
+    return collector.result
 
 
-def install_haproxy_check_script(group: NodeGroup) -> None:
+def install_haproxy_check_script(group: DeferredGroup) -> None:
     script = utils.read_internal("./resources/scripts/check_haproxy.sh")
     group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
@@ -203,12 +214,11 @@ def restart(group: NodeGroup) -> None:
     time.sleep(static.GLOBALS['keepalived']['restart_wait'])
 
 
-def enable(group: NodeGroup) -> None:
-    with group.new_executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            service_name = exe.cluster.get_package_association_for_node(
-                node.get_host(), 'keepalived', 'service_name')
-            system.enable_service(node, name=service_name, now=True)
+def enable(node: DeferredGroup) -> None:
+    # currently it is invoked only for single node
+    service_name = node.cluster.get_package_association_for_node(
+        node.get_host(), 'keepalived', 'service_name')
+    system.enable_service(node, name=service_name, now=True)
 
 
 def disable(group: NodeGroup) -> None:
@@ -219,9 +229,10 @@ def disable(group: NodeGroup) -> None:
             system.disable_service(node, name=service_name)
 
 
-def generate_config(inventory: dict, node: NodeConfig) -> str:
+def generate_config(cluster: KubernetesCluster, node: NodeConfig) -> str:
     config = ''
 
+    inventory = cluster.inventory
     for i, item in enumerate(inventory['vrrp_ips']):
 
         if i > 0:
@@ -233,16 +244,18 @@ def generate_config(inventory: dict, node: NodeConfig) -> str:
             'peers': []
         }
 
-        priority = 100
-        interface = 'eth0'
-        # todo Probably skip the VRRP if it not defined for this node?
-        #  Currently behaviour does not correspond to documentation.
         for record in item['hosts']:
             if record['name'] == node['name']:
                 priority = record['priority']
                 interface = record['interface']
+                break
+        else:
+            # This VRRP IP should not be configured on this node.
+            # There is still at least one VRRP IP to configure on this node
+            # due to the way how 'keepalived' group is calculated.
+            continue
 
-        for i_node in inventory['nodes']:
+        for i_node in cluster.nodes['keepalived'].get_final_nodes().get_ordered_members_configs_list():
             for record in item['hosts']:
                 if i_node['name'] == record['name'] and i_node['internal_address'] != ips['source']:
                     ips['peers'].append(i_node['internal_address'])
@@ -259,23 +272,35 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
+    collector = CollectorCallback(cluster)
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
             node_name = node.get_node_name()
             log.debug("Configuring keepalived on '%s'..." % node_name)
 
-            package_associations = cluster.get_associations_for_node(node.get_host(), 'keepalived')
-            configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
+            config_location = cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'config_location')
 
-            exe.group.sudo('mkdir -p %s' % configs_directory)
-
-            config = generate_config(cluster.inventory, node.get_config())
+            config = generate_config(cluster, node.get_config())
             utils.dump_file(cluster, config, 'keepalived_%s.conf' % node_name)
 
-            node.put(io.StringIO(config), package_associations['config_location'], sudo=True)
+            node.put(io.StringIO(config), config_location, sudo=True, mkdir=True)
+            node.sudo('ls -la %s' % config_location, callback=collector)
 
-    log.debug(group.sudo('ls -la %s' % package_associations['config_location']))
+    log.debug(collector.result)
 
     restart(group)
 
-    return group.sudo('systemctl status %s' % package_associations['service_name'], warn=True)
+    return status(group)
+
+
+def status(group: NodeGroup) -> RunnersGroupResult:
+    cluster: KubernetesCluster = group.cluster
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            service_name = cluster.get_package_association_for_node(
+                node.get_host(), 'keepalived', 'service_name')
+            system.service_status(node, name=service_name, callback=collector)
+
+    return collector.result

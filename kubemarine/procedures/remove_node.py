@@ -15,7 +15,7 @@
 
 
 from collections import OrderedDict
-from typing import Optional, List
+from typing import List
 
 from kubemarine import kubernetes, haproxy, keepalived
 from kubemarine.core import flow, summary
@@ -26,18 +26,16 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, add_node
 
 
-def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[NodeGroup]:
-    all_nodes = None
-    if cluster.nodes.get(node_type) is not None:
-        all_nodes = cluster.nodes[node_type].get_nodes_for_removal()
-    if all_nodes is None or all_nodes.is_empty():
+def get_active_nodes(node_type: str, cluster: KubernetesCluster) -> NodeGroup:
+    all_nodes = cluster.make_group_from_roles([node_type]).get_nodes_for_removal()
+    if all_nodes.is_empty():
         cluster.log.debug("Skipped - no %s to remove" % node_type)
-        return None
+        return all_nodes
     active_nodes = all_nodes.get_online_nodes(True)
     disabled_nodes = all_nodes.exclude_group(active_nodes)
     if active_nodes.is_empty():
         cluster.log.debug("Skipped - %s nodes are inactive: %s" % (node_type, ", ".join(disabled_nodes.nodes)))
-        return None
+        return active_nodes
     if not disabled_nodes.is_empty():
         cluster.log.debug("Partly Skipped - several %s nodes are inactive: %s"
                           % (node_type, ", ".join(disabled_nodes.nodes)))
@@ -45,15 +43,15 @@ def _get_active_nodes(node_type: str, cluster: KubernetesCluster) -> Optional[No
 
 
 def loadbalancer_remove_haproxy(cluster: KubernetesCluster) -> None:
-    nodes = _get_active_nodes("balancer", cluster)
-    if nodes is None:
+    nodes = get_active_nodes("balancer", cluster)
+    if nodes.is_empty():
         return
     nodes.call(haproxy.disable)
 
 
 def loadbalancer_remove_keepalived(cluster: KubernetesCluster) -> None:
-    nodes = _get_active_nodes("keepalived", cluster)
-    if nodes is None:
+    nodes = get_active_nodes("keepalived", cluster)
+    if nodes.is_empty():
         return
     nodes.call(keepalived.disable)
 
@@ -73,45 +71,32 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory_to_finalize
 
-    nodes_for_removal = cluster.nodes['all'].get_nodes_for_removal()
     final_nodes = cluster.nodes['all'].get_final_nodes()
 
-    # check if there are no more hosts where keepalived installed - remove according vrrp_ips
-    for i, item in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
-        if 'hosts' in item:
-            hosts = item['hosts']
-        else:
-            from kubemarine import keepalived
-            hosts = keepalived.get_default_node_names(inventory_to_finalize)
+    is_finalization = any('remove_node' in node['roles'] for node in inventory_to_finalize['nodes'])
 
-        for host in hosts:
-            host_name = host
-            if isinstance(host_name, dict):
-                host_name = host['name']
-            if not final_nodes.has_node(host_name):
-                hosts.remove(host)
-        if not hosts:
-            del inventory_to_finalize['vrrp_ips'][i]
-        else:
-            if inventory_to_finalize['vrrp_ips'][i].get('hosts', []):
-                inventory_to_finalize['vrrp_ips'][i]['hosts'] = hosts
+    if not is_finalization:
+        kubernetes.remove_node_enrichment(inventory_to_finalize, cluster)
+
+    # Do not remove VRRP IPs and do not change their assigned hosts.
+    # If the assigned host does not exist or is not a balancer, it will be just skipped.
+    # Though it is necessary to remove hosts from the VRRP IP of finalized inventory if they were enriched ourselves.
+    if is_finalization:
+        for i, item in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
+            raw_item = cluster.raw_inventory['vrrp_ips'][i]
+            # If redefined, it was not enriched. See keepalived.enrich_inventory_apply_defaults().
+            if not isinstance(raw_item, str) and 'hosts' in raw_item:
+                continue
+
+            item['hosts'] = [host for host in item['hosts'] if final_nodes.has_node(host['name'])]
 
     # remove nodes from inventory if they in nodes for removal
     size = len(inventory_to_finalize['nodes'])
     for i in range(size):
         for j, node in enumerate(inventory_to_finalize['nodes']):
-            if nodes_for_removal.has_node(node["name"]):
+            if 'remove_node' in node['roles']:
                 del inventory_to_finalize['nodes'][j]
                 break
-
-    if inventory_to_finalize.get('services', {}).get('kubeadm', {}).get('apiServer', {}).get('certSANs'):
-        for node in nodes_for_removal.get_ordered_members_configs_list():
-            hostnames = [node['name'], node['internal_address']]
-            if node.get('address') is not None:
-                hostnames.append(node['address'])
-            for name in hostnames:
-                if name in inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs']:
-                    inventory_to_finalize['services']['kubeadm']['apiServer']['certSANs'].remove(name)
 
     return inventory_to_finalize
 

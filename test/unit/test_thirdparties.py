@@ -94,3 +94,5 @@ class SHACalculationTest(unittest.TestCase):
                          cluster.inventory['services']['thirdparties']["custom/thirdparty/with/sha"]['sha1'])
 
 
+if __name__ == '__main__':
+    unittest.main()
