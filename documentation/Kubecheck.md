@@ -713,7 +713,7 @@ If the configured rules are not presented, the test fails.
 
 *Task*: `system.sysctl.config`
 
-This test compares the kernel parameters on the nodes
+This test compares the Kernel parameters on the nodes
 with the parameters specified in the inventory or with the default parameters.
 If the configured parameters are not presented, the test fails.
 
