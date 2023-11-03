@@ -348,3 +348,45 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 
 * ETCD restore procedures should take into consideration the keys rotation, otherwise some data may be unavailable due to keys that were used for encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
 * External services that interact with ETCD may stop working due to encryption enabling.
+
+## Kubelet Server Certificate Approval
+
+The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
+
+```yaml
+...
+services:
+  kubeadm_kubelet:
+    serverTLSBootstrap: true
+    rotateCertificates: true
+  kubeadm:
+    apiServer:
+      extraArgs:
+        kubelet-certificate-authority: /etc/kubernetes/pki/ca.crt
+...
+```
+
+These settings enforce `kubelet` on each node of the cluster to request certificate approval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
+
+```
+# kubectl get csr
+NAME        AGE     SIGNERNAME                          REQUESTOR                 REQUESTEDDURATION    CONDITION
+csr-2z6rv   12m     kubernetes.io/kubelet-serving       system:node:nodename-1    <none>               Pending
+csr-424qg   89m     kubernetes.io/kubelet-serving       system:node:nodename-2    <none>               Pending
+```
+
+Approve the particular request:
+
+```
+kubectl certificate approve csr-424qg
+```
+
+These commands might be automated in several ways.
+
+### Auto Approval CronJob
+
+Basically, `CronJob` runs the approval command above for every CSR according to some schedule.
+
+### Auto Approval Service
+
+It is possible to install the kubelet-csr-approver service. For more information, refer to [[kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)](https://github.com/postfinance/kubelet-csr-approver). This service approves CSR automatically when a CSR is created according to several settings. It is better to restrict nodes' IP addresses (`providerIpPrefixes` option) and FQDN templates (providerRegex). For more information, refer to the official documentation.
