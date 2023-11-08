@@ -181,30 +181,33 @@ The actual information about the supported versions can be found in `compatibili
 * Opened TCP-ports:
   * Internal communication:
     * 22 : SSH 
+    * 53 : CoreDNS (TCP & UDP), if access is needed from services bound to the host network.
     * 80 (or 20080, if balancers are presented): HTTP
     * 179 : Calico BGP
     * 443 (or 20443, if balancers are presented): HTTPS
-    * 5473 : Calico netowrking with Typha enabled
+    * 5443 : Calico API server, if enabled
+    * 5473 : Calico networking with Typha enabled
     * 6443 : Kubernetes API server
-    * 8443 : Kubernetes dashboard
+    * 8443 : Ingress NGINX validating webhook
     * 2379-2380 : ETCD server & client API
-    * 9091 - Calico metric port
-    * 9093 - Calico Typha metric port
-    * 9094 - Calico kube-controller metric port
+    * 9091 : Calico metrics port
+    * 9093 : Calico Typha metrics port
     * 10250 : Kubelet API
-    * 10257 : Kube-scheduler
-    * 10259 : Kube-controller-manager 
-    * 10254 : Prometheus port
     * 30000-32767 : NodePort Services
+    * Other ports if communication happens between services with any participant bound to the host network.
   * External communication:
+    * 22 : SSH, if you use external nodes' IP addresses to deploy the cluster
     * 80
     * 443
+    * 6443 : Kubernetes API server, if necessary to access externally, for example using [helm](#helm) plugin.
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
-  * Traffic is allowed for pod subnet. Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
-  * Traffic is allowed for service subnet. Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
-  * Traffic to/from podSubnet, serviceSubnet is allowed inside the cluster.
+  * Traffic is allowed for the **Opened TCP-ports** between the nodes inside the cluster's internal subnet:
+  * TCP & UDP traffic is allowed for pod subnet between the nodes inside the cluster.
+    Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
+  * TCP & UDP traffic is allowed for service subnet between the nodes inside the cluster.
+    Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
