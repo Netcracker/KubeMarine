@@ -1109,7 +1109,7 @@ KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-c
 ### Upgrade Procedure Fails on ETCD Step
 
 **Symptoms**:
-Upgrade procedure from v1.28.x to v1.28.3 fails with error message:
+Upgrade procedure from v1.28.0(v1.28.1, v1.28.2 as well) to v1.28.3 fails with error message:
 
 ```
 2023-11-10 11:56:44,465 CRITICAL        Command: "sudo kubeadm upgrade apply v1.28.3 -f --certificate-renewal=true --ignore-preflight-errors='Port-6443,CoreDNSUnsupportedPlugins' --patches=/etc/kubernetes/patches && sudo kubectl uncordon ubuntu && sudo systemctl restart kubelet"
@@ -1121,7 +1121,7 @@ and `debug.log` has the following message:
 2023-11-10 11:56:44,441 140368685827904 DEBUG [__init__.upgrade_first_control_plane]    [upgrade/apply] FATAL: fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: static Pod hash for component etcd on Node ubuntu did not change after 5m0s: timed out waiting for the condition
 ```
 
-**Root cause**: `kubeadm v1.28.0` adds default fields that are not comatible with `kubeadm v1.28.3`
+**Root cause**: `kubeadm v1.28.0` adds default fields that are not compatible with `kubeadm v1.28.3`
 
 **Solution**: remove the following parts from the `etcd.yaml` manifest(lines are marked by `-`):
 
