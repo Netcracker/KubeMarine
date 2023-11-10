@@ -891,7 +891,7 @@ def verify_system_audit_rules(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '231', "System", "Audit Daemon Rules") as tc:
-        group = cluster.nodes['all']
+        group = cluster.make_group_from_roles(['control-plane', 'worker'])
         rules_valid, auditctl_results = audit.audit_rules_valid(group)
         cluster.log.debug(auditctl_results)
         if rules_valid:
