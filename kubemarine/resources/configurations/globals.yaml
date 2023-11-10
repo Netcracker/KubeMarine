@@ -355,6 +355,7 @@ compatibility_map:
         versions:
           - '8.6'
           - '8.7'
+          - '8.8'
       - os_family: 'rhel9'
         versions:
           - '9.2'
