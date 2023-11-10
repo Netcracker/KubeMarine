@@ -265,10 +265,6 @@ def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source:
     group.put(io.StringIO(utils.read_internal(patch_source)),
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
               sudo=True)
-    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
-        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d")
-        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d/{service_name}.conf")
-    
     group.sudo("systemctl daemon-reload")
 
 
