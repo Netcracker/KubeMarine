@@ -10,13 +10,6 @@
         "$ref": "definitions/node.json"
       }
     },
-    "vrrp_ips": {
-      "type": "array",
-      "description": "List of VRRP IPs to be assigned to balancers. The VRRP IPs redefine the vrrp_ips section of cluster.yaml. Each item can be either a simple address string or a dictionary with the address and additional parameters.",
-      "items": {
-        "$ref": "definitions/vrrp_ip.json"
-      }
-    },
     "prepull_group_size": {"$ref": "definitions/procedures.json#/definitions/PrepullGroupSize"}
   },
   "required": ["nodes"],

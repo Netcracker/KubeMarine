@@ -51,7 +51,7 @@ class KubernetesCluster(Environment):
         make_dumps = custom_enrichment_fns is None
         from kubemarine.core import defaults
         self._inventory = defaults.enrich_inventory(
-            self, self.raw_inventory, make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
+            self, deepcopy(self.raw_inventory), make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
 
         self._connection_pool = self.create_connection_pool(self.ips['all'])
 
@@ -77,7 +77,7 @@ class KubernetesCluster(Environment):
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> NodeGroup:
         return NodeGroup(ips, self)
 
-    def get_access_address_from_node(self, node: dict) -> str:
+    def get_access_address_from_node(self, node: NodeConfig) -> str:
         """
         Returns address which should be used to connect to the node via Fabric.
         The address also can be used as unique identifier of the node.
@@ -148,11 +148,11 @@ class KubernetesCluster(Environment):
             "kubemarine.core.defaults.merge_defaults",
             "kubemarine.kubernetes.verify_initial_version",
             "kubemarine.kubernetes.add_node_enrichment",
+            "kubemarine.core.defaults.calculate_node_names",
             "kubemarine.kubernetes.remove_node_enrichment",
             "kubemarine.controlplane.controlplane_node_enrichment",
             "kubemarine.core.defaults.append_controlplain",
             "kubemarine.core.defaults.compile_inventory",
-            "kubemarine.core.defaults.calculate_node_names",
             "kubemarine.core.defaults.verify_node_names",
             "kubemarine.core.defaults.apply_defaults",
             "kubemarine.core.defaults.calculate_nodegroups"
@@ -215,7 +215,7 @@ class KubernetesCluster(Environment):
         """
         Returns the detected operating system family for hosts.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
         """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
         if len(os_families) > 1:
@@ -230,7 +230,7 @@ class KubernetesCluster(Environment):
         Returns common OS family name from all final remote hosts.
         The method can be used during enrichment when NodeGroups are not yet calculated.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
         """
         hosts_detect_os_family = []
         for node in self.inventory['nodes']:

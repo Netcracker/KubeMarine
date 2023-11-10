@@ -43,7 +43,7 @@ def _get_associations_for_node(node: AbstractGroup[RunResult]) -> dict:
     return node.cluster.get_associations_for_node(node.get_host(), 'haproxy')
 
 
-def _is_vrrp_not_bind(vrrp_item: dict) -> bool:
+def is_vrrp_not_bind(vrrp_item: dict) -> bool:
     maintenance_type: str = vrrp_item.get('params', {}).get('maintenance-type', '')
     return maintenance_type == 'not bind'
 
@@ -51,7 +51,9 @@ def _is_vrrp_not_bind(vrrp_item: dict) -> bool:
 def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> List[str]:
     # bindings list for common config and maintenance should be different
 
-    if not maintenance and len([role for role in node['roles'] if role not in ['add_node', 'remove_node']]) == 1:
+    is_combined = len([role for role in node['roles'] if role != 'add_node']) > 1
+
+    if not maintenance and not is_combined:
         return ["0.0.0.0", '::']
 
     # If we have combination of balancer-control-plane / balancer-worker or if haproxy is in maintenance mode,
@@ -61,13 +63,13 @@ def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> Li
     bindings = []
     for item in inventory['vrrp_ips']:
         # skip IPs with type 'not bind' in maintenance mode
-        if maintenance and _is_vrrp_not_bind(item):
+        if maintenance and is_vrrp_not_bind(item):
             continue
         for record in item['hosts']:
             if record['name'] == node['name']:
                 bindings.append(item['ip'])
 
-    if len([role for role in node['roles'] if role not in ['add_node', 'remove_node']]) == 1:
+    if not is_combined:
         # In maintenance mode and if balancer is not combined with some other role,
         # we can listen also own internal address of the balancer
         bindings.append(node['internal_address'])
@@ -79,11 +81,8 @@ def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> Li
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     for node in inventory["nodes"]:
-        if 'balancer' not in node['roles']:
+        if 'balancer' not in node['roles'] or 'remove_node' in node['roles']:
             continue
-
-        # todo what if balancer is removed? It will have roles=['balancer', 'remove_node'].
-        #  It should probably also not participate in other vrrp_ips validation.
 
         regular_bindings = _get_bindings(inventory, node, maintenance=False)
         if not regular_bindings:
@@ -94,7 +93,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
         if is_mntc_mode and not mntc_bindings:
             raise Exception(ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC % node["name"])
 
-        not_bind = sum(1 for item in inventory["vrrp_ips"] if _is_vrrp_not_bind(item))
+        not_bind = sum(1 for item in inventory["vrrp_ips"] if is_vrrp_not_bind(item))
         if bool(not_bind) != is_mntc_mode:
             raise Exception("Haproxy maintenance mode should be used when and only when "
                             "there is at least one VRRP IP with 'maintenance-type: not bind'")
@@ -185,8 +184,8 @@ def enable(node: DeferredGroup) -> None:
     system.enable_service(node, name=service_name, now=True)
 
 
-def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[NodeConfig],
-               maintenance: bool = False) -> str:
+def get_config(cluster: KubernetesCluster, node: NodeConfig, maintenance: bool = False) -> str:
+    future_nodes = cluster.nodes['all'].get_final_nodes().get_ordered_members_configs_list()
 
     inventory = cluster.inventory
     bindings = _get_bindings(inventory, node, maintenance=maintenance)
@@ -212,30 +211,24 @@ def get_config(cluster: KubernetesCluster, node: NodeConfig, future_nodes: List[
 
 def configure(group: DeferredGroup) -> None:
     cluster: KubernetesCluster = group.cluster
-    all_nodes_configs = cluster.nodes['all'].get_final_nodes().get_ordered_members_configs_list()
 
     for node in group.get_ordered_members_list():
         node_config = node.get_config()
         node_name = node.get_node_name()
         package_associations = _get_associations_for_node(node)
-        configs_directory = '/'.join(package_associations['config_location'].split('/')[:-1])
 
         cluster.log.debug("\nConfiguring haproxy on \'%s\'..." % node_name)
-        config = get_config(cluster, node_config, all_nodes_configs)
+        config = get_config(cluster, node_config)
         utils.dump_file(cluster, config, 'haproxy_%s.cfg' % node_name)
-        node.sudo('mkdir -p %s' % configs_directory)
-        node.put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True)
-        node.sudo('ls -la %s' % package_associations['config_location'])
+        node.put(io.StringIO(config), package_associations['config_location'], backup=True, sudo=True, mkdir=True)
 
         # add maintenance config to balancer if 'maintenance_mode' is True
         if is_maintenance_mode(cluster):
             mntc_config_location = cluster.inventory['services']['loadbalancer']['haproxy']['mntc_config_location']
             cluster.log.debug("\nConfiguring haproxy for maintenance on \'%s\'..." % node_name)
-            mntc_config = get_config(cluster, node_config, all_nodes_configs, True)
+            mntc_config = get_config(cluster, node_config, True)
             utils.dump_file(cluster, mntc_config, 'haproxy_mntc_%s.cfg' % node_name)
-            node.sudo('mkdir -p %s' % configs_directory)
-            node.put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True)
-            node.sudo('ls -la %s' % mntc_config_location)
+            node.put(io.StringIO(mntc_config), mntc_config_location, backup=True, sudo=True, mkdir=True)
 
 
 def override_haproxy18(group: DeferredGroup) -> None:

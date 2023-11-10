@@ -370,7 +370,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
 
     k8s_versions = [version
                     for pkg in ('docker', 'containerd', 'containerdio')
-                    for v_key in ('version_rhel', 'version_rhel8', 'version_debian')
+                    for v_key in ('version_rhel', 'version_rhel8', 'version_rhel9', 'version_debian')
                     for version in upgrade_config['packages'][pkg].get(v_key, [])]
     if k8s_versions:
         verify_allowed_kubernetes_versions(k8s_versions)
@@ -378,7 +378,7 @@ def resolve_upgrade_patches() -> List[_SoftwareUpgradePatch]:
 
     for package_name in ['haproxy', 'keepalived']:
         if any(upgrade_config['packages'][package_name].get(v_key)
-               for v_key in ('version_rhel', 'version_rhel8', 'version_debian')):
+               for v_key in ('version_rhel', 'version_rhel8', 'version_rhel9', 'version_debian')):
             upgrade_patches.append(BalancerUpgradePatch(upgrade_config, package_name))
 
     default_plugins = static.DEFAULTS['plugins']

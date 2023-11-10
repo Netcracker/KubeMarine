@@ -36,6 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
+  - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
 
@@ -1198,3 +1199,21 @@ The user can analyze these files and try to find the reason for the failed insta
 sudo systemctl stop kubepods-burstable.slice
 sudo systemctl restart containerd
 ```
+
+## kubectl logs and kubectl exec fail
+
+**Symptoms**: The attempt to get pod logs and execute a command inside the container fails with the following errors:
+
+```
+$ kubectl -n my-namespace logs my-pod
+Error from server: Get "https://192.168.1.1:10250/containerLogs/my-namespace/my-pod/controller": remote error: tls: internal error
+```
+
+```
+$ kubectl -n my-namespace exec my-pod -- id
+Error from server: error dialing backend: remote error: tls: internal error
+```
+
+**Root cause**: The `kubelet` server certificate is not approved, whereas the cluster has been configured not to use self-signed certificates for the `kubelet` server.
+
+**Solution**: Perform CSR approval steps from the maintenance guide. Refer to the [Kubelet Server Certificate Approval](https://github.com/Netcracker/KubeMarine/blob/main/documentation/Maintenance.md#kubelet-server-certificate-approval) section for details.

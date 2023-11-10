@@ -22,16 +22,11 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.p1_enable_calico_audit import EnableCalicoAudit
-from kubemarine.patches.p2_calico_typha_metrics import EnableCalicoTyphaMetrics
-from kubemarine.patches.p3_reconfigure_registries import ReconfigureRegistries
-from kubemarine.patches.p4_reinstall_etcdctl_thirdparty import ReinstallEtcdctl
+from kubemarine.patches.p0_bind_vrrp_ips_interfaces import FixVRRP_IPsInterfaces
 
 patches: List[Patch] = [
-    EnableCalicoAudit(),
-    EnableCalicoTyphaMetrics(),
-    ReconfigureRegistries(),
-    ReinstallEtcdctl()
+    # FixVRRP_IPsInterfaces should be the first RegularPatch.
+    FixVRRP_IPsInterfaces(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.

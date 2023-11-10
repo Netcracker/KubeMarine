@@ -63,7 +63,16 @@ class DynamicResources:
         return self._logger
 
     def raw_inventory(self) -> dict:
-        """Returns raw inventory, which does not preserve formatting and which should be read only."""
+        """
+        Returns raw inventory, that does not preserve formatting and which should be read only.
+
+        This inventory should be passed to the cluster instance.
+        It can also be used to check the user-supplied sections and values before running of the enrichment.
+
+        Note that this inventory is not compiled, so its values should be checked with care.
+
+        :return: raw inventory
+        """
         if self._raw_inventory is None:
             self._load_inventory()
 

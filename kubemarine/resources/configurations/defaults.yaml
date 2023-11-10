@@ -157,6 +157,13 @@ services:
       - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat{% endif %}'
       - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
       - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
+    rhel9:
+      - br_netfilter
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_conntrack{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_nat{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_reject_ipv6{% endif %}'
+      - '{% if not nodes[0]["internal_address"]|isipv4 %}nf_defrag_ipv6{% endif %}'
     debian:
       - br_netfilter
       - '{% if not nodes[0]["internal_address"]|isipv4 %}ip6table_filter{% endif %}'
@@ -478,6 +485,21 @@ services:
           package_name: 'conntrack-tools'
         semanage:
           package_name: 'policycoreutils-python-utils'
+      rhel9:
+        docker: {}
+        containerd: {}
+        haproxy:
+          executable_name: '/usr/sbin/haproxy'
+          service_name: 'haproxy'
+        keepalived: {}
+        audit:
+          package_name: 'audit'
+        conntrack:
+          package_name: 'conntrack-tools'
+        semanage:
+          package_name: 'policycoreutils-python-utils'
+        iptables:
+          package_name: 'iptables-nft'
 
 plugin_defaults:
   installation: {}

@@ -63,6 +63,7 @@ This section provides information about the inventory, features, and steps for i
     - [Admission pss](#admission-pss)
       - [Configuring Default Profiles](#configuring-default-profiles)
       - [Configuring Exemptions](#configuring-exemptions)
+      - [Application Prerequisites](#application-prerequisites)
     - [RBAC Accounts](#rbac-accounts)
       - [RBAC account_defaults](#rbac-account_defaults)
     - [Plugins](#plugins)
@@ -77,10 +78,10 @@ This section provides information about the inventory, features, and steps for i
         - [Plugins Installation Order](#plugins-installation-order)
         - [Node Selector](#node-selector)
         - [Tolerations](#tolerations)
-        - [Resources requets and limits](#resources-requests-and-limits)
+        - [Resources Requests and Limits](#resources-requests-and-limits)
       - [Custom Plugins Installation Procedures](#custom-plugins-installation-procedures)
         - [template](#template)
-        - [config](#config) 
+        - [config](#config)
         - [expect pods](#expect-pods)
         - [expect deployments/daemonsets/replicasets/statefulsets](#expect-deploymentsdaemonsetsreplicasetsstatefulsets)
         - [python](#python)
@@ -88,7 +89,7 @@ This section provides information about the inventory, features, and steps for i
         - [shell](#shell)
         - [ansible](#ansible)
         - [helm](#helm)
-  - [Advanced features](#advanced-features)
+  - [Advanced Features](#advanced-features)
     - [List Merge Strategy](#list-merge-strategy)
       - [Merge Strategy Positioning](#merge-strategy-positioning)
       - [List Merge Allowed Sections](#list-merge-allowed-sections)
@@ -164,10 +165,10 @@ For cluster machines, ensure the following requirements are met:
 
 * The following distributives and versions are supported:
 
-  * Centos 7.5+, 8.4
-  * RHEL 7.5+, 8.4, 8.6, 8.7
-  * Oracle Linux 7.5+, 8.4
-  * RockyLinux 8.6, 8.7, 8.8
+  * Centos 7.5+, 8.4, 9
+  * RHEL 7.5+, 8.4, 8.6, 8.7, 8.8, 9.2
+  * Oracle Linux 7.5+, 8.4, 9.2
+  * RockyLinux 8.6, 8.7, 8.8, 9.2
   * Ubuntu 20.04
   * Ubuntu 22.04.1
 
@@ -212,7 +213,7 @@ If you have other solution, remove or switch off the IP firewall before the inst
 
 * Installation of the following packages is highly recommended; however, Kubernetes can work without them, but may show warnings:
   * ethtool
-  * ebtables
+  * ebtables (included in the iptables-nft package which is available on systems like RHEL 9+)
   * socat
 
 **Warning**: You have to specify packages names in "RPM format" if it is possible for you OS,
@@ -3716,7 +3717,7 @@ The default configuration does not enforce the default policy to any of the pods
 
 Do not change the namespaces exemption list without strong necessary. In any case check our maintenance guide before any implementation.
 
-#### Application prerequisites
+#### Application Prerequisites
 
 In case of using PSS the application that installed in Kubernetes cluster should be matched with PSS profiles (`privileged`, 
 `baseline`, `restricted`). Those profiles may be set by labeling the namespace so as it described above for predefined plugins. 

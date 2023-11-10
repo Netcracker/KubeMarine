@@ -20,7 +20,7 @@ def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster) ->
     The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
     """
     for node in inventory["nodes"]:
-        node_info = node.get('name', cluster.get_access_address_from_node(node))
+        node_info = node['name']
         if "master" in node["roles"] and "control-plane" not in node["roles"]:
             cluster.log.debug(f"The 'control-plane' role will be added for {node_info}")
             cluster.log.warning(f"Node {node_info} has legacy role 'master'. "
@@ -40,7 +40,7 @@ def controlplane_finalize_inventory(cluster: KubernetesCluster, inventory: dict)
     # remove 'master' role from inventory before dump
     for node in inventory["nodes"]:
         if 'master' in node["roles"]:
-            node_info = node.get('name', cluster.get_access_address_from_node(node))
+            node_info = node['name']
             cluster.log.debug(f"The 'master' role will be removed for {node_info} node before saving")
             node["roles"].remove("master")
 

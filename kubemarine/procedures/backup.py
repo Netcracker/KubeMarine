@@ -50,6 +50,7 @@ def get_default_backup_files_list(cluster: KubernetesCluster) -> List[str]:
         "/etc/chrony.conf",
         "/etc/selinux/config",
         "/etc/yum.repos.d/",
+        "/etc/apt/sources.list.d/",
         "/var/lib/kubelet/pki",
         "/etc/modules-load.d/",
         "/etc/audit/rules.d/",
@@ -104,7 +105,7 @@ def export_ansible_inventory(cluster: KubernetesCluster) -> None:
 
 def export_packages_list(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if cluster.get_os_family() in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8', 'rhel9']:
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"

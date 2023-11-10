@@ -47,8 +47,6 @@ def renew_apply(control_planes: NodeGroup) -> None:
         # need to update cluster-admin config
         kubernetes.copy_admin_config(log, control_planes)
 
-    control_planes.call(force_renew_kubelet_serving_certs)
-
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
     control_planes.call(force_restart_control_plane)
 
@@ -65,14 +63,6 @@ def force_restart_control_plane(control_planes: NodeGroup) -> None:
         control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
     else:
         control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
-
-
-def force_renew_kubelet_serving_certs(control_planes: NodeGroup) -> None:
-    # Delete *serving* kubelet cert (kubelet.crt) and restart kubelet to create new up-to-date cert.
-    # Client kubelet cert (kubelet.conf) is assumed to be updated automatically by kubelet.
-    for control_plane in control_planes.get_ordered_members_list():
-        control_plane.sudo(f"rm -f /var/lib/kubelet/pki/kubelet.crt /var/lib/kubelet/pki/kubelet.key")
-    control_planes.sudo("systemctl restart kubelet")
 
 
 def verify_all_is_absent_or_single(cert_list: List[str]) -> None:

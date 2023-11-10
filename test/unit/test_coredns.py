@@ -195,3 +195,7 @@ data:
         self.assertNotIn('hosts /etc/coredns/Hosts', config)
         self.assertIn('template IN A k8s.fake.local', config)
         self.assertNotIn('forward . /etc/resolv.conf', config)
+
+
+if __name__ == '__main__':
+    unittest.main()
