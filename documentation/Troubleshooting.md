@@ -36,6 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
+  - [Upgrade Procedure Fails on ETCD Step](#upgrade-procedure-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
@@ -1105,7 +1106,7 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
-### Upgrade Procedure Fails on etcd step
+### Upgrade Procedure Fails on ETCD Step
 
 **Symptoms**:
 Upgrade procedure from v1.28.x to v1.28.3 fails with error message:
@@ -1114,17 +1115,17 @@ Upgrade procedure from v1.28.x to v1.28.3 fails with error message:
 2023-11-10 11:56:44,465 CRITICAL        Command: "sudo kubeadm upgrade apply v1.28.3 -f --certificate-renewal=true --ignore-preflight-errors='Port-6443,CoreDNSUnsupportedPlugins' --patches=/etc/kubernetes/patches && sudo kubectl uncordon ubuntu && sudo systemctl restart kubelet"
 ```
 
-and debug log has the following message:
+and `debug.log` has the following message:
 
 ```
 2023-11-10 11:56:44,441 140368685827904 DEBUG [__init__.upgrade_first_control_plane]    [upgrade/apply] FATAL: fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: static Pod hash for component etcd on Node ubuntu did not change after 5m0s: timed out waiting for the condition
 ```
 
-**Root cause**: currently is undefined
+**Root cause**: `kubeadm v1.28.0` adds default fields that are not comatible with `kubeadm v1.28.3`
 
-**Solution**: remove the following parts from the `etcd.yaml` manifest:
+**Solution**: remove the following parts from the `etcd.yaml` manifest(lines are marked by `-`):
 
-```
+```yaml
 apiVersion: v1
 kind: Pod
 ...
