@@ -362,8 +362,6 @@ def install(group: NodeGroup) -> RunnersGroupResult:
             log.debug("Uploading to '%s'..." % node.get_host())
             node.put(io.StringIO(template + "\n"), '/etc/systemd/system/kubelet.service', sudo=True)
             node.sudo("chmod 600 /etc/systemd/system/kubelet.service")
-            if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
-                    node.sudo("chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/kubelet.service")
 
         log.debug("\nReloading systemd daemon...")
         system.reload_systemctl(exe.group)
@@ -1241,8 +1239,6 @@ def images_prepull(group: DeferredGroup, collector: CollectorCallback) -> Token:
     config = f'{config}---\n{yaml.dump(kubeadm_init, default_flow_style=False)}'
 
     group.put(io.StringIO(config), '/etc/kubernetes/prepull-config.yaml', sudo=True)
-    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
-        group.sudo("chcon -u system_u -r object_r -t kubernetes_file_t /etc/kubernetes/prepull-config.yaml")
 
     return group.sudo("kubeadm config images pull --config=/etc/kubernetes/prepull-config.yaml",
                       callback=collector)
