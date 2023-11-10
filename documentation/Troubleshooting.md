@@ -1105,6 +1105,85 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
+### Upgrade Procedure Fails on etcd step
+
+**Symptoms**:
+Upgrade procedure from v1.28.x to v1.28.3 fails with error message:
+
+```
+2023-11-10 11:56:44,465 CRITICAL        Command: "sudo kubeadm upgrade apply v1.28.3 -f --certificate-renewal=true --ignore-preflight-errors='Port-6443,CoreDNSUnsupportedPlugins' --patches=/etc/kubernetes/patches && sudo kubectl uncordon ubuntu && sudo systemctl restart kubelet"
+```
+
+and debug log has the following message:
+
+```
+2023-11-10 11:56:44,441 140368685827904 DEBUG [__init__.upgrade_first_control_plane]    [upgrade/apply] FATAL: fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: static Pod hash for component etcd on Node ubuntu did not change after 5m0s: timed out waiting for the condition
+```
+
+**Root cause**: currently undefined
+
+**Solution**: remove the following parts from the `etcd.yaml` manifest:
+
+```
+apiVersion: v1
+kind: Pod
+...
+spec:
+  containers:
+  - command:
+...
+    image: registry.k8s.io/etcd:3.5.9-0
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: 127.0.0.1
+        path: /health?exclude=NOSPACE&serializable=true
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+-     successThreshold: 1
+      timeoutSeconds: 15
+    name: etcd
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        host: 127.0.0.1
+        path: /health?serializable=false
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+-     successThreshold: 1
+      timeoutSeconds: 15
+-   terminationMessagePath: /dev/termination-log
+-   terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/lib/etcd
+      name: etcd-data
+    - mountPath: /etc/kubernetes/pki/etcd
+      name: etcd-certs
+- dnsPolicy: ClusterFirst
+- enableServiceLinks: true
+  hostNetwork: true
+  priority: 2000001000
+  priorityClassName: system-node-critical
+- restartPolicy: Always
+- schedulerName: default-scheduler
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+- terminationGracePeriodSeconds: 30
+...
+```
+
+and run upgrade procedure once again.
+
 ## Numerous Generation of `Auditd` System
 
 **Symptoms**: Generation of numerous system messages on nodes and their processing in graylog:
