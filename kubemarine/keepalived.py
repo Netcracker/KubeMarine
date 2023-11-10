@@ -196,7 +196,6 @@ def install_haproxy_check_script(group: DeferredGroup) -> None:
     group.put(io.StringIO(script), "/usr/local/bin/check_haproxy.sh", sudo=True)
     group.sudo("chmod +x /usr/local/bin/check_haproxy.sh")
 
-
 def uninstall(group: NodeGroup) -> RunnersGroupResult:
     return packages.remove(group, include='keepalived')
 

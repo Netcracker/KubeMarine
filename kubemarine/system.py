@@ -91,7 +91,7 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
     os_family = cluster.get_os_family()
     if os_family in ["unknown", "unsupported"]:
         raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
-    elif os_family in ["debian", "rhel", "rhel8"]:
+    elif os_family in ["debian", "rhel", "rhel8", "rhel9"]:
         modprobe = {}
         modprobe[os_family] = inventory["services"]["modprobe"][os_family]
         inventory["services"]["modprobe"] = modprobe
@@ -537,7 +537,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
     # this method handles clusters with multiple OS
     os_family = group.get_nodes_os()
 
-    if os_family in ['rhel', 'rhel8'] and cluster.is_task_completed('prepare.system.setup_selinux'):
+    if os_family in ['rhel', 'rhel8', 'rhel9'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,

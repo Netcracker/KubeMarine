@@ -389,7 +389,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         if immutable:
             self.cluster.log.verbose('File \"%s\" immutable set required' % remote_file)
 
-        advanced_move_required = sudo or backup or immutable
+        advanced_move_required = sudo or backup or immutable or mkdir
         temp_filepath = remote_file
 
         if advanced_move_required:
@@ -406,10 +406,11 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
 
         self.cluster.log.verbose("Moving temporary file '%s' to '%s'..." % (temp_filepath, remote_file))
 
+        # -Z option is necessary for RHEL family to set SELinux context to default type.
         if sudo:
-            mv_command = "sudo chown root:root %s && sudo mv -f %s %s" % (temp_filepath, temp_filepath, remote_file)
+            mv_command = "sudo chown root:root %s && sudo mv -fZ %s %s" % (temp_filepath, temp_filepath, remote_file)
         else:
-            mv_command = "mv -f %s %s" % (temp_filepath, remote_file)
+            mv_command = "mv -fZ %s %s" % (temp_filepath, remote_file)
 
         if backup:
             if sudo:
@@ -614,7 +615,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         """
         Returns the detected operating system family for group.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
         """
         return self.cluster.get_os_family_for_nodes(self.nodes)
 
@@ -631,7 +632,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         :param os_family: The name of required OS family
         :return: NodeGroup
         """
-        if os_family not in ['debian', 'rhel', 'rhel8']:
+        if os_family not in ['debian', 'rhel', 'rhel8', 'rhel9']:
             raise Exception('Unsupported OS family provided')
         hosts = []
         for host in self.nodes:
