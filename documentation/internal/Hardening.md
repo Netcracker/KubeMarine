@@ -1,3 +1,11 @@
+# Security Hardening Guide
+<!-- TOC -->
+- [The purpose](#the-purpose)
+- [Disable anonymous authentication for kube-apiserver](#disable-anonymous-authentication-for-kube-apiserver)
+- [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
+- [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
+<!-- /TOC -->
+
 ## The purpose
 
 The current document discrbes manual steps or procedures that are not covered by `KubeMarine` code itself, but should be implemented to get production-ready Kubernetes cluster.
@@ -5,11 +13,12 @@ The current document discrbes manual steps or procedures that are not covered by
 `kube-bench` is a well-known open-source tool to check the Kubernetes cluster against the `CIS Kubernetes Benchmark`. The report is divided on several parts. Each check has its own unique number. The items could be identified by that number.
 
 Useful links:
-[Kube-bench](https://github.com/aquasecurity/kube-bench)
+[kube-bench](https://github.com/aquasecurity/kube-bench)
 
 ## Disable anonymous authentication for `kube-apiserver`
 
 **Kube-bench identifier**:
+
 * 1.2.1
 
 The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default it enables anonymous requests.
@@ -59,7 +68,7 @@ subjects:
 - kind: ServiceAccount
   name: healthz
   namespace: kube-system
-``` 
+```
 
 ### Disabling procedure
 
@@ -130,7 +139,7 @@ spec:
 
 Where TOKEN is the result of the following command:
 
-```
+```console
 kubectl -n kube-system get secret token-healthz -o jsonpath='{.data.token}' | base64 --decode
 ```
 
@@ -145,6 +154,7 @@ Besides, disabled anonymous resuests to `kube-apiserver` need changes in monitor
 ## Data Encryption in Kubernetes
 
 **Kube-bench identifier**:
+
 * 1.2.29
 * 1.2.30
 
@@ -185,7 +195,8 @@ resources:
 
 It should be created preliminarily and placed in the `/etc/kubernetes/enc/` directory.
 
-The next step is to enable the encryption settings in `kubeadm-config`: 
+The next step is to enable the encryption settings in `kubeadm-config`:
+
 ```yaml
 data:
   ClusterConfiguration: |
@@ -251,7 +262,6 @@ resources:
 
 Also, unix socket must be available for `kube-apiserver`:
 
-
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -310,6 +320,7 @@ spec:
 ```
 
 For more information, refer to:
+
 * [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
 * [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment)
 
@@ -355,6 +366,7 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 ### Maintenance and Operation Features
 
 * Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to the file must be restricted. For instance:
+  
 ```console
 # chmod 0700 /etc/kubernetes/enc/
 ```
@@ -368,6 +380,7 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 ## Kubelet Server Certificate Approval
 
 **Kube-bench identifier**:
+
 * 1.2.5 
 
 The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
@@ -387,7 +400,7 @@ services:
 
 These settings enforce `kubelet` on each node of the cluster to request certificate approval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
 
-```
+```console
 # kubectl get csr
 NAME        AGE     SIGNERNAME                          REQUESTOR                 REQUESTEDDURATION    CONDITION
 csr-2z6rv   12m     kubernetes.io/kubelet-serving       system:node:nodename-1    <none>               Pending
@@ -396,7 +409,7 @@ csr-424qg   89m     kubernetes.io/kubelet-serving       system:node:nodename-2  
 
 Approve the particular request:
 
-```
+```console
 kubectl certificate approve csr-424qg
 ```
 
