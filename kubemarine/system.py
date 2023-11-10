@@ -23,7 +23,7 @@ from typing import Dict, Tuple, Optional, List
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, kubernetes, apparmor
+from kubemarine import selinux, kubernetes, apparmor, sysctl
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -32,9 +32,6 @@ from kubemarine.core.group import (
     NodeGroup, DeferredGroup, AbstractGroup, GROUP_RUN_TYPE, CollectorCallback
 )
 from kubemarine.core.annotations import restrict_empty_group
-
-ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED = \
-        "Kernel modules are not available for the current OS family"
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -87,22 +84,12 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
-    
-    os_family = cluster.get_os_family()
-    if os_family in ["unknown", "unsupported"]:
-        raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
-    elif os_family in ["debian", "rhel", "rhel8", "rhel9"]:
-        modprobe = {}
-        modprobe[os_family] = inventory["services"]["modprobe"][os_family]
-        inventory["services"]["modprobe"] = modprobe
-    elif os_family == "multiple":
-        modprobe = {}
-        os_families = set()
-        for node in cluster.nodes['all'].get_final_nodes().get_hosts():
-            os_families.add(cluster.get_os_family_for_node(node))
-        for item in os_families:
-            modprobe[item] = inventory["services"]["modprobe"][item]
-        inventory["services"]["modprobe"] = modprobe
+
+    final_nodes = cluster.nodes['all'].get_final_nodes()
+    for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
+        # Remove the section for OS families if no node has these OS families.
+        if final_nodes.get_subgroup_with_os(os_family).is_empty():
+            del inventory["services"]["modprobe"][os_family]
 
     return inventory
 
@@ -149,7 +136,7 @@ def detect_os_family(cluster: KubernetesCluster) -> None:
 
         cluster.log.debug("Distribution: %s; Version: %s" % (name, version))
 
-        os_family = detect_of_family_by_name_version(name, version)
+        os_family = detect_os_family_by_name_version(name, version)
 
         cluster.log.debug("OS family: %s" % os_family)
 
@@ -160,7 +147,7 @@ def detect_os_family(cluster: KubernetesCluster) -> None:
         }
 
 
-def detect_of_family_by_name_version(name: str, version: str) -> str:
+def detect_os_family_by_name_version(name: str, version: str) -> str:
     os_family = 'unsupported'
     if name in static.GLOBALS["compatibility_map"]["distributives"]:
         os_family = 'unknown'
@@ -482,13 +469,9 @@ def configure_timesyncd(group: NodeGroup, retries: int = 120) -> RunnersGroupRes
 
 
 def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
-    log = group.cluster.log
-
-    os_family = group.get_nodes_os()
-    if group.cluster.inventory['services'].get('modprobe') is None \
-            or not group.cluster.inventory['services']['modprobe']:
-        log.debug('Skipped - no modprobe configs in inventory')
-        return None
+    cluster: KubernetesCluster = group.cluster
+    log = cluster.log
+    group_os_family = group.get_nodes_os()
 
     is_valid, result = is_modprobe_valid(group)
 
@@ -496,21 +479,29 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
         log.debug("Skipped - all necessary kernel modules are presented")
         return result
 
-    config = ''
-    raw_config = ''
-    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        module_name = module_name.strip()
-        if module_name is not None and module_name != '':
-            config += module_name + "\n"
-            raw_config += module_name + " "
+    defer = group.new_defer()
+    for node in defer.get_ordered_members_list():
+        config = ''
+        raw_config = ''
+        for module_name in cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
+            module_name = module_name.strip()
+            if module_name is not None and module_name != '':
+                config += module_name + "\n"
+                raw_config += module_name + " "
 
-    log.debug("Uploading config...")
-    utils.dump_file(group.cluster, config, 'modprobe_predefined.conf')
-    group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
-    group.sudo("modprobe -a %s" % raw_config)
+        log.debug("Uploading config...")
+        dump_filename = 'modprobe_predefined.conf'
+        if group_os_family == 'multiple':
+            dump_filename = f'modprobe_predefined_{node.get_node_name()}.conf'
 
-    group.cluster.schedule_cumulative_point(reboot_nodes)
-    group.cluster.schedule_cumulative_point(verify_system)
+        utils.dump_file(cluster, config, dump_filename)
+        node.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
+        node.sudo("modprobe -a %s" % raw_config)
+
+    defer.flush()
+
+    cluster.schedule_cumulative_point(reboot_nodes)
+    cluster.schedule_cumulative_point(verify_system)
 
     return None
 
@@ -521,9 +512,10 @@ def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
     verify_results = group.sudo("lsmod", warn=True)
     is_valid = True
 
-    os_family = group.get_nodes_os()
-    for module_name in group.cluster.inventory['services']['modprobe'][os_family]:
-        for host, result in verify_results.items():
+    for node in group.get_ordered_members_list():
+        host = node.get_host()
+        result = verify_results[host]
+        for module_name in group.cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
             if module_name not in result.stdout:
                 log.debug('Kernel module %s not found at %s' % (module_name, host))
                 is_valid = False
@@ -585,6 +577,16 @@ def verify_system(cluster: KubernetesCluster) -> None:
             raise Exception("Required kernel modules are not presented")
     else:
         log.debug('Modprobe verification skipped - origin setup task was not completed')
+
+    if cluster.is_task_completed('prepare.system.sysctl'):
+        log.debug("Verifying kernel parameters...")
+        sysctl_valid = sysctl.is_valid(group)
+        if not sysctl_valid:
+            raise Exception("Required kernel parameters are not presented")
+        else:
+            log.debug("Required kernel parameters are presented")
+    else:
+        log.debug('Kernel parameters verification skipped - origin setup task was not completed')
 
 
 def detect_active_interface(cluster: KubernetesCluster) -> None:

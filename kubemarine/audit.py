@@ -18,7 +18,8 @@ Using this module you can install, enable audit and configure audit rules.
 """
 
 import io
-from typing import Optional
+import shlex
+from typing import Optional, Tuple, List, Set
 
 from kubemarine import system, packages
 from kubemarine.core import utils
@@ -27,7 +28,10 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallba
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for host in cluster.nodes['all'].get_final_nodes().get_hosts():
+    for node in cluster.nodes['all'].get_final_nodes().get_ordered_members_list():
+        if node.get_nodes_os() in ('unknown', 'unsupported'):
+            continue
+        host = node.get_host()
         package_name = cluster.get_package_association_for_node(host, 'audit', 'package_name')
         if isinstance(package_name, str):
             package_name = [package_name]
@@ -80,6 +84,10 @@ def install(group: NodeGroup) -> Optional[RunnersGroupResult]:
     return collector.result
 
 
+def make_config(cluster: KubernetesCluster) -> str:
+    return " \n".join(cluster.inventory['services']['audit']['rules'])
+
+
 def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
     """
     Generates and applies audit rules to the group
@@ -89,8 +97,13 @@ def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
+    rules_valid, auditctl_results = audit_rules_valid(group)
+    if rules_valid:
+        log.debug('Auditd rules are already actual on all nodes')
+        return auditctl_results
+
     log.debug('Applying audit rules...')
-    rules_content = " \n".join(cluster.inventory['services']['audit']['rules'])
+    rules_content = make_config(cluster)
     utils.dump_file(cluster, rules_content, 'audit.rules')
 
     collector = CollectorCallback(cluster)
@@ -104,4 +117,30 @@ def apply_audit_rules(group: NodeGroup) -> RunnersGroupResult:
             service_name = cluster.get_package_association_for_node(host, 'audit', 'service_name')
             node.sudo(f'service {service_name} restart', callback=collector)
 
-    return collector.result
+    _, auditctl_results = audit_rules_valid(group, silent=True)
+    return auditctl_results
+
+
+def audit_rules_valid(group: NodeGroup, silent: bool = False) -> Tuple[bool, RunnersGroupResult]:
+    cluster: KubernetesCluster = group.cluster
+    logger = cluster.log
+
+    rules_content = make_config(cluster)
+
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            executable = cluster.get_package_association_for_node(node.get_host(), 'audit', 'executable_name')
+            node.sudo(f'{executable} -l', callback=collector)
+
+    verify_results = collector.result
+    rules_valid = True
+    for host, result in verify_results.items():
+        tokens: List[Set[str]] = [set(shlex.split(line)) for line in result.stdout.rstrip('\n').split('\n')]
+        for rule in rules_content.split('\n'):
+            if not any(set(shlex.split(rule)).issubset(token) for token in tokens):
+                if not silent:
+                    logger.debug(f'Audit rule {rule!r} is not found at {host}')
+                rules_valid = False
+
+    return rules_valid, verify_results

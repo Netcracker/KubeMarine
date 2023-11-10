@@ -29,36 +29,35 @@ def make_config(cluster: KubernetesCluster) -> str:
     Converts parameters from inventory['services']['sysctl'] to a string in the format of systcl.conf.
     """
     config = ""
-    if cluster.inventory['services'].get('sysctl') is not None:
-        for key, value in cluster.inventory['services']['sysctl'].items():
-            if isinstance(value, str):
-                value = value.strip()
-            if value is not None and value != '':
-                value = int(value)
-                if key == "kernel.pid_max":
-                    required_pid_max = get_pid_max(cluster.inventory)
-                    if value > 2 ** 22:
-                        raise Exception(
-                            "The 'kernel.pid_max' value = '%s' is greater than the maximum allowable '%s'"
-                            % (value, 2 ** 22))
-                    if value < required_pid_max:
-                        raise Exception(
-                            "The 'kernel.pid_max' value = '%s' is lower than "
-                            "the minimum required for kubelet configuration = '%s'"
-                            % (value, required_pid_max))
-                    if value < 32768:
-                        cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
-                                            "default system value = '32768'" % value)
-                config += "%s = %s\n" % (key, value)
-        if not cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
-            pid_max = get_pid_max(cluster.inventory)
-            if pid_max < 32768:
-                cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
-                                    "default system value = '32768'" % pid_max)
-            if pid_max > 2**22:
-                raise Exception("Calculated 'pid_max' value = '%s' is greater than the maximum allowable '%s'"
-                                % (pid_max, 2**22))
-            config += "%s = %s\n" % ("kernel.pid_max", pid_max)
+    for key, value in cluster.inventory['services']['sysctl'].items():
+        if isinstance(value, str):
+            value = value.strip()
+        if value is not None and value != '':
+            value = int(value)
+            if key == "kernel.pid_max":
+                required_pid_max = get_pid_max(cluster.inventory)
+                if value > 2 ** 22:
+                    raise Exception(
+                        "The 'kernel.pid_max' value = '%s' is greater than the maximum allowable '%s'"
+                        % (value, 2 ** 22))
+                if value < required_pid_max:
+                    raise Exception(
+                        "The 'kernel.pid_max' value = '%s' is lower than "
+                        "the minimum required for kubelet configuration = '%s'"
+                        % (value, required_pid_max))
+                if value < 32768:
+                    cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
+                                        "default system value = '32768'" % value)
+            config += "%s = %s\n" % (key, value)
+    if not cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
+        pid_max = get_pid_max(cluster.inventory)
+        if pid_max < 32768:
+            cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
+                                "default system value = '32768'" % pid_max)
+        if pid_max > 2**22:
+            raise Exception("Calculated 'pid_max' value = '%s' is greater than the maximum allowable '%s'"
+                            % (pid_max, 2**22))
+        config += "%s = %s\n" % ("kernel.pid_max", pid_max)
     return config
 
 
@@ -72,6 +71,22 @@ def configure(group: NodeGroup) -> RunnersGroupResult:
     utils.dump_file(group.cluster, config, '98-kubemarine-sysctl.conf')
     group.put(io.StringIO(config), '/etc/sysctl.d/98-kubemarine-sysctl.conf', backup=True, sudo=True)
     return group.sudo('ls -la /etc/sysctl.d/98-kubemarine-sysctl.conf')
+
+
+def is_valid(group: NodeGroup) -> bool:
+    logger = group.cluster.log
+
+    verify_results = group.sudo('sysctl -a')
+    config = make_config(group.cluster)
+
+    sysctl_valid = True
+    for host, result in verify_results.items():
+        for parameter in config.rstrip('\n').split('\n'):
+            if parameter not in result.stdout:
+                logger.debug(f'Kernel parameter {parameter!r} is not found at {host}')
+                sysctl_valid = False
+
+    return sysctl_valid
 
 
 def reload(group: NodeGroup) -> RunnersGroupResult:

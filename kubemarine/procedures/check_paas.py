@@ -25,7 +25,7 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes
+from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup
@@ -849,7 +849,6 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
     :return: None
     """
     with TestCase(cluster, '217', "System", "Modprobe rules") as tc:
-        _check_same_os(cluster)
         group = cluster.nodes['all']
         modprobe_valid, modprobe_result = system.is_modprobe_valid(group)
         cluster.log.debug(modprobe_result)
@@ -859,6 +858,48 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
             raise TestFailure('invalid',
                               hint=f"Modprobe rules do not match those loaded in modprobe on cluster nodes. Check "
                                    f"manually what the differences are and make changes on the appropriate nodes.")
+
+
+def verify_sysctl_config(cluster: KubernetesCluster) -> None:
+    """
+    This test compares the kernel parameters on the nodes
+    with the parameters specified in the inventory or with the default parameters.
+    If the configured parameters are not presented, the test fails.
+
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster, '232', "System", "Kernel Parameters") as tc:
+        group = cluster.nodes['all']
+        sysctl_valid = sysctl.is_valid(group)
+        if sysctl_valid:
+            cluster.log.debug("Required kernel parameters are presented")
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid',
+                              hint=f"Some configured kernel parameters are not loaded on the cluster nodes.\n"
+                                   f"Check manually what the differences are, and make changes on the appropriate nodes.")
+
+
+def verify_system_audit_rules(cluster: KubernetesCluster) -> None:
+    """
+    This test compares the Audit rules on the nodes
+    with the rules specified in the inventory or with the default rules.
+    If the configured rules are not presented, the test fails.
+
+    :param cluster: KubernetesCluster object
+    :return: None
+    """
+    with TestCase(cluster, '231', "System", "Audit Daemon Rules") as tc:
+        group = cluster.make_group_from_roles(['control-plane', 'worker'])
+        rules_valid, auditctl_results = audit.audit_rules_valid(group)
+        cluster.log.debug(auditctl_results)
+        if rules_valid:
+            tc.success(results='valid')
+        else:
+            raise TestFailure('invalid',
+                              hint=f"Some configured Audit rules are not loaded on the cluster nodes.\n"
+                                   f"Check manually what the differences are, and make changes on the appropriate nodes.")
 
 
 def etcd_health_status(cluster: KubernetesCluster) -> None:
@@ -1467,7 +1508,13 @@ tasks = OrderedDict({
             },
             'modprobe': {
                 'rules': verify_modprobe_rules
-            }
+            },
+            'sysctl': {
+                'config': verify_sysctl_config
+            },
+            'audit': {
+                'rules': verify_system_audit_rules
+            },
         },
         'haproxy': {
             'status': lambda cluster: services_status(cluster, 'haproxy'),

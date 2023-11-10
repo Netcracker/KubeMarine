@@ -130,13 +130,18 @@ def system_prepare_system_timesyncd(group: NodeGroup) -> None:
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_sysctl(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
-    if cluster.inventory['services'].get('sysctl') is None or not cluster.inventory['services']['sysctl']:
-        cluster.log.debug("Skipped - sysctl is not defined or empty in config file")
+
+    if sysctl.is_valid(group):
+        cluster.log.debug("Skipped - all necessary kernel parameters are presented")
         return
+
     group.call_batch([
         sysctl.configure,
         sysctl.reload,
     ])
+
+    cluster.schedule_cumulative_point(system.reboot_nodes)
+    cluster.schedule_cumulative_point(system.verify_system)
 
 
 @_applicable_for_new_nodes_with_roles('all')
@@ -569,21 +574,15 @@ tasks = OrderedDict({
 
 cumulative_points = {
 
-    # prepare.system.sysctl requires
-    # - /proc/sys/net/bridge/bridge-nf-call-iptables
-    # - /proc/sys/net/bridge/bridge-nf-call-ip6tables
-    # for the following records:
-    # - net.ipv4.ip_forward = 1
-    # - net.ipv4.ip_nonlocal_bind = 1
-    # - net.ipv6.ip_nonlocal_bind = 1
-    # - net.ipv6.conf.all.forwarding = 1
-    # That is why reboot required BEFORE this task
+    # Reboot and verify that the most crucial system settings are applied on boot.
+    # This is done before `prepare.system.audit`.
     system.reboot_nodes: [
-        "prepare.system.sysctl"
+        "prepare.system.audit"
     ],
     system.verify_system: [
-        "prepare.system.sysctl"
+        "prepare.system.audit"
     ],
+    # Some checks can be done only at the end when the necessary services are configured.
     summary.exec_delayed: [
         flow.END_OF_TASKS
     ]

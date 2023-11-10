@@ -142,18 +142,25 @@ class NodeGroupResultsTest(unittest.TestCase):
         package_associations = cluster.inventory['services']['packages']['associations']['debian']['audit']
         package_name = package_associations['package_name']
         config_location = package_associations['config_location']
+        executable_name = package_associations['executable_name']
 
         cluster.fake_fs.reset()
 
-        expected_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='restarted', code=0)
-        cluster.fake_shell.add(expected_results, 'sudo', ['service %s restart' % package_name])
+        expected_data = " \n".join(cluster.inventory['services']['audit']['rules'])
+
+        results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='No rules\n', code=0)
+        cluster.fake_shell.add(results, 'sudo', [f'{executable_name} -l'], usage_limit=1)
+
+        expected_results = demo.create_nodegroup_result(cluster.nodes['master'], stdout=expected_data, code=0)
+        cluster.fake_shell.add(expected_results, 'sudo', [f'{executable_name} -l'])
+
+        results = demo.create_nodegroup_result(cluster.nodes['master'], stdout='restarted', code=0)
+        cluster.fake_shell.add(results, 'sudo', ['service %s restart' % package_name])
 
         actual_results = audit.apply_audit_rules(cluster.nodes['master'])
 
         self.assertEqual(expected_results, actual_results,
                          msg='Configuration task did not did not finished with restart result')
-
-        expected_data = " \n".join(cluster.inventory['services']['audit']['rules'])
 
         node_hostname = cluster.nodes['master'].get_hosts()[0]
         actual_data = cluster.fake_fs.read(node_hostname, config_location)
