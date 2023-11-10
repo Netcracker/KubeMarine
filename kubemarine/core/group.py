@@ -793,7 +793,7 @@ class RemoteExecutor(RawExecutor):
 class GroupException(Exception):
     def __init__(self, cluster: object, results: Dict[str, List[GenericResult]]):
         self.cluster = cluster
-        self._results = results
+        self.results = results
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -813,7 +813,7 @@ class GroupException(Exception):
         :return: List with hosts
         """
         excepted_hosts: List[str] = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             if any(isinstance(result, Exception) for result in results):
                 excepted_hosts.append(host)
         return excepted_hosts
@@ -834,7 +834,7 @@ class GroupException(Exception):
         :return: List with hosts
         """
         exited_hosts: List[str] = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             if all(isinstance(result, RunnersResult) for result in results):
                 exited_hosts.append(host)
         return exited_hosts
@@ -853,7 +853,7 @@ class GroupException(Exception):
         # for the reason that the user code might want to print output of some commands in the batch,
         # but failed to do that because of the exception.
         host_outputs = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             output = f"{host}:"
 
             # filter out transfer results and the last exception if present
@@ -884,4 +884,3 @@ class GroupResultException(GroupException):
 class RemoteGroupException(GroupException):
     def __init__(self, cluster: object, results: Dict[str, TokenizedResult]):
         super().__init__(cluster, {host: list(res.values()) for host, res in results.items()})
-        self.results = results

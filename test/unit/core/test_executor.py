@@ -48,8 +48,8 @@ class RemoteExecutorTest(unittest.TestCase):
                 exe.flush()
             except RemoteGroupException as exc:
                 exception = exc
-            for tokenized_results in exception.results.values():
-                self.assertIsInstance(list(tokenized_results.values())[0], UnexpectedExit)
+            for results_list in exception.results.values():
+                self.assertIsInstance(results_list[0], UnexpectedExit)
 
     def test_get_merged_results_all_exited_warn(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], code=1)
@@ -73,8 +73,8 @@ class RemoteExecutorTest(unittest.TestCase):
                 exe.flush()
             except RemoteGroupException as exc:
                 exception = exc
-            for tokenized_results in exception.results.values():
-                self.assertIsInstance(list(tokenized_results.values())[0], TimeoutError)
+            for results_list in exception.results.values():
+                self.assertIsInstance(results_list[0], TimeoutError)
 
     def test_get_merged_results_multiple_commands(self):
         results = demo.create_nodegroup_result(self.cluster.nodes["all"], stdout="foo\n")
@@ -123,8 +123,8 @@ class RemoteExecutorTest(unittest.TestCase):
                 exception = exc
 
             self.assertIsNotNone(exception, "Exception was not raised")
-            for tokenized_results in exception.results.values():
-                self.assertIsInstance(list(tokenized_results.values())[0], UnexpectedExit)
+            for results_list in exception.results.values():
+                self.assertIsInstance(results_list[0], UnexpectedExit)
 
             for host in self.cluster.nodes['all'].get_hosts():
                 self.assertIsNone(self.cluster.fake_fs.read(host, '/fake/path'))
@@ -146,9 +146,9 @@ class RemoteExecutorTest(unittest.TestCase):
 
             self.assertIsNotNone(exception, "Exception was not raised")
             self.assertEqual(exe.group.nodes, set(exception.results), "Exception results were not collected")
-            for tokenized_results in exception.results.values():
-                self.assertEqual(2, len(tokenized_results), "Two commands should be run")
-                result = list(tokenized_results.values())[1]
+            for results_list in exception.results.values():
+                self.assertEqual(2, len(results_list), "Two commands should be run")
+                result = results_list[1]
                 self.assertIsInstance(result, UnexpectedExit)
                 self.assertEqual("echo \"bar\" && false", result.result.command,
                                  "Unexpected exit should contain original command string of only failed command")

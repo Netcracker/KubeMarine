@@ -16,23 +16,29 @@ import io
 import ipaddress
 import math
 import os
+import random
 import re
 import sys
 import uuid
 from collections import OrderedDict
 import time
 from contextlib import contextmanager
-from typing import List, Dict, Any, cast, Match, Iterator, Optional
+from typing import List, Dict, cast, Match, Iterator, Optional, Tuple, Set, Union
 
 import yaml
+from ordered_set import OrderedSet
 
-from kubemarine.core import flow, utils
-from kubemarine import system, packages
+from kubemarine.core import flow, utils, static
+from kubemarine import system, packages, jinja
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.testsuite import TestSuite, TestCase, TestFailure, TestWarn
-from kubemarine.core.group import NodeConfig, GroupException, GroupResultException, CollectorCallback
+from kubemarine.core.group import (
+    NodeConfig, NodeGroup, DeferredGroup, GroupException, GroupResultException, CollectorCallback
+)
+
+_CONNECTIVITY_PORTS: Dict[str, Dict[str, Dict[str, Dict[str, List[str]]]]] = {}
 
 
 def connection_ssh_connectivity(cluster: KubernetesCluster) -> None:
@@ -592,120 +598,261 @@ def suspend_firewalld(cluster: KubernetesCluster) -> Iterator[None]:
         system.start_service(nodes_to_rollback, "firewalld")
 
 
-def _get_not_balancers(cluster: KubernetesCluster) -> Dict[str, NodeConfig]:
-    nodes = {}
-    for node in cluster.inventory['nodes']:
-        # exclude nodes which are only balancers.
-        if node["roles"] == ["balancer"]:
-            cluster.log.debug(f"Exclude balancer '{node['name']}' from subnet connectivity check.")
-            continue
-        nodes[node["connect_to"]] = node
+def get_host_network_ports(_: KubernetesCluster) -> Dict[str, Set[str]]:
+    """
+    :return: ports bound to host network for each cluster role
+    """
+    return {
+        'balancer': {'80', '443', '6443'},
+        'control-plane': {'6443', '10250', '2379', '2380', '179', '9091'},
+        'worker': {'10250', '179', '5473', '9091', '9093'},
+    }
 
-    return nodes
+
+def get_ports_connectivity(cluster: KubernetesCluster, proto: str) -> Dict[str, Dict[str, Dict[str, List[str]]]]:
+    if proto in _CONNECTIVITY_PORTS:
+        return _CONNECTIVITY_PORTS[proto]
+
+    random_node_port = str(random.randint(30000, 32767))
+    random_user_port = str(random.randint(1024, 65535))
+    if proto == 'tcp':
+        target_ports = cluster.inventory['services']['loadbalancer']['target_ports']
+        ingress_ports = [str(target_ports['http']), str(target_ports['https'])]
+        connectivity_ports = {
+            'internal': {
+                'input': {
+                    'balancer': ['80', '443', '6443'],
+                    'control-plane': [
+                        '53', '6443', '10250', '2379', '2380', '179',
+                        '9091',  # calico-node metrics, but not calico-typha. By default, calico-typha is deployed only on workers.
+                        '5443',  # calico-apiserver, if enabled.
+                        random_node_port,
+                    ],
+                    'worker': [
+                        '53', '10250', '179',
+                        '8443',  # Ingress NGINX validating webhook
+                        '5443',  # calico-apiserver, if enabled.
+                        '5473',  # If calico-typha is enabled
+                        '9091', '9093',  # Calico metrics on host ports
+                        random_node_port,
+                    ] + ingress_ports,
+                },
+                'output': {
+                    'balancer': [
+                        '80', '443',  # This only way we can check balancers connectivity
+                        '6443',
+                        random_node_port,  # Maybe custom balancing of NodePorts
+                    ] + ingress_ports,
+                    'control-plane': [
+                        '80', '443',  # This only way we can check balancers connectivity
+                        '53', '6443', '10250', '2379', '2380', '179',
+                        '5443',  # calico-apiserver, if enabled.
+                        '5473',  # If calico-typha is enabled
+                        '8443',  # Ingress NGINX validating webhook
+                    ],
+                    'worker': [
+                        '80', '443',  # This only way we can check balancers connectivity
+                        '53', '6443', '179',
+                        '5473',  # If calico-typha is enabled
+                        '9091', '9093',  # Calico metrics on host ports
+                    ]
+                }
+            },
+            # Check only some ports. In fact, it is desirable to allow all ports for pod subnet
+            'pod': {
+                'input': {
+                    'control-plane': [
+                        '53',
+                        '9094',  # calico-kube-controllers metrics
+                        random_user_port,
+                    ],
+                    'worker': [
+                        '53',
+                        '9094',  # calico-kube-controllers metrics
+                        '8443',  # Kubernetes dashboard, if installed
+                        '10254',  # Ingress NGINX metrics
+                        random_user_port,
+                    ],
+                },
+                'output': {
+                    'control-plane': ['53', random_user_port],
+                    'worker': [
+                        '53',
+                        '9094',  # calico-kube-controllers metrics
+                        '8443',  # Kubernetes dashboard, if installed
+                        '10254',  # Ingress NGINX metrics
+                        random_user_port,
+                    ],
+                }
+            },
+            'service': {
+                'input': {
+                    'control-plane': [random_user_port],
+                    'worker': [random_user_port],
+                },
+                'output': {
+                    'control-plane': [random_user_port],
+                    'worker': [random_user_port],
+                }
+            }
+        }
+
+    else:  # udp
+        connectivity_ports = {
+            'internal': {
+                'input': {
+                    'control-plane': ['53'],
+                    'worker': ['53']
+                },
+                'output': {
+                    'control-plane': ['53'],
+                    'worker': ['53']
+                }
+            },
+            'pod': {
+                'input': {
+                    'control-plane': ['53'],
+                    'worker': ['53'],
+                },
+                'output': {
+                    'control-plane': ['53'],
+                    'worker': ['53']
+                }
+            },
+        }
+
+    _CONNECTIVITY_PORTS[proto] = connectivity_ports
+    return connectivity_ports
+
+
+def get_input_ports(cluster: KubernetesCluster, group: NodeGroup, subnet_type: str, proto: str) -> Dict[str, List[str]]:
+    connectivity_ports = get_ports_connectivity(cluster, proto).get(subnet_type, {}).get('input', {})
+
+    host_ports: Dict[str, OrderedSet[str]] = {}
+    for node in group.get_ordered_members_configs_list():
+        host = node['connect_to']
+        for role in node['roles']:
+            ports = connectivity_ports.get(role, [])
+            if ports:
+                host_ports.setdefault(host, OrderedSet[str]()).update(ports)
+
+    return {host: list(ports) for host, ports in host_ports.items()}
 
 
 @contextmanager
-def assign_random_ips(cluster: KubernetesCluster, nodes: Dict[str, NodeConfig], subnet: str) -> Iterator[Dict[str, Any]]:
-    inet = ipaddress.ip_network(subnet)
-    net_mask = str(inet.netmask)
-    prefix = str(inet.prefixlen)
-    subnet_hosts = []
-    ip_numbers = 0
-    for addr in inet.hosts():
-        subnet_hosts.append(addr)
-        ip_numbers += 1
-        if ip_numbers == 1000000:
-           break
-    subnet_hosts_len = len(subnet_hosts)
-
-    host_to_inf = {}
-    host_to_ip = {}
-    skipped_nodes = []
-    nodes_to_rollback = cluster.make_group([])
-
+def assign_ips(group: NodeGroup,
+               host_to_ip: Dict[str, str], host_to_inf: Dict[str, str],
+               prefix: int) -> Iterator[None]:
+    group_to_rollback = group
     try:
-        # Assign random IP for the subnet on every node
-        i = 30
-        for host, node_config in nodes.items():
-            inf = cluster.context['nodes'][host]['active_interface']
-            if not inf:
-                raise TestFailure(f"Failed to detect active interface on {node_config['name']}")
-            host_to_inf[host] = inf
-            random_host = subnet_hosts[subnet_hosts_len - i]
-            host_to_ip[host] = random_host
-            i = i + 1
-
-        collector = CollectorCallback(cluster)
-        with cluster.make_group(nodes).new_executor() as exe:
-            for node in exe.group.get_ordered_members_list():
-                host = node.get_host()
-                existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
-                node.sudo(existing_alias, warn=True, callback=collector)
-
-        for host, result in collector.result.items():
-            if not result.stdout and not result.stderr and result.exited == 1:
-                # grep returned nothing, subnet is not used.
-                pass
-            else:
-                skipped_nodes.append(nodes[host]["name"])
-                del nodes[host]
-
+        # Create alias from the node network interface for the subnet on every node
         try:
-            with cluster.make_group(nodes).new_executor() as exe:
-                # Create alias from the node network interface for the subnet on every node
+            with group.new_executor() as exe:
                 for node in exe.group.get_ordered_members_list():
                     host = node.get_host()
                     node.sudo(f"ip a add {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}")
-
-            nodes_to_rollback = cluster.make_group(nodes.keys())
         except GroupException as e:
-            nodes_to_rollback = e.get_exited_nodes_group()
+            group_to_rollback = e.get_exited_nodes_group()
             raise
 
-        yield host_to_ip
+        yield
     finally:
         # Remove the created aliases from network interfaces
-        with nodes_to_rollback.new_executor() as exe:
+        with group_to_rollback.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
                 host = node.get_host()
                 node.sudo(f"ip a del {host_to_ip[host]}/{prefix} dev {host_to_inf[host]}",
                           warn=True)
 
-    if skipped_nodes:
-        raise TestWarn(f"Cannot perform check on {skipped_nodes}: subnet is already in use. "
-                       f"Use check_paas procedure if you already have installed cluster.")
+
+@contextmanager
+def assign_random_ips(cluster: KubernetesCluster, group: NodeGroup, host_to_inf: Dict[str, str], subnet: str) -> Iterator[Dict[str, str]]:
+    cluster.log.debug(f"Assigning random IP addresses from {subnet} to the internal interface...")
+
+    inet = ipaddress.ip_network(subnet)
+    prefix = inet.prefixlen
+    broadcast = int(inet.broadcast_address)
+
+    host_to_ip = {}
+
+    collector = CollectorCallback(cluster)
+    with group.new_executor() as exe:
+        # Assign random IP for the subnet on every node
+        i = 30
+        for node in exe.group.get_ordered_members_list():
+            host = node.get_host()
+            random_host = str(ipaddress.ip_address(broadcast - i))
+            host_to_ip[host] = random_host
+            i = i + 1
+
+            existing_alias = f"ip -o a | grep {host_to_inf[host]} | grep {host_to_ip[host]}"
+            node.sudo(existing_alias, warn=True, callback=collector)
+
+    group = group.new_group(
+        apply_filter=lambda node_config: collector.result[node_config['connect_to']].grep_returned_nothing()
+    )
+    with assign_ips(group, host_to_ip, host_to_inf, prefix):
+        yield host_to_ip
+
+
+def get_active_interfaces(cluster: KubernetesCluster) -> Dict[str, str]:
+    host_to_inf = {}
+    no_active_interfaces = []
+    for host in cluster.nodes['all'].get_hosts():
+        inf = cluster.context['nodes'][host].get('active_interface')
+        if not inf:
+            no_active_interfaces.append(host)
+        else:
+            host_to_inf[host] = inf
+
+    if no_active_interfaces:
+        hint = f"Failed to detect active interface " \
+               f"on nodes: {', '.join(cluster.make_group(no_active_interfaces).get_nodes_names())}."
+        raise TestFailure('Failed', hint=hint)
+
+    return host_to_inf
+
+
+def subnet_connectivity(cluster: KubernetesCluster, subnet_type: str) -> None:
+    subnet = cluster.inventory['services']['kubeadm']['networking'][
+        'podSubnet' if subnet_type == 'pod' else 'serviceSubnet'
+    ]
+    cluster.log.debug(f"Checking connectivity for the {subnet_type} subnet {subnet}")
+
+    skipped_msgs = nodes_require_python(cluster)
+    group = cluster.make_group_from_roles(['control-plane', 'worker'])\
+        .intersection_group(get_python_group(cluster, True))
+
+    mtu = get_mtu(cluster)
+    host_to_inf = get_active_interfaces(cluster)
+    with assign_random_ips(cluster, group, host_to_inf, subnet) as host_to_ip:
+        failed_nodes: Set[str] = set()
+        for proto in ('tcp', 'udp'):
+            host_ports = get_input_ports(cluster, group, subnet_type, proto)
+            with install_listeners(cluster, host_ports, host_to_ip, proto, mtu) as listened_ports:
+                failed_nodes.update(check_connect_between_all_nodes(
+                    cluster, listened_ports, host_to_ip, subnet_type, proto, mtu))
+
+        if failed_nodes:
+            hint = f"Traffic is not allowed for the {subnet_type} subnet {subnet} " \
+                   f"on nodes: {', '.join(cluster.make_group(failed_nodes).get_nodes_names())}."
+            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                              hint=hint)
+
+    if skipped_msgs:
+        raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
 
 
 def pod_subnet_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '009', 'Network', 'PodSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
-        pod_subnet = cluster.inventory['services']['kubeadm']['networking']['podSubnet']
-        nodes = _get_not_balancers(cluster)
-        tcp_ports = ["30050"]
-        with assign_random_ips(cluster, nodes, pod_subnet) as host_to_ip, \
-                install_tcp_listener(cluster, nodes, tcp_ports):
-            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
-
-            if failed_nodes:
-                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                                  hint=f"Traffic is not allowed for the pod subnet({pod_subnet}) "
-                                       f"on nodes: {failed_nodes}.")
+        subnet_connectivity(cluster, 'pod')
 
 
 def service_subnet_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '010', 'Network', 'ServiceSubnet', default_results='Connected'),\
             suspend_firewalld(cluster):
-        service_subnet = cluster.inventory['services']['kubeadm']['networking']['serviceSubnet']
-        nodes = _get_not_balancers(cluster)
-        tcp_ports = ["30050"]
-        with assign_random_ips(cluster, nodes, service_subnet) as host_to_ip, \
-                install_tcp_listener(cluster, nodes, tcp_ports):
-            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
-
-            if failed_nodes:
-                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                                  hint=f"Traffic is not allowed for the service subnet({service_subnet}) "
-                                       f"on nodes: {failed_nodes}.")
+        subnet_connectivity(cluster, 'service')
 
 
 def cmd_for_ports(ports: List[str], query: str) -> str:
@@ -715,24 +862,50 @@ def cmd_for_ports(ports: List[str], query: str) -> str:
     return result[3:]
 
 
-def tcp_connect(cluster: KubernetesCluster, node_from: NodeConfig, node_to: NodeConfig,
-                tcp_ports: List[str], host_to_ip: Dict[str, Any], mtu: int) -> None:
+def get_mtu(cluster: KubernetesCluster) -> int:
+    mtu: int = cluster.inventory['plugins']['calico']['mtu']
     # 40 bites for headers
     mtu -= 40
-    cluster.log.verbose(f"Trying connection from '{node_from['name']}' to '{node_to['name']}")
-    cmd = cmd_for_ports(tcp_ports, f"echo $(dd if=/dev/urandom bs={mtu}  count=1) >/dev/tcp/{host_to_ip[node_to['connect_to']]}/%s")
-    group = cluster.make_group([node_from['connect_to']])
-    group.sudo(cmd, timeout=cluster.globals['connection']['defaults']['timeout'])
+    return mtu
 
 
-def get_start_tcp_listener_cmd(python_executable: str, tcp_listener: str, ip_version: int) -> str:
+def port_connect(cluster: KubernetesCluster, port_client: str,
+                 node: DeferredGroup, payload: Tuple[str, str, bool],
+                 host_to_ip: Dict[str, str], timeout: int) -> None:
+    target_host, port, connect_only = payload
+    cluster.log.verbose(f"Trying connection from {node.get_node_name()!r} "
+                        f"to {cluster.get_node_name(target_host)!r} by port {port}")
+
+    python_executable = cluster.context['nodes'][node.get_host()]['python']['executable']
+    # Do not send random stream of bytes if port is already in use,
+    # and test listener is not installed.
+    # Also, do not send random stream of bytes for Kubernetes managed ports,
+    # that are not listened on host network.
+    # Such traffic may not reach the test listener even if it was installed successfully,
+    # as the target address may be translated into the pod address.
+    connect_only = connect_only or all(
+        port not in get_host_network_ports(cluster).get(role, [])
+        for role in cluster.get_node(target_host)['roles']
+    )
+    action = 'connect' if connect_only else 'send'
+
+    address = host_to_ip[target_host]
+    ip_version = ipaddress.ip_address(address).version
+
+    # For UDP, `action` is ignored and random stream of bytes is sent anyway.
+    # Currently, for 53 port we do not expect any addressee except the test listener.
+    cmd = f"{python_executable} {port_client} {action} {port} {address} {ip_version}"
+    node.sudo(cmd, timeout=timeout)
+
+
+def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
     # 1. Create anonymous pipe
-    # 2. Create python tcp listener process in background and redirect output to pipe
+    # 2. Create python listener process in background and redirect output to pipe
     # 3. Wait till the listener successfully binds the port, or till it fails and exits.
     #    Read one line from pipe to check that.
     # 4. Exit with success or fail correspondingly.
     return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
-           f"sudo nohup {python_executable} {tcp_listener} $PORT {ip_version} >&3 2>&1 & " \
+           f"sudo nohup {python_executable} {port_listener} $PORT >&3 2>&1 & " \
            "PID=$(echo $!); " \
            "while read -t 0.1 -u 3 || sudo kill -0 $PID 2>/dev/null && [[ -z $REPLY ]]; do " \
                ":; " \
@@ -740,7 +913,7 @@ def get_start_tcp_listener_cmd(python_executable: str, tcp_listener: str, ip_ver
            "DATA=$REPLY; " \
            "if [[ $DATA == \"In use\" ]]; then " \
                "echo \"$PORT in use\" >&2 ; " \
-               "exit 1; " \
+               "exit 0; " \
            "elif [[ $DATA == \"Listen\" ]]; then " \
                "exit 0; " \
            "fi; " \
@@ -749,136 +922,240 @@ def get_start_tcp_listener_cmd(python_executable: str, tcp_listener: str, ip_ver
            "exit 1"
 
 
-def get_stop_tcp_listener_cmd(tcp_listener: str) -> str:
-    identify_pid = "ps aux | grep \" %s ${port} \" | grep -v grep | grep -v nohup | awk '{print $2}'" % tcp_listener
+def get_stop_listener_cmd(port_listener: str) -> str:
+    identify_pid = f"ps aux | grep \" {port_listener} ${{port}}$\" " \
+                   f"| grep -v grep | grep -v nohup | awk '{{print $2}}'"
     return f"port=%s;pid=$({identify_pid}) " \
            "&& if [ ! -z $pid ]; then sudo kill -9 $pid; echo \"killed pid $pid for port $port\"; fi"
 
 
-def check_tcp_connect_between_all_nodes(cluster: KubernetesCluster, node_list: List[NodeConfig],
-                                        tcp_ports: List[str], host_to_ip: Dict[str, Any]) -> List[str]:
-    if len(node_list) <= 1:
-        return []
+def install_client(cluster: KubernetesCluster, group: DeferredGroup, proto: str, mtu: int, timeout: int) -> str:
+    check_script = utils.read_internal('resources/scripts/simple_port_client.py')
+    udp_client = "/tmp/%s.py" % uuid.uuid4().hex
+    for node in group.get_ordered_members_list():
+        rendered_script = jinja.new(cluster.log).from_string(check_script).render({
+            'proto': proto,
+            'timeout': timeout,
+            'mtu': mtu,
+        })
+        node.put(io.StringIO(rendered_script), udp_client)
 
-    mtu = cluster.inventory['plugins']['calico']['mtu']
+    group.flush()
 
-    cluster.log.verbose("Searching for success node...")
-    success_node = None
-    failed_nodes = []
-    for node in node_list:
-        failed_nodes.append(node['name'])
-    nodes_for_check = []
-    for node in node_list:
-        nodes_for_check.append(node)
+    return udp_client
 
-    for i in range(0, len(node_list)):
-        for j in range(i + 1, len(node_list)):
-            try:
-                tcp_connect(cluster, node_list[j], node_list[i], tcp_ports, host_to_ip, mtu)
-                # If node has at least one successful connection with another node - this node has appropriate settings.
-                success_node = node_list[i]
-                cluster.log.verbose(f"Successful node found: {success_node['name']}")
-                failed_nodes.remove(success_node["name"])
-                break
-            except Exception as e:
-                cluster.log.error(f"Subnet connectivity test failed from '{node_list[j]['name']}' to '{node_list[i]['name']}'")
-                cluster.log.verbose(f"Exception details: {e}")
 
-        nodes_for_check.remove(node_list[i])
-        if success_node is not None:
+def check_connect_between_all_nodes(cluster: KubernetesCluster,
+                                    host_ports: Dict[str, List[Tuple[str, bool]]], host_to_ip: Dict[str, str],
+                                    subnet_type: str, proto: str, mtu: int) -> Dict[str, List[str]]:
+    if not host_ports:
+        return {}
+
+    logger = cluster.log
+    logger.debug(f"Checking {proto.upper()} connectivity between nodes...")
+
+    group = get_python_group(cluster, True).new_defer()
+    timeout = static.GLOBALS['connection']['defaults']['timeout']
+    port_client = install_client(cluster, group, proto, mtu, timeout)
+
+    connectivity_ports = get_ports_connectivity(cluster, proto).get(subnet_type, {}).get('output', {})
+
+    # Check connectivity from all nodes to each listened port of each specified host.
+    connectivity_payloads: Dict[str, OrderedSet[Tuple[str, str, bool]]] = {}
+
+    def remove_payload(host: str, payload: Tuple[str, str, bool]) -> None:
+        payloads = connectivity_payloads.get(host)
+        if payloads is None:
+            return
+
+        payloads.discard(payload)
+        if not payloads:
+            del connectivity_payloads[host]
+
+    for node in group.get_ordered_members_list():
+        host = node.get_host()
+        output_ports = {port for role in node.get_config()['roles'] for port in connectivity_ports.get(role, [])}
+        for target_host, listen_ports in host_ports.items():
+            if host == target_host:
+                continue
+
+            for listen_port, in_use in listen_ports:
+                if listen_port in output_ports:
+                    connectivity_payloads.setdefault(host, OrderedSet[Tuple[str, str, bool]]())\
+                        .add((target_host, listen_port, in_use))
+
+    failures = 0
+    failures_limit = 10
+    failed_ports: Dict[str, OrderedSet[str]] = {}
+
+    while connectivity_payloads:
+        payloads_chunk: Dict[str, Tuple[str, str, bool]] = {}
+        for node in group.get_ordered_members_list():
+            host = node.get_host()
+            payloads = connectivity_payloads.get(host)
+            if payloads is None:
+                continue
+
+            # Try making unique target (host, port) pairs in each chunk
+            payload = next((p for p in payloads if p not in payloads_chunk.values()), payloads[0])
+            remove_payload(host, payload)
+            payloads_chunk[host] = payload
+
+        failed_payloads = nodes_ports_connect(cluster, port_client, payloads_chunk, host_to_ip, timeout)
+        if failed_payloads:
+            failures += 1
+            for host, payload in failed_payloads.items():
+                target_host, listen_port, _ = payload
+                cluster.log.error(f"Subnet connectivity test failed from '{cluster.get_node_name(host)}' "
+                                  f"to '{cluster.get_node_name(target_host)}' by {proto.upper()} port {listen_port}")
+
+                failed_ports.setdefault(target_host, OrderedSet[str]()).add(listen_port)
+
+                # If at least one node failed to connect to the given target host and port,
+                # no need to attempt to do that from other nodes
+                for host in group.get_hosts():
+                    remove_payload(host, payload)
+
+        if failures == failures_limit:
+            logger.debug("Exceeded limit of failed connectivity checks. Further check is skipped.")
             break
 
-    # TCP connect from found successful node to every other node
-    if success_node is not None:
-        for node in nodes_for_check:
-            try:
-                tcp_connect(cluster, success_node, node, tcp_ports, host_to_ip, mtu)
-                failed_nodes.remove(node["name"])
-            except Exception as e:
-                cluster.log.error(f"Subnet connectivity test failed from '{success_node['name']}' to '{node['name']}'")
-                cluster.log.verbose(f"Exception details: {e}")
+    return {host: list(ports) for host, ports in failed_ports.items()}
 
-    return failed_nodes
+
+def nodes_ports_connect(cluster: KubernetesCluster, port_client: str,
+                        payloads: Dict[str, Tuple[str, str, bool]],
+                        host_to_ip: Dict[str, str], timeout: int) -> Dict[str, Tuple[str, str, bool]]:
+    group = cluster.make_group(payloads).new_defer()
+
+    for node in group.get_ordered_members_list():
+        host = node.get_host()
+        payload = payloads[host]
+        port_connect(cluster, port_client, node, payload, host_to_ip, timeout)
+
+    failed_payloads = {}
+    try:
+        group.flush()
+    except GroupException as e:
+        cluster.log.verbose(e)
+        excepted_hosts = e.get_excepted_hosts_list()
+        failed_payloads = {host: payload for host, payload in payloads.items() if host in excepted_hosts}
+
+    return failed_payloads
+
+
+def get_python_group(cluster: KubernetesCluster, has_python: bool) -> NodeGroup:
+    def filter_(node: NodeConfig) -> bool:
+        python_spec: Union[dict, str] = cluster.context['nodes'][node['connect_to']]['python']
+        return has_python == (python_spec != "Not installed")
+
+    return cluster.nodes['all'].new_group(filter_)
+
+
+def nodes_require_python(cluster: KubernetesCluster) -> List[str]:
+    detect_preinstalled_python(cluster)
+    group_no_python = get_python_group(cluster, False)
+
+    if not group_no_python.is_empty():
+        msg = f"Nodes without python: {', '.join(group_no_python.get_nodes_names())}"
+        cluster.log.warning(msg)
+
+        return [msg]
+
+    return []
 
 
 @contextmanager
-def install_tcp_listener(cluster: KubernetesCluster,
-                         nodes: Dict[str, NodeConfig], tcp_ports: List[str]) -> Iterator[None]:
-    detect_preinstalled_python(cluster)
-    nodes_without_python = {node_config['name']: node_config for host, node_config in nodes.items()
-                            if cluster.context['nodes'][host]['python'] == "Not installed"}
-    for node_nonfig in nodes_without_python.values():
-        del nodes[node_nonfig['connect_to']]
+def install_listeners(cluster: KubernetesCluster,
+                      host_ports: Dict[str, List[str]], host_to_ip: Dict[str, str],
+                      proto: str, mtu: int) -> Iterator[Dict[str, List[Tuple[str, bool]]]]:
+    logger = cluster.log
+    logger.debug(f"Installing {proto.upper()} listeners on nodes...")
 
-    # currently tcp listener can be run on both python 2 and 3
-    check_script = utils.read_internal('resources/scripts/simple_tcp_listener.py')
-    tcp_listener = "/tmp/%s.py" % uuid.uuid4().hex
-    cluster.make_group(nodes.keys()).put(io.StringIO(check_script), tcp_listener)
+    group = cluster.make_group(host_ports)
+    # currently port listener can be run on both python 2 and 3
+    check_script = utils.read_internal('resources/scripts/simple_port_listener.py')
+    port_listener = "/tmp/%s.py" % uuid.uuid4().hex
 
-    skipped_nodes = {}
-    nodes_to_rollback = cluster.make_group([])
+    listened_ports: Dict[str, List[Tuple[str, bool]]] = {}
     try:
         collector = CollectorCallback(cluster)
-        try:
-            nodes_to_rollback = group = cluster.make_group(nodes)
-            with group.new_executor() as exe:
-                # Run process that LISTEN TCP port
-                for node in exe.group.get_ordered_members_list():
-                    host = node.get_host()
-                    internal_ip: str = nodes[host]['internal_address']
-                    ip_version = ipaddress.ip_address(internal_ip).version
-                    python_executable = cluster.context['nodes'][host]['python']['executable']
-                    tcp_listener_cmd = cmd_for_ports(tcp_ports, get_start_tcp_listener_cmd(python_executable, tcp_listener, ip_version))
-                    node.sudo(tcp_listener_cmd, warn=True, callback=collector)
-        except GroupException as e:
-            nodes_to_rollback = e.get_exited_nodes_group()
-            raise
+        with group.new_executor() as exe:
+            # Run processes that listen TCP or UDP ports
+            for node in exe.group.get_ordered_members_list():
+                host = node.get_host()
+                bind_address = host_to_ip[host]
+                ip_version = ipaddress.ip_address(bind_address).version
+                rendered_script = jinja.new(logger).from_string(check_script).render({
+                    'proto': proto,
+                    'address': bind_address,
+                    'ip_version': ip_version,
+                    'mtu': mtu,
+                })
+                node.put(io.StringIO(rendered_script), port_listener)
 
-        port_in_use = re.compile(r'^(\d+) in use$')
+                python_executable = cluster.context['nodes'][host]['python']['executable']
+                port_start_listener_cmd = get_start_listener_cmd(python_executable, port_listener)
+                listener_cmd = cmd_for_ports(host_ports[host], port_start_listener_cmd)
+                node.sudo(listener_cmd, callback=collector)
+
+        port_in_use_ptrn = re.compile(r'^(\d+) in use$')
         for host, result in collector.result.items():
-            matcher = port_in_use.match(result.stderr.strip())
-            if matcher is not None:
-                skipped_nodes[nodes[host]["name"]] = matcher.group(1)
-                del nodes[host]
-            elif result.exited != 0:
-                raise GroupResultException(collector.result)
-            else:
-                cluster.log.verbose(result)
+            ports_in_use = []
+            if result.stderr:
+                for msg in result.stderr.rstrip('\n').split('\n'):
+                    matcher = port_in_use_ptrn.match(msg)
+                    if matcher is None:
+                        raise GroupResultException(collector.result)
+                    else:
+                        port = matcher.group(1)
+                        ports_in_use.append(port)
+                        logger.verbose(f"{proto.upper()} port {port} is already in use on {cluster.get_node_name(host)}")
 
-        yield
+            for port in host_ports[host]:
+                in_use = port in ports_in_use
+                listened_ports.setdefault(host, []).append((port, in_use))
+
+        yield listened_ports
 
     finally:
-        with nodes_to_rollback.new_executor() as exe:
-            # Kill the created during the test processes
+        with group.new_executor() as exe:
+            # Kill the processes created during the test
             for node in exe.group.get_ordered_members_list():
-                tcp_listener_cmd = cmd_for_ports(tcp_ports, get_stop_tcp_listener_cmd(tcp_listener))
-                node.sudo(tcp_listener_cmd, warn=True)
-
-    if skipped_nodes:
-        cluster.log.warning(f"Ports in use: {skipped_nodes}")
-        raise TestWarn(f"Cannot perform check on {list(skipped_nodes.keys())}: some ports are already in use. "
-                       f"Use check_paas procedure if you already have installed cluster.")
-
-    if nodes_without_python:
-        cluster.log.warning(f"Nodes without python: {nodes_without_python.keys()}")
-        raise TestWarn(f"Cannot perform check on {list(nodes_without_python.keys())}: python doesn't exist.")
+                host = node.get_host()
+                port_stop_listener_cmd = get_stop_listener_cmd(port_listener)
+                listener_cmd = cmd_for_ports(host_ports[host], port_stop_listener_cmd)
+                node.sudo(listener_cmd, warn=True)
 
 
-def check_tcp_ports(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '011', 'Network', 'TCPPorts', default_results='Connected'),\
+def ports_connectivity(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '011', 'Network', 'TCP & UDP Ports', default_results='Connected'),\
             suspend_firewalld(cluster):
-        tcp_ports = ["80", "443", "179", "5473", "6443", "8443", "2379", "2380", "9091", "9093", "9094", "10250", "10254",
-                     "10257", "10259", "30001", "30002"]
-        nodes = {node["connect_to"]: node
-                 for node in cluster.inventory['nodes']}
-        host_to_ip = {host: node['internal_address'] for host, node in nodes.items()}
-        with install_tcp_listener(cluster, nodes, tcp_ports):
-            failed_nodes = check_tcp_connect_between_all_nodes(cluster, list(nodes.values()), tcp_ports, host_to_ip)
+        skipped_msgs = nodes_require_python(cluster)
+        failed_nodes: Set[str] = set()
+        failed_msgs: List[str] = []
 
-            if failed_nodes:
-                raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                                  hint=f"Not all needed tcp ports are opened on nodes: {failed_nodes}. "
-                                       f"Ports that should be opened: {tcp_ports}")
+        group = get_python_group(cluster, True)
+
+        host_to_ip = {node['connect_to']: node['internal_address'] for node in group.get_ordered_members_configs_list()}
+        mtu = get_mtu(cluster)
+        for proto in ('tcp', 'udp'):
+            cluster.log.debug(f"Checking {proto.upper()} ports connectivity")
+            host_ports = get_input_ports(cluster, group, 'internal', proto)
+            with install_listeners(cluster, host_ports, host_to_ip, proto, mtu) as listened_ports:
+                failed_ports = check_connect_between_all_nodes(
+                    cluster, listened_ports, host_to_ip, 'internal', proto, mtu)
+                failed_nodes.update(failed_ports)
+                failed_msgs.extend(
+                    f"{proto.upper()} ports not opened for internal traffic on {cluster.get_node_name(host)}: {', '.join(ports)}"
+                    for host, ports in failed_ports.items())
+
+        if failed_msgs:
+            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                              hint='\n'.join(failed_msgs))
+
+        if skipped_msgs:
+            raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
 
 
 def make_reports(context: dict) -> None:
@@ -901,7 +1178,7 @@ tasks = OrderedDict({
     'network': {
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
-        'check_tcp_ports': check_tcp_ports
+        'ports_connectivity': ports_connectivity,
     },
     'hardware': {
         'members_amount': {
