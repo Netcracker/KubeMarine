@@ -1120,7 +1120,7 @@ and debug log has the following message:
 2023-11-10 11:56:44,441 140368685827904 DEBUG [__init__.upgrade_first_control_plane]    [upgrade/apply] FATAL: fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: static Pod hash for component etcd on Node ubuntu did not change after 5m0s: timed out waiting for the condition
 ```
 
-**Root cause**: currently undefined
+**Root cause**: currently is undefined
 
 **Solution**: remove the following parts from the `etcd.yaml` manifest:
 
@@ -1182,7 +1182,7 @@ spec:
 ...
 ```
 
-and run upgrade procedure once again.
+wait for the ETCD restart and run upgrade procedure once again.
 
 ## Numerous Generation of `Auditd` System
 
