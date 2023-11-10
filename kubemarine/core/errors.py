@@ -64,7 +64,8 @@ def get_kme_dictionary() -> dict:
                     "Please, specify required third-party configuration explicitly in procedure inventory."
         },
         "KME0012": {
-            "name": "Upgrade is possible only for cluster with all nodes having the same and supported OS family."
+            "name": "Procedure {procedure!r} is possible only for cluster "
+                    "with all nodes having the same and supported OS family."
         },
         'KME0013': {
             "name": "Key 'plugins.\"io.containerd.grpc.v1.cri\".sandbox_image' is redefined for 'containerdConfig' "

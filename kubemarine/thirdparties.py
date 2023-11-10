@@ -206,16 +206,7 @@ def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> di
         return inventory
 
     _, upgrade_thirdparties = upgrade_plan[0]
-    if upgrade_thirdparties:
-        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
-        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
-
-        for destination in upgrade_thirdparties:
-            config = _convert_thirdparty(thirdparties, destination)
-            upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
-            default_merger.merge(config, upgrade_config)
-
-    return inventory
+    return _enrich_procedure_inventory(inventory, upgrade_thirdparties)
 
 
 def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -227,14 +218,30 @@ def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
         return inventory
 
     restore_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
-    if restore_thirdparties:
-        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
+    return _enrich_procedure_inventory(inventory, restore_thirdparties)
 
-        for destination, value in restore_thirdparties.items():
+
+def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    return migrate_cri_finalize_inventory(cluster, inventory)
+
+
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "migrate_cri":
+        return inventory
+
+    procedure_thirdparties = cluster.procedure_inventory.get("thirdparties", {})
+    return _enrich_procedure_inventory(inventory, procedure_thirdparties)
+
+
+def _enrich_procedure_inventory(inventory: dict, procedure_thirdparties: dict) -> dict:
+    if procedure_thirdparties:
+        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
+        procedure_thirdparties = deepcopy(procedure_thirdparties)
+
+        for destination in procedure_thirdparties:
             config = _convert_thirdparty(thirdparties, destination)
-            config['source'] = value['source']
-            if value.get('sha1'):
-                config['sha1'] = value['sha1']
+            procedure_config = _convert_thirdparty(procedure_thirdparties, destination)
+            default_merger.merge(config, procedure_config)
 
     return inventory
 

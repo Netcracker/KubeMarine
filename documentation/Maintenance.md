@@ -551,7 +551,9 @@ By default, the following files are backed up from all nodes in the cluster:
 * /etc/systemd/system/kubelet.service
 * /etc/docker/daemon.json
 * /etc/containerd/config.toml
-* /etc/crictl.yaml  
+* /etc/containerd/certs.d
+* /etc/crictl.yaml
+* /etc/ctr/kubemarine_ctr_flags.conf
 * /etc/haproxy/haproxy.cfg
 * /etc/systemd/system/{haproxy_service_name}.service.d/{haproxy_service_name}.conf
 * /etc/keepalived/keepalived.conf
@@ -563,6 +565,7 @@ By default, the following files are backed up from all nodes in the cluster:
 * /etc/audit/rules.d/
 * /etc/kubernetes/
 * /var/lib/kubelet/pki/
+* /root/.kube/config
 
 **Note**: If the file does not exist on the node, it is skipped without error.
 
@@ -1260,9 +1263,12 @@ The following sections describe the `migrate_cri` parameters.
 
 #### cri Parameter
 
-In this parameter, you should specify `containerRuntime: containerd` and the configuration for it.
+In this parameter, you should specify the `containerRuntime: containerd` parameter.
 
 **Note**: This parameter is mandatory. An exception is raised if the parameter is absent.
+
+You can also optionally specify the configuration for the containerd.
+For more information, refer to [CRI](Installation.md#cri).
 
 Example for CLI:
 
@@ -1272,27 +1278,10 @@ cri:
   containerdConfig:
     plugins."io.containerd.grpc.v1.cri":
       sandbox_image: registry.k8s.io/pause:3.2
-    plugins."io.containerd.grpc.v1.cri".registry.mirrors."artifactory.example.com:5443":
-      endpoint:
-      - https://artifactory.example.com:5443
-```
-
-#### yum-repositories Parameter
-
-This parameter allows you to specify a new repository from where containerd could be downloaded.
-
-**Note**: This parameter is optional.
-
-Example:
-
-```yaml
-yum:
-  repositories:
-    test-repo:
-      name: repo-name
-      enabled: 1
-      gpgcheck: 0
-      baseurl: http://example.com/misc/epel/7/x86_64/
+  containerdRegistriesConfig:
+    artifactory.example.com:5443:
+      host."https://artifactory.example.com:5443":
+        capabilities: [ "pull", "resolve" ]
 ```
 
 #### packages-associations Parameter
