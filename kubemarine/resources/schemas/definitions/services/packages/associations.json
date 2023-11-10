@@ -5,12 +5,13 @@
   "properties": {
     "debian": {"$ref": "#/definitions/OSFamilyAssociations"},
     "rhel": {"$ref": "#/definitions/OSFamilyAssociations"},
-    "rhel8": {"$ref": "#/definitions/OSFamilyAssociations"}
+    "rhel8": {"$ref": "#/definitions/OSFamilyAssociations"},
+    "rhel9": {"$ref": "#/definitions/OSFamilyAssociations"}
   },
   "propertyNames": {
     "anyOf": [
       {"$ref": "#/definitions/AssociationsNames"},
-      {"enum": ["debian", "rhel", "rhel8"]}
+      {"enum": ["debian", "rhel", "rhel8", "rhel9"]}
     ]
   },
   "definitions": {

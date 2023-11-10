@@ -4,11 +4,12 @@
   "properties": {
     "debian": {"$ref": "#/definitions/OSFamilyModules"},
     "rhel": {"$ref": "#/definitions/OSFamilyModules"},
-    "rhel8": {"$ref": "#/definitions/OSFamilyModules"}
+    "rhel8": {"$ref": "#/definitions/OSFamilyModules"},
+    "rhel9": {"$ref": "#/definitions/OSFamilyModules"}
   },
   "propertyNames": {
     "anyOf": [
-      {"enum": ["debian", "rhel", "rhel8"]}
+      {"enum": ["debian", "rhel", "rhel8", "rhel9"]}
     ]
   },
   "definitions": {

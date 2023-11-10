@@ -91,7 +91,7 @@ def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
     os_family = cluster.get_os_family()
     if os_family in ["unknown", "unsupported"]:
         raise Exception(ERROR_UNSUPPORTED_KERNEL_MODULES_VERSIONS_DETECTED)
-    elif os_family in ["debian", "rhel", "rhel8"]:
+    elif os_family in ["debian", "rhel", "rhel8", "rhel9"]:
         modprobe = {}
         modprobe[os_family] = inventory["services"]["modprobe"][os_family]
         inventory["services"]["modprobe"] = modprobe
@@ -265,6 +265,10 @@ def patch_systemd_service(group: DeferredGroup, service_name: str, patch_source:
     group.put(io.StringIO(utils.read_internal(patch_source)),
               f"/etc/systemd/system/{service_name}.service.d/{service_name}.conf",
               sudo=True)
+    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
+        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d")
+        group.sudo(f"chcon -u system_u -r object_r -t systemd_unit_file_t /etc/systemd/system/{service_name}.service.d/{service_name}.conf")
+    
     group.sudo("systemctl daemon-reload")
 
 
@@ -509,6 +513,9 @@ def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
     group.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
     group.sudo("modprobe -a %s" % raw_config)
 
+    if group.get_nodes_os() in ['rhel', 'rhel8', 'rhel9']:
+        group.sudo("chcon -u system_u -r object_r -t etc_t /etc/modules-load.d/predefined.conf")
+
     group.cluster.schedule_cumulative_point(reboot_nodes)
     group.cluster.schedule_cumulative_point(verify_system)
 
@@ -537,7 +544,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
     # this method handles clusters with multiple OS
     os_family = group.get_nodes_os()
 
-    if os_family in ['rhel', 'rhel8'] and cluster.is_task_completed('prepare.system.setup_selinux'):
+    if os_family in ['rhel', 'rhel8', 'rhel9'] and cluster.is_task_completed('prepare.system.setup_selinux'):
         log.debug("Verifying Selinux...")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,

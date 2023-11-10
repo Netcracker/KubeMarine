@@ -105,7 +105,7 @@ def export_ansible_inventory(cluster: KubernetesCluster) -> None:
 
 def export_packages_list(cluster: KubernetesCluster) -> None:
     cluster.context['backup_descriptor']['nodes']['packages'] = {}
-    if cluster.get_os_family() in ['rhel', 'rhel8']:
+    if cluster.get_os_family() in ['rhel', 'rhel8', 'rhel9']:
         cmd = r"rpm -qa"
     else:
         cmd = r"dpkg-query -f '${Package}=${Version}\n' -W"
