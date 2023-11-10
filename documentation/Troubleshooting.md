@@ -1123,7 +1123,8 @@ and `debug.log` has the following message:
 
 **Root cause**: `kubeadm v1.28.0` adds default fields that are not compatible with `kubeadm v1.28.3`
 
-**Solution**: remove the following parts from the `etcd.yaml` manifest(lines are marked by `-`):
+**Solution**: 
+* Remove the following parts from the `etcd.yaml` manifest on each control plane node in the cluster one by one(lines are marked by `-`):
 
 ```yaml
 apiVersion: v1
@@ -1183,7 +1184,8 @@ spec:
 ...
 ```
 
-wait for the ETCD restart and run upgrade procedure once again.
+* Wait for the ETCD restart.
+* Run upgrade procedure once again.
 
 ## Numerous Generation of `Auditd` System
 
