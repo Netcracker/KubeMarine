@@ -4,6 +4,7 @@
 - [Disable anonymous authentication for kube-apiserver](#disable-anonymous-authentication-for-kube-apiserver)
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
+- [Disabling auto-mounting of tokens for service accounts](#Disabling auto-mounting of tokens for service accounts)
 <!-- /TOC -->
 
 ## The purpose
@@ -239,6 +240,8 @@ spec:
 In the above case, the `secrets` and `configmaps` are encrypted on the first key of the `aesgcm` provider, but the previously encrypted `secrets` and `configmaps` are decrypted on any keys of any providers that are matched. This approach allows to change both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. `identity` is the default provider that does not provide any encryption at all.
 For more information, refer to [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
 
+As per CIS bechmark (kube-bench checks), `aesgcm` provider for encrypption is not recognized as appropriate provider. To fulfil this requirement, we have to configure `aescbc`, `secretxbox` or `kms` as encryption provider.
+
 ### Integration with External KMS
 
 There is an encryption provider `kms` that allows using an external `Key Management Service` for the key storage, therefore the keys are not stored in the `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further use.
@@ -422,3 +425,55 @@ Basically, `CronJob` runs the approval command above for every CSR according to 
 ### Auto Approval Service
 
 It is possible to install the kubelet-csr-approver service. For more information, refer to [[kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)](https://github.com/postfinance/kubelet-csr-approver). This service approves CSR automatically when a CSR is created according to several settings. It is better to restrict nodes' IP addresses (`providerIpPrefixes` option) and FQDN templates (providerRegex). For more information, refer to the official documentation.
+
+## Disabling auto-mounting of tokens for service accounts
+
+To disable the auto-mounting of service account tokens, we need to create secrets associated with perticular service account and mount that secret as a volume to the pod's specification wherver necessary.
+
+To acchieve it, we have to follow below proedure -
+
+### Disable auto-mounting
+To disbale the auto-mounting of token add `automountServiceAccountToken: false` falg to the service account properties as shwon below -
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+automountServiceAccountToken: false
+...
+```
+
+### Create secret
+Create a new kuebernetes secret of type `kubernetes.io/service-account-token` as below -
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ingress-nginx-token
+  namespace: ingress-nginx
+  annotations:
+    kubernetes.io/service-account.name: ingress-nginx
+type: kubernetes.io/service-account-token
+```
+
+### Mount the token thorugh secrets
+Edit POD specification and mount the secret as volume to the pod as below -
+
+```yaml
+...
+volumeMounts:
+  - name: ingress-nginx-token
+    mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+
+...
+
+volumes:
+  - name: service-account-token
+    secret:
+      secretName: calico-node-token
+...
+```
+After this restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
+
