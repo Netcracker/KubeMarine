@@ -951,7 +951,11 @@ Address:        172.30.0.10:53
 
 ### Case 2
 
-**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly. 
+**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly. The error message is the following:
+
+```
+;; connection timed out; no servers could be reached
+``` 
 
 **Root cause**: Traffic from node network to pod network is blocked for UDP port 53
 
