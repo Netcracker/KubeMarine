@@ -30,6 +30,9 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
   - [Ingress Cannot Be Created or Updated](#ingress-cannot-be-created-or-updated)
+  - [CoreDNS Cannot Resolve the Name](coredns-cannot-resolve-the-name]
+    - [Case 1](case-1]
+    - [Case 2](case-2]
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
@@ -926,6 +929,33 @@ spec:
       args:
         - '--disable-full-test'
 ```
+
+## CoreDNS Cannot Resolve the Name
+
+### Case 1
+
+**Symptoms**: A pod can't resolve the non-FQDN. Check inside the pod looks the following:
+
+```
+$ nslookup kubernetes.default
+Server:         172.30.0.10
+Address:        172.30.0.10:53
+
+
+** server can't find kubernetes.default: NXDOMAIN
+```
+
+**Root cause**: Images that are based on Alpine Linux do not use `search` directives in `/etc/resolv.conf`.
+
+**Solution**: Use FQDN.
+
+### Case 2
+
+**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly. 
+
+**Root cause**: Traffic from node network to pod network is blocked for UDP port 53
+
+**Solution**: Change cloud provider configuration to allow the traffic.
 
 # Troubleshooting Kubemarine
 
