@@ -2522,6 +2522,7 @@ The `services.sysctl` section manages the Linux Kernel parameters for all hosts 
 |net.bridge.bridge-nf-call-ip6tables|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.conf.all.forwarding|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.ip_nonlocal_bind|1|Presented only when IPv6 detected in node IP|
+|net.netfilter.nf_conntrack_max|1000000||
 |kernel.panic|10||
 |vm.overcommit_memory|1||
 |kernel.panic_on_oops|1||
