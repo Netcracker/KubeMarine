@@ -30,9 +30,9 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
   - [Ingress Cannot Be Created or Updated](#ingress-cannot-be-created-or-updated)
-  - [CoreDNS Cannot Resolve the Name](coredns-cannot-resolve-the-name]
-    - [Case 1](case-1]
-    - [Case 2](case-2]
+  - [CoreDNS Cannot Resolve the Name](coredns-cannot-resolve-the-name)
+    - [Case 1](case-1)
+    - [Case 2](case-2)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
@@ -945,21 +945,22 @@ Address:        172.30.0.10:53
 ** server can't find kubernetes.default: NXDOMAIN
 ```
 
-**Root cause**: Images that are based on Alpine Linux do not use `search` directives in `/etc/resolv.conf`.
+**Root cause**: Images that are based on Alpine Linux do not use `search` directives in `/etc/resolv.conf` by default.
 
-**Solution**: Use FQDN.
+**Solution**: Use FQDN instead of that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local`.
 
 ### Case 2
 
-**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly. The error message is the following:
+**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly, even if it's FQDN. The error message is the following:
 
 ```
+$ nslookup kubernetes.default.svc.cluster.local
 ;; connection timed out; no servers could be reached
 ``` 
 
 **Root cause**: Traffic from node network to pod network is blocked for UDP port 53
 
-**Solution**: Change cloud provider configuration to allow the traffic.
+**Solution**: Change cloud provider configuration to allow the traffic on IaaS layer. In OpenStack the Security Groups manage the allowed traffic.
 
 # Troubleshooting Kubemarine
 
