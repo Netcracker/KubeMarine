@@ -36,7 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
-  - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-fails-on-etcd-step)
+  - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1.28.3-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
@@ -1106,7 +1106,7 @@ If other files except images and containers use the disk so that GC cannot free 
 KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.1 --kube-reserved cpu=200m,memory=256Mi --system-reserved cpu=200m,memory=512Mi --max-pods 250 --image-gc-high-threshold 80 --image-gc-low-threshold 70"
 ```
 
-### Upgrade Procedure Fails on ETCD Step
+### Upgrade Procedure to v1.28.3 Fails on ETCD Step
 
 **Symptoms**:
 Upgrade procedure from v1.28.0(v1.28.1, v1.28.2 as well) to v1.28.3 fails with error message:
