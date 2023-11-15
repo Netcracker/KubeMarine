@@ -12,7 +12,7 @@ class TheAction(Action):
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
 
-        node_group = cluster.make_group_from_roles(['control-plane', 'worker'])
+        node_group = cluster.make_group_from_roles(['all'])
         node_group.call(sysctl.configure)
         node_group.call(sysctl.reload)
         
