@@ -39,7 +39,7 @@ from kubemarine.kubernetes.daemonset import DaemonSet
 from kubemarine.kubernetes.deployment import Deployment
 from kubemarine.kubernetes.object import KubernetesObject
 from kubemarine.coredns import generate_configmap
-from deepdiff import DeepDiff  # type: ignore[import]
+from deepdiff import DeepDiff  # type: ignore[import-untyped]
 
 
 def services_status(cluster: KubernetesCluster, service_type: str) -> None:

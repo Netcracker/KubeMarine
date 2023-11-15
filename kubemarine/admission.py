@@ -16,7 +16,7 @@ import io
 import os
 import uuid
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 import ruamel.yaml
 import yaml
@@ -899,22 +899,22 @@ def get_labels_to_ensure_profile(inventory: dict, profile: str) -> Dict[str, str
 def label_namespace_pss(cluster: KubernetesCluster, manage_type: str) -> None:
     first_control_plane = cluster.nodes["control-plane"].get_first_member()
     # set/delete labels on predifined plugins namsespaces
-    for namespace, profile in builtin.get_namespace_to_necessary_pss_profiles(cluster).items():
+    for ns_name, profile in builtin.get_namespace_to_necessary_pss_profiles(cluster).items():
         target_labels = get_labels_to_ensure_profile(cluster.inventory, profile)
         if manage_type in ["apply", "install"] and target_labels:
-            cluster.log.debug(f"Set PSS labels for profile {profile} on namespace {namespace}")
+            cluster.log.debug(f"Set PSS labels for profile {profile} on namespace {ns_name}")
             command = "kubectl label ns {namespace} {lk}={lv} --overwrite"
 
         else:  # manage_type == "delete" or default labels are not necessary
-            cluster.log.debug(f"Delete PSS labels from namespace {namespace}")
+            cluster.log.debug(f"Delete PSS labels from namespace {ns_name}")
             command = "kubectl label ns {namespace} {lk}- || true"
             target_labels = _get_default_labels(profile)
 
         for lk, lv in target_labels.items():
-            first_control_plane.sudo(command.format(namespace=namespace, lk=lk, lv=lv))
+            first_control_plane.sudo(command.format(namespace=ns_name, lk=lk, lv=lv))
 
     procedure_config = cluster.procedure_inventory["pss"]
-    namespaces = procedure_config.get("namespaces")
+    namespaces: List[Union[str, Dict[str, dict]]] = procedure_config.get("namespaces")
     # get the list of namespaces that should be labeled then set/delete labels
     if namespaces:
         default_modes = {}

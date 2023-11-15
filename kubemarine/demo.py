@@ -22,7 +22,7 @@ from abc import ABC
 from copy import deepcopy
 from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO, Tuple, cast
 
-import fabric  # type: ignore[import]
+import fabric  # type: ignore[import-untyped]
 import invoke
 
 from kubemarine import system, procedures

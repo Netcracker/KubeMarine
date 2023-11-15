@@ -22,7 +22,7 @@ major_version = sys.version_info.major
 if major_version == 3:
     import urllib.request as urllib
 else:
-    import urllib2 as urllib  # type: ignore[import, no-redef]
+    import urllib2 as urllib  # type: ignore[import-not-found, no-redef]
 
 try:
     source = sys.argv[1]
