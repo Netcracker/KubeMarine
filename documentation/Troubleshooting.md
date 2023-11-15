@@ -36,7 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
-  - [Upgrade Procedure Fails on ETCD Step](#upgrade-procedure-fails-on-etcd-step)
+  - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
