@@ -17,7 +17,7 @@ import os
 import sys
 from abc import ABC, abstractmethod
 
-from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import]
+from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import-untyped]
 
 from copy import deepcopy
 from typing import Any, List, Optional, cast, Dict, Union

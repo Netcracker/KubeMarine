@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from deepmerge import Merger  # type: ignore[import]
+from deepmerge import Merger  # type: ignore[import-untyped]
 
 
 def is_list_extends(nxt: list) -> bool:

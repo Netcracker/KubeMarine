@@ -22,8 +22,8 @@ from datetime import datetime
 from types import TracebackType
 from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable
 
-import fabric  # type: ignore[import]
-import fabric.transfer  # type: ignore[import]
+import fabric  # type: ignore[import-untyped]
+import fabric.transfer  # type: ignore[import-untyped]
 
 from concurrent.futures.thread import ThreadPoolExecutor
 

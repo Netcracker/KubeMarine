@@ -14,7 +14,7 @@
 import os
 from typing import Dict, List
 
-import fabric  # type: ignore[import]
+import fabric  # type: ignore[import-untyped]
 
 from kubemarine.core import static
 
