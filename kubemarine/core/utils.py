@@ -23,6 +23,7 @@ import tarfile
 
 from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence
 
+import deepdiff  # type: ignore[import]
 import yaml
 import ruamel.yaml
 from copy import deepcopy
@@ -466,6 +467,12 @@ def true_or_false(value: Union[str, bool]) -> str:
     else:
         result = "undefined"
     return result
+
+
+def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
+    # Extra transformation to JSON is necessary,
+    # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
+    logger.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
 
 
 def get_version_filepath() -> str:

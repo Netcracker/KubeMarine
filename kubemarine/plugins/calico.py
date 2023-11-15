@@ -62,6 +62,17 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
     processor.apply(cluster, manifest)
 
 
+def is_typha_enabled(inventory: dict) -> bool:
+    str_value = utils.true_or_false(inventory['plugins']['calico']['typha']['enabled'])
+    if str_value == 'false':
+        return False
+    elif str_value == 'true':
+        return True
+    else:
+        raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
+                        f"as string or boolean value")
+
+
 def is_apiserver_enabled(inventory: dict) -> bool:
     enabled: bool = inventory['plugins']['calico']['apiserver']['enabled']
     return enabled
@@ -130,20 +141,10 @@ class CalicoManifestProcessor(Processor):
                  original_yaml_path: Optional[str] = None, destination_name: Optional[str] = None):
         super().__init__(logger, inventory, Identity('calico'), original_yaml_path, destination_name)
 
-    def is_typha_enabled(self) -> bool:
-        str_value = utils.true_or_false(self.inventory['plugins']['calico']['typha']['enabled'])
-        if str_value == 'false':
-            return False
-        elif str_value == 'true':
-            return True
-        else:
-            raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                            f"as string or boolean value")
-
     def exclude_typha_objects_if_disabled(self, manifest: Manifest) -> None:
         # enrich 'calico-typha' objects only if it's enabled in 'cluster.yaml'
         # in other case those objects must be excluded
-        if not self.is_typha_enabled():
+        if not is_typha_enabled(self.inventory):
             for key in ("Deployment_calico-typha", "Service_calico-typha", "PodDisruptionBudget_calico-typha"):
                 self.exclude(manifest, key)
 
@@ -158,7 +159,7 @@ class CalicoManifestProcessor(Processor):
         val = self.inventory['plugins']['calico']['mtu']
         source_yaml['data']['veth_mtu'] = str(val)
         self.log.verbose(f"The {key} has been patched in 'data.veth_mtu' with '{val}'")
-        val = "calico-typha" if self.is_typha_enabled() else "none"
+        val = "calico-typha" if is_typha_enabled(self.inventory) else "none"
         source_yaml['data']['typha_service_name'] = val
         self.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
         string_part = source_yaml['data']['cni_network_config']
@@ -224,7 +225,7 @@ class CalicoManifestProcessor(Processor):
                 'CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD',
                 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'
             ])
-        if not self.is_typha_enabled():
+        if not is_typha_enabled(self.inventory):
             env_delete.append('FELIX_TYPHAK8SSERVICENAME')
 
         env_ensure: Dict[str, str] = {
@@ -325,7 +326,7 @@ class CalicoManifestProcessor(Processor):
         yaml = utils.yaml_structure_preserver()
         self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-kube-controllers-metrics.yaml')))
         self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-metrics.yaml')))
-        if self.is_typha_enabled():
+        if is_typha_enabled(self.inventory):
             self.include(manifest, sz, yaml.load(utils.read_internal('templates/plugins/calico-typha-metrics.yaml')))
 
     def get_known_objects(self) -> List[str]:

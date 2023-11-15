@@ -65,7 +65,7 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         #         "source": f"templates/plugins/<paste template filename>.yaml.j2"
         #     }
         #     plugins.apply_template(cluster, config)
-        processor = builtin.get_manifest_processor(cluster.log, cluster.inventory, self.manifest_identity)
+        processor = builtin._get_manifest_processor(cluster.log, cluster.inventory, self.manifest_identity)
         return processor.enrich()
 
     def check_all_images_contain_registry(self, inventory: dict) -> int:
