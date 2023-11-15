@@ -18,7 +18,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [`kube-controller-manager` Unable to Sync Caches for Garbage Collector](#kube-controller-manager-unable-to-sync-caches-for-garbage-collector)
   - [Etcdctl Compaction and Defragmentation](#etcdctl-compaction-and-defragmentation)
   - [Etcdctl Defrag Return Context Deadline Exceeded](#etcdctl-defrag-return-context-deadline-exceeded)
-  - [Etcdserver Request Timeout](#etcdserver-request-rimeout)
+  - [Etcdserver Request Timeout](#etcdserver-request-timeout)
   - [Etcd Database Corruption](#etcd-database-corruption)
     - [Manual Restoration of Etcd Database](#manual-restoration-of-etcd-database)
   - [HTTPS Ingress Doesn't Work](#https-ingress-doesnt-work)
@@ -36,7 +36,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
   - [Troubleshooting an Installation That Ended Incorrectly](#troubleshooting-an-installation-that-ended-incorrectly)
   - [Kubelet Has Conflict With Kubepods-burstable.slice and Kube-proxy Pods Stick in ContainerCreating Status](#kubelet-has-conflict-with-kubepods-burstableslice-and-kube-proxy-pods-stick-in-containercreating-status)
-  - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1.28.3-fails-on-etcd-step)
+  - [Upgrade Procedure to v1.28.3 Fails on ETCD Step](#upgrade-procedure-to-v1283-fails-on-etcd-step)
   - [kubectl logs and kubectl exec fail](#kubectl-logs-and-kubectl-exec-fail)
 
 # Kubemarine Errors
@@ -474,13 +474,13 @@ Failed to defragment etcd member
 
 **Symptoms**: there are such error messages in the `kubelet` logs:
 
-```commandline
+```bash
 Apr 23 06:32:33 node-9 kubelet: 2023-04-23 06:32:33.378 [ERROR][9428] ipam_plugin.go 309: Failed to release address ContainerID="8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" HandleID="k8s-pod-network.8938210a16212763148e8fcc3b4785440eea07e52ff82d1f0370495ed3315ffc" Workload="example-workload-name" error=etcdserver: request timed out
 ```
 
 In etcd logs there are such messages:
 
-```commandline
+```bash
 2023-04-29 06:06:16.087641 W | etcdserver: failed to send out heartbeat on time (exceeded the 100ms timeout for 6.102899ms, to fa4ddfec63d549fc)
 ```
 
@@ -500,7 +500,7 @@ Then add the following flags to the `/etc/kubernetes/manifests/etcd.yaml` manife
 Also it is recommended to set different `snapshot-count` values at different control-plane nodes so they persist snapshots to the disk not simultaneously.
 Default value of `snapshot-count` is `10000`, so set it to a different value at the second and the third control-plane nodes in the `/etc/kubernetes/manifests/etcd.yaml` manifest, for example:
 
-```commandline
+```bash
 # second master: 
 --snapshot-count=11210
 # third master:
@@ -1133,7 +1133,7 @@ kind: Pod
 spec:
   containers:
   - command:
-...
+      ...  
     image: registry.k8s.io/etcd:3.5.9-0
     imagePullPolicy: IfNotPresent
     livenessProbe:
@@ -1145,7 +1145,7 @@ spec:
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
--     successThreshold: 1
+      successThreshold: 1
       timeoutSeconds: 15
     name: etcd
     resources:
@@ -1161,26 +1161,26 @@ spec:
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
--     successThreshold: 1
+      successThreshold: 1
       timeoutSeconds: 15
--   terminationMessagePath: /dev/termination-log
--   terminationMessagePolicy: File
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/lib/etcd
       name: etcd-data
     - mountPath: /etc/kubernetes/pki/etcd
       name: etcd-certs
-- dnsPolicy: ClusterFirst
-- enableServiceLinks: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
   hostNetwork: true
   priority: 2000001000
   priorityClassName: system-node-critical
-- restartPolicy: Always
-- schedulerName: default-scheduler
+  restartPolicy: Always
+  schedulerName: default-scheduler
   securityContext:
     seccompProfile:
       type: RuntimeDefault
-- terminationGracePeriodSeconds: 30
+  terminationGracePeriodSeconds: 30
 ...
 ```
 
