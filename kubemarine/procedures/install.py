@@ -144,20 +144,6 @@ def system_prepare_system_sysctl(group: NodeGroup) -> None:
     cluster.schedule_cumulative_point(system.verify_system)
 
 
-@_applicable_for_new_nodes_with_roles('control-plane', 'worker')
-def system_prepare_system_networkmanager(group: NodeGroup) -> None:
-    cluster: KubernetesCluster = group.cluster
-    with group.new_executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            nm_folder_result = node.sudo("ls /etc/NetworkManager", warn=True)
-            if nm_folder_result == 0 :
-                # upload NM config file for calico
-                nm_calico_conf = "[keyfile]\nunmanaged-devices=interface-name:cali*;interface-name:tunl*\n"
-                node.sudo("mkdir -p /etc/NetworkManager/conf.d")
-                utils.dump_file(cluster, nm_calico_conf, "nm_kubemarine_calico.conf")
-                node.put(io.StringIO(nm_calico_conf), "/etc/NetworkManager/conf.d/kubemarine_calico.conf", sudo=True)
-
-
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_setup_selinux(group: NodeGroup) -> None:
     group.call(selinux.setup_selinux)
@@ -548,7 +534,6 @@ tasks = OrderedDict({
             "disable_firewalld": system_prepare_system_disable_firewalld,
             "disable_swap": system_prepare_system_disable_swap,
             "modprobe": system_prepare_system_modprobe,
-            "networkmanager": system_prepare_system_networkmanager,
             "sysctl": system_prepare_system_sysctl,
             "audit": {
                 "install": system_install_audit,
