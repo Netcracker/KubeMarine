@@ -470,9 +470,9 @@ volumeMounts:
 ...
 
 volumes:
-  - name: service-account-token
+  - name: ingress-nginx-token
     secret:
-      secretName: calico-node-token
+      secretName: ingress-nginx-token
 ...
 ```
 After this restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
