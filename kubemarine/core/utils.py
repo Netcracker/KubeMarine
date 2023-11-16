@@ -23,7 +23,7 @@ import tarfile
 
 from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence
 
-import deepdiff  # type: ignore[import]
+import deepdiff  # type: ignore[import-untyped]
 import yaml
 import ruamel.yaml
 from copy import deepcopy
