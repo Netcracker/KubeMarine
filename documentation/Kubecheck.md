@@ -26,6 +26,7 @@ This section provides information about the Kubecheck functionality.
       - [009 PodSubnet](#009-podsubnet)
       - [010 ServiceSubnet](#010-servicesubnet)
       - [011 TCP & UDP Ports](#011-tcp--udp-ports)
+      - [016 VRRP IPs](#016-vrrp-ips)
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
@@ -158,6 +159,7 @@ The task tree is as follows:
   * pod_subnet_connectivity
   * service_subnet_connectivity
   * ports_connectivity
+  * vips_connectivity
 * hardware
   * members_amount
     * vips
@@ -314,6 +316,12 @@ This test checks the connectivity between nodes inside the service's subnetwork.
 *Task*: `network.ports_connectivity`
 
 This test checks the connectivity between nodes for the predefined set of ports inside the nodes' internal subnetwork.
+
+##### 016 VRRP IPs
+
+*Task*: `network.vips_connectivity`
+
+This test checks the connectivity between nodes and the VRRP IPs when they are assigned to the balancer nodes.
 
 ##### 012 Thirdparties Availability
 

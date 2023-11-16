@@ -22,7 +22,7 @@ import sys
 import uuid
 from collections import OrderedDict
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext, AbstractContextManager
 from typing import List, Dict, cast, Match, Iterator, Optional, Tuple, Set, Union
 
 import yaml
@@ -1158,6 +1158,87 @@ def ports_connectivity(cluster: KubernetesCluster) -> None:
             raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
 
 
+def vips_connectivity(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '016', 'Network', 'VRRP IPs') as tc,\
+            suspend_firewalld(cluster):
+        logger = cluster.log
+        keepalived_group = cluster.make_group_from_roles(['keepalived'])
+        if keepalived_group.is_empty():
+            return tc.success(results='Skipped')
+
+        skipped_msgs = nodes_require_python(cluster)
+        failed_nodes: Set[str] = set()
+        failed_msgs: List[str] = []
+
+        keepalived_group = keepalived_group.intersection_group(get_python_group(cluster, True))
+        mtu = get_mtu(cluster)
+
+        for item in cluster.inventory['vrrp_ips']:
+            ip = item['ip']
+            node_names = [record['name'] for record in item['hosts']]
+            group = keepalived_group.new_group(apply_filter={'name': node_names})
+            if group.is_empty():
+                logger.debug(f"Skipping VRRP IP {ip} as it is not assigned to any balancer with python installed.")
+                continue
+
+            logger.debug(f"Checking TCP ports connectivity to VRRP IP {ip}")
+            vip_assigned_balancer = next((
+                host
+                for host, result in group.sudo(f"ip -o a | grep {ip}", warn=True).items()
+                if not result.grep_returned_nothing()
+            ), None)
+
+            if vip_assigned_balancer is not None:
+                logger.debug(f"VRRP IP is already assigned to balancer {cluster.get_node_name(vip_assigned_balancer)}.")
+
+            for record in item['hosts']:
+                node_name = record['name']
+                # Probably not existing hosts.name
+                if not group.has_node(node_name):
+                    continue
+
+                node = group.get_member_by_name(node_name)
+                host = node.get_host()
+
+                if vip_assigned_balancer is not None and vip_assigned_balancer != host:
+                    logger.debug(f"Skipping check on balancer {node_name} "
+                                 f"as the VRRP IP {ip} is assigned to another balancer.")
+                    continue
+
+                logger.debug(f"Checking VRRP IP {ip} on balancer {node_name}...")
+
+                host_to_inf = {host: record['interface']}
+                host_to_ip = {host: ip}
+
+                assign_ips_ctx: AbstractContextManager = nullcontext()
+                if vip_assigned_balancer is None:
+                    logger.debug(f"Assigning IP address {ip} to the internal interface on balancer {node_name}...")
+                    get_python_group(cluster, True).exclude_group(node).sudo(f'ip neigh flush {ip}')
+
+                    prefix = ipaddress.ip_address(ip).max_prefixlen
+                    assign_ips_ctx = assign_ips(node, host_to_ip, host_to_inf, prefix)
+
+                host_ports = {
+                    host: list(get_ports_connectivity(cluster, 'tcp')['internal']['input']['balancer'])
+                }
+                with assign_ips_ctx, install_listeners(cluster, host_ports, host_to_ip, 'tcp', mtu) as listened_ports:
+                    failed_ports = check_connect_between_all_nodes(
+                        cluster, listened_ports, host_to_ip, 'internal', 'tcp', mtu)
+                    failed_nodes.update(failed_ports)
+                    failed_msgs.extend(
+                        f"Ports not opened on {ip} when assigned to balancer {node_name}: {', '.join(ports)}"
+                        for host, ports in failed_ports.items())
+
+        if failed_msgs:
+            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                              hint='\n'.join(failed_msgs))
+
+        if skipped_msgs:
+            raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
+
+        tc.success(results='Connected')
+
+
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
         context['testsuite'].save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
@@ -1179,6 +1260,7 @@ tasks = OrderedDict({
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
         'ports_connectivity': ports_connectivity,
+        'vips_connectivity': vips_connectivity,
     },
     'hardware': {
         'members_amount': {
