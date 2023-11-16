@@ -945,9 +945,11 @@ Address:        172.30.0.10:53
 ** server can't find kubernetes.default: NXDOMAIN
 ```
 
-**Root cause**: Images that are based on Alpine Linux do not use `search` directives in `/etc/resolv.conf` by default.
+**Root cause**: Images with `busybox` utility that represents `nslookup` command could have issues with `search` directives in `/etc/resolv.conf`.
 
-**Solution**: Use FQDN instead of that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local`.
+**Solution**: Use FQDN instead of that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local`. In some cases addition `bind-tools` package fixes the issue with short names resolving. More information: 
+* [https://github.com/docker-library/busybox/issues/48](https://github.com/docker-library/busybox/issues/48)
+* [https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
 
 ### Case 2
 
