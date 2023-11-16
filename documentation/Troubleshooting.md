@@ -934,7 +934,7 @@ spec:
 
 ### Case 1
 
-**Symptoms**: A pod can't resolve the non-FQDN. Check inside the pod looks the following:
+**Symptoms**: A pod can't resolve a short name. Check inside the pod looks the following:
 
 ```
 $ nslookup kubernetes.default
@@ -947,7 +947,7 @@ Address:        172.30.0.10:53
 
 **Root cause**: Images with `busybox` utility that represents `nslookup` command could have issues with `search` directives in `/etc/resolv.conf`.
 
-**Solution**: Use FQDN instead of that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local`. In some cases addition `bind-tools` package fixes the issue with short names resolving. More information: 
+**Solution**: Use FQDN instead of short name that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`. In some cases addition `bind-tools` package fixes the issue with short names resolving. More information: 
 * [https://github.com/docker-library/busybox/issues/48](https://github.com/docker-library/busybox/issues/48)
 * [https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
 
