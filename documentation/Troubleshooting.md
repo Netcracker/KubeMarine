@@ -30,6 +30,9 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
   - [Ingress Cannot Be Created or Updated](#ingress-cannot-be-created-or-updated)
+  - [CoreDNS Cannot Resolve the Name](#coredns-cannot-resolve-the-name)
+    - [Case 1](#case-1)
+    - [Case 2](#case-2)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
@@ -927,6 +930,40 @@ spec:
       args:
         - '--disable-full-test'
 ```
+
+## CoreDNS Cannot Resolve the Name
+
+### Case 1
+
+**Symptoms**: A pod cannot resolve a short name. A check inside the pod looks like the following:
+
+```
+$ nslookup kubernetes.default
+Server:         172.30.0.10
+Address:        172.30.0.10:53
+
+
+** server can't find kubernetes.default: NXDOMAIN
+```
+
+**Root cause**: Images with the `busybox` utility that represents the `nslookup` command could have issues with the `search` directives in `/etc/resolv.conf`.
+
+**Solution**: Use FQDN instead of a short name, which consists of `service` and `namespace` only. For example, `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`. In some cases, addition of `bind-tools` package fixes the issue with short names. For more information, refer to the following: 
+* [https://github.com/docker-library/busybox/issues/48](https://github.com/docker-library/busybox/issues/48)
+* [https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
+
+### Case 2
+
+**Symptoms**: A pod that is attached to `hostNetwork` cannot resolve a name periodically or constantly, even if it is FQDN. The following error message is displayed:
+
+```
+$ nslookup kubernetes.default.svc.cluster.local
+;; connection timed out; no servers could be reached
+``` 
+
+**Root cause**: Traffic from node network to pod network is blocked for UDP port 53.
+
+**Solution**: Change the cloud provider configuration to allow the traffic on the IaaS layer. In OpenStack, the Security Groups manage the allowed traffic.
 
 # Troubleshooting Kubemarine
 
