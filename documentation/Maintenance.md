@@ -29,8 +29,8 @@ This section describes the features and steps for performing maintenance procedu
     - [Changing Cluster CIDR](#changing-cluster-cidr)
     - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Common Practice](#common-practice)
-  - [Security hardening guide](#security-hardening-guide)
-  - [Worker nodes should be managed by kubelet](#worker-nodes-should-be-managed-by-kubelet)
+  - [Security Hardening Guide](#security-hardening-guide)
+  - [Worker Nodes Should be Managed by Kubelet](#worker-nodes-should-be-managed-by-kubelet)
 
 # Prerequisites
 
@@ -1621,10 +1621,10 @@ data:
 
 # Common Practice
 
-## Security hardening guide
+## Security Hardening Guide
 
-[Security hardening guide](./internal/Hardening.md)
+For more information, refer to [Security Hardening Guide](./internal/Hardening.md).
 
-## Worker nodes should be managed by kubelet
+## Worker Nodes Should be Managed by Kubelet
 
 You should not run any containers on worker nodes that are not managed by `kubelet` so as not to break the `kube-scheduler` precision.
