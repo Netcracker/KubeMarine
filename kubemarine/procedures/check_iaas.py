@@ -901,24 +901,24 @@ def port_connect(cluster: KubernetesCluster, port_client: str,
 def get_start_listener_cmd(python_executable: str, port_listener: str) -> str:
     # 1. Create anonymous pipe
     # 2. Create python listener process in background and redirect output to pipe
-    # 3. Wait till the listener successfully binds the port, or till it fails and exits.
-    #    Read one line from pipe to check that.
-    # 4. Exit with success or fail correspondingly.
+    # 3. Wait till the listener fails and exits, or till it responds with message
+    # 4. Read the remained data from pipe in non-blocking mode
+    # 5. Exit with success or fail depending on what was received from pipe
     return "PORT=%s; PIPE=$(mktemp -u); mkfifo $PIPE; exec 3<>$PIPE; rm $PIPE; " \
            f"sudo nohup {python_executable} {port_listener} $PORT >&3 2>&1 & " \
            "PID=$(echo $!); " \
-           "while read -t 0.1 -u 3 || sudo kill -0 $PID 2>/dev/null && [[ -z $REPLY ]]; do " \
-               ":; " \
+           "while sudo kill -0 $PID 2>/dev/null ; do " \
+               "DATA=$(dd iflag=nonblock status=none <&3 2>/dev/null) ; " \
+               "if [[ -n $DATA ]]; then break; else sleep 0.1; fi; " \
            "done; " \
-           "DATA=$REPLY; " \
+           "DATA=$(echo -n \"$DATA\" && dd iflag=nonblock status=none <&3 2>/dev/null); " \
            "if [[ $DATA == \"In use\" ]]; then " \
                "echo \"$PORT in use\" >&2 ; " \
                "exit 0; " \
            "elif [[ $DATA == \"Listen\" ]]; then " \
                "exit 0; " \
            "fi; " \
-           "DATA=$(echo $DATA && dd iflag=nonblock status=none <&3 2>/dev/null); " \
-           "echo \"$DATA\" >&2 ; " \
+           "echo -n \"$DATA\" >&2 ; " \
            "exit 1"
 
 
