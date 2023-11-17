@@ -196,18 +196,18 @@ The actual information about the supported versions can be found in `compatibili
     * 30000-32767 : NodePort Services
     * Other ports if communication happens between services with any participant bound to the host network.
   * External communication:
-    * 22 : SSH, if you use external nodes' IP addresses to deploy the cluster
+    * 22 : SSH, if you use external nodes' IP addresses to deploy the cluster.
     * 80
     * 443
-    * 6443 : Kubernetes API server, if necessary to access externally, for example using [helm](#helm) plugin.
+    * 6443 : Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
-  * Traffic is allowed for the **Opened TCP-ports** between the nodes inside the cluster's internal subnet:
+  * Traffic is allowed for **Opened TCP-ports** between the nodes inside the cluster's internal subnet.
   * TCP & UDP traffic is allowed for pod subnet between the nodes inside the cluster.
-    Search for address at`services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
+    Search for address at `services.kubeadm.networking.podSubnet`. By default, `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6.
   * TCP & UDP traffic is allowed for service subnet between the nodes inside the cluster.
-    Search for address at `services.kubeadm.networking.serviceSubnet`. By default `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6).
+    Search for address at `services.kubeadm.networking.serviceSubnet`. By default, `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6.
 
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
