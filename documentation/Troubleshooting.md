@@ -934,7 +934,7 @@ spec:
 
 ### Case 1
 
-**Symptoms**: A pod can't resolve a short name. Check inside the pod looks the following:
+**Symptoms**: A pod cannot resolve a short name. A check inside the pod looks like the following:
 
 ```
 $ nslookup kubernetes.default
@@ -945,24 +945,24 @@ Address:        172.30.0.10:53
 ** server can't find kubernetes.default: NXDOMAIN
 ```
 
-**Root cause**: Images with `busybox` utility that represents `nslookup` command could have issues with `search` directives in `/etc/resolv.conf`.
+**Root cause**: Images with the `busybox` utility that represents the `nslookup` command could have issues with the `search` directives in `/etc/resolv.conf`.
 
-**Solution**: Use FQDN instead of short name that consists of `service` and `namespace` only, e.g.: `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`. In some cases addition `bind-tools` package fixes the issue with short names resolving. More information: 
+**Solution**: Use FQDN instead of a short name, which consists of `service` and `namespace` only. For example, `kubernetes.default.svc.cluster.local` instead of `kubernetes.default`. In some cases, addition of `bind-tools` package fixes the issue with short names. For more information, refer to the following: 
 * [https://github.com/docker-library/busybox/issues/48](https://github.com/docker-library/busybox/issues/48)
 * [https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes](https://stackoverflow.com/questions/65181012/does-alpine-have-known-dns-issue-within-kubernetes)
 
 ### Case 2
 
-**Symptoms**: A pod that is attached to `hostNetwork` can't resolve a name periodically or constantly, even if it's FQDN. The error message is the following:
+**Symptoms**: A pod that is attached to `hostNetwork` cannot resolve a name periodically or constantly, even if it is FQDN. The following error message is displayed:
 
 ```
 $ nslookup kubernetes.default.svc.cluster.local
 ;; connection timed out; no servers could be reached
 ``` 
 
-**Root cause**: Traffic from node network to pod network is blocked for UDP port 53
+**Root cause**: Traffic from node network to pod network is blocked for UDP port 53.
 
-**Solution**: Change cloud provider configuration to allow the traffic on IaaS layer. In OpenStack the Security Groups manage the allowed traffic.
+**Solution**: Change the cloud provider configuration to allow the traffic on the IaaS layer. In OpenStack, the Security Groups manage the allowed traffic.
 
 # Troubleshooting Kubemarine
 
