@@ -1,32 +1,32 @@
 # Security Hardening Guide
 <!-- TOC -->
-- [The purpose](#the-purpose)
-- [Disable anonymous authentication for kube-apiserver](#disable-anonymous-authentication-for-kube-apiserver)
+- [Overview](#overview)
+- [Disable Anonymous Authentication for kube-apiserver](#disable-anonymous-authentication-for-kube-apiserver)
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
-- [Disabling auto-mounting of tokens for service accounts](#Disabling auto-mounting of tokens for service accounts)
+- [Disabling Auto-Mounting of Tokens for Service Accounts](#disabling-auto-mounting-of-tokens-for-service-accounts)
 <!-- /TOC -->
 
-## The purpose
+## Overview
 
-The current document discrbes manual steps or procedures that are not covered by `KubeMarine` code itself, but should be implemented to get production-ready Kubernetes cluster.
+The current document describes the manual steps or procedures that are not covered by the `KubeMarine` code itself, but should be implemented to get a production-ready Kubernetes cluster.
 
 `kube-bench` is a well-known open-source tool to check the Kubernetes cluster against the `CIS Kubernetes Benchmark`. The report is divided on several parts. Each check has its own unique number. The items could be identified by that number.
 
 Useful links:
 [kube-bench](https://github.com/aquasecurity/kube-bench)
 
-## Disable anonymous authentication for `kube-apiserver`
+## Disable Anonymous Authentication for `kube-apiserver`
 
-**Kube-bench identifier**:
+**Kube-bench Identifier**:
 
 * 1.2.1
 
-The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default it enables anonymous requests.
+The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default, it enables anonymous requests.
 
 ### Prerequisites
 
-* Working Kubernetes cluster
+* A working Kubernetes cluster.
 * The following RBAC resources:
 
 ```yaml
@@ -71,9 +71,9 @@ subjects:
   namespace: kube-system
 ```
 
-### Disabling procedure
+### Disabling Procedure
 
-1. Add `anonymous-auth: "false"` into the `kubeadm-config` configmap e.g.:
+1. Add `anonymous-auth: "false"` into the `kubeadm-config` configmap. For example:
 
 ```yaml
 apiVersion: v1
@@ -138,7 +138,7 @@ spec:
 ...
 ```
 
-Where TOKEN is the result of the following command:
+Where, TOKEN is the result of the following command:
 
 ```console
 kubectl -n kube-system get secret token-healthz -o jsonpath='{.data.token}' | base64 --decode
@@ -146,24 +146,24 @@ kubectl -n kube-system get secret token-healthz -o jsonpath='{.data.token}' | ba
 
 ### Limitations
 
-If the `--anonymous-auth` is set to `false` the upgrade and node addition procedures need some changes in workflow. The upgrade procedure needs enabling `anonymous-auth` before the `kubeadm upgrade` run. 
+If the `--anonymous-auth` is set to "false", the upgrade and node addition procedures need some changes in the workflow. The upgrade procedure needs enabling `anonymous-auth` before the `kubeadm upgrade` run. 
 
-The node addition procedure affects if the control plane node is being added. After new control plane node has successfully added, the [disabling procedure](#disabling-procedure) should be performed on that node.
+The node addition procedure is affected if the control plane node is being added. After the new control plane node is successfully added, the [Disabling Procedure](#disabling-procedure) should be performed on that node.
 
-Besides, disabled anonymous resuests to `kube-apiserver` need changes in monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system. 
+Besides, disabled anonymous requests to `kube-apiserver` need changes in the monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system. 
 
 ## Data Encryption in Kubernetes
 
-**Kube-bench identifier**:
+**Kube-bench Identifier**:
 
 * 1.2.29
 * 1.2.30
 
-The following section describes the Kubernetes cluster capabilities to store and manipulate encrypted data.
+The following section describes the Kubernetes cluster capabilities to store and manipulate the encrypted data.
 
 ### Enabling Encryption
 
-ETCD as a Kubernetes cluster storage can interact with encrypted data. The encryption/decryption procedures are the part of `kube-apiserver` functionality.
+ETCD as a Kubernetes cluster storage can interact with the encrypted data. The encryption/decryption procedures are the part of the `kube-apiserver` functionality.
 
 An example of the `EncryptionConfiguration` file is as follows:
 
@@ -237,15 +237,15 @@ spec:
       type: DirectoryOrCreate
 ```
 
-In the above case, the `secrets` and `configmaps` are encrypted on the first key of the `aesgcm` provider, but the previously encrypted `secrets` and `configmaps` are decrypted on any keys of any providers that are matched. This approach allows to change both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. `identity` is the default provider that does not provide any encryption at all.
+In the above case, `secrets` and `configmaps` are encrypted on the first key of the `aesgcm` provider, but the previously encrypted `secrets` and `configmaps` are decrypted on any keys of any providers that are matched. This approach allows to change both encryption providers and keys during the operation. The keys should be random strings in base64 encoding. `identity` is the default provider that does not provide any encryption at all.
 For more information, refer to [https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
 
-As per CIS bechmark (kube-bench checks), `aesgcm` provider for encrypption is not recognized as appropriate provider. To fulfil this requirement, we have to configure `aescbc`, `secretxbox` or `kms` as encryption provider.
+As per the CIS benchmark (kube-bench checks), the `aesgcm` provider for encryption is not recognized as an appropriate provider. To fulfil this requirement, we have to configure `aescbc`, `secretxbox`, or `kms` as an encryption provider.
 
 ### Integration with External KMS
 
 There is an encryption provider `kms` that allows using an external `Key Management Service` for the key storage, therefore the keys are not stored in the `EncryptionConfiguration` file, which is more secure. The `kms` provider needs to deploy a KMS plugin for further use.
-The `Trousseau` KMS plugin is an example. It works through a unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using the KMS provider, the `EncryptionConfiguration` is as follows (`Vault` is a KMS):
+The `Trousseau` KMS plugin is an example. It works through a unix socket, therefore `Trousseau` pods must be run on the same nodes as `kube-apiserver`. In case of using a KMS provider, the `EncryptionConfiguration` is as follows (`Vault` is a KMS):
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
@@ -263,7 +263,7 @@ resources:
       - identity: {}
 ```
 
-Also, unix socket must be available for `kube-apiserver`:
+Also, the unix socket must be available for `kube-apiserver`:
 
 ```yaml
 apiVersion: v1
@@ -285,7 +285,7 @@ spec:
     name: vault-kms
 ```
 
-The environment variable `VAULT_ADDR` matches the address of the `Vault` service and `--listen-addr` argument points to KMS plugin unix socket in the following example:
+The environment variable `VAULT_ADDR` matches the address of the `Vault` service and `--listen-addr` argument points to the KMS plugin unix socket in the following example:
 
 ```yaml
 apiVersion: apps/v1
@@ -329,7 +329,7 @@ For more information, refer to:
 
 ### Disabling Encryption
 
-The first step of disabling encryption is to make the `identity` provider default for encryption. The enabling of `EncryptionConfiguration` should be similar to the following example:
+The first step for disabling encryption is to make the `identity` provider default for encryption. The enabling of `EncryptionConfiguration` should be similar to the following example:
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
@@ -358,13 +358,13 @@ resources:
               secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
 ```
 
-The next step is to replace all resources that were previously encrypted (e.g. `secrets`):
+The next step is to replace all resources that were previously encrypted (for example, `secrets`):
 
 ```console
 # kubectl get secrets --all-namespaces -o json | kubectl replace -f -
 ```
 
-It is then possible to remove encryption settings from the `kubeadm-config` configmap and `kube-apiserver` manifest.
+It is then possible to remove the encryption settings from the `kubeadm-config` configmap and `kube-apiserver` manifest.
 
 ### Maintenance and Operation Features
 
@@ -374,15 +374,14 @@ It is then possible to remove encryption settings from the `kubeadm-config` conf
 # chmod 0700 /etc/kubernetes/enc/
 ```
 
-* The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
-* The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows applying a new `EncryptionConfiguration` without `kube-apiserver` reload.
-
-* ETCD restore procedures should take into consideration the keys rotation, otherwise some data may be unavailable due to keys that were used for encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
+* The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys' rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
+* The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows to apply a new `EncryptionConfiguration` without `kube-apiserver` reload.
+* ETCD restore procedures should take into consideration the keys' rotation, otherwise some data may be unavailable due to keys that were used for the encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for the data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
 * External services that interact with ETCD may stop working due to encryption enabling.
 
 ## Kubelet Server Certificate Approval
 
-**Kube-bench identifier**:
+**Kube-bench Identifier**:
 
 * 1.2.5 
 
@@ -401,7 +400,7 @@ services:
 ...
 ```
 
-These settings enforce `kubelet` on each node of the cluster to request certificate approval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They might be approved manually by the following commans. Get the list of certificate requests:
+These settings enforce `kubelet` on each node of the cluster to request certificate approval (for `kubelet` server part) from the default Kubernetes CA and rotate certificate in the future. The `kube-apiserver` machinery does not approve certificate requests for `kubelet` automatically. They can be approved manually by the following commands. Use the following command to get the list of certificate requests:
 
 ```console
 # kubectl get csr
@@ -410,7 +409,7 @@ csr-2z6rv   12m     kubernetes.io/kubelet-serving       system:node:nodename-1  
 csr-424qg   89m     kubernetes.io/kubelet-serving       system:node:nodename-2    <none>               Pending
 ```
 
-Approve the particular request:
+Use the following command to approve a particular request:
 
 ```console
 kubectl certificate approve csr-424qg
@@ -420,20 +419,21 @@ These commands might be automated in several ways.
 
 ### Auto Approval CronJob
 
-Basically, `CronJob` runs the approval command above for every CSR according to some schedule.
+Generally, `CronJob` runs the approval command above for every CSR according to some schedule.
 
 ### Auto Approval Service
 
-It is possible to install the kubelet-csr-approver service. For more information, refer to [[kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver)](https://github.com/postfinance/kubelet-csr-approver). This service approves CSR automatically when a CSR is created according to several settings. It is better to restrict nodes' IP addresses (`providerIpPrefixes` option) and FQDN templates (providerRegex). For more information, refer to the official documentation.
+It is possible to install the kubelet-csr-approver service. For more information, refer to [kubelet-csr-approver](https://github.com/postfinance/kubelet-csr-approver). This service approves the CSR automatically when a CSR is created according to several settings. It is better to restrict nodes' IP addresses (`providerIpPrefixes` option) and FQDN templates (providerRegex). For more information, refer to the official documentation.
 
-## Disabling auto-mounting of tokens for service accounts
+## Disabling Auto-Mounting of Tokens for Service Accounts
 
-To disable the auto-mounting of service account tokens, we need to create secrets associated with perticular service account and mount that secret as a volume to the pod's specification wherver necessary.
+To disable the auto-mounting of service account tokens, create secrets associated with a particular service account and mount that secret as a volume to the pod's specification wherever necessary.
 
-To acchieve it, we have to follow below proedure -
+To achieve this, implement the following procedure.
 
-### Disable auto-mounting
-To disbale the auto-mounting of token add `automountServiceAccountToken: false` falg to the service account properties as shwon below -
+### Disable Auto-Mounting
+
+To disable auto-mounting of a token, add `automountServiceAccountToken: false` flag to the service account properties as shown below.
 
 ```yaml
 apiVersion: v1
@@ -445,8 +445,10 @@ automountServiceAccountToken: false
 ...
 ```
 
-### Create secret
-Create a new kuebernetes secret of type `kubernetes.io/service-account-token` as below -
+### Create Secret
+
+Create a new Kubernetes secret of type `kubernetes.io/service-account-token` as follows.
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -458,8 +460,9 @@ metadata:
 type: kubernetes.io/service-account-token
 ```
 
-### Mount the token thorugh secrets
-Edit POD specification and mount the secret as volume to the pod as below -
+### Mount the Token Through Secrets
+
+Edit the POD specification and mount the secret as a volume to the pod as follows.
 
 ```yaml
 ...
@@ -475,5 +478,4 @@ volumes:
       secretName: ingress-nginx-token
 ...
 ```
-After this restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
-
+After this, restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
