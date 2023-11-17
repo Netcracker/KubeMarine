@@ -209,6 +209,13 @@ The actual information about the supported versions can be found in `compatibili
 **Warning**: `Kubemarine` works only with `firewalld` as an IP firewall, and switches it off during the installation.
 If you have other solution, remove or switch off the IP firewall before the installation.
 
+* In case of NetworkManager usage at the control-plane and/or worker nodes, create the following configuration file at `/etc/NetworkManager/conf.d/calico.conf` to prevent NetworkManager from interfering with the interfaces being created by Calico:
+
+```conf
+[keyfile]
+unmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:vxlan-v6.calico
+```
+
 **Preinstalled software**
 
 * Installation of the following packages is highly recommended; however, Kubernetes can work without them, but may show warnings:
@@ -2522,6 +2529,7 @@ The `services.sysctl` section manages the Linux Kernel parameters for all hosts 
 |net.bridge.bridge-nf-call-ip6tables|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.conf.all.forwarding|1|Presented only when IPv6 detected in node IP|
 |net.ipv6.ip_nonlocal_bind|1|Presented only when IPv6 detected in node IP|
+|net.netfilter.nf_conntrack_max|1000000||
 |kernel.panic|10||
 |vm.overcommit_memory|1||
 |kernel.panic_on_oops|1||

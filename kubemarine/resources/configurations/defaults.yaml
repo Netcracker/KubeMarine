@@ -180,6 +180,7 @@ services:
     net.bridge.bridge-nf-call-ip6tables: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
     net.ipv6.conf.all.forwarding: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
     net.ipv6.ip_nonlocal_bind: '{% if not nodes[0]["internal_address"]|isipv4 %}1{% endif %}'
+    net.netfilter.nf_conntrack_max: 1000000
     kernel.panic: 10
     vm.overcommit_memory: 1
     kernel.panic_on_oops: 1
