@@ -427,6 +427,13 @@ It is possible to install the kubelet-csr-approver service. For more information
 
 ## Disabling Auto-Mounting of Tokens for Service Accounts
 
+**Kube-bench Identifier**:
+
+* 5.1.5
+
+Create explicit service accounts wherever a Kubernetes workload requires specific access to the Kubernetes API server.
+Modify the configuration of each default service account to include this value `automountServiceAccountToken: false`
+
 To disable the auto-mounting of service account tokens, create secrets associated with a particular service account and mount that secret as a volume to the pod's specification wherever necessary.
 
 To achieve this, implement the following procedure.
