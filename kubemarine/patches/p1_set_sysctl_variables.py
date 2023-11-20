@@ -25,8 +25,14 @@ class TheAction(Action):
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
-
         node_group = cluster.make_group_from_roles(['all'])
+
+        # add nf_conntrack module to predefined modules list
+        # and load it without the node reboot
+        for node in node_group:
+            node.sudo("echo nf_conntrack >> /etc/modules-load.d/predefined.conf ; modprobe -a nf_conntrack")
+
+        # configure syslog variables
         node_group.call(sysctl.configure)
         node_group.call(sysctl.reload)
         
@@ -43,6 +49,6 @@ class SetSysctlVariables(RegularPatch):
     def description(self) -> str:
         return dedent(
             f"""\
-            This patch sets kernel variables with sysctl at the control-plane, worker nodes according to the new defaults.
+            This patch sets kernel variables with sysctl at all the nodes according to the new defaults.
             """.rstrip()
         )
