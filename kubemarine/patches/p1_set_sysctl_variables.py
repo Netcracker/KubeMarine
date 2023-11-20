@@ -18,6 +18,8 @@ from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine import sysctl
+from kubemarine.core import utils
+import io
 
 class TheAction(Action):
     def __init__(self) -> None:
@@ -26,11 +28,28 @@ class TheAction(Action):
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         node_group = cluster.make_group_from_roles(['all'])
+        group_os_family = node_group.get_nodes_os()
 
         # add nf_conntrack module to predefined modules list
         # and load it without the node reboot
-        for node in node_group:
-            node.sudo("echo nf_conntrack >> /etc/modules-load.d/predefined.conf ; modprobe -a nf_conntrack")
+        for node in node_group.get_ordered_members_list():
+            config = ''
+            raw_config = ''
+
+            for module_name in cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
+                module_name = module_name.strip()
+                if module_name is not None and module_name != '':
+                    config += module_name + "\n"
+                    raw_config += module_name + " "
+
+            dump_filename = 'modprobe_predefined.conf'
+            if group_os_family == 'multiple':
+                dump_filename = f'modprobe_predefined_{node.get_node_name()}.conf'
+
+            utils.dump_file(cluster, config, dump_filename)
+            node.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
+            node.sudo("modprobe -a %s" % raw_config)
+ 
 
         # configure syslog variables
         node_group.call(sysctl.configure)
