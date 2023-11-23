@@ -448,7 +448,7 @@ The `upgrade` procedure executes the following sequence of tasks:
 The backup procedure automatically saves the following entities:
 * ETCD snapshot
 * Files and configs from cluster nodes
-* Kubernetes resources
+* Kubernetes resources (if it's configured in procedure.yaml)
 
 As a result of the procedure, you receive an archive with all the stored objects inside. The archive has approximately the following structure inside:
 
@@ -585,7 +585,7 @@ backup_plan:
 
 #### kubernetes Parameter
 
-The procedure exports all available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to restrict resources for export, you can specify which ones you need.
+The procedure can export any available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to export resources, you can specify which ones you need. By default, **no** resources from **all** namespaces are exported.
 
 **Note**: If the specified resource is missing, it is skipped without an error.
 
@@ -628,6 +628,16 @@ Another example:
 backup_plan:
   kubernetes:
     nonnamespaced_resources: all
+```
+
+If you do not specify `backup_plan.kubernetes`, the following configuration will be used:
+```yaml
+backup_plan:
+  kubernetes:
+    namespaced_resources:
+      namespaces: all
+      resources: []
+    nonnamespaced_resources: []
 ```
 
 ### Backup Procedure Tasks Tree
