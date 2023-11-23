@@ -22,8 +22,13 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
+from kubemarine.patches.p0_bind_vrrp_ips_interfaces import FixVRRP_IPsInterfaces
+from kubemarine.patches.p1_set_sysctl_variables import SetSysctlVariables
 
 patches: List[Patch] = [
+    # FixVRRP_IPsInterfaces should be the first RegularPatch.
+    FixVRRP_IPsInterfaces(),
+    SetSysctlVariables(),
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
