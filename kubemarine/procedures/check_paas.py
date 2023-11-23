@@ -26,7 +26,10 @@ import ruamel.yaml
 import ipaddress
 import uuid
 
-from kubemarine import packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit, plugins
+from kubemarine import (
+    packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit,
+    plugins, modprobe
+)
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeConfig, NodeGroup, CollectorCallback
@@ -861,7 +864,7 @@ def verify_modprobe_rules(cluster: KubernetesCluster) -> None:
     """
     with TestCase(cluster, '217', "System", "Modprobe rules") as tc:
         group = cluster.nodes['all']
-        modprobe_valid, modprobe_result = system.is_modprobe_valid(group)
+        modprobe_valid, _, modprobe_result = modprobe.is_modprobe_valid(group)
         cluster.log.debug(modprobe_result)
         if modprobe_valid:
             tc.success(results='valid')
