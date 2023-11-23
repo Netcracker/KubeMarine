@@ -6,10 +6,19 @@ metadata:
 ---
 apiVersion: v1
 kind: ServiceAccount
+automountServiceAccountToken: false
 metadata:
   name: local-path-provisioner-service-account
   namespace: local-path-storage
-
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: local-path-provisioner-service-account-token
+  namespace: local-path-storage
+  annotations:
+    kubernetes.io/service-account.name: local-path-provisioner-service-account
+type: kubernetes.io/service-account-token
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -73,6 +82,8 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config/
+            - name: local-path-provisioner-service-account-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           env:
             - name: POD_NAMESPACE
               valueFrom:
@@ -82,6 +93,9 @@ spec:
         - name: config-volume
           configMap:
             name: local-path-config
+        - name: local-path-provisioner-service-account-token
+          secret:
+            secretName: local-path-provisioner-service-account-token
 
 ---
 apiVersion: storage.k8s.io/v1
