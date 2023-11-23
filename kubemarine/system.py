@@ -23,7 +23,7 @@ from typing import Dict, Tuple, Optional, List
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, kubernetes, apparmor, sysctl
+from kubemarine import selinux, kubernetes, apparmor, sysctl, modprobe
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -468,61 +468,6 @@ def configure_timesyncd(group: NodeGroup, retries: int = 120) -> RunnersGroupRes
     raise Exception("Time not synced, but timeout is reached")
 
 
-def setup_modprobe(group: NodeGroup) -> Optional[RunnersGroupResult]:
-    cluster: KubernetesCluster = group.cluster
-    log = cluster.log
-    group_os_family = group.get_nodes_os()
-
-    is_valid, result = is_modprobe_valid(group)
-
-    if is_valid:
-        log.debug("Skipped - all necessary kernel modules are presented")
-        return result
-
-    defer = group.new_defer()
-    for node in defer.get_ordered_members_list():
-        config = ''
-        raw_config = ''
-        for module_name in cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
-            module_name = module_name.strip()
-            if module_name is not None and module_name != '':
-                config += module_name + "\n"
-                raw_config += module_name + " "
-
-        log.debug("Uploading config...")
-        dump_filename = 'modprobe_predefined.conf'
-        if group_os_family == 'multiple':
-            dump_filename = f'modprobe_predefined_{node.get_node_name()}.conf'
-
-        utils.dump_file(cluster, config, dump_filename)
-        node.put(io.StringIO(config), "/etc/modules-load.d/predefined.conf", backup=True, sudo=True)
-        node.sudo("modprobe -a %s" % raw_config)
-
-    defer.flush()
-
-    cluster.schedule_cumulative_point(reboot_nodes)
-    cluster.schedule_cumulative_point(verify_system)
-
-    return None
-
-
-def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, RunnersGroupResult]:
-    log = group.cluster.log
-
-    verify_results = group.sudo("lsmod", warn=True)
-    is_valid = True
-
-    for node in group.get_ordered_members_list():
-        host = node.get_host()
-        result = verify_results[host]
-        for module_name in group.cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
-            if module_name not in result.stdout:
-                log.debug('Kernel module %s not found at %s' % (module_name, host))
-                is_valid = False
-
-    return is_valid, verify_results
-
-
 def verify_system(cluster: KubernetesCluster) -> None:
     group = cluster.nodes["all"].get_new_nodes_or_self()
     log = cluster.log
@@ -571,7 +516,7 @@ def verify_system(cluster: KubernetesCluster) -> None:
 
     if cluster.is_task_completed('prepare.system.modprobe'):
         log.debug("Verifying modprobe...")
-        modprobe_valid, modprobe_result = is_modprobe_valid(group)
+        modprobe_valid, _, modprobe_result = modprobe.is_modprobe_valid(group)
         log.debug(modprobe_result)
         if not modprobe_valid:
             raise Exception("Required kernel modules are not presented")

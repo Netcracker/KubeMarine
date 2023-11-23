@@ -24,8 +24,10 @@ import io
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
-from kubemarine import system, sysctl, haproxy, keepalived, kubernetes, plugins, \
-    kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor
+from kubemarine import (
+    system, sysctl, haproxy, keepalived, kubernetes, plugins,
+    kubernetes_accounts, selinux, thirdparties, admission, audit, coredns, cri, packages, apparmor, modprobe
+)
 from kubemarine.core import flow, utils, summary
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 from kubemarine.core.resources import DynamicResources
@@ -166,7 +168,12 @@ def system_prepare_system_disable_swap(group: NodeGroup) -> None:
 
 @_applicable_for_new_nodes_with_roles('all')
 def system_prepare_system_modprobe(group: NodeGroup) -> None:
-    group.call(system.setup_modprobe)
+    cluster: KubernetesCluster = group.cluster
+
+    is_updated = modprobe.setup_modprobe(group)
+    if is_updated:
+        cluster.schedule_cumulative_point(system.reboot_nodes)
+        cluster.schedule_cumulative_point(system.verify_system)
 
 
 @_applicable_for_new_nodes_with_roles('control-plane', 'worker')
