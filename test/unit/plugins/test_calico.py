@@ -222,7 +222,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 calico.setdefault('installation', {})['registry'] = 'example.registry'
                 calico['typha'].update({
                     'nodeSelector': {"kubernetes.io/os": "something"},
-                    'tolerations': [{"effect": "NoSchedule"}],
+                    'tolerations': [{"key": 'something', "effect": "NoSchedule"}],
                 })
 
                 cluster = demo.new_cluster(inventory)
@@ -236,12 +236,12 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 self.assertEqual(expected_image, container['image'], "Unexpected calico-typha image")
                 self.assertEqual({"kubernetes.io/os": "something"}, template_spec['nodeSelector'],
                                  "Unexpected calico-typha nodeSelector")
-                self.assertEqual([{'key': 'CriticalAddonsOnly', 'operator': 'Exists'},
-                                  {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
-                                  {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'},
-                                  {"effect": "NoSchedule"}],
-                                 template_spec['tolerations'],
-                                 "Unexpected calico-typha tolerations")
+                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'}, template_spec['tolerations'],
+                              "Default calico-typha toleration is not present")
+                self.assertIn({'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}, template_spec['tolerations'],
+                              "Default calico-typha toleration is not present")
+                self.assertIn({"key": 'something', "effect": "NoSchedule"}, template_spec['tolerations'],
+                              "Custom calico-typha toleration is not present")
 
                 self._test_calico_typha_env(manifest)
 

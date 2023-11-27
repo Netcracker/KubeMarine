@@ -201,6 +201,7 @@ class IngressNginxManifestProcessor(Processor):
             "Job_ingress-nginx-admission-create",
             "Job_ingress-nginx-admission-patch",
             "IngressClass_nginx",
+            "NetworkPolicy_ingress-nginx-admission",
             "ValidatingWebhookConfiguration_ingress-nginx-admission",
         ]
 
@@ -256,6 +257,8 @@ class IngressNginxManifestProcessor(Processor):
         self.enrich_node_selector(manifest, key, plugin_service='controller')
         self.enrich_tolerations(manifest, key, plugin_service='controller')
 
+        # DeamonSet spec lacks of strategy. Discard it if present.
+        source_yaml['spec'].pop('strategy', None)
         # Patch kind in the last step to avoid sudden key change in log messages
         source_yaml['kind'] = 'DaemonSet'
         self.log.verbose(f"The {key} has been patched in 'kind' with 'DaemonSet'")
