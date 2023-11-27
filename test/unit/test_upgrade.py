@@ -576,9 +576,9 @@ class InventoryRecreation(unittest.TestCase):
         self.upgrade = demo.generate_procedure_inventory('upgrade')
         self.upgrade['upgrade_plan'] = upgrade_plan
         self.actions = []
-        for ver in upgrade_plan:
+        for i, ver in enumerate(upgrade_plan):
             self.upgrade[ver] = {}
-            self.actions.append(upgrade.UpgradeAction(ver))
+            self.actions.append(upgrade.UpgradeAction(ver, i == 0))
 
         self.resources: Optional[demo.FakeResources] = None
 
