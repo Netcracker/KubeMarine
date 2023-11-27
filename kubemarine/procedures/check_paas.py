@@ -1161,7 +1161,7 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
         for plugin in plugins.oob_plugins:
             plugin_item = cluster.inventory['plugins'][plugin]
             if not plugin_item['install']:
-                break
+                continue
 
             recommended_version = software_compatibility[plugin][version]["version"]
             expected_version = plugin_item['version']
@@ -1177,7 +1177,7 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
                 if calico.is_typha_enabled(cluster.inventory):
                     entities_to_check["kube-system"]["Deployment"]["calico-typha"] = {"version": expected_version}
 
-            if plugin == 'ingress-nginx-controller':
+            if plugin == 'nginx-ingress-controller':
                 entities_to_check['ingress-nginx'] = {"DaemonSet": {"ingress-nginx-controller": {"version": expected_version}}}
             if plugin == 'local-path-provisioner':
                 entities_to_check['local-path-storage'] = {"Deployment": {"local-path-provisioner": {"version": expected_version}}}
