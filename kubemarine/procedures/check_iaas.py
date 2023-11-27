@@ -624,7 +624,8 @@ def get_ports_connectivity(cluster: KubernetesCluster, proto: str) -> Dict[str, 
                     'balancer': ['80', '443', '6443'],
                     'control-plane': [
                         '53', '6443', '10250', '2379', '2380', '179',
-                        '9091',  # calico-node metrics, but not calico-typha. By default, calico-typha is deployed only on workers.
+                        '9091', '9093',  # Calico metrics on host ports
+                        '5473',  # If calico-typha is enabled
                         '5443',  # calico-apiserver, if enabled.
                         random_node_port,
                     ],
