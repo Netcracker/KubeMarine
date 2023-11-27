@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import copy
 from collections import OrderedDict
 from itertools import chain
 from typing import List
@@ -25,6 +24,13 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
+
+
+def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
+    # Clean up kubernetes tmp dir, where backup files from previous upgrades are located
+    nodes = cluster.make_group_from_roles(roles=["control-plane", "worker"])
+    nodes.sudo("rm -rf /etc/kubernetes/tmp")
+    cluster.log.debug("Backup files for previous upgrades were cleaned")
 
 
 def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
@@ -108,6 +114,7 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
 
 
 tasks = OrderedDict({
+    "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
     "prepull_images": prepull_images,
@@ -116,7 +123,6 @@ tasks = OrderedDict({
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
     "overview": install.overview
-
 })
 
 
@@ -142,17 +148,21 @@ class UpgradeFlow(flow.Flow):
             raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
         # todo inventory is preserved few times, probably need to preserve it once instead.
-        actions = [UpgradeAction(version) for version in upgrade_plan]
+        actions = [UpgradeAction(version, i == 0) for i, version in enumerate(upgrade_plan)]
         flow.run_actions(resources, actions)
 
 
 class UpgradeAction(Action):
-    def __init__(self, upgrade_version: str) -> None:
+    def __init__(self, upgrade_version: str, first_upgrade: bool) -> None:
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
         self.upgrade_version = upgrade_version
+        self.first_upgrade = first_upgrade
 
     def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        action_tasks = copy.deepcopy(tasks)
+        if not self.first_upgrade:
+            del action_tasks['cleanup_tmp_dir']
+        flow.run_tasks(res, action_tasks)
         res.make_final_inventory()
 
     def prepare_context(self, context: dict) -> None:

@@ -255,6 +255,12 @@ UPGRADING KUBERNETES v1.18.8 ⭢ v1.19.3
 
 The script upgrades Kubernetes versions one-by-one. After each upgrade, the `cluster.yaml` is regenerated to reflect the actual cluster state. Use the latest updated `cluster.yaml` configuration to further work with the cluster.
 
+Additionally, before the upgrade kubemarine cleans up `/etc/kubernetes/tmp` directory, where kubeadm stores [backup files](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#recovering-from-a-failure-state)
+during upgrade. For this reason only backups for the latest upgrade via kubemarine will be placed here after the upgrade procedure.
+
+**Note**: we do not recommend to use those backup files for rolling back after upgrade, because it can follow inconsistent state 
+for `cluster.yaml`. Please, use kubemarine [backup](#backup-procedure) and [restore](#restore-procedure) procedures instead of manual restoration.
+
 #### Upgrading Specific Nodes
 
 **Note**: Kubemarine automatically determines already upgraded nodes and excludes them from the Kubernetes upgrade procedure. Use manual nodes specifying for updating in exceptional cases when the problem cannot be solved automatically. Also, if any of the nodes are not available, first remove the node from the cluster, instead of changing the list of nodes for the upgrade.
