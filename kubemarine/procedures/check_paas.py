@@ -578,11 +578,11 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                         raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
                 found_url = result.stdout
                 if ipaddress.ip_address(found_url).version == 4:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443', warn=True)
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443 -s -o /dev/null -w "%{{http_code}}"', warn=True)
                 else:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I https://[{found_url}]:443', warn=True)
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I https://[{found_url}]:443 -s -o /dev/null -w "%{{http_code}}"', warn=True)
                 status = list(check_url.values())[0].stdout
-                if '200' in status:
+                if status == '200':
                     cluster.log.verbose(status)
                     cluster.log.debug('Dashboard service is OK')
                     test_service_succeeded = True
