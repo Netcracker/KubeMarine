@@ -603,11 +603,12 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                 found_url = result.stdout
                 
                 if ipaddress.ip_address(ingress_ip).version == 4:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I --resolve {found_url}:443:{ingress_ip} https://{found_url} 2>&1', warn=True)
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I -L --resolve {found_url}:443:{ingress_ip} https://{found_url} -s -o /dev/null -w "%{{http_code}}"', warn=True)
                 else:
-                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I --resolve "{found_url}:443:{ingress_ip}" https://{found_url} 2>&1', warn=True)
+                    check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I -L --resolve "{found_url}:443:{ingress_ip}" https://{found_url} -s -o /dev/null -w "%{{http_code}}"', warn=True)
                 status = list(check_url.values())[0].stdout
-                if '200' in status:
+                cluster.log.debug(f"HTTP STATUS: {status}")
+                if status == '200':
                     cluster.log.verbose(status)
                     cluster.log.debug('Dashboard ingress is OK')
                     test_ingress_succeeded = True
