@@ -22,9 +22,11 @@ This section provides information about the Kubecheck functionality.
       - [007 RAM Amount - Control-planes](#007-ram-amount---control-planes)
       - [007 RAM Amount - Workers](#007-ram-amount---workers)
     - [008 Distributive](#008-distributive)
-    - [009 PodSubnet](#009-podsubnet)
-    - [010 ServiceSubnet](#010-servicesubnet)
-    - [011 TCPPorts](#011-tcpports)
+    - Network
+      - [009 PodSubnet](#009-podsubnet)
+      - [010 ServiceSubnet](#010-servicesubnet)
+      - [011 TCP & UDP Ports](#011-tcp--udp-ports)
+      - [016 VRRP IPs](#016-vrrp-ips)
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
@@ -156,8 +158,8 @@ The task tree is as follows:
 * network
   * pod_subnet_connectivity
   * service_subnet_connectivity
-  * check_tcp_ports
-  * thirdparties_available
+  * ports_connectivity
+  * vips_connectivity
 * hardware
   * members_amount
     * vips
@@ -175,8 +177,14 @@ The task tree is as follows:
     * workers
 * system
   * distributive
-* thirdparties
-  * availability
+* software
+  * kernel
+    * version
+  * thirdparties
+    * availability
+  * packages
+    * repositories
+    * availability
 
 ##### 001 Connectivity
 
@@ -303,11 +311,17 @@ This test checks the connectivity between nodes inside a pod's subnetwork.
 
 This test checks the connectivity between nodes inside the service's subnetwork.
 
-##### 011 TCPPorts
+##### 011 TCP & UDP Ports
 
-*Task*: `network.check_tcp_ports`
+*Task*: `network.ports_connectivity`
 
-This test checks if necessary ports are opened on the nodes.
+This test checks the connectivity between nodes for the predefined set of ports inside the nodes' internal subnetwork.
+
+##### 016 VRRP IPs
+
+*Task*: `network.vips_connectivity`
+
+This test checks the connectivity between nodes and the VRRP IPs when they are assigned to the balancer nodes.
 
 ##### 012 Thirdparties Availability
 

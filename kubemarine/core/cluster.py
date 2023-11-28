@@ -111,6 +111,10 @@ class KubernetesCluster(Environment):
     def get_node(self, host: _AnyConnectionTypes) -> NodeConfig:
         return self.make_group([host]).get_config()
 
+    def get_node_name(self, host: _AnyConnectionTypes) -> str:
+        name: str = self.get_node(host)['name']
+        return name
+
     def make_group_from_nodes(self, node_names: List[str]) -> NodeGroup:
         ips = self.get_addresses_from_node_names(node_names)
         return self.make_group(ips)

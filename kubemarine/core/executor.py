@@ -121,6 +121,9 @@ class RunnersResult:
                            f"{val.rstrip()}\n")
         return "\n".join(ret)
 
+    def grep_returned_nothing(self) -> bool:
+        return not self.stdout and not self.stderr and self.exited == 1
+
 
 class UnexpectedExit(Exception):
     def __init__(self, result: RunnersResult):
