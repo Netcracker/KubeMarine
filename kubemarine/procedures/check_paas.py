@@ -607,7 +607,6 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                 else:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -g -k -I -L --resolve "{found_url}:443:{ingress_ip}" https://{found_url} -s -o /dev/null -w "%{{http_code}}"', warn=True)
                 status = list(check_url.values())[0].stdout
-                cluster.log.debug(f"HTTP STATUS: {status}")
                 if status == '200':
                     cluster.log.verbose(status)
                     cluster.log.debug('Dashboard ingress is OK')
