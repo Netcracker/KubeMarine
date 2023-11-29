@@ -52,20 +52,27 @@ class TestBackupTasks(unittest.TestCase):
                 h.close()
         self.tmpdir.cleanup()
 
-    def _run(self):
+    def _run(self, procedure_inventory: dict):
         self.resources = demo.FakeResources(self.context, self.inventory,
-                                            procedure_inventory=demo.generate_procedure_inventory('backup'),
+                                            procedure_inventory=procedure_inventory,
                                             nodes_context=demo.generate_nodes_context(self.inventory),
                                             fake_shell=self.fake_shell)
 
         flow.run_actions(self.resources, [backup.BackupAction()])
 
-    def test_export_kubernetes(self):
+    def test_export_whole_kubernetes(self):
         self.args['tasks'] = 'export.kubernetes'
         self._stub_load_namespaces()
         self._stub_load_resources()
+
+        backup_all_procedure = demo.generate_procedure_inventory('backup')
+        backup_all_procedure.setdefault('backup_plan', {}).setdefault('kubernetes', {})\
+            .setdefault('namespaced_resources', {}).setdefault('resources', 'all')
+        backup_all_procedure.setdefault('backup_plan', {}).setdefault('kubernetes', {}) \
+            .setdefault('nonnamespaced_resources', 'all')
+
         with self._mock_manifest_processor_enrich():
-            self._run()
+            self._run(backup_all_procedure)
 
         descriptor = self.resources.last_cluster.context['backup_descriptor']['kubernetes']['resources']
         self.assertEqual({'kube-system': ['configmaps', 'configmaps.example.com', 'roles.rbac.authorization.k8s.io']},
@@ -171,6 +178,23 @@ class TestBackupTasks(unittest.TestCase):
             str(resources_path / 'kube-system/roles.rbac.authorization.k8s.io.yaml')))
         self.assertEqual(expected_context, actual_content,
                          f"Data in file 'kube-system/roles.rbac.authorization.k8s.io.yaml' is not expected")
+
+    def test_export_default_kubernetes(self):
+        self.args['tasks'] = 'export.kubernetes'
+        self._stub_load_namespaces()
+        self._stub_load_resources()
+
+        backup_all_procedure = demo.generate_procedure_inventory('backup')
+
+        with self._mock_manifest_processor_enrich():
+            self._run(backup_all_procedure)
+
+        descriptor = self.resources.last_cluster.context['backup_descriptor']['kubernetes']['resources']
+        self.assertEqual({}, descriptor, "Not expected resulting list of resources")
+
+        resources_path = Path(self.tmpdir.name) / 'dump' / 'backup' / 'kubernetes_resources'
+        actual_files = {str(p.relative_to(resources_path)) for p in resources_path.glob("**/*.yaml")}
+        self.assertFalse(actual_files, "List of files is not empty")
 
     def _parse_yaml(self, data: str):
         return utils.yaml_structure_preserver().load(data)
