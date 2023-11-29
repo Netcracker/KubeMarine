@@ -39,6 +39,7 @@ a = Analysis(['./kubemarine/__main__.py'],
                 ('./kubemarine/resources',      './kubemarine/resources'),
                 ('./kubemarine/templates',      './kubemarine/templates')
              ],
+             hookspath=['scripts/ci/custom-hooks'],
              runtime_hooks=[],
              excludes=[],
              win_no_prefer_redirects=False,

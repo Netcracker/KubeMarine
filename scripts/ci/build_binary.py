@@ -17,7 +17,12 @@ import subprocess
 import sys
 from typing import List
 
-PYINSTALLER_VERSION = "5.12.0"
+PIP_VERSION = "23.3.1"
+PYINSTALLER_VERSION = "6.2.0"
+# Pinned version is used because scripts/ci/custom-hooks/hook-cryptography.py
+# relies on internal implementation of pyinstaller-hooks-contrib.
+# Need to regenerate scripts/ci/custom-hooks/hook-cryptography.py each time the version is upgraded.
+PYINSTALLER_HOOK_CONTRIB_VERSION = "2023.10"
 
 
 def call(args: List[str]) -> None:
@@ -28,8 +33,8 @@ def call(args: List[str]) -> None:
 
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.
-# https://github.com/pypa/pip/blob/23.0/docs/html/user_guide.rst#using-pip-from-your-program
-call([sys.executable, '-m', 'pip', 'install', 'pip==23.0'])
+# https://github.com/pypa/pip/blob/23.3.1/docs/html/user_guide.rst#using-pip-from-your-program
+call([sys.executable, '-m', 'pip', 'install', f'pip=={PIP_VERSION}'])
 
 target_arch = None
 if len(sys.argv) > 1:
@@ -42,7 +47,7 @@ call(install_package)
 
 # To avoid ambiguity, remove Kubemarine package to surely run PyInstaller on sources.
 call(['pip', 'uninstall', '-y', 'kubemarine'])
-call(['pip', 'install', f'pyinstaller=={PYINSTALLER_VERSION}'])
+call(['pip', 'install', f'pyinstaller=={PYINSTALLER_VERSION}', f'pyinstaller-hooks-contrib=={PYINSTALLER_HOOK_CONTRIB_VERSION}'])
 
 if target_arch:
     with fileinput.FileInput('kubemarine.spec', inplace=True) as file:
