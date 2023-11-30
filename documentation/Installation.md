@@ -166,7 +166,7 @@ For cluster machines, ensure the following requirements are met:
 * The following distributives and versions are supported:
 
   * Centos 7.5+, 8.4, 9
-  * RHEL 7.5+, 8.4, 8.6, 8.7, 8.8, 9.2
+  * RHEL 7.5+, 8.4, 8.6, 8.7, 8.8, 8.9, 9.2
   * Oracle Linux 7.5+, 8.4, 9.2
   * RockyLinux 8.6, 8.7, 8.8, 9.2
   * Ubuntu 20.04
