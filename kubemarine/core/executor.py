@@ -697,4 +697,3 @@ class RawExecutor:
             self.logger.verbose('Disconnected session with %s' % host)
             cxn = self.connection_pool.get_connection(host)
             cxn.close()
-            cxn._sftp = None

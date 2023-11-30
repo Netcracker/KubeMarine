@@ -19,7 +19,6 @@ import toml
 import yaml
 import base64
 
-from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
@@ -37,7 +36,7 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     runc_options_path = f'{path}.containerd.runtimes.runc.options'
     if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
         containerd_config[runc_options_path]['SystemdCgroup'] = \
-            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
+            utils.strtobool(containerd_config[runc_options_path]['SystemdCgroup'], "containerdConfig.SystemdCgroup")
 
     # Check if field for new and old configuration formats are presented
     old_format_result, old_format_field = contains_old_format_properties(inventory)

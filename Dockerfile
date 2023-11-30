@@ -1,4 +1,4 @@
-FROM python:3-slim-buster
+FROM python:3.12-slim-bookworm
 
 ARG BUILD_TYPE
 

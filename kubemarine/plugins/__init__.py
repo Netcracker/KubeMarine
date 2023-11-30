@@ -27,9 +27,6 @@ import time
 import urllib.request
 import zipfile
 from copy import deepcopy
-from distutils.dir_util import copy_tree
-from distutils.dir_util import remove_tree
-from distutils.dir_util import mkpath
 from itertools import chain
 from types import ModuleType, FunctionType
 from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast, TextIO, Optional
@@ -896,8 +893,8 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
 
     local_chart_folder = "local_chart_folder"
     if os.path.isdir(local_chart_folder):
-        remove_tree(local_chart_folder)
-    mkpath(local_chart_folder)
+        shutil.rmtree(local_chart_folder)
+    os.makedirs(local_chart_folder)
     if is_curl:
         logger.verbose('Chart download via curl detected')
         destination = os.path.basename(chart_path)
@@ -921,7 +918,7 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
                 tf.extractall(local_chart_folder)
     else:
         logger.debug("Create copy of chart to work with")
-        copy_tree(chart_path, local_chart_folder)
+        shutil.copytree(chart_path, local_chart_folder, dirs_exist_ok=True)
 
     # Find all Chart.yaml files in the chart.
     glob_search = os.path.join(local_chart_folder, '**', 'Chart.yaml')

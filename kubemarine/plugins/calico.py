@@ -63,14 +63,7 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
 
 
 def is_typha_enabled(inventory: dict) -> bool:
-    str_value = utils.true_or_false(inventory['plugins']['calico']['typha']['enabled'])
-    if str_value == 'false':
-        return False
-    elif str_value == 'true':
-        return True
-    else:
-        raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                        f"as string or boolean value")
+    return utils.strtobool(inventory['plugins']['calico']['typha']['enabled'], 'plugins.calico.typha.enabled')
 
 
 def is_apiserver_enabled(inventory: dict) -> bool:

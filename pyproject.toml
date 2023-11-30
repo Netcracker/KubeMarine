@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Developers",
@@ -27,20 +28,20 @@ classifiers = [
 keywords = ["kubernetes", "devops", "administration", "helm"]
 dependencies = [
     "PyYAML==6.0.*",
-    "deepmerge==1.0.*",
-    "fabric==2.6.*",
+    "deepmerge==1.1.*",
+    "fabric==3.2.*",
     "jinja2==3.1.*",
     "MarkupSafe==2.1.*",
-    "invoke==1.6.*",
+    "invoke==2.2.*",
     "ruamel.yaml==0.17.22",
     "pygelf==0.4.*",
     "toml==0.10.*",
     "python-dateutil==2.8.*",
-    "deepdiff==6.2.*",
+    "deepdiff==6.7.*",
     "ordered-set==4.1.*",
     # Each time cryptography version is updated, need to regenerate scripts/ci/custom-hooks/hook-cryptography.py
     "cryptography==41.0.7",
-    "paramiko==2.11.*",
+    "paramiko==3.3.*",
     "jsonschema==4.17.*",
     "typing_extensions==4.7.*",
     "pathvalidate==3.2.*"
@@ -52,10 +53,10 @@ ansible = ["ansible==7.0.*"]
 mypy = [
     "mypy==1.7.*",
     "types-PyYAML==6.*",
-    "types-invoke==1.*",
+    "types-invoke==2.*",
     "types-toml==0.*",
     "types-python-dateutil==2.*",
-    "types-paramiko==2.*",
+    "types-paramiko==3.*",
     "types-jsonschema==4.*",
     "types-pyinstaller==6.2.0.*",
 ]
