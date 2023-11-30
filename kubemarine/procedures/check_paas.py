@@ -700,15 +700,15 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
                         nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
                 else:
                     cluster.log.error("podPidsLimit is set to unlimited in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
-                    nodes_failed_pid_max_check[node_name] = [pid_max, '-1']
+                    nodes_failed_pid_max_check[node_name] = [pid_max, -1]
             else:
                 cluster.log.error("No podPidsLimit set in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
-                nodes_failed_pid_max_check[node_name] = [pid_max, '-1']
+                nodes_failed_pid_max_check[node_name] = [pid_max, -1]
 
         if nodes_failed_pid_max_check:
             output = "The requirement for the 'pid_max' value is not met for nodes:\n"
             for node_name in nodes_failed_pid_max_check:
-                if nodes_failed_pid_max_check[node_name][1] == '-1':
+                if nodes_failed_pid_max_check[node_name][1] == -1:
                     output += ("For node %s podPidsLimit is not set" % node_name)
                 else:
                     output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
