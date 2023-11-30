@@ -29,7 +29,7 @@ from kubemarine.procedures import install
 def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
     # Clean up kubernetes tmp dir, where backup files from previous upgrades are located
     nodes = cluster.make_group_from_roles(roles=["control-plane", "worker"])
-    nodes.sudo("rm -rf /etc/kubernetes/tmp/*")
+    nodes.sudo("rm -rf $(sudo find /etc/kubernetes/tmp -mindepth 1 -maxdepth 1)")
     cluster.log.debug("Backup files for previous upgrades were cleaned")
 
 
