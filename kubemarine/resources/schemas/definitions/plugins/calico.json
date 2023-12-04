@@ -12,7 +12,7 @@
       "type": "string"
     },
     "mode": {
-      "enum": ["ipip", "vxlan"],
+      "enum": ["ipip", "vxlan", "none"],
       "default": "ipip",
       "description": "Network protocol to be used in network plugin"
     },

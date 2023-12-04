@@ -3913,7 +3913,7 @@ The plugin configuration supports the following parameters:
 
 | Name                   | Type    | Default Value                       | Value Rules                                      | Description                                                        |
 |------------------------|---------|-------------------------------------|--------------------------------------------------|--------------------------------------------------------------------|
-| mode                   | string  | `ipip`                              | `ipip` / `vxlan`                                 | Network protocol to be used in network plugin                      |
+| mode                   | string  | `ipip`                              | `ipip` / `vxlan` / `none`                        | Network protocol to be used in network plugin                      |
 | crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to improve network performance  |
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
 | fullmesh               | boolean | true                                | true/false                                       | Enable or disable full mesh BGP topology                           |
