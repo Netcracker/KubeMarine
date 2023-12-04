@@ -13,7 +13,6 @@
 # limitations under the License.
 from typing import Optional
 
-from distutils.util import strtobool
 from kubemarine.core import static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import RunnersGroupResult, NodeGroup

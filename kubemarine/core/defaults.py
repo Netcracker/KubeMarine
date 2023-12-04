@@ -514,8 +514,6 @@ def manage_true_false_values(inventory: dict, _: KubernetesCluster) -> dict:
         # Check install value
         if 'install' not in plugin_item:
             continue
-        value = utils.true_or_false(plugin_item.get('install', False))
-        if value == 'undefined':
-            raise ValueError(f"Found unsupported value for plugin.{plugin_name}.install: {plugin_item['install']}")
-        plugin_item['install'] = value == 'true'
+        value = utils.strtobool(plugin_item.get('install', False), f"plugin.{plugin_name}.install")
+        plugin_item['install'] = value
     return inventory

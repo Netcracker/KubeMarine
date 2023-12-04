@@ -454,19 +454,22 @@ def load_yaml(filepath: str) -> dict:
         return {}  # unreachable
 
 
-def true_or_false(value: Union[str, bool]) -> str:
+def strtobool(value: Union[str, bool], section: str = None) -> bool:
     """
     The method check string and boolean value
     :param value: Value that should be checked
+    :param section: inventory section for debugging purpose
     """
-    input_string = str(value)
-    if input_string in ['true', 'True', 'TRUE']:
-        result = "true"
-    elif input_string in ['false', 'False', 'FALSE']:
-        result = "false"
+    val = str(value).lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
     else:
-        result = "undefined"
-    return result
+        msg = f"invalid truth value {value!r}"
+        if section is not None:
+            msg = f"invalid truth value for {section}: {value!r}"
+        raise ValueError(msg)
 
 
 def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:

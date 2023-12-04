@@ -63,14 +63,7 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
 
 
 def is_typha_enabled(inventory: dict) -> bool:
-    str_value = utils.true_or_false(inventory['plugins']['calico']['typha']['enabled'])
-    if str_value == 'false':
-        return False
-    elif str_value == 'true':
-        return True
-    else:
-        raise Exception(f"plugins.calico.typha.enabled must be set in 'True' or 'False' "
-                        f"as string or boolean value")
+    return utils.strtobool(inventory['plugins']['calico']['typha']['enabled'], 'plugins.calico.typha.enabled')
 
 
 def is_apiserver_enabled(inventory: dict) -> bool:
@@ -333,6 +326,7 @@ class CalicoManifestProcessor(Processor):
         return [
             "ConfigMap_calico-config",
             "CustomResourceDefinition_bgpconfigurations.crd.projectcalico.org",
+            "CustomResourceDefinition_bgpfilters.crd.projectcalico.org",
             "CustomResourceDefinition_bgppeers.crd.projectcalico.org",
             "CustomResourceDefinition_blockaffinities.crd.projectcalico.org",
             "CustomResourceDefinition_caliconodestatuses.crd.projectcalico.org",
@@ -352,9 +346,12 @@ class CalicoManifestProcessor(Processor):
             "ClusterRole_calico-kube-controllers",
             "ClusterRoleBinding_calico-kube-controllers",
             "ClusterRole_calico-node",
+            "ClusterRole_calico-cni-plugin",
             "ClusterRoleBinding_calico-node",
+            "ClusterRoleBinding_calico-cni-plugin",
             "DaemonSet_calico-node",
             "ServiceAccount_calico-node",
+            "ServiceAccount_calico-cni-plugin",
             "Deployment_calico-kube-controllers",
             "ServiceAccount_calico-kube-controllers",
             "PodDisruptionBudget_calico-kube-controllers",

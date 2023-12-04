@@ -43,7 +43,9 @@ class LocalPathProvisionerManifestProcessor(Processor):
         return [
             "Namespace_local-path-storage",
             "ServiceAccount_local-path-provisioner-service-account",
+            "Role_local-path-provisioner-role",
             "ClusterRole_local-path-provisioner-role",
+            "RoleBinding_local-path-provisioner-bind",
             "ClusterRoleBinding_local-path-provisioner-bind",
             "Deployment_local-path-provisioner",
             "StorageClass_local-path",
