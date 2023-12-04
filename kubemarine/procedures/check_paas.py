@@ -677,31 +677,45 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
             config = yaml.load(node_info)
             max_pods = int(config['status']['capacity']['pods'])
 
+            pid_max = int(node.sudo("cat /proc/sys/kernel/pid_max").get_simple_out())
+
             kubelet_config = node.sudo("cat /var/lib/kubelet/config.yaml").get_simple_out()
             config = yaml.load(kubelet_config)
-            pod_pids_limit = int(config['podPidsLimit'])
 
-            pid_max = int(node.sudo("cat /proc/sys/kernel/pid_max").get_simple_out())
-            required_pid_max = max_pods * pod_pids_limit + 2048
-            cluster.log.debug("Current values:\n maxPods = %s \n podPidsLimit = %s \n pid_max = %s"
-                              % (max_pods, pod_pids_limit, pid_max))
-            cluster.log.debug("Required pid_max for current kubelet configuration is %s for node '%s'"
-                              % (required_pid_max, node_name))
-            if cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
-                inventory_pid_max = cluster.inventory['services']['sysctl'].get("kernel.pid_max")
-                if pid_max != inventory_pid_max:
-                    raise TestWarn("The 'kernel.pid_max' value defined in system = %s, "
-                                   "but 'kernel.pid_max', which defined in cluster.yaml = %s"
-                                   % (pid_max, inventory_pid_max))
-            if pid_max < required_pid_max:
-                nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
+            if 'podPidsLimit' in config:
+                pod_pids_limit = int(config['podPidsLimit'])
+
+                # we need limited podPidsLimit to avoid PIDs exhaustion
+                if pod_pids_limit != -1: 
+                    required_pid_max = max_pods * pod_pids_limit + 2048
+                    cluster.log.debug("Current values:\n maxPods = %s \n podPidsLimit = %s \n pid_max = %s"
+                                  % (max_pods, pod_pids_limit, pid_max))
+                    cluster.log.debug("Required pid_max for current kubelet configuration is %s for node '%s'"
+                                  % (required_pid_max, node_name))
+                    if cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
+                        inventory_pid_max = cluster.inventory['services']['sysctl'].get("kernel.pid_max")
+                        if pid_max != inventory_pid_max:
+                            raise TestWarn("The 'kernel.pid_max' value defined in system = %s, "
+                                       "but 'kernel.pid_max', which defined in cluster.yaml = %s"
+                                       % (pid_max, inventory_pid_max))
+                    if pid_max < required_pid_max:
+                        nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
+                else:
+                    cluster.log.error("podPidsLimit is set to unlimited in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
+                    nodes_failed_pid_max_check[node_name] = [pid_max, -1]
+            else:
+                cluster.log.error("No podPidsLimit set in the /var/lib/kubelet/config.yaml for node '%s'" % node_name)
+                nodes_failed_pid_max_check[node_name] = [pid_max, -1]
 
         if nodes_failed_pid_max_check:
             output = "The requirement for the 'pid_max' value is not met for nodes:\n"
             for node_name in nodes_failed_pid_max_check:
-                output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
-                           % (node_name, nodes_failed_pid_max_check[node_name][0],
-                              nodes_failed_pid_max_check[node_name][1]))
+                if nodes_failed_pid_max_check[node_name][1] == -1:
+                    output += ("For node %s podPidsLimit is unlimited" % node_name)
+                else:
+                    output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
+                               % (node_name, nodes_failed_pid_max_check[node_name][0],
+                                  nodes_failed_pid_max_check[node_name][1]))
             raise TestFailure(output)
         tc.success(results="pid_max correctly installed on all nodes")
 
