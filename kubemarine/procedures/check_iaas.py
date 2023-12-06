@@ -699,15 +699,17 @@ def get_ports_connectivity(cluster: KubernetesCluster, proto: str) -> Dict[str, 
         }
 
     else:  # udp
+        overlay = cluster.inventory['plugins']['calico']['mode']
+        vxlan_port = ['4789'] if overlay == 'vxlan' else []
         connectivity_ports = {
             'internal': {
                 'input': {
-                    'control-plane': ['53'],
-                    'worker': ['53']
+                    'control-plane': ['53'] + vxlan_port,
+                    'worker': ['53'] + vxlan_port
                 },
                 'output': {
-                    'control-plane': ['53'],
-                    'worker': ['53']
+                    'control-plane': ['53'] + vxlan_port,
+                    'worker': ['53'] + vxlan_port
                 }
             },
             'pod': {
@@ -1159,12 +1161,13 @@ def ports_connectivity(cluster: KubernetesCluster) -> None:
             raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
 
 
-def overlay_connectivity(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '012', 'Network', 'Encapsulation', default_results='Connected'),\
+def ipip_connectivity(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '012', 'Network', 'IP in IP Encapsulation', default_results='Connected'),\
             suspend_firewalld(cluster):
 
-        skipped_msgs = ""
-        failed_msgs = ""
+        skipped_msgs: ""
+        failed_nodes: List[str] = []
+        failed_msgs: List[str] = []
 
         # Check encapsulation for 'Calico' CNI
         if cluster.inventory['plugins']['calico']['install'] == 'true':
@@ -1174,66 +1177,67 @@ def overlay_connectivity(cluster: KubernetesCluster) -> None:
 
         # Check encapsulation for clusters with two or more nodes
         group = cluster.make_group_from_roles(['control-plane', 'worker'])
-        if len(group.get_ordered_members_configs_list()) == 1:
+        if group.nodes_amount() == 1:
             cluster.log.debug(f"Too few nodes, check is skipped")
             return tc.success(results='Skipped')
 
         enc_type = cluster.inventory['plugins']['calico']['mode']
-        cluster.log.debug(f"Encapsulation: {enc_type.upper()}")
 
         mtu = cluster.inventory['plugins']['calico']['mtu']
-        if enc_type == "vxlan":
-            # Check if UDP port 4789 is allowed
-            port = '4789'
-            proto = 'udp'
-            group = get_python_group(cluster, True)
-            host_to_ip = {node['connect_to']: node['internal_address'] for node in group.get_ordered_members_configs_list()}
-            cluster.log.debug(f"Checking {proto.upper()} ports connectivity")
-            host_ports = {}
-            for node in group.get_ordered_members_configs_list():
-                host = node['connect_to']
-                host_ports = {host: [port]}
-            with install_listeners(cluster, host_ports, host_to_ip, proto, mtu) as listened_ports:
-                failed_ports = check_connect_between_all_nodes(
-                    cluster, listened_ports, host_to_ip, 'internal', proto, mtu)
-                failed_nodes.update(failed_ports)
-                failed_msgs.extend(
-                    f"{proto.upper} port {port} is not allowed on {cluster.get_node_name(host)} node; VxLAN mode won't work"
-                    for host, ports in failed_ports.items())
-        elif enc_type == "ipip":
+        if enc_type == "ipip":
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
-                skipped_msgs = f"IPv6 is not supported by {enc_type} encapsulation"
+                skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
                 return tc.success(results='Skipped')
             # Check if cluster is running with Calico CNI and IPIP
             results = group.sudo("iptables -nvL | grep 'Drop IPIP'", warn=True)
             if  list(results.values())[0].stdout:
-                cluster.log.debug(f"Cannot check {enc_type.upper()} encapsulation on running cluster")
+                cluster.log.debug(f"Cannot check IP in IP encapsulation on running cluster")
                 return tc.success(results='Skipped')
             # Create IP-IP tunnels configurations
             ipip_config = get_ipip_config(group)
             results = check_ipip_tunnel(group, ipip_config)
-            failed_nodes = []
             for host, item in results.items():
                 if item.return_code:
                     cluster.log.debug(f"{host}:\n {item.stdout}")
                     failed_nodes.append(host)
 
-            if failed_nodes:
-                failed_msgs = "Check firewall settings between nodes, IPIP traffic is not allowed"
+            for item in failed_nodes:
+                failed_msgs.append(cluster.get_node_name(item))
         else:
-            skipped_msgs = "Encapsulation is disabled"
+            skipped_msgs = "Encapsulation IPIP is disabled"
 
         if failed_msgs:
-            raise TestFailure(f"Failed to connect by {enc_type} encapsulation to the following nodes: \n{' '.join(failed_nodes)}",
-                              hint=failed_msgs)
+            raise TestFailure(f"Check firewall settings between nodes, IP in IP traffic is not allowed \n"
+                              f"Failed to connect to the following nodes:",
+                              hint='\n'.join(failed_msgs))
         if skipped_msgs:
             raise TestWarn("Check cannot be completed", hint=skipped_msgs)
 
+#        elif enc_type == "vxlan":
+#            # Check if UDP port 4789 is allowed
+#            port = '4789'
+#            proto = 'udp'
+#            host_to_ip = {node['connect_to']: node['internal_address'] for node in group.get_ordered_members_configs_list()}
+#            cluster.log.debug(f"Checking {proto.upper()} port connectivity")
+#            host_ports = {}
+#            group = get_python_group(cluster, True)
+#            for node in group.get_ordered_members_configs_list():
+#                host = node['connect_to']
+#                host_ports = {host: [port]}
+#            cluster.log.debug(f"HOST_PORTS: {host_ports}")
+#            with install_listeners(cluster, host_ports, host_to_ip, proto, mtu) as listened_ports:
+#                failed_ports = check_connect_between_all_nodes(
+#                    cluster, listened_ports, host_to_ip, 'internal', proto, mtu)
+#                cluster.log.debug(f"PORTS: {listened_ports}")
+#                failed_nodes.update(failed_ports)
+#                failed_msgs.extend(f"{proto.upper()} ports are not opened for internal traffic on "
+#                               f"{cluster.get_node_name(host)}: {', '.join(ports)} \n"
+#                               "VxLAN mode won't work" for host, ports in failed_ports.items())
 
 def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
 
-    ipip_config = {}
+    ipip_config: Dict[str, Dict[str, str]] = {}
     host_pairs = get_pairs(group)
     for node in group.get_ordered_members_configs_list():
         host = node['connect_to']
@@ -1270,6 +1274,7 @@ def is_conflict(ipip_config: Dict[str, Dict[str, str]], ips: List[str]):
 
 def get_ips(pod_subnet: str) -> List[str]:
 
+    ips_str: List[str] = []
     random.seed()
     ip_pod_net = ipaddress.ip_network(pod_subnet)
     # Split pod network to subnets
@@ -1278,7 +1283,6 @@ def get_ips(pod_subnet: str) -> List[str]:
     subnet = random.choice(pod_subnets)
 
     ips_ip = list(subnet.subnets(6))
-    ips_str = []
     for ip in ips_ip:
         ips_str.append(str(ip))
     # Choose IP from the subnet above
@@ -1289,12 +1293,12 @@ def get_ips(pod_subnet: str) -> List[str]:
 
 def get_pairs(group: NodeGroup) -> Dict[str, List[str]]:
 
-    pairs = {}
+    pairs: Dict[str, List[str]] = {}
     nodes_list = group.get_ordered_members_configs_list()
     i = 0 
     # Create a loop
     for node in nodes_list:
-        pairs_list = []
+        pairs_list: List[str] = []
         if i > 0 and i < len(nodes_list) - 1:
             pairs_list.append(nodes_list[i+1]['connect_to'])
             pairs_list.append(nodes_list[i-1]['connect_to'])
@@ -1457,7 +1461,7 @@ tasks = OrderedDict({
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
         'ports_connectivity': ports_connectivity,
-        'overlay_connectivity': overlay_connectivity,
+        'ipip_connectivity': ipip_connectivity,
         'vips_connectivity': vips_connectivity,
     },
     'hardware': {
