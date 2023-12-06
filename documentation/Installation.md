@@ -3914,7 +3914,7 @@ The plugin configuration supports the following parameters:
 | Name                   | Type    | Default Value                       | Value Rules                                      | Description                                                        |
 |------------------------|---------|-------------------------------------|--------------------------------------------------|--------------------------------------------------------------------|
 | mode                   | string  | `ipip`                              | `ipip` / `vxlan` / `none`                        | Network overlay technology to be used in network plugin                      |
-| crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to avoid additional network configuration |
+| crossSubnet            | boolean | `true`                              | true/false                                       | Enables crossing subnet boundaries to avoid additional network configuration. See more details in [Overlay networking](https://docs.tigera.io/calico/latest/networking/configuring/vxlan-ipip)|
 | mtu                    | int     | `1440`                              | MTU size on interface - 50                       | MTU size for Calico interface                                      |
 | fullmesh               | boolean | true                                | true/false                                       | Enable or disable full mesh BGP topology                           |
 | announceServices       | boolean | false                               | true/false                                       | Enable announces of ClusterIP services CIDR through BGP            |
