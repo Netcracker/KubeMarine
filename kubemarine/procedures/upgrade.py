@@ -49,10 +49,12 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
-    minor_version = int(cluster.context['upgrade_version'].split('.')[1])
+    initial_kubernetes_version = cluster.context['initial_kubernetes_version']
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-    if minor_version >= 28 and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled':
+    if (admission.is_pod_security_unconditional(cluster)
+            and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.28")
+            and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
         first_control_plane = cluster.nodes["control-plane"].get_first_member()
 
         cluster.log.debug("Updating kubeadm config map")
