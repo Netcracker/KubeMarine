@@ -1161,8 +1161,89 @@ def ports_connectivity(cluster: KubernetesCluster) -> None:
             raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
 
 
+def vips_connectivity(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '016', 'Network', 'VRRP IPs') as tc,\
+            suspend_firewalld(cluster):
+        logger = cluster.log
+        keepalived_group = cluster.make_group_from_roles(['keepalived'])
+        if keepalived_group.is_empty():
+            return tc.success(results='Skipped')
+
+        skipped_msgs = nodes_require_python(cluster)
+        failed_nodes: Set[str] = set()
+        failed_msgs: List[str] = []
+
+        keepalived_group = keepalived_group.intersection_group(get_python_group(cluster, True))
+        mtu = get_mtu(cluster)
+
+        for item in cluster.inventory['vrrp_ips']:
+            ip = item['ip']
+            node_names = [record['name'] for record in item['hosts']]
+            group = keepalived_group.new_group(apply_filter={'name': node_names})
+            if group.is_empty():
+                logger.debug(f"Skipping VRRP IP {ip} as it is not assigned to any balancer with python installed.")
+                continue
+
+            logger.debug(f"Checking TCP ports connectivity to VRRP IP {ip}")
+            vip_assigned_balancer = next((
+                host
+                for host, result in group.sudo(f"ip -o a | grep {ip}", warn=True).items()
+                if not result.grep_returned_nothing()
+            ), None)
+
+            if vip_assigned_balancer is not None:
+                logger.debug(f"VRRP IP is already assigned to balancer {cluster.get_node_name(vip_assigned_balancer)}.")
+
+            for record in item['hosts']:
+                node_name = record['name']
+                # Probably not existing hosts.name
+                if not group.has_node(node_name):
+                    continue
+
+                node = group.get_member_by_name(node_name)
+                host = node.get_host()
+
+                if vip_assigned_balancer is not None and vip_assigned_balancer != host:
+                    logger.debug(f"Skipping check on balancer {node_name} "
+                                 f"as the VRRP IP {ip} is assigned to another balancer.")
+                    continue
+
+                logger.debug(f"Checking VRRP IP {ip} on balancer {node_name}...")
+
+                host_to_inf = {host: record['interface']}
+                host_to_ip = {host: ip}
+
+                assign_ips_ctx: AbstractContextManager = nullcontext()
+                if vip_assigned_balancer is None:
+                    logger.debug(f"Assigning IP address {ip} to the internal interface on balancer {node_name}...")
+                    get_python_group(cluster, True).exclude_group(node).sudo(f'ip neigh flush {ip}')
+
+                    prefix = ipaddress.ip_address(ip).max_prefixlen
+                    assign_ips_ctx = assign_ips(node, host_to_ip, host_to_inf, prefix)
+
+                host_ports = {
+                    host: list(get_ports_connectivity(cluster, 'tcp')['internal']['input']['balancer'])
+                }
+                with assign_ips_ctx, install_listeners(cluster, host_ports, host_to_ip, 'tcp', mtu) as listened_ports:
+                    failed_ports = check_connect_between_all_nodes(
+                        cluster, listened_ports, host_to_ip, 'internal', 'tcp', mtu)
+                    failed_nodes.update(failed_ports)
+                    failed_msgs.extend(
+                        f"Ports not opened on {ip} when assigned to balancer {node_name}: {', '.join(ports)}"
+                        for host, ports in failed_ports.items())
+
+        if failed_msgs:
+            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
+                              hint='\n'.join(failed_msgs))
+
+        if skipped_msgs:
+            raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
+
+        tc.success(results='Connected')
+
+
 def ipip_connectivity(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '012', 'Network', 'IP in IP Encapsulation', default_results='Connected'),\
+    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected'),\
             suspend_firewalld(cluster):
 
         skipped_msgs: ""
@@ -1214,26 +1295,6 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         if skipped_msgs:
             raise TestWarn("Check cannot be completed", hint=skipped_msgs)
 
-#        elif enc_type == "vxlan":
-#            # Check if UDP port 4789 is allowed
-#            port = '4789'
-#            proto = 'udp'
-#            host_to_ip = {node['connect_to']: node['internal_address'] for node in group.get_ordered_members_configs_list()}
-#            cluster.log.debug(f"Checking {proto.upper()} port connectivity")
-#            host_ports = {}
-#            group = get_python_group(cluster, True)
-#            for node in group.get_ordered_members_configs_list():
-#                host = node['connect_to']
-#                host_ports = {host: [port]}
-#            cluster.log.debug(f"HOST_PORTS: {host_ports}")
-#            with install_listeners(cluster, host_ports, host_to_ip, proto, mtu) as listened_ports:
-#                failed_ports = check_connect_between_all_nodes(
-#                    cluster, listened_ports, host_to_ip, 'internal', proto, mtu)
-#                cluster.log.debug(f"PORTS: {listened_ports}")
-#                failed_nodes.update(failed_ports)
-#                failed_msgs.extend(f"{proto.upper()} ports are not opened for internal traffic on "
-#                               f"{cluster.get_node_name(host)}: {', '.join(ports)} \n"
-#                               "VxLAN mode won't work" for host, ports in failed_ports.items())
 
 def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
 
@@ -1357,87 +1418,6 @@ def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, List[Dict[str, st
             for node in exe.group.get_ordered_members_list():
                 node.sudo("ip link delete name test-ipip1; "
                            "sudo ip link delete name test-ipip2", warn=True)
-
-
-def vips_connectivity(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '016', 'Network', 'VRRP IPs') as tc,\
-            suspend_firewalld(cluster):
-        logger = cluster.log
-        keepalived_group = cluster.make_group_from_roles(['keepalived'])
-        if keepalived_group.is_empty():
-            return tc.success(results='Skipped')
-
-        skipped_msgs = nodes_require_python(cluster)
-        failed_nodes: Set[str] = set()
-        failed_msgs: List[str] = []
-
-        keepalived_group = keepalived_group.intersection_group(get_python_group(cluster, True))
-        mtu = get_mtu(cluster)
-
-        for item in cluster.inventory['vrrp_ips']:
-            ip = item['ip']
-            node_names = [record['name'] for record in item['hosts']]
-            group = keepalived_group.new_group(apply_filter={'name': node_names})
-            if group.is_empty():
-                logger.debug(f"Skipping VRRP IP {ip} as it is not assigned to any balancer with python installed.")
-                continue
-
-            logger.debug(f"Checking TCP ports connectivity to VRRP IP {ip}")
-            vip_assigned_balancer = next((
-                host
-                for host, result in group.sudo(f"ip -o a | grep {ip}", warn=True).items()
-                if not result.grep_returned_nothing()
-            ), None)
-
-            if vip_assigned_balancer is not None:
-                logger.debug(f"VRRP IP is already assigned to balancer {cluster.get_node_name(vip_assigned_balancer)}.")
-
-            for record in item['hosts']:
-                node_name = record['name']
-                # Probably not existing hosts.name
-                if not group.has_node(node_name):
-                    continue
-
-                node = group.get_member_by_name(node_name)
-                host = node.get_host()
-
-                if vip_assigned_balancer is not None and vip_assigned_balancer != host:
-                    logger.debug(f"Skipping check on balancer {node_name} "
-                                 f"as the VRRP IP {ip} is assigned to another balancer.")
-                    continue
-
-                logger.debug(f"Checking VRRP IP {ip} on balancer {node_name}...")
-
-                host_to_inf = {host: record['interface']}
-                host_to_ip = {host: ip}
-
-                assign_ips_ctx: AbstractContextManager = nullcontext()
-                if vip_assigned_balancer is None:
-                    logger.debug(f"Assigning IP address {ip} to the internal interface on balancer {node_name}...")
-                    get_python_group(cluster, True).exclude_group(node).sudo(f'ip neigh flush {ip}')
-
-                    prefix = ipaddress.ip_address(ip).max_prefixlen
-                    assign_ips_ctx = assign_ips(node, host_to_ip, host_to_inf, prefix)
-
-                host_ports = {
-                    host: list(get_ports_connectivity(cluster, 'tcp')['internal']['input']['balancer'])
-                }
-                with assign_ips_ctx, install_listeners(cluster, host_ports, host_to_ip, 'tcp', mtu) as listened_ports:
-                    failed_ports = check_connect_between_all_nodes(
-                        cluster, listened_ports, host_to_ip, 'internal', 'tcp', mtu)
-                    failed_nodes.update(failed_ports)
-                    failed_msgs.extend(
-                        f"Ports not opened on {ip} when assigned to balancer {node_name}: {', '.join(ports)}"
-                        for host, ports in failed_ports.items())
-
-        if failed_msgs:
-            raise TestFailure(f"Failed to connect to {len(failed_nodes)} nodes.",
-                              hint='\n'.join(failed_msgs))
-
-        if skipped_msgs:
-            raise TestWarn("Cannot complete check", hint='\n'.join(skipped_msgs))
-
-        tc.success(results='Connected')
 
 
 def make_reports(context: dict) -> None:
