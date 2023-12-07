@@ -182,7 +182,7 @@ The actual information about the supported versions can be found in `compatibili
 * Opened TCP-ports:
   * Internal communication:
     * 22 : SSH 
-    * 53 : CoreDNS (TCP & UDP), if access is needed from services bound to the host network.
+    * 53 : CoreDNS, if access is needed from services bound to the host network.
     * 80 (or 20080, if balancers are presented): HTTP
     * 179 : Calico BGP
     * 443 (or 20443, if balancers are presented): HTTPS
@@ -201,6 +201,10 @@ The actual information about the supported versions can be found in `compatibili
     * 80
     * 443
     * 6443 : Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
+* Opened UDP-ports:
+  * Internal communication:
+    * 53 : CoreDNS, if access is needed from services bound to the host network.
+    * 4789 : Calico VxLAN encapsulation, if that type of encapsulation is enabled
 * Enabled additional protocols:
   * **VRRP**: protocol is using by keepalived to manage vIP between nodes with role **balancer**. IP protocol number - 112
   * **IPIP**: protocol is using for communication between kubernetes nodes of several clusters in Active-Active scheme only. Make shure **IPIP** protocol is added to all Security Groups in OpenStack and allowed on all intermediate network devices. IP protocol number - 4
