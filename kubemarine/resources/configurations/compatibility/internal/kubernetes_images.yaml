@@ -37,6 +37,8 @@ kube-apiserver:
     version: v1.28.3
   v1.28.4:
     version: v1.28.4
+  v1.29.0-rc.1:
+    version: v1.29.0-rc.1
 kube-controller-manager:
   v1.23.1:
     version: v1.23.1
@@ -74,6 +76,8 @@ kube-controller-manager:
     version: v1.28.3
   v1.28.4:
     version: v1.28.4
+  v1.29.0-rc.1:
+    version: v1.29.0-rc.1
 kube-scheduler:
   v1.23.1:
     version: v1.23.1
@@ -111,6 +115,8 @@ kube-scheduler:
     version: v1.28.3
   v1.28.4:
     version: v1.28.4
+  v1.29.0-rc.1:
+    version: v1.29.0-rc.1
 kube-proxy:
   v1.23.1:
     version: v1.23.1
@@ -148,6 +154,8 @@ kube-proxy:
     version: v1.28.3
   v1.28.4:
     version: v1.28.4
+  v1.29.0-rc.1:
+    version: v1.29.0-rc.1
 pause:
   v1.23.1:
     version: '3.6'
@@ -184,6 +192,8 @@ pause:
   v1.28.3:
     version: '3.9'
   v1.28.4:
+    version: '3.9'
+  v1.29.0-rc.1:
     version: '3.9'
 etcd:
   v1.23.1:
@@ -222,6 +232,8 @@ etcd:
     version: 3.5.9-0
   v1.28.4:
     version: 3.5.9-0
+  v1.29.0-rc.1:
+    version: 3.5.10-0
 coredns/coredns:
   v1.23.1:
     version: v1.8.6
@@ -259,3 +271,5 @@ coredns/coredns:
     version: v1.10.1
   v1.28.4:
     version: v1.10.1
+  v1.29.0-rc.1:
+    version: v1.11.1
