@@ -1243,57 +1243,60 @@ def vips_connectivity(cluster: KubernetesCluster) -> None:
 
 
 def ipip_connectivity(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected'),\
+    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected') as tc,\
             suspend_firewalld(cluster):
 
-        skipped_msgs: ""
         failed_nodes: List[str] = []
         failed_msgs: List[str] = []
 
         # Check encapsulation for 'Calico' CNI
-        if cluster.inventory['plugins']['calico']['install'] == 'true':
-            cluster.log.debug(f"Calico is not set as CNI for the cluster, check is skipped")
-            skipped_msgs = "Unsupported CNI"
+        if not cluster.inventory['plugins']['calico']['install']:
+            skipped_msgs = "Calico is not set as CNI for the cluster"
+            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
             return tc.success(results='Skipped')
 
         # Check encapsulation for clusters with two or more nodes
         group = cluster.make_group_from_roles(['control-plane', 'worker'])
         if group.nodes_amount() == 1:
-            cluster.log.debug(f"Too few nodes, check is skipped")
+            skipped_msgs = f"Too few nodes, check is skipped"
+            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
             return tc.success(results='Skipped')
 
         enc_type = cluster.inventory['plugins']['calico']['mode']
-
-        mtu = cluster.inventory['plugins']['calico']['mtu']
         if enc_type == "ipip":
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
                 skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
+                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
                 return tc.success(results='Skipped')
             # Check if cluster is running with Calico CNI and IPIP
-            results = group.sudo("iptables -nvL | grep 'Drop IPIP'", warn=True)
-            if  list(results.values())[0].stdout:
-                cluster.log.debug(f"Cannot check IP in IP encapsulation on running cluster")
-                return tc.success(results='Skipped')
+            results = group.sudo("iptables -L cali-INPUT  -n -v", warn=True)
+            for result in list(results.values()):
+                if result.return_code  == 0:
+                    skipped_msgs = f"Cannot check IP in IP encapsulation on running cluster"
+                    raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+                    return tc.success(results='Skipped')
             # Create IP-IP tunnels configurations
             ipip_config = get_ipip_config(group)
-            results = check_ipip_tunnel(group, ipip_config)
-            for host, item in results.items():
-                if item.return_code:
-                    cluster.log.debug(f"{host}:\n {item.stdout}")
-                    failed_nodes.append(host)
-
+            failed_nodes = check_ipip_tunnel(group, ipip_config)
             for item in failed_nodes:
-                failed_msgs.append(cluster.get_node_name(item))
+                first_name = cluster.get_node_name(item)
+                second_name: str = ""
+                first_int_addr = cluster.get_node(item)['internal_address']
+                second_int_addr = ipip_config[first_int_addr]['remote_ext1']
+                for node in cluster.nodes['all'].get_ordered_members_list():
+                    if node.get_config()['internal_address'] == second_int_addr:
+                        second_name = node.get_node_name()
+                failed_msgs.append(f"{first_name} and {second_name}")
         else:
-            skipped_msgs = "Encapsulation IPIP is disabled"
+            skipped_msgs = f"Encapsulation IPIP is disabled"
+            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+            return tc.success(results='Skipped')
 
         if failed_msgs:
             raise TestFailure(f"Check firewall settings between nodes, IP in IP traffic is not allowed \n"
-                              f"Failed to connect to the following nodes:",
+                              f"Connection check failed between the following nodes:",
                               hint='\n'.join(failed_msgs))
-        if skipped_msgs:
-            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
 
 
 def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
@@ -1301,7 +1304,7 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
     ipip_config: Dict[str, Dict[str, str]] = {}
     host_pairs = get_pairs(group)
     for node in group.get_ordered_members_configs_list():
-        host = node['connect_to']
+        host = node['internal_address']
         ipip_config[host] = {}
         ipip_config[host]['remote_ext1'] = host_pairs[host][0]
         ipip_config[host]['remote_ext2'] = host_pairs[host][1]
@@ -1310,20 +1313,20 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
         ips = get_ips(pod_subnet)
         # IPs should be uniq
         while is_conflict(ipip_config, ips):
-            ips = get_ips(cluster, host, host_pairs[host])
+            ips = get_ips(pod_subnet)
 
         ipip_config[host]['local_int1'] = ips[0]
         ipip_config[host]['remote_int1'] = ips[1]
 
     for node in group.get_ordered_members_configs_list():
-        host = node['connect_to']
+        host = node['internal_address']
         ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
         ipip_config[host]['remote_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['local_int1']
 
     return ipip_config
 
 
-def is_conflict(ipip_config: Dict[str, Dict[str, str]], ips: List[str]):
+def is_conflict(ipip_config: Dict[str, Dict[str, str]], ips: List[str]) -> bool:
 
     for ip in ips:
         for host_ips in ipip_config.values():
@@ -1361,21 +1364,21 @@ def get_pairs(group: NodeGroup) -> Dict[str, List[str]]:
     for node in nodes_list:
         pairs_list: List[str] = []
         if i > 0 and i < len(nodes_list) - 1:
-            pairs_list.append(nodes_list[i+1]['connect_to'])
-            pairs_list.append(nodes_list[i-1]['connect_to'])
+            pairs_list.append(nodes_list[i+1]['internal_address'])
+            pairs_list.append(nodes_list[i-1]['internal_address'])
         elif i == len(nodes_list) - 1:
-            pairs_list.append(nodes_list[0]['connect_to'])
-            pairs_list.append(nodes_list[-2]['connect_to'])
+            pairs_list.append(nodes_list[0]['internal_address'])
+            pairs_list.append(nodes_list[-2]['internal_address'])
         elif i == 0:
-            pairs_list.append(nodes_list[1]['connect_to'])
-            pairs_list.append(nodes_list[-1]['connect_to'])
-        pairs[node['connect_to']] = pairs_list
+            pairs_list.append(nodes_list[1]['internal_address'])
+            pairs_list.append(nodes_list[-1]['internal_address'])
+        pairs[node['internal_address']] = pairs_list
         i += 1
 
     return pairs
 
 
-def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, List[Dict[str, str]]]):
+def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, Dict[str, str]]) -> List[str]:
 
     ipip_mtu = group.cluster.inventory['plugins']['calico']['mtu']
     icmp_payload = str(int(ipip_mtu) - 8)
@@ -1386,7 +1389,7 @@ def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, List[Dict[str, st
         # Create IPIP tunnels
         with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
-                host = node.get_host()
+                host = node.get_config()['internal_address']
                 node.sudo(f"ip link add name test-ipip1 type ipip "
                            f"local {host} remote {ipip_config[host]['remote_ext1']} && "
                            f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
@@ -1403,13 +1406,15 @@ def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, List[Dict[str, st
         collector = CollectorCallback(group.cluster)
         with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
-                host = node.get_host()
+                host = node.get_config()['internal_address']
                 node.sudo(f"ping {ipip_config[host]['remote_int1'].split('/')[0]} -c 10 -s {icmp_payload}", 
                         warn=True, callback=collector)
 
-        output = {}
-        for host, result in collector.result.items():
-            output[host] = result
+        output: List[str] = []
+        for host, item in collector.result.items():
+            if item.return_code:
+                group.cluster.log.debug(f"{host}:\n {item.stdout}")
+                output.append(host)
 
         return output
     finally:
