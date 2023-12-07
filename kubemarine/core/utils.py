@@ -13,6 +13,7 @@
 # limitations under the License.
 import hashlib
 import io
+import ipaddress
 import json
 import os
 import re
@@ -478,6 +479,10 @@ def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
     logger.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
 
 
+def isipv(address: str, versions: List[int]) -> bool:
+    return ipaddress.ip_network(address).version in versions
+
+
 def get_version_filepath() -> str:
     return get_internal_resource_path("version")
 
@@ -491,6 +496,13 @@ def minor_version(version: str) -> str:
     Converts vN.N.N to vN.N
     """
     return 'v' + '.'.join(map(str, _test_version(version, 3)[0:2]))
+
+
+def major_version(version: str) -> str:
+    """
+    Converts vN.N.N to vN
+    """
+    return 'v' + '.'.join(map(str, _test_version(version, 3)[0:1]))
 
 
 def version_key(version: str) -> Tuple[int, int, int]:
@@ -511,21 +523,28 @@ def minor_version_key(version: str) -> Tuple[int, int]:
 
 def _test_version(version: str, numbers_amount: int) -> List[int]:
     # catch version without "v" at the first symbol
+    is_rc = 0
     if version.startswith('v'):
         version_list: list = version[1:].split('.')
-        # catch invalid version 'v1.16'
-        if len(version_list) == numbers_amount:
-            # parse str to int and catch invalid symbols in version number
-            try:
-                for i, value in enumerate(version_list):
-                    # whitespace required because python's int() ignores them
-                    version_list[i] = int(value.replace(' ', '.'))
-            except ValueError:
-                pass
-            else:
-                return version_list
+        # catch version with unexpected number or parts
+        parts_num = len(version_list)
+        try:
+            for i, value in enumerate(version_list):
+                # catch release candidate version like v1.29.0-rc.1
+                if parts_num == 4 and i == 2 and value.endswith('-rc'):
+                    value = value[:-3]
+                    is_rc = 1
+                # whitespace required because python's int() ignores them
+                version_list[i] = int(value.replace(' ', '.'))
+        except ValueError:
+            pass
+        else:
+            if numbers_amount == parts_num - is_rc:
+                return version_list[:numbers_amount]
 
     expected_pattern = 'v' + '.'.join('N+' for _ in range(numbers_amount))
+    if numbers_amount == 3:
+        expected_pattern += '[-rc.N+]'
     raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
 
 

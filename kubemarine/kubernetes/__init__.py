@@ -42,6 +42,11 @@ ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than o
 ERROR_MINOR_RANGE_EXCEEDED='Minor version \"%s\" rises to new \"%s\" more than one'
 
 
+def is_container_runtime_not_configurable(cluster: KubernetesCluster) -> bool:
+    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.27")
+
+
 def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
@@ -182,23 +187,9 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
             
-    # Validate the provided podSubnet IP address
-    pod_subnet = inventory.get('services', {}).get('kubeadm', {}).get('networking', {}).get('podSubnet')
-    try:
-        ip_network = ipaddress.ip_network(pod_subnet)
-        if ip_network.version not in [4, 6]:
-            raise ValueError(f"Invalid podSubnet IP address: {pod_subnet}")
-    except ValueError:
-        raise ValueError(f"Invalid podSubnet IP address: {pod_subnet}")
-
-    # Validate the provided serviceSubnet IP address
-    service_subnet = inventory.get('services', {}).get('kubeadm', {}).get('networking', {}).get('serviceSubnet')
-    try:
-        ip_network = ipaddress.ip_network(service_subnet)
-        if ip_network.version not in [4, 6]:
-            raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
-    except ValueError:
-        raise ValueError(f"Invalid serviceSubnet IP address: {service_subnet}")
+    # Validate the provided podSubnet and serviceSubnet IP addresses
+    for subnet in ('podSubnet', 'serviceSubnet'):
+        utils.isipv(inventory['services']['kubeadm']['networking'][subnet], [4, 6])
 
     # validate nodes in kubeadm_patches (groups are validated with JSON schema)
     for node in inventory["nodes"]:
@@ -411,12 +402,9 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
             'localAPIEndpoint': {
                 'advertiseAddress': node_config['internal_address'],
             }
-        }
+        },
+        'patches': {'directory': '/etc/kubernetes/patches'},
     }
-
-    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
     if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
@@ -546,12 +534,9 @@ def init_first_control_plane(group: NodeGroup) -> None:
         'kind': 'InitConfiguration',
         'localAPIEndpoint': {
             'advertiseAddress': node_config['internal_address']
-        }
+        },
+        'patches': {'directory': '/etc/kubernetes/patches'},
     }
-
-    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        init_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
     if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
@@ -708,12 +693,9 @@ def init_workers(group: NodeGroup) -> None:
                     join_dict['discovery-token-ca-cert-hash']
                 ]
             }
-        }
+        },
+        'patches': {'directory': '/etc/kubernetes/patches'},
     }
-
-    # TODO: when k8s v1.21 is excluded from Kubemarine, patches should be added to InitConfiguration unconditionally
-    if "v1.21" not in cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]:
-        join_config['patches'] = {'directory': '/etc/kubernetes/patches'}
 
     if cluster.inventory['services']['kubeadm']['controllerManager']['extraArgs'].get(
             'external-cloud-volume-plugin'):
@@ -1095,8 +1077,7 @@ def configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict
 
         kubeadm_config['nodeRegistration']['criSocket'] = '/var/run/containerd/containerd.sock'
 
-        minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-        if minor_version < 27:
+        if not is_container_runtime_not_configurable(cluster):
             kubeadm_config['nodeRegistration']['kubeletExtraArgs']['container-runtime'] = 'remote'
 
         kubeadm_config['nodeRegistration']['kubeletExtraArgs']['container-runtime-endpoint'] = \
@@ -1361,7 +1342,6 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
 def fix_flag_kubelet(group: NodeGroup) -> bool:
     kubeadm_flags_file = "/var/lib/kubelet/kubeadm-flags.env"
     cluster = group.cluster
-    version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
     sandbox_image = containerd.get_sandbox_image(cluster.inventory['services']['cri'])
     infra_image_flag = f"--pod-infra-container-image={sandbox_image}"
     container_runtime_flag = '--container-runtime=remote'
@@ -1375,7 +1355,7 @@ def fix_flag_kubelet(group: NodeGroup) -> bool:
         for node in exe.group.get_ordered_members_list():
             kubeadm_flags = collector.result[node.get_host()].stdout
             updated_kubeadm_flags = kubeadm_flags
-            if utils.version_key(version) >= utils.version_key("v1.27.0"):
+            if is_container_runtime_not_configurable(cluster):
                 # remove the deprecated kubelet flag for versions starting from 1.27.0
                 updated_kubeadm_flags = updated_kubeadm_flags.replace(container_runtime_flag, '')
 

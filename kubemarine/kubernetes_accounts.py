@@ -42,10 +42,10 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
         if account['configs'][1]['subjects'][0].get('namespace') is None:
             rbac["accounts"][i]['configs'][1]['subjects'][0]['namespace'] = account['namespace']
 
-        # For Kubernetes v1.23 and lower are used legacy enrichment
+        # For Kubernetes lower than v1.24 use legacy enrichment
         # It has only 'ServiceAccount' and 'ClusterRoleBinding'
-        minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-        if minor_version < 24:
+        kubernetes_version = inventory["services"]["kubeadm"]["kubernetesVersion"]
+        if utils.version_key(kubernetes_version)[0:2] < utils.minor_version_key("v1.24"):
             if len(rbac["accounts"][i]['configs']) > 2:
                 rbac["accounts"][i]['configs'].pop(2)
             if rbac["accounts"][i]['configs'][0].get('secrets') is not None:

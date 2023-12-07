@@ -50,6 +50,17 @@ loaded_oob_policies = {}
 
 # TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
+
+def support_pss_only(cluster: KubernetesCluster) -> bool:
+    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.25")
+
+
+def is_pod_security_unconditional(cluster: KubernetesCluster) -> bool:
+    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.28")
+
+
 def enrich_inventory_psp(inventory: dict, _: KubernetesCluster) -> dict:
     global loaded_oob_policies
     loaded_oob_policies = load_oob_policies_files()
@@ -71,20 +82,18 @@ def enrich_inventory_psp(inventory: dict, _: KubernetesCluster) -> dict:
     return inventory
 
 
-def enrich_inventory_pss(inventory: dict, _: KubernetesCluster) -> dict:
+def enrich_inventory_pss(inventory: dict, cluster: KubernetesCluster) -> dict:
     if not is_security_enabled(inventory):
         return inventory
     # check flags, enforce and logs parameters
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version < 23:
-        raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
+    kubernetes_version = inventory["services"]["kubeadm"]["kubernetesVersion"]
     for item in inventory["rbac"]["pss"]["defaults"]:
         if item.endswith("version"):
-            verify_version(item, inventory["rbac"]["pss"]["defaults"][item], minor_version)
+            verify_version(item, inventory["rbac"]["pss"]["defaults"][item], kubernetes_version)
 
     # add extraArgs to kube-apiserver config
     extra_args = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]
-    if minor_version <= 27:
+    if not is_pod_security_unconditional(cluster):
         enabled_admissions = extra_args.get("feature-gates")
         if enabled_admissions:
             if 'PodSecurity=true' not in enabled_admissions:
@@ -110,9 +119,8 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
 
 
 def manage_psp_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version >= 25:
-        raise Exception("PSP is not supported in Kubernetes version higher than v1.24")
+    if support_pss_only(cluster):
+        raise Exception("PSP is not supported in Kubernetes v1.25 or higher")
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory
 
@@ -157,14 +165,13 @@ def verify_custom_list(custom_list: List[dict], type: str) -> None:
             raise Exception("Name %s is not allowed for custom %s" % (item["metadata"]["name"], type))
 
 
-def verify_version(owner: str, version: str, minor_version_cfg: int) -> None:
+def verify_version(owner: str, version: str, kubernetes_version: str) -> None:
     # check Kubernetes version and admission config matching
     if version != "latest":
         result = re.match(valid_versions_templ, version)
         if result is None:
             raise Exception("incorrect Kubernetes version %s, valid version(for example): v1.23" % owner)
-        minor_version = int(version.split('.')[1])
-        if minor_version > minor_version_cfg:
+        if utils.minor_version_key(version) > utils.version_key(kubernetes_version)[0:2]:
             raise Exception("%s version must not be higher than Kubernetes version" % owner)
 
 
@@ -586,18 +593,19 @@ def manage_pss_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
         return inventory
 
     procedure_config = cluster.procedure_inventory["pss"]
-    minor_version = int(cluster.inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    minor_version_key = utils.version_key(kubernetes_version)[0:2]
         
     if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
         raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
 
     # check flags, profiles; enrich inventory
-    if minor_version < 23:
+    if minor_version_key < utils.minor_version_key("v1.23"):
         raise Exception("PSS is not supported properly in Kubernetes version before v1.23")
     if "defaults" in procedure_config:
         for item in procedure_config["defaults"]:
             if item.endswith("version"):
-                verify_version(item, procedure_config["defaults"][item], minor_version)
+                verify_version(item, procedure_config["defaults"][item], kubernetes_version)
             inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
     if "exemptions" in procedure_config:
         default_merger.merge(inventory["rbac"]["pss"]["exemptions"], procedure_config["exemptions"])
@@ -609,19 +617,18 @@ def manage_pss_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
                 for item in list(namespace_item[namespace]):
                     if namespace_item[namespace][item]:
                         if item.endswith("version"):
-                            verify_version(item, namespace_item[namespace][item], minor_version)
+                            verify_version(item, namespace_item[namespace][item], kubernetes_version)
     if "namespaces_defaults" in procedure_config:
         for item in procedure_config["namespaces_defaults"]:
             if item.endswith("version"):
-                verify_version(item, procedure_config["namespaces_defaults"][item], minor_version)
+                verify_version(item, procedure_config["namespaces_defaults"][item], kubernetes_version)
 
     return inventory
 
 
-def enrich_default_admission(inventory: dict, _: KubernetesCluster) -> dict:
-    minor_version = int(inventory["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
+def enrich_default_admission(inventory: dict, cluster: KubernetesCluster) -> dict:
     if not inventory["rbac"].get("admission"):
-        inventory["rbac"]["admission"] = "psp" if minor_version < 25 else "pss"
+        inventory["rbac"]["admission"] = "psp" if not support_pss_only(cluster) else "pss"
     return inventory
 
 
@@ -693,15 +700,11 @@ def update_kubeapi_config_pss(control_planes: NodeGroup, features_list: str) -> 
 
     for control_plane in control_planes.get_ordered_members_list():
         result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
-        if control_plane.cluster.context['initial_procedure'] == 'upgrade':
-            minor_version = int(control_plane.cluster.context['upgrade_version'].split('.')[1])
-        else:
-            minor_version = int(control_plane.cluster.inventory['services']['kubeadm']['kubernetesVersion'].split('.')[1])
         # update kube-apiserver config with updated features list or delete '--feature-gates' and '--admission-control-config-file'
         conf = yaml.load(list(result.values())[0].stdout)
         new_command = [cmd for cmd in conf["spec"]["containers"][0]["command"]]
         if len(features_list) != 0:
-            if minor_version <= 27:
+            if not is_pod_security_unconditional(control_plane.cluster):
                 if 'PodSecurity=true' in features_list:
                     new_command.append("--admission-control-config-file=%s" % admission_path)
                 else:
@@ -748,14 +751,10 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
     result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
     kubeadm_cm = yaml.load(list(result.values())[0].stdout)
     cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
-    if first_control_plane.cluster.context['initial_procedure'] == 'upgrade':
-        minor_version = int(first_control_plane.cluster.context['upgrade_version'].split('.')[1])
-    else:
-        minor_version = int(cluster_config['kubernetesVersion'].split('.')[1])
 
     # update kubeadm config map with feature list
     if target_state == "enabled":
-        if minor_version <= 27:
+        if not is_pod_security_unconditional(first_control_plane.cluster):
             if "feature-gates" in cluster_config["apiServer"]["extraArgs"]:
                 enabled_admissions = cluster_config["apiServer"]["extraArgs"]["feature-gates"]
                 if 'PodSecurity=true' not in enabled_admissions:
@@ -777,7 +776,7 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
                     del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
             final_feature_list = "PodSecurity deprecated in %s" % cluster_config['kubernetesVersion']
     elif target_state == "disabled":
-        if minor_version <= 27:
+        if not is_pod_security_unconditional(first_control_plane.cluster):
             feature_list = cluster_config["apiServer"]["extraArgs"]["feature-gates"].replace("PodSecurity=true", "")
             final_feature_list = feature_list.replace(",,", ",")
             if len(final_feature_list) == 0:
@@ -847,9 +846,8 @@ def update_finalized_inventory(cluster: KubernetesCluster, inventory_to_finalize
     elif cluster.context.get('initial_procedure') == 'manage_psp':
         current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("psp", {})
         current_config["pod-security"] = cluster.procedure_inventory["psp"].get("pod-security", current_config.get("pod-security", "enabled"))
-    # remove PSP section from cluster_finalyzed.yaml  
-    minor_version = int(inventory_to_finalize["services"]["kubeadm"]["kubernetesVersion"].split('.')[1])
-    if minor_version > 24:
+    # remove PSP section from cluster_finalyzed.yaml
+    if support_pss_only(cluster):
         del inventory_to_finalize["rbac"]["psp"]
 
     return inventory_to_finalize
