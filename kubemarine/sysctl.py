@@ -18,6 +18,7 @@ Using this module you can generate new sysctl configs, install and apply them.
 """
 
 import io
+from typing import Dict
 
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
@@ -29,27 +30,24 @@ def make_config(cluster: KubernetesCluster) -> str:
     Converts parameters from inventory['services']['sysctl'] to a string in the format of systcl.conf.
     """
     config = ""
-    for key, value in cluster.inventory['services']['sysctl'].items():
-        if isinstance(value, str):
-            value = value.strip()
-        if value is not None and value != '':
-            value = int(value)
-            if key == "kernel.pid_max":
-                required_pid_max = get_pid_max(cluster.inventory)
-                if value > 2 ** 22:
-                    raise Exception(
-                        "The 'kernel.pid_max' value = '%s' is greater than the maximum allowable '%s'"
-                        % (value, 2 ** 22))
-                if value < required_pid_max:
-                    raise Exception(
-                        "The 'kernel.pid_max' value = '%s' is lower than "
-                        "the minimum required for kubelet configuration = '%s'"
-                        % (value, required_pid_max))
-                if value < 32768:
-                    cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
-                                        "default system value = '32768'" % value)
-            config += "%s = %s\n" % (key, value)
-    if not cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
+    sysctl_config: Dict[str, int] = cluster.inventory['services']['sysctl']
+    for key, value in sysctl_config.items():
+        if key == "kernel.pid_max":
+            required_pid_max = get_pid_max(cluster.inventory)
+            if value > 2 ** 22:
+                raise Exception(
+                    "The 'kernel.pid_max' value = '%s' is greater than the maximum allowable '%s'"
+                    % (value, 2 ** 22))
+            if value < required_pid_max:
+                raise Exception(
+                    "The 'kernel.pid_max' value = '%s' is lower than "
+                    "the minimum required for kubelet configuration = '%s'"
+                    % (value, required_pid_max))
+            if value < 32768:
+                cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "
+                                    "default system value = '32768'" % value)
+        config += "%s = %s\n" % (key, value)
+    if "kernel.pid_max" not in sysctl_config:
         pid_max = get_pid_max(cluster.inventory)
         if pid_max < 32768:
             cluster.log.warning("The 'kernel.pid_max' value = '%s' is lower than "

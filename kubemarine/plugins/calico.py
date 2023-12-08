@@ -63,7 +63,8 @@ def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, cal
 
 
 def is_typha_enabled(inventory: dict) -> bool:
-    return utils.strtobool(inventory['plugins']['calico']['typha']['enabled'], 'plugins.calico.typha.enabled')
+    enabled: bool = inventory['plugins']['calico']['typha']['enabled']
+    return enabled
 
 
 def is_apiserver_enabled(inventory: dict) -> bool:
@@ -246,7 +247,7 @@ class CalicoManifestProcessor(Processor):
                                {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
 
         val = self.inventory['plugins']['calico']['typha']['replicas']
-        source_yaml['spec']['replicas'] = int(val)
+        source_yaml['spec']['replicas'] = val
         self.log.verbose(f"The {key} has been patched in 'spec.replicas' with '{val}'")
 
         self.enrich_node_selector(manifest, key, plugin_service='typha')

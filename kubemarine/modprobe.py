@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import io
-from typing import Tuple
+from typing import Tuple, List
 
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
@@ -22,13 +22,26 @@ from kubemarine.core.group import NodeGroup, RunnersGroupResult, DeferredGroup, 
 predefined_file_path = "/etc/modules-load.d/predefined.conf"
 
 
+def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
+    """
+    The method enrich the list of kernel modules ('services.modprobe') according to OS family
+    """
+
+    final_nodes = cluster.nodes['all'].get_final_nodes()
+    for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
+        # Remove the section for OS families if no node has these OS families.
+        if final_nodes.get_subgroup_with_os(os_family).is_empty():
+            del inventory["services"]["modprobe"][os_family]
+
+    return inventory
+
+
 def generate_config(node: DeferredGroup) -> str:
     cluster: KubernetesCluster = node.cluster
     config = ''
-    for module_name in cluster.inventory['services']['modprobe'][node.get_nodes_os()]:
-        module_name = module_name.strip()
-        if module_name is not None and module_name != '':
-            config += module_name + "\n"
+    modprobe_config: List[str] = cluster.inventory['services']['modprobe'][node.get_nodes_os()]
+    for module_name in modprobe_config:
+        config += module_name + "\n"
 
     return config
 
