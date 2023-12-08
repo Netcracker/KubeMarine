@@ -5,7 +5,7 @@
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Disabling Auto-Mounting of Tokens for Service Accounts](#disabling-auto-mounting-of-tokens-for-service-accounts)
-- [Use strong cryptographic ciphers for API server] (#Use-strong-cryptographic-ciphers-for-api-server) 
+- [Use strong cryptographic ciphers for API server](#Use-strong-cryptographic-ciphers-for-api-server) 
 <!-- /TOC -->
 
 ## Overview
