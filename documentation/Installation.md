@@ -33,6 +33,7 @@ This section provides information about the inventory, features, and steps for i
         - [Cloud Provider Plugin](#cloud-provider-plugin)
         - [Service Account Issuer](#service-account-issuer)
       - [kubeadm_kubelet](#kubeadm_kubelet)
+      - [kubeadm_kube-proxy](#kubeadm_kube-proxy)
       - [kubeadm_patches](#kubeadm_patches)
       - [kernel_security](#kernel_security)
         - [selinux](#selinux)
@@ -1078,7 +1079,8 @@ In the `services` section, you can configure the service settings. The settings 
 
 *OS specific*: No
 
-In `services.kubeadm` section, you can override the original settings for the kubeadm. For more information these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
+In `services.kubeadm` section, you can override the original settings for the kubeadm.
+For more information about these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
 |Parameter| Default Value                                            |
@@ -1476,7 +1478,8 @@ Example result:
 
 *OS specific*: No
 
-In `services.kubeadm_kubelet` section, you can override the original settings for the kubelet. For more information these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
+In `services.kubeadm_kubelet` section, you can override the original settings for the kubelet.
+For more information about these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
 |Parameter|Default Value|
@@ -1507,6 +1510,23 @@ services:
     maxPods: 100
     cgroupDriver: systemd
 ```
+
+#### kubeadm_kube-proxy
+
+*Installation task*: `deploy.kubernetes`
+
+*Can cause reboot*: no
+
+*Can restart service*: always yes, `kubelet`
+
+*OS specific*: No
+
+In `services.kubeadm_kube-proxy` section, you can override the original settings for the kube-proxy.
+For more information about these settings, refer to the [Official Kubernetes Documentation](https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration).
+By default, the installer uses the following parameters:
+
+|Parameter|Default Value|
+|---|---|
 
 #### kubeadm_patches
 

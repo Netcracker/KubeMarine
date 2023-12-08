@@ -6,6 +6,9 @@
     "kubeadm_kubelet": {
       "$ref": "services/kubeadm_kubelet.json"
     },
+    "kubeadm_kube-proxy": {
+      "$ref": "services/kubeadm_kube-proxy.json"
+    },
     "kubeadm_patches": {
       "$ref": "services/kubeadm_patches.json"
     },
