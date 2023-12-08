@@ -80,20 +80,6 @@ def enrich_etc_hosts(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
-    """
-    The method enrich the list of kernel modules ('services.modprobe') according to OS family
-    """
-
-    final_nodes = cluster.nodes['all'].get_final_nodes()
-    for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
-        # Remove the section for OS families if no node has these OS families.
-        if final_nodes.get_subgroup_with_os(os_family).is_empty():
-            del inventory["services"]["modprobe"][os_family]
-
-    return inventory
-
-
 def fetch_os_versions(cluster: KubernetesCluster) -> RunnersGroupResult:
     group = cluster.nodes['all'].get_accessible_nodes()
     '''

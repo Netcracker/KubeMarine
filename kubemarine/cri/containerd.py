@@ -33,11 +33,6 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
     containerd_config[path].setdefault('sandbox_image', get_default_sandbox_image(inventory, kubernetes_version))
 
-    runc_options_path = f'{path}.containerd.runtimes.runc.options'
-    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-        containerd_config[runc_options_path]['SystemdCgroup'] = \
-            utils.strtobool(containerd_config[runc_options_path]['SystemdCgroup'], "containerdConfig.SystemdCgroup")
-
     # Check if field for new and old configuration formats are presented
     old_format_result, old_format_field = contains_old_format_properties(inventory)
     new_format_result, new_format_field = contains_new_format_properties(inventory)
