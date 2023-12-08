@@ -5,6 +5,7 @@
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Disabling Auto-Mounting of Tokens for Service Accounts](#disabling-auto-mounting-of-tokens-for-service-accounts)
+- [Use strong cryptographic ciphers for API server] (#Use-strong-cryptographic-ciphers-for-api-server) 
 <!-- /TOC -->
 
 ## Overview
@@ -486,3 +487,52 @@ volumes:
 ...
 ```
 After this, restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
+
+## Use strong cryptographic ciphers for API server
+
+**Kube-bench Identifier**:
+
+* 1.2.31
+
+### Strong Cyrptographic Ciphers suggested by CIS
+* TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+* TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+* TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+* TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+* TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+* TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+
+### Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
+
+Edit the API server pod specification `file /etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
+
+```yaml
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA
+    ...
+```
+Save the file with above mentioned changes and the kube-apiserver pods will be restarted.
+Restart the pods manually in case automatic restart doesn't happen in order to apply the changes in the cluster.
+
+### Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation
+
+For applying Strong Cyrptographic Ciphers for API server at the time of installation of cluster itself, then it can be done thourgh kubemarine.
+To do so follow below procdure
+
+- Add cryptographic chipers suites to the kubeadm config as extra arguments for API server in `cluster.yaml` file
+```yaml
+services:
+  kubeadm:
+    kubernetesVersion: v1.28.3
+    ...
+    apiServer:
+      extraArgs:
+        tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    ...
+```
+
+- Run kubemarine install procedure using above config added to `cluster.yaml` file.
