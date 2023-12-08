@@ -90,7 +90,6 @@ def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
-    kubernetes_apply_taints(cluster)
 
 
 def upgrade_packages(cluster: KubernetesCluster) -> None:
