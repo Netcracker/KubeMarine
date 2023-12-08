@@ -793,8 +793,9 @@ def is_cluster_installed(cluster: KubernetesCluster) -> bool:
 
 def get_kubeadm_config(inventory: dict) -> str:
     kubeadm_kubelet = yaml.dump(inventory["services"]["kubeadm_kubelet"], default_flow_style=False)
+    kubeadm_kube_proxy = yaml.dump(inventory["services"]["kubeadm_kube-proxy"], default_flow_style=False)
     kubeadm = yaml.dump(inventory["services"]["kubeadm"], default_flow_style=False)
-    return f'{kubeadm_kubelet}---\n{kubeadm}'
+    return f'{kubeadm_kube_proxy}---\n{kubeadm_kubelet}---\n{kubeadm}'
 
 
 def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs: Any) -> None:

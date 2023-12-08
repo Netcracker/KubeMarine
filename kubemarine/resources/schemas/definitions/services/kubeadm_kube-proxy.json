@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Override the original settings for the kube-proxy",
+  "properties": {
+    "apiVersion": {"enum": ["kubeproxy.config.k8s.io/v1alpha1"], "default": "kubeproxy.config.k8s.io/v1alpha1"},
+    "kind": {"enum": ["KubeProxyConfiguration"], "default": "KubeProxyConfiguration"}
+  }
+}
