@@ -504,7 +504,7 @@ After this, restart the pod to reflect the changes and verify that the secret is
 
 ### Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
 
-Edit the API server pod specification `file /etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
+Edit the API server pod specification file `/etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
 
 ```yaml
 spec:
@@ -517,6 +517,10 @@ spec:
 ```
 Save the file with above mentioned changes and the kube-apiserver pods will be restarted.
 Restart the pods manually in case automatic restart doesn't happen in order to apply the changes in the cluster.
+
+Also make sure to update `kubeadm-config` configmap in kube-system namespace to store these changes. Elseon running any of the mantenance procedue, these changes would be lost.
+
+`kubectl edit cm kubeadm-config -n kube-system`
 
 ### Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation
 
