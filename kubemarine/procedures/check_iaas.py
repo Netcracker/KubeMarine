@@ -1337,7 +1337,7 @@ def get_ips(pod_subnet: str) -> List[str]:
     random.seed()
     ip_pod_net = ipaddress.ip_network(pod_subnet)
     # Split pod network to subnets
-    pod_subnets: List[ipaddress.IPv4Network | ipaddress.IPv6Network] = list(ip_pod_net.subnets(12))
+    pod_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = list(ip_pod_net.subnets(12))
     # Choose subnet
     subnet = random.choice(pod_subnets)
 
