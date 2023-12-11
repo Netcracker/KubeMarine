@@ -37,7 +37,8 @@
               "all",
               "apiserver", "apiserver-etcd-client", "apiserver-kubelet-client",
               "etcd-healthcheck-client", "etcd-peer", "etcd-server",
-              "admin.conf", "controller-manager.conf", "scheduler.conf",
+              "admin.conf", "super-admin.conf",
+              "controller-manager.conf", "scheduler.conf",
               "front-proxy-client"
             ]
           },
