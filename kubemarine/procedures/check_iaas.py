@@ -1253,14 +1253,12 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         if not cluster.inventory['plugins']['calico']['install']:
             skipped_msgs = "Calico is not set as CNI for the cluster"
             raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            return tc.success(results='Skipped')
 
         # Check encapsulation for clusters with two or more nodes
         group = cluster.make_group_from_roles(['control-plane', 'worker'])
         if group.nodes_amount() == 1:
             skipped_msgs = f"Too few nodes, check is skipped"
             raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            return tc.success(results='Skipped')
 
         enc_type = cluster.inventory['plugins']['calico']['mode']
         if enc_type == "ipip":
@@ -1268,14 +1266,12 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
                 skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
                 raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-                return tc.success(results='Skipped')
             # Check if cluster is running with Calico CNI and IPIP
             results = group.sudo("iptables -L cali-INPUT  -n -v", warn=True)
             for result in list(results.values()):
                 if result.return_code  == 0:
                     skipped_msgs = f"Cannot check IP in IP encapsulation on running cluster"
                     raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-                    return tc.success(results='Skipped')
             # Create IP-IP tunnels configurations
             ipip_config = get_ipip_config(group)
             failed_nodes = check_ipip_tunnel(group, ipip_config)
@@ -1291,7 +1287,6 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         else:
             skipped_msgs = f"Encapsulation IPIP is disabled"
             raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            return tc.success(results='Skipped')
 
         if failed_msgs:
             raise TestFailure(f"Check firewall settings between nodes, IP in IP traffic is not allowed \n"
