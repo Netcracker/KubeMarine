@@ -1149,7 +1149,7 @@ The `cert_renew` procedure allows you to renew some certificates on an existing 
 
 For Kubernetes, most of the internal certificates could be updated, specifically: 
 `apiserver`, `apiserver-etcd-client`, `apiserver-kubelet-client`, `etcd-healthcheck-client`, `etcd-peer`, `etcd-server`,
-`admin.conf`, `controller-manager.conf`, `scheduler.conf`, `front-proxy-client`. 
+`admin.conf`, `super-admin.conf`, `controller-manager.conf`, `scheduler.conf`, `front-proxy-client`. 
 Certificate used by `kubelet.conf` by default is updated automatically by Kubernetes, 
 link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io/docs/tasks/tls/certificate-rotation/#understanding-the-certificate-rotation-configuration.
 
@@ -1221,6 +1221,7 @@ kubernetes:
     - etcd-peer
     - etcd-server
     - admin.conf
+    - super-admin.conf
     - controller-manager.conf
     - scheduler.conf
     - front-proxy-client
