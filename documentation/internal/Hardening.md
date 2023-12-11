@@ -1,10 +1,28 @@
 # Security Hardening Guide
 <!-- TOC -->
+
 - [Overview](#overview)
 - [Disable Anonymous Authentication for kube-apiserver](#disable-anonymous-authentication-for-kube-apiserver)
+  - [Prerequisites](#prerequisites)
+  - [Disabling Procedure](#disabling-procedure)
+  - [Limitations](#limitations)
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
+  - [Enabling Encryption](#enabling-encryption)
+  - [Integration with External KMS](#integration-with-external-kms)
+  - [Disabling Encryption](#disabling-encryption)
+  - [Maintenance and Operation Features](#maintenance-and-operation-features)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
+  - [Auto Approval CronJob](#auto-approval-cronjob)
+  - [Auto Approval Service](#auto-approval-service)
 - [Disabling Auto-Mounting of Tokens for Service Accounts](#disabling-auto-mounting-of-tokens-for-service-accounts)
+  - [Disable Auto-Mounting](#disable-auto-mounting)
+  - [Create Secret](#create-secret)
+  - [Mount the Token Through Secrets](#mount-the-token-through-secrets)
+- [Use strong cryptographic ciphers for API server](#use-strong-cryptographic-ciphers-for-api-server)
+  - [Strong Cyrptographic Ciphers suggested by CIS](#strong-cyrptographic-ciphers-suggested-by-cis)
+  - [Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster](#mnaual-application-for-strong-cyrptographic-ciphers-for-api-server-on-pr-installed-cluster)
+  - [Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation](#automated-application-for-strong-cyrptographic-ciphers-for-api-server-during-new-cluster-installation)
+
 <!-- /TOC -->
 
 ## Overview
@@ -20,14 +38,14 @@ Useful links:
 
 **Kube-bench Identifier**:
 
-* 1.2.1
+- 1.2.1
 
 The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default, it enables anonymous requests.
 
 ### Prerequisites
 
-* A working Kubernetes cluster.
-* The following RBAC resources:
+- A working Kubernetes cluster.
+- The following RBAC resources:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -75,68 +93,68 @@ subjects:
 
 1. Add `anonymous-auth: "false"` into the `kubeadm-config` configmap. For example:
 
-```yaml
-apiVersion: v1
-data:
-  ClusterConfiguration: |
-    apiServer:
-      certSANs:
-      - 192.168.56.106
-      - ubuntu
-      extraArgs:
-        anonymous-auth: "false"
-...
-```
+    ```yaml
+    apiVersion: v1
+    data:
+      ClusterConfiguration: |
+        apiServer:
+          certSANs:
+          - 192.168.56.106
+          - ubuntu
+          extraArgs:
+            anonymous-auth: "false"
+    ...
+    ```
 
 2. Change the `kube-apiserver` manifest on each control plane nodes one by one according to the following example:
 
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-...
-  name: kube-apiserver
-  namespace: kube-system
-spec:
-  containers:
-  - command:
-    - kube-apiserver
-    - --anonymous-auth=false
-...
-    livenessProbe:
-      failureThreshold: 8
-      httpGet:
-        host: 192.168.56.106
-        path: /livez
-        port: 6443
-        scheme: HTTPS
-        httpHeaders:
-          - name: Authorization
-            value: Bearer <TOKEN>
-...
-    readinessProbe:
-      failureThreshold: 3
-      httpGet:
-        host: 192.168.56.106
-        path: /readyz
-        port: 6443
-        scheme: HTTPS
-        httpHeaders:
-          - name: Authorization
-            value: Bearer <TOKEN>
-...
-    startupProbe:
-      failureThreshold: 24
-      httpGet:
-        host: 192.168.56.106
-        path: /livez
-        port: 6443
-        scheme: HTTPS
-        httpHeaders:
-          - name: Authorization
-            value: Bearer <TOKEN>
-...
-```
+    ```yaml
+    apiVersion: v1
+    kind: Pod
+    metadata:
+    ...
+      name: kube-apiserver
+      namespace: kube-system
+    spec:
+      containers:
+      - command:
+        - kube-apiserver
+        - --anonymous-auth=false
+    ...
+        livenessProbe:
+          failureThreshold: 8
+          httpGet:
+            host: 192.168.56.106
+            path: /livez
+            port: 6443
+            scheme: HTTPS
+            httpHeaders:
+              - name: Authorization
+                value: Bearer <TOKEN>
+    ...
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            host: 192.168.56.106
+            path: /readyz
+            port: 6443
+            scheme: HTTPS
+            httpHeaders:
+              - name: Authorization
+                value: Bearer <TOKEN>
+    ...
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            host: 192.168.56.106
+            path: /livez
+            port: 6443
+            scheme: HTTPS
+            httpHeaders:
+              - name: Authorization
+                value: Bearer <TOKEN>
+    ...
+    ```
 
 Where, TOKEN is the result of the following command:
 
@@ -146,18 +164,18 @@ kubectl -n kube-system get secret token-healthz -o jsonpath='{.data.token}' | ba
 
 ### Limitations
 
-If the `--anonymous-auth` is set to "false", the upgrade and node addition procedures need some changes in the workflow. The upgrade procedure needs enabling `anonymous-auth` before the `kubeadm upgrade` run. 
+If the `--anonymous-auth` is set to "false", the upgrade and node addition procedures need some changes in the workflow. The upgrade procedure needs enabling `anonymous-auth` before the `kubeadm upgrade` run.
 
 The node addition procedure is affected if the control plane node is being added. After the new control plane node is successfully added, the [Disabling Procedure](#disabling-procedure) should be performed on that node.
 
-Besides, disabled anonymous requests to `kube-apiserver` need changes in the monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system. 
+Besides, disabled anonymous requests to `kube-apiserver` need changes in the monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system.
 
 ## Data Encryption in Kubernetes
 
 **Kube-bench Identifier**:
 
-* 1.2.29
-* 1.2.30
+- 1.2.29
+- 1.2.30
 
 The following section describes the Kubernetes cluster capabilities to store and manipulate the encrypted data.
 
@@ -324,8 +342,8 @@ spec:
 
 For more information, refer to:
 
-* [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
-* [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment)
+- [https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
+- [https://github.com/ondat/trousseau/wiki/Trousseau-Deployment](https://github.com/ondat/trousseau/wiki/Trousseau-Deployment)
 
 ### Disabling Encryption
 
@@ -368,22 +386,22 @@ It is then possible to remove the encryption settings from the `kubeadm-config` 
 
 ### Maintenance and Operation Features
 
-* Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to the file must be restricted. For instance:
+- Since the `/etc/kubernetes/enc/enc.yaml` file has keys, access to the file must be restricted. For instance:
   
 ```console
 # chmod 0700 /etc/kubernetes/enc/
 ```
 
-* The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys' rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
-* The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows to apply a new `EncryptionConfiguration` without `kube-apiserver` reload.
-* ETCD restore procedures should take into consideration the keys' rotation, otherwise some data may be unavailable due to keys that were used for the encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for the data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
-* External services that interact with ETCD may stop working due to encryption enabling.
+- The proper way for using encryption is to rotate the keys. The rotation procedure of the keys should take into consideration the fact that the `EncryptionConfiguration` file must be equal on each `control-plane` node. During the keys' rotation procedure, some operation of getting the encrypted resources may be unsuccessful.
+- The `kube-apiserver` has an `--encryption-provider-config-automatic-reload` option that allows to apply a new `EncryptionConfiguration` without `kube-apiserver` reload.
+- ETCD restore procedures should take into consideration the keys' rotation, otherwise some data may be unavailable due to keys that were used for the encryption and is not available after restoration. The backup procedure may include an additional step that renews all encrypted data before the ETCD backup. This approach decreases the security level for the data in ETCD backup, but it prevents any inconvenience in the future. Another option is not to delete the keys from `env.yml` even if they are not used for encryption/decryption anymore.
+- External services that interact with ETCD may stop working due to encryption enabling.
 
 ## Kubelet Server Certificate Approval
 
 **Kube-bench Identifier**:
 
-* 1.2.5 
+- 1.2.5
 
 The `kubelet` server certificate is self-signed by default, and is usually stored in the `/var/lib/kubelet/pki/kubelet.crt` file. To avoid using the self-signed `kubelet` server certificate, alter the `cluster.yaml` file in the following way:
 
@@ -429,7 +447,7 @@ It is possible to install the kubelet-csr-approver service. For more information
 
 **Kube-bench Identifier**:
 
-* 5.1.5
+- 5.1.5
 
 Create explicit service accounts wherever a Kubernetes workload requires specific access to the Kubernetes API server.
 Modify the configuration of each default service account to include this value `automountServiceAccountToken: false`
@@ -485,4 +503,61 @@ volumes:
       secretName: ingress-nginx-token
 ...
 ```
+
 After this, restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
+
+## Use strong cryptographic ciphers for API server
+
+**Kube-bench Identifier**:
+
+- 1.2.31
+
+### Strong Cyrptographic Ciphers suggested by CIS
+
+- TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+- TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+- TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+- TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+- TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+- TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+
+### Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
+
+Edit the API server pod specification file `/etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
+
+```yaml
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA
+    ...
+```
+
+Save the file with above mentioned changes and the kube-apiserver pods will be restarted.
+Restart the pods manually in case automatic restart doesn't happen in order to apply the changes in the cluster.
+
+Also make sure to update `kubeadm-config` configmap in kube-system namespace to store these changes. Elseon running any of the mantenance procedue, these changes would be lost.
+
+`kubectl edit cm kubeadm-config -n kube-system`
+
+### Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation
+
+For applying Strong Cyrptographic Ciphers for API server at the time of installation of cluster itself, then it can be done thourgh kubemarine.
+To do so follow below procdure
+
+- Add cryptographic chipers suites to the kubeadm config as extra arguments for API server in `cluster.yaml` file
+
+```yaml
+services:
+  kubeadm:
+    kubernetesVersion: v1.28.3
+    ...
+    apiServer:
+      extraArgs:
+        tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    ...
+```
+
+- Run kubemarine install procedure using above config added to `cluster.yaml` file
