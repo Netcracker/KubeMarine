@@ -1527,6 +1527,9 @@ By default, the installer uses the following parameters:
 
 |Parameter|Default Value|
 |---|---|
+|conntrack.min|1000000|
+
+`conntrack.min` inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value from [sysctl](#sysctl).
 
 #### kubeadm_patches
 

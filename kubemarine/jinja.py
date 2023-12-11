@@ -34,6 +34,7 @@ def new(_: log.EnhancedLogger, *,
     precompile_filters['isipv4'] = lambda ip: utils.isipv(ip, [4])
     precompile_filters['minorversion'] = utils.minor_version
     precompile_filters['majorversion'] = utils.major_version
+    precompile_filters['versionkey'] = utils.version_key
 
     for name, filter_ in precompile_filters.items():
         env.filters[name] = lambda s, n=name, f=filter_: f(_precompile(n, s))
