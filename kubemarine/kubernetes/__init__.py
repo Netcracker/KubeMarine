@@ -48,6 +48,11 @@ def is_container_runtime_not_configurable(cluster: KubernetesCluster) -> bool:
     return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.27")
 
 
+def kube_proxy_overwrites_higher_system_values(cluster: KubernetesCluster) -> bool:
+    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.29")
+
+
 def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
