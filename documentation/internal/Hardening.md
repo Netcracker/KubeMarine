@@ -22,7 +22,7 @@
   - [Strong Cyrptographic Ciphers suggested by CIS](#strong-cyrptographic-ciphers-suggested-by-cis)
   - [Manual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster](#manual-application-for-strong-cyrptographic-ciphers-for-api-server-on-pr-installed-cluster)
   - [Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation](#automated-application-for-strong-cyrptographic-ciphers-for-api-server-during-new-cluster-installation)
-- [Implementing OAuth2 authorization in Kubernetes](#Implementin-OAuth2-authorization-in-Kubernetes)
+- [Implementing OAuth2 authorization in Kubernetes](#implementing-oauth2-authorization-in-kubernetes)
 
 <!-- /TOC -->
 
@@ -566,9 +566,10 @@ services:
 ## Implementing OAuth2 authorization in Kubernetes
 
 **Kube-bench Identifier**:
-* 3.1.2
 
-Service account token authentication should not be used for users 
+- 3.1.2
+
+Service account token authentication should not be used for users
 Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of service account tokens.
 Here we are suggesting using OAuth authorization using Keycloak in kubernetes cluster.
 
