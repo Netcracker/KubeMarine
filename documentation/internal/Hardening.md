@@ -20,7 +20,7 @@
   - [Mount the Token Through Secrets](#mount-the-token-through-secrets)
 - [Use strong cryptographic ciphers for API server](#use-strong-cryptographic-ciphers-for-api-server)
   - [Strong Cyrptographic Ciphers suggested by CIS](#strong-cyrptographic-ciphers-suggested-by-cis)
-  - [Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster](#mnaual-application-for-strong-cyrptographic-ciphers-for-api-server-on-pr-installed-cluster)
+  - [Manual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster](#manual-application-for-strong-cyrptographic-ciphers-for-api-server-on-pr-installed-cluster)
   - [Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation](#automated-application-for-strong-cyrptographic-ciphers-for-api-server-during-new-cluster-installation)
 - [Implementing OAuth2 authorization in Kubernetes](#Implementin-OAuth2-authorization-in-Kubernetes)
 
@@ -522,7 +522,7 @@ After this, restart the pod to reflect the changes and verify that the secret is
 - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
 - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
 
-### Mnaual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
+### Manual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
 
 Edit the API server pod specification file `/etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
 
