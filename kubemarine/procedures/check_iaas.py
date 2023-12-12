@@ -1263,10 +1263,10 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         enc_type = cluster.inventory['plugins']['calico']['mode']
         if enc_type == "ipip":
             # Check if IPv6 addresses are used
-            for node in group.get_ordered_members_configs_list():
-                if type(ipaddress.ip_address(node['connect_to'])) is not ipaddress.IPv4Address:
-                    skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
-                    raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+            connect_to_ip = group.get_ordered_members_configs_list()[0]['connect_to']
+            if type(ipaddress.ip_address(connect_to_ip)) is not ipaddress.IPv4Address:
+                skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
+                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
                 skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
