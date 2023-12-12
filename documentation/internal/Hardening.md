@@ -5,6 +5,7 @@
 - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
 - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Disabling Auto-Mounting of Tokens for Service Accounts](#disabling-auto-mounting-of-tokens-for-service-accounts)
+- [Implementing OAuth2 authorization in Kubernetes](#Implementin-OAuth2-authorization-in-Kubernetes)
 <!-- /TOC -->
 
 ## Overview
@@ -486,3 +487,15 @@ volumes:
 ...
 ```
 After this, restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
+
+## Implementing OAuth2 authorization in Kubernetes
+
+**Kube-bench Identifier**:
+* 3.1.2
+
+Service account token authentication should not be used for users 
+Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of service account tokens.
+Here we are suggesting using OAuth authorization using Keycloak in kubernetes cluster.
+
+Please refer below guide for implemention this-
+[OAuth2 authorization in Kubernetes](/documentation/internal/OAuth.md)
