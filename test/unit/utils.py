@@ -16,19 +16,35 @@ import unittest
 from contextlib import contextmanager
 from copy import deepcopy
 from types import FunctionType
-from typing import Dict, Iterator, Callable, cast
+from typing import Dict, Iterator, Callable, cast, Any
 from unittest import mock
 
 from kubemarine import demo, packages
 from kubemarine.core import utils, errors, static
 
 
-def make_finalized_inventory(cluster: demo.FakeKubernetesCluster):
-    return cluster.make_finalized_inventory()
+class FakeResources(demo.FakeResources):
+    def __init__(self, *args: Any, **kwargs: Any):
+        kwargs['make_finalized_inventory'] = True
+        super().__init__(*args, **kwargs)
+
+    def collect_action_result(self) -> None:
+        super().collect_action_result()
+        cluster = self.cluster_if_initialized()
+        if isinstance(cluster, demo.FakeKubernetesCluster):
+            stub_associations_packages(cluster, {})
 
 
-def get_final_inventory(cluster: demo.FakeKubernetesCluster, inventory: dict):
-    return utils.get_final_inventory(cluster, inventory)
+def make_finalized_inventory(cluster: demo.FakeKubernetesCluster,
+                             *,
+                             stub_cache_packages: bool = True) -> dict:
+    if stub_cache_packages:
+        stub_associations_packages(cluster, {})
+
+    resources = cluster.resources
+    resources.make_finalized_inventory = True
+    resources.dump_finalized_inventory(cluster)
+    return resources.finalized_inventory
 
 
 def stub_detect_packages(cluster: demo.FakeKubernetesCluster, packages_hosts_stub: Dict[str, Dict[str, str]]):
@@ -78,6 +94,7 @@ def assert_raises_kme(test: unittest.TestCase, code: str, **kwargs):
             yield
         except errors.FailException as e:
             raise e.reason
+
 
 @contextmanager
 def backup_globals():

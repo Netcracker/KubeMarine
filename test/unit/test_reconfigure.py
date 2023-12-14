@@ -108,11 +108,10 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         services = cluster.inventory['services']
         self._test_enrich_and_finalize_inventory_check(services, True)
 
-        test_utils.stub_associations_packages(cluster, {})
         services = test_utils.make_finalized_inventory(cluster)['services']
         self._test_enrich_and_finalize_inventory_check(services, True)
 
-        services = test_utils.get_final_inventory(cluster, self.inventory)['services']
+        services = cluster.formatted_inventory['services']
         self._test_enrich_and_finalize_inventory_check(services, False)
 
     def _test_enrich_and_finalize_inventory_check(self, services: dict, enriched: bool):

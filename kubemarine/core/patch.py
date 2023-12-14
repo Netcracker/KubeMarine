@@ -59,6 +59,7 @@ class InventoryOnlyPatch(Patch, ABC):
     """
     The patch should only change the inventory.
     Enrichment is prohibited. Calling DynamicResources.cluster() is prohibited.
+
     Patches if this type are executed first.
     """
 
@@ -76,7 +77,11 @@ class _SoftwareUpgradePatch(Patch, ABC):
 class RegularPatch(Patch, ABC):
     """
     The patch can access and make some operations on the cluster.
-    Changes in the inventory are possible, but they should not affect the software upgrade procedure.
+
+    Changes in the inventory are possible,
+    but the cluster should be `DynamicResources.reset_cluster()` for the changes to take effect.
+    The changes in the inventory should also not affect the software upgrade procedure.
+
     Patches if this type are executed last.
     """
 

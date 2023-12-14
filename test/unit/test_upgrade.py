@@ -14,7 +14,6 @@
 # limitations under the License.
 import itertools
 import json
-import random
 import re
 import unittest
 from copy import deepcopy
@@ -23,23 +22,28 @@ from typing import List, Optional, Tuple, Set
 import yaml
 
 from kubemarine import kubernetes
-from kubemarine.core import errors, utils as kutils, static, flow
+from kubemarine.core import errors, utils as kutils, static, log, flow
 from kubemarine.procedures import upgrade, install
 from kubemarine import demo
 from test.unit import utils
 
 
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
+    logger: log.EnhancedLogger = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.logger = demo.new_cluster(demo.generate_inventory(**demo.ALLINONE)).log
 
     def test_valid_upgrade_plan(self):
-        upgrade.verify_upgrade_plan(self.k8s_versions()[0], self.latest_patch_k8s_versions()[1:])
+        upgrade.verify_upgrade_plan(self.k8s_versions()[0], self.latest_patch_k8s_versions()[1:], self.logger)
 
     def test_invalid_upgrade_plan(self):
         k8s_oldest = self.k8s_versions()[0]
         k8s_latest = self.k8s_versions()[-1]
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(k8s_oldest), re.escape(k8s_latest))):
-            upgrade.verify_upgrade_plan(k8s_oldest, [k8s_latest])
+            upgrade.verify_upgrade_plan(k8s_oldest, [k8s_latest], self.logger)
 
     def test_upgrade_plan_not_supported_version(self):
         k8s_latest = self.k8s_versions()[-1]
@@ -47,28 +51,28 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
         with utils.assert_raises_kme(self, "KME0008",
                                      version=re.escape(not_allowed_version),
                                      allowed_versions='.*'):
-            upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version])
+            upgrade.verify_upgrade_plan(k8s_latest, [not_allowed_version], self.logger)
 
     def test_incorrect_inventory_high_range(self):
         old_kubernetes_version = 'v1.23.17'
         new_kubernetes_version = 'v1.25.7'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_MINOR_RANGE_EXCEEDED
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
-            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_downgrade(self):
         old_kubernetes_version = 'v1.25.7'
         new_kubernetes_version = 'v1.23.17'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_DOWNGRADE
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
-            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_same_version(self):
         old_kubernetes_version = 'v1.24.2'
         new_kubernetes_version = 'v1.24.2'
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_SAME
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
-            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def test_incorrect_inventory_not_latest_patch_version(self):
         old_kubernetes_version = 'v1.27.1'
@@ -77,15 +81,7 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
                                               if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version))
         with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_LATEST_PATCH
                                                % (re.escape(new_kubernetes_version), re.escape(latest_supported_patch_version))):
-            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
-
-    def test_upgrade_plan_sort(self):
-        k8s_oldest = self.k8s_versions()[0]
-        k8s_versions = list(self.latest_patch_k8s_versions())[1:]
-        random.shuffle(k8s_versions)
-        result = upgrade.verify_upgrade_plan(k8s_oldest, k8s_versions)
-
-        self.assertEqual(self.latest_patch_k8s_versions()[1:], result)
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version], self.logger)
 
     def k8s_versions(self) -> List[str]:
         return sorted(list(static.KUBERNETES_VERSIONS['compatibility_map']), key=kutils.version_key)
@@ -112,7 +108,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
     def prepare_inventory(self, old, new):
         self.inventory, self.context = generate_upgrade_environment(old)
-        self.context['upgrade_version'] = new
+        self.context['upgrade_step'] = 0
         self.upgrade = demo.generate_procedure_inventory('upgrade')
         self.upgrade['upgrade_plan'] = [new]
 
@@ -143,7 +139,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
 
         # Upgrade PSP->PSS kuber version
         old_kubernetes_version = 'v1.24.11'
-        new_kubernetes_version = 'v1.25.2'
+        new_kubernetes_version = 'v1.25.7'
         self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
         with self.assertRaisesRegex(Exception, "PSP is not supported in Kubernetes v1.25 or higher"):
             self._new_cluster()
@@ -162,9 +158,8 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
         self.inventory, self.context = generate_upgrade_environment(self.old)
-        self.context['upgrade_version'] = self.new
-        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
-                                                            os_name='ubuntu', os_version='20.04')
+        self.context['upgrade_step'] = 0
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.inventory['services'].update({'packages': {'associations': {
             'docker': {},
             'containerd': {},
@@ -183,7 +178,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
 
     def _new_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
-                                context=self.context)
+                                context=self.context, nodes_context=self.nodes_context)
 
     def _patch_globals(self, package: str, os_family: str, *, equal=False):
         package_compatibility = static.GLOBALS['compatibility_map']['software'][package]
@@ -208,7 +203,7 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         self.upgrade[self.new]['packages']['associations']['docker']['package_name'] = 'docker-ce'
         self.upgrade[self.new]['packages']['install'] = ['curl']
         cluster = self._new_cluster()
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         self.assertEqual(['curl'], final_inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
         self.assertEqual('docker-ce', final_inventory['services']['packages']['associations']['docker']['package_name'],
@@ -237,8 +232,8 @@ class UpgradePackagesEnrichment(unittest.TestCase):
                         self._patch_globals(package_vary, os_family, equal=False)
 
                         self.setUp()
-                        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
-                                                                            os_name=os_name, os_version=os_version)
+                        self.nodes_context = demo.generate_nodes_context(self.inventory,
+                                                                         os_name=os_name, os_version=os_version)
                         set_cri(self.inventory, cri)
 
                         cluster = self._new_cluster()
@@ -306,12 +301,12 @@ class UpgradePackagesEnrichment(unittest.TestCase):
         utils.stub_associations_packages(cluster, {})
         utils.stub_detect_packages(cluster, {"unzip": {}, "curl": {}})
 
-        finalized_inventory = utils.make_finalized_inventory(cluster)
+        finalized_inventory = utils.make_finalized_inventory(cluster, stub_cache_packages=False)
         self.assertEqual(['unzip', 'curl'], finalized_inventory['services']['packages']['install']['include'])
         self.assertEqual(['conntrack', 'socat'], finalized_inventory['services']['packages']['upgrade']['exclude'])
         self.assertEqual(['*'], finalized_inventory['services']['packages']['upgrade']['include'])
 
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         self.assertEqual(['unzip', 'curl'], final_inventory['services']['packages']['install']['include'])
         self.assertEqual(['conntrack', 'socat'], final_inventory['services']['packages']['upgrade']['exclude'])
         self.assertIsNone(final_inventory['services']['packages']['upgrade'].get('include'))
@@ -322,7 +317,7 @@ class UpgradePluginsEnrichment(unittest.TestCase):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
         self.inventory, self.context = generate_upgrade_environment(self.old)
-        self.context['upgrade_version'] = self.new
+        self.context['upgrade_step'] = 0
         self.inventory['plugins'] = {}
         self.upgrade = demo.generate_procedure_inventory('upgrade')
         self.upgrade['upgrade_plan'] = [self.new]
@@ -333,7 +328,7 @@ class UpgradePluginsEnrichment(unittest.TestCase):
                                 context=self.context)
 
     def _patch_globals(self, plugin: str, *, equal=False):
-        fake_version = 'v1.2.3'
+        fake_version = static.KUBERNETES_VERSIONS['compatibility_map'][self.old][plugin]
         package_compatibility = static.GLOBALS['compatibility_map']['software'][plugin]
         package_compatibility[self.old]["version"] = fake_version
         if equal:
@@ -369,7 +364,8 @@ class UpgradePluginsEnrichment(unittest.TestCase):
             self._new_cluster()
 
     def test_require_version_redefinition(self):
-        self.inventory['plugins'].setdefault('nginx-ingress-controller', {})['version'] = 'fake version'
+        fake_version = static.KUBERNETES_VERSIONS['compatibility_map'][self.old]['nginx-ingress-controller']
+        self.inventory['plugins'].setdefault('nginx-ingress-controller', {})['version'] = fake_version
         with utils.backup_globals(), \
                 utils.assert_raises_kme(self, "KME0009",
                                         key='version', plugin_name='nginx-ingress-controller',
@@ -383,7 +379,7 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         self.old = 'v1.24.2'
         self.new = 'v1.24.11'
         self.inventory, self.context = generate_upgrade_environment(self.old)
-        self.context['upgrade_version'] = self.new
+        self.context['upgrade_step'] = 0
         self.inventory['services']['thirdparties'] = {}
         self.upgrade = demo.generate_procedure_inventory('upgrade')
         self.upgrade['upgrade_plan'] = [self.new]
@@ -423,7 +419,6 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         self.assertEqual(['control-plane'], thirdparties_section['/custom2']['groups'])
         self.assertEqual('custom3-initial', thirdparties_section['/custom3']['source'])
 
-        utils.stub_associations_packages(cluster, {})
         finalized_inventory = utils.make_finalized_inventory(cluster)
         thirdparties_section = finalized_inventory['services']['thirdparties']
 
@@ -435,7 +430,7 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         self.assertEqual(['control-plane'], thirdparties_section['/custom2']['groups'])
         self.assertEqual('custom3-initial', thirdparties_section['/custom3']['source'])
 
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         thirdparties_section = final_inventory['services']['thirdparties']
 
         self.assertEqual({'/usr/bin/kubeadm', '/usr/bin/kubelet', '/custom1', '/custom2', '/custom3'},
@@ -481,11 +476,10 @@ class ThirdpartiesEnrichment(unittest.TestCase):
 class UpgradeContainerdConfigEnrichment(unittest.TestCase):
     def setUp(self):
         self.old = 'v1.25.7'
-        self.new = 'v1.26.4'
+        self.new = 'v1.26.11'
         self.inventory, self.context = generate_upgrade_environment(self.old)
-        self.context['upgrade_version'] = self.new
-        self.context['nodes'] = demo.generate_nodes_context(self.inventory,
-                                                            os_name='ubuntu', os_version='20.04')
+        self.context['upgrade_step'] = 0
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.inventory['services']['cri'].setdefault('containerdConfig', {})\
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})
         set_cri(self.inventory, 'containerd')
@@ -501,7 +495,7 @@ class UpgradeContainerdConfigEnrichment(unittest.TestCase):
 
     def _new_cluster(self):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.upgrade),
-                                context=self.context)
+                                context=self.context, nodes_context=self.nodes_context)
 
     def _patch_globals(self, fake_version: str, *, equal=False):
         package_compatibility = static.GLOBALS['compatibility_map']['software']['pause']
@@ -522,12 +516,11 @@ class UpgradeContainerdConfigEnrichment(unittest.TestCase):
         sandbox_image = self._grpc_cri(cluster.inventory['services'])['sandbox_image']
         self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
 
-        utils.stub_associations_packages(cluster, {})
-        finalized_inventory = cluster.make_finalized_inventory()
+        finalized_inventory = utils.make_finalized_inventory(cluster)
         sandbox_image = self._grpc_cri(finalized_inventory['services'])['sandbox_image']
         self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
 
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         sandbox_image = self._grpc_cri(final_inventory['services'])['sandbox_image']
         self.assertEqual('pause-new', sandbox_image, "containerdConfig is enriched incorrectly")
 
@@ -595,7 +588,7 @@ class InventoryRecreation(unittest.TestCase):
         self.actions = []
         for i, ver in enumerate(upgrade_plan):
             self.upgrade[ver] = {}
-            self.actions.append(upgrade.UpgradeAction(ver, i == 0))
+            self.actions.append(upgrade.UpgradeAction(upgrade_plan[i], i))
 
         self.resources: Optional[demo.FakeResources] = None
 
@@ -608,59 +601,59 @@ class InventoryRecreation(unittest.TestCase):
             .setdefault('plugins."io.containerd.grpc.v1.cri"', {})['sandbox_image'] = sandbox_image
 
     def run_actions(self):
-        self.resources = demo.FakeResources(self.context, self.inventory,
-                                            procedure_inventory=self.upgrade, nodes_context=self.nodes_context)
+        self.resources = utils.FakeResources(self.context, self.inventory,
+                                             procedure_inventory=self.upgrade, nodes_context=self.nodes_context)
         flow.run_actions(self.resources, self.actions)
 
     def test_plugins_iterative_image_redefinition(self):
-        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
-        self.upgrade['v1.25.2'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
-        self.upgrade['v1.25.7'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'B'
+        self.prepare_inventory(['v1.24.11', 'v1.25.7', 'v1.26.11'])
+        self.upgrade['v1.25.7'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
+        self.upgrade['v1.26.11'].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'B'
 
         self.run_actions()
 
-        actual_image = self.resources.stored_inventory['plugins']['calico']['cni']['image']
+        actual_image = self.resources.inventory()['plugins']['calico']['cni']['image']
         self.assertEqual('B', actual_image,
                          "Plugin image was not redefined in recreated inventory.")
 
     def test_packages_iterative_package_names_redefinition(self):
-        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        self.prepare_inventory(['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
-        self.package_names(self.upgrade['v1.25.2'], 'containerd', 'A')
-        self.package_names(self.upgrade['v1.25.7'], 'containerd', 'B')
+        self.package_names(self.upgrade['v1.25.7'], 'containerd', 'A')
+        self.package_names(self.upgrade['v1.26.11'], 'containerd', 'B')
 
         self.run_actions()
 
-        actual_package = self.resources.stored_inventory['services']['packages']['associations']['containerd']['package_name']
+        actual_package = self.resources.inventory()['services']['packages']['associations']['containerd']['package_name']
         self.assertEqual('B', actual_package,
                          "Containerd packages associations were not redefined in recreated inventory.")
 
     def test_thirdparties_iterative_source_redefinition(self):
-        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        self.prepare_inventory(['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
-        self.upgrade['v1.25.2'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = 'A'
-        self.upgrade['v1.25.7'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = {
+        self.upgrade['v1.25.7'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = 'A'
+        self.upgrade['v1.26.11'].setdefault('thirdparties', {})['/usr/bin/calicoctl'] = {
             'source': 'B',
             'sha1': 'fake-sha1'
         }
 
         self.run_actions()
 
-        actual_thirdparty = self.resources.stored_inventory['services']['thirdparties']['/usr/bin/calicoctl']
+        actual_thirdparty = self.resources.inventory()['services']['thirdparties']['/usr/bin/calicoctl']
         self.assertEqual('B', actual_thirdparty['source'],
                          "Source of /usr/bin/calicoctl was not redefined in recreated inventory.")
         self.assertEqual('fake-sha1', actual_thirdparty['sha1'],
                          "sha1 of /usr/bin/calicoctl was not redefined in recreated inventory.")
 
     def test_iterative_sandbox_image_redefinition(self):
-        self.prepare_inventory(['v1.24.11', 'v1.25.2', 'v1.25.7'])
+        self.prepare_inventory(['v1.24.11', 'v1.25.7', 'v1.26.11'])
         set_cri(self.inventory, 'containerd')
-        self.sandbox_image(self.upgrade['v1.25.2'], 'A')
-        self.sandbox_image(self.upgrade['v1.25.7'], 'B')
+        self.sandbox_image(self.upgrade['v1.25.7'], 'A')
+        self.sandbox_image(self.upgrade['v1.26.11'], 'B')
 
         self.run_actions()
 
-        actual_image = self.resources.stored_inventory['services']['cri']['containerdConfig']\
+        actual_image = self.resources.inventory()['services']['cri']['containerdConfig']\
             ['plugins."io.containerd.grpc.v1.cri"']['sandbox_image']
         self.assertEqual('B', actual_image,
                          "Containerd config was not redefined in recreated inventory.")
@@ -690,7 +683,7 @@ class RunTasks(unittest.TestCase):
 
         kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'master', 'control-plane'})]
         with utils.mock_call(kubernetes.autodetect_non_upgraded_nodes, return_value=kubernetes_nodes):
-            flow.run_actions(resources, [upgrade.UpgradeAction(self.new, True)])
+            flow.run_actions(resources, [upgrade.UpgradeAction(self.new, 0)])
 
         return resources
 
@@ -717,8 +710,8 @@ class RunTasks(unittest.TestCase):
     def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
         for old, new, expected_called in (
                 ('v1.26.11', 'v1.27.8', False),
-                ('v1.27.8', 'v1.28.4', True),
-                ('v1.28.3', 'v1.28.4', False),
+                ('v1.27.8', 'v1.28.6', True),
+                ('v1.28.3', 'v1.28.6', False),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
                     utils.mock_call(kubernetes.components.reconfigure_components) as run:
@@ -734,7 +727,7 @@ class RunTasks(unittest.TestCase):
                 self.assertEqual(expected_called, actual_called,
                                  f"kube-apiserver was {'not' if expected_called else 'unexpectedly'} preconfigured")
 
-                apiserver_extra_args = res.last_cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+                apiserver_extra_args = res.working_inventory['services']['kubeadm']['apiServer']['extraArgs']
                 feature_gates_expected = 'PodSecurity=true' if kutils.version_key(new)[:2] < (1, 28) else None
                 self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'),
                                  "Unexpected apiserver extra args")
@@ -745,7 +738,7 @@ class RunTasks(unittest.TestCase):
                     utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
                     utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
                     utils.mock_call(kubernetes.components._update_configmap, return_value=True):
-                self.setUpVersions('v1.27.8', 'v1.28.4')
+                self.setUpVersions('v1.27.8', 'v1.28.6')
                 self.inventory.setdefault('rbac', {}).update({
                     'admission': 'pss', 'pss': {'pod-security': 'enabled'}
                 })
@@ -773,7 +766,7 @@ class RunTasks(unittest.TestCase):
 
     def test_kubernetes_preconfigure_kube_proxy_conntrack_min_if_necessary(self):
         for old, new, expected_called in (
-                ('v1.27.8', 'v1.28.4', False),
+                ('v1.27.8', 'v1.28.6', False),
                 ('v1.28.4', 'v1.29.1', True),
         ):
             with self.subTest(f"old: {old}, new: {new}"), \
@@ -787,7 +780,7 @@ class RunTasks(unittest.TestCase):
                 self.assertEqual(expected_called, actual_called,
                                  f"kube-proxy was {'not' if expected_called else 'unexpectedly'} preconfigured")
 
-                conntrack_min_actual = res.last_cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min')
+                conntrack_min_actual = res.working_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min')
                 conntrack_min_expected = None if kutils.version_key(new)[:2] < (1, 29) else 1000000
                 self.assertEqual(conntrack_min_expected, conntrack_min_actual,
                                  "Unexpected kubeadm_kube-proxy.conntrack.min")

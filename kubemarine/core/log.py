@@ -19,7 +19,6 @@ from abc import ABC, abstractmethod
 
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import-untyped]
 
-from copy import deepcopy
 from typing import Any, List, Optional, cast, Dict, Union
 
 VERBOSE = 5
@@ -272,8 +271,8 @@ class LogHandler:
 
 class Log:
 
-    def __init__(self, raw_inventory: dict, handlers: List[LogHandler]):
-        logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
+    def __init__(self, name: str, handlers: List[LogHandler]):
+        logger = logging.getLogger(name)
         self._logger = cast(EnhancedLogger, logger)
         self._logger.setLevel(VERBOSE)
 
@@ -359,7 +358,7 @@ def get_dump_debug_filepath(context: dict) -> Optional[str]:
     return os.path.join(args['dump_location'], 'dump', 'debug.log')
 
 
-def init_log_from_context_args(globals: dict, context: dict, raw_inventory: dict) -> Log:
+def init_log_from_context_args(globals: dict, context: dict, name: str) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
     :param globals: parsed globals collection
@@ -388,10 +387,10 @@ def init_log_from_context_args(globals: dict, context: dict, raw_inventory: dict
                                    **globals['logging']['default_targets']['dump']))
 
     if not stdout_specified:
-        stdout_settings = deepcopy(globals['logging']['default_targets']['stdout'])
+        stdout_settings = globals['logging']['default_targets']['stdout']
         handlers.append(LogHandler(target='stdout', **stdout_settings))
 
-    log = Log(raw_inventory, handlers)
+    log = Log(name, handlers)
 
     log.logger.verbose('Using the following loggers: \n\t%s' % "\n\t".join("- " + str(x) for x in handlers))
 

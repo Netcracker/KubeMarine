@@ -15,7 +15,7 @@
 from typing import Dict, Optional
 
 from kubemarine.core import log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.plugins import calico, manifest
 from kubemarine.plugins.calico import CalicoManifestProcessor, CalicoApiServerManifestProcessor
 from kubemarine.plugins.kubernetes_dashboard import get_dashboard_manifest_processor
@@ -108,7 +108,9 @@ def _is_manifest_disabled(inventory: dict, manifest_identity: Identity) -> bool:
     return False
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def verify_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     for manifest_identity in MANIFEST_PROCESSOR_PROVIDERS:
         if _is_manifest_disabled(inventory, manifest_identity):
             continue
@@ -121,8 +123,6 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             cluster.log.warning(f"Invocation of plugins.builtin.apply_yaml for {manifest_identity.repr_id()} "
                                 f"is not found for {manifest_identity.plugin_name!r} plugin. "
                                 f"Such configuration is obsolete, and support for it may be stopped in future releases.")
-
-    return inventory
 
 
 def _get_manifest_processor(logger: log.VerboseLogger, inventory: dict, manifest_identity: Identity,

@@ -12,7 +12,7 @@ cluster_name: "test-local-k8s.com"
 
 services:
   kubeadm:
-    kubernetesVersion: <KUBERNETES_VERSION>
+    kubernetesVersion: '{{ env.KUBERNETES_VERSION }}'
 
 plugins:
 

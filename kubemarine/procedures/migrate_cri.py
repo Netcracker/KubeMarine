@@ -22,10 +22,8 @@ from typing import List
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
 from kubemarine.core import flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
 from kubemarine import packages
@@ -93,7 +91,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         if docker_disk:
             node.sudo(
                 "umount /var/lib/docker && "
-                "sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
+                r"sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
                 "sudo sh -c 'rm -rf /var/lib/containerd/*' && "
                 "sudo mount -a && "
                 "sudo systemctl restart containerd")
@@ -169,13 +167,9 @@ tasks = OrderedDict({
 })
 
 
-class MigrateCRIAction(Action):
+class MigrateCRIAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('migrate cri', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('migrate cri', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

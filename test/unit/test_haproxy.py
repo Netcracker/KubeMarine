@@ -18,7 +18,6 @@ import unittest
 
 from kubemarine import haproxy, yum
 from kubemarine import demo
-from kubemarine.core.group import NodeGroupResult
 
 
 class HAProxyDefaultsEnrichment(unittest.TestCase):

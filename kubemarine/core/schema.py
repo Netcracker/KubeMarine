@@ -21,17 +21,19 @@ import jsonschema
 from ordered_set import OrderedSet
 
 from kubemarine.core import utils, log, errors
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.LIGHT)
+def verify_inventory(cluster: KubernetesCluster) -> None:
+    inventory = utils.convert_native_yaml(cluster.inventory)
     _verify_inventory_by_schema(cluster, inventory, 'cluster')
     context = cluster.context
     args: dict = context['execution_arguments']
     # Skip validation if procedure inventory is optional and not provided
     if args.get('procedure_config'):
-        _verify_inventory_by_schema(cluster, cluster.procedure_inventory, context["initial_procedure"])
-    return inventory
+        procedure_inventory = utils.convert_native_yaml(cluster.procedure_inventory)
+        _verify_inventory_by_schema(cluster, procedure_inventory, context["initial_procedure"])
 
 
 def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, schema_name: str) -> None:

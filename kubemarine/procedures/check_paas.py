@@ -31,10 +31,8 @@ from kubemarine import (
     packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit,
     plugins, modprobe, admission
 )
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
 from kubemarine.plugins import calico, builtin, manifest
@@ -71,7 +69,7 @@ def services_status(cluster: KubernetesCluster, service_type: str) -> None:
         result = group.sudo('systemctl status %s' % service_name, warn=True)
         cluster.log.verbose(result)
 
-        status_regexp = re.compile("Active:\s([a-z\s()]*)(\ssince|$)", re.M)
+        status_regexp = re.compile(r"Active:\s([a-z\s()]*)(\ssince|$)", re.M)
 
         statuses = []
         failed = False
@@ -1761,12 +1759,9 @@ tasks = OrderedDict({
 })
 
 
-class PaasAction(Action):
+class PaasAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('check paas')
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        super().__init__('check paas', tasks)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:
@@ -1802,6 +1797,7 @@ def create_context(cli_arguments: List[str] = None) -> dict:
     context = flow.create_context(parser, cli_arguments, procedure='check_paas')
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
+    context['result'].append('testsuite')
 
     return context
 
@@ -1811,14 +1807,13 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
     flow_ = flow.ActionsFlow([PaasAction()])
     result = flow_.run_flow(context, print_summary=False)
 
-    context = result.context
-    testsuite: TestSuite = context['testsuite']
+    testsuite: TestSuite = result.context['testsuite']
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files
     print(testsuite.get_final_summary(show_minimal=False, show_recommended=False))
     testsuite.print_final_status(result.logger)
-    check_iaas.make_reports(context)
+    check_iaas.make_reports(context, testsuite)
     return testsuite
 
 

@@ -111,11 +111,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
         cluster = self._create_cluster()
         self.assertEqual(['a', 'b', 'c'], cluster.inventory['rbac']['pss']['exemptions']['namespaces'])
 
-        utils.stub_associations_packages(cluster, {})
         finalized_inventory = utils.make_finalized_inventory(cluster)
         self.assertEqual(['a', 'b', 'c'], finalized_inventory['rbac']['pss']['exemptions']['namespaces'])
 
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         self.assertEqual(['a', 'b', 'c'], final_inventory['rbac']['pss']['exemptions']['namespaces'])
 
     def test_disable_pss_dont_enrich_feature_gates(self):
@@ -129,7 +128,6 @@ class EnrichmentAndFinalization(unittest.TestCase):
         self.assertEqual(None, apiserver_extra_args.get('feature-gates'))
         self.assertEqual(None, apiserver_extra_args.get('admission-control-config-file'))
 
-        utils.stub_associations_packages(cluster, {})
         finalized_inventory = utils.make_finalized_inventory(cluster)
         apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
 
@@ -137,7 +135,7 @@ class EnrichmentAndFinalization(unittest.TestCase):
         self.assertEqual(None, apiserver_extra_args.get('feature-gates'))
         self.assertEqual(None, apiserver_extra_args.get('admission-control-config-file'))
 
-        final_inventory = utils.get_final_inventory(cluster, self.inventory)
+        final_inventory = cluster.formatted_inventory
         apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
 
         self.assertEqual('disabled', final_inventory['rbac']['pss']['pod-security'])
@@ -160,7 +158,6 @@ class EnrichmentAndFinalization(unittest.TestCase):
                 self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
                 self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args.get('admission-control-config-file'))
 
-                utils.stub_associations_packages(cluster, {})
                 finalized_inventory = utils.make_finalized_inventory(cluster)
                 apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
 
@@ -169,7 +166,7 @@ class EnrichmentAndFinalization(unittest.TestCase):
                 self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args.get('admission-control-config-file'))
                 self.assertNotIn('psp', finalized_inventory['rbac'])
 
-                final_inventory = utils.get_final_inventory(cluster, self.inventory)
+                final_inventory = cluster.formatted_inventory
                 apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
 
                 self.assertEqual('enabled', final_inventory['rbac']['pss']['pod-security'])
@@ -212,7 +209,7 @@ class RunTasks(unittest.TestCase):
             self.assertEqual(['kube-apiserver'], run.call_args[1]['components'],
                              "kube-apiserver was not reconfigured")
 
-            apiserver_extra_args = res.last_cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+            apiserver_extra_args = res.working_inventory['services']['kubeadm']['apiServer']['extraArgs']
             self.assertEqual('PodSecurity=true', apiserver_extra_args.get('feature-gates'),
                              "Unexpected apiserver extra args")
 

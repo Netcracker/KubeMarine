@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import io
-from copy import deepcopy
 from typing import Tuple, Optional, Dict, List, Union
 
+from kubemarine import jinja
 from kubemarine.core import utils, static, errors
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
@@ -125,39 +125,54 @@ def _convert_thirdparty(thirdparties: dict, destination: str) -> dict:
     return config
 
 
-def _get_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
+def _get_procedure_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     context = cluster.context
-    if context.get("initial_procedure") == "upgrade":
-        upgrade_version = context["upgrade_version"]
-        upgrade_plan = []
-        for version in procedure_inventory['upgrade_plan']:
-            if utils.version_key(version) < utils.version_key(upgrade_version):
-                continue
+    procedure = context["initial_procedure"]
+    procedure_inventory = cluster.procedure_inventory
+    upgrade_plan = []
+    if procedure == "upgrade":
+        kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        for i, v in enumerate(procedure_inventory['upgrade_plan'][context['upgrade_step']:]):
+            version = kubernetes_version if i == 0 else v
+            upgrade_plan.append((version, procedure_inventory.get(v, {}).get("thirdparties", {})))
 
-            upgrade_plan.append((version, procedure_inventory.get(version, {}).get("thirdparties", {})))
-
-    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_thirdparty' in context:
-        upgrade_thirdparties = procedure_inventory.get('upgrade', {}).get("thirdparties", {})
-        upgrade_thirdparties = dict(item for item in upgrade_thirdparties.items()
-                                    if item[0] == context['upgrading_thirdparty'])
-        upgrade_plan = [("", upgrade_thirdparties)]
-    else:
-        upgrade_plan = []
+    elif procedure == "migrate_kubemarine" and 'upgrading_thirdparty' in context:
+        procedure_thirdparties = procedure_inventory.get('upgrade', {}).get("thirdparties", {})
+        procedure_thirdparties = utils.subdict_yaml(procedure_thirdparties, [context['upgrading_thirdparty']])
+        upgrade_plan = [("", procedure_thirdparties)]
+    elif procedure == "migrate_cri":
+        upgrade_plan = [("", procedure_inventory.get("thirdparties", {}))]
+    elif procedure == "restore":
+        upgrade_plan = [("", procedure_inventory.get('restore_plan', {}).get('thirdparties', {}))]
 
     return upgrade_plan
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    upgrade_plan = _get_upgrade_plan(cluster)
-    if not upgrade_plan:
-        return inventory
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri', 'restore'])
+def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
+    procedure_plan = _get_procedure_plan(cluster)
+    procedure_thirdparties = {} if not procedure_plan else procedure_plan[0][1]
 
+    if procedure_thirdparties:
+        thirdparties = cluster.inventory.setdefault("services", {}).setdefault("thirdparties", {})
+        procedure_thirdparties = utils.deepcopy_yaml(procedure_thirdparties)
+
+        for destination in procedure_thirdparties:
+            config = _convert_thirdparty(thirdparties, destination)
+            procedure_config = _convert_thirdparty(procedure_thirdparties, destination)
+            default_merger.merge(config, procedure_config)
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
+def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
     context = cluster.context
-    if context.get("initial_procedure") == "upgrade":
-        previous_version = context['initial_kubernetes_version']
+
+    upgrade_plan = _get_procedure_plan(cluster)
+    if not upgrade_plan:
+        return
+
+    if context["initial_procedure"] == "upgrade":
+        previous_version = cluster.previous_inventory['services']['kubeadm']['kubernetesVersion']
         # Validation is currently turned off for backward compatibility.
         # It is possible to redefine all thirdparties with templates depending on Kubernetes version and the compatibility map.
         # This technically allows to not supply new thirdparties during upgrade.
@@ -169,19 +184,20 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
         previous_version = ""
         thirdparties_verify = [context['upgrading_thirdparty']]
 
-    _verify_upgrade_plan(inventory, previous_version, thirdparties_verify, upgrade_plan)
-
-    return generic_upgrade_inventory(cluster, inventory)
+    _verify_upgrade_plan(cluster, previous_version, thirdparties_verify, upgrade_plan)
 
 
-def _verify_upgrade_plan(inventory: dict, previous_version: str,
+def _verify_upgrade_plan(cluster: KubernetesCluster, previous_version: str,
                          thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
 
-    thirdparties = deepcopy(inventory["services"]['thirdparties'])
+    thirdparties = utils.deepcopy_yaml(cluster.previous_raw_inventory.get('services', {}).get('thirdparties', {}))
     sensitive_keys = ['source', 'sha1']
 
     for version, upgrade_thirdparties in upgrade_plan:
-        upgrade_thirdparties = deepcopy(upgrade_thirdparties)
+        if version != '' and jinja.is_template(version):
+            break
+
+        upgrade_thirdparties = utils.deepcopy_yaml(upgrade_thirdparties)
 
         for destination in thirdparties_verify:
             config = _convert_thirdparty(thirdparties, destination)
@@ -199,70 +215,10 @@ def _verify_upgrade_plan(inventory: dict, previous_version: str,
         previous_version = version
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory, procedure_inventory)
-
-
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    upgrade_plan = _get_upgrade_plan(cluster, procedure_inventory)
-    if not upgrade_plan:
-        return inventory
-
-    _, upgrade_thirdparties = upgrade_plan[0]
-    return _enrich_procedure_inventory(inventory, upgrade_thirdparties)
-
-
-def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    return restore_finalize_inventory(cluster, inventory)
-
-
-def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    if cluster.context.get("initial_procedure") != "restore":
-        return inventory
-
-    restore_thirdparties = procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
-    return _enrich_procedure_inventory(inventory, restore_thirdparties)
-
-
-def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    return migrate_cri_finalize_inventory(cluster, inventory)
-
-
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    procedure_thirdparties = procedure_inventory.get("thirdparties", {})
-    return _enrich_procedure_inventory(inventory, procedure_thirdparties)
-
-
-def _enrich_procedure_inventory(inventory: dict, procedure_thirdparties: dict) -> dict:
-    if procedure_thirdparties:
-        thirdparties = inventory.setdefault("services", {}).setdefault("thirdparties", {})
-        procedure_thirdparties = deepcopy(procedure_thirdparties)
-
-        for destination in procedure_thirdparties:
-            config = _convert_thirdparty(thirdparties, destination)
-            procedure_config = _convert_thirdparty(procedure_thirdparties, destination)
-            default_merger.merge(config, procedure_config)
-
-    return inventory
-
-
-def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
-    thirdparties: Dict[str, dict] = inventory['services'].get('thirdparties', {})
-    # if thirdparties is empty, then nothing to do
-    if not thirdparties:
-        return inventory
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory_apply_defaults(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+    thirdparties: Dict[str, dict] = inventory['services']['thirdparties']
 
     for destination in thirdparties:
 
@@ -294,7 +250,7 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
                                     % (destination, all_nodes_names, node_name))
 
         if is_default_thirdparty(destination) and 'source' not in config:
-            source, sha1 = get_default_thirdparty_identity(cluster.inventory, destination, in_public=True)
+            source, sha1 = get_default_thirdparty_identity(inventory, destination, in_public=True)
             config['source'] = source
             if 'sha1' not in config:
                 config['sha1'] = sha1
@@ -305,8 +261,6 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
     if cri_name == "docker" and \
             crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}):
         del(thirdparties[crictl_key])
-
-    return inventory
 
 
 def get_install_group(cluster: KubernetesCluster, config: dict) -> NodeGroup:

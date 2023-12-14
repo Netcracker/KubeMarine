@@ -29,14 +29,14 @@ class RunActionsTest(unittest.TestCase):
     def test_patch_inventory(self):
         class TheAction(Action):
             def run(self, res: DynamicResources):
-                res.formatted_inventory()['p2'] = 'v2'
+                res.inventory()['p2'] = 'v2'
 
             def __init__(self):
                 super().__init__('test', recreate_inventory=True)
 
         res = demo.FakeResources(self.context, {"p1": "v1"})
         flow.ActionsFlow([TheAction()]).run_flow(res, print_summary=False)
-        self.assertEqual(res.stored_inventory, {"p1": "v1", "p2": "v2"})
+        self.assertEqual(res.inventory(), {"p1": "v1", "p2": "v2"})
 
     def test_patch_cluster(self):
         class TheAction(Action):
@@ -59,7 +59,7 @@ class RunActionsTest(unittest.TestCase):
             history = fake_shell.history_find(host, 'sudo', ['whoami'])
             self.assertTrue(len(history) == 1 and history[0]["used_times"] == 1)
 
-        self.assertEqual(['test'], res.working_context['successfully_performed'])
+        self.assertEqual(['test'], res.context['successfully_performed'])
 
 
 if __name__ == '__main__':

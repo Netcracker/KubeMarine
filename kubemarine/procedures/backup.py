@@ -33,10 +33,8 @@ from typing_extensions import Literal
 import yaml
 
 from kubemarine.core import utils, flow, log
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RemoteExecutor
-from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import containerd
 
 
@@ -722,12 +720,9 @@ tasks = OrderedDict({
 })
 
 
-class BackupAction(Action):
+class BackupAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('backup')
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        super().__init__('backup', tasks)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

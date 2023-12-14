@@ -20,8 +20,9 @@ from typing import Dict, Optional
 from unittest import mock
 
 from kubemarine import demo, plugins
-from kubemarine.core import flow, utils, log
+from kubemarine.core import utils, log, flow
 from kubemarine.procedures import install
+from test.unit import utils as test_utils
 
 
 class TestEnvironmentVariables(unittest.TestCase):
@@ -44,8 +45,8 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.tmpdir.cleanup()
 
     def _new_resources(self) -> demo.FakeResources:
-        return demo.FakeResources(self.context, self.inventory,
-                                  nodes_context=demo.generate_nodes_context(self.inventory))
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        nodes_context=demo.generate_nodes_context(self.inventory))
 
     def _run(self, mock_environ: Dict[str, str]):
         self.resources = self._new_resources()
@@ -67,7 +68,7 @@ class TestEnvironmentVariables(unittest.TestCase):
 
         self._run({'ENV_NAME': 'value1', 'CRI_NAME': 'me', 'CRI_PASS': 'password123'})
 
-        inventory = self.resources.last_cluster.inventory
+        inventory = self.resources.working_inventory
         self.assertEqual('value1', inventory['values']['variable'])
 
         config = inventory['services']['cri']['containerdConfig']['plugins."io.containerd.grpc.v1.cri".registry.configs."host".auth']
@@ -87,7 +88,7 @@ class TestEnvironmentVariables(unittest.TestCase):
 
         self._run({'IMAGE_TAG': '1.2.3'})
 
-        inventory = self.resources.last_cluster.inventory
+        inventory = self.resources.working_inventory
         values = inventory['plugins']['my_plugin']['installation']['procedures'][0]['helm']['values']
         self.assertEqual('test-image:1.2.3', values['image'])
         self.assertEqual('1.2.3', values['version'])
@@ -97,7 +98,7 @@ class TestEnvironmentVariables(unittest.TestCase):
             'variable': '{{ env.ENV_NAME1 | default("not defined") }}',
         }
         self._run({})
-        inventory = self.resources.last_cluster.inventory
+        inventory = self.resources.working_inventory
         self.assertEqual('not defined', inventory['values']['variable'])
 
     def test_recursive_env_variables(self):
@@ -107,7 +108,7 @@ class TestEnvironmentVariables(unittest.TestCase):
             'variable3': '{{ values.variable2 }}',
         }
         self._run({'ENV_NAME': 'value-recursive'})
-        inventory = self.resources.last_cluster.inventory
+        inventory = self.resources.working_inventory
         self.assertEqual('value-recursive', inventory['values']['variable1'])
         self.assertEqual('value-recursive', inventory['values']['variable2'])
         self.assertEqual('value-recursive', inventory['values']['variable3'])

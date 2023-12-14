@@ -127,14 +127,13 @@ class EnrichmentAndFinalization(unittest.TestCase):
                 self.assertEqual(target_state, cluster.inventory['rbac']['psp']['pod-security'])
                 self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
 
-                test_utils.stub_associations_packages(cluster, {})
                 finalized_inventory = test_utils.make_finalized_inventory(cluster)
                 apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
 
                 self.assertEqual(target_state, finalized_inventory['rbac']['psp']['pod-security'])
                 self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
 
-                final_inventory = test_utils.get_final_inventory(cluster, self.inventory)
+                final_inventory = cluster.formatted_inventory
                 apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
 
                 self.assertEqual(target_state, final_inventory['rbac']['psp']['pod-security'])
@@ -187,7 +186,7 @@ class RunTasks(unittest.TestCase):
                              "kube-apiserver pods should be waited for")
 
             admission_plugins_expected = 'NodeRestriction'
-            apiserver_extra_args = res.last_cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+            apiserver_extra_args = res.working_inventory['services']['kubeadm']['apiServer']['extraArgs']
             self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'),
                              "Unexpected apiserver extra args")
 

@@ -14,14 +14,16 @@
 
 from __future__ import annotations
 
+import collections
 import io
+import itertools
 import os
 import random
 import uuid
 from abc import ABC, abstractmethod
 from types import FunctionType
 from typing import (
-    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast
+    Callable, Dict, List, Union, Any, TypeVar, Mapping, Iterator, Optional, Iterable, Generic, Set, cast, Sequence
 )
 
 from kubemarine.core import utils, log, errors
@@ -460,17 +462,17 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             self.call(action)
 
     def get_online_nodes(self: GROUP_SELF, online: bool) -> GROUP_SELF:
-        online_hosts = [host for host, node_context in self.cluster.context['nodes'].items()
+        online_hosts = [host for host, node_context in self.cluster.nodes_context.items()
                         if node_context['access']['online'] == online]
         return self._make_group(online_hosts).intersection_group(self)
 
     def get_accessible_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        accessible = [host for host, node_context in self.cluster.context['nodes'].items()
+        accessible = [host for host, node_context in self.cluster.nodes_context.items()
                       if node_context['access']['accessible']]
         return self._make_group(accessible).intersection_group(self)
 
     def get_sudo_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        sudo = [host for host, node_context in self.cluster.context['nodes'].items()
+        sudo = [host for host, node_context in self.cluster.nodes_context.items()
                 if node_context['access']['sudo'] != "No"]
         return self._make_group(sudo).intersection_group(self)
 
@@ -480,41 +482,48 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
 
     def get_ordered_members_configs_list(self, apply_filter: GroupFilter = None) -> List[NodeConfig]:
 
-        result = []
-        # we have to iterate strictly in order which was defined by user in config-file
-        for node in self.cluster.inventory['nodes']:
+        if self.is_empty():
+            return []
+
+        result = collections.OrderedDict()
+        # We have to iterate strictly in order which was defined by user in config-file.
+        # By iterative over `previous_inventory` first we ensure that all removed nodes are at the original position,
+        # Added nodes will be at the end thus reproducing the procedure enrichment.
+        for node in itertools.chain(self.cluster.previous_inventory['nodes'], self.cluster.inventory['nodes']):
+            host = node['connect_to']
             # is iterable node from inventory is part of current NodeGroup?
-            if node['connect_to'] in self.nodes:
+            if host not in self.nodes:
+                continue
 
-                # apply filters
-                suitable = True
-                if apply_filter is not None:
-                    if callable(apply_filter):
-                        if not apply_filter(node):
+            # apply filters
+            suitable = True
+            if apply_filter is not None:
+                if callable(apply_filter):
+                    if not apply_filter(node):
+                        suitable = False
+                else:
+                    # here intentionally there is no way to filter by values in lists field,
+                    # for this you need to use custom functions.
+                    # Current solution implemented in this way because the filtering strategy is
+                    # unclear - do I need to include when everything matches or is partial matching enough?
+                    for key, value in apply_filter.items():
+                        if node.get(key) is None:
                             suitable = False
-                    else:
-                        # here intentionally there is no way to filter by values in lists field,
-                        # for this you need to use custom functions.
-                        # Current solution implemented in this way because the filtering strategy is
-                        # unclear - do I need to include when everything matches or is partial matching enough?
-                        for key, value in apply_filter.items():
-                            if node.get(key) is None:
+                            break
+                        if isinstance(value, list):
+                            if node[key] not in value:
                                 suitable = False
                                 break
-                            if isinstance(value, list):
-                                if node[key] not in value:
-                                    suitable = False
-                                    break
-                            # elif should definitely be here, not if
-                            elif node[key] != value:
-                                suitable = False
-                                break
+                        # elif should definitely be here, not if
+                        elif node[key] != value:
+                            suitable = False
+                            break
 
-                # if not filtered
-                if suitable:
-                    result.append(node)
+            # if not filtered
+            if suitable:
+                result[host] = node
 
-        return result
+        return list(result.values())
 
     def get_first_member(self: GROUP_SELF, apply_filter: GroupFilter = None) -> GROUP_SELF:
         results = self.get_ordered_members_list(apply_filter)
@@ -546,21 +555,16 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         return self._make_group(ips)
 
     def get_nodes_names(self) -> List[str]:
-        result = []
         members = self.get_ordered_members_configs_list()
-        for node in members:
-            result.append(node['name'])
-        return result
+        return [node['name'] for node in members]
 
     def get_node_name(self) -> str:
-        if len(self.nodes) != 1:
-            raise Exception("Cannot get the only name from not a single node")
-
-        return self.get_nodes_names()[0]
+        name: str = self.get_config()['name']
+        return name
 
     def get_hosts(self) -> List[str]:
-        members = self.get_ordered_members_list()
-        return [node.get_host() for node in members]
+        members = self.get_ordered_members_configs_list()
+        return [node['connect_to'] for node in members]
 
     def get_host(self) -> str:
         if len(self.nodes) != 1:
@@ -580,29 +584,19 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def has_node(self, node_name: str) -> bool:
         return node_name in self.get_nodes_names()
 
-    def get_new_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        return self.new_group(lambda node: 'add_node' in node['roles'])
+    def having_roles(self: GROUP_SELF, roles: Sequence[str]) -> GROUP_SELF:
+        candidate_hosts = set()
+        for role in roles:
+            candidate_nodes = (self.cluster.previous_nodes, self.cluster.nodes)
+            if not any(role in nodes for nodes in candidate_nodes):
+                self.cluster.log.verbose(f'Group {role!r} is requested for usage, but this group does not exist.')
+                continue
 
-    def get_new_nodes_or_self(self: GROUP_SELF) -> GROUP_SELF:
-        new_nodes = self.get_new_nodes()
-        if not new_nodes.is_empty():
-            return new_nodes
-        return self
+            for nodes in candidate_nodes:
+                if role in nodes:
+                    candidate_hosts.update(nodes[role].nodes)
 
-    def get_nodes_for_removal(self: GROUP_SELF) -> GROUP_SELF:
-        return self.new_group(lambda node: 'remove_node' in node['roles'])
-
-    def get_changed_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        return self.get_new_nodes().include_group(self.get_nodes_for_removal())
-
-    def get_unchanged_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        return self.exclude_group(self.get_changed_nodes())
-
-    def get_final_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        return self.new_group(lambda node: 'remove_node' not in node['roles'])
-
-    def get_initial_nodes(self: GROUP_SELF) -> GROUP_SELF:
-        return self.new_group(lambda node: 'add_node' not in node['roles'])
+        return self.intersection_group(self._make_group(candidate_hosts))
 
     def nodes_amount(self) -> int:
         """
@@ -615,7 +609,8 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         """
         Returns the detected operating system family for group.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+                 "multiple", "unknown", "unsupported", "<undefined>".
         """
         return self.cluster.get_os_family_for_nodes(self.nodes)
 

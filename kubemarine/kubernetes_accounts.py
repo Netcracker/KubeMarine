@@ -18,13 +18,15 @@ from typing import Optional
 import yaml
 
 from kubemarine.core import utils, summary
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 
 
-def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     rbac = inventory['rbac']
     if not rbac.get("accounts"):
-        return inventory
+        return
 
     for i, account in enumerate(rbac["accounts"]):
         if account['configs'][0]['metadata'].get('name') is None:
@@ -60,8 +62,6 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
                 rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"
             if account['configs'][2]['metadata'].get('namespace') is None:
                 rbac["accounts"][i]['configs'][2]['metadata']['namespace'] = account['namespace']
-
-    return inventory
 
 
 def install(cluster: KubernetesCluster) -> None:

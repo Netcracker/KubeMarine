@@ -14,7 +14,7 @@
 
 import unittest
 from contextlib import contextmanager
-from typing import List, ContextManager, Tuple
+from typing import List, ContextManager, Tuple, Iterator
 from unittest import mock
 
 import yaml
@@ -22,6 +22,7 @@ import yaml
 from kubemarine import patches, demo
 from kubemarine.core import static, utils, flow
 from kubemarine.core.action import Action
+from kubemarine.core.cluster import EnrichmentStage, KubernetesCluster
 from kubemarine.core.patch import Patch, InventoryOnlyPatch, RegularPatch
 from kubemarine.core.resources import DynamicResources
 from kubemarine.core.yaml_merger import default_merger
@@ -68,6 +69,20 @@ def generate_environment(kubernetes_version: str, scheme=demo.MINIHA_KEEPALIVED)
 
 def set_cri(inventory: dict, cri: str):
     inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = cri
+
+
+@contextmanager
+def mock_cluster_enrich_max_stage() -> Iterator[List[EnrichmentStage]]:
+    cluster_enrich_orig = KubernetesCluster.enrich
+    max_stage = [EnrichmentStage.NONE]
+
+    def cluster_enrich_mocked(cluster: KubernetesCluster, *args, **kwargs):
+        if args[0] > max_stage[0]:
+            max_stage[0] = args[0]
+        return cluster_enrich_orig(cluster, *args, **kwargs)
+
+    with mock.patch.object(KubernetesCluster, cluster_enrich_orig.__name__, new=cluster_enrich_mocked):
+        yield max_stage
 
 
 class PatchesResolvingTest(unittest.TestCase):
@@ -154,19 +169,17 @@ class UpgradeCRI(unittest.TestCase):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
         self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = 'containerd-new'
-        res = self._run_and_check(True)
+        res = self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
-        cluster = res.last_cluster
-        associations = cluster.inventory['services']['packages']['associations']['debian']
+        associations = res.working_inventory['services']['packages']['associations']['debian']
         self.assertEqual('containerd-new', associations['containerd']['package_name'],
                          "Package associations are enriched incorrectly")
 
-        test_utils.stub_associations_packages(cluster, {})
-        associations = cluster.make_finalized_inventory()['services']['packages']['associations']['debian']
+        associations = res.finalized_inventory['services']['packages']['associations']['debian']
         self.assertEqual('containerd-new', associations['containerd']['package_name'],
                          "Package associations are enriched incorrectly")
 
-        associations = res.stored_inventory['services']['packages']['associations']
+        associations = res.inventory()['services']['packages']['associations']
         self.assertEqual('containerd-new', associations['containerd']['package_name'],
                          "Package associations are enriched incorrectly")
 
@@ -183,19 +196,18 @@ class UpgradeCRI(unittest.TestCase):
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
 
-        cluster = res.last_cluster
-        associations = cluster.inventory['services']['packages']['associations']['debian']
+        associations = res.working_inventory['services']['packages']['associations']['debian']
         self.assertNotEqual('containerd-new', associations['containerd']['package_name'],
                             "Package associations should not be enriched")
 
-        associations = res.stored_inventory['services']['packages']['associations']
+        associations = res.inventory()['services']['packages']['associations']
         self.assertNotEqual('containerd-new', associations['containerd'].get('package_name'),
                             "Package associations should not be enriched")
 
     def test_simple_upgrade_required(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
-        self._run_and_check(True)
+        self._run_and_check(True, EnrichmentStage.PROCEDURE)
 
     def test_specific_os_family_cri_association_upgrade_required(self):
         for os_name, os_family, os_version in (
@@ -211,9 +223,8 @@ class UpgradeCRI(unittest.TestCase):
                     with self.subTest(f"{os_family}, {cri}, {package_vary}"):
                         self.prepare_environment(cri, os_name, os_version)
                         self.changed_config['packages'][package_vary][f"version_{os_family}"] = [self.kubernetes_version]
-                        res = self._run_and_check(expected_upgrade_required)
-                        self.assertEqual(expected_upgrade_required, res.last_cluster is not None,
-                                         f"Cluster was {'not' if expected_upgrade_required else 'unexpectedly'} initialized")
+                        self._run_and_check(expected_upgrade_required,
+                                            EnrichmentStage.PROCEDURE if expected_upgrade_required else EnrichmentStage.DEFAULT)
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
         if cri == 'containerd':
@@ -236,28 +247,24 @@ class UpgradeCRI(unittest.TestCase):
                 self.changed_config['packages']['containerd']['version_debian'] = [self.kubernetes_version]
                 self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-inventory'
                 self.migrate_kubemarine['upgrade']['packages']['associations']['containerd']['package_name'] = procedure_associations
-                res = self._run_and_check(expected_upgrade_required)
-                self.assertIsNotNone(res.last_cluster, "Cluster was not initialized")
+                self._run_and_check(expected_upgrade_required, EnrichmentStage.PROCEDURE)
 
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_debian'] = [get_kubernetes_versions()[-2]]
-        res = self._run_and_check(False)
-        self.assertIsNone(res.last_cluster, "Enrichment should not run")
+        self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_changed_other_os_family_upgrade_not_required(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['containerd']['version_rhel'] = [self.kubernetes_version]
-        res = self._run_and_check(False)
-        self.assertIsNone(res.last_cluster, "Enrichment should not run")
+        self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_changed_not_associated_package_upgrade_not_required(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
         self.changed_config['packages']['docker']['version_debian'] = [self.kubernetes_version]
-        res = self._run_and_check(False)
-        self.assertIsNone(res.last_cluster, "Enrichment should not run")
+        self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
@@ -265,7 +272,7 @@ class UpgradeCRI(unittest.TestCase):
         self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
         with test_utils.assert_raises_kme(self, "KME0010", package='containerd',
                                           previous_version_spec='', next_version_spec=''):
-            self._run_and_check(False)
+            self._run_and_check(False, EnrichmentStage.DEFAULT)
 
     def test_run_other_patch_not_require_package_redefinition(self):
         self.prepare_environment('containerd', 'ubuntu', '20.04')
@@ -281,16 +288,18 @@ class UpgradeCRI(unittest.TestCase):
             self.assertTrue(run.called, f"Other patch was not run")
 
     def _new_resources(self) -> demo.FakeResources:
-        return demo.FakeResources(self.context, self.inventory,
-                                  procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
 
-    def _run_and_check(self, called: bool) -> demo.FakeResources:
+    def _run_and_check(self, called: bool, expected_max_stage: EnrichmentStage) -> demo.FakeResources:
         resources = self._new_resources()
         with mock_load_upgrade_config(self.changed_config), \
-                mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__) as run:
+                mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__) as run, \
+                mock_cluster_enrich_max_stage() as actual_max_stage:
             action = get_patch_by_id('upgrade_cri').action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
+            self.assertEqual(expected_max_stage, actual_max_stage[0], "Cluster was enriched to unexpected state")
 
         return resources
 
@@ -310,19 +319,17 @@ class UpgradePlugins(unittest.TestCase):
         self.migrate_kubemarine['upgrade']['plugins']['kubernetes-dashboard'] \
             = {'dashboard': {'image': 'dashboard-image-new'}}
 
-        res = self._run_and_check('upgrade_kubernetes_dashboard', True)
+        res = self._run_and_check('upgrade_kubernetes_dashboard', True, EnrichmentStage.PROCEDURE)
 
-        cluster = res.last_cluster
-        dashboard = cluster.inventory['plugins']['kubernetes-dashboard']
+        dashboard = res.working_inventory['plugins']['kubernetes-dashboard']
         self.assertEqual('dashboard-image-new', dashboard['dashboard']['image'],
                          "Image was not enriched from procedure inventory")
 
-        test_utils.stub_associations_packages(cluster, {})
-        dashboard = cluster.make_finalized_inventory()['plugins']['kubernetes-dashboard']
+        dashboard = res.finalized_inventory['plugins']['kubernetes-dashboard']
         self.assertEqual('dashboard-image-new', dashboard['dashboard']['image'],
                          "Image was not enriched from procedure inventory")
 
-        dashboard = res.stored_inventory['plugins']['kubernetes-dashboard']
+        dashboard = res.inventory()['plugins']['kubernetes-dashboard']
         self.assertEqual('dashboard-image-new', dashboard['dashboard']['image'],
                          "Image was not enriched from procedure inventory")
 
@@ -334,12 +341,11 @@ class UpgradePlugins(unittest.TestCase):
         self.changed_config['thirdparties'] = {'calicoctl': [self.kubernetes_version]}
         self.migrate_kubemarine['upgrade']['thirdparties'] = {'/usr/bin/calicoctl': {'source': 'calicoctl-new'}}
 
-        res = self._run_and_check('upgrade_calico', True)
-        cluster = res.last_cluster
-        dashboard = cluster.inventory['plugins']['calico']
-        self.assertEqual('calico-node-new', dashboard['node']['image'],
+        res = self._run_and_check('upgrade_calico', True, EnrichmentStage.PROCEDURE)
+        calico = res.working_inventory['plugins']['calico']
+        self.assertEqual('calico-node-new', calico['node']['image'],
                          "Calico image was not enriched from procedure inventory")
-        crictl = cluster.inventory['services']['thirdparties']['/usr/bin/calicoctl']
+        crictl = res.working_inventory['services']['thirdparties']['/usr/bin/calicoctl']
         self.assertEqual('calicoctl-new', crictl['source'],
                          "Calicoctl source was not enriched from procedure inventory")
 
@@ -349,27 +355,25 @@ class UpgradePlugins(unittest.TestCase):
             = {'node': {'image': 'calico-node-new'}}
 
         self.changed_config['plugins']['kubernetes-dashboard'] = [self.kubernetes_version]
-        res = self._run_and_check('upgrade_kubernetes_dashboard', True)
+        res = self._run_and_check('upgrade_kubernetes_dashboard', True, EnrichmentStage.PROCEDURE)
 
-        cluster = res.last_cluster
-        dashboard = cluster.inventory['plugins']['calico']
+        dashboard = res.working_inventory['plugins']['calico']
         self.assertNotEqual('calico-node-new', dashboard['node']['image'],
                             "Calico image should not be enriched")
 
-        dashboard = res.stored_inventory['plugins'].get('calico', {})
+        dashboard = res.inventory()['plugins'].get('calico', {})
         self.assertNotEqual('calico-node-new', dashboard.get('node', {}).get('image'),
                             "Calico image should not be enriched")
 
     def test_simple_upgrade_required(self):
         self.changed_config['plugins']['calico'] = [self.kubernetes_version]
-        self._run_and_check('upgrade_calico', True)
+        self._run_and_check('upgrade_calico', True, EnrichmentStage.PROCEDURE)
 
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
         self.changed_config['plugins']['calico'] = [get_kubernetes_versions()[-2]]
-        res = self._run_and_check('upgrade_calico', False)
-        self.assertIsNone(res.last_cluster, "Enrichment should not run")
+        self._run_and_check('upgrade_calico', False, EnrichmentStage.DEFAULT)
 
     def test_require_image_redefinition(self):
         self.changed_config['plugins']['calico'] = [self.kubernetes_version]
@@ -377,7 +381,7 @@ class UpgradePlugins(unittest.TestCase):
         with test_utils.assert_raises_kme(self, "KME0009",
                                           key='image', plugin_name='calico',
                                           previous_version_spec='', next_version_spec=''):
-            self._run_and_check('upgrade_calico', False)
+            self._run_and_check('upgrade_calico', False, EnrichmentStage.PROCEDURE)
 
     def test_calico_require_calicoctl_redefinition(self):
         self.changed_config['plugins']['calico'] = [self.kubernetes_version]
@@ -385,26 +389,28 @@ class UpgradePlugins(unittest.TestCase):
         with test_utils.assert_raises_kme(self, "KME0011",
                                           key='source', thirdparty='/usr/bin/calicoctl',
                                           previous_version_spec='', next_version_spec=''):
-            self._run_and_check('upgrade_calico', False)
+            self._run_and_check('upgrade_calico', False, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_image_redefinition(self):
         self.changed_config['plugins']['calico'] = [self.kubernetes_version]
         self.inventory['plugins']['calico'] = {'node': {'image': 'calico-node-redefined'}}
 
         self.changed_config['plugins'].update({'local-path-provisioner': [self.kubernetes_version]})
-        self._run_and_check('upgrade_local_path_provisioner', True)
+        self._run_and_check('upgrade_local_path_provisioner', True, EnrichmentStage.PROCEDURE)
 
     def _new_resources(self) -> demo.FakeResources:
-        return demo.FakeResources(self.context, self.inventory,
-                                  procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
 
-    def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
+    def _run_and_check(self, patch_id: str, called: bool, expected_max_stage: EnrichmentStage) -> demo.FakeResources:
         resources = self._new_resources()
         with mock_load_upgrade_config(self.changed_config), \
-                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run:
+                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as run, \
+                mock_cluster_enrich_max_stage() as actual_max_stage:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
+            self.assertEqual(expected_max_stage, actual_max_stage[0], "Cluster was enriched to unexpected state")
 
         return resources
 
@@ -425,23 +431,21 @@ class UpgradeThirdparties(unittest.TestCase):
         self.migrate_kubemarine['upgrade']['thirdparties']['/usr/bin/crictl.tar.gz'] \
             = {'source': 'crictl-new', 'sha1': 'fake-sha1'}
 
-        res = self._run_and_check('upgrade_crictl', True)
+        res = self._run_and_check('upgrade_crictl', True, EnrichmentStage.PROCEDURE)
 
-        cluster = res.last_cluster
-        crictl = cluster.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
+        crictl = res.working_inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
         self.assertEqual('crictl-new', crictl['source'],
                          "Source was not enriched from procedure inventory")
         self.assertEqual('fake-sha1', crictl['sha1'],
                          "sha1 was not enriched from procedure inventory")
 
-        test_utils.stub_associations_packages(cluster, {})
-        crictl = cluster.make_finalized_inventory()['services']['thirdparties']['/usr/bin/crictl.tar.gz']
+        crictl = res.finalized_inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
         self.assertEqual('crictl-new', crictl['source'],
                          "Source was not enriched from procedure inventory")
         self.assertEqual('fake-sha1', crictl['sha1'],
                          "sha1 was not enriched from procedure inventory")
 
-        crictl = res.stored_inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
+        crictl = res.inventory()['services']['thirdparties']['/usr/bin/crictl.tar.gz']
         self.assertEqual('crictl-new', crictl['source'],
                          "Source was not enriched from procedure inventory")
         self.assertEqual('fake-sha1', crictl['sha1'],
@@ -461,33 +465,30 @@ class UpgradeThirdparties(unittest.TestCase):
             flow.run_actions(res, [action])
             self.assertTrue(run.called, f"Other patch was not run")
 
-        cluster = res.last_cluster
-        crictl = cluster.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
+        crictl = res.working_inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz']
         self.assertNotEqual('crictl-new', crictl['source'],
                             "Source should not be enriched")
 
-        crictl = res.stored_inventory['services']['thirdparties'].get('/usr/bin/crictl.tar.gz', {})
+        crictl = res.inventory()['services']['thirdparties'].get('/usr/bin/crictl.tar.gz', {})
         self.assertNotEqual('crictl-new', crictl.get('source'),
                             "Source should not be enriched")
 
     def test_simple_upgrade_required(self):
         set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
-        self._run_and_check('upgrade_crictl', True)
+        self._run_and_check('upgrade_crictl', True, EnrichmentStage.PROCEDURE)
 
     def test_changed_other_kubernetes_version_upgrade_not_required(self):
         if len(get_kubernetes_versions()) == 1:
             self.skipTest("Cannot change other Kubernetes version.")
         set_cri(self.inventory, 'containerd')
         self.changed_config['thirdparties']['crictl'] = [get_kubernetes_versions()[-2]]
-        res = self._run_and_check('upgrade_crictl', False)
-        self.assertIsNone(res.last_cluster, "Enrichment should not run")
+        self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
 
     def test_docker_cri_upgrade_crictl_not_required(self):
         set_cri(self.inventory, 'docker')
         self.changed_config['thirdparties']['crictl'] = [self.kubernetes_version]
-        res = self._run_and_check('upgrade_crictl', False)
-        self.assertIsNotNone(res.last_cluster, "Cluster was not initialized")
+        self._run_and_check('upgrade_crictl', False, EnrichmentStage.DEFAULT)
 
     def test_require_source_redefinition(self):
         set_cri(self.inventory, 'containerd')
@@ -496,7 +497,7 @@ class UpgradeThirdparties(unittest.TestCase):
         with test_utils.assert_raises_kme(self, "KME0011",
                                           key='source', thirdparty='/usr/bin/crictl.tar.gz',
                                           previous_version_spec='.*', next_version_spec='.*'):
-            self._run_and_check('upgrade_crictl', False)
+            self._run_and_check('upgrade_crictl', False, EnrichmentStage.PROCEDURE)
 
     def test_require_sha1_redefinition(self):
         set_cri(self.inventory, 'containerd')
@@ -509,7 +510,7 @@ class UpgradeThirdparties(unittest.TestCase):
         with test_utils.assert_raises_kme(self, "KME0011",
                                           key='sha1', thirdparty='/usr/bin/crictl.tar.gz',
                                           previous_version_spec='.*', next_version_spec='.*'):
-            self._run_and_check('upgrade_crictl', False)
+            self._run_and_check('upgrade_crictl', False, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_source_redefinition(self):
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
@@ -526,16 +527,18 @@ class UpgradeThirdparties(unittest.TestCase):
             self.assertTrue(run.called, f"Other patch was not run")
 
     def _new_resources(self) -> demo.FakeResources:
-        return demo.FakeResources(self.context, self.inventory,
-                                  procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
 
-    def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
+    def _run_and_check(self, patch_id: str, called: bool, expected_max_stage: EnrichmentStage) -> demo.FakeResources:
         resources = self._new_resources()
         with mock_load_upgrade_config(self.changed_config), \
-                mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run:
+                mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as run, \
+                mock_cluster_enrich_max_stage() as actual_max_stage:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
+            self.assertEqual(expected_max_stage, actual_max_stage[0], "Cluster was enriched to unexpected state")
 
         return resources
 
@@ -566,19 +569,17 @@ class UpgradeBalancers(unittest.TestCase):
                 self.prepare_environment('ubuntu', '20.04')
                 self.changed_config['packages'][package]['version_debian'] = True
                 self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = f'{package}-new'
-                res = self._run_and_check(f'upgrade_{package}', True)
+                res = self._run_and_check(f'upgrade_{package}', True, EnrichmentStage.PROCEDURE)
 
-                cluster = res.last_cluster
-                associations = cluster.inventory['services']['packages']['associations']['debian']
+                associations = res.working_inventory['services']['packages']['associations']['debian']
                 self.assertEqual(f'{package}-new', associations[package]['package_name'],
                                  "Package associations are enriched incorrectly")
 
-                test_utils.stub_associations_packages(cluster, {})
-                associations = cluster.make_finalized_inventory()['services']['packages']['associations']['debian']
+                associations = res.finalized_inventory['services']['packages']['associations']['debian']
                 self.assertEqual(f'{package}-new', associations[package]['package_name'],
                                  "Package associations are enriched incorrectly")
 
-                associations = res.stored_inventory['services']['packages']['associations']
+                associations = res.inventory()['services']['packages']['associations']
                 self.assertEqual(f'{package}-new', associations[package]['package_name'],
                                  "Package associations are enriched incorrectly")
 
@@ -590,14 +591,13 @@ class UpgradeBalancers(unittest.TestCase):
                 self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = f'{package}-new'
 
                 self.changed_config['packages'][other_package]['version_debian'] = True
-                res = self._run_and_check(f'upgrade_{other_package}', True)
+                res = self._run_and_check(f'upgrade_{other_package}', True, EnrichmentStage.PROCEDURE)
 
-                cluster = res.last_cluster
-                associations = cluster.inventory['services']['packages']['associations']['debian']
+                associations = res.working_inventory['services']['packages']['associations']['debian']
                 self.assertNotEqual(f'{package}-new', associations[package]['package_name'],
                                     "Package associations should not be enriched")
 
-                associations = res.stored_inventory['services']['packages']['associations']
+                associations = res.inventory()['services']['packages']['associations']
                 self.assertNotEqual(f'{package}-new', associations[package].get('package_name'),
                                     "Package associations should not be enriched")
 
@@ -606,7 +606,7 @@ class UpgradeBalancers(unittest.TestCase):
             with self.subTest(package):
                 self.prepare_environment('ubuntu', '20.04')
                 self.changed_config['packages'][package]['version_debian'] = True
-                self._run_and_check(f'upgrade_{package}', True)
+                self._run_and_check(f'upgrade_{package}', True, EnrichmentStage.PROCEDURE)
 
     def test_procedure_inventory_upgrade_required_inventory_redefined(self):
         for package in ('haproxy', 'keepalived'):
@@ -619,30 +619,26 @@ class UpgradeBalancers(unittest.TestCase):
                     self.changed_config['packages'][package]['version_debian'] = True
                     self.inventory['services']['packages']['associations'][package]['package_name'] = f'{package}-inventory'
                     self.migrate_kubemarine['upgrade']['packages']['associations'][package]['package_name'] = procedure_associations
-                    res = self._run_and_check(f'upgrade_{package}', expected_upgrade_required)
-                    self.assertIsNotNone(res.last_cluster, "Cluster was not initialized")
+                    self._run_and_check(f'upgrade_{package}', expected_upgrade_required, EnrichmentStage.PROCEDURE)
 
     def test_changed_other_os_family_upgrade_not_required(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
                 self.prepare_environment('ubuntu', '20.04')
                 self.changed_config['packages'][package]['version_rhel'] = True
-                res = self._run_and_check(f'upgrade_{package}', False)
-                self.assertIsNone(res.last_cluster, "Enrichment should not run")
+                self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_balancers_upgrade_not_required(self):
         for package in ('haproxy', 'keepalived'):
             with self.subTest(package):
                 self.prepare_environment('ubuntu', '20.04', scheme=demo.FULLHA_NOBALANCERS)
                 self.changed_config['packages'][package]['version_debian'] = True
-                res = self._run_and_check(f'upgrade_{package}', False)
-                self.assertIsNotNone(res.last_cluster, "Cluster was not initialized")
+                self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.DEFAULT)
 
     def test_no_keepalived_upgrade_not_required(self):
         self.prepare_environment('ubuntu', '20.04', scheme=demo.NON_HA_BALANCER)
         self.changed_config['packages']['keepalived']['version_debian'] = True
-        res = self._run_and_check(f'upgrade_keepalived', False)
-        self.assertIsNotNone(res.last_cluster, "Cluster was not initialized")
+        self._run_and_check(f'upgrade_keepalived', False, EnrichmentStage.DEFAULT)
 
     def test_require_package_redefinition(self):
         for package in ('haproxy', 'keepalived'):
@@ -652,7 +648,7 @@ class UpgradeBalancers(unittest.TestCase):
                 self.inventory['services']['packages']['associations'][package]['package_name'] = f'{package}-redefined'
                 with test_utils.assert_raises_kme(self, "KME0010", package=package,
                                                   previous_version_spec='', next_version_spec=''):
-                    self._run_and_check(f'upgrade_{package}', False)
+                    self._run_and_check(f'upgrade_{package}', False, EnrichmentStage.PROCEDURE)
 
     def test_run_other_patch_not_require_package_redefinition(self):
         for package, other_package in (('haproxy', 'keepalived'), ('keepalived', 'haproxy')):
@@ -662,19 +658,21 @@ class UpgradeBalancers(unittest.TestCase):
                 self.inventory['services']['packages']['associations'][package]['package_name'] = f'{package}-redefined'
 
                 self.changed_config['packages'][other_package]['version_debian'] = True
-                self._run_and_check(f'upgrade_{other_package}', True)
+                self._run_and_check(f'upgrade_{other_package}', True, EnrichmentStage.PROCEDURE)
 
     def _new_resources(self) -> demo.FakeResources:
-        return demo.FakeResources(self.context, self.inventory,
-                                  procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.migrate_kubemarine, nodes_context=self.nodes_context)
 
-    def _run_and_check(self, patch_id: str, called: bool) -> demo.FakeResources:
+    def _run_and_check(self, patch_id: str, called: bool, expected_max_stage: EnrichmentStage) -> demo.FakeResources:
         resources = self._new_resources()
         with mock_load_upgrade_config(self.changed_config), \
-                mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run:
+                mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as run, \
+                mock_cluster_enrich_max_stage() as actual_max_stage:
             action = get_patch_by_id(patch_id).action
             flow.run_actions(resources, [action])
             self.assertEqual(called, run.called, f"Upgrade was {'not' if called else 'unexpectedly'} run")
+            self.assertEqual(expected_max_stage, actual_max_stage[0], "Cluster was enriched to unexpected state")
 
         return resources
 

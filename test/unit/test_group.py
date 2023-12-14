@@ -77,7 +77,7 @@ class TestGroupCall(unittest.TestCase):
 
     def test_run_empty_group(self):
         # bug reproduces inside _do(), that is why it is necessary to use real cluster
-        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         empty_group = cluster.nodes["worker"].new_group(apply_filter=lambda node: 'xxx' in node['roles'])
         # if there no nodes in empty group - an exception should not be produced - empty result should be returned
         empty_group.run('whoami')

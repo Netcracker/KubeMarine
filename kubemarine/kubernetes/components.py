@@ -15,7 +15,6 @@
 import io
 import re
 import uuid
-from copy import deepcopy
 from textwrap import dedent
 from typing import List, Optional, Dict, Callable, Sequence
 
@@ -194,7 +193,7 @@ class KubeadmConfig:
             patch_config: dict = KubeadmConfig(self.cluster).maps[configmap]
             # It seems that all default lists are always overridden with custom instead of appending,
             # and so override merger seems the most suitable.
-            config_ = override_merger.merge(config_, deepcopy(patch_config))
+            config_ = override_merger.merge(config_, utils.deepcopy_yaml(patch_config))
             return config_
 
         return merge_func
@@ -958,7 +957,7 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         stored_config = kubeadm_config.load(configmap, control_plane)
 
         generated_config = kubeadm_config.merge_with_inventory(configmap)\
-                (deepcopy(stored_config))
+                (utils.deepcopy_yaml(stored_config))
 
         if generated_config == stored_config:
             return None

@@ -59,11 +59,12 @@ class RestoreEnrichmentTest(unittest.TestCase):
         return context
 
     def _run(self) -> demo.FakeResources:
-        resources = demo.FakeResources(self.context, self.inventory,
-                                       procedure_inventory=self.restore,
-                                       nodes_context=demo.generate_nodes_context(self.inventory))
+        resources = test_utils.FakeResources(self.context, self.inventory,
+                                             procedure_inventory=self.restore,
+                                             nodes_context=demo.generate_nodes_context(self.inventory))
 
         restore.RestoreFlow()._run(resources)
+
         return resources
 
     def _pack_descriptor(self, backup_descriptor: dict):
@@ -80,17 +81,14 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self._pack_data()
 
         resources = self._run()
-        cluster = resources.last_cluster
 
-        self.assertEqual('v1.27.4', cluster.inventory['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.27.4', resources.working_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = cluster.make_finalized_inventory()
-        self.assertEqual('v1.27.4', finalized_inventory['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.27.4', resources.finalized_inventory['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
-        self.assertEqual('v1.27.4', resources.stored_inventory['services']['kubeadm']['kubernetesVersion'],
+        self.assertEqual('v1.27.4', resources.inventory()['services']['kubeadm']['kubernetesVersion'],
                          "Kubernetes version was not restored from backup")
 
     def test_enrich_and_finalize_inventory_thirdparties(self):
@@ -120,9 +118,8 @@ class RestoreEnrichmentTest(unittest.TestCase):
 
         with mock.patch.object(thirdparties, thirdparties.install_thirdparty.__name__) as install_thirdparty:
             resources = self._run()
-        cluster = resources.last_cluster
 
-        thirdparties_section = cluster.inventory['services']['thirdparties']
+        thirdparties_section = resources.working_inventory['services']['thirdparties']
         self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
         self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])
         self.assertEqual('kubectl-sha1-old', thirdparties_section['/usr/bin/kubectl']['sha1'])
@@ -131,9 +128,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.assertEqual('kubelet-old', thirdparties_section['/usr/bin/kubelet']['source'])
         self.assertIsNone(thirdparties_section['/usr/bin/kubelet'].get('sha1'))
 
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = cluster.make_finalized_inventory()
-        thirdparties_section = finalized_inventory['services']['thirdparties']
+        thirdparties_section = resources.finalized_inventory['services']['thirdparties']
 
         self.assertEqual(all_thirdparties, set(thirdparties_section.keys()))
         self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])
@@ -143,7 +138,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.assertEqual('kubelet-old', thirdparties_section['/usr/bin/kubelet']['source'])
         self.assertIsNone(thirdparties_section['/usr/bin/kubelet'].get('sha1'))
 
-        thirdparties_section = resources.stored_inventory['services']['thirdparties']
+        thirdparties_section = resources.inventory()['services']['thirdparties']
         self.assertEqual({'/usr/bin/kubectl', '/usr/bin/kubelet', '/usr/bin/kubeadm'},
                          set(thirdparties_section.keys()))
         self.assertEqual('kubectl-old', thirdparties_section['/usr/bin/kubectl']['source'])

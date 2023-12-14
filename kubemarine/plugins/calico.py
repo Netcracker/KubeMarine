@@ -19,15 +19,17 @@ import os
 
 from kubemarine import plugins, kubernetes
 from kubemarine.core import utils, log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     if not inventory["plugins"]["calico"]["install"]:
-        return inventory
+        return
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_calico_node = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("node", {})
@@ -42,8 +44,6 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     raw_apiserver = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("apiserver", {})
     if "resources" in raw_apiserver:
         inventory["plugins"]["calico"]["apiserver"]["resources"] = raw_apiserver["resources"]
-
-    return inventory
 
 
 # DEPRECATED

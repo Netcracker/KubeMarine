@@ -18,16 +18,15 @@ import os
 import time
 import uuid
 from contextlib import contextmanager
-from copy import deepcopy
 from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
 import ipaddress
 
-from kubemarine import system, admission, etcd, packages
+from kubemarine import system, admission, etcd, packages, jinja
 from kubemarine.core import utils, static, summary, log, errors
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import Token
 from kubemarine.core.group import NodeGroup, DeferredGroup, RunnersGroupResult, CollectorCallback
 from kubemarine.core.errors import KME
@@ -45,133 +44,78 @@ ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE = "%s patch can be uploaded only to cont
 ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded only to control-plane nodes"
 ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET = "Patches for kubelet are not supported in Kubernetes {version}"
 
-
-def add_node_enrichment(inventory: dict, cluster: KubernetesCluster, procedure_inventory: dict = None) -> dict:
-    if cluster.context.get('initial_procedure') != 'add_node':
-        return inventory
-
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    # adding role "new_node" for all specified new nodes and putting these nodes to all "nodes" list
-    for new_node in procedure_inventory.get("nodes", []):
-        # deepcopy is necessary, otherwise role append will happen in procedure_inventory too
-        node = deepcopy(new_node)
-        node["roles"].append("add_node")
-        inventory["nodes"].append(node)
-
-    # If "vrrp_ips" section is ever supported when adding node,
-    # It will be necessary to more accurately install and reconfigure the keepalived on existing nodes.
-
-    # if "vrrp_ips" in cluster.procedure_inventory:
-    #     utils.merge_vrrp_ips(cluster.procedure_inventory, inventory)
-
-    return inventory
+ERROR_UPGRADE_UNEXPECTED_PROPERTY='Unexpected %s properties in the procedure inventory for upgrade.'
 
 
-def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster,  procedure_inventory: dict = None) -> dict:
-    if cluster.context.get('initial_procedure') != 'remove_node':
-        return inventory
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
+def enrich_upgrade_inventory(cluster: KubernetesCluster) -> None:
+    procedure_inventory = cluster.procedure_inventory
+    allowed_properties = {
+        'upgrade_plan', 'upgrade_nodes', 'disable-eviction', 'prepull_group_size', 'grace_period', 'drain_timeout'
+    }
+    allowed_properties.update(procedure_inventory['upgrade_plan'])
+    unexpected_properties = set(procedure_inventory) - allowed_properties
+    if unexpected_properties:
+        raise Exception(ERROR_UPGRADE_UNEXPECTED_PROPERTY % (', '.join(map(repr, unexpected_properties)),))
 
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    # adding role "remove_node" for all specified nodes
-    node_names_to_remove = [node['name'] for node in procedure_inventory.get("nodes", [])]
-    for node_remove in node_names_to_remove:
-        for i, node in enumerate(inventory['nodes']):
-            # Inventory is not compiled at this step.
-            # Expecting that the names are not jinja, or the same jinja expressions.
-            if node['name'] == node_remove:
-                node['roles'].append('remove_node')
-                break
-        else:
-            raise Exception(f"Failed to find node to remove {node_remove} among existing nodes")
-
-    return inventory
+    upgrade_version = get_procedure_upgrade_version(cluster)
+    cluster.inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get('initial_procedure') == 'upgrade':
-        cluster.context['initial_kubernetes_version'] = inventory['services']['kubeadm']['kubernetesVersion']
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
+def verify_upgrade_inventory(cluster: KubernetesCluster) -> None:
+    initial_kubernetes_version = get_kubernetes_version(cluster.previous_inventory)
+    upgrade_version = get_kubernetes_version(cluster.inventory)
 
-        cluster.log.info(
-            '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
-            cluster.context['initial_kubernetes_version'], cluster.context['upgrade_version']))
+    test_version_upgrade_possible(initial_kubernetes_version, upgrade_version)
 
-    return generic_upgrade_inventory(cluster, inventory)
+    cluster.log.info(
+        '------------------------------------------\nUPGRADING KUBERNETES %s ⭢ %s\n------------------------------------------' % (
+        initial_kubernetes_version, upgrade_version))
 
-
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory)
-
-
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return inventory
-
-    upgrade_version = cluster.context.get("upgrade_version")
-    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = upgrade_version
-    return inventory
+    dump_directory = utils.get_dump_directory(cluster.context)
+    if jinja.is_template(get_procedure_upgrade_version(cluster)) and os.path.exists(dump_directory):
+        os.rename(dump_directory, os.path.join(os.path.dirname(dump_directory), upgrade_version))
+        cluster.context['dump_subdir'] = upgrade_version
 
 
-def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get("initial_procedure") != "restore":
-        return inventory
-
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['restore'])
+def enrich_restore_inventory(cluster: KubernetesCluster) -> None:
     logger = cluster.log
-    kubernetes_descriptor = cluster.context['backup_descriptor'].setdefault('kubernetes', {})
-    initial_kubernetes_version = get_initial_kubernetes_version(inventory)
-    backup_kubernetes_version = kubernetes_descriptor.get('version')
-    if not backup_kubernetes_version:
+    inventory = cluster.inventory
+    backup_version = cluster.context['backup_descriptor'].get('kubernetes', {}).get('version')
+    if not backup_version:
         logger.warning("Not possible to verify Kubernetes version, as descriptor does not contain 'kubernetes.version'")
-        backup_kubernetes_version = initial_kubernetes_version
+        return
 
-    if backup_kubernetes_version != initial_kubernetes_version:
-        logger.warning('Installed kubernetes version does not match version from backup')
-        verify_allowed_version(backup_kubernetes_version)
+    installed_version = get_kubernetes_version(inventory)
+    if backup_version != installed_version and not jinja.is_template(installed_version):
+        logger.warning(f'Installed kubernetes version {installed_version} '
+                       f'does not match version from backup {backup_version}')
 
-    kubernetes_descriptor['version'] = backup_kubernetes_version
-    return restore_finalize_inventory(cluster, inventory)
-
-
-def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    if cluster.context.get("initial_procedure") != "restore":
-        return inventory
-
-    target_kubernetes_version = cluster.context['backup_descriptor']['kubernetes']['version']
-    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = target_kubernetes_version
-    return inventory
+    inventory.setdefault("services", {}).setdefault("kubeadm", {})['kubernetesVersion'] = backup_version
 
 
-def enrich_reconfigure_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    return reconfigure_finalize_inventory(cluster, inventory)
-
-
-def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
-    if cluster.context.get("initial_procedure") != "reconfigure":
-        return inventory
-
-    kubeadm_sections = {s: v for s, v in procedure_inventory.get('services', {}).items()
-                        if s in ('kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches')}
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['reconfigure'])
+def enrich_reconfigure_inventory(cluster: KubernetesCluster) -> None:
+    kubeadm_sections = utils.subdict_yaml(
+        cluster.procedure_inventory.get('services', {}),
+        ['kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches'])
 
     if kubeadm_sections:
-        default_merger.merge(inventory.setdefault('services', {}), deepcopy(kubeadm_sections))
-
-    return inventory
+        default_merger.merge(cluster.inventory.setdefault('services', {}), utils.deepcopy_yaml(kubeadm_sections))
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     kubeadm = inventory['services']['kubeadm']
     kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")
 
     enriched_certsans = []
 
     for node in inventory["nodes"]:
-        if ('balancer' in node['roles'] or 'control-plane' in node['roles']) and 'remove_node' not in node['roles']:
+        if 'balancer' in node['roles'] or 'control-plane' in node['roles']:
             enriched_certsans.extend([node['name'], node['internal_address']])
             if node.get('address') is not None:
                 enriched_certsans.append(node['address'])
@@ -211,7 +155,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             if "labels" not in node:
                 node["labels"] = {}
             node["labels"]["node-role.kubernetes.io/worker"] = "worker"
-            
+
     # Validate the provided podSubnet and serviceSubnet IP addresses
     for subnet in ('podSubnet', 'serviceSubnet'):
         utils.isipv(kubeadm['networking'][subnet], [4, 6])
@@ -241,8 +185,6 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     preflight_errors.extend(default_preflight_errors)
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
-    return inventory
-
 
 def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
     log = group.cluster.log
@@ -250,6 +192,7 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
     log.debug("Cleaning up previous installation...")
 
     cluster: KubernetesCluster = group.cluster
+    procedure: str = cluster.context['initial_procedure']
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
@@ -261,14 +204,12 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
     # perform FULL reset only for "add" or "remove" procedures
     # do not perform full reset on cluster (re)installation, it could hang on last etcd member
     # nodes should be deleted only during "add" or "remove" procedures
-    is_add_or_remove_procedure = True
+    full_reset = procedure != 'install'
 
     nodes_for_manual_etcd_remove = cluster.make_group([])
+    active_nodes = group.get_online_nodes(True)
 
-    if not group.get_nodes_for_removal().is_empty():
-        # this is remove_node procedure
-        active_nodes = group.get_online_nodes(True)
-
+    if procedure == 'remove_node':
         # We need to manually remove members from etcd for "remove" procedure,
         # only if corresponding nodes are not active.
         # Otherwise, they will be removed by "kubeadm reset" command.
@@ -277,16 +218,8 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
         # kubectl drain command hands on till timeout is exceeded for nodes which are off
         # so we should drain only active nodes
         nodes_for_draining = active_nodes
-    else:
-        # in other case we consider all nodes are active
-        active_nodes = group
-
-        if not group.get_new_nodes().is_empty():
-            # this is add_node procedure
-            nodes_for_draining = group
-        else:
-            # this is install procedure
-            is_add_or_remove_procedure = False
+    elif procedure == 'add_node':
+        nodes_for_draining = group
 
     if not nodes_for_manual_etcd_remove.is_empty():
         log.warning(f"Nodes {nodes_for_manual_etcd_remove.get_hosts()} are considered as not active. "
@@ -297,7 +230,7 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
     if not nodes_for_draining.is_empty():
         drain_nodes(nodes_for_draining, drain_timeout=drain_timeout, grace_period=grace_period)
 
-    if is_add_or_remove_procedure and not active_nodes.is_empty():
+    if full_reset and not active_nodes.is_empty():
         log.verbose(f"Resetting kubeadm on nodes {active_nodes.get_hosts()} ...")
         result = active_nodes.sudo('sudo kubeadm reset -f')
         log.debug("Kubeadm successfully reset:\n%s" % result)
@@ -316,7 +249,7 @@ def reset_installation_env(group: NodeGroup) -> Optional[RunnersGroupResult]:
 
         log.debug(f"Nodes {active_nodes.get_hosts()} cleaned up successfully:\n" + "%s" % result)
 
-    if is_add_or_remove_procedure:
+    if full_reset:
         return delete_nodes(group)
 
     return None
@@ -327,7 +260,7 @@ def drain_nodes(group: NodeGroup, disable_eviction: bool = False,
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    control_plane = cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    control_plane = cluster.get_unchanged_nodes().having_roles(['control-plane']).get_first_member()
     result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
@@ -351,7 +284,7 @@ def delete_nodes(group: NodeGroup) -> RunnersGroupResult:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    control_plane = cluster.nodes['control-plane'].get_final_nodes().get_first_member()
+    control_plane = cluster.get_unchanged_nodes().having_roles(['control-plane']).get_first_member()
     result = control_plane.sudo("kubectl get nodes -o custom-columns=NAME:.metadata.name")
 
     stdout = list(result.values())[0].stdout
@@ -879,7 +812,7 @@ def upgrade_cri_if_required(group: NodeGroup) -> None:
 
 def verify_upgrade_versions(cluster: KubernetesCluster) -> None:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
-    upgrade_version = cluster.context["upgrade_version"]
+    upgrade_version = get_kubernetes_version(cluster.inventory)
 
     k8s_nodes_group = cluster.nodes["worker"].include_group(cluster.nodes['control-plane'])
     for node in k8s_nodes_group.get_ordered_members_list():
@@ -892,32 +825,39 @@ def verify_upgrade_versions(cluster: KubernetesCluster) -> None:
         test_version_upgrade_possible(curr_version, upgrade_version, skip_equal=True)
 
 
-def get_initial_kubernetes_version(inventory: dict) -> str:
+def get_procedure_upgrade_version(cluster: KubernetesCluster) -> str:
+    upgrade_version: str = cluster.procedure_inventory['upgrade_plan'][cluster.context["upgrade_step"]]
+    return upgrade_version
+
+
+def get_kubernetes_version(inventory: dict) -> str:
     kubernetes_version: str
     if inventory.get("services", {}).get("kubeadm", {}).get("kubernetesVersion") is not None:
-        kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
+        kubernetes_version = str(inventory['services']['kubeadm']['kubernetesVersion'])
     else:
         kubernetes_version = static.DEFAULTS['services']['kubeadm']['kubernetesVersion']
 
     return kubernetes_version
 
 
-def verify_initial_version(inventory: dict, _: KubernetesCluster) -> dict:
-    version = get_initial_kubernetes_version(inventory)
+@enrichment(EnrichmentStage.FULL)
+def verify_version(cluster: KubernetesCluster) -> None:
+    version = get_kubernetes_version(cluster.inventory)
     verify_allowed_version(version)
-    return inventory
+    verify_supported_version(version, cluster.log)
 
 
-def verify_allowed_version(version: str) -> None:
+def verify_allowed_version(version: str) -> str:
     allowed_versions = static.KUBERNETES_VERSIONS['compatibility_map'].keys()
     if version not in allowed_versions:
         raise errors.KME('KME0008',
                          version=version,
                          allowed_versions=', '.join(map(repr, allowed_versions)))
 
+    return version
+
 
 def verify_supported_version(target_version: str, logger: log.EnhancedLogger) -> None:
-    verify_allowed_version(target_version)
     minor_version = utils.minor_version(target_version)
     supported_versions = static.KUBERNETES_VERSIONS['kubernetes_versions']
     if not supported_versions.get(minor_version, {}).get("supported", False):
@@ -1182,7 +1122,7 @@ def get_nodes_description_cmd() -> str:
 
 def get_nodes_description(cluster: KubernetesCluster) -> dict:
     cmd = get_nodes_description_cmd()
-    result = cluster.nodes['control-plane'].get_final_nodes().get_any_member().sudo(cmd)
+    result = cluster.nodes['control-plane'].get_any_member().sudo(cmd)
     cluster.log.verbose(result)
     data: dict = yaml.safe_load(list(result.values())[0].stdout)
     return data

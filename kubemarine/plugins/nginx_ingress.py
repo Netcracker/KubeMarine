@@ -17,7 +17,7 @@ import ipaddress
 from typing import Optional, List, Dict
 
 from kubemarine.core import utils, log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
@@ -38,14 +38,11 @@ def check_job_for_nginx(cluster: KubernetesCluster) -> None:
         cluster.log.debug('There are no jobs to delete')
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     if not inventory["plugins"]["nginx-ingress-controller"]["install"]:
-        return inventory
-
-    # Change type for hostPorts because of jinja enrichment
-    for port in inventory["plugins"]["nginx-ingress-controller"].get("ports", []):
-        if "hostPort" in port and not isinstance(port['hostPort'], int):
-            port['hostPort'] = int(port['hostPort'])
+        return
 
     if inventory["plugins"]["nginx-ingress-controller"].get('custom_headers'):
         if not inventory["plugins"]["nginx-ingress-controller"].get('config_map'):
@@ -61,78 +58,36 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if "resources" in raw_webhook:
         inventory["plugins"]["nginx-ingress-controller"]["webhook"]["resources"] = raw_webhook["resources"]
 
-    return inventory
 
-
-def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
+def cert_renew_enrichment(cluster: KubernetesCluster) -> None:
     # check that renewal is required for nginx
-    if cluster.context.get('initial_procedure') != 'cert_renew' \
-            or not cluster.procedure_inventory.get("nginx-ingress-controller"):
-        return inventory
-
-    nginx_plugin = inventory["plugins"]["nginx-ingress-controller"]
-
-    # check that renewal is possible
-    if not nginx_plugin["install"]:
-        raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
+    procedure_nginx_cert = cluster.procedure_inventory.get("nginx-ingress-controller", {})
+    if not procedure_nginx_cert:
+        return
 
     # update certificates in inventory
-    nginx_plugin["controller"]["ssl"]["default-certificate"] = cluster.procedure_inventory["nginx-ingress-controller"]
+    cluster.inventory.setdefault("plugins", {}).setdefault("nginx-ingress-controller", {}) \
+        .setdefault("controller", {}).setdefault("ssl", {})["default-certificate"] \
+        = utils.deepcopy_yaml(procedure_nginx_cert)
 
-    return inventory
 
-
-def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
-                       procedure_inventory_for_finalization: dict) -> dict:
-    # check that renewal is required for nginx
-    if cluster.context.get('initial_procedure') != 'cert_renew' \
-            or not procedure_inventory_for_finalization.get("nginx-ingress-controller"):
-        return inventory_to_finalize
-
-    if not inventory_to_finalize["plugins"].get("nginx-ingress-controller"):
-        inventory_to_finalize["plugins"]["nginx-ingress-controller"] = {}
-
-    if not inventory_to_finalize["plugins"]["nginx-ingress-controller"].get("controller"):
-        inventory_to_finalize["plugins"]["nginx-ingress-controller"]["controller"] = {}
-
-    if not inventory_to_finalize["plugins"]["nginx-ingress-controller"]["controller"].get("ssl"):
-        inventory_to_finalize["plugins"]["nginx-ingress-controller"]["controller"]["ssl"] = {}
-
-    nginx_plugin = inventory_to_finalize["plugins"]["nginx-ingress-controller"]
-    nginx_plugin["controller"]["ssl"]["default-certificate"] = (
-        procedure_inventory_for_finalization)["nginx-ingress-controller"]
-
-    return inventory_to_finalize
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
+def verify_cert_renew(cluster: KubernetesCluster) -> None:
+    procedure_nginx_cert = cluster.procedure_inventory.get("nginx-ingress-controller", {})
+    # check that renewal is possible
+    if procedure_nginx_cert and not cluster.inventory["plugins"]["nginx-ingress-controller"]["install"]:
+        raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
 
 
 def redeploy_ingress_nginx_is_needed(cluster: KubernetesCluster) -> bool:
     # redeploy ingres-nginx-controller for add/remove node procedures is needed in case:
     # 1. plugins.nginx-ingress-controller.install=true
-    # 2. any balancer node exists (including as remove_node)
-    # 3. all balancers have add_node/remove_node roles (added the first or removed the last balancer)
-    # 4. One of following is not overriden:
-    #    4.1. use-proxy-protocol
-    #    4.2. ingress-nginx-ports and some from target ports
+    # 2. Something is changes in the plugin configuration after procedure inventory is applied.
+    #    Typically, `ports` configuration may change if balancers existence is changed.
     ingress_nginx_plugin = cluster.inventory['plugins']['nginx-ingress-controller']
-    balancers = [balancer for balancer in cluster.inventory['nodes'] if 'balancer' in balancer['roles']]
-    if not ingress_nginx_plugin.get("install", False) or \
-            not balancers or \
-            any('add_node' not in node['roles'] and 'remove_node' not in node['roles'] for node in balancers):
-        return False
-
-    proxy_protocol_overriden = 'use-proxy-protocol' in cluster.raw_inventory.get('plugins', {})\
-        .get('nginx-ingress-controller', {})\
-        .get('config_map', {})
-    http_target_port_overriden = 'http' in cluster.raw_inventory.get('services', {})\
-        .get('loadbalancer', {})\
-        .get('target_ports', {})
-    https_target_port_overriden = 'https' in cluster.raw_inventory.get('services', {}) \
-        .get('loadbalancer', {}) \
-        .get('target_ports', {})
-    ingress_nginx_ports_overriden = 'ports' in cluster.raw_inventory.get('plugins', {})\
-        .get('nginx-ingress-controller', {})
-    return not proxy_protocol_overriden or not (ingress_nginx_ports_overriden or
-                                                (https_target_port_overriden and http_target_port_overriden))
+    install: bool = ingress_nginx_plugin['install']
+    return install and cluster.previous_inventory['plugins']['nginx-ingress-controller'] != ingress_nginx_plugin
 
 
 def manage_custom_certificate(cluster: KubernetesCluster) -> None:
