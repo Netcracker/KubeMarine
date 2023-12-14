@@ -46,6 +46,9 @@ Before you start any maintenance procedure, you must complete the following mand
 
 1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform. Each procedure has its own configuration format. Read documentation below to fill procedure inventory data.
 
+# Basics
+
+According to `KubeMarine` concept the `cluster.yaml` is a reflection of a Kubernetes cluster state. Therefore, any changes on cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state. That is important practice even if the `cluster.yaml` section or option is applicable only for installation procedure, because the particular `cluster.yaml` could be used for reinstallation or reproduction some cases. For the changes that can't be reflected in `cluster.yaml` appropriate comments could be used.
 
 # Provided Procedures
 
@@ -328,9 +331,6 @@ etcd:
       election-timeout: "10000"
 ...
 ```
-
-**Note**: All the custom settings for the system services should be properly reflected in the cluster.yaml (see [services.kubeadm parameters](Installation.md#kubeadm)) to be kept after upgrade.
-
 
 #### Thirdparties Upgrade Section and Task
 
