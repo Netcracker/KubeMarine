@@ -95,6 +95,11 @@ docker:
     version_rhel8: 19.03*
     version_rhel9: 20.10*
     version_debian: 5:20.10.*
+  v1.29.0:
+    version_rhel: 19.03*
+    version_rhel8: 19.03*
+    version_rhel9: 20.10*
+    version_debian: 5:20.10.*
 containerd:
   v1.23.1:
     version_debian: 1.5.*
@@ -131,6 +136,8 @@ containerd:
   v1.28.3:
     version_debian: 1.6.*
   v1.28.4:
+    version_debian: 1.6.*
+  v1.29.0:
     version_debian: 1.6.*
 containerdio:
   v1.23.1:
@@ -219,6 +226,11 @@ containerdio:
     version_rhel9: 1.6*
     version_debian: 1.6.*
   v1.28.4:
+    version_rhel: 1.6*
+    version_rhel8: 1.6*
+    version_rhel9: 1.6*
+    version_debian: 1.6.*
+  v1.29.0:
     version_rhel: 1.6*
     version_rhel8: 1.6*
     version_rhel9: 1.6*
