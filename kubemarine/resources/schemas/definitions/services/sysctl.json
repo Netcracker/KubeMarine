@@ -17,5 +17,8 @@
       "type": ["string", "integer"],
       "description": "If this parameter is not explicitly indicated in the cluster.yaml, then this value is calculated by this formula: maxPods * podPidsLimit + 2048"
     }
+  },
+  "additionalProperties": {
+    "type": ["string", "integer"]
   }
 }

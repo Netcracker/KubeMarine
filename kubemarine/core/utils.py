@@ -454,7 +454,7 @@ def load_yaml(filepath: str) -> dict:
         return {}  # unreachable
 
 
-def strtobool(value: Union[str, bool], section: str = None) -> bool:
+def strtobool(value: Union[str, bool]) -> bool:
     """
     The method check string and boolean value
     :param value: Value that should be checked
@@ -466,10 +466,18 @@ def strtobool(value: Union[str, bool], section: str = None) -> bool:
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
     else:
-        msg = f"invalid truth value {value!r}"
-        if section is not None:
-            msg = f"invalid truth value for {section}: {value!r}"
-        raise ValueError(msg)
+        raise ValueError(f"invalid truth value {value!r}")
+
+
+def strtoint(value: Union[str, int]) -> int:
+    if isinstance(value, int):
+        return value
+
+    try:
+        # whitespace required because python's int() ignores them
+        return int(value.replace(' ', '.'))
+    except ValueError:
+        raise ValueError(f"invalid integer value {value!r}")
 
 
 def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
