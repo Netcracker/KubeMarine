@@ -460,17 +460,20 @@ def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
                    ignore_jinja_escapes: bool = True) -> str:
     logger.verbose("Rendering \"%s\"" % struct)
 
+    def precompile(struct: str) -> str:
+        return compile_string(logger, struct, root)
+
     if ignore_jinja_escapes:
         iterator = escaped_expression_regex.finditer(struct)
         struct = re.sub(escaped_expression_regex, '', struct)
-        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, recursive_compiler=precompile).from_string(struct).render(**root)
 
         # TODO this does not work for {raw}{jinja}{raw}{jinja}
         for match in iterator:
             span = match.span()
             struct = struct[:span[0]] + match.group() + struct[span[0]:]
     else:
-        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, recursive_compiler=precompile).from_string(struct).render(**root)
 
     logger.verbose("\tRendered as \"%s\"" % struct)
     return struct

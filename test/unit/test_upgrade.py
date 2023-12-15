@@ -128,7 +128,7 @@ class UpgradeDefaultsEnrichment(unittest.TestCase):
         old_kubernetes_version = 'v1.24.11'
         new_kubernetes_version = 'v1.25.2'
         self.prepare_inventory(old_kubernetes_version, new_kubernetes_version)
-        with self.assertRaisesRegex(Exception, "PSP is not supported in Kubernetes version higher than v1.24"):
+        with self.assertRaisesRegex(Exception, "PSP is not supported in Kubernetes v1.25 or higher"):
             self._new_cluster()
 
     def test_incorrect_disable_eviction(self):
