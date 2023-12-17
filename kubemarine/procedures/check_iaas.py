@@ -1279,6 +1279,10 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
                     raise TestWarn("Check cannot be completed", hint=skipped_msgs)
             # Create IP-IP tunnels configurations
             ipip_config = get_ipip_config(group)
+            # Verify if the check is feasible
+            if ipip_config == {}:
+                skipped_msgs = f"Pod network doesn't incude enough IP addresses to establish all of the tunnels"
+                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
             failed_nodes = check_ipip_tunnel(group, ipip_config)
             for item in failed_nodes:
                 first_name = cluster.get_node_name(item)
@@ -1310,10 +1314,14 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
         ipip_config[host]['remote_ext2'] = host_pairs[host][1]
 
         pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
-        ips = get_ips(pod_subnet)
+        nodes_number: int = len(group.get_ordered_members_configs_list())
+        ips = get_ips(pod_subnet, nodes_number)
+        if len(ips) == 0:
+            ipip_config = {}
+            return ipip_config
         # IPs should be uniq
         while is_conflict(ipip_config, ips):
-            ips = get_ips(pod_subnet)
+            ips = get_ips(pod_subnet, nodes_number)
 
         ipip_config[host]['local_int1'] = ips[0]
         ipip_config[host]['remote_int1'] = ips[1]
@@ -1336,17 +1344,22 @@ def is_conflict(ipip_config: Dict[str, Dict[str, str]], ips: List[str]) -> bool:
     return False
 
 
-def get_ips(pod_subnet: str) -> List[str]:
+def get_ips(pod_subnet: str, nodes_number: int) -> List[str]:
 
     ips_str: List[str] = []
-    random.seed()
     ip_pod_net = ipaddress.ip_network(pod_subnet)
-    # Split pod network to subnets
-    pod_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = list(ip_pod_net.subnets(12))
+    # Check if the network has enough IP addreses to perform the check
+    if ip_pod_net.num_addresses < nodes_number * 2 or ip_pod_net.prefixlen >= 30:
+        return ips_str
+    # Split pod network to subnets '/32'
+    divider = 30 - ip_pod_net.prefixlen
+    pod_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = list(ip_pod_net.subnets(divider))
     # Choose subnet
+    random.seed()
     subnet = random.choice(pod_subnets)
 
-    ips_ip = list(subnet.subnets(6))
+    divider = 32 - subnet.prefixlen
+    ips_ip = list(subnet.subnets(divider))
     for ip in ips_ip:
         ips_str.append(str(ip))
     # Choose IP from the subnet above
