@@ -1307,29 +1307,44 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
 
     ipip_config: Dict[str, Dict[str, str]] = {}
     host_pairs = get_pairs(group)
-    for node in group.get_ordered_members_configs_list():
-        host = node['internal_address']
-        ipip_config[host] = {}
-        ipip_config[host]['remote_ext1'] = host_pairs[host][0]
-        ipip_config[host]['remote_ext2'] = host_pairs[host][1]
-
-        pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
-        nodes_number: int = len(group.get_ordered_members_configs_list())
-        ips = get_ips(pod_subnet, nodes_number)
-        if len(ips) == 0:
-            ipip_config = {}
-            return ipip_config
-        # IPs should be uniq
-        while is_conflict(ipip_config, ips):
+    nodes_list = group.get_ordered_members_configs_list()
+    pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
+    nodes_number: int = len(nodes_list)
+    if nodes_number > 2:
+        for node in nodes_list:
+            host = node['internal_address']
+            ipip_config[host] = {}
+            ipip_config[host]['remote_ext1'] = host_pairs[host][0]
+            ipip_config[host]['remote_ext2'] = host_pairs[host][1]
+    
             ips = get_ips(pod_subnet, nodes_number)
+            if len(ips) == 0:
+                ipip_config = {}
+                return ipip_config
+            # IPs should be uniq
+            while is_conflict(ipip_config, ips):
+                ips = get_ips(pod_subnet, nodes_number)
+    
+            ipip_config[host]['local_int1'] = ips[0]
+            ipip_config[host]['remote_int1'] = ips[1]
+    
+        for node in nodes_list():
+            host = node['internal_address']
+            ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
+            ipip_config[host]['remote_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['local_int1']
+    else:
+        node1 = nodes_list[0]['internal_address']
+        node2 = nodes_list[1]['internal_address']
+        ipip_config[node1] = {}
+        ipip_config[node2] = {}
+        ipip_config[node1]['remote_ext1'] = host_pairs[node1][0]
+        ipip_config[node2]['remote_ext1'] = host_pairs[node2][0]
 
-        ipip_config[host]['local_int1'] = ips[0]
-        ipip_config[host]['remote_int1'] = ips[1]
-
-    for node in group.get_ordered_members_configs_list():
-        host = node['internal_address']
-        ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
-        ipip_config[host]['remote_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['local_int1']
+        ips = get_ips(pod_subnet, nodes_number)
+        ipip_config[node1]['local_int1'] = ips[0]
+        ipip_config[node1]['remote_int1'] = ips[1]
+        ipip_config[node2]['local_int1'] = ips[1]
+        ipip_config[node2]['remote_int1'] = ips[0]
 
     return ipip_config
 
@@ -1372,6 +1387,10 @@ def get_pairs(group: NodeGroup) -> Dict[str, List[str]]:
 
     pairs: Dict[str, List[str]] = {}
     nodes_list = group.get_ordered_members_configs_list()
+    if len(nodes_list) == 2:
+        pairs[nodes_list[0]['internal_address']] = [nodes_list[1]['internal_address']]
+        pairs[nodes_list[1]['internal_address']] = [nodes_list[0]['internal_address']]
+        return pairs
     i = 0 
     # Create a loop
     for node in nodes_list:
@@ -1401,20 +1420,31 @@ def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, Dict[str, str]]) 
     try:
         # Create IPIP tunnels
         with group.new_executor() as exe:
-            for node in exe.group.get_ordered_members_list():
-                host = node.get_config()['internal_address']
-                node.sudo(f"ip link add name test-ipip1 type ipip "
-                           f"local {host} remote {ipip_config[host]['remote_ext1']} && "
-                           f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
-                           f"sudo ip link set test-ipip1 up && "
-                           f"sudo ip addr add {ipip_config[host]['local_int1']} dev test-ipip1 && "
-                           f"sudo ip route add {ipip_config[host]['remote_int1']} dev test-ipip1 &&"
-                           f"sudo ip link add name test-ipip2 type ipip "
-                           f"local {host} remote {ipip_config[host]['remote_ext2']} && "
-                           f"sudo ip link set mtu {ipip_mtu} dev test-ipip2 && "
-                           f"sudo ip link set test-ipip2 up && "
-                           f"sudo ip addr add {ipip_config[host]['local_int2']} dev test-ipip2 && "
-                           f"sudo ip route add {ipip_config[host]['remote_int2']} dev test-ipip2")
+            if len(exe.group.get_ordered_members_list()) > 2:
+                for node in exe.group.get_ordered_members_list():
+                    host = node.get_config()['internal_address']
+                    node.sudo(f"ip link add name test-ipip1 type ipip "
+                              f"local {host} remote {ipip_config[host]['remote_ext1']} && "
+                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
+                              f"sudo ip link set test-ipip1 up && "
+                              f"sudo ip addr add {ipip_config[host]['local_int1']} dev test-ipip1 && "
+                              f"sudo ip route add {ipip_config[host]['remote_int1']} dev test-ipip1 &&"
+                              f"sudo ip link add name test-ipip2 type ipip "
+                              f"local {host} remote {ipip_config[host]['remote_ext2']} && "
+                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip2 && "
+                              f"sudo ip link set test-ipip2 up && "
+                              f"sudo ip addr add {ipip_config[host]['local_int2']} dev test-ipip2 && "
+                              f"sudo ip route add {ipip_config[host]['remote_int2']} dev test-ipip2")
+            else:
+                for node in exe.group.get_ordered_members_list():
+                    host = node.get_config()['internal_address']
+                    node.sudo(f"ip link add name test-ipip1 type ipip "
+                              f"local {host} remote {ipip_config[host]['remote_ext1']} && "
+                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
+                              f"sudo ip link set test-ipip1 up && "
+                              f"sudo ip addr add {ipip_config[host]['local_int1']} dev test-ipip1 && "
+                              f"sudo ip route add {ipip_config[host]['remote_int1']} dev test-ipip1")
+
         # Run IPIP tunnel check
         collector = CollectorCallback(group.cluster)
         with group.new_executor() as exe:
