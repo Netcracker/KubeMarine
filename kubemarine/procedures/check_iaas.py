@@ -1316,7 +1316,7 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
             ipip_config[host] = {}
             ipip_config[host]['remote_ext1'] = host_pairs[host][0]
             ipip_config[host]['remote_ext2'] = host_pairs[host][1]
-    
+
             ips = get_ips(pod_subnet, nodes_number)
             if len(ips) == 0:
                 ipip_config = {}
@@ -1324,10 +1324,10 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
             # IPs should be uniq
             while is_conflict(ipip_config, ips):
                 ips = get_ips(pod_subnet, nodes_number)
-    
+
             ipip_config[host]['local_int1'] = ips[0]
             ipip_config[host]['remote_int1'] = ips[1]
-    
+
         for node in nodes_list():
             host = node['internal_address']
             ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
