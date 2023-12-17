@@ -1328,7 +1328,7 @@ def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
             ipip_config[host]['local_int1'] = ips[0]
             ipip_config[host]['remote_int1'] = ips[1]
 
-        for node in nodes_list():
+        for node in nodes_list:
             host = node['internal_address']
             ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
             ipip_config[host]['remote_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['local_int1']
