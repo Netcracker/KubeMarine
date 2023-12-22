@@ -229,40 +229,40 @@ def disable(group: NodeGroup) -> None:
 
 
 def generate_config(cluster: KubernetesCluster, node: NodeConfig) -> str:
-    config = ''
+    config_options: dict = cluster.inventory['services']['loadbalancer']['keepalived']
+    config_string: Optional[str] = config_options.get('config')
+    if config_string is not None:
+        return config_string
 
-    inventory = cluster.inventory
-    for i, item in enumerate(inventory['vrrp_ips']):
-
-        if i > 0:
-            # this is required for double newline in config, but avoid double newline in the end of file
-            config += "\n"
-
-        ips = {
-            'source': node['internal_address'],
-            'peers': []
-        }
-
-        for record in item['hosts']:
-            if record['name'] == node['name']:
-                priority = record['priority']
-                interface = record['interface']
-                break
-        else:
+    vrrps_ips = []
+    keepalived_nodes = cluster.nodes['keepalived'].get_final_nodes().get_ordered_members_configs_list()
+    for item in cluster.inventory['vrrp_ips']:
+        host = next((record for record in item['hosts'] if record['name'] == node['name']), None)
+        if not host:
             # This VRRP IP should not be configured on this node.
             # There is still at least one VRRP IP to configure on this node
             # due to the way how 'keepalived' group is calculated.
             continue
+        vrrps_ips.append({
+            'id': item['id'],
+            'router_id': item['router_id'],
+            'ip': item['ip'],
+            'password': item['password'],
+            'interface': host['interface'],
+            'priority': host['priority'],
+            'source': node['internal_address'],
+            'peers': [
+                i_node['internal_address'] for i_node in keepalived_nodes
+                if any(i_node['name'] == record['name'] and i_node['internal_address'] != node['internal_address']
+                       for record in item['hosts'])
+            ]
+        })
 
-        for i_node in cluster.nodes['keepalived'].get_final_nodes().get_ordered_members_configs_list():
-            for record in item['hosts']:
-                if i_node['name'] == record['name'] and i_node['internal_address'] != ips['source']:
-                    ips['peers'].append(i_node['internal_address'])
-
+    if config_options.get('config_file'):
+        config_source = utils.read_external(config_options['config_file'])
+    else:
         config_source = utils.read_internal('templates/keepalived.conf.j2')
-        config += Template(config_source).render(inventory=inventory, item=item, node=node,
-                                                 interface=interface,
-                                                 priority=priority, **ips) + "\n"
+    config = Template(config_source).render(vrrp_ips=vrrps_ips, globals=config_options['global'])
 
     return config
 

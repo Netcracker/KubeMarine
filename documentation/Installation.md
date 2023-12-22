@@ -989,6 +989,9 @@ By default, autodetection is enabled.
 
 In order to assign VRRP IP you need to create a `vrrp_ips` section in the inventory and specify the appropriate configuration.
 You can specify several VRRP IP addresses.
+This configuration will be applied in keepalived configuration on balancer nodes.
+If it's needed, it's possible to specify global parameters or override whole keepalived configuration. More about it is
+in keepalived section in [loadbalancer specification](#loadbalancer).
 
 The following parameters are supported:
 
@@ -3220,7 +3223,7 @@ However, it is possible to add or modify any deployment parameters of the invent
 
 #### loadbalancer
 
-`loadbalancer` configures the balancers for the Kubernetes cluster. Currently, only the Haproxy configuration can be customized.
+`loadbalancer` configures the balancers for the Kubernetes cluster. Currently, only the Haproxy and Keepalived configuration can be customized.
 
 ###### target_ports
 
@@ -3432,6 +3435,162 @@ This parameter use the following context options for template rendering:
 - target_ports
 
 As an example of a template, you can look at [default template](/kubemarine/templates/haproxy.cfg.j2).
+
+##### keepalived
+
+This section describes the configuration parameters that are applied to the **keepalived.conf** config file in addition 
+to those related to [vrrp ips](#vrrp_ips).
+By default, the following configuration is used:
+
+```yaml
+services:
+  loadbalancer:
+    keepalived:
+      global: {}
+```
+
+These settings can be overrided in the **cluster.yaml**. Currently, the following settings of **keepalived.conf** are supported:
+
+<table>
+<thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Type<br></th>
+    <th>Default value</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>global.vrrp_garp_master_refresh</td>
+    <td>integer</td>
+    <td></td>
+    <td>"vrrp_garp_master_refresh". Number of gratuitous ARP messages to send at a time while MASTER. Not applied by default. </td>
+  </tr>
+  <tr>
+    <td>config</td>
+    <td>string</td>
+    <td></td>
+    <td>Custom keepalived config value to be used instead of the default one.</td>
+  </tr>
+  <tr>
+    <td>config_file</td>
+    <td>string</td>
+    <td></td>
+    <td>Path to the Jinja-template file with custom keepalived config to be used instead of the default one.</td>
+  </tr>
+</tbody>
+</table>
+
+**Note**: you can use either `config` or `config_file` if you need to use custom config instead of default.
+
+Parameter `config` allows to specify your custom config file. The priority of this option is higher than that of `config_file`, and if both are specified, `config` will be used. Example:
+
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+      keep_configs_updated: True
+      config: |
+        global_defs {
+          vrrp_garp_master_refresh 60
+          vrrp_garp_master_refresh_repeat 10
+          vrrp_garp_interval 1
+        }
+        vrrp_script script_27a2eb32e5 {
+          script       "/usr/local/bin/check_haproxy.sh"
+          interval 2
+          fall 2
+          rise 2
+        }
+
+        vrrp_instance balancer_27a2eb32e5 {
+          state BACKUP
+          interface enp0s8
+          virtual_router_id 130
+          priority 254
+          nopreempt
+          virtual_ipaddress {
+            10.0.2.2 dev enp0s8 label vip_27a2eb32e5
+          }
+        
+          track_script {
+            script_27a2eb32e5
+          }
+        
+          authentication {
+            auth_type PASS
+            auth_pass 6f3a13e1
+          }
+        }
+```
+
+Parameter `config_file` allows to specify path to Jinja-compiled template. Example:
+```yaml
+services:
+  loadbalancer:
+    haproxy:
+      keep_configs_updated: True
+      config_file: '/root/my_keepalived_config.conf.j2'
+```
+
+This parameter use the following context options for template rendering:
+* `globals` (values from 'services.loadbalancer.keepalived.global`);
+* modified [vrrp_ips](#vrrp_ips) with following properties for every of them:
+
+<table>
+<thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Type<br></th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>id</td>
+    <td>string</td>
+    <td>The ID of the VRRP IP, specified in <code>vrrp_ips[].id</code>.</td>
+  </tr>
+  <tr>
+    <td>router_id</td>
+    <td>string</td>
+    <td>The router ID of the VRRP IP, specified in <code>vrrp_ips[].router_id</code>.</td>
+  </tr>
+  <tr>
+    <td>ip</td>
+    <td>string</td>
+    <td>The IP address for virtual IP, specified in <code>vrrp_ips[].ip</code>.</td>
+  </tr>
+  <tr>
+    <td>password</td>
+    <td>string</td>
+    <td>Password for VRRP IP set, specified in <code>vrrp_ips[].password</code> or randomly generated.</td>
+  </tr>
+  <tr>
+    <td>interface</td>
+    <td>string</td>
+    <td>The interface on which the address must be listened, specified in <code>vrrp_ips[].interface</code> or autodetected.</td>
+  </tr>
+  <tr>
+    <td>priority</td>
+    <td>string</td>
+    <td>The priority of the VRRP IP host, specified in <code>vrrp_ips[].priority</code>.</td>
+  </tr>
+  <tr>
+    <td>source</td>
+    <td>string</td>
+    <td>The `internal_address` of the node, where target configuration is applied.</td>
+  </tr>
+  <tr>
+    <td>peers</td>
+    <td>list of strings</td>
+    <td>The `internal_address` of the other nodes, where VRRP IP should be set.</td>
+  </tr>
+</tbody>
+</table>
+
+As an example of a template, you can look at [default template](/kubemarine/templates/keepalived.conf.j2).
 
 #### maintenance mode
 
