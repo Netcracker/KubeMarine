@@ -34,6 +34,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
+  - [Operation not permitted error in kubemarine docker run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
@@ -968,6 +969,18 @@ $ nslookup kubernetes.default.svc.cluster.local
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
+
+## Operation not permitted error in kubemarine docker run
+
+**Symptoms**: Some command in kubemarine docker fails with "Operation not permitted" error. The command can be absolutely different, e.g. new thread creation for kubemarine run or simple `ls` command.
+
+**Root cause**: The problem is not compatible docker and kubemarine base [image version](/Dockerfile#L1): kubemarine uses system calls, that is not allowed by default in docker.
+
+**Solution**: Check the compatibility issues for used docker version and kubemarine base [image version](/Dockerfile#L1) and 
+upgrade docker version to one, where found issues are resolved. 
+
+As alternative, provide additional grants to kubemarine container using `--privileged` or `--cap-add` options for docker command.
+
 
 ## Failures During Kubernetes Upgrade Procedure
 
