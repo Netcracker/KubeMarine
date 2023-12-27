@@ -982,7 +982,8 @@ upgrade docker version to one, where found issues are resolved.
 As alternative, provide additional grants to kubemarine container using `--privileged` or `--cap-add` options for docker command.
 
 **Example of problem**: kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
-```
+
+```bash
 $ docker run --entrypoint ls kubemarine:v0.25.0 -la
 ls: cannot access '.': Operation not permitted
 ls: cannot access '..': Operation not permitted
