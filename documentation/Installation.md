@@ -2320,7 +2320,7 @@ services:
       source: 'http://user:password@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
 ```
 
-**Note**: Do not forget to use percent-encoded credentials, for example for username `user` and password `p@$$w0rD`:
+**Note**: Percent-encoded (URL encoded) should be used for credentials. For example for username `user` and password `p@$$w0rD`:
 ```yaml
 services:
   thirdparties:
