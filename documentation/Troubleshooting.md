@@ -34,6 +34,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
     - [Case 1](#case-1)
     - [Case 2](#case-2)
 - [Troubleshooting Kubemarine](#troubleshooting-kubemarine)
+  - [Operation not permitted error in kubemarine docker run](#operation-not-permitted-error-in-kubemarine-docker-run)
   - [Failures During Kubernetes Upgrade Procedure](#failures-during-kubernetes-upgrade-procedure)
   - [Numerous Generation of Auditd System Messages](#numerous-generation-of-auditd-system)
   - [Failure During Installation on Ubuntu OS With Cloud-init](#failure-during-installation-on-ubuntu-os-with-cloud-init)
@@ -968,6 +969,34 @@ $ nslookup kubernetes.default.svc.cluster.local
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
+
+## Operation not permitted error in kubemarine docker run
+
+**Symptoms**: Some command in kubemarine docker fails with "Operation not permitted" error. The command can be absolutely different, e.g. new thread creation for kubemarine run or simple `ls` command.
+
+**Root cause**: The problem is not compatible docker and kubemarine base [image version](/Dockerfile#L1): kubemarine uses system calls, that is not allowed by default in docker.
+
+**Solution**: Check the compatibility issues for used docker version and kubemarine base [image version](/Dockerfile#L1) and 
+upgrade docker version to one, where found issues are resolved. 
+
+As alternative, provide additional grants to kubemarine container using `--privileged` or `--cap-add` options for docker command.
+
+**Example of problem**: kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
+
+```bash
+$ docker run --entrypoint ls kubemarine:v0.25.0 -la
+ls: cannot access '.': Operation not permitted
+ls: cannot access '..': Operation not permitted
+ls: cannot access '.dockerignore': Operation not permitted
+total 0
+d????????? ? ? ? ?            ? .
+d????????? ? ? ? ?            ? ..
+-????????? ? ? ? ?            ? .dockerignore
+```
+
+The root cause here is in `coreutils 8.32` library, that is installed in that kubemarine image. This library uses `statx` calls for `ls` command,
+but those calls were added to docker white-list only since `1.13.1-109` version. For this reason it works only with this  or newer version.
+
 
 ## Failures During Kubernetes Upgrade Procedure
 
