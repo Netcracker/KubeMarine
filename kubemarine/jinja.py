@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 from typing import Callable, Dict, Any
+from urllib.parse import quote_plus
 
 import yaml
 import jinja2
@@ -34,6 +36,9 @@ def new(_: log.EnhancedLogger, *,
     precompile_filters['isipv4'] = lambda ip: utils.isipv(ip, [4])
     precompile_filters['minorversion'] = utils.minor_version
     precompile_filters['majorversion'] = utils.major_version
+    precompile_filters['b64encode'] = lambda s: base64.b64encode(s.encode()).decode()
+    precompile_filters['b64decode'] = lambda s: base64.b64decode(s.encode()).decode()
+    precompile_filters['url_quote'] = lambda u: quote_plus(u)
 
     for name, filter_ in precompile_filters.items():
         env.filters[name] = lambda s, n=name, f=filter_: f(_precompile(n, s))
