@@ -981,6 +981,21 @@ upgrade docker version to one, where found issues are resolved.
 
 As alternative, provide additional grants to kubemarine container using `--privileged` or `--cap-add` options for docker command.
 
+**Example of problem**: kubemarine image `v0.25.0` runs `ls -la` command on `Centos 7.5 OS` with docker version `1.13.1-102` installed:
+```
+$ docker run --entrypoint ls kubemarine:v0.25.0 -la
+ls: cannot access '.': Operation not permitted
+ls: cannot access '..': Operation not permitted
+ls: cannot access '.dockerignore': Operation not permitted
+total 0
+d????????? ? ? ? ?            ? .
+d????????? ? ? ? ?            ? ..
+-????????? ? ? ? ?            ? .dockerignore
+```
+
+The root cause here is in `coreutils 8.32` library, that is installed in that kubemarine image. This library uses `statx` calls for `ls` command,
+but those calls were added to docker white-list only since `1.13.1-109` version. For this reason it works only with this  or newer version.
+
 
 ## Failures During Kubernetes Upgrade Procedure
 
