@@ -1783,6 +1783,8 @@ services:
 
 **Note**: You cannot and do not need to specify repositories for different package managers. The package manager is detected automatically and the specified configuration should match it.
 
+**Note**: You can use secure repositories with credentials as for [thirdparties](#secure-registries-for-thirdparties).
+
 ##### management
 
 *Installation task*: `prepare.package_manager.manage_packages`
@@ -2300,6 +2302,56 @@ services:
       source: https://example.com/kubernetes/kubeadm/v1.22.2/bin/linux/amd64/kubeadm
 ```
 
+##### secure registries for thirdparties
+
+If you have secure registry for thirdparties, you can specify credentials in `source` field using HTTP basic configuration, e.g.:
+```yaml
+services:
+  thirdparties:
+    /usr/bin/kubeadm:
+      source: 'http://user:password@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubeadm'
+    /usr/bin/kubelet:
+      source: 'http://user:password@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubelet'
+    /usr/bin/kubectl:
+      source: 'http://user:password@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubectl'
+    /usr/bin/calicoctl:
+      source: 'http://user:password@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
+    /usr/bin/crictl.tar.gz:
+      source: 'http://user:password@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+```
+
+**Note**: Percent-encoded (URL encoded) should be used for credentials. For example for username `user` and password `p@$$w0rD`:
+```yaml
+services:
+  thirdparties:
+    /usr/bin/kubeadm:
+      source: 'http://user:p%40%24%24w0rD@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubeadm'
+```
+
+Also it's possible to use environment variables for such credentials. 
+For that kubemarine provide following jinja functions to convert strings:
+* `b64encode` to encode to base64;
+* `b64decode` to decode from base64;
+* `url_quote` to use percent-encoding;
+
+**Note**: such functions can be used not only for thirdparties, but in any places and order;
+
+For example, if you use `REG_USERNAME` and `REG_PASSWORD` [environments](#environment-variables) for credentials, you can use following configuration:
+```yaml
+services:
+  thirdparties:
+    /usr/bin/kubeadm:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubeadm'
+    /usr/bin/kubelet:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubelet'
+    /usr/bin/kubectl:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-release/release/{{k8s-version}}/bin/linux/amd64/kubectl'
+    /usr/bin/calicoctl:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/projectcalico/calico/releases/download/{{calico-version}}/calicoctl-linux-amd64'
+    /usr/bin/crictl.tar.gz:
+      source: 'http://{{ env.REG_USERNAME | url_quote }}:{{ env.REG_PASSWORD | url_quote }}@some-registry-url/kubernetes-sigs/cri-tools/releases/download/{{crictl-version}}/crictl-{{crictl-version}}-linux-amd64.tar.gz'
+```
+
 #### CRI
 
 *Installation task*: `prepare.cri`
@@ -2419,6 +2471,38 @@ services:
 ```
 
 Where, `auth: "bmMtdXNlcjperfr="` field is `username:password` string in base64 encoding.
+
+**Note**: it's possible to use environment variables for credentials as for [thirdparies](#secure-registries-for-thirdparties). 
+For example, you can use `REG_USERNAME` and `REG_PASSWORD` environments with folowing configuration:
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".auth:
+        auth: "{{ (env.REG_USERNAME ~ ':' ~ env.REG_PASSWORD ) | b64encode }}"
+    containerdRegistriesConfig:
+      private-registry:5000:
+        host."https://private-registry:5000":
+          capabilities: [ "pull", "resolve" ]
+          skip_verify: true
+```
+
+Or more simple:
+```yaml
+services:
+  cri:
+    containerRuntime: containerd
+    containerdConfig:
+      plugins."io.containerd.grpc.v1.cri".registry.configs."private-registry:5000".auth:
+        username: "{{ env.REG_USERNAME }}"
+        password: "{{ env.REG_PASSWORD }}"
+    containerdRegistriesConfig:
+      private-registry:5000:
+        host."https://private-registry:5000":
+          capabilities: [ "pull", "resolve" ]
+          skip_verify: true
+```
 
 Note how `containerdConfig` and `containerdRegistriesConfig.<registry>` sections reflect the toml format structure.
 For more details on containerd configuration, refer to the official containerd configuration file documentation at [https://github.com/containerd/containerd/blob/main/docs/cri/config.md](https://github.com/containerd/containerd/blob/main/docs/cri/config.md).
