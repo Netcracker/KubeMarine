@@ -42,13 +42,20 @@ Before you start any maintenance procedure, you must complete the following mand
 1. If using custom RPM repositories, make sure they are online, accessible from nodes, and you are able to perform repository updates.
 1. Prepare the latest actual **cluster.yaml** that should contain information about the current cluster state. For more information, refer to the [Kubemarine Inventory Preparation](Installation.md#inventory-preparation) section in _Kubemarine Installation Procedure_.
 
-   **Note**: If you provide an incorrect config file, it can cause unknown consequences.
+   **Note**: If you provide an incorrect config file, it can cause unknown consequences. For more information, refer to [Basics](#basics). 
 
 1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform. Each procedure has its own configuration format. Read documentation below to fill procedure inventory data.
 
 # Basics
 
-According to `KubeMarine` concept the `cluster.yaml` is a reflection of a Kubernetes cluster state. Therefore, any changes on cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state. That is important practice even if the `cluster.yaml` section or option is applicable only for installation procedure, because the particular `cluster.yaml` could be used for reinstallation or reproduction some cases. For the changes that can't be reflected in `cluster.yaml` appropriate comments could be used.
+According to `KubeMarine` concept the `cluster.yaml` is a reflection of a Kubernetes cluster state.
+Therefore, any changes on cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
+That is important practice even if the `cluster.yaml` section or option is applicable only for installation procedure, because the particular `cluster.yaml` could be used for reinstallation or reproduction some cases.
+For the changes that can't be reflected in `cluster.yaml` appropriate comments could be used.
+
+Maintenance of the cluster can be done in two scenarios:
+1. It can be performed using some Kubemarine procedure. In this case Kubemarine does its best to keep `cluster.yaml` and the cluster constistent to each other.
+2. Cluster can be reconfigured manually. In this case the user should also manually reflect the changes in the `cluster.yaml`.
 
 # Provided Procedures
 
