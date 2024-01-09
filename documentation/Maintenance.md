@@ -48,14 +48,14 @@ Before you start any maintenance procedure, you must complete the following mand
 
 # Basics
 
-According to `KubeMarine` concept the `cluster.yaml` is a reflection of a Kubernetes cluster state.
-Therefore, any changes on cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
-That is important practice even if the `cluster.yaml` section or option is applicable only for installation procedure, because the particular `cluster.yaml` could be used for reinstallation or reproduction some cases.
-For the changes that can't be reflected in `cluster.yaml` appropriate comments could be used.
+According to the `KubeMarine` concept, `cluster.yaml` is a reflection of the Kubernetes cluster state.
+Therefore, any changes on the cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
+This is an important practice even if the `cluster.yaml` section or option is applicable only for the installation procedure because the particular `cluster.yaml` can be used for the reinstallation or reproduction of some cases.
+For the changes that cannot be reflected in `cluster.yaml`, the appropriate comments can be used.
 
-Maintenance of the cluster can be done in two scenarios:
-1. It can be performed using some Kubemarine procedure. In this case Kubemarine does its best to keep `cluster.yaml` and the cluster constistent to each other.
-2. Cluster can be reconfigured manually. In this case the user should also manually reflect the changes in the `cluster.yaml`.
+The maintenance of the cluster can be done in two scenarios:
+* It can be performed using some Kubemarine procedure. In this case, Kubemarine does its best to keep `cluster.yaml` and the cluster consistent to each other.
+* The cluster can be reconfigured manually. In this case, the user should also manually reflect the changes in the `cluster.yaml`.
 
 # Provided Procedures
 
