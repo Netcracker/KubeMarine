@@ -3489,7 +3489,7 @@ Parameter `config` allows to specify your custom config file. The priority of th
 ```yaml
 services:
   loadbalancer:
-    haproxy:
+    keepalived:
       keep_configs_updated: True
       config: |
         global_defs {
@@ -3529,7 +3529,7 @@ Parameter `config_file` allows to specify path to Jinja-compiled template. Examp
 ```yaml
 services:
   loadbalancer:
-    haproxy:
+    keepalived:
       keep_configs_updated: True
       config_file: '/root/my_keepalived_config.conf.j2'
 ```
@@ -3599,7 +3599,7 @@ Kubemarine supports maintenance mode for HAproxy balancer. HAproxy balancer has 
 ```yaml
 services:
   loadbalancer:
-    haproxy:
+    keepalived:
       maintenance_mode: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
