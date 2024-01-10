@@ -3599,7 +3599,7 @@ Kubemarine supports maintenance mode for HAproxy balancer. HAproxy balancer has 
 ```yaml
 services:
   loadbalancer:
-    keepalived:
+    haproxy:
       maintenance_mode: True
       mntc_config_location: '/etc/haproxy/haproxy_mntc_v1.cfg'
 ```
