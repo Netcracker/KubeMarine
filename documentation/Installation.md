@@ -3477,7 +3477,7 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td>config</td>
     <td>string</td>
     <td></td>
-    <td>Custom keepalived config value to be used instead of the default one.</td>
+    <td>Custom keepalived config value to be used instead of the default one. It can be userful, when every installation/add_node procedure adds only one balancer. In that case it's possible to specify custom configuration for every balancer without jinja templates./td>
   </tr>
   <tr>
     <td>config_file</td>
