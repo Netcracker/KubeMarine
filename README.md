@@ -9,7 +9,7 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 
 ## Highlights
 - Easy to use
-- Many procedures supported:
+- Many procedures supported following the [generic maintenance approach](documentation/Maintenance.md#basics):
   - [install](documentation/Installation.md#)
   - [add_node](documentation/Maintenance.md#add-node-procedure)
   - [remove_node](documentation/Maintenance.md#remove-node-procedure)

@@ -1138,6 +1138,8 @@ services:
 
 **Warning**: These kubeadm parameters are configurable only during installation, currently. 
 Kubemarine currently do not provide special procedure to change these parameters after installation.
+To reconfigure the parameters manually, refer to the official documentation at [https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-reconfigure](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-reconfigure).
+For more information about generic approach of the cluster maintenance, refer to [Maintenance Basics](Maintenance.md#basics).
 
 During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
