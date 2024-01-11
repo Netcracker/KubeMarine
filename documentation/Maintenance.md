@@ -1,6 +1,7 @@
 This section describes the features and steps for performing maintenance procedures on the existing Kubernetes cluster.
 
 - [Prerequisites](#prerequisites)
+- [Basics](#basics)
 - [Provided Procedures](#provided-procedures)
     - [Kubemarine Migration Procedure](#kubemarine-migration-procedure)
       - [Software Upgrade Patches](#software-upgrade-patches)
@@ -48,14 +49,15 @@ Before you start any maintenance procedure, you must complete the following mand
 
 # Basics
 
-According to the `KubeMarine` concept, `cluster.yaml` is a reflection of the Kubernetes cluster state.
+According to the Kubemarine concept, `cluster.yaml` is a reflection of the Kubernetes cluster state.
 Therefore, any changes on the cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
 This is an important practice even if the `cluster.yaml` section or option is applicable only for the installation procedure because the particular `cluster.yaml` can be used for the reinstallation or reproduction of some cases.
 For the changes that cannot be reflected in `cluster.yaml`, the appropriate comments can be used.
 
 The maintenance of the cluster can be done in two scenarios:
-* It can be performed using some Kubemarine procedure. In this case, Kubemarine does its best to keep `cluster.yaml` and the cluster consistent to each other.
-* The cluster can be reconfigured manually. In this case, the user should also manually reflect the changes in the `cluster.yaml`.
+
+- It can be performed using some Kubemarine procedure. In this case, Kubemarine does its best to keep `cluster.yaml` and the cluster consistent to each other.
+- The cluster can be reconfigured manually. In this case, the user should also manually reflect the changes in the `cluster.yaml`.
 
 # Provided Procedures
 
