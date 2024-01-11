@@ -116,6 +116,11 @@
         "config_file": {
           "type": "string",
           "description": "Path to the Jinja-template file with custom keepalived config to be used instead of the default one"
+        },
+        "keep_configs_updated": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allows Kubemarine update keepalived configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)"
         }
       }
     }

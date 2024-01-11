@@ -424,6 +424,10 @@ def deploy_loadbalancer_keepalived_install(group: NodeGroup) -> None:
 
 
 def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster) -> None:
+    if not cluster.inventory['services'].get('loadbalancer', {}) \
+            .get('keepalived', {}).get('keep_configs_updated', True):
+        cluster.log.debug('Skipped - keepalived balancers configs update manually disabled')
+        return
     # For install procedure, configure all keepalives.
     # If balancer with VRPP IP is added or removed, reconfigure all keepalives
     keepalived_nodes = cluster.make_group_from_roles(['keepalived'])

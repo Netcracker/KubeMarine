@@ -3468,6 +3468,12 @@ These settings can be overrided in the **cluster.yaml**. Currently, the followin
     <td>"vrrp_garp_master_refresh". Number of gratuitous ARP messages to send at a time while MASTER. Not applied by default. </td>
   </tr>
   <tr>
+    <td>keep_configs_updated</td>
+    <td>boolean</td>
+    <td>True</td>
+    <td>Allows Kubemarine update keepalived configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)</td>
+  </tr>
+  <tr>
     <td>config</td>
     <td>string</td>
     <td></td>
