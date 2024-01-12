@@ -201,6 +201,9 @@ The actual information about the supported versions can be found in `compatibili
     * 80
     * 443
     * 6443 : Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
+* Enabled additional protocols:
+  * **VRRP**: protocol is using by keepalived to manage vIP between nodes with role **balancer**. Protocol number 112
+  * **IPIP**: protocol is using for communication between kubernetes nodes of several clusters in Active-Active scheme only. Make shure **IPIP** protocol is added to all Security Groups in OpenStack and allowed on all intermediate network devices. Protocol number 4
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
