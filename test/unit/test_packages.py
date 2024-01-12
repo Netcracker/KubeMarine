@@ -216,6 +216,15 @@ class AssociationsEnrichment(unittest.TestCase):
         with self.assertRaisesRegex(Exception, packages.ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS):
             demo.new_cluster(inventory, procedure_inventory=add_node, context=context, nodes_context=nodes_context)
 
+    def test_no_error_if_global_section_redefined_for_check_iaas_all_nodes_inaccessible(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        expected_pkgs = 'docker-ce'
+        package_associations(inventory, None, 'docker')['package_name'] = expected_pkgs
+        context = demo.create_silent_context(procedure='check_iaas')
+        nodes_context = {node['address']: demo.generate_node_context(accessible=False) for node in inventory['nodes']}
+        # no error
+        demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+
     def test_success_if_os_specific_section_redefined_for_add_node_different_os(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         expected_pkgs = 'docker-ce'

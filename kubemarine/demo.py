@@ -21,7 +21,7 @@ import threading
 import time
 from abc import ABC
 from copy import deepcopy
-from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO, Tuple, cast
+from typing import List, Dict, Union, Any, Optional, Mapping, Iterable, IO, Tuple, cast, Callable
 
 import fabric  # type: ignore[import-untyped]
 import invoke
@@ -182,26 +182,42 @@ class FakeFS:
         return result
 
 
+class FakeClusterStorage(utils.ClusterStorage):
+    def __init__(self, cluster: object, context: dict):
+        super().__init__(cluster, context)
+
+    def make_dir(self) -> None:
+        pass
+
+    def upload_and_rotate(self) -> None:
+        cluster = cast(FakeKubernetesCluster, self.cluster)
+        cluster.uploaded_archives.append(self.local_archive_path)
+
+    def upload_info_new_control_planes(self) -> None:
+        pass
+
+
 class FakeKubernetesCluster(KubernetesCluster):
 
     def __init__(self, *args: Any, **kwargs: Any):
         self.resources: FakeResources = kwargs.pop("resources")
         self.fake_shell = self.resources.fake_shell
         self.fake_fs = self.resources.fake_fs
+        self.uploaded_archives: List[str] = []
         super().__init__(*args, **kwargs)
 
     def _create_connection_pool(self, nodes: Dict[str, dict], gateway_nodes: Dict[str, dict], hosts: List[str]) -> ConnectionPool:
         return FakeConnectionPool(nodes, gateway_nodes, hosts, self.fake_shell, self.fake_fs)
 
+    def _create_cluster_storage(self, context: dict) -> utils.ClusterStorage:
+        return FakeClusterStorage(self, context)
+
     def make_group(self, ips: Iterable[_AnyConnectionTypes]) -> FakeNodeGroup:
         return FakeNodeGroup(ips, self)
 
-    def preserve_inventory(self, context) -> None:
-        return
-
 
 class FakeResources(DynamicResources):
-    def __init__(self, context: dict, inventory: dict, procedure_inventory: dict = None,
+    def __init__(self, context: dict, inventory: dict = None, procedure_inventory: dict = None,
                  nodes_context: Dict[str, Any] = None,
                  fake_shell: FakeShell = None, fake_fs: FakeFS = None, make_finalized_inventory: bool = False):
         super().__init__(context)
@@ -251,6 +267,21 @@ class FakeResources(DynamicResources):
             connection_pool=self._connection_pool, nodes_context=self._nodes_context,
             resources=self,
         )
+
+    def insert_enrichment_function(self, near: EnrichmentFunction, stages: EnrichmentStage,
+                                   fn: Callable[[KubernetesCluster], Optional[dict]],
+                                   *,
+                                   procedure: str = None,
+                                   after: bool = False) -> None:
+
+        enrichment_fn = enrichment(stages, procedures=None if procedure is None else [procedure])(fn)
+
+        idx = self._enrichment_functions.index(near)
+        if after:
+            idx += 1
+        self._enrichment_functions.insert(idx, enrichment_fn)
+
+        self._skip_default_enrichment = None
 
     def enrichment_functions(self) -> List[EnrichmentFunction]:
         return self._enrichment_functions
@@ -425,8 +456,8 @@ def create_silent_context(args: list = None, procedure: str = 'install') -> dict
     return context
 
 
-def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict = None,
-                nodes_context: dict = None) -> FakeKubernetesCluster:
+def new_resources(inventory: dict, procedure_inventory: dict = None, context: dict = None,
+                  nodes_context: dict = None) -> FakeResources:
     if context is None:
         context = create_silent_context()
 
@@ -434,8 +465,13 @@ def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict
     if nodes_context is not None:
         nds_context.update(nodes_context)
 
-    res = FakeResources(context, inventory,
-                        procedure_inventory=procedure_inventory, nodes_context=nds_context)
+    return FakeResources(context, inventory,
+                         procedure_inventory=procedure_inventory, nodes_context=nds_context)
+
+
+def new_cluster(inventory: dict, procedure_inventory: dict = None, context: dict = None,
+                nodes_context: dict = None) -> FakeKubernetesCluster:
+    res = new_resources(inventory, procedure_inventory, context, nodes_context)
     try:
         return res.cluster()
     except errors.FailException as exc:

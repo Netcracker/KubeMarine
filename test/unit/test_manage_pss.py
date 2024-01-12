@@ -81,6 +81,29 @@ class EnrichmentValidation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, re.escape(admission.ERROR_INCONSISTENT_INVENTORIES)):
             self._create_cluster()
 
+    def test_defaults_verify_version(self):
+        self.manage_pss['pss']['defaults']['enforce-version'] = 'not a version'
+        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+            self._create_cluster()
+
+    def test_namespaces_verify_version(self):
+        self.manage_pss['pss']['namespaces'] = [
+            {'custom_ns': {'enforce-version': 'not a version'}}
+        ]
+        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+            self._create_cluster()
+
+    def test_namespaces_defaults_verify_version(self):
+        self.manage_pss['pss']['namespaces_defaults'] = {'enforce-version': 'not a version'}
+        with self.assertRaisesRegex(Exception, 'incorrect Kubernetes version'):
+            self._create_cluster()
+
+    def test_verify_poth_states_disabled(self):
+        self.inventory['rbac']['pss']['pod-security'] = 'disabled'
+        self.manage_pss['pss']['pod-security'] = 'disabled'
+        with self.assertRaisesRegex(Exception, re.escape(admission.ERROR_PSS_BOTH_STATES_DISABLED)):
+            self._create_cluster()
+
 
 class EnrichmentAndFinalization(unittest.TestCase):
     def setUp(self):
@@ -104,18 +127,48 @@ class EnrichmentAndFinalization(unittest.TestCase):
         return demo.new_cluster(deepcopy(self.inventory), procedure_inventory=deepcopy(self.manage_pss),
                                 context=self.context)
 
-    def test_merge_exemptions(self):
-        self.inventory['rbac']['pss']['exemptions']['namespaces'] = ['a', 'b']
-        self.manage_pss['pss']['exemptions']['namespaces'] = [{'<<': 'merge'}, 'c']
+    def test_enrich_and_finalize_admission_configuration(self):
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        self.inventory['rbac']['pss'] = {
+            'exemptions': {
+                'namespaces': ['a', 'b'],
+                'usernames': ['u'],
+                'runtimeClasses': ['rc-old']
+            },
+            'defaults': {
+                'enforce': 'privileged',
+            }
+        }
+        self.manage_pss['pss'] = {
+            'pod-security': "enabled",
+            'exemptions': {
+                'namespaces': [{'<<': 'merge'}, 'c'],
+                'runtimeClasses': ['rc-new']
+            },
+            'defaults': {
+                'enforce': 'restricted',
+                'enforce-version': 'v1.28'
+            }
+        }
 
         cluster = self._create_cluster()
-        self.assertEqual(['a', 'b', 'c'], cluster.inventory['rbac']['pss']['exemptions']['namespaces'])
+        pss = cluster.inventory['rbac']['pss']
+        self._test_enrich_and_finalize_admission_configuration_check(pss, True)
 
-        finalized_inventory = utils.make_finalized_inventory(cluster)
-        self.assertEqual(['a', 'b', 'c'], finalized_inventory['rbac']['pss']['exemptions']['namespaces'])
+        pss = utils.make_finalized_inventory(cluster)['rbac']['pss']
+        self._test_enrich_and_finalize_admission_configuration_check(pss, True)
 
-        final_inventory = cluster.formatted_inventory
-        self.assertEqual(['a', 'b', 'c'], final_inventory['rbac']['pss']['exemptions']['namespaces'])
+        pss = cluster.formatted_inventory['rbac']['pss']
+        self._test_enrich_and_finalize_admission_configuration_check(pss, False)
+
+    def _test_enrich_and_finalize_admission_configuration_check(self, pss: dict, enriched: bool):
+        self.assertEqual(['a', 'b', 'c'], pss['exemptions']['namespaces'])
+        self.assertEqual(['u'], pss['exemptions']['usernames'])
+        self.assertEqual(['rc-new'], pss['exemptions']['runtimeClasses'])
+
+        self.assertEqual('restricted', pss['defaults']['enforce'])
+        self.assertEqual('v1.28', pss['defaults']['enforce-version'])
+        self.assertEqual(enriched, pss['defaults'].get('audit') == 'baseline')
 
     def test_disable_pss_dont_enrich_feature_gates(self):
         self.inventory['rbac']['pss']['pod-security'] = 'enabled'

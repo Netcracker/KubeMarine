@@ -50,9 +50,7 @@ class EnrichmentAndFinalization(unittest.TestCase):
         return self._new_resources().cluster()
 
     def _run(self) -> demo.FakeResources:
-        resources = test_utils.FakeResources(self.context, self.inventory,
-                                             procedure_inventory=self.remove_node,
-                                             nodes_context=self.nodes_context)
+        resources = self._new_resources()
         flow.run_actions(resources, [remove_node.RemoveNodeAction()])
         return resources
 

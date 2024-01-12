@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import gzip
-import logging
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -23,7 +22,7 @@ from typing import Optional
 from unittest import mock
 
 from kubemarine import demo
-from kubemarine.core import utils, log, flow
+from kubemarine.core import utils, flow
 from kubemarine.procedures import backup
 from test.unit import utils as test_utils
 
@@ -39,16 +38,13 @@ class TestBackupTasks(unittest.TestCase):
         self.args = self.context['execution_arguments']
         self.args['disable_dump'] = False
         self.args['dump_location'] = self.tmpdir.name
-        utils.prepare_dump_directory(self.args['dump_location'])
+        test_utils.prepare_dump_directory(self.context)
 
         self.fake_shell = demo.FakeShell()
         self.resources: Optional[demo.FakeResources] = None
 
     def tearDown(self):
-        logger = logging.getLogger("k8s.fake.local")
-        for h in logger.handlers:
-            if isinstance(h, log.FileHandlerWithHeader):
-                h.close()
+        test_utils.prepare_dump_directory(self.context)
         self.tmpdir.cleanup()
 
     def _run(self, procedure_inventory: dict):

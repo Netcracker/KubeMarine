@@ -48,12 +48,9 @@ class Flow(ABC):
             resources = res.RESOURCES_FACTORY(context)
 
         context = resources.context
-        args: dict = context['execution_arguments']
 
         try:
-            if not args['disable_dump']:
-                utils.prepare_dump_directory(args['dump_location'],
-                                             reset_directory=not args['disable_dump_cleanup'])
+            utils.prepare_dump_directory(context)
             resources.logger()
             self._run(resources)
         except Exception as exc:

@@ -393,6 +393,9 @@ class KubernetesCluster(Environment):
     def _create_connection_pool(self, nodes: Dict[str, dict], gateway_nodes: Dict[str, dict], hosts: List[str]) -> ConnectionPool:
         return ConnectionPool(nodes, gateway_nodes, hosts)
 
+    def _create_cluster_storage(self, context: dict) -> utils.ClusterStorage:
+        return utils.ClusterStorage(self, context)
+
     @property
     def log(self) -> log.EnhancedLogger:
         return self._logger
@@ -649,10 +652,10 @@ class KubernetesCluster(Environment):
 
     def preserve_inventory(self, context: dict) -> None:
         self.log.debug("Start preserving of the information about the procedure.")
-        cluster_storage = utils.ClusterStorage(self, context)
+        cluster_storage = self._create_cluster_storage(context)
         cluster_storage.make_dir()
         if self.context.get('initial_procedure') == 'add_node':
             cluster_storage.upload_info_new_control_planes()
         cluster_storage.collect_procedure_info()
-        cluster_storage.compress_and_upload_archive()
-        cluster_storage.rotation_file()
+        cluster_storage.compress_archive()
+        cluster_storage.upload_and_rotate()

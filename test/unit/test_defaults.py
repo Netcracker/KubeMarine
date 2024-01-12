@@ -260,6 +260,10 @@ class PrimitiveValuesAsString(unittest.TestCase):
         self.assertEqual(False, typha['enabled'])
         self.assertEqual(2, typha['replicas'])
 
+        nginx_ingress_ports = inventory['plugins']['nginx-ingress-controller']['ports']
+        self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
+        self.assertEqual(20443, [port for port in nginx_ingress_ports if port['name'] == 'https'][0]['hostPort'])
+
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'

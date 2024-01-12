@@ -166,6 +166,20 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
 
         self.assertEqual([{'groups': ['worker'], 'patch': {'kubelet_kp1': 'kubelet_vp1_new'}}], kubeadm_patches['kubelet'])
 
+    def test_change_apiserver_args_check_jinja_dependent_parameters(self):
+        self.reconfigure['services']['kubeadm'] = {
+            'apiServer': {
+                'extraArgs': {'audit-policy-file': '/changed/path'},
+            }
+        }
+
+        cluster = self.new_cluster()
+
+        apiserver = cluster.inventory['services']['kubeadm']['apiServer']
+        self.assertEqual('/changed/path', apiserver['extraArgs']['audit-policy-file'])
+        self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['hostPath'])
+        self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['mountPath'])
+
     def test_pss_managed_arg_not_redefined(self):
         self.inventory.setdefault('rbac', {})['admission'] = 'pss'
         self.inventory['rbac']['pss'] = {'pod-security': 'enabled'}

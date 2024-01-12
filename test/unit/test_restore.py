@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 import tempfile
 import unittest
@@ -22,7 +21,7 @@ from unittest import mock
 import yaml
 
 from kubemarine import demo, thirdparties
-from kubemarine.core import utils, log, static
+from kubemarine.core import utils, static
 from kubemarine.procedures import restore, backup
 from test.unit import utils as test_utils
 
@@ -33,7 +32,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
 
         self.context = self._create_context(['--without-act'])
-        utils.prepare_dump_directory(self.context['execution_arguments']['dump_location'])
+        test_utils.prepare_dump_directory(self.context)
 
         self.restore_tmpdir = os.path.join(self.tmpdir.name, 'restore_test')
         os.mkdir(self.restore_tmpdir)
@@ -43,10 +42,7 @@ class RestoreEnrichmentTest(unittest.TestCase):
         self.restore['backup_location'] = self.backup_location
 
     def tearDown(self):
-        logger = logging.getLogger("k8s.fake.local")
-        for h in logger.handlers:
-            if isinstance(h, log.FileHandlerWithHeader):
-                h.close()
+        test_utils.prepare_dump_directory(self.context)
         self.tmpdir.cleanup()
 
     def _create_context(self, args: List[str]) -> dict:

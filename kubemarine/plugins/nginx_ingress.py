@@ -22,6 +22,8 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
+ERROR_CERT_RENEW_NOT_INSTALLED = "Certificates can not be renewed for nginx plugin since it is not installed"
+
 
 def check_job_for_nginx(cluster: KubernetesCluster) -> None:
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -77,7 +79,7 @@ def verify_cert_renew(cluster: KubernetesCluster) -> None:
     procedure_nginx_cert = cluster.procedure_inventory.get("nginx-ingress-controller", {})
     # check that renewal is possible
     if procedure_nginx_cert and not cluster.inventory["plugins"]["nginx-ingress-controller"]["install"]:
-        raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
+        raise Exception(ERROR_CERT_RENEW_NOT_INSTALLED)
 
 
 def manage_custom_certificate(cluster: KubernetesCluster) -> None:

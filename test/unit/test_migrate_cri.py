@@ -14,6 +14,7 @@
 
 import unittest
 from copy import deepcopy
+from typing import Tuple
 
 from kubemarine import demo
 from kubemarine.core import errors, flow
@@ -21,7 +22,7 @@ from kubemarine.procedures import migrate_cri
 from test.unit import utils as test_utils
 
 
-def generate_migrate_cri_environment() -> (dict, dict):
+def generate_migrate_cri_environment() -> Tuple[dict, dict]:
     inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
     inventory['services']['cri'] = {
         'containerRuntime': 'docker'
@@ -188,6 +189,16 @@ class MigrateCriRegistryEnrichment(unittest.TestCase):
 
         self.assertIn('host."https://example.another-registry:8080"', registry_settings_2)
         self.assertEqual(['pull'], registry_settings_2['host."https://example.another-registry:8080"'].get('capabilities'))
+
+    def test_remove_docker_config(self):
+        self.inventory.setdefault('services', {}).setdefault('cri', {})['dockerConfig'] = {
+            'registry-mirrors': ['http://example.registry']
+        }
+        resources = self._run()
+
+        self.assertNotIn('dockerConfig', resources.working_inventory['services']['cri'])
+        self.assertNotIn('dockerConfig', resources.inventory()['services']['cri'])
+        self.assertNotIn('dockerConfig', resources.finalized_inventory['services']['cri'])
 
 
 if __name__ == '__main__':

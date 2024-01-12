@@ -80,11 +80,16 @@ def get_elapsed_string(start: float, end: float) -> str:
     return '{:02}h {:02}m {:02}s'.format(int(hours), int(minutes), int(seconds))
 
 
-def prepare_dump_directory(location: str, reset_directory: bool = True) -> None:
+def prepare_dump_directory(context: dict) -> None:
+    args: dict = context['execution_arguments']
+    location = args['dump_location']
+    reset_directory = not args['disable_dump_cleanup']
     dumpdir = os.path.join(location, 'dump')
     if reset_directory and os.path.exists(dumpdir) and os.path.isdir(dumpdir):
         shutil.rmtree(dumpdir)
-    os.makedirs(dumpdir, exist_ok=True)
+
+    if not args['disable_dump']:
+        os.makedirs(dumpdir, exist_ok=True)
 
 
 def make_ansible_inventory(location: str, c: object) -> None:
@@ -636,8 +641,8 @@ class ClusterStorage:
         self.cluster = cast(KubernetesCluster, cluster)
         self.context = context
         self.dir_path = "/etc/kubemarine/procedures/"
-        self.dir_name = ''
         self.dir_location = ''
+        self.local_archive_path = ''
 
     def make_dir(self) -> None:
         """
@@ -650,16 +655,26 @@ class ClusterStorage:
         self.cluster.nodes['control-plane'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                                  f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
-    def rotation_file(self) -> None:
+    def upload_and_rotate(self) -> None:
         """
-        This method packs files with logs and maintains a structured storage of logs on the cluster.
+        This method uploads and unpacks the archive,
+        then packs files with logs and maintains a structured storage of logs on the cluster.
         """
+        control_planes = self.cluster.nodes["control-plane"]
+
+        self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
+        remote_archive = self.dir_location + "local.tar.gz"
+        control_planes.put(self.local_archive_path, remote_archive, sudo=True)
+        control_planes.sudo(
+            f'tar -C {self.dir_location} -xzv --no-same-owner -f {remote_archive}  && '
+            f'sudo rm -f {remote_archive} ')
+
         not_pack_file = self.cluster.inventory['procedure_history']['archive_threshold']
         delete_old = self.cluster.inventory['procedure_history']['delete_threshold']
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
-        node_group_results = self.cluster.nodes["control-plane"].sudo(command)
-        with node_group_results.get_group().new_executor() as exe:
+        node_group_results = control_planes.sudo(command)
+        with control_planes.new_executor() as exe:
             for control_plane in exe.group.get_ordered_members_list():
                 result = node_group_results[control_plane.get_host()]
                 files = result.stdout.split()
@@ -673,24 +688,19 @@ class ClusterStorage:
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
-    def compress_and_upload_archive(self) -> None:
+    def compress_archive(self) -> None:
         """
-        This method compose dump files and sends the collected files to the nodes.
+        This method compose dump files in the local archive.
         """
         context = self.context
-        archive = get_dump_filepath(context, "local.tar.gz")
-        with tarfile.open(archive, "w:gz") as tar:
+        self.local_archive_path = get_dump_filepath(context, "local.tar.gz")
+        with tarfile.open(self.local_archive_path, "w:gz") as tar:
             for name in ClusterStorage.PRESERVED_DUMP_FILES:
                 source = get_dump_filepath(context, name)
                 if os.path.exists(source):
                     tar.add(source, 'dump/' + name)
             tar.add(context['execution_arguments']['config'], 'cluster.yaml')
             tar.add(get_version_filepath(), 'version')
-
-        self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
-        self.cluster.nodes['control-plane'].put(archive, self.dir_location + 'local.tar.gz', sudo=True)
-        self.cluster.nodes['control-plane'].sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
-                                                 f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
 
     def collect_procedure_info(self) -> None:
         """

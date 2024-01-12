@@ -48,6 +48,9 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 loaded_oob_policies = {}
 
 ERROR_INCONSISTENT_INVENTORIES = "Procedure config and cluster config are inconsistent. Please check 'admission' option"
+ERROR_CHANGE_OOB_PSP_DISABLED = "OOB policies can not be configured when security is disabled"
+ERROR_PSS_BOTH_STATES_DISABLED = ("both 'pod-security' in procedure config and current config are 'disabled'. "
+                                  "There is nothing to change")
 
 # TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
@@ -145,7 +148,7 @@ def verify_psp_enrichment(cluster: KubernetesCluster) -> None:
     previous_psp = cluster.previous_inventory["rbac"]["psp"]
     psp = cluster.inventory["rbac"]["psp"]
     if psp["pod-security"] == "disabled" and previous_psp["oob-policies"] != psp["oob-policies"]:
-        raise Exception("OOB policies can not be configured when security is disabled")
+        raise Exception(ERROR_CHANGE_OOB_PSP_DISABLED)
 
 
 def verify_custom(custom_scope: Dict[str, List[dict]]) -> None:
@@ -468,7 +471,7 @@ def verify_pss_enrichment(cluster: KubernetesCluster) -> None:
 
     if (cluster.previous_inventory["rbac"]["pss"]["pod-security"] == "disabled"
             and cluster.inventory["rbac"]["pss"]["pod-security"] == "disabled"):
-        raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
+        raise Exception(ERROR_PSS_BOTH_STATES_DISABLED)
 
     if "namespaces" in procedure_config:
         for namespace_item in procedure_config["namespaces"]:

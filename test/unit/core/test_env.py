@@ -12,48 +12,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 import tempfile
 import unittest
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from unittest import mock
 
 from kubemarine import demo, plugins
-from kubemarine.core import utils, log, flow
-from kubemarine.procedures import install
+from kubemarine.core import utils, flow, action
+from kubemarine.core.yaml_merger import default_merger
+from kubemarine.procedures import install, upgrade, migrate_kubemarine
+from kubemarine.procedures.migrate_kubemarine import ThirdpartyUpgradeAction, CriUpgradeAction, BalancerUpgradeAction, \
+    PluginUpgradeAction
 from test.unit import utils as test_utils
 
 
 class TestEnvironmentVariables(unittest.TestCase):
     def setUp(self):
-        self.tmpdir = tempfile.TemporaryDirectory()
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
-        self.context = demo.create_silent_context(['--without-act'])
+        self.procedure_inventory = None
+        self.nodes_context = demo.generate_nodes_context(self.inventory)
+        self.resources: Optional[demo.FakeResources] = None
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        test_utils.prepare_dump_directory(self.context)
+        self.tmpdir.cleanup()
+
+    def prepare_context(self, args: list = None, procedure: str = 'install'):
+        self.context = demo.create_silent_context(args, procedure)
         args = self.context['execution_arguments']
         args['disable_dump'] = False
         args['dump_location'] = self.tmpdir.name
-        utils.prepare_dump_directory(args['dump_location'])
-
-        self.resources: Optional[demo.FakeResources] = None
-
-    def tearDown(self):
-        logger = logging.getLogger("k8s.fake.local")
-        for h in logger.handlers:
-            if isinstance(h, log.FileHandlerWithHeader):
-                h.close()
-        self.tmpdir.cleanup()
+        test_utils.prepare_dump_directory(self.context)
 
     def _new_resources(self) -> demo.FakeResources:
         return test_utils.FakeResources(self.context, self.inventory,
-                                        nodes_context=demo.generate_nodes_context(self.inventory))
+                                        procedure_inventory=self.procedure_inventory,
+                                        nodes_context=self.nodes_context)
 
-    def _run(self, mock_environ: Dict[str, str]):
+    def _run(self, mock_environ: Dict[str, str], actions: List[action.Action] = None):
         self.resources = self._new_resources()
         with mock.patch.dict(os.environ, mock_environ):
-            flow.run_actions(self.resources, [install.InstallAction()])
+            if actions is None:
+                actions = [install.InstallAction()]
+            flow.run_actions(self.resources, actions)
 
     def test_simple_miscellaneous_env_variables(self):
+        self.prepare_context(['--without-act'])
         self.inventory['values'] = {
             'variable': '{{ env.ENV_NAME }}',
         }
@@ -76,6 +83,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('password123', config['password'])
 
     def test_substring_jinja_env_variables(self):
+        self.prepare_context(['--without-act'])
         self.inventory['plugins'] = {'my_plugin': {'installation': {'procedures': [
             {'helm': {
                 'chart_path': __file__,
@@ -94,6 +102,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('1.2.3', values['version'])
 
     def test_expression_jinja_env_variables(self):
+        self.prepare_context(['--without-act'])
         self.inventory['values'] = {
             'variable': '{{ env.ENV_NAME1 | default("not defined") }}',
         }
@@ -102,6 +111,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('not defined', inventory['values']['variable'])
 
     def test_recursive_env_variables(self):
+        self.prepare_context(['--without-act'])
         self.inventory['values'] = {
             'variable1': '{{ values.variable3 }}',
             'variable2': '{{ env.ENV_NAME }}',
@@ -114,6 +124,7 @@ class TestEnvironmentVariables(unittest.TestCase):
         self.assertEqual('value-recursive', inventory['values']['variable3'])
 
     def test_plugin_template_apply_env_variables(self):
+        self.prepare_context()
         template_file = os.path.join(self.tmpdir.name, 'template.yaml.j2')
         with utils.open_external(template_file, 'w') as t:
             t.write('Some {{ env.ENV_VAR }}\n')
@@ -133,6 +144,80 @@ class TestEnvironmentVariables(unittest.TestCase):
 
         compiled_template = utils.read_external(os.path.join(self.tmpdir.name, 'dump', 'template.yaml'))
         self.assertIn('Some env_value', compiled_template, "Env variable should be expanded in dump files.")
+
+    def test_kubernetes_version_env_variable(self):
+        kubernetes_version = 'v1.28.4'
+        self.prepare_context(['--without-act'])
+        self.inventory['services']['kubeadm'] = {
+            'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
+        }
+
+        self._run({'KUBERNETES_VERSION': kubernetes_version})
+
+        inventory = self.resources.working_inventory
+        self.assertEqual(kubernetes_version, inventory['services']['kubeadm']['kubernetesVersion'])
+        self.assertEqual(f'https://storage.googleapis.com/kubernetes-release/release/{kubernetes_version}/bin/linux/amd64/kubeadm',
+                         inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
+
+    def test_kubernetes_version_upgrade_env_variable(self):
+        before, after = 'v1.27.8', 'v1.28.6'
+        self.prepare_context(['fake_path.yaml', '--without-act'], procedure='upgrade')
+        self.inventory['services']['kubeadm'] = {
+            'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
+        }
+        self.inventory['services']['packages'] = {
+            'associations': {'containerd': {'package_name': 'containerd_old'}}
+        }
+        self.procedure_inventory = demo.generate_procedure_inventory('upgrade')
+        upgrade_plan = ['{{ env.UPGRADE_VERSION }}']
+        self.procedure_inventory['upgrade_plan'] = upgrade_plan
+        self.procedure_inventory.setdefault('{{ env.UPGRADE_VERSION }}', {})['packages'] = {
+            'associations': {'containerd': {'package_name': 'containerd_new'}}
+        }
+
+        self._run({'KUBERNETES_VERSION': before, 'UPGRADE_VERSION': after},
+                  [upgrade.UpgradeAction(upgrade_plan[0], 0)])
+
+        inventory = self.resources.working_inventory
+        self.assertEqual(after, inventory['services']['kubeadm']['kubernetesVersion'])
+        self.assertEqual(f'https://storage.googleapis.com/kubernetes-release/release/{after}/bin/linux/amd64/kubeadm',
+                         inventory['services']['thirdparties']['/usr/bin/kubeadm']['source'])
+        self.assertEqual('containerd_new',
+                         inventory['services']['packages']['associations']['rhel']['containerd']['package_name'])
+
+    def test_kubernetes_version_env_variable_migrate_kubemarine_upgrade_patches(self):
+        self.prepare_context(procedure='migrate_kubemarine')
+        self.inventory['services']['kubeadm'] = {
+            'kubernetesVersion': "{{ env.KUBERNETES_VERSION }}"
+        }
+        self.inventory.setdefault('services', {}).setdefault('cri', {})['containerRuntime'] = 'containerd'
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='22.04')
+
+        env_kubernetes_version = 'v1.27.8'
+        changed_upgrade_config = {
+            'thirdparties': {'crictl': [env_kubernetes_version]},
+            'packages': {
+                'containerd': {'version_debian': [env_kubernetes_version]},
+                'haproxy': {'version_debian': True},
+            },
+            'plugins': {
+                'calico': [env_kubernetes_version],
+            },
+        }
+        with test_utils.backup_software_upgrade_config() as upgrade_config, \
+                mock.patch.object(ThirdpartyUpgradeAction, ThirdpartyUpgradeAction._run.__name__) as thirdparty_run, \
+                mock.patch.object(CriUpgradeAction, CriUpgradeAction._run.__name__) as cri_run, \
+                mock.patch.object(BalancerUpgradeAction, BalancerUpgradeAction._run.__name__) as balancer_run, \
+                mock.patch.object(PluginUpgradeAction, PluginUpgradeAction._run.__name__) as plugin_run:
+
+            default_merger.merge(upgrade_config, changed_upgrade_config)
+            actions = [p.action for p in migrate_kubemarine.load_patches()
+                       if p.identifier in ['upgrade_crictl', 'upgrade_cri', 'upgrade_haproxy', 'upgrade_calico']]
+
+            self._run({'KUBERNETES_VERSION': env_kubernetes_version}, actions)
+
+            for run in (thirdparty_run, cri_run, balancer_run, plugin_run):
+                self.assertTrue(run.called, f"Upgrade patch was not run")
 
 
 if __name__ == '__main__':
