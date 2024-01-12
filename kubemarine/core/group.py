@@ -621,18 +621,22 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
         """
         return self.get_nodes_os() == 'multiple'
 
-    def get_subgroup_with_os(self: GROUP_SELF, os_family: str) -> GROUP_SELF:
+    def get_subgroup_with_os(self: GROUP_SELF, os_families: Union[str, List[str]]) -> GROUP_SELF:
         """
         Forms and returns a new group from the nodes of the original group that have a specific OS family
-        :param os_family: The name of required OS family
+        :param os_families: The name of or list of names of required OS families
         :return: NodeGroup
         """
-        if os_family not in ['debian', 'rhel', 'rhel8', 'rhel9']:
-            raise Exception('Unsupported OS family provided')
+        if not isinstance(os_families, list):
+            os_families = [os_families]
+
+        for os_family in os_families:
+            if os_family not in ['debian', 'rhel', 'rhel8', 'rhel9']:
+                raise Exception('Unsupported OS family provided')
         hosts = []
         for host in self.nodes:
             node_os_family = self.cluster.get_os_family_for_node(host)
-            if node_os_family == os_family:
+            if node_os_family in os_families:
                 hosts.append(host)
         return self._make_group(hosts)
 
