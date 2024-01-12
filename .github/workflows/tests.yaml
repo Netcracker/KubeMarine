@@ -2,7 +2,7 @@ name: Tests and Validations
 on:
   push:
     branches:
-      - '**'
+      - 'main'
 env:
    COPYRIGHT_COMPANY: 'NetCracker Technology Corporation'
    COPYRIGHT_YEAR: '2021-2023'

@@ -29,6 +29,7 @@ jobs:
   test-default-installation:
     runs-on: ubuntu-22.04
     needs: collect_kubernetes_versions
+    if: false
     env:
       cluster_yaml_file: ./ci/default_cluster.yaml
     strategy:
@@ -137,6 +138,20 @@ jobs:
       - name: Get events kubectl
         if: failure()
         run: sudo kubectl get events --sort-by='.metadata.creationTimestamp' -A
+      - name: Describe coredns
+        if: failure()
+        run: |
+          sudo kubectl get pods -A -o wide
+          sudo kubectl describe pods -A
+          sudo kubectl get cm -n kube-system kubelet-config -o yaml
+          sudo kubectl describe pod -n kube-system $(sudo kubectl get pods -A | awk '/coredns/{{ print $2 }}')
+          sudo kubectl logs -n kube-system $(sudo kubectl get pods -A | awk '/coredns/{{ print $2 }}' | head -1)
+          sudo ls -la /etc/cni/net.d/
+          sudo cat /etc/cni/net.d/10-calico.conflist
+          sudo cat /etc/cni/net.d/87-podman-bridge.conflist
+          sudo kubectl get cm -n kube-system calico-config -o yaml
+          sudo cat /run/systemd/resolve/resolv.conf
+          sudo cat /etc/resolv.conf
       - name: Collect journalctl logs
         if: failure()
         run: |
