@@ -453,11 +453,10 @@ class ThirdpartiesEnrichment(unittest.TestCase):
 
     def test_require_source_redefinition(self):
         self.inventory['services']['thirdparties']['/usr/bin/kubelet'] = 'kubelet-redefined'
-        self._new_cluster()
-        # with utils.assert_raises_kme(self, "KME0011",
-        #                              key='source', thirdparty='/usr/bin/kubelet',
-        #                              previous_version_spec='.*', next_version_spec='.*'):
-        #     self._new_cluster()
+        with utils.assert_raises_kme(self, "KME0011",
+                                     key='source', thirdparty='/usr/bin/kubelet',
+                                     previous_version_spec='.*', next_version_spec='.*'):
+            self._new_cluster()
 
     def test_require_sha1_redefinition(self):
         self.inventory['services']['thirdparties']['/usr/bin/kubectl'] = {
@@ -466,11 +465,10 @@ class ThirdpartiesEnrichment(unittest.TestCase):
         }
         self.upgrade[self.new]['thirdparties']['/usr/bin/kubectl'] = 'kubectl-new'
 
-        self._new_cluster()
-        # with utils.assert_raises_kme(self, "KME0011",
-        #                              key='sha1', thirdparty='/usr/bin/kubectl',
-        #                              previous_version_spec='.*', next_version_spec='.*'):
-        #     self._new_cluster()
+        with utils.assert_raises_kme(self, "KME0011",
+                                     key='sha1', thirdparty='/usr/bin/kubectl',
+                                     previous_version_spec='.*', next_version_spec='.*'):
+            self._new_cluster()
 
 
 class UpgradeContainerdConfigEnrichment(unittest.TestCase):

@@ -173,13 +173,7 @@ def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
 
     if context["initial_procedure"] == "upgrade":
         previous_version = cluster.previous_inventory['services']['kubeadm']['kubernetesVersion']
-        # Validation is currently turned off for backward compatibility.
-        # It is possible to redefine all thirdparties with templates depending on Kubernetes version and the compatibility map.
-        # This technically allows to not supply new thirdparties during upgrade.
-        # The validation is turned on for new functionality of thirdparty upgrade during Kubemarine migration.
-        #
-        # thirdparties_verify = get_default_thirdparties()
-        thirdparties_verify = []
+        thirdparties_verify = get_default_thirdparties()
     else:  # migrate_kubemarine procedure
         previous_version = ""
         thirdparties_verify = [context['upgrading_thirdparty']]
@@ -190,27 +184,46 @@ def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
 def _verify_upgrade_plan(cluster: KubernetesCluster, previous_version: str,
                          thirdparties_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
 
-    thirdparties = utils.deepcopy_yaml(cluster.previous_raw_inventory.get('services', {}).get('thirdparties', {}))
+    previous_raw_thirdparties = utils.deepcopy_yaml(cluster.previous_raw_inventory.get('services', {}).get('thirdparties', {}))
     sensitive_keys = ['source', 'sha1']
 
-    for version, upgrade_thirdparties in upgrade_plan:
+    # Restrict validation to the next version only because it depends on compilation.
+    for version, upgrade_thirdparties in upgrade_plan[:1]:
         if version != '' and jinja.is_template(version):
             break
 
         upgrade_thirdparties = utils.deepcopy_yaml(upgrade_thirdparties)
 
         for destination in thirdparties_verify:
-            config = _convert_thirdparty(thirdparties, destination)
+            raw_config = _convert_thirdparty(previous_raw_thirdparties, destination)
+            # No need to copy two below inventories as they are (to be) enriched.
+            previous_config = _convert_thirdparty(cluster.previous_inventory['services']['thirdparties'], destination)
+            config = _convert_thirdparty(cluster.inventory['services']['thirdparties'], destination)
+
             upgrade_config = _convert_thirdparty(upgrade_thirdparties, destination)
 
             for key in sensitive_keys:
-                if config.get(key) and not upgrade_config.get(key):
+                defaults_changed = True if version == '' else (
+                        get_default_thirdparty_version(previous_version, destination)
+                        != get_default_thirdparty_version(version, destination)
+                )
+
+                if raw_config.get(key) and (
+                        not upgrade_config.get(key)
+                        # It is historically possible to redefine all thirdparties with templates
+                        # dependent on Kubernetes version and the compatibility map.
+                        # This technically allows to do not supply new thirdparties during upgrade, but still upgrade them.
+                        # The validation below checks this case and allows upgrade if defaults are changed,
+                        # and the result of compilation differs.
+                        # For Kubemarine migration procedure, the check below is always True.
+                        and defaults_changed and previous_config.get(key) == config.get(key)
+                ):
                     raise errors.KME("KME0011",
                                      key=key, thirdparty=destination,
                                      previous_version_spec=f" for version {previous_version}" if previous_version else "",
                                      next_version_spec=f" for next version {version}" if version else "")
 
-            default_merger.merge(config, upgrade_config)
+            default_merger.merge(raw_config, upgrade_config)
 
         previous_version = version
 
