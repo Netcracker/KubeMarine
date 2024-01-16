@@ -39,7 +39,8 @@
               "default": 10000,
               "description": "Set the total number of connections allowed, process-wide."
             }
-          }  
+          },
+          "additionalProperties": false
         },
         "defaults": {
           "type": "object",
@@ -75,9 +76,11 @@
               "default": 10000,
               "description": "Limits the sockets to this number of concurrent connections"
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "target_ports": {
       "type": "object",
@@ -93,7 +96,39 @@
           "default": 443,
           "description": "Target https port"
         }
-      }
+      },
+      "additionalProperties": false
+    },
+    "keepalived": {
+      "type": "object",
+      "description": "The section contains the configuration parameters that are applied to the keepalived.conf config file",
+      "properties": {
+        "global": {
+          "type": "object",
+          "description": "Parameters that are passed directly to the 'global_defs ' section of keepalived.conf file.",
+          "properties": {
+            "vrrp_garp_master_refresh": {
+              "type": "integer",
+              "description": "minimum time interval (in seconds) for refreshing gratuitous ARPs while MASTER."
+            }
+          },
+          "additionalProperties": false
+        },
+        "config": {
+          "type": "string",
+          "description": "Custom keepalived config value to be used instead of the default one"
+        },
+        "config_file": {
+          "type": "string",
+          "description": "Path to the Jinja-template file with custom keepalived config to be used instead of the default one"
+        },
+        "keep_configs_updated": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allows Kubemarine update keepalived configs every time, when cluster (re)installed or it's schema updated (added/removed nodes)"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

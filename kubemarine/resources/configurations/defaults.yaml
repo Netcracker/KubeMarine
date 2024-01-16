@@ -434,6 +434,9 @@ services:
     target_ports:
       http: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20080{% else %}80{% endif %}'
       https: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20443{% else %}443{% endif %}'
+    keepalived:
+      keep_configs_updated: True
+      global: {}
 
   packages:
     cache_versions: true
