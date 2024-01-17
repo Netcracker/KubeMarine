@@ -92,6 +92,7 @@ subjects:
 
 **Note:** ClusterRole and ClusterRoleBinding are not required
 if you have `system:discovery` or `system:public-info-viewer` ClusterRoleBindings installed on the cluster (default).
+Though, such role bindings provide wider permissions than those that are necessary for the probes.
 
 ### Disabling Procedure
 
