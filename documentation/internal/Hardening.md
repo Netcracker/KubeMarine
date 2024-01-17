@@ -42,6 +42,11 @@ Useful links:
 
 The `--anonymous-auth` option manages anonymous requests to the `kube-apiserver`. By default, it enables anonymous requests.
 
+**Note:** If you disable anonymous authentication for `kube-apiserver`,
+some Kubemarine maintenance procedures will not work automatically,
+and will require manual actions before and after the maintenance.
+For more information, refer to [Limitations](#limitations).
+
 ### Prerequisites
 
 - A working Kubernetes cluster.
@@ -53,11 +58,7 @@ kind: ClusterRole
 metadata:
   name: healthz
 rules:
-- nonResourceURLs: ["/readyz"]
-  verbs: ["get"]
-- nonResourceURLs: ["/livez"]
-  verbs: ["get"]
-- nonResourceURLs: ["/healthz"]
+- nonResourceURLs: ["/readyz", "/livez", "/healthz"]
   verbs: ["get"]
 ---
 apiVersion: v1
@@ -82,12 +83,15 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: view
+  name: healthz
 subjects:
 - kind: ServiceAccount
   name: healthz
   namespace: kube-system
 ```
+
+**Note:** ClusterRole and ClusterRoleBinding are not required
+if you have `system:discovery` or `system:public-info-viewer` ClusterRoleBindings installed on the cluster (default).
 
 ### Disabling Procedure
 
@@ -164,9 +168,10 @@ kubectl -n kube-system get secret token-healthz -o jsonpath='{.data.token}' | ba
 
 ### Limitations
 
-If the `--anonymous-auth` is set to "false", the upgrade and node addition procedures need some changes in the workflow. The upgrade procedure needs enabling `anonymous-auth` before the `kubeadm upgrade` run.
+If the `--anonymous-auth` is set to "false", the upgrade and node addition procedures need some changes in the workflow.
+Both procedures needs enabling `anonymous-auth` on all existing control plane nodes before the `kubeadm` run.
 
-The node addition procedure is affected if the control plane node is being added. After the new control plane node is successfully added, the [Disabling Procedure](#disabling-procedure) should be performed on that node.
+After the procedure is performed, the [Disabling Procedure](#disabling-procedure) should be performed on all control plane nodes.
 
 Besides, disabled anonymous requests to `kube-apiserver` need changes in the monitoring system, if the resources like `healthz`, `readyz`, and `livez` are used in the system.
 
