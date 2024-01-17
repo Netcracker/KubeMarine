@@ -58,7 +58,7 @@ kind: ClusterRole
 metadata:
   name: healthz
 rules:
-- nonResourceURLs: ["/readyz", "/livez", "/healthz"]
+- nonResourceURLs: ["/readyz", "/livez"]
   verbs: ["get"]
 ---
 apiVersion: v1
