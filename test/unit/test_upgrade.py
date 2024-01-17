@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import random
 import re
 import unittest
@@ -28,7 +29,7 @@ from test.unit import utils
 class UpgradeVerifyUpgradePlan(unittest.TestCase):
 
     def test_valid_upgrade_plan(self):
-        upgrade.verify_upgrade_plan(self.k8s_versions()[0], self.k8s_versions()[1:])
+        upgrade.verify_upgrade_plan(self.k8s_versions()[0], self.latest_patch_k8s_versions()[1:])
 
     def test_invalid_upgrade_plan(self):
         k8s_oldest = self.k8s_versions()[0]
@@ -66,16 +67,29 @@ class UpgradeVerifyUpgradePlan(unittest.TestCase):
                                                % (re.escape(old_kubernetes_version), re.escape(new_kubernetes_version))):
             upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
 
+    def test_incorrect_inventory_not_latest_patch_version(self):
+        old_kubernetes_version = 'v1.27.1'
+        new_kubernetes_version = 'v1.28.0'
+        latest_supported_patch_version = next(v for v in self.latest_patch_k8s_versions()
+                                              if kutils.minor_version(v) == kutils.minor_version(new_kubernetes_version))
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_NOT_LATEST_PATCH
+                                               % (re.escape(new_kubernetes_version), re.escape(latest_supported_patch_version))):
+            upgrade.verify_upgrade_plan(old_kubernetes_version, [new_kubernetes_version])
+
     def test_upgrade_plan_sort(self):
         k8s_oldest = self.k8s_versions()[0]
-        k8s_versions = list(self.k8s_versions())[1:]
+        k8s_versions = list(self.latest_patch_k8s_versions())[1:]
         random.shuffle(k8s_versions)
         result = upgrade.verify_upgrade_plan(k8s_oldest, k8s_versions)
 
-        self.assertEqual(self.k8s_versions()[1:], result)
+        self.assertEqual(self.latest_patch_k8s_versions()[1:], result)
 
     def k8s_versions(self) -> List[str]:
         return sorted(list(static.KUBERNETES_VERSIONS['compatibility_map']), key=kutils.version_key)
+
+    def latest_patch_k8s_versions(self) -> List[str]:
+        return [sorted(versions, key=kutils.version_key)[-1]
+                for _, versions in itertools.groupby(self.k8s_versions(), key=kutils.minor_version)]
 
 
 def generate_upgrade_environment(old) -> Tuple[dict, dict]:

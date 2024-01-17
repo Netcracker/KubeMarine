@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Tuple, Iterator, Any, Optional
+from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
@@ -40,6 +40,7 @@ ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
 ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
 ERROR_MINOR_RANGE_EXCEEDED='Minor version \"%s\" rises to new \"%s\" more than one'
+ERROR_NOT_LATEST_PATCH='New version \"%s\" is not the latest supported patch version \"%s\"'
 
 
 def is_container_runtime_not_configurable(cluster: KubernetesCluster) -> bool:
@@ -1034,31 +1035,45 @@ def expect_kubernetes_version(cluster: KubernetesCluster, version: str,
     raise Exception('In the expected time, the nodes did not receive correct Kubernetes version')
 
 
-def test_version_upgrade_possible(old: str, new: str, skip_equal: bool = False) -> None:
-    versions_unchanged = {
-        'old': old.strip(),
-        'new': new.strip()
-    }
-    versions: Dict[str, Tuple[int, int, int]] = {}
+def is_version_upgrade_possible(old: str, new: str) -> bool:
+    try:
+        test_version_upgrade_possible(old, new)
+        return True
+    except Exception:
+        return False
 
-    for v_type, version in versions_unchanged.items():
-        versions[v_type] = utils.version_key(version)
+
+def test_version_upgrade_possible(old: str, new: str, skip_equal: bool = False) -> None:
+    old = old.strip()
+    new = new.strip()
+    old_version_key = utils.version_key(old)
+    new_version_key = utils.version_key(new)
 
     # test new is greater than old
-    if versions['old'] > versions['new']:
-        raise Exception(ERROR_DOWNGRADE % (versions_unchanged['old'], versions_unchanged['new']))
+    if old_version_key > new_version_key:
+        raise Exception(ERROR_DOWNGRADE % (old, new))
 
     # test new is the same as old
-    if versions['old'] == versions['new'] and not skip_equal:
-        raise Exception(ERROR_SAME % (versions_unchanged['old'], versions_unchanged['new']))
+    if old_version_key == new_version_key and not skip_equal:
+        raise Exception(ERROR_SAME % (old, new))
 
     # test major step is not greater than 1
-    if versions['new'][0] - versions['old'][0] > 1:
-        raise Exception(ERROR_MAJOR_RANGE_EXCEEDED % (versions_unchanged['old'], versions_unchanged['new']))
+    if new_version_key[0] - old_version_key[0] > 1:
+        raise Exception(ERROR_MAJOR_RANGE_EXCEEDED % (old, new))
 
     # test minor step is not greater than 1
-    if versions['new'][1] - versions['old'][1] > 1:
-        raise Exception(ERROR_MINOR_RANGE_EXCEEDED % (versions_unchanged['old'], versions_unchanged['new']))
+    if new_version_key[1] - old_version_key[1] > 1:
+        raise Exception(ERROR_MINOR_RANGE_EXCEEDED % (old, new))
+
+    # test the target version is the latest supported patch version
+    new_minor_version = utils.minor_version(new)
+    latest_supported_patch_version = max(
+        (v for v in static.KUBERNETES_VERSIONS['compatibility_map']
+         if utils.minor_version(v) == new_minor_version),
+        key=utils.version_key)
+
+    if new != latest_supported_patch_version:
+        raise Exception(ERROR_NOT_LATEST_PATCH % (new, latest_supported_patch_version))
 
 
 def recalculate_proper_timeout(cluster: KubernetesCluster, timeout: int) -> int:

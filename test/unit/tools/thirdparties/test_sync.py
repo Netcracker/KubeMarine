@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+import itertools
 import re
 import unittest
 from contextlib import contextmanager
@@ -343,8 +344,23 @@ class SynchronizationTest(unittest.TestCase):
                 with self.assertRaisesRegex(Exception, error_msg_pattern.format(**kwargs)):
                     self.run_sync()
 
+    def test_mapped_software_latest_patch_ascending_order(self):
+        for software_name in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner',
+                              'crictl'):
+            with self.subTest(software_name):
+                k8s_latest = self.k8s_versions()[-1]
+                self.kubernetes_versions = FakeKubernetesVersions()
+                software_version = self.compatibility_map()[k8s_latest][software_name]
+                for latest_patch_k8s_version in self.latest_patch_k8s_versions():
+                    software_version = test_utils.increment_version(software_version)
+                    self.compatibility_map()[latest_patch_k8s_version][software_name] = software_version
+
+                # No error should be raised
+                self.run_sync()
+
     def test_plugins_suspicious_aba_extra_images(self):
-        if len(self.k8s_versions()) < 3:
+        latest_patch_k8s_versions = self.latest_patch_k8s_versions()
+        if len(latest_patch_k8s_versions) < 3:
             self.skipTest("Cannot check suspicions A -> B -> A versions of extra images,")
 
         plugin_images = {
@@ -355,16 +371,14 @@ class SynchronizationTest(unittest.TestCase):
         for plugin, extra_image in plugin_images.items():
             with self.subTest(plugin):
                 self.kubernetes_versions = FakeKubernetesVersions()
-                self.compatibility_map()[self.k8s_versions()[0]][extra_image] = 'A'
-                self.compatibility_map()[self.k8s_versions()[1]][extra_image] = 'B'
-                self.compatibility_map()[self.k8s_versions()[-1]][extra_image] = 'A'
+                self.compatibility_map()[latest_patch_k8s_versions[0]][extra_image] = 'A'
+                self.compatibility_map()[latest_patch_k8s_versions[1]][extra_image] = 'B'
+                self.compatibility_map()[latest_patch_k8s_versions[-1]][extra_image] = 'A'
 
                 kwargs = {
                     'image': re.escape(extra_image), 'plugin': re.escape(plugin),
-                    'version_A': 'A', 'version_B': '.*',
-                    'older_k8s_version': re.escape(self.k8s_versions()[0]),
-                    'newer_k8s_version': re.escape(self.k8s_versions()[-1]),
-                    'k8s_version': '.*',
+                    'version_A': '.*', 'version_B': '.*',
+                    'older_k8s_version': '.*', 'newer_k8s_version': '.*', 'k8s_version': '.*',
                 }
                 with self.assertRaisesRegex(Exception, ERROR_SUSPICIOUS_ABA_VERSIONS.format(**kwargs)):
                     self.run_sync()
@@ -534,6 +548,10 @@ class SynchronizationTest(unittest.TestCase):
 
     def k8s_versions(self) -> List[str]:
         return sorted(self.compatibility_map(), key=utils.version_key)
+
+    def latest_patch_k8s_versions(self) -> List[str]:
+        return [sorted(versions, key=utils.version_key)[-1]
+                for _, versions in itertools.groupby(self.k8s_versions(), key=utils.minor_version)]
 
 
 if __name__ == '__main__':

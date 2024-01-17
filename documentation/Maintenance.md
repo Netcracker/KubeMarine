@@ -228,7 +228,10 @@ The configuration format for the plugins is the same.
   * https://kubernetes.io/docs/tasks/run-application/configure-pdb/#unhealthy-pod-eviction-policy is configured to _AlwaysAllow_
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
-* The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
+* The upgrade procedure only maintains upgrading from one `supported` version to the higher `supported` version.
+  The target version must also be the latest patch version supported by Kubemarine.
+  For example, upgrade is allowed from v1.26.7 to v1.26.11, or from v1.26.7 to v1.27.8, or from v1.26.7 to v1.28.4 through v1.27.8,
+  but not from v1.26.7 to v1.27.1 as v1.27.1 is not the latest supported patch version of Kubernetes v1.27.
 * Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 ### Upgrade Procedure Parameters

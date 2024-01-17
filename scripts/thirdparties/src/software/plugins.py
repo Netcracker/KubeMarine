@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import itertools
 import os
 import tarfile
 import tempfile
 from typing import List, Tuple, Dict, Any
 
-from kubemarine import demo
+from kubemarine import demo, kubernetes
 from kubemarine.core import static, utils, log
 from kubemarine.plugins import builtin
 from kubemarine.plugins.manifest import Manifest, get_default_manifest_path, Identity
@@ -131,6 +131,9 @@ def validate_plugin_versions(kubernetes_versions: Dict[str, Dict[str, str]], plu
     for i, older_k8s_version in enumerate(k8s_versions):
         for j in range(i + 1, len(k8s_versions)):
             newer_k8s_version = k8s_versions[j]
+            if not kubernetes.is_version_upgrade_possible(older_k8s_version, newer_k8s_version):
+                continue
+
             older_version = kubernetes_versions[older_k8s_version][plugin_name]
             newer_version = kubernetes_versions[newer_k8s_version][plugin_name]
             if key(newer_version) < key(older_version):
@@ -144,6 +147,8 @@ def validate_plugin_versions(kubernetes_versions: Dict[str, Dict[str, str]], plu
 def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name: str) -> None:
     plugin_mapping: dict = compatibility_map.compatibility_map[plugin_name]
     k8s_versions = list(plugin_mapping)
+    latest_patch_k8s_versions = [sorted(versions, key=utils.version_key)[-1]
+                                 for _, versions in itertools.groupby(k8s_versions, key=utils.minor_version)]
 
     extra_images = []
     if plugin_name == 'nginx-ingress-controller':
@@ -155,10 +160,13 @@ def validate_compatibility_map(compatibility_map: CompatibilityMap, plugin_name:
 
     for extra_image in extra_images:
         version_key = f"{extra_image}-version"
-        for i, newer_k8s_version in enumerate(k8s_versions):
-            for j in range(i - 1):
-                k8s_version = k8s_versions[i - 1]
-                older_k8s_version = k8s_versions[j]
+        for i, older_k8s_version in enumerate(k8s_versions):
+            newer_latest_patch_versions = [v for v in latest_patch_k8s_versions
+                                           if utils.version_key(v) > utils.version_key(older_k8s_version)]
+
+            for j in range(len(newer_latest_patch_versions) - 1):
+                k8s_version = newer_latest_patch_versions[j]
+                newer_k8s_version = newer_latest_patch_versions[j + 1]
                 version_A = plugin_mapping[older_k8s_version][version_key]
                 version_B = plugin_mapping[k8s_version][version_key]
                 version_A1 = plugin_mapping[newer_k8s_version][version_key]
