@@ -21,12 +21,22 @@ metadata:
 
 apiVersion: v1
 kind: ServiceAccount
+automountServiceAccountToken: false
 metadata:
   labels:
     k8s-app: kubernetes-dashboard
   name: kubernetes-dashboard
   namespace: kubernetes-dashboard
 
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubernetes-dashboard-service-account-token
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: kubernetes-dashboard-service-account
+type: kubernetes.io/service-account-token
 ---
 
 kind: Service
@@ -208,6 +218,8 @@ spec:
               # Create on-disk volume to store exec logs
             - mountPath: /tmp
               name: tmp-volume
+            - name: kubernetes-dashboard-service-account-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           livenessProbe:
             httpGet:
               scheme: HTTPS
@@ -224,6 +236,9 @@ spec:
         - name: kubernetes-dashboard-certs
           secret:
             secretName: kubernetes-dashboard-certs
+        - name: kubernetes-dashboard-service-account-token
+          secret:
+            secretName: kubernetes-dashboard-service-account-token
         - name: tmp-volume
           emptyDir: {}
       serviceAccountName: kubernetes-dashboard
@@ -289,6 +304,8 @@ spec:
           volumeMounts:
           - mountPath: /tmp
             name: tmp-volume
+          - name: kubernetes-dashboard-service-account-token
+            mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -304,3 +321,6 @@ spec:
       volumes:
         - name: tmp-volume
           emptyDir: {}
+        - name: kubernetes-dashboard-service-account-token
+          secret:
+            secretName: kubernetes-dashboard-service-account-token
