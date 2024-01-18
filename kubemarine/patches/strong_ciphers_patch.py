@@ -1,3 +1,4 @@
+from textwrap import dedent
 import yaml
 from io import StringIO
 
