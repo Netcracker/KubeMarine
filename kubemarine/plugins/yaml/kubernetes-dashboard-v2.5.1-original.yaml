@@ -25,7 +25,7 @@ automountServiceAccountToken: false
 metadata:
   labels:
     k8s-app: kubernetes-dashboard
-  name: kubernetes-dashboard
+  name: kubernetes-dashboard-service-account
   namespace: kubernetes-dashboard
 
 ---
@@ -157,7 +157,7 @@ roleRef:
   name: kubernetes-dashboard
 subjects:
   - kind: ServiceAccount
-    name: kubernetes-dashboard
+    name: kubernetes-dashboard-service-account
     namespace: kubernetes-dashboard
 
 ---
@@ -172,7 +172,7 @@ roleRef:
   name: kubernetes-dashboard
 subjects:
   - kind: ServiceAccount
-    name: kubernetes-dashboard
+    name: kubernetes-dashboard-service-account
     namespace: kubernetes-dashboard
 
 ---
@@ -241,7 +241,7 @@ spec:
             secretName: kubernetes-dashboard-service-account-token
         - name: tmp-volume
           emptyDir: {}
-      serviceAccountName: kubernetes-dashboard
+      serviceAccountName: kubernetes-dashboard-service-account
       nodeSelector:
         "kubernetes.io/os": linux
       # Comment the following tolerations if Dashboard must not be deployed on master
@@ -311,7 +311,7 @@ spec:
             readOnlyRootFilesystem: true
             runAsUser: 1001
             runAsGroup: 2001
-      serviceAccountName: kubernetes-dashboard
+      serviceAccountName: kubernetes-dashboard-service-account
       nodeSelector:
         "kubernetes.io/os": linux
       # Comment the following tolerations if Dashboard must not be deployed on master
