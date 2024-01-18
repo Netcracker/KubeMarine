@@ -1,6 +1,7 @@
 from textwrap import dedent
 import yaml
 from io import StringIO
+from typing import Any, Dict, List
 
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
@@ -8,10 +9,10 @@ from kubemarine.core.resources import DynamicResources
 from kubemarine import kubernetes
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Update API Server TLS cipher suites")
 
-    def run(self, res: DynamicResources):
+    def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
         kubernetes_nodes = cluster.make_group_from_roles(['control-plane'])
 
@@ -34,9 +35,8 @@ class TheAction(Action):
             # Write the updated configuration to the file
             member_node.put(StringIO(updated_config), apiserver_file, backup=True, sudo=True)
 
-
 class ApiServerCipherSuites(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("apiserver_cipher_suites")
 
     @property
