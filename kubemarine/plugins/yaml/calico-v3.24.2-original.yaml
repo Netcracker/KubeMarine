@@ -4469,6 +4469,8 @@ spec:
               name: host-local-net-dir
             - mountPath: /host/opt/cni/bin
               name: cni-bin-dir
+            - name: calico-node-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           securityContext:
             privileged: true
         # This container installs the CNI binaries
