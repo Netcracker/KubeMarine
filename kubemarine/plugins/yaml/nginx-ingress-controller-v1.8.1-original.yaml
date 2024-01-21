@@ -7,7 +7,7 @@ metadata:
   name: ingress-nginx
 ---
 apiVersion: v1
-automountServiceAccountToken: true
+automountServiceAccountToken: false
 kind: ServiceAccount
 metadata:
   labels:
@@ -18,6 +18,16 @@ metadata:
     app.kubernetes.io/version: 1.8.1
   name: ingress-nginx
   namespace: ingress-nginx
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ingress-nginx-token
+  namespace: ingress-nginx
+  annotations:
+    kubernetes.io/service-account.name: ingress-nginx
+type: kubernetes.io/service-account-token
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -495,6 +505,8 @@ spec:
         - mountPath: /usr/local/certificates/
           name: webhook-cert
           readOnly: true
+        - name: ingress-nginx-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/os: linux
@@ -504,6 +516,9 @@ spec:
       - name: webhook-cert
         secret:
           secretName: ingress-nginx-admission
+      - name: ingress-nginx-token
+        secret:
+          secretName: ingress-nginx-token
 ---
 apiVersion: batch/v1
 kind: Job
