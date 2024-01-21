@@ -34,16 +34,36 @@ spec:
 # Source: calico/templates/calico-kube-controllers.yaml
 apiVersion: v1
 kind: ServiceAccount
+automountServiceAccountToken: false
 metadata:
   name: calico-kube-controllers
   namespace: kube-system
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: calico-kube-controllers-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: calico-kube-controllers
+type: kubernetes.io/service-account-token
+---
 # Source: calico/templates/calico-node.yaml
 apiVersion: v1
 kind: ServiceAccount
+automountServiceAccountToken: false
 metadata:
   name: calico-node
   namespace: kube-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: calico-node-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: calico-node
+type: kubernetes.io/service-account-token
 ---
 # Source: calico/templates/calico-config.yaml
 # This ConfigMap is used to configure a self-hosted Calico installation.
@@ -4658,6 +4678,8 @@ spec:
             - name: cni-log-dir
               mountPath: /var/log/calico/cni
               readOnly: true
+            - name: calico-node-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       volumes:
         # Used by calico-node.
         - name: lib-modules
@@ -4707,6 +4729,9 @@ spec:
           hostPath:
             type: DirectoryOrCreate
             path: /var/run/nodeagent
+        - name: calico-node-token
+          secret:
+            secretName: calico-node-token
 ---
 # Source: calico/templates/calico-kube-controllers.yaml
 # See https://github.com/projectcalico/kube-controllers
@@ -4769,6 +4794,13 @@ spec:
               - /usr/bin/check-status
               - -r
             periodSeconds: 10
+          volumeMounts:
+          - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+            name: calico-kube-controllers-token
+      volumes:
+      - name: calico-kube-controllers-token
+        secret:
+          secretName: calico-kube-controllers-token
 ---
 # Source: calico/templates/calico-typha.yaml
 # This manifest creates a Deployment of Typha to back the above service.
@@ -4867,3 +4899,10 @@ spec:
             host: localhost
           periodSeconds: 10
           timeoutSeconds: 10
+        volumeMounts:
+        - name: calico-node-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      volumes:
+       - name: calico-node-token
+         secret:
+           seretName: calico-node-token
