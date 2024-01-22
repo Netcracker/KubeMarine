@@ -699,17 +699,15 @@ def get_ports_connectivity(cluster: KubernetesCluster, proto: str) -> Dict[str, 
         }
 
     else:  # udp
-        overlay = cluster.inventory['plugins']['calico']['mode']
-        vxlan_port = ['4789'] if overlay == 'vxlan' else []
         connectivity_ports = {
             'internal': {
                 'input': {
-                    'control-plane': ['53'] + vxlan_port,
-                    'worker': ['53'] + vxlan_port
+                    'control-plane': ['53'],
+                    'worker': ['53']
                 },
                 'output': {
-                    'control-plane': ['53'] + vxlan_port,
-                    'worker': ['53'] + vxlan_port
+                    'control-plane': ['53'],
+                    'worker': ['53']
                 }
             },
             'pod': {
@@ -1246,227 +1244,234 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected') as tc,\
             suspend_firewalld(cluster):
 
-        failed_nodes: List[str] = []
-        failed_msgs: List[str] = []
+        skipped_msgs = nodes_require_python(cluster)
+        failed_nodes: Set[str] = set()
 
         # Check encapsulation for 'Calico' CNI
         if not cluster.inventory['plugins']['calico']['install']:
-            skipped_msgs = "Calico is not set as CNI for the cluster"
-            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+            skipped_msgs.append("Calico is not set as CNI for the cluster")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
 
         # Check encapsulation for clusters with two or more nodes
         group = cluster.make_group_from_roles(['control-plane', 'worker'])
         if group.nodes_amount() == 1:
-            skipped_msgs = f"Too few nodes, check is skipped"
-            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+            skipped_msgs.append("Too few nodes, check is skipped")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
 
         enc_type = cluster.inventory['plugins']['calico']['mode']
         if enc_type == "ipip":
             # Check if IPv6 addresses are used
             connect_to_ip = group.get_ordered_members_configs_list()[0]['internal_address']
             if type(ipaddress.ip_address(connect_to_ip)) is not ipaddress.IPv4Address:
-                skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
-                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+                skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
+                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
-                skipped_msgs = f"IPv6 is not supported by IP in IP encapsulation"
-                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            # Check if cluster is running with Calico CNI and IPIP
-            results = group.sudo("iptables -L cali-INPUT  -n -v", warn=True)
-            for result in list(results.values()):
-                if result.return_code  == 0:
-                    skipped_msgs = f"Cannot check IP in IP encapsulation on running cluster"
-                    raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            # Create IP-IP tunnels configurations
-            ipip_config = get_ipip_config(group)
+                skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
+                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+            group = get_python_group(cluster, True)
+            # Get current netwok configuration
+            nets_and_ips = get_networks(group)
+            # Create IP-IP tunnels check configuration
+            cmd_config = get_command_config(group, nets_and_ips)
+            #exit()
             # Verify if the check is feasible
-            if ipip_config == {}:
-                skipped_msgs = f"Pod network doesn't incude enough IP addresses to establish all of the tunnels"
-                raise TestWarn("Check cannot be completed", hint=skipped_msgs)
-            failed_nodes = check_ipip_tunnel(group, ipip_config)
-            for item in failed_nodes:
-                first_name = cluster.get_node_name(item)
-                second_name: str = ""
-                first_int_addr = cluster.get_node(item)['internal_address']
-                second_int_addr = ipip_config[first_int_addr]['remote_ext1']
-                for node in cluster.nodes['all'].get_ordered_members_list():
-                    if node.get_config()['internal_address'] == second_int_addr:
-                        second_name = node.get_node_name()
-                failed_msgs.append(f"{first_name} and {second_name}")
+            if cmd_config == {}:
+                skipped_msgs.append("Pod network doesn't incude enough IP addresses to set them on tunnel interfaces")
+                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+            failed_nodes = check_ipip_tunnel(group, cmd_config)
         else:
-            skipped_msgs = f"Encapsulation IPIP is disabled"
-            raise TestWarn("Check cannot be completed", hint=skipped_msgs)
+            skipped_msgs.append("Encapsulation IPIP is disabled")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
 
-        if failed_msgs:
-            raise TestFailure(f"Check firewall settings between nodes, IP in IP traffic is not allowed \n"
-                              f"Connection check failed between the following nodes:",
-                              hint='\n'.join(failed_msgs))
+        if failed_nodes:
+            raise TestFailure(f"Check firewall settings, IP in IP traffic is not allowed between nodes.",
+                              hint='\n'.join(failed_nodes))
 
 
-def get_ipip_config(group: NodeGroup) -> Dict[str, Dict[str, str]]:
+def get_networks(group: NodeGroup) -> Dict[str, Set[str]]:
 
-    ipip_config: Dict[str, Dict[str, str]] = {}
-    host_pairs = get_pairs(group)
+    # Get routes, except 'blackhole' and default routes
+    collector = CollectorCallback(group.cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node.sudo(f"ip r | grep -v 'blackhole' | grep -v 'default'", warn=True, callback=collector)
+
+    nets_and_ips: Dict[str, Set[str]] = {}
+    nets: Set[str] = set()
+    for host, item in collector.result.items():
+        for line in item.stdout.split("\n"):
+            if len(line) != 0:
+                nets.add(line.split(" ")[0])
+
+    nets_and_ips['nets'] = nets
+
+    # Get IPs, except IPv6
+    collector = CollectorCallback(group.cluster)
+    with group.new_executor() as exe:
+        for node in exe.group.get_ordered_members_list():
+            node.sudo(f"ip addr | grep 'inet' | grep -v 'inet6'", warn=True, callback=collector)
+
+    ips: Set[str] = set()
+    for host, item in collector.result.items():
+        for line in item.stdout.split("\n"):
+            if len(line) != 0:
+                ips.add(line.replace("    ","").split(" ")[1])
+
+    nets_and_ips['ips'] = ips
+    return nets_and_ips
+
+
+def get_command_config(group: NodeGroup, nets_and_ips: Dict[str, Set[str]]) -> Dict[str, Dict[str, str]]:
+
+    cmd_config: Dict[str, Dict[str, str]] = {}
     nodes_list = group.get_ordered_members_configs_list()
     pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
     nodes_number: int = len(nodes_list)
-    if nodes_number > 2:
-        for node in nodes_list:
-            host = node['internal_address']
-            ipip_config[host] = {}
-            ipip_config[host]['remote_ext1'] = host_pairs[host][0]
-            ipip_config[host]['remote_ext2'] = host_pairs[host][1]
+    for node in nodes_list:
+        host = node['internal_address']
+        cmd_config[host] = {}
 
-            ips = get_ips(pod_subnet, nodes_number)
-            if len(ips) == 0:
-                ipip_config = {}
-                return ipip_config
-            # IPs should be uniq
-            while is_conflict(ipip_config, ips):
-                ips = get_ips(pod_subnet, nodes_number)
+        ip = get_ip(pod_subnet, nodes_number)
+        if ip == "":
+            cmd_config = {}
+            return cmd_config
+        # IPs should be uniq
+        while is_conflict(cmd_config, ip, nets_and_ips):
+            ip = get_ip(pod_subnet, nodes_number)
 
-            ipip_config[host]['local_int1'] = ips[0]
-            ipip_config[host]['remote_int1'] = ips[1]
+        cmd_config[host]['local_int'] = ip
 
-        for node in nodes_list:
-            host = node['internal_address']
-            ipip_config[host]['local_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['remote_int1']
-            ipip_config[host]['remote_int2'] = ipip_config[ipip_config[host]['remote_ext2']]['local_int1']
-    else:
-        node1 = nodes_list[0]['internal_address']
-        node2 = nodes_list[1]['internal_address']
-        ipip_config[node1] = {}
-        ipip_config[node2] = {}
-        ipip_config[node1]['remote_ext1'] = host_pairs[node1][0]
-        ipip_config[node2]['remote_ext1'] = host_pairs[node2][0]
+    for node in nodes_list:
+        host = node['internal_address']
+        cmd_config[host]['init_cmd'] = f"modprobe ipip && sudo ip link set tunl0 up && " \
+                                       f"sudo ip addr add dev tunl0 {cmd_config[host]['local_int']}"
+        cmd_config[host]['remove_cmd'] = f"sudo ip addr del dev tunl0 {cmd_config[host]['local_int']}"
 
-        ips = get_ips(pod_subnet, nodes_number)
-        ipip_config[node1]['local_int1'] = ips[0]
-        ipip_config[node1]['remote_int1'] = ips[1]
-        ipip_config[node2]['local_int1'] = ips[1]
-        ipip_config[node2]['remote_int1'] = ips[0]
-
-    return ipip_config
+    return cmd_config
 
 
-def is_conflict(ipip_config: Dict[str, Dict[str, str]], ips: List[str]) -> bool:
+def is_conflict(cmd_config: Dict[str, Dict[str, str]], ip: str, nets_and_ips: Dict[str, Set[str]]) -> bool:
 
-    for ip in ips:
-        for host_ips in ipip_config.values():
-            for value in host_ips.values():
-                if ip == value:
-                    return True
+    for host_ips in cmd_config.values():
+        for value in host_ips.values():
+            if ip == value:
+                return True
+
+    # Check if IP is included in some known subnet
+    ip_cur: ipaddress.IPv4Network = ipaddress.ip_network(ip)
+    for item in nets_and_ips['nets']:
+        ip_item: ipaddress.IPv4Network = ipaddress.ip_network(item)
+        if ip_item.subnet_of(ip_cur):
+            return True
+
+    # Check if IP is equal to any of the IPs that have been assinged in te cluster
+    for item in nets_and_ips['ips']:
+        if ip == item.split("/")[0]:
+            return True
+
     return False
 
 
-def get_ips(pod_subnet: str, nodes_number: int) -> List[str]:
+def get_ip(pod_subnet: str, nodes_number: int) -> str:
 
-    ips_str: List[str] = []
     ip_pod_net = ipaddress.ip_network(pod_subnet)
     # Check if the network has enough IP addreses to perform the check
     if ip_pod_net.num_addresses < nodes_number * 2 or ip_pod_net.prefixlen >= 30:
-        return ips_str
-    # Split pod network to subnets '/32'
-    divider = 30 - ip_pod_net.prefixlen
-    pod_subnets: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = list(ip_pod_net.subnets(divider))
-    # Choose subnet
+        return ""
+    # Choose IP
     random.seed()
-    subnet = random.choice(pod_subnets)
+    subnet_num = random.randint(1, ip_pod_net.num_addresses - 1)
+    ip = f'{ip_pod_net.network_address + subnet_num}/32'
 
-    divider = 32 - subnet.prefixlen
-    ips_ip = list(subnet.subnets(divider))
-    for ip in ips_ip:
-        ips_str.append(str(ip))
-    # Choose IP from the subnet above
-    ips = random.choices(ips_str, k=2)
-
-    return ips
+    return ip
 
 
-def get_pairs(group: NodeGroup) -> Dict[str, List[str]]:
-
-    pairs: Dict[str, List[str]] = {}
-    nodes_list = group.get_ordered_members_configs_list()
-    if len(nodes_list) == 2:
-        pairs[nodes_list[0]['internal_address']] = [nodes_list[1]['internal_address']]
-        pairs[nodes_list[1]['internal_address']] = [nodes_list[0]['internal_address']]
-        return pairs
-    i = 0 
-    # Create a loop
-    for node in nodes_list:
-        pairs_list: List[str] = []
-        if i > 0 and i < len(nodes_list) - 1:
-            pairs_list.append(nodes_list[i+1]['internal_address'])
-            pairs_list.append(nodes_list[i-1]['internal_address'])
-        elif i == len(nodes_list) - 1:
-            pairs_list.append(nodes_list[0]['internal_address'])
-            pairs_list.append(nodes_list[-2]['internal_address'])
-        elif i == 0:
-            pairs_list.append(nodes_list[1]['internal_address'])
-            pairs_list.append(nodes_list[-1]['internal_address'])
-        pairs[node['internal_address']] = pairs_list
-        i += 1
-
-    return pairs
-
-
-def check_ipip_tunnel(group: NodeGroup, ipip_config: Dict[str, Dict[str, str]]) -> List[str]:
-
-    ipip_mtu = group.cluster.inventory['plugins']['calico']['mtu']
-    icmp_payload = str(int(ipip_mtu) - 8)
+def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -> Set[str]:
 
     group_to_rollback = group
+    cluster = group.cluster
+
+    # Copy binaries to the nodes
+    random_port = str(random.randint(50000, 65535))
+    failed_nodes: Set[str] = set()
+    recv_cmd: Dict[str, str] = {}
+    trns_cmd: Dict[str, str] = {}
+
+    binary_trns_path = utils.get_internal_resource_path('./resources/scripts/ipip_trns')
+    ipip_trns = "/tmp/%s" % uuid.uuid4().hex
+    binary_recv_path = utils.get_internal_resource_path('./resources/scripts/ipip_recv')
+    ipip_recv = "/tmp/%s" % uuid.uuid4().hex
+    recv_log = "/tmp/%s" % uuid.uuid4().hex
+    msg = "TEST_MESSAGE"
+    timeout = 10
+    for node in group.get_ordered_members_configs_list():
+        host = node['internal_address']
+        # Receiver start command
+        recv_cmd[host] = f"nohup {ipip_recv} {cmd_config[node['internal_address']]['local_int'].split('/')[0]} " \
+                         f"{msg} {random_port} {timeout} > {recv_log}.log 2>{recv_log}.err &"
+
+        # Transmitter start command
+        trns_item_cmd: List[str] = []
+        for node_item in group.get_ordered_members_configs_list():
+            if node_item['internal_address'] != host:
+                trns_item_cmd.append(f"{ipip_trns} {node_item['internal_address']} "
+                                f"{cmd_config[node_item['internal_address']]['local_int'].split('/')[0]} "
+                                f"{random_port} {msg}")
+        trns_cmd[host] = '; sudo '.join(trns_item_cmd)
 
     try:
-        # Create IPIP tunnels
-        with group.new_executor() as exe:
-            if len(exe.group.get_ordered_members_list()) > 2:
-                for node in exe.group.get_ordered_members_list():
-                    host = node.get_config()['internal_address']
-                    node.sudo(f"ip link add name test-ipip1 type ipip "
-                              f"local {host} remote {ipip_config[host]['remote_ext1']} && "
-                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
-                              f"sudo ip link set test-ipip1 up && "
-                              f"sudo ip addr add {ipip_config[host]['local_int1']} dev test-ipip1 && "
-                              f"sudo ip route add {ipip_config[host]['remote_int1']} dev test-ipip1 &&"
-                              f"sudo ip link add name test-ipip2 type ipip "
-                              f"local {host} remote {ipip_config[host]['remote_ext2']} && "
-                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip2 && "
-                              f"sudo ip link set test-ipip2 up && "
-                              f"sudo ip addr add {ipip_config[host]['local_int2']} dev test-ipip2 && "
-                              f"sudo ip route add {ipip_config[host]['remote_int2']} dev test-ipip2")
-            else:
-                for node in exe.group.get_ordered_members_list():
-                    host = node.get_config()['internal_address']
-                    node.sudo(f"ip link add name test-ipip1 type ipip "
-                              f"local {host} remote {ipip_config[host]['remote_ext1']} && "
-                              f"sudo ip link set mtu {ipip_mtu} dev test-ipip1 && "
-                              f"sudo ip link set test-ipip1 up && "
-                              f"sudo ip addr add {ipip_config[host]['local_int1']} dev test-ipip1 && "
-                              f"sudo ip route add {ipip_config[host]['remote_int1']} dev test-ipip1")
-
-        # Run IPIP tunnel check
         collector = CollectorCallback(group.cluster)
+        cluster.log.debug("Copy binaries to the nodes")
+        group.put(binary_trns_path, ipip_trns)
+        group.put(binary_recv_path, ipip_recv)
+        group.sudo(f"sudo chmod +x {ipip_recv} {ipip_trns}")
+        # Prepare network for IPIP check
+        cluster.log.debug("Set temporary IPs")
         with group.new_executor() as exe:
-            for node in exe.group.get_ordered_members_list():
-                host = node.get_config()['internal_address']
-                node.sudo(f"ping {ipip_config[host]['remote_int1'].split('/')[0]} -c 10 -s {icmp_payload}", 
-                        warn=True, callback=collector)
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{cmd_config[host_int]['init_cmd']}")
+        # Run receivers
+        cluster.log.debug("Run receivers")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True)
+        # Run IPIP check
+        cluster.log.debug("Run transmitters")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{trns_cmd[host_int]}")
+        # Wailt for the timeout
+        cluster.log.debug("Wait for receivers")
+        time.sleep(timeout)
+        # Get results from the log file
+        cluster.log.debug("Check logs")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                node_exe.sudo(f"cat {recv_log}.log", warn=True, callback=collector)
 
-        output: List[str] = []
         for host, item in collector.result.items():
-            if item.return_code:
-                group.cluster.log.debug(f"{host}:\n {item.stdout}")
-                output.append(host)
+            node_name = cluster.get_node_name(host)
+            item_list: List[str] = []
+            if len(item.stdout) > 0:
+                for log_item in item.stdout.split("\n")[:-1]:
+                    item_list.append(log_item)
+                for node in group.get_ordered_members_configs_list():
+                    if node['internal_address'] not in item_list and node['connect_to'] != host:
+                        failed_nodes.add(f"{node['name']} -> {node_name}")
 
-        return output
+        return failed_nodes
     finally:
-        # Delete IPIP tunnels
+        # Delete IPs, binaries, ang log
+        cluster.log.debug("Delete temporaty IPs, binaries, and logs")
         with group_to_rollback.new_executor() as exe:
-            for node in exe.group.get_ordered_members_list():
-                node.sudo("ip link delete name test-ipip1; "
-                           "sudo ip link delete name test-ipip2", warn=True)
-
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{cmd_config[host_int]['remove_cmd']}; "
+                              f"sudo rm -f {ipip_recv} {ipip_trns} {recv_log}.log {recv_log}.err", warn=True)
 
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
