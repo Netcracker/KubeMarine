@@ -1269,12 +1269,10 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
-            group = get_python_group(cluster, True)
             # Get current netwok configuration
             nets_and_ips = get_networks(group)
             # Create IP-IP tunnels check configuration
             cmd_config = get_command_config(group, nets_and_ips)
-            #exit()
             # Verify if the check is feasible
             if cmd_config == {}:
                 skipped_msgs.append("Pod network doesn't incude enough IP addresses to set them on tunnel interfaces")
@@ -1291,11 +1289,11 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
 
 def get_networks(group: NodeGroup) -> Dict[str, Set[str]]:
 
-    # Get routes, except 'blackhole' and default routes
+    # Get routes to pods
     collector = CollectorCallback(group.cluster)
     with group.new_executor() as exe:
         for node in exe.group.get_ordered_members_list():
-            node.sudo(f"ip r | grep -v 'blackhole' | grep -v 'default'", warn=True, callback=collector)
+            node.sudo(f"ip r | grep 'dev\ cali'", warn=True, callback=collector)
 
     nets_and_ips: Dict[str, Set[str]] = {}
     nets: Set[str] = set()
@@ -1328,41 +1326,29 @@ def get_command_config(group: NodeGroup, nets_and_ips: Dict[str, Set[str]]) -> D
     nodes_list = group.get_ordered_members_configs_list()
     pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
     nodes_number: int = len(nodes_list)
+    ip = get_ip(pod_subnet)
+    if ip == "":
+        cmd_config = {}
+        return cmd_config
+    # IPs should be uniq
+    while is_conflict(ip, nets_and_ips):
+        ip = get_ip(pod_subnet)
     for node in nodes_list:
         host = node['internal_address']
         cmd_config[host] = {}
-
-        ip = get_ip(pod_subnet, nodes_number)
-        if ip == "":
-            cmd_config = {}
-            return cmd_config
-        # IPs should be uniq
-        while is_conflict(cmd_config, ip, nets_and_ips):
-            ip = get_ip(pod_subnet, nodes_number)
-
-        cmd_config[host]['local_int'] = ip
-
-    for node in nodes_list:
-        host = node['internal_address']
+        cmd_config[host]['local_int'] = ip.split('/')[0]
         cmd_config[host]['init_cmd'] = f"modprobe ipip && sudo ip link set tunl0 up && " \
-                                       f"sudo ip addr add dev tunl0 {cmd_config[host]['local_int']}"
-        cmd_config[host]['remove_cmd'] = f"sudo ip addr del dev tunl0 {cmd_config[host]['local_int']}"
+                                       f"sudo ip addr add dev tunl0 {ip}"
+        cmd_config[host]['remove_cmd'] = f"sudo ip addr del dev tunl0 {ip}"
 
     return cmd_config
 
 
-def is_conflict(cmd_config: Dict[str, Dict[str, str]], ip: str, nets_and_ips: Dict[str, Set[str]]) -> bool:
+def is_conflict(ip: str, nets_and_ips: Dict[str, Set[str]]) -> bool:
 
-    for host_ips in cmd_config.values():
-        for value in host_ips.values():
-            if ip == value:
-                return True
-
-    # Check if IP is included in some known subnet
-    ip_cur: ipaddress.IPv4Network = ipaddress.ip_network(ip)
+    # Check if IP conflicts with IP that are allocated to pods. It works for running cluster
     for item in nets_and_ips['nets']:
-        ip_item: ipaddress.IPv4Network = ipaddress.ip_network(item)
-        if ip_item.subnet_of(ip_cur):
+        if item == ip.split('/')[0]:
             return True
 
     # Check if IP is equal to any of the IPs that have been assinged in te cluster
@@ -1373,11 +1359,11 @@ def is_conflict(cmd_config: Dict[str, Dict[str, str]], ip: str, nets_and_ips: Di
     return False
 
 
-def get_ip(pod_subnet: str, nodes_number: int) -> str:
+def get_ip(pod_subnet: str) -> str:
 
     ip_pod_net = ipaddress.ip_network(pod_subnet)
     # Check if the network has enough IP addreses to perform the check
-    if ip_pod_net.num_addresses < nodes_number * 2 or ip_pod_net.prefixlen >= 30:
+    if ip_pod_net.prefixlen >= 30:
         return ""
     # Choose IP
     random.seed()
@@ -1404,11 +1390,11 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
     ipip_recv = "/tmp/%s" % uuid.uuid4().hex
     recv_log = "/tmp/%s" % uuid.uuid4().hex
     msg = "TEST_MESSAGE"
-    timeout = 10
+    timeout = int(cluster.inventory['globals']['timeout_download'])
     for node in group.get_ordered_members_configs_list():
         host = node['internal_address']
         # Receiver start command
-        recv_cmd[host] = f"nohup {ipip_recv} {cmd_config[node['internal_address']]['local_int'].split('/')[0]} " \
+        recv_cmd[host] = f"nohup {ipip_recv} {cmd_config[host]['local_int']} {host} " \
                          f"{msg} {random_port} {timeout} > {recv_log}.log 2>{recv_log}.err &"
 
         # Transmitter start command
@@ -1416,8 +1402,7 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
         for node_item in group.get_ordered_members_configs_list():
             if node_item['internal_address'] != host:
                 trns_item_cmd.append(f"{ipip_trns} {node_item['internal_address']} "
-                                f"{cmd_config[node_item['internal_address']]['local_int'].split('/')[0]} "
-                                f"{random_port} {msg}")
+                                f"{cmd_config[host]['local_int']} {random_port} {msg}")
         trns_cmd[host] = '; sudo '.join(trns_item_cmd)
 
     try:
@@ -1431,13 +1416,15 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{cmd_config[host_int]['init_cmd']}")
+                node_exe.sudo(f"{cmd_config[host_int]['init_cmd']}", warn=True)
         # Run receivers
         cluster.log.debug("Run receivers")
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
                 node_exe.sudo(f"{recv_cmd[host_int]}", warn=True)
+        # Waite for receivers start
+        time.sleep(10)
         # Run IPIP check
         cluster.log.debug("Run transmitters")
         with group.new_executor() as exe:
@@ -1494,8 +1481,8 @@ tasks = OrderedDict({
         'pod_subnet_connectivity': pod_subnet_connectivity,
         'service_subnet_connectivity': service_subnet_connectivity,
         'ports_connectivity': ports_connectivity,
-        'ipip_connectivity': ipip_connectivity,
         'vips_connectivity': vips_connectivity,
+        'ipip_connectivity': ipip_connectivity,
     },
     'hardware': {
         'members_amount': {
