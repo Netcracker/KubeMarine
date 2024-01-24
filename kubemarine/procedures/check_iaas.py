@@ -1270,9 +1270,11 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             # Get current netwok configuration
-            nets_and_ips = get_networks(group)
+            pod_ips = get_pod_ips(group)
+            cluster.log.debug(f"NETS: {pod_ips}")
             # Create IP-IP tunnels check configuration
-            cmd_config = get_command_config(group, nets_and_ips)
+            cmd_config = get_command_config(group, pod_ips)
+            cluster.log.debug(f"CMD: {cmd_config}")
             # Verify if the check is feasible
             if cmd_config == {}:
                 skipped_msgs.append("Pod network doesn't incude enough IP addresses to set them on tunnel interfaces")
@@ -1287,7 +1289,7 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
                               hint='\n'.join(failed_nodes))
 
 
-def get_networks(group: NodeGroup) -> Dict[str, Set[str]]:
+def get_pod_ips(group: NodeGroup) -> List[str]:
 
     # Get routes to pods
     collector = CollectorCallback(group.cluster)
@@ -1295,32 +1297,16 @@ def get_networks(group: NodeGroup) -> Dict[str, Set[str]]:
         for node in exe.group.get_ordered_members_list():
             node.sudo(f"ip r | grep 'dev\ cali'", warn=True, callback=collector)
 
-    nets_and_ips: Dict[str, Set[str]] = {}
-    nets: Set[str] = set()
+    pod_ips: List[str] = []
     for host, item in collector.result.items():
         for line in item.stdout.split("\n"):
             if len(line) != 0:
-                nets.add(line.split(" ")[0])
+                pod_ips.append(line.split(" ")[0])
 
-    nets_and_ips['nets'] = nets
-
-    # Get IPs, except IPv6
-    collector = CollectorCallback(group.cluster)
-    with group.new_executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            node.sudo(f"ip addr | grep 'inet' | grep -v 'inet6'", warn=True, callback=collector)
-
-    ips: Set[str] = set()
-    for host, item in collector.result.items():
-        for line in item.stdout.split("\n"):
-            if len(line) != 0:
-                ips.add(line.replace("    ","").split(" ")[1])
-
-    nets_and_ips['ips'] = ips
-    return nets_and_ips
+    return pod_ips
 
 
-def get_command_config(group: NodeGroup, nets_and_ips: Dict[str, Set[str]]) -> Dict[str, Dict[str, str]]:
+def get_command_config(group: NodeGroup, pod_ips: List[str]) -> Dict[str, Dict[str, str]]:
 
     cmd_config: Dict[str, Dict[str, str]] = {}
     nodes_list = group.get_ordered_members_configs_list()
@@ -1331,7 +1317,7 @@ def get_command_config(group: NodeGroup, nets_and_ips: Dict[str, Set[str]]) -> D
         cmd_config = {}
         return cmd_config
     # IPs should be uniq
-    while is_conflict(ip, nets_and_ips):
+    while is_conflict(ip, pod_ips):
         ip = get_ip(pod_subnet)
     for node in nodes_list:
         host = node['internal_address']
@@ -1344,16 +1330,11 @@ def get_command_config(group: NodeGroup, nets_and_ips: Dict[str, Set[str]]) -> D
     return cmd_config
 
 
-def is_conflict(ip: str, nets_and_ips: Dict[str, Set[str]]) -> bool:
+def is_conflict(ip: str, pod_ips: List[str]) -> bool:
 
     # Check if IP conflicts with IP that are allocated to pods. It works for running cluster
-    for item in nets_and_ips['nets']:
+    for item in pod_ips:
         if item == ip.split('/')[0]:
-            return True
-
-    # Check if IP is equal to any of the IPs that have been assinged in te cluster
-    for item in nets_and_ips['ips']:
-        if ip == item.split("/")[0]:
             return True
 
     return False
