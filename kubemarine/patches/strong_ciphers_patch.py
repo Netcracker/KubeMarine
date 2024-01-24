@@ -64,7 +64,7 @@ class TheAction(Action):
             else:
                 cluster.log.error("API server restart failed.") 
 
-    def verify_apiserver_restart(self, member_node, res):
+    def verify_apiserver_restart(self, member_node, res: DynamicResources) -> bool:
         # Implement logic to check API server restart status
         cluster = res.cluster()
         restart_successful = False
