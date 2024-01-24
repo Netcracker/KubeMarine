@@ -1269,17 +1269,7 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
             if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
-            # Get current netwok configuration
-            pod_ips = get_pod_ips(group)
-            cluster.log.debug(f"NETS: {pod_ips}")
-            # Create IP-IP tunnels check configuration
-            cmd_config = get_command_config(group, pod_ips)
-            cluster.log.debug(f"CMD: {cmd_config}")
-            # Verify if the check is feasible
-            if cmd_config == {}:
-                skipped_msgs.append("Pod network doesn't incude enough IP addresses to set them on tunnel interfaces")
-                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
-            failed_nodes = check_ipip_tunnel(group, cmd_config)
+            failed_nodes = check_ipip_tunnel(group)
         else:
             skipped_msgs.append("Encapsulation IPIP is disabled")
             raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
@@ -1289,72 +1279,7 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
                               hint='\n'.join(failed_nodes))
 
 
-def get_pod_ips(group: NodeGroup) -> List[str]:
-
-    # Get routes to pods
-    collector = CollectorCallback(group.cluster)
-    with group.new_executor() as exe:
-        for node in exe.group.get_ordered_members_list():
-            node.sudo(f"ip r | grep 'dev\ cali'", warn=True, callback=collector)
-
-    pod_ips: List[str] = []
-    for host, item in collector.result.items():
-        for line in item.stdout.split("\n"):
-            if len(line) != 0:
-                pod_ips.append(line.split(" ")[0])
-
-    return pod_ips
-
-
-def get_command_config(group: NodeGroup, pod_ips: List[str]) -> Dict[str, Dict[str, str]]:
-
-    cmd_config: Dict[str, Dict[str, str]] = {}
-    nodes_list = group.get_ordered_members_configs_list()
-    pod_subnet = group.cluster.inventory['services']['kubeadm']['networking']['podSubnet']
-    nodes_number: int = len(nodes_list)
-    ip = get_ip(pod_subnet)
-    if ip == "":
-        cmd_config = {}
-        return cmd_config
-    # IPs should be uniq
-    while is_conflict(ip, pod_ips):
-        ip = get_ip(pod_subnet)
-    for node in nodes_list:
-        host = node['internal_address']
-        cmd_config[host] = {}
-        cmd_config[host]['local_int'] = ip.split('/')[0]
-        cmd_config[host]['init_cmd'] = f"modprobe ipip && sudo ip link set tunl0 up && " \
-                                       f"sudo ip addr add dev tunl0 {ip}"
-        cmd_config[host]['remove_cmd'] = f"sudo ip addr del dev tunl0 {ip}"
-
-    return cmd_config
-
-
-def is_conflict(ip: str, pod_ips: List[str]) -> bool:
-
-    # Check if IP conflicts with IP that are allocated to pods. It works for running cluster
-    for item in pod_ips:
-        if item == ip.split('/')[0]:
-            return True
-
-    return False
-
-
-def get_ip(pod_subnet: str) -> str:
-
-    ip_pod_net = ipaddress.ip_network(pod_subnet)
-    # Check if the network has enough IP addreses to perform the check
-    if ip_pod_net.prefixlen >= 30:
-        return ""
-    # Choose IP
-    random.seed()
-    subnet_num = random.randint(1, ip_pod_net.num_addresses - 1)
-    ip = f'{ip_pod_net.network_address + subnet_num}/32'
-
-    return ip
-
-
-def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -> Set[str]:
+def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
     group_to_rollback = group
     cluster = group.cluster
@@ -1375,7 +1300,7 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
     for node in group.get_ordered_members_configs_list():
         host = node['internal_address']
         # Receiver start command
-        recv_cmd[host] = f"nohup {ipip_recv} {cmd_config[host]['local_int']} {host} " \
+        recv_cmd[host] = f"nohup {ipip_recv} 10.0.0.1 {host} " \
                          f"{msg} {random_port} {timeout} > {recv_log}.log 2>{recv_log}.err &"
 
         # Transmitter start command
@@ -1383,7 +1308,7 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
         for node_item in group.get_ordered_members_configs_list():
             if node_item['internal_address'] != host:
                 trns_item_cmd.append(f"{ipip_trns} {node_item['internal_address']} "
-                                f"{cmd_config[host]['local_int']} {random_port} {msg}")
+                                f"10.0.0.1 {random_port} {msg}")
         trns_cmd[host] = '; sudo '.join(trns_item_cmd)
 
     try:
@@ -1393,11 +1318,10 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
         group.put(binary_recv_path, ipip_recv)
         group.sudo(f"sudo chmod +x {ipip_recv} {ipip_trns}")
         # Prepare network for IPIP check
-        cluster.log.debug("Set temporary IPs")
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{cmd_config[host_int]['init_cmd']}", warn=True)
+                node_exe.sudo("modprobe ipip", warn=True)
         # Run receivers
         cluster.log.debug("Run receivers")
         with group.new_executor() as exe:
@@ -1433,13 +1357,12 @@ def check_ipip_tunnel(group: NodeGroup, cmd_config: Dict[str, Dict[str, str]]) -
 
         return failed_nodes
     finally:
-        # Delete IPs, binaries, ang log
-        cluster.log.debug("Delete temporaty IPs, binaries, and logs")
+        # Delete binaries ang logs
+        cluster.log.debug("Delete binaries and logs")
         with group_to_rollback.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{cmd_config[host_int]['remove_cmd']}; "
-                              f"sudo rm -f {ipip_recv} {ipip_trns} {recv_log}.log {recv_log}.err", warn=True)
+                node_exe.sudo(f"sudo rm -f {ipip_recv} {ipip_trns} {recv_log}.log {recv_log}.err", warn=True)
 
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
