@@ -253,6 +253,8 @@ class IngressNginxManifestProcessor(Processor):
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
 
+        self.enrich_deamonset_ingress_nginx_controller_container(manifest)
+
         if 'volumes' not in source_yaml['spec']['template']['spec']:
             source_yaml['spec']['template']['spec']['volumes'] = []
         if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
@@ -270,8 +272,6 @@ class IngressNginxManifestProcessor(Processor):
         })
        
         self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
-
-        self.enrich_deamonset_ingress_nginx_controller_container(manifest)
 
         self.enrich_image_for_container(manifest, key,
             plugin_service='controller', container_name='controller', is_init_container=False)
