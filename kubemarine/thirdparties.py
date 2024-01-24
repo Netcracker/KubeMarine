@@ -415,7 +415,7 @@ def install_all_thirparties(group: NodeGroup) -> None:
         if cluster.context.get("initial_procedure") in ("install", "upgrade"):
             managing_plugin = next((plugin_name
                                     for plugin_name, plugin_configs in cluster.inventory['plugins'].items()
-                                    for plugin_procedure in plugin_configs['installation']['procedures']
+                                    for plugin_procedure in plugin_configs.get('installation', {}).get('procedures', [])
                                     if plugin_procedure.get('thirdparty') == destination),
                                    None)
 
