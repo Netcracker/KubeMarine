@@ -7,6 +7,7 @@ from textwrap import dedent
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
+from kubemarine.core.group import NodeGroup
 
 class TheAction(Action):
     def __init__(self) -> None:
