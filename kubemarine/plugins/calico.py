@@ -173,6 +173,16 @@ class CalicoManifestProcessor(Processor):
         log_str = new_string_part.replace("\n", "")
         self.log.verbose(f"The {key} has been patched in 'data.cni_network_config' with '{log_str}'")
 
+    def enrich_service_account_calico_node(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_calico-node"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
+    def enrich_service_account_calico_kube_controllers(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_calico-kube-controllers"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
     def enrich_deployment_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
         The method implements the enrichment procedure for Calico controller Deployment
@@ -180,6 +190,29 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "Deployment_calico-kube-controllers"
+
+        source_yaml= manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+
+        # Check if 'volumeMounts' is present, if not, create it
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'calico-kube-controllers-token',
+        'secret': {
+            'secretName': 'calico-kube-controllers-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'calico-kube-controllers-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_node_selector(manifest, key, plugin_service='kube-controllers')
         self.enrich_tolerations(manifest, key, plugin_service='kube-controllers')
         self.enrich_resources_for_container(manifest, key,
@@ -194,6 +227,30 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "DaemonSet_calico-node"
+
+        source_yaml = manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'calico-node-token',
+        'secret': {
+            'secretName': 'calico-node-token'  
+        }
+        })
+        source_yaml['spec']['template']['spec']['initContainers'][0]['volumeMounts'].append({
+        'name': 'calico-node-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'calico-node-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         for container_name in ['upgrade-ipam', 'install-cni']:
             self.enrich_image_for_container(manifest, key,
                 plugin_service='cni', container_name=container_name, is_init_container=True)
@@ -248,6 +305,25 @@ class CalicoManifestProcessor(Processor):
         if not manifest.has_obj(key):
             return None
         source_yaml = manifest.get_obj(key, patch=True)
+
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'calico-node-token',
+        'secret': {
+            'secretName': 'calico-node-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'calico-node-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                                {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]
@@ -367,6 +443,8 @@ class CalicoManifestProcessor(Processor):
         return [
             self.exclude_typha_objects_if_disabled,
             self.enrich_configmap_calico_config,
+            self.enrich_service_account_calico_kube_controllers,
+            self.enrich_service_account_calico_node,
             self.enrich_deployment_calico_kube_controllers,
             self.enrich_daemonset_calico_node,
             self.enrich_deployment_calico_typha,
@@ -402,6 +480,7 @@ class CalicoApiServerManifestProcessor(Processor):
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
             self.enrich_namespace_calico_apiserver,
+            self.enrich_service_account_calico_apiserver,
             self.enrich_deployment_calico_apiserver,
             self.enrich_clusterrole_calico_crds,
         ]
@@ -412,8 +491,30 @@ class CalicoApiServerManifestProcessor(Processor):
     def enrich_namespace_calico_apiserver(self, manifest: Manifest) -> None:
         self.assign_default_pss_labels(manifest, 'calico-apiserver')
 
+    def enrich_service_account_calico_apiserver(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_calico-apiserver"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
     def enrich_deployment_calico_apiserver(self, manifest: Manifest) -> None:
         key = "Deployment_calico-apiserver"
+        source_yaml= manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'calico-apiserver-token',
+        'secret': {
+            'secretName': 'calico-apiserver-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'calico-apiserver-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
         self.enrich_node_selector(manifest, key, plugin_service='apiserver')
         self.enrich_tolerations(manifest, key, plugin_service='apiserver')
         self.enrich_image_for_container(

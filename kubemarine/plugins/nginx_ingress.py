@@ -209,6 +209,7 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_namespace_ingress_nginx,
             self.enrich_configmap_ingress_nginx_controller,
             self.add_configmap_ingress_nginx_controller,
+            self.enrich_service_account,
             self.enrich_deployment_ingress_nginx_controller,
             self.enrich_ingressclass_nginx,
             self.enrich_job_ingress_nginx_admission_create,
@@ -242,10 +243,33 @@ class IngressNginxManifestProcessor(Processor):
             self.include(manifest, ingres_nginx_cm, custom_headers_cm)
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
+            
+    def enrich_service_account(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_ingress-nginx"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
 
     def enrich_deployment_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
+
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'ingress-nginx-token',
+        'secret': {
+            'secretName': 'ingress-nginx-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'ingress-nginx-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         self.enrich_deamonset_ingress_nginx_controller_container(manifest)
 

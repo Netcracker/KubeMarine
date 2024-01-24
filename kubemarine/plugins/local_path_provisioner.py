@@ -54,6 +54,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
         return [
             self.enrich_namespace_local_path_storage,
             self.add_clusterrolebinding_local_path_provisioner_privileged_psp,
+            self.enrich_service_account,
             self.enrich_deployment_local_path_provisioner,
             self.enrich_storageclass_local_path,
             self.enrich_configmap_local_path_config,
@@ -73,8 +74,34 @@ class LocalPathProvisionerManifestProcessor(Processor):
                           if key.startswith("ClusterRoleBinding_"))
         self.include(manifest, max_crb_idx + 1, new_yaml)
 
+
+    def enrich_service_account(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_local-path-provisioner-service-account"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
     def enrich_deployment_local_path_provisioner(self, manifest: Manifest) -> None:
         key = "Deployment_local-path-provisioner"
+
+        source_yaml = manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'local-path-provisioner-service-account-token',
+        'secret': {
+            'secretName': 'local-path-provisioner-service-account-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'local-path-provisioner-service-account-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_image_for_container(manifest, key,
             container_name='local-path-provisioner', is_init_container=False)
 

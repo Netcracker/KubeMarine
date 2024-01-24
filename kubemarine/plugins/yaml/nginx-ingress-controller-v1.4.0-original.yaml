@@ -7,7 +7,7 @@ metadata:
   name: ingress-nginx
 ---
 apiVersion: v1
-automountServiceAccountToken: false
+automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
   labels:
@@ -514,8 +514,6 @@ spec:
         - mountPath: /usr/local/certificates/
           name: webhook-cert
           readOnly: true
-        - name: ingress-nginx-token
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/os: linux
@@ -525,9 +523,6 @@ spec:
       - name: webhook-cert
         secret:
           secretName: ingress-nginx-admission
-      - name: ingress-nginx-token
-        secret:
-          secretName: ingress-nginx-token
 ---
 apiVersion: batch/v1
 kind: Job

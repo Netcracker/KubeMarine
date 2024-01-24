@@ -4154,13 +4154,6 @@ spec:
             host: localhost
           periodSeconds: 10
           timeoutSeconds: 10
-        volumeMounts:
-        - name: calico-node-token
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      volumes:
-       - name: calico-node-token
-         secret:
-           seretName: calico-node-token
 
 ---
 
@@ -4247,8 +4240,6 @@ spec:
               name: host-local-net-dir
             - mountPath: /host/opt/cni/bin
               name: cni-bin-dir
-            - name: calico-node-token
-              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           securityContext:
             privileged: true
         # This container installs the CNI binaries
@@ -4440,8 +4431,6 @@ spec:
             - name: cni-log-dir
               mountPath: /var/log/calico/cni
               readOnly: true
-            - name: calico-node-token
-              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       volumes:
         # Used by calico-node.
         - name: lib-modules
@@ -4488,14 +4477,11 @@ spec:
           hostPath:
             type: DirectoryOrCreate
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
-        - name: calico-node-token
-          secret:
-            secretName: calico-node-token
+
 ---
 
 apiVersion: v1
 kind: ServiceAccount
-automountServiceAccountToken: false
 metadata:
   name: calico-node
   namespace: kube-system
@@ -4568,19 +4554,11 @@ spec:
               - /usr/bin/check-status
               - -r
             periodSeconds: 10
-          volumeMounts:
-          - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-            name: calico-kube-controllers-token
-      volumes:
-      - name: calico-kube-controllers-token
-        secret:
-          secretName: calico-kube-controllers-token
 
 ---
 
 apiVersion: v1
 kind: ServiceAccount
-automountServiceAccountToken: false
 metadata:
   name: calico-kube-controllers
   namespace: kube-system

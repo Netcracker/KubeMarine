@@ -66,6 +66,7 @@ class DashboardManifestProcessor(Processor):
     def get_enrichment_functions(self) -> List[EnrichmentFunction]:
         return [
             self.enrich_namespace_kubernetes_dashboard,
+            self.enrich_service_account,
             self.enrich_deployment_kubernetes_dashboard,
             self.enrich_deployment_dashboard_metrics_scraper,
         ]
@@ -76,8 +77,32 @@ class DashboardManifestProcessor(Processor):
     def enrich_namespace_kubernetes_dashboard(self, manifest: Manifest) -> None:
         self.assign_default_pss_labels(manifest, 'kubernetes-dashboard')
 
+    def enrich_service_account(self, manifest: Manifest) -> None:
+        key = "ServiceAccount_kubernetes-dashboard"
+        source_yaml = manifest.get_obj(key, patch=True)
+        source_yaml['automountServiceAccountToken'] = False
+
     def enrich_deployment_kubernetes_dashboard(self, manifest: Manifest) -> None:
         key = "Deployment_kubernetes-dashboard"
+        source_yaml = manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'kubernetes-dashboard-token',
+        'secret': {
+            'secretName': 'kubernetes-dashboard-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'kubernetes-dashboard-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_image_for_container(manifest, key,
             plugin_service='dashboard', container_name='kubernetes-dashboard', is_init_container=False)
 
@@ -87,6 +112,25 @@ class DashboardManifestProcessor(Processor):
 
     def enrich_deployment_dashboard_metrics_scraper(self, manifest: Manifest) -> None:
         key = "Deployment_dashboard-metrics-scraper"
+        source_yaml = manifest.get_obj(key, patch=True)
+        if 'volumes' not in source_yaml['spec']['template']['spec']:
+            source_yaml['spec']['template']['spec']['volumes'] = []
+        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
+            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
+        source_yaml['spec']['template']['spec']['volumes'].append({
+        'name': 'kubernetes-dashboard-token',
+        'secret': {
+            'secretName': 'kubernetes-dashboard-token'  
+        }
+        })
+
+        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
+        'name': 'kubernetes-dashboard-token',
+        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
+        })
+       
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
+
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
 

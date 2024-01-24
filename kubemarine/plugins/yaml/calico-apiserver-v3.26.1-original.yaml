@@ -99,8 +99,6 @@ spec:
         volumeMounts:
         - mountPath: /code/apiserver.local.config/certificates
           name: calico-apiserver-certs
-        - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-          name: calico-apiserver-token
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/os: linux
@@ -116,15 +114,11 @@ spec:
       - name: calico-apiserver-certs
         secret:
           secretName: calico-apiserver-certs
-      - name: calico-apiserver-token
-        secret:
-          secretName: calico-apiserver-token
 
 ---
 
 apiVersion: v1
 kind: ServiceAccount
-automountServiceAccountToken: false
 metadata:
   name: calico-apiserver
   namespace: calico-apiserver
