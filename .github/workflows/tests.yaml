@@ -61,11 +61,22 @@ jobs:
           xenon -a A kubemarine scripts
   mypy:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+#          - "3.7"  # Currently used version of mypy does not work on Python 3.7
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
       # Install kubemarine with all dependencies except ansible but including mypy and library stubs.
       # Then uninstall only kubemarine to avoid ambiguity and to surely run mypy on sources.
       - run: pip install .[mypy] && pip uninstall -y kubemarine
