@@ -1335,7 +1335,7 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
         'apiServer' : 'kube-apiserver+json.json',
         'etcd' : 'etcd+json.json',
         'controllerManager' : 'kube-controller-manager+json.json',
-        'scheduler' : 'kube-scheduler_json.json',
+        'scheduler' : 'kube-scheduler+json.json',
         'kubelet' : 'kubeletconfiguration.yaml'
     }
 
