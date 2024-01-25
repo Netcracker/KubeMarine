@@ -75,6 +75,9 @@ jobs:
       - name: Check paas
         id: test_check_paas
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
+      - name: Get events kubectl
+        if: failure()
+        run: sudo kubectl get events --sort-by='.metadata.creationTimestamp' -A
       - name: Collect journalctl logs
         if: failure()
         run: |
@@ -136,7 +139,7 @@ jobs:
         run: kubemarine check_paas -c ${{ env.cluster_yaml_file }} --dump-location ./results/check_paas_dump/
       - name: Get events kubectl
         if: failure()
-        run: kubectl get events --sort-by='.metadata.creationTimestamp' -A
+        run: sudo kubectl get events --sort-by='.metadata.creationTimestamp' -A
       - name: Collect journalctl logs
         if: failure()
         run: |
