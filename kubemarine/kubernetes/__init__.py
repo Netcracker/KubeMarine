@@ -152,7 +152,7 @@ def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     return inventory
 
 
-def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
+def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     kubeadm = inventory['services']['kubeadm']
     kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")
 
@@ -205,16 +205,16 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
         utils.isipv(inventory['services']['kubeadm']['networking'][subnet], [4, 6])
 
     # validate nodes in kubeadm_patches (groups are validated with JSON schema)
-    for node in inventory["nodes"]:
-        for control_plane_item in inventory["services"]["kubeadm_patches"]:
-            for i in inventory["services"]["kubeadm_patches"][control_plane_item]:
-                if i.get('nodes') is not None:
-                    for n in i['nodes']:
-                        if node['name'] == n:
-                            if control_plane_item == 'kubelet' and 'control-plane' not in node['roles'] and 'worker' not in node['roles']:
-                                raise Exception("%s patch can be uploaded only to control-plane or worker nodes" % control_plane_item)
-                            if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
-                                raise Exception("%s patch can be uploaded only to control-plane nodes" % control_plane_item)
+    for control_plane_item, patches in inventory["services"]["kubeadm_patches"].items():
+        for patch in patches:
+            if 'nodes' not in patch:
+                continue
+
+            for node in cluster.get_nodes_by_names(patch['nodes']):
+                if control_plane_item == 'kubelet' and 'control-plane' not in node['roles'] and 'worker' not in node['roles']:
+                    raise Exception("%s patch can be uploaded only to control-plane or worker nodes" % control_plane_item)
+                if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
+                    raise Exception("%s patch can be uploaded only to control-plane nodes" % control_plane_item)
 
     if not any_worker_found:
         raise KME("KME0004")
@@ -1355,13 +1355,11 @@ def get_patched_flags_for_control_plane_item(inventory: dict, control_plane_item
 
     for n in inventory['services']['kubeadm_patches'][control_plane_item]:
         if n.get('groups') is not None and list(set(node['roles']) & set(n['groups'])):
-            if n.get('patch') is not None:
-                for arg, value in n['patch'].items():
-                    flags[arg] = value
+            for arg, value in n['patch'].items():
+                flags[arg] = value
         if n.get('nodes') is not None and node['name'] in n['nodes']:
-            if n.get('patch') is not None:
-                for arg, value in n['patch'].items():
-                    flags[arg] = value
+            for arg, value in n['patch'].items():
+                flags[arg] = value
 
     # we always set binding-address to the node's internal address for apiServer
     if control_plane_item == 'apiServer' and 'control-plane' in node['roles']:

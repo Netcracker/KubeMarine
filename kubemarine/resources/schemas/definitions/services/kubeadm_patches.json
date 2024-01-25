@@ -26,50 +26,27 @@
       "description": "Patches for control-plane pods",
       "minItems": 0,
       "items": {
-        "anyOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "groups": {
-              "type": "array",
-              "items": {
-                "enum": ["control-plane"]
+        "allOf": [
+          {
+            "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "patch": {
+                "$ref": "#/definitions/patch"
+              },
+              "groups": {
+                "$ref": "../common/node_ref.json#/definitions/ControlPlanes"
+              },
+              "nodes": {
+                "$ref": "../common/node_ref.json#/definitions/Names"
               }
             },
-            "patch": {
-              "type": "object",
-              "properties": {
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
+            "required": ["patch"],
+            "additionalProperties": false
           }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "nodes": {
-              "type": "array",
-              "items": [ 
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "patch": {
-              "type": "object",
-              "properties": {
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      ]
+        ]
       }
     },
     "kubelet-patch": {
@@ -77,52 +54,34 @@
       "description": "Patches for kubelet",
       "minItems": 0,
       "items": {
-        "anyOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "groups": {
-              "type": "array",
-              "items": {
-                "enum": ["control-plane", "worker"]
+        "allOf": [
+          {
+            "$ref": "../common/node_ref.json#/definitions/OneOfNodesGroupsSpec"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "patch": {
+                "$ref": "#/definitions/patch"
+              },
+              "groups": {
+                "$ref": "../common/node_ref.json#/definitions/KubernetesRoles"
+              },
+              "nodes": {
+                "$ref": "../common/node_ref.json#/definitions/Names"
               }
             },
-            "patch": {
-              "type": "object",
-              "properties": {
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
+            "required": ["patch"],
+            "additionalProperties": false
           }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "nodes": {
-              "type": "array",
-              "items": [
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "patch": {
-              "type": "object",
-              "properties": {
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      ]
+        ]
+      }
+    },
+    "patch": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "boolean", "integer"]
       }
     }
   }
 }
-
