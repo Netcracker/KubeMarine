@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Iterator, Any, Optional
+from typing import List, Dict, Iterator, Any, Optional, Callable
 
 import yaml
 from jinja2 import Template
