@@ -321,7 +321,6 @@ subjects:
 apiVersion: v1
 data:
   allow-snippet-annotations: "true"
-  use-proxy-protocol: "true"
 kind: ConfigMap
 metadata:
   labels:
@@ -336,8 +335,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: ingress-nginx
@@ -646,4 +643,3 @@ webhooks:
     resources:
     - ingresses
   sideEffects: None
-  timeoutSeconds: 29
