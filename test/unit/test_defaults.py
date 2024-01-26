@@ -257,7 +257,7 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.0'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
         inventory = demo.new_cluster(inventory).inventory
 
         self.assertEqual(1000000, inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
