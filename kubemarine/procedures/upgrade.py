@@ -15,7 +15,6 @@
 import itertools
 import os
 from collections import OrderedDict
-from itertools import chain
 from typing import List, Callable, Dict
 
 from kubemarine import kubernetes, plugins, admission, jinja
@@ -142,10 +141,18 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
     # upgrade_candidates is a source of upgradeable plugins, not list of plugins to upgrade.
     # Some plugins from upgrade_candidates will not be upgraded, because they have "install: false"
     upgrade_candidates = {}
-    defined_plugins = cluster.procedure_inventory.get(upgrade_version, {}).get("plugins", {}).keys()
-    for plugin in chain(defined_plugins, plugins.oob_plugins):
-        # TODO: use only OOB plugins that have changed version so that we do not perform redundant installations
-        upgrade_candidates[plugin] = cluster.inventory["plugins"][plugin]
+    for plugin, plugin_item in cluster.inventory["plugins"].items():
+        # Both OOB and custom plugins can have templates dependent on the inventory.
+        # By default, let's do not re-install plugins if inventory does not change for them.
+        #
+        # Still there should be an ability to force re-install them with the same target inventory configuration,
+        # using just empty spec in the procedure inventory.
+        #
+        # This requirement makes it impossible to turn off re-installation of OOB plugins,
+        # if compatibility map changes, but target inventory does not (e.g. if all images are redefined).
+        if (plugin in cluster.procedure_inventory.get(upgrade_version, {}).get("plugins", {})
+                or cluster.previous_inventory["plugins"].get(plugin) != plugin_item):
+            upgrade_candidates[plugin] = cluster.inventory["plugins"][plugin]
 
     plugins.install(cluster, upgrade_candidates)
 

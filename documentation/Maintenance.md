@@ -421,10 +421,18 @@ Kubernetes re-creates all the pod containers. However, your custom containers ma
 
 #### Plugins Upgrade Section and Task
 
-This task is required to upgrade OOB plugins and specified user plugins. The OOB plugins are upgraded automatically. You can also configure your own plugins for the upgrade as follows:
+This task is required to upgrade OOB plugins and specified user plugins.
+
+The OOB plugins are upgraded automatically if supported versions are changed for them.
+For more information about supported versions, please refer to [Supported Versions](Installation.md#supported-versions).
+
+Previously configured custom plugins are also re-installed if effectively resolved inventory configuration is changed for them.
+For example, they may depend on Kubernetes version using [Dynamic Variables](Installation.md#dynamic-variables).
+
+You can also configure your own plugins for the upgrade as follows:
 
 ```yaml
-v1.18.10:
+v1.28.4:
   plugins:
     example-plugin:
       installation:
@@ -439,6 +447,15 @@ v1.18.10:
               apply_groups: None
               apply_nodes: ['control-plane-1', 'worker-1']
               apply_command: 'testctl apply -f /etc/example/configuration.yaml'
+```
+
+You can also re-install custom or OOB plugins even without changes in the inventory configuration.
+
+```yaml
+v1.28.4:
+  plugins:
+    calico: {}
+    example-plugin: {}
 ```
 
 After applying, this configuration is merged with the plugins' configuration contained in the current `cluster.yaml`. Only the `installation` section for each plugin is overwritten, if specified.

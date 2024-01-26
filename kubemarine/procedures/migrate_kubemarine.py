@@ -270,8 +270,9 @@ class BalancerUpgradeAction(Action):
 
 class PluginUpgradeAction(SoftwareUpgradeAction):
     def _upgrade(self, cluster: KubernetesCluster) -> None:
-        # TODO despite that we are sure that the recommended version has changed,
-        #  upgrade might still be not required if the effective configuration did not change.
+        # Recommended version is changed in globals.
+        # In general, there can be arbitrary references to globals using jinja templates in the inventory,
+        # So let's always run upgrade.
         upgrade_candidates = {
             self.software_name: cluster.inventory['plugins'][self.software_name]
         }
