@@ -1,6 +1,7 @@
 This section describes the features and steps for performing maintenance procedures on the existing Kubernetes cluster.
 
 - [Prerequisites](#prerequisites)
+- [Basics](#basics)
 - [Provided Procedures](#provided-procedures)
     - [Kubemarine Migration Procedure](#kubemarine-migration-procedure)
       - [Software Upgrade Patches](#software-upgrade-patches)
@@ -42,10 +43,21 @@ Before you start any maintenance procedure, you must complete the following mand
 1. If using custom RPM repositories, make sure they are online, accessible from nodes, and you are able to perform repository updates.
 1. Prepare the latest actual **cluster.yaml** that should contain information about the current cluster state. For more information, refer to the [Kubemarine Inventory Preparation](Installation.md#inventory-preparation) section in _Kubemarine Installation Procedure_.
 
-   **Note**: If you provide an incorrect config file, it can cause unknown consequences.
+   **Note**: If you provide an incorrect config file, it can cause unknown consequences. For more information, refer to [Basics](#basics). 
 
 1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform. Each procedure has its own configuration format. Read documentation below to fill procedure inventory data.
 
+# Basics
+
+According to the Kubemarine concept, `cluster.yaml` is a reflection of the Kubernetes cluster state.
+Therefore, any changes on the cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
+This is an important practice even if the `cluster.yaml` section or option is applicable only for the installation procedure because the particular `cluster.yaml` can be used for the reinstallation or reproduction of some cases.
+For the changes that cannot be reflected in `cluster.yaml`, the appropriate comments can be used.
+
+The maintenance of the cluster can be done in two scenarios:
+
+- It can be performed using some Kubemarine procedure. In this case, Kubemarine does its best to keep `cluster.yaml` and the cluster consistent to each other.
+- The cluster can be reconfigured manually. In this case, the user should also manually reflect the changes in the `cluster.yaml`.
 
 # Provided Procedures
 
@@ -216,7 +228,10 @@ The configuration format for the plugins is the same.
   * https://kubernetes.io/docs/tasks/run-application/configure-pdb/#unhealthy-pod-eviction-policy is configured to _AlwaysAllow_
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
-* The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
+* The upgrade procedure only maintains upgrading from one `supported` version to the higher `supported` version.
+  The target version must also be the latest patch version supported by Kubemarine.
+  For example, upgrade is allowed from v1.26.7 to v1.26.11, or from v1.26.7 to v1.27.8, or from v1.26.7 to v1.28.4 through v1.27.8,
+  but not from v1.26.7 to v1.27.1 as v1.27.1 is not the latest supported patch version of Kubernetes v1.27.
 * Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 ### Upgrade Procedure Parameters
@@ -328,9 +343,6 @@ etcd:
       election-timeout: "10000"
 ...
 ```
-
-**Note**: All the custom settings for the system services should be properly reflected in the cluster.yaml (see [services.kubeadm parameters](Installation.md#kubeadm)) to be kept after upgrade.
-
 
 #### Thirdparties Upgrade Section and Task
 

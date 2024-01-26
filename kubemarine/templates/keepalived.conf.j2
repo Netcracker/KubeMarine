@@ -1,3 +1,10 @@
+{% if globals|length %}
+global_defs {
+    {% if globals['vrrp_garp_master_refresh'] is defined %}vrrp_garp_master_refresh {{ globals['vrrp_garp_master_refresh'] }}{% endif %}
+}
+{% endif %}
+
+{%- for item in vrrp_ips %}
 vrrp_script script_{{ item['id'] }} {
     script       "/usr/local/bin/check_haproxy.sh"
     interval 2
@@ -8,12 +15,12 @@ vrrp_script script_{{ item['id'] }} {
 
 vrrp_instance balancer_{{ item['id'] }} {
     state BACKUP
-    interface {{ interface }}
+    interface {{ item['interface'] }}
     virtual_router_id {{ item['router_id'] }}
-    priority {{ priority }}
+    priority {{ item['priority'] }}
     nopreempt
     virtual_ipaddress {
-        {{ item['ip'] }} dev {{ interface }} label vip_{{ item['id'] }}
+        {{ item['ip'] }} dev {{ item['interface'] }} label vip_{{ item['id'] }}
     }
 
     track_script {
@@ -24,12 +31,15 @@ vrrp_instance balancer_{{ item['id'] }} {
         auth_type PASS
         auth_pass {{ item['password'] }}
     }
-{%- if peers | length > 0 %}
-    unicast_src_ip {{ source }}
+
+{%- if item['peers'] | length > 0 %}
+    unicast_src_ip {{ item['source'] }}
     unicast_peer {
-{%- for ip in peers %}
+{%- for ip in item['peers'] %}
         {{ ip }}
 {%- endfor %}
     }
 {%- endif %}
 }
+
+{%- endfor %}
