@@ -48,6 +48,7 @@ def new(_: log.EnhancedLogger, *,
 
     env.filters['toyaml'] = lambda data: yaml.dump(data, default_flow_style=False)
     env.tests['has_role'] = lambda node, role: role in node['roles']
+    env.tests['has_roles'] = lambda node, roles: bool(set(node['roles']) & set(roles))
 
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'

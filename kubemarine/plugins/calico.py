@@ -46,6 +46,47 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
         inventory["plugins"]["calico"]["apiserver"]["resources"] = raw_apiserver["resources"]
 
 
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['remove_node'])
+def enrich_remove_node_set_previous_typha_enabled(cluster: KubernetesCluster) -> None:
+    if not cluster.previous_inventory["plugins"]["calico"]["install"]:
+        return
+
+    # If Typha was (effectively) enabled before removing of node and `enabled` value is not explicitly provided,
+    # Let's set previous flag in all inventories including final, as we are not able to fully remove Typha.
+    typha_enabled_before = is_typha_enabled(cluster.previous_inventory)
+    if typha_enabled_before and 'enabled' not in cluster.inventory.get('plugins', {}).get('calico', {}).get('typha', {}):
+        cluster.inventory.setdefault('plugins', {}).setdefault('calico', {})\
+            .setdefault('typha', {})['enabled'] = typha_enabled_before
+
+
+def new_route_reflectors_added(cluster: KubernetesCluster) -> bool:
+    procedure = cluster.context['initial_procedure']
+    if procedure != 'add_node':
+        return False
+
+    calico = cluster.inventory['plugins']['calico']
+    if calico['fullmesh']:
+        return False
+
+    for node in cluster.get_new_nodes().having_roles(['control-plane', 'worker']).get_ordered_members_configs_list():
+        if node.get('labels', {}).get('route-reflector') is True:
+            break
+    else:
+        return False
+
+    steps = calico['installation']['procedures']
+    for step in steps:
+        if 'template' not in step:
+            continue
+
+        if step['template']['source'] == 'templates/plugins/calico-rr.sh.j2':
+            break
+    else:
+        return False
+
+    return True
+
+
 # DEPRECATED
 def apply_calico_yaml(cluster: KubernetesCluster, calico_original_yaml: str, calico_yaml: str) -> None:
     """

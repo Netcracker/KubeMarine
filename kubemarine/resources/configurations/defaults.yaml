@@ -582,9 +582,9 @@ plugins:
     globalBgpPeers: []
     typha:
       # enabled by default for envs with nodes > 3
-      enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'
+      enabled: '{% if (nodes | select("has_roles", ["control-plane", "worker"]) | list | length) < 4 %}false{% else %}true{% endif %}'
       # let's start from 2 replicas and increment it every 50 nodes
-      replicas: '{{ (((nodes|length)/50) + 2) | round(1) | int }}'
+      replicas: '{{ (((nodes | select("has_roles", ["control-plane", "worker"]) | list | length) / 50) + 2) | round(0, "floor") | int }}'
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux

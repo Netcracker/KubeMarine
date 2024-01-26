@@ -389,6 +389,7 @@ class DynamicResources:
             kubemarine.admission.manage_enrichment,
             kubemarine.keepalived.enrich_add_node_vrrp_ips,
             kubemarine.keepalived.enrich_remove_node_vrrp_ips,
+            kubemarine.plugins.calico.enrich_remove_node_set_previous_typha_enabled,
             kubemarine.kubernetes.enrich_upgrade_inventory,
             kubemarine.kubernetes.enrich_restore_inventory,
             kubemarine.kubernetes.enrich_reconfigure_inventory,

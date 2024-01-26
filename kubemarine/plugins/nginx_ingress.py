@@ -80,16 +80,6 @@ def verify_cert_renew(cluster: KubernetesCluster) -> None:
         raise Exception("Certificates can not be renewed for nginx plugin since it is not installed")
 
 
-def redeploy_ingress_nginx_is_needed(cluster: KubernetesCluster) -> bool:
-    # redeploy ingres-nginx-controller for add/remove node procedures is needed in case:
-    # 1. plugins.nginx-ingress-controller.install=true
-    # 2. Something is changes in the plugin configuration after procedure inventory is applied.
-    #    Typically, `ports` configuration may change if balancers existence is changed.
-    ingress_nginx_plugin = cluster.inventory['plugins']['nginx-ingress-controller']
-    install: bool = ingress_nginx_plugin['install']
-    return install and cluster.previous_inventory['plugins']['nginx-ingress-controller'] != ingress_nginx_plugin
-
-
 def manage_custom_certificate(cluster: KubernetesCluster) -> None:
     default_cert = cluster.inventory["plugins"]["nginx-ingress-controller"]["controller"]["ssl"]\
         .get("default-certificate")

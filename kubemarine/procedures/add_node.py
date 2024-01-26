@@ -21,7 +21,7 @@ from kubemarine import kubernetes, packages, plugins
 from kubemarine.core import flow
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.kubernetes import components
-from kubemarine.plugins.nginx_ingress import redeploy_ingress_nginx_is_needed
+from kubemarine.plugins import calico
 from kubemarine.procedures import install
 
 
@@ -63,13 +63,17 @@ def write_new_apiserver_certsans(cluster: KubernetesCluster) -> None:
 
 
 def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
-    # redeploy ingress-nginx-controller if needed
-    if redeploy_ingress_nginx_is_needed(cluster):
-        cluster.log.debug("Redeploy ingress-nginx-controller plugin")
-        plugins.install_plugin(cluster, 'nginx-ingress-controller',
-                               cluster.inventory['plugins']['nginx-ingress-controller']['installation']['procedures'])
-    else:
-        cluster.log.debug("Redeploy ingress-nginx-controller is not needed, skip it")
+    # redeploy_candidates is a source of plugins that may be redeployed.
+    # Some plugins from redeploy_candidates will not be redeployed, because they have "install: false"
+    redeploy_candidates = {}
+    for plugin, plugin_item in cluster.inventory["plugins"].items():
+        if (cluster.previous_inventory["plugins"][plugin] != plugin_item
+                # New route reflectors are added with disabled fullmesh
+                or (plugin == 'calico' and calico.new_route_reflectors_added(cluster))):
+            cluster.log.debug(f"Configuration of {plugin!r} plugin has changed, scheduling it for redeploy")
+            redeploy_candidates[plugin] = cluster.inventory["plugins"][plugin]
+
+    plugins.install(cluster, redeploy_candidates)
 
 
 def cache_installed_packages(cluster: KubernetesCluster) -> None:
