@@ -215,6 +215,21 @@ class TestErrorHeuristics(unittest.TestCase):
         with self.assertRaisesRegex(errors.FailException, r"'address' was unexpected"):
             demo.new_cluster(inventory)
 
+    def test_propertyNames_not_enum(self):
+        """
+        'services.kubeadm_kube-proxy' section is an example where propertyNames are configured as not(enum).
+        Specify unexpected property to check correctly generated error.
+        See kubemarine.core.schema._friendly_msg
+        """
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        context = demo.create_silent_context(["fake.yaml"], procedure='reconfigure')
+
+        reconfigure = demo.generate_procedure_inventory(procedure='reconfigure')
+        reconfigure.setdefault('services', {}).setdefault('kubeadm_kube-proxy', {})['kind'] = 'unsupported'
+
+        with self.assertRaisesRegex(errors.FailException, "Property name 'kind' is unexpected"):
+            demo.new_cluster(inventory, procedure_inventory=reconfigure, context=context)
+
 
 if __name__ == '__main__':
     unittest.main()
