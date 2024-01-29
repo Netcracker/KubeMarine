@@ -5650,6 +5650,13 @@ plugins:
 Application of the list merge strategy is allowed in the following sections:
 * `plugins.installation.procedures`
 * `services.kubeadm.apiServer.extraVolumes`
+* `services.kubeadm.controllerManager.extraVolumes`
+* `services.kubeadm.scheduler.extraVolumes`
+* `services.kubeadm_patches.apiServer`
+* `services.kubeadm_patches.controllerManager`
+* `services.kubeadm_patches.etcd`
+* `services.kubeadm_patches.kubelet`
+* `services.kubeadm_patches.scheduler`
 * `services.kernel_security.permissive`
 * `services.modprobe`
 * `services.etc_hosts`

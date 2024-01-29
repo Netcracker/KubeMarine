@@ -324,9 +324,9 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
             # In current 3rd-party version the error should not appear, but let's still fall back to default behaviour
             pass
 
-    if _validated_by(error, 'not') and isinstance(error.validator_value, dict) \
-            and error.validator_value.get('enum', {}) == ['<<'] and "propertyNames" in error.schema_path:
-        return "Property name '<<' is unexpected"
+    if (_validated_by(error, 'not') and isinstance(error.validator_value, dict)
+            and set(error.validator_value) == {'enum'} and "propertyNames" in error.schema_path):
+        return f"Property name {error.instance!r} is unexpected"
 
     if _validated_by(error, 'enum'):
         if "propertyNames" not in error.schema_path:
