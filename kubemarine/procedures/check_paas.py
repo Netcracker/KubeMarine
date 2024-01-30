@@ -1423,9 +1423,9 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
                 cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
             profile_inv = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
         profile = ""
-        result = first_control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
-        kubeadm_cm = yaml.safe_load(list(result.values())[0].stdout)
-        cluster_config = yaml.safe_load(kubeadm_cm["data"]["ClusterConfiguration"])
+        kubeadm_cm = kubernetes.KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
+        kubeadm_cm.reload(first_control_plane)
+        cluster_config = yaml.safe_load(kubeadm_cm.obj["data"]["ClusterConfiguration"])
         api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
         api_conf = yaml.safe_load(list(api_result.values())[0].stdout)
         ext_args = [cmd for cmd in api_conf["spec"]["containers"][0]["command"]]

@@ -81,8 +81,10 @@ class EnrichmentValidation(unittest.TestCase):
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def setUp(self):
         self.commonSetUp(Identity('nginx-ingress-controller'))
-        # Requires ingress-nginx >= v1.9.0
+        # Requires ingress-nginx >= v1.9.5
         self.k8s_latest = self.get_latest_k8s()
+        # Requires ingress-nginx < v1.9.5
+        self.k8s_1_28_x = self.get_latest_k8s("v1.28")
         # Requires ingress-nginx < v1.9.0
         self.k8s_1_25_x = self.get_latest_k8s("v1.25")
         # Requires ingress-nginx v1.2.x
@@ -180,7 +182,8 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for k8s_version, expected_num_resources in (
             (self.k8s_1_24_x, 0),
             (self.k8s_1_25_x, 9),
-            (self.k8s_latest, 10)
+            (self.k8s_1_28_x, 10),
+            (self.k8s_latest, 9)
         ):
             with self.subTest(k8s_version):
                 cluster = demo.new_cluster(self.inventory(k8s_version))

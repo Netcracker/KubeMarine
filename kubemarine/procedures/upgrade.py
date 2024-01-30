@@ -51,16 +51,33 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     initial_kubernetes_version = cluster.context['initial_kubernetes_version']
 
+    first_control_plane = cluster.nodes["control-plane"].get_first_member()
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     if (admission.is_pod_security_unconditional(cluster)
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.28")
             and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
-        first_control_plane = cluster.nodes["control-plane"].get_first_member()
 
         cluster.log.debug("Updating kubeadm config map")
         final_features_list = first_control_plane.call(admission.update_kubeadm_configmap_pss, target_state="enabled")
         cluster.log.debug("Updating kube-apiserver configs on control-planes")
         cluster.nodes["control-plane"].call(admission.update_kubeapi_config_pss, features_list=final_features_list)
+
+    if (kubernetes.kube_proxy_overwrites_higher_system_values(cluster)
+            and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.29")):
+        cluster.log.debug("Updating kube-proxy config map")
+
+        def edit_kube_proxy_conntrack_min(kube_proxy_cm: dict) -> dict:
+            expected_conntrack: dict = cluster.inventory['services']['kubeadm_kube-proxy']['conntrack']
+            if 'min' not in expected_conntrack:
+                return kube_proxy_cm
+
+            actual_conntrack = kube_proxy_cm['conntrack']
+            if expected_conntrack['min'] != actual_conntrack.get('min'):
+                actual_conntrack['min'] = expected_conntrack['min']
+
+            return kube_proxy_cm
+
+        first_control_plane.call(kubernetes.reconfigure_kube_proxy_configmap, mutate_func=edit_kube_proxy_conntrack_min)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
@@ -90,7 +107,6 @@ def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
-    kubernetes_apply_taints(cluster)
 
 
 def upgrade_packages(cluster: KubernetesCluster) -> None:
@@ -220,12 +236,6 @@ def fix_cri_socket(cluster: KubernetesCluster) -> None:
                            f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
-
-
-def kubernetes_apply_taints(cluster: KubernetesCluster) -> None:
-    # Apply taints after upgrade
-    group = cluster.nodes['control-plane']
-    kubernetes.apply_taints(group)
 
 
 if __name__ == '__main__':

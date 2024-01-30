@@ -36,6 +36,7 @@ def new(_: log.EnhancedLogger, *,
     precompile_filters['isipv4'] = lambda ip: utils.isipv(ip, [4])
     precompile_filters['minorversion'] = utils.minor_version
     precompile_filters['majorversion'] = utils.major_version
+    precompile_filters['versionkey'] = utils.version_key
     precompile_filters['b64encode'] = lambda s: base64.b64encode(s.encode()).decode()
     precompile_filters['b64decode'] = lambda s: base64.b64decode(s.encode()).decode()
     precompile_filters['url_quote'] = lambda u: quote_plus(u)
