@@ -20,6 +20,7 @@ import random
 import re
 import sys
 import uuid
+import string
 from collections import OrderedDict
 import time
 from contextlib import contextmanager, nullcontext, AbstractContextManager
@@ -1295,24 +1296,29 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     binary_recv_path = utils.get_internal_resource_path('./resources/scripts/ipip_recv')
     ipip_recv = "/tmp/%s" % uuid.uuid4().hex
     recv_log = "/tmp/%s" % uuid.uuid4().hex
-    # TODO: Random message, random IP
-    msg = "TEST_MESSAGE"
-    fake_addr = "240.0.0.1"
+    # Random message
+    random.seed()
+    msg = ''.join(random.choices(string.ascii_letters + string.digits, k=15))
+    # Random IP from class E
+    int_ip = random.randint(4026531841, 4294967294)
+    fake_addr = str(ipaddress.IPv4Address(int_ip))
     # That is used as number of packets for transmitter
     timeout = int(cluster.inventory['globals']['timeout_download'])
     for node in group.get_ordered_members_configs_list():
         host = node['internal_address']
-        # Receiver start command
-        recv_cmd[host] = f"{ipip_recv} {host} {fake_addr} {random_port} " \
-                         f"{msg} 3 > {recv_log}.log 2>{recv_log}.err"
-
         # Transmitter start command
+        # Transmitter starts first and sends IPIP packets every 1 second until the timeout comes or
+        # the process is killed by terminating command
         trns_item_cmd: List[str] = []
         for node_item in group.get_ordered_members_configs_list():
             if node_item['internal_address'] != host:
                 trns_item_cmd.append(f"nohup {ipip_trns} {host} {node_item['internal_address']} "
                                 f"{fake_addr} {random_port} {msg} {timeout} > /dev/null 2>&1 & echo $! >> {recv_log}.pid")
         trns_cmd[host] = '& sudo '.join(trns_item_cmd)
+        # Receiver start command
+        # Receiver starts after the transmitter and try to get 2 or 3 packets from eache node
+        recv_cmd[host] = f"{ipip_recv} {host} {fake_addr} {random_port} " \
+                         f"{msg} 3 > {recv_log}.log 2>{recv_log}.err"
 
     try:
         collector = CollectorCallback(group.cluster)
