@@ -34,6 +34,7 @@ from kubemarine.core.group import (
     NodeConfig, RunnersGroupResult, RunResult, CollectorCallback
 )
 from kubemarine.core.errors import KME
+from kubemarine.core.yaml_merger import default_merger
 from kubemarine.cri import containerd
 from kubemarine.kubernetes.object import KubernetesObject
 
@@ -42,6 +43,9 @@ ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
 ERROR_MAJOR_RANGE_EXCEEDED='Major version \"%s\" rises to new \"%s\" more than one'
 ERROR_MINOR_RANGE_EXCEEDED='Minor version \"%s\" rises to new \"%s\" more than one'
 ERROR_NOT_LATEST_PATCH='New version \"%s\" is not the latest supported patch version \"%s\"'
+
+ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE = "%s patch can be uploaded only to control-plane or worker nodes"
+ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded only to control-plane nodes"
 
 
 def is_container_runtime_not_configurable(cluster: KubernetesCluster) -> bool:
@@ -146,6 +150,23 @@ def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> d
     return inventory
 
 
+def enrich_reconfigure_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+    return reconfigure_finalize_inventory(cluster, inventory)
+
+
+def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+    if cluster.context.get("initial_procedure") != "reconfigure":
+        return inventory
+
+    kubeadm_sections = {s: v for s, v in cluster.procedure_inventory.get('services', {}).items()
+                        if s in ('kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches')}
+
+    if kubeadm_sections:
+        default_merger.merge(inventory.setdefault('services', {}), deepcopy(kubeadm_sections))
+
+    return inventory
+
+
 def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     kubeadm = inventory['services']['kubeadm']
     kubeadm['dns'].setdefault('imageRepository', f"{kubeadm['imageRepository']}/coredns")
@@ -206,9 +227,9 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
 
             for node in cluster.get_nodes_by_names(patch['nodes']):
                 if control_plane_item == 'kubelet' and 'control-plane' not in node['roles'] and 'worker' not in node['roles']:
-                    raise Exception("%s patch can be uploaded only to control-plane or worker nodes" % control_plane_item)
+                    raise Exception(ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE % control_plane_item)
                 if control_plane_item != 'kubelet' and ('control-plane' not in node['roles']):
-                    raise Exception("%s patch can be uploaded only to control-plane nodes" % control_plane_item)
+                    raise Exception(ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE % control_plane_item)
 
     if not any_worker_found:
         raise KME("KME0004")
