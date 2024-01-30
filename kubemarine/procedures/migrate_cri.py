@@ -115,8 +115,8 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         else:
             control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
 
+        kubernetes.components.wait_for_pods(node)
         if is_control_plane:
-            kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
             # check ETCD health
             etcd.wait_for_health(cluster, node)
 

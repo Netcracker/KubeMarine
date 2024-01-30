@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import difflib
 import hashlib
 import io
 import ipaddress
@@ -22,7 +23,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -170,7 +171,7 @@ def make_ansible_inventory(location: str, c: object) -> None:
 
 
 def get_current_timestamp_formatted() -> str:
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 
 def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
@@ -272,25 +273,74 @@ def get_dump_filepath(context: dict, filename: str) -> str:
 
 
 def wait_command_successful(g: object, command: str,
+                            *,
                             retries: int = 15, timeout: int = 5,
-                            warn: bool = True, hide: bool = False) -> None:
+                            hide: bool = False) -> None:
     from kubemarine.core.group import NodeGroup
     group = cast(NodeGroup, g)
 
-    log = group.cluster.log
+    logger = group.cluster.log
 
-    while retries > 0:
-        log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide)
+    def attempt() -> bool:
+        result = group.sudo(command, warn=True, hide=hide)
         if hide:
-            log.verbose(result)
+            logger.verbose(result)
             for host in result.get_failed_hosts_list():
                 stderr = result[host].stderr.rstrip('\n')
                 if stderr:
-                    log.debug(f"{host}: {stderr}")
+                    logger.debug(f"{host}: {stderr}")
 
-        if not result.is_any_failed():
-            log.debug("Command succeeded")
+        return not result.is_any_failed()
+
+    _wait_command_successful(logger, attempt, retries, timeout)
+
+
+def wait_commands_successful(g: object, commands: List[str],
+                             *,
+                             retries: int = 15, timeout: int = 5) -> None:
+    from kubemarine.core.group import NodeGroup, RemoteGroupException
+    from kubemarine.core.executor import UnexpectedExit
+    group = cast(NodeGroup, g)
+
+    if group.nodes_amount() != 1:
+        raise Exception("Waiting for few commands is currently supported only for single node")
+
+    logger = group.cluster.log
+
+    remained_commands = list(commands)
+
+    def attempt() -> bool:
+        defer = group.new_defer()
+        for command in remained_commands:
+            defer.sudo(command)
+
+        try:
+            defer.flush()
+        except RemoteGroupException as e:
+            results = e.results[group.get_host()]
+            for result in results:
+                if isinstance(result, UnexpectedExit):
+                    logger.debug(result.result.stderr)
+                    break
+                elif isinstance(result, Exception):
+                    raise
+
+                del remained_commands[0]
+
+            return False
+
+        return True
+
+    _wait_command_successful(logger, attempt, retries, timeout)
+
+
+def _wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
+                             retries: int, timeout: int) -> None:
+    while retries > 0:
+        logger.debug("Waiting for command to succeed, %s retries left" % retries)
+        result = attempt()
+        if result:
+            logger.debug("Command succeeded")
             return
         retries = retries - 1
         time.sleep(timeout)
@@ -486,6 +536,18 @@ def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
     # Extra transformation to JSON is necessary,
     # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
     logger.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+
+
+def get_unified_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    diff = list(difflib.unified_diff(
+        old.splitlines(), new.splitlines(),
+        fromfile=fromfile, tofile=tofile,
+        lineterm=''))
+
+    if diff:
+        return '\n'.join(diff)
+
+    return None
 
 
 def isipv(address: str, versions: List[int]) -> bool:

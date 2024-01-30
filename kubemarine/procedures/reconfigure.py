@@ -1,6 +1,9 @@
 from collections import OrderedDict
-from typing import List
+from typing import List, Union
 
+from ordered_set import OrderedSet
+
+from kubemarine import kubernetes
 from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
@@ -8,7 +11,23 @@ from kubemarine.core.resources import DynamicResources
 
 
 def deploy_kubernetes_reconfigure(cluster: KubernetesCluster) -> None:
-    pass
+    changed_components = OrderedSet[str]()
+    for component, constants in kubernetes.components.COMPONENTS_CONSTANTS.items():
+        for section_names in constants['sections']:
+            section: Union[dict, list, None] = cluster.procedure_inventory
+            for name in section_names:
+                if isinstance(section, dict):
+                    section = section.get(name)
+
+            if section is not None:
+                changed_components.add(component)
+
+    if changed_components:
+        cluster.log.debug(f"Detected changes in components: {', '.join(changed_components)}")
+        kubernetes_nodes = cluster.make_group_from_roles(['control-plane', 'worker'])
+        kubernetes_nodes.call(kubernetes.components.reconfigure_components, components=list(changed_components))
+    else:
+        cluster.log.debug("No changes detected, skipping.")
 
 
 tasks = OrderedDict({

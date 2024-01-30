@@ -50,8 +50,7 @@ def renew_apply(control_planes: NodeGroup) -> None:
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
     control_planes.call(force_restart_control_plane)
 
-    for control_plane in control_planes.get_ordered_members_list():
-        kubernetes.wait_for_any_pods(control_planes.cluster, control_plane, apply_filter=control_plane.get_node_name())
+    kubernetes.components.wait_for_pods(control_planes)
 
 
 def force_restart_control_plane(control_planes: NodeGroup) -> None:
