@@ -27,6 +27,8 @@ from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
+from kubemarine.kubernetes import components
+from kubemarine.kubernetes.object import KubernetesObject
 from kubemarine.plugins import builtin
 
 privileged_policy_filename = "privileged.yaml"
@@ -52,13 +54,11 @@ loaded_oob_policies = {}
 
 
 def support_pss_only(cluster: KubernetesCluster) -> bool:
-    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.25")
+    return components.kubernetes_minor_release_at_least(cluster.inventory, "v1.25")
 
 
 def is_pod_security_unconditional(cluster: KubernetesCluster) -> bool:
-    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-    return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.28")
+    return components.kubernetes_minor_release_at_least(cluster.inventory, "v1.28")
 
 
 def enrich_inventory_psp(inventory: dict, _: KubernetesCluster) -> dict:
@@ -357,13 +357,12 @@ def restart_pods_task(cluster: KubernetesCluster) -> None:
         first_control_plane.sudo("kubectl rollout restart ds %s -n %s" % (ds["metadata"]["name"], ds["metadata"]["namespace"]))
 
     # we do not know to wait for, only for system pods maybe
-    cluster.log.debug("Waiting for system pods...")
-    kubernetes.wait_for_any_pods(cluster, first_control_plane)
+    kube_nodes.call(components.wait_for_pods)
 
 
 def update_kubeadm_configmap_psp(first_control_plane: NodeGroup, target_state: str) -> str:
     # load kubeadm config map and retrieve cluster config
-    kubeadm_cm = kubernetes.KubernetesObject(first_control_plane.cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
+    kubeadm_cm = KubernetesObject(first_control_plane.cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
     kubeadm_cm.reload(first_control_plane)
     cluster_config = yaml.safe_load(kubeadm_cm.obj["data"]["ClusterConfiguration"])
 
@@ -740,7 +739,7 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
     final_feature_list = ""
 
     # load kubeadm config map and retrieve cluster config
-    kubeadm_cm = kubernetes.KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
+    kubeadm_cm = KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
     kubeadm_cm.reload(first_control_plane)
     cluster_config = yaml.safe_load(kubeadm_cm.obj["data"]["ClusterConfiguration"])
 

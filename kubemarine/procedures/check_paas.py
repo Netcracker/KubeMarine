@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import difflib
 import io
 import sys
 import time
@@ -643,15 +642,13 @@ def kubernetes_audit_policy_configuration(cluster: KubernetesCluster) -> None:
                 broken.append(f"{node_name}: {audit_file_name} is absent")
             else:
                 actual_config = policy_result.stdout
-                diff = list(difflib.unified_diff(
-                    actual_config.splitlines(),
-                    expected_config.splitlines(),
+                diff = utils.get_unified_diff(
+                    actual_config, expected_config,
                     fromfile=audit_file_name,
-                    tofile="inventory['services']['audit']['cluster_policy']",
-                    lineterm=''))
-                if diff:
+                    tofile="inventory['services']['audit']['cluster_policy']")
+                if diff is not None:
                     cluster.log.debug(f"Configuration of audit policy is not actual on {node_name} node")
-                    cluster.log.debug('\n'.join(diff))
+                    cluster.log.debug(diff)
                     broken.append(f"{node_name}: {audit_file_name} is not actual")
 
         if broken:
@@ -1154,18 +1151,15 @@ def default_services_configuration_status(cluster: KubernetesCluster) -> None:
         original_coredns_cm = yaml.safe_load(generate_configmap(cluster.inventory))
         result = first_control_plane.sudo('kubectl get cm coredns -n kube-system -oyaml')
         coredns_cm = yaml.safe_load(result.get_simple_out())
-        diff = list(difflib.unified_diff(
-            coredns_cm['data']['Corefile'].splitlines(),
-            original_coredns_cm['data']['Corefile'].splitlines(),
+        diff = utils.get_unified_diff(
+            coredns_cm['data']['Corefile'], original_coredns_cm['data']['Corefile'],
             fromfile='kube-system/configmaps/coredns/data/Corefile',
-            tofile="inventory['services']['coredns']['configmap']['Corefile']",
-            lineterm=''))
+            tofile="inventory['services']['coredns']['configmap']['Corefile']")
 
         failed_messages = []
         warn_messages = []
-        if diff:
-            diff_str = '\n'.join(diff)
-            failed_messages.append(f"CoreDNS config is outdated: \n{diff_str}")
+        if diff is not None:
+            failed_messages.append(f"CoreDNS config is outdated: \n{diff}")
 
         software_compatibility = static.GLOBALS["compatibility_map"]["software"]
         version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
@@ -1423,7 +1417,7 @@ def kubernetes_admission_status(cluster: KubernetesCluster) -> None:
                 cluster.inventory["rbac"]["pss"]["pod-security"] == "enabled":
             profile_inv = cluster.inventory["rbac"]["pss"]["defaults"]["enforce"]
         profile = ""
-        kubeadm_cm = kubernetes.KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
+        kubeadm_cm = KubernetesObject(cluster, 'ConfigMap', 'kubeadm-config', 'kube-system')
         kubeadm_cm.reload(first_control_plane)
         cluster_config = yaml.safe_load(kubeadm_cm.obj["data"]["ClusterConfiguration"])
         api_result = first_control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
