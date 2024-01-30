@@ -1295,21 +1295,24 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     binary_recv_path = utils.get_internal_resource_path('./resources/scripts/ipip_recv')
     ipip_recv = "/tmp/%s" % uuid.uuid4().hex
     recv_log = "/tmp/%s" % uuid.uuid4().hex
+    # TODO: Random message, random IP
     msg = "TEST_MESSAGE"
+    fake_addr = "240.0.0.1"
+    # That is used as number of packets for transmitter
     timeout = int(cluster.inventory['globals']['timeout_download'])
     for node in group.get_ordered_members_configs_list():
         host = node['internal_address']
         # Receiver start command
-        recv_cmd[host] = f"{ipip_recv} {host} 10.0.0.1 {random_port} " \
-                         f"{msg} {timeout} > {recv_log}.log 2>{recv_log}.err"
+        recv_cmd[host] = f"{ipip_recv} {host} {fake_addr} {random_port} " \
+                         f"{msg} 3 > {recv_log}.log 2>{recv_log}.err"
 
         # Transmitter start command
         trns_item_cmd: List[str] = []
         for node_item in group.get_ordered_members_configs_list():
             if node_item['internal_address'] != host:
                 trns_item_cmd.append(f"nohup {ipip_trns} {host} {node_item['internal_address']} "
-                                f"10.0.0.1 {random_port} {msg} {timeout} & echo $! >> {recv_log}.pid")
-        trns_cmd[host] = '; sudo '.join(trns_item_cmd)
+                                f"{fake_addr} {random_port} {msg} {timeout} > /dev/null 2>&1 & echo $! >> {recv_log}.pid")
+        trns_cmd[host] = '& sudo '.join(trns_item_cmd)
 
     try:
         collector = CollectorCallback(group.cluster)
@@ -1337,13 +1340,13 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)
-            item_list: List[str] = []
+            item_list: Set[str] = set()
             if len(item.stdout) > 0:
                 for log_item in item.stdout.split("\n")[:-1]:
-                    item_list.append(log_item)
-                for node in group.get_ordered_members_configs_list():
-                    if node['internal_address'] not in item_list and node['connect_to'] != host:
-                        failed_nodes.add(f"{node['name']} -> {node_name}")
+                    item_list.add(log_item)
+            for node in group.get_ordered_members_configs_list():
+                if node['internal_address'] not in item_list and node['connect_to'] != host:
+                    failed_nodes.add(f"{node['name']} -> {node_name}")
 
         return failed_nodes
     finally:
@@ -1353,7 +1356,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
                 node_exe.sudo(f"kill -9 $(cat {recv_log}.pid); " \
-                              f"sudo rm -f {ipip_recv} {ipip_trns} {recv_log}.log {recv_log}.err", warn=True)
+                              f"sudo rm -f {ipip_recv} {ipip_trns} {recv_log}.log {recv_log}.err {recv_log}.pid", warn=True)
 
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
