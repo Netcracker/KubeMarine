@@ -47,7 +47,9 @@ class ManifestResolver:
 
     def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
         manifest_path = get_default_manifest_path(manifest_identity, plugin_version)
-        if not os.path.exists(manifest_path) or self.refresh:
+        # TODO remove the following statement once https://github.com/kubernetes/ingress-nginx/issues/10942 is gone
+        force_refresh = self.refresh and plugin_version not in ('v1.7.0', 'v1.8.4')
+        if not os.path.exists(manifest_path) or force_refresh:
             manifest_local_path = resolve_local_path(manifest_identity, plugin_version)
             print(f"Copying {os.path.basename(manifest_local_path)} to {manifest_path}")
             with utils.open_external(manifest_local_path, 'r') as source, \
