@@ -199,6 +199,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None, procedure_ini
         remove_node.remove_node_finalize_inventory,
         lambda cluster, inventory, _: kubernetes.restore_finalize_inventory(cluster, inventory),
         lambda cluster, inventory, _: kubernetes.upgrade_finalize_inventory(cluster, inventory),
+        kubernetes.reconfigure_finalize_inventory,
         thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         thirdparties.migrate_cri_finalize_inventory,
