@@ -56,8 +56,9 @@ class TheAction(Action):
             
             # Call the update_kubeadm_configmap_tls_cipher_suites method
             self.update_kubeadm_configmap_tls_cipher_suites(control_plane, tls_cipher_suites)
+            
 
-    def update_kubeadm_configmap_tls_cipher_suites(self, control_plane, tls_cipher_suite) -> None:
+    def update_kubeadm_configmap_tls_cipher_suites(self, control_plane:NodeGroup, tls_cipher_suite:str) -> None:
         yaml = ruamel.yaml.YAML()
     
         # Retrieve current kubeadm config map
