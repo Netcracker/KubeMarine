@@ -9,7 +9,7 @@ from kubemarine.core.group import NodeGroup
 from kubemarine.core.resources import DynamicResources
 
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Update API Server TLS cipher suites (if necessary)")
 
     def run(self, res: DynamicResources) -> None:
@@ -57,7 +57,7 @@ class TheAction(Action):
             # Call the update_kubeadm_configmap_tls_cipher_suites method
             self.update_kubeadm_configmap_tls_cipher_suites(control_plane, tls_cipher_suites)
 
-    def update_kubeadm_configmap_tls_cipher_suites(self, control_plane, tls_cipher_suite):
+    def update_kubeadm_configmap_tls_cipher_suites(self, control_plane, tls_cipher_suite) -> None:
         yaml = ruamel.yaml.YAML()
     
         # Retrieve current kubeadm config map
@@ -84,7 +84,7 @@ class TheAction(Action):
         control_plane.sudo("rm -f /tmp/%s.yaml" % filename)
 
 class UpdateApiServerCipherSuites(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("apiserver_cipher_suites")
 
     @property
