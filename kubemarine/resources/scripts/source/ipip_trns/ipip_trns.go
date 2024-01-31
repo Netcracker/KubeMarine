@@ -16,13 +16,17 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/examples/util"
 	"github.com/google/gopacket/layers"
 )
 
 func main() {
-	defer util.Run()()
-
+	if len(os.Args[1:]) < 6 {
+		fmt.Println("Some parameters haven't been defined.")
+		fmt.Println("Please use the following example:")
+		fmt.Println("./ipip_trns 192.168.1.1 192.168.1.2 10.0.0.1 54321 UDP_Message 5")
+		fmt.Println("Notice: launch needs root privileges")
+		os.Exit(1)
+	}
 	// External source IP (Src IP)
 	srcIP := net.ParseIP(os.Args[1])
 	if srcIP == nil {
@@ -89,6 +93,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer ipConn.Close()
 	// Send packet with one second pause
 	for i := 0; i < num; i++ {
 		_, err = ipConn.WriteTo(buf.Bytes(), &dstExtIPaddr)

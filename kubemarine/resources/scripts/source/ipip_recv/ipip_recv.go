@@ -20,6 +20,13 @@ import (
 )
 
 func main() {
+	if len(os.Args[1:]) < 5 {
+		fmt.Println("Some parameters haven't been defined.")
+		fmt.Println("Please use the following example:")
+		fmt.Println("./ipip_recv 192.168.1.2 10.0.0.1 54321 UDP_Message 3")
+		fmt.Println("Notice: launch needs root privileges")
+		os.Exit(1)
+	}
 	// External IP address (DstExt IP)
 	dstExtIP := net.ParseIP(os.Args[1])
 	if dstExtIP == nil {
@@ -36,7 +43,7 @@ func main() {
 		panic(err)
 	}
 	dstUDPPort := layers.UDPPort(dport) 
-	// Payload of UDP packet
+	// Expected payload of UDP packet
 	msg := os.Args[4]
 	if len(msg) > 1000 {
 		panic("Message is too long")
