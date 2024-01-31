@@ -1,5 +1,5 @@
 /*
-The code receives IPIP packet and try to parse it
+The code receives IPIP packets and tries to parse them. The packet format is the following:
 
  -------------------------------------------------------------------------------------------------------------------
 || Src IP | DstExt IP | IP Payload: | Src IP | DstInt IP | IP Payload: | UDP Src Port | UDP Dst Port | UDP Payload ||
