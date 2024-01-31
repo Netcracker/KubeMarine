@@ -1,102 +1,90 @@
-
-import yaml
-import time
-from io import StringIO
-from typing import Any, Dict, List
+import io
 from textwrap import dedent
+import ruamel.yaml
+import uuid
+from kubemarine.core import utils
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
-from kubemarine.core.resources import DynamicResources
 from kubemarine.core.group import NodeGroup
+from kubemarine.core.resources import DynamicResources
 
 class TheAction(Action):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__("Update API Server TLS cipher suites (if necessary)")
 
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster()
-
-        # Access the raw inventory directly
-        raw_inventory = res.raw_inventory()
-
-        # Check for probable configuration in the initial inventory
-        probable_ciphers_initial = raw_inventory.get("services", {}).get("kubeadm", {}).get("apiServer", {}).get("extraArgs", {}).get("tls-cipher-suites")
-
-        # Compare with desired ciphers
-        desired_ciphers = "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384"
-        if probable_ciphers_initial == desired_ciphers:
-            cluster.log.info("API server already has the desired cipher suites in the initial inventory. Skipping patch.")
-            return
-
+        yaml = ruamel.yaml.YAML()
+        tls_cipher_suites = "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384"
         kubernetes_nodes = cluster.make_group_from_roles(['control-plane'])
 
-        for member_node in kubernetes_nodes.get_ordered_members_list():
-            apiserver_file = "/etc/kubernetes/manifests/kube-apiserver.yaml"
+        for control_plane in kubernetes_nodes.get_ordered_members_list():
+            # Read current kube-apiserver configuration
+            result = control_plane.sudo("cat /etc/kubernetes/manifests/kube-apiserver.yaml")
+            conf = yaml.load(list(result.values())[0].stdout)
 
-            # Load the YAML configuration
-            try:
-                apiserver_config = yaml.safe_load(member_node.sudo(f"cat {apiserver_file}").get_simple_out())
-            except yaml.YAMLError as exc:
-                cluster.log.error(f"Failed to parse YAML file: {exc}")
-                continue
-
-            # Check for any existing --tls-cipher-suites argument
-            existing_ciphers_found = False
-            for command in apiserver_config['spec']['containers'][0]['command']:
+            # Check for existing --tls-cipher-suites argument
+            existing_ciphers = None
+            for command in conf["spec"]["containers"][0]["command"]:
                 if command.startswith("--tls-cipher-suites="):
-                    existing_ciphers_found = True
+                    existing_ciphers = command.split("=")[1]
                     break
 
-            # Compare with desired ciphers
-            if existing_ciphers_found:
-                cluster.log.info("Skipping patch on this node as tls-cipher-suites are already present.")
+            # Skip patch if ciphers are present
+            if existing_ciphers:
+                cluster.log.info("API server already has the cipher suites. Skipping patch.")
                 continue
 
             # Apply the patch
-            apiserver_config['spec']['containers'][0]['command'].append("--tls-cipher-suites=TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384")
-            updated_config = yaml.dump(apiserver_config)
-            member_node.put(StringIO(updated_config), apiserver_file, backup=True, sudo=True)
+            conf["spec"]["containers"][0]["command"].append("--tls-cipher-suites=%s" % tls_cipher_suites)
+            
+            # Updating kube-apiserver.yaml on control-plane
+            buf = io.StringIO()
+            yaml.dump(conf, buf)
+            control_plane.put(buf, "/etc/kubernetes/manifests/kube-apiserver.yaml", sudo=True)
 
-            # Call verify_apiserver_restart to check API server restart
-            restart_successful = self.verify_apiserver_restart(member_node, res)
-
-            if restart_successful:
-                cluster.log.info("API server restart succeeded.")
+            # Restart kube-apiserver pod and wait for it to become available
+            cri_runtime = control_plane.cluster.inventory['services']['cri']['containerRuntime']
+            if cri_runtime == 'containerd':
+                control_plane.call(utils.wait_command_successful, command="crictl rm -f "
+                                                        "$(sudo crictl ps --name kube-apiserver -q)")
             else:
-                cluster.log.error("API server restart failed.") 
+                control_plane.call(utils.wait_command_successful, command="docker stop "
+                                                        "$(sudo docker ps -f 'name=k8s_kube-apiserver'"
+                                                        " | awk '{print $1}')")
+            control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
+            
+            # Call the update_kubeadm_configmap_tls_cipher_suites method
+            self.update_kubeadm_configmap_tls_cipher_suites(control_plane, tls_cipher_suites)
 
-    def verify_apiserver_restart(self, member_node: NodeGroup, res: DynamicResources) -> bool:
-        # Implement logic to check API server restart status
-        cluster = res.cluster()
-        restart_successful = False
+    def update_kubeadm_configmap_tls_cipher_suites(self, control_plane, tls_cipher_suite):
+        yaml = ruamel.yaml.YAML()
+    
+        # Retrieve current kubeadm config map
+        result = control_plane.sudo("kubectl get cm kubeadm-config -n kube-system -o yaml")
+        kubeadm_cm = yaml.load(list(result.values())[0].stdout)
+        cluster_config = yaml.load(kubeadm_cm["data"]["ClusterConfiguration"])
+    
+        # Add or update tls-cipher-suites in the extraArgs section
+        if 'extraArgs' not in cluster_config['apiServer']:
+            cluster_config['apiServer']['extraArgs'] = {}
+        cluster_config['apiServer']['extraArgs']['tls-cipher-suites'] = ruamel.yaml.scalarstring.PreservedScalarString(tls_cipher_suite)
+    
+        # Dump the updated config back to the kubeadm config map
+        buf = io.StringIO()
+        yaml.dump(cluster_config, buf)
+        kubeadm_cm["data"]["ClusterConfiguration"] = buf.getvalue()
+    
+        # Apply the updated kubeadm config map
+        buf = io.StringIO()
+        yaml.dump(kubeadm_cm, buf)
+        filename = uuid.uuid4().hex
+        control_plane.put(buf, "/tmp/%s.yaml" % filename)
+        control_plane.sudo("kubectl apply -f /tmp/%s.yaml" % filename)
+        control_plane.sudo("rm -f /tmp/%s.yaml" % filename)
 
-        # Get the creation timestamp of the kube-apiserver pod
-        pod_creation_timestamp = member_node.run("sudo kubectl get pod -n kube-system -l component=kube-apiserver -o jsonpath='{.items[0].metadata.creationTimestamp}'")
-
-        cluster.log.debug(f"Original pod creation timestamp: {pod_creation_timestamp}")
-
-        # Optionally, force restart the kube-apiserver pod
-        member_node.run("sudo kubectl delete pod -n kube-system -l component=kube-apiserver")
-
-        # Wait for the new pod to be created
-        time.sleep(10)  # Adjust the sleep time 
-
-        # Get the new creation timestamp
-        new_pod_creation_timestamp = member_node.run("sudo kubectl get pod -n kube-system -l component=kube-apiserver -o jsonpath='{.items[0].metadata.creationTimestamp}'")
-
-        cluster.log.debug(f"New pod creation timestamp: {new_pod_creation_timestamp}")
-
-        # Check if the creation timestamps are different
-        if pod_creation_timestamp != new_pod_creation_timestamp:
-            cluster.log.info("kube-apiserver pod has been restarted successfully.")
-            restart_successful = True
-        else:
-            cluster.log.error("kube-apiserver pod restart failed.")
-
-        return restart_successful
-
-class ApiServerCipherSuites(RegularPatch):
-    def __init__(self) -> None:
+class UpdateApiServerCipherSuites(RegularPatch):
+    def __init__(self):
         super().__init__("apiserver_cipher_suites")
 
     @property

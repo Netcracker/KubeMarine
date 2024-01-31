@@ -22,10 +22,10 @@ The whole directory is automatically cleared and reset after new version of Kube
 from typing import List
 
 from kubemarine.core.patch import Patch
-from kubemarine.patches.strong_ciphers_patch import ApiServerCipherSuites
+from kubemarine.patches.strong_ciphers_patch import UpdateApiServerCipherSuites
 
 patches: List[Patch] = [
-    ApiServerCipherSuites(),  # Add the new patch to the list
+    UpdateApiServerCipherSuites(),  # Add the new patch to the list
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
