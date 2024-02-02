@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	//"strconv"
 	"time"
 	"flag"
 	"errors"
@@ -37,22 +36,33 @@ var (
 	dport, timeout uint
 )
 
+func customUsage() {
+	fmt.Printf("Usage of %s:\n", os.Args[0])
+	fmt.Printf("%s -mode client -src 192.168.0.1 -ext 192.168.0.2 -int 240.0.0.1 -dport 54545 -msg Message -timeout 10\n",
+	      os.Args[0])
+	fmt.Printf("%s -mode server -ext 192.168.0.2 -int 240.0.0.1 -dport 54545 -msg Message -timeout 3\n",
+	      os.Args[0])
+	fmt.Println("Where:")
+	flag.PrintDefaults()
+}
+
 func parseParam() error {
+	flag.Usage = customUsage
 	// Server or client mode. Server gets and parses IPIP pakets, and client sends IPIP pakets
 	flag.StringVar(&mode, "mode", "", "Server or client mode")
 	// External source IP (Src IP)
-	flag.StringVar(&src, "src", "", "External source address")
+	flag.StringVar(&src, "src", "", "External source IP address")
 	// External destination IP (DstExt IP)
-	flag.StringVar(&dstExt, "ext", "", "External destination address")
+	flag.StringVar(&dstExt, "ext", "", "External destination IP address")
 	// Internal destination IP (DstInt IP)
-	flag.StringVar(&dstInt, "int", "", "Internal destination address")
+	flag.StringVar(&dstInt, "int", "", "Internal destination IP address")
 	// UDP port number (UDP Dst Port)
 	flag.UintVar(&dport, "dport", 65000, "Destination UDP port")
-	flag.UintVar(&timeout, "timeout", 0, "Internal destination address")
-	flag.StringVar(&msg, "msg", "", "Internal destination address")
+	flag.UintVar(&timeout, "timeout", 0, "Operation timeout")
+	flag.StringVar(&msg, "msg", "", "Message as UDP payload")
 	flag.Parse()
 	if mode != "server" && mode != "client" {
-		return errors.New("Unknown mode")
+		return errors.New("Unknown mode. It might be 'server' or 'client'")
 	}
 	srcIP = net.ParseIP(src)
         if srcIP == nil && mode == "client" {
@@ -199,5 +209,4 @@ func main() {
 	case "client":
 		runClt()
 	}
-	//fmt.Printf("SRC:%s; EXT: %s; INT:%s; PORT: %v; TIMEOUT: %v; MSG: %s\n", srcIP, dstExtIP, dstIntIP, dport, timeout, msg)
 }

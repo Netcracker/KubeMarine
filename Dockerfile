@@ -1,4 +1,16 @@
-FROM python:3.12-slim-bullseye
+# syntax=docker/dockerfile:1
+
+# Build ipip_check binary
+FROM golang:1.19 AS go-build
+
+WORKDIR /opt
+
+COPY ./kubemarine/resources/scripts/source/ipip_check ./
+
+RUN go mod download && \
+    GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false
+
+FROM python:3.12-slim-bullseye AS python-build
 
 ARG BUILD_TYPE
 
@@ -8,17 +20,10 @@ ENV PYTHONUNBUFFERED 1
 ENV ANSIBLE_HOST_KEY_CHECKING False
 
 COPY . /opt/kubemarine/
+COPY --from=go-build /opt/ipip_check /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \
-    # Install Golang and build ipip_check
-    apt install -y wget  gcc && \
-    wget https://golang.org/dl/go1.19.8.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.19.8.linux-amd64.tar.gz && \
-    /usr/local/go/bin/go mod download && \
-    GOOS=linux CGO_ENABLED=1 /usr/local/go/bin/go build -ldflags="-linkmode external -extldflags='-static'" -o kubemarine/resources/scripts/ipip_check -buildvcs=false kubemarine/resources/scripts/source/ipip_check/ipip_check.go && \
-    rm -Rf /usr/local/go go1.19.8.linux-amd64.tar.gz && \
-    apt autoremove -y gcc wget && \
     pip3 install --no-cache-dir build && \
     python3 -m build -n && \
     # In any if branch delete source code, but preserve specific directories for different service aims
