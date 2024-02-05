@@ -38,30 +38,12 @@ metadata:
   name: calico-kube-controllers
   namespace: kube-system
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: calico-kube-controllers-token
-  namespace: kube-system
-  annotations:
-    kubernetes.io/service-account.name: calico-kube-controllers
-type: kubernetes.io/service-account-token
----
 # Source: calico/templates/calico-node.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: calico-node-token
-  namespace: kube-system
-  annotations:
-    kubernetes.io/service-account.name: calico-node
-type: kubernetes.io/service-account-token
 ---
 # Source: calico/templates/calico-config.yaml
 # This ConfigMap is used to configure a self-hosted Calico installation.

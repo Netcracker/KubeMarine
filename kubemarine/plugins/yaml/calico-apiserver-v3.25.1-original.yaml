@@ -124,15 +124,6 @@ metadata:
   namespace: calico-apiserver 
 
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: calico-apiserver-token
-  namespace: calico-apiserver
-  annotations:
-    kubernetes.io/service-account.name: calico-apiserver
-type: kubernetes.io/service-account-token
----
 
 # Cluster-scoped resources below here.
 apiVersion: apiregistration.k8s.io/v1

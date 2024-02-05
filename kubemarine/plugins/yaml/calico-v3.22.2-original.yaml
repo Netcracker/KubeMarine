@@ -4486,16 +4486,6 @@ metadata:
   name: calico-node
   namespace: kube-system
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: calico-node-token
-  namespace: kube-system
-  annotations:
-    kubernetes.io/service-account.name: calico-node
-type: kubernetes.io/service-account-token
-
----
 # Source: calico/templates/calico-kube-controllers.yaml
 # See https://github.com/projectcalico/kube-controllers
 apiVersion: apps/v1
@@ -4563,16 +4553,6 @@ metadata:
   name: calico-kube-controllers
   namespace: kube-system
 
----
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: calico-kube-controllers-token
-  namespace: kube-system
-  annotations:
-    kubernetes.io/service-account.name: calico-kube-controllers
-type: kubernetes.io/service-account-token
 ---
 
 # This manifest creates a Pod Disruption Budget for Controller to allow K8s Cluster Autoscaler to evict

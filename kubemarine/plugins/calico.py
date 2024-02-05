@@ -16,6 +16,7 @@ from textwrap import dedent
 from typing import Optional, List, Dict
 
 import os
+import yaml
 
 from kubemarine import plugins, kubernetes
 from kubemarine.core import utils, log
@@ -178,10 +179,26 @@ class CalicoManifestProcessor(Processor):
         source_yaml = manifest.get_obj(key, patch=True)
         source_yaml['automountServiceAccountToken'] = False
 
+    def add_service_account_secret_calico_node(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret_calico_node)
+
+        service_account_key = "ServiceAccount_calico-node"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
+
     def enrich_service_account_calico_kube_controllers(self, manifest: Manifest) -> None:
         key = "ServiceAccount_calico-kube-controllers"
         source_yaml = manifest.get_obj(key, patch=True)
         source_yaml['automountServiceAccountToken'] = False
+
+    def add_service_account_secret_calico_kube_controllers(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret_calico_kube_controllers)
+
+        service_account_key = "ServiceAccount_calico-kube-controllers"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
 
     def enrich_deployment_calico_kube_controllers(self, manifest: Manifest) -> None:
         """
@@ -445,6 +462,8 @@ class CalicoManifestProcessor(Processor):
             self.enrich_configmap_calico_config,
             self.enrich_service_account_calico_kube_controllers,
             self.enrich_service_account_calico_node,
+            self.add_service_account_secret_calico_node,
+            self.add_service_account_secret_calico_kube_controllers,
             self.enrich_deployment_calico_kube_controllers,
             self.enrich_daemonset_calico_node,
             self.enrich_deployment_calico_typha,
@@ -481,6 +500,7 @@ class CalicoApiServerManifestProcessor(Processor):
         return [
             self.enrich_namespace_calico_apiserver,
             self.enrich_service_account_calico_apiserver,
+            self.add_service_account_secret_calico_apiserver,
             self.enrich_deployment_calico_apiserver,
             self.enrich_clusterrole_calico_crds,
         ]
@@ -495,6 +515,13 @@ class CalicoApiServerManifestProcessor(Processor):
         key = "ServiceAccount_calico-apiserver"
         source_yaml = manifest.get_obj(key, patch=True)
         source_yaml['automountServiceAccountToken'] = False
+    
+    def add_service_account_secret_calico_apiserver(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret_calico_apiserver)
+        service_account_key = "ServiceAccount_calico-apiserver"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
 
     def enrich_deployment_calico_apiserver(self, manifest: Manifest) -> None:
         key = "Deployment_calico-apiserver"
@@ -562,3 +589,36 @@ cluster_role_use_privileged_psp = {
         "verbs":     ["use"],
         "resourceNames": ["oob-privileged-psp"]
 }
+
+service_account_secret_calico_node = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+    name: calico-node-token
+    namespace: kube-system
+    annotations:
+        kubernetes.io/service-account.name: calico-node
+    type: kubernetes.io/service-account-token
+""")
+
+service_account_secret_calico_kube_controllers = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+    name: calico-kube-controllers-token
+    namespace: kube-system
+    annotations:
+        kubernetes.io/service-account.name: calico-kube-controllers
+    type: kubernetes.io/service-account-token
+""")
+
+service_account_secret_calico_apiserver = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+    name: calico-apiserver-token
+    namespace: calico-apiserver
+    annotations:
+        kubernetes.io/service-account.name: calico-apiserver
+    type: kubernetes.io/service-account-token    
+""")

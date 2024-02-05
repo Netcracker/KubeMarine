@@ -55,6 +55,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
             self.enrich_namespace_local_path_storage,
             self.add_clusterrolebinding_local_path_provisioner_privileged_psp,
             self.enrich_service_account,
+            self.add_service_account_secret,
             self.enrich_deployment_local_path_provisioner,
             self.enrich_storageclass_local_path,
             self.enrich_configmap_local_path_config,
@@ -65,6 +66,14 @@ class LocalPathProvisionerManifestProcessor(Processor):
 
     def enrich_namespace_local_path_storage(self, manifest: Manifest) -> None:
         self.assign_default_pss_labels(manifest, 'local-path-storage')
+
+    def add_service_account_secret(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret)
+
+        service_account_key = "ServiceAccount_local-path-provisioner-service-account"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
 
     def add_clusterrolebinding_local_path_provisioner_privileged_psp(self, manifest: Manifest) -> None:
         # TODO add only if psp is enabled?
@@ -157,4 +166,15 @@ clusterrolebinding_local_path_provisioner_privileged_psp = dedent("""\
     - kind: ServiceAccount
       name: local-path-provisioner-service-account
       namespace: local-path-storage
+""")
+
+service_account_secret = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: local-path-provisioner-service-account-token
+      namespace: local-path-storage
+      annotations:
+        kubernetes.io/service-account.name: local-path-provisioner-service-account
+    type: kubernetes.io/service-account-token  
 """)
