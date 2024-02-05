@@ -1032,7 +1032,6 @@ To avoid this, you need to specify custom policy and bind it using `ClusterRoleB
 
 The `manage_psp` procedure executes the following sequence of tasks:
 
-1. check_inventory
 1. delete_custom
 2. add_custom
 3. reconfigure_oob
@@ -1113,10 +1112,8 @@ application is stateless or stateful. Also shouldn't use `restart-pod: true` opt
 
 The `manage_pss procedure executes the following sequence of tasks:
 
-1. check_inventory
-2. delete_default_pss
-3. apply_default_pss
-4. restart_pods
+1. manage_pss
+2. restart_pods
 
 ## Reboot Procedure
 

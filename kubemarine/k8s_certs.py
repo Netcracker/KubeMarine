@@ -48,20 +48,8 @@ def renew_apply(control_planes: NodeGroup) -> None:
         kubernetes.copy_admin_config(log, control_planes)
 
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
-    control_planes.call(force_restart_control_plane)
-
-    kubernetes.components.wait_for_pods(control_planes)
-
-
-def force_restart_control_plane(control_planes: NodeGroup) -> None:
-    cri_impl = control_planes.cluster.inventory['services']['cri']['containerRuntime']
-    restart_containers = ["etcd", "kube-scheduler", "kube-apiserver", "kube-controller-manager"]
-    c_filter = "grep -e %s" % " -e ".join(restart_containers)
-
-    if cri_impl == "docker":
-        control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
-    else:
-        control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+    control_planes.call(kubernetes.components.restart_components,
+                        components=kubernetes.components.CONTROL_PLANE_COMPONENTS)
 
 
 def verify_all_is_absent_or_single(cert_list: List[str]) -> None:

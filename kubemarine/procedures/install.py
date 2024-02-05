@@ -18,9 +18,6 @@ from collections import OrderedDict
 from types import FunctionType
 from typing import Callable, List, Dict, cast
 
-import yaml
-import io
-
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
@@ -198,42 +195,7 @@ def deploy_kubernetes_audit(group: NodeGroup) -> None:
         return
 
     kubernetes.prepare_audit_policy(group)
-
-    for control_plane in group.get_ordered_members_list():
-        node_config = control_plane.get_config()
-        config_new = kubernetes.get_kubeadm_config(cluster.inventory)
-
-        # we need InitConfiguration in audit-on-config.yaml file to take into account kubeadm patch for apiserver
-        init_config = {
-            'apiVersion': cluster.inventory["services"]["kubeadm"]['apiVersion'],
-            'kind': 'InitConfiguration',
-            'localAPIEndpoint': {
-                'advertiseAddress': node_config['internal_address']
-            },
-            'patches': {
-                'directory': '/etc/kubernetes/patches'
-            }
-        }
-
-        config_new = config_new + "---\n" + yaml.dump(init_config, default_flow_style=False)
-
-        control_plane.put(io.StringIO(config_new), '/etc/kubernetes/audit-on-config.yaml', sudo=True)
-
-        kubernetes.create_kubeadm_patches_for_node(cluster, control_plane)
-
-        control_plane.sudo(f"kubeadm init phase control-plane apiserver "
-                           f"--config=/etc/kubernetes/audit-on-config.yaml ")
-
-        if cluster.inventory['services']['cri']['containerRuntime'] == 'containerd':
-            control_plane.call(utils.wait_command_successful,
-                               command="crictl rm -f $(sudo crictl ps --name kube-apiserver -q)")
-        else:
-            control_plane.call(utils.wait_command_successful,
-                               command="docker stop $(sudo docker ps -q -f 'name=k8s_kube-apiserver'"
-                                       " | awk '{print $1}')")
-        control_plane.call(utils.wait_command_successful, command="kubectl get pod -n kube-system")
-        control_plane.sudo("kubeadm init phase upload-config kubeadm "
-                           "--config=/etc/kubernetes/audit-on-config.yaml")
+    group.call(kubernetes.components.reconfigure_components, components=['kube-apiserver'], force_restart=True)
 
 
 @_applicable_for_new_nodes_with_roles('all')
