@@ -15,7 +15,7 @@
 import copy
 from collections import OrderedDict
 from itertools import chain
-from typing import List
+from typing import List, Callable, Dict
 
 from kubemarine import kubernetes, plugins, admission
 from kubemarine.core import flow
@@ -51,21 +51,35 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     initial_kubernetes_version = cluster.context['initial_kubernetes_version']
 
-    first_control_plane = cluster.nodes["control-plane"].get_first_member()
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
+    preconfigure_components = []
+    preconfigure_functions: Dict[str, Callable[[dict], dict]] = {}
     if (admission.is_pod_security_unconditional(cluster)
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.28")
             and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
 
-        cluster.log.debug("Updating kubeadm config map")
-        final_features_list = first_control_plane.call(admission.update_kubeadm_configmap_pss, target_state="enabled")
-        cluster.log.debug("Updating kube-apiserver configs on control-planes")
-        cluster.nodes["control-plane"].call(admission.update_kubeapi_config_pss, features_list=final_features_list)
+        # Extra args of API server have changed, need to reconfigure the API server.
+        # See admission.enrich_inventory_pss()
+        # Still, should not reconfigure using generated ConfigMaps from inventory,
+        # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
+        # Instead, change only necessary apiServer args.
+        def reconfigure_feature_gates(cluster_config: dict) -> dict:
+            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
+            if feature_gates is not None:
+                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = feature_gates
+            else:
+                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
 
-    if (kubernetes.kube_proxy_overwrites_higher_system_values(cluster)
+            return cluster_config
+
+        preconfigure_components.append('kube-apiserver')
+        preconfigure_functions['kubeadm-config'] = reconfigure_feature_gates
+
+    if (kubernetes.components.kube_proxy_overwrites_higher_system_values(cluster)
             and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.29")):
-        cluster.log.debug("Updating kube-proxy config map")
 
+        # Defaults of KubeProxyConfiguration have changed.
+        # See services.kubeadm_kube-proxy.conntrack.min section of defaults.yaml
         def edit_kube_proxy_conntrack_min(kube_proxy_cm: dict) -> dict:
             expected_conntrack: dict = cluster.inventory['services']['kubeadm_kube-proxy']['conntrack']
             if 'min' not in expected_conntrack:
@@ -77,7 +91,12 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
 
             return kube_proxy_cm
 
-        first_control_plane.call(kubernetes.reconfigure_kube_proxy_configmap, mutate_func=edit_kube_proxy_conntrack_min)
+        preconfigure_components.append('kube-proxy')
+        preconfigure_functions['kube-proxy'] = edit_kube_proxy_conntrack_min
+
+    if preconfigure_components:
+        upgrade_group.call(kubernetes.components.reconfigure_components,
+                           components=preconfigure_components, edit_functions=preconfigure_functions)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')

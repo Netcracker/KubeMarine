@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import List, Dict, Iterator, Any, Optional, Callable
+from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
@@ -34,7 +34,6 @@ from kubemarine.core.errors import KME
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
-from kubemarine.kubernetes.object import KubernetesObject
 
 ERROR_DOWNGRADE='Kubernetes old version \"%s\" is greater than new one \"%s\"'
 ERROR_SAME='Kubernetes old version \"%s\" is the same as new one \"%s\"'
@@ -723,33 +722,6 @@ def is_cluster_installed(cluster: KubernetesCluster) -> bool:
     cluster.context['controlplain_uri'] = None
     cluster.log.verbose('Failed to detect any Kubernetes cluster')
     return False
-
-
-def reconfigure_kube_proxy_configmap(control_plane: NodeGroup, mutate_func: Callable[[dict], dict]) -> None:
-    cluster: KubernetesCluster = control_plane.cluster
-
-    # Load kube-proxy config map and retrieve config
-    kube_proxy_cm = KubernetesObject(cluster, 'ConfigMap', 'kube-proxy', 'kube-system')
-    kube_proxy_cm.reload(control_plane)
-    cluster_config: dict = yaml.safe_load(kube_proxy_cm.obj["data"]["config.conf"])
-
-    # Always perform the reconfiguration entirely even if nothing is changed.
-    # This is necessary because the operation is not atomic, but idempotent.
-    cluster_config = mutate_func(cluster_config)
-    kube_proxy_cm.obj["data"]["config.conf"] = yaml.dump(cluster_config)
-
-    # Apply updated kube-proxy config map
-    kube_proxy_cm.apply(control_plane)
-
-    for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
-        node_name = node.get_node_name()
-        control_plane.sudo(
-            f"kubectl delete pod -n kube-system $("
-            f"    sudo kubectl describe node {node_name} "
-            f"    | awk '/kube-system\\s+kube-proxy-[a-z,0-9]{{5}}/{{print $2}}'"
-            f")")
-
-        components.wait_for_pods(node, ['kube-proxy'])
 
 
 def upgrade_first_control_plane(upgrade_group: NodeGroup, cluster: KubernetesCluster, **drain_kwargs: Any) -> None:
