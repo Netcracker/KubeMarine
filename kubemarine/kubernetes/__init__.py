@@ -697,7 +697,7 @@ def apply_taints(group: NodeGroup) -> RunnersGroupResult:
 
     return control_plane.sudo(
         "kubectl get nodes -o=jsonpath="
-        "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}'")
+        "'{range .items[*]}{\"node: \"}{.metadata.name}{\"\\ntaints: \"}{.spec.taints}{\"\\n\"}{end}'")
 
 
 def is_cluster_installed(cluster: KubernetesCluster) -> bool:
