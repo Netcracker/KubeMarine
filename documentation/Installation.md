@@ -498,7 +498,7 @@ For more information about the structure of the inventory and how to specify the
 * [Minimal All-in-one Inventory Example](../examples/cluster.yaml/allinone-cluster.yaml) - It provides the minimum set of parameters for deploying All-in-one scheme.
 * [Minimal Mini-HA Inventory Example](../examples/cluster.yaml/miniha-cluster.yaml) - It provides the minimum set of parameters for deploying Mini-HA scheme.
 
-#### Inventory validation 
+#### Inventory validation
 
 When configuring the inventory, you can use your favorite IDE supporting YAML validation by JSON schema.
 JSON schema for inventory file can be used by [URL](../kubemarine/resources/schemas/cluster.json?raw=1).
@@ -1086,23 +1086,25 @@ In the `services.kubeadm` section, you can override the original settings for ku
 For more information about these settings, refer to the official Kubernetes documentation at [https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file).
 By default, the installer uses the following parameters:
 
-|Parameter| Default Value                                            |
-|---|----------------------------------------------------------|
-|kubernetesVersion| `v1.26.11`                                                |
-|controlPlaneEndpoint| `{{ cluster_name }}:6443`                                |
-|networking.podSubnet| `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |
-|networking.serviceSubnet| `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |
-|apiServer.certSANs| List with all nodes internal IPs, external IPs and names |
-|apiServer.extraArgs.enable-admission-plugins| `NodeRestriction`                                        |
-|apiServer.extraArgs.profiling| `false`                                                  |
-|apiServer.extraArgs.audit-log-path| `/var/log/kubernetes/audit/audit.log`                    |
-|apiServer.extraArgs.audit-policy-file| `/etc/kubernetes/audit-policy.yaml`                      |
-|apiServer.extraArgs.audit-log-maxage| `30`                                                     |
-|apiServer.extraArgs.audit-log-maxbackup| `10`                                                     |
-|apiServer.extraArgs.audit-log-maxsize| `100`                                                    |
-|scheduler.extraArgs.profiling| `false`                                                  |
-|controllerManager.extraArgs.profiling| `false`                                                  |
-|controllerManager.extraArgs.terminated-pod-gc-threshold| `1000`                                                   |
+| Parameter                                             | Default Value                                            | Description                                                                                      |
+|-------------------------------------------------------|----------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+|kubernetesVersion                                      | `v1.26.11`                                               |                                                                                                  |
+|controlPlaneEndpoint                                   | `{{ cluster_name }}:6443`                                |                                                                                                  |
+|networking.podSubnet                                   | `10.128.0.0/14` for IPv4 or `fd02::/48` for IPv6         |                                                                                                  |
+|networking.serviceSubnet                               | `172.30.0.0/16` for IPv4 or `fd03::/112` for IPv6        |                                                                                                  |
+|apiServer.certSANs                                     | List with all nodes internal IPs, external IPs and names | Custom SANs are only appended to, but do not override the default list                           |
+|apiServer.extraArgs.enable-admission-plugins           | `NodeRestriction`                                        | `PodSecurityPolicy` plugin is added if [Admission psp](#admission-psp) is enabled                |
+|apiServer.extraArgs.feature-gates                      |                                                          | `PodSecurity=true` is added for Kubernetes < v1.28 if [Admission pss](#admission-pss) is enabled |
+|apiServer.extraArgs.admission-control-config-file      | `/etc/kubernetes/pki/admission.yaml`                     | Provided default value **overrides** custom value if [Admission pss](#admission-pss) is enabled. |
+|apiServer.extraArgs.profiling                          | `false`                                                  |                                                                                                  |
+|apiServer.extraArgs.audit-log-path                     | `/var/log/kubernetes/audit/audit.log`                    |                                                                                                  |
+|apiServer.extraArgs.audit-policy-file                  | `/etc/kubernetes/audit-policy.yaml`                      |                                                                                                  |
+|apiServer.extraArgs.audit-log-maxage                   | `30`                                                     |                                                                                                  |
+|apiServer.extraArgs.audit-log-maxbackup                | `10`                                                     |                                                                                                  |
+|apiServer.extraArgs.audit-log-maxsize                  | `100`                                                    |                                                                                                  |
+|scheduler.extraArgs.profiling                          | `false`                                                  |                                                                                                  |
+|controllerManager.extraArgs.profiling                  | `false`                                                  |                                                                                                  |
+|controllerManager.extraArgs.terminated-pod-gc-threshold| `1000`                                                   |                                                                                                  |
 
 The following is an example of kubeadm defaults override:
 
@@ -1139,10 +1141,7 @@ services:
 
 **Note**: Those parameters remain in manifests files after Kubernetes upgrade. That is the proper way to preserve custom settings for system services.
 
-**Warning**: These kubeadm parameters are configurable only during installation, currently. 
-Kubemarine currently do not provide special procedure to change these parameters after installation.
-To reconfigure the parameters manually, refer to the official documentation at [https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-reconfigure](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-reconfigure).
-For more information about generic approach of the cluster maintenance, refer to [Maintenance Basics](Maintenance.md#basics).
+**Note**: These kubeadm parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
 During init, join, upgrade procedures kubeadm runs `preflight` procedure to do some preliminary checks. In case of any error kubeadm stops working. Sometimes it is necessary to ignore some preflight errors to deploy or upgrade successfully.
 
@@ -1502,6 +1501,8 @@ By default, the installer uses the following parameters:
 
 `serializeImagePulls` parameter defines whether the images will be pulled in parallel (false) or one at a time.
 
+**Note**: Some of the parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+
 **Warning**: If you want to change the values of variables `podPidsLimit` and `maxPods`, you have to update the value of the `pid_max` (this value should not less than result of next expression: `maxPods * podPidsLimit + 2048`), which can be done using task `prepare.system.sysctl`. To get more info about `pid_max` you can go to [sysctl](#sysctl) section.
 
 The following is an example of kubeadm defaults override:
@@ -1535,6 +1536,8 @@ By default, the installer uses the following parameters:
 |conntrack.min|1000000|
 
 `conntrack.min` inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value from [sysctl](#sysctl).
+
+**Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
 #### kubeadm_patches
 
@@ -1591,7 +1594,11 @@ services:
 
 By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node.internal_address` via patches at every control-plane node.
 
-**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `kubeadm.paches`, the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `kubeadm.patches`). This behaviour persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
+**Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
+
+**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `services.kubeadm_patches`,
+the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `services.kubeadm_patches`).
+This behaviour persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
 
 #### kernel_security
 
