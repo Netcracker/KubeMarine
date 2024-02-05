@@ -11,6 +11,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Add Node Procedure](#add-node-procedure)
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
+    - [Reconfigure Procedure](#reconfigure-procedure)
     - [Manage PSP Procedure](#manage-psp-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
@@ -969,6 +970,168 @@ To change the operating system on an already running cluster:
 **Warning**: It is necessary to complete the procedure and completely migrate all nodes to a single operating system. The cluster and services can exist on different operating systems, but if you need to immediately perform any maintenance procedure, Kubemarine does not allow you to do this, since the cluster is in an inconsistent state with another maintenance procedure not yet completed.
 
 **Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](Installation.md#associations) section in the _Kubemarine Installation Procedure_.
+
+## Reconfigure Procedure
+
+This procedure is aimed to reconfigure the cluster.
+
+It is supposed to reconfigure the cluster as a generalized concept described by the inventory file.
+Though, currently the procedure supports to reconfigure only Kubeadm-managed settings.
+If you are looking for how to reconfigure other settings, consider the following:
+* Probably some other [maintenance procedure](#provided-procedures) can do the task.
+* Some [installation tasks](Installation.md#tasks-list-redefinition) can reconfigure some system settings without full redeploy of the cluster.
+
+**Basic prerequisites**:
+* Make sure to follow the [Basics](#basics).
+* Before starting the procedure, consider making a backup. For more information, see the section [Backup Procedure](#backup-procedure).
+
+### Reconfigure Procedure Parameters
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
+
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reconfigure.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+#### Reconfigure Kubeadm
+
+The following Kubeadm-managed sections can be reconfigured:
+* `services.kubeadm.apiServer`
+* `services.kubeadm.apiServer.certSANs`
+* `services.kubeadm.scheduler`
+* `services.kubeadm.controllerManager`
+* `services.kubeadm.etcd.local.extraArgs`
+* `services.kubeadm_kubelet`
+* `services.kubeadm_kube-proxy`
+* `services.kubeadm_patches`
+
+For more information, refer to the description of these sections:
+* [kubeadm](Installation.md#kubeadm)
+* [kubeadm_kubelet](Installation.md#kubeadm_kubelet)
+* [kubeadm_kube-proxy](Installation.md#kubeadm_kube-proxy)
+* [kubeadm_patches](Installation.md#kubeadm_patches)
+
+Example of procedure inventory that reconfigures all the supported sections:
+
+<details>
+  <summary>Click to expand</summary>
+
+```yaml
+services:
+  kubeadm:
+    apiServer:
+      certSANs:
+        - k8s-lb
+      extraArgs:
+        enable-admission-plugins: NodeRestriction,PodNodeSelector
+        profiling: "false"
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+        audit-log-maxage: "30"
+        audit-log-maxbackup: "10"
+        audit-log-maxsize: "100"
+    scheduler:
+      extraArgs:
+        profiling: "false"
+    controllerManager:
+      extraArgs:
+        profiling: "false"
+        terminated-pod-gc-threshold: "1000"
+    etcd:
+      local:
+        extraArgs:
+          heartbeat-interval: "1000"
+          election-timeout: "10000"
+  kubeadm_kubelet:
+    readOnlyPort: 0
+    protectKernelDefaults: true
+    podPidsLimit: 2048
+    maxPods: 100
+    cgroupDriver: systemd
+  kubeadm_kube-proxy:
+    conntrack:
+      min: 1000000
+  kubeadm_patches:
+    apiServer:
+      - groups: [control-plane]
+        patch:
+          max-requests-inflight: 500
+      - nodes: [master-3]
+        patch:
+          max-requests-inflight: 600
+    etcd:
+      - nodes: [master-1]
+        patch:
+          snapshot-count: 110001
+      - nodes: [master-2]
+        patch:
+          snapshot-count: 120001
+      - nodes: [master-3]
+        patch:
+          snapshot-count: 130001
+    controllerManager:
+      - groups: [control-plane]
+        patch:
+          authorization-webhook-cache-authorized-ttl: 30s
+    scheduler:
+      - nodes: [master-2,master-3]
+        patch:
+          profiling: true
+    kubelet:
+      - nodes: [worker5]
+        patch:
+          maxPods: 100
+      - nodes: [worker6]
+        patch:
+          maxPods: 200
+```
+</details>
+
+The above configuration is merged with the corresponding sections in the main `cluster.yaml`,
+and the related Kubernetes components are reconfigured based on the resulting inventory.
+
+In this way it is not possible to delete some property,
+allowing the corresponding Kubernetes component to fall back to the default behaviour.
+This can be worked around by manual changing of the `cluster.yaml`
+and running the `reconfigure` procedure with **empty** necessary section.
+For example, you can delete `services.kubeadm.etcd.local.extraArgs.election-timeout` from `cluster.yaml`
+and then run the procedure with the following procedure inventory:
+
+```yaml
+services:
+  kubeadm:
+    etcd: {}
+```
+
+**Note**: It is not possible to delete default parameters offered by Kubemarine.
+
+**Note**: The mentioned hint to delete custom properties is not enough for `services.kubeadm_kube-proxy` due to existing restrictions of Kubeadm CLI tool.
+One should additionally edit the `kube-proxy` ConfigMap and set the value that is considered the default.
+
+**Note**: Passing of empty `services.kubeadm.apiServer` section reconfigures the `kube-apiserver`,
+but does not write new certificate.
+To **additionally** write new certificate, pass the desirable extra SANs in `services.kubeadm.apiServer.certSANs`.
+
+**Restrictions**:
+
+* Very few options of `services.kubeadm_kubelet` section can be reconfigured currently.
+  To learn exact set of options, refer to the JSON schema.
+* Some properties cannot be fully redefined.
+  For example, this relates to some settings in `services.kubeadm.apiServer`.
+  For details, refer to the description of the corresponding sections in the installation guide.
+
+**Basic flow**:
+
+If the procedure affects the particular Kubernetes component, the component is reconfigured on each relevant node one by one.
+The flow proceeds to the next nodes only after the component is considered up and ready on the reconfigured node.
+
+### Reconfigure Procedure Tasks Tree
+
+The `reconfigure` procedure executes the following sequence of tasks:
+
+* deploy
+  * kubernetes
+    * reconfigure
 
 ## Manage PSP Procedure
 
