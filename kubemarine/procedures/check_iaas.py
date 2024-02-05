@@ -1293,7 +1293,6 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
     binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check')
     ipip_check = "/tmp/%s" % uuid.uuid4().hex
-    recv_log = "/tmp/%s" % uuid.uuid4().hex
     # Random message
     random.seed()
     msg = ''.join(random.choices(string.ascii_letters + string.digits, k=15))
@@ -1312,12 +1311,12 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             if node_item['internal_address'] != host:
                 trns_item_cmd.append(f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} "
                                      f"-ext {node_item['internal_address']} -dport {random_port} "
-                                     f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {recv_log}.pid")
+                                     f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid")
         trns_cmd[host] = '& sudo '.join(trns_item_cmd)
         # Receiver start command
         # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from eache node
         recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -dport {random_port} " \
-                         f"-msg {msg} -timeout 3 > {recv_log}.log 2>{recv_log}.err"
+                         f"-msg {msg} -timeout 3 2> /dev/null"
 
     try:
         collector = CollectorCallback(group.cluster)
@@ -1330,17 +1329,12 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
                 node_exe.sudo(f"{trns_cmd[host_int]}")
-        # Run receivers
+        # Run receivers and get results
         cluster.log.debug("Run receivers")
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True)
-        # Get results from the log file
-        cluster.log.debug("Check logs")
-        with group.new_executor() as exe:
-            for node_exe in exe.group.get_ordered_members_list():
-                node_exe.sudo(f"cat {recv_log}.log", warn=True, callback=collector)
+                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
 
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)
@@ -1359,8 +1353,8 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         with group_to_rollback.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
                 host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"kill -9 $(cat {recv_log}.pid); " \
-                              f"sudo rm -f {ipip_check} {recv_log}.log {recv_log}.err {recv_log}.pid", warn=True)
+                node_exe.sudo(f"kill -9 $(cat {ipip_check}.pid); " \
+                              f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
 
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
