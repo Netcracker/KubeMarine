@@ -176,16 +176,16 @@ To do this without conflicting with KubeMarine, use following steps:
 1. Create HAProxy systemd drop-in directory, if not created already. For example, if haproxy service is named `haproxy.service`,
 you will need to create directory `"/etc/systemd/system/haproxy.service.d`.
 2. In this directory, create file named `EnvFile` with following content:
-  ```
-  CONFIG=/etc/haproxy/haproxy-mntc.cfg
-  ```
+      ```
+      CONFIG=/etc/haproxy/haproxy-mntc.cfg
+      ```
 3. In the same directory, create file named `select.conf` with path to `EnvFile` created above:
-  ```
-  [Service]
-  EnvironmentFile=/etc/systemd/system/haproxy.service.d/EnvFile
-  ```
+      ```
+      [Service]
+      EnvironmentFile=/etc/systemd/system/haproxy.service.d/EnvFile
+      ```
 4. Restart HAProxy service using command `sudo systemctl daemon-reload; sudo systemctl restart haproxy`
 5. To disable maintenance mode, change `EnvFile` content to use default configuration and restart haproxy again:
-  ```
-  CONFIG=/etc/haproxy/haproxy.cfg
-  ```
+      ```
+      CONFIG=/etc/haproxy/haproxy.cfg
+      ```
