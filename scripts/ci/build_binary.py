@@ -16,7 +16,7 @@ import fileinput
 import subprocess
 import sys
 from typing import List
-from shutil import copyfile
+import tarfile
 
 PIP_VERSION = "23.3.1"
 PYINSTALLER_VERSION = "6.2.0"
@@ -32,7 +32,13 @@ def call(args: List[str]) -> None:
         exit(return_code)
 
 # Copy ipip_check from package
-copyfile('dist/ipip_check', 'kubemarine/resources/scripts/ipip_check')
+with open('kubemarine/version', 'r') as version_file:
+    version = version_file.readline().split('\n')[0].split('v')[1]
+
+with tarfile.open(f"dist/kubemarine-{version}.tar.gz") as arch:
+    file_obj = arch.extractfile("kubemarine-0.26.0/kubemarine/resources/scripts/ipip_check")
+    with open('kubemarine/resources/scripts/ipip_check', 'wb') as binary:
+        binary.write(file_obj.read())
 
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.

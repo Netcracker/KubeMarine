@@ -22,7 +22,6 @@ ENV ANSIBLE_HOST_KEY_CHECKING False
 COPY . /opt/kubemarine/
 COPY --from=go-build /opt/ipip_check /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
-COPY --from=go-build /opt/ipip_check ./dist/
 
 RUN apt update && \
     pip3 install --no-cache-dir build && \
