@@ -16,6 +16,7 @@ import fileinput
 import subprocess
 import sys
 from typing import List
+from shutil import copyfile
 
 PIP_VERSION = "23.3.1"
 PYINSTALLER_VERSION = "6.2.0"
@@ -30,6 +31,8 @@ def call(args: List[str]) -> None:
     if return_code != 0:
         exit(return_code)
 
+# Copy ipip_check from package
+copyfile('dist/ipip_check', 'kubemarine/resources/scripts/ipip_check')
 
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.
