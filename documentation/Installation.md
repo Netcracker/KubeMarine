@@ -3110,14 +3110,19 @@ will lead to the following content of /etc/hosts:
 ...
 ```
 
+**Warning**: The content of the user-defined `services.etc_hosts` section is not transmitted into the CoreDNS configmap. If you would like CoreDNS to have these records, put them into the [`services.coredns.configmap.Hosts` section](#configmap).
+
+
 #### coredns
 
 `coredns` parameter configures the Coredns service and its DNS rules in the Kubernetes cluster. It is divided into the following sections:
 
 ##### add_etc_hosts_generated
 
-This is a boolean parameter defining whether IP addresses of the cluster nodes and their generated domain names should be added to `coredns.configmap.Hosts`.
+This is a boolean parameter defining whether IP addresses of the cluster nodes and their generated domain names should be added to `services.coredns.configmap.Hosts`.
 Default is `true`.
+
+**Warning**: The `add_etc_hosts_generated: true` parameter doesn't add the user-defined hosts from `services.etc_hosts` to the CoreDNS configmap; if necessary, they must be added explicitly to `services.coredns.configmap.Hosts`.
 
 ##### configmap
 
