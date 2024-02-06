@@ -174,7 +174,7 @@ After these steps, HAProxy nodes will support enabling maintenance mode.
 To actually move HAProxy to maintenance mode, it is required to change HAProxy configuration from `haproxy.cfg` to `haproxy-mntc.cfg`.
 To do this without conflicting with KubeMarine, use following steps:
 1. Create HAProxy systemd drop-in directory, if not created already. For example, if haproxy service is named `haproxy.service`,
-you will need to create directory `"/etc/systemd/system/haproxy.service.d`.
+you will need to create directory `/etc/systemd/system/haproxy.service.d`.
 2. In this directory, create file named `EnvFile` with following content:
       ```
       CONFIG=/etc/haproxy/haproxy-mntc.cfg
