@@ -1352,8 +1352,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         cluster.log.debug("Delete binaries and logs")
         with group_to_rollback.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
-                host_int = node_exe.get_config()['internal_address']
-                node_exe.sudo(f"kill -9 $(cat {ipip_check}.pid); " \
+                node_exe.sudo(f"pkill -9 -P $(cat {ipip_check}.pid | xargs | tr ' ' ',') && " \
                               f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
 
 def make_reports(context: dict) -> None:

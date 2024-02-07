@@ -15,7 +15,6 @@
 import fileinput
 import subprocess
 import sys
-import io
 from typing import List
 import tarfile
 
@@ -37,7 +36,7 @@ with open('kubemarine/version', 'r') as version_file:
     version = version_file.readline().split('\n')[0].split('v')[1]
 
 with tarfile.open(f"dist/kubemarine-{version}.tar.gz") as arch:
-    file_obj = arch.extractfile("kubemarine-0.26.0/kubemarine/resources/scripts/ipip_check")
+    file_obj = arch.extractfile(f"kubemarine-{version}/kubemarine/resources/scripts/ipip_check")
     with open('kubemarine/resources/scripts/ipip_check', 'wb') as binary:
         if file_obj is not None:
             binary.write(file_obj.read())
