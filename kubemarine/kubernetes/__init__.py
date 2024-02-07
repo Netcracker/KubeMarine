@@ -579,10 +579,10 @@ def wait_uncordon(node: NodeGroup) -> None:
     timeout_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
     # This forces to use local API server and waits till it is up.
     with local_admin_config(node) as kubeconfig:
-        utils.wait_command_successful(node, f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()}",
-                                      hide=False,
-                                      timeout=timeout_config['timeout'],
-                                      retries=timeout_config['retries'])
+        node.wait_command_successful(f"kubectl --kubeconfig {kubeconfig} uncordon {node.get_node_name()}",
+                                     hide=False,
+                                     timeout=timeout_config['timeout'],
+                                     retries=timeout_config['retries'])
 
 
 def wait_for_nodes(group: NodeGroup) -> None:

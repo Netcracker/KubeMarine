@@ -277,70 +277,8 @@ def get_dump_filepath(context: dict, filename: str) -> str:
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(g: object, command: str,
-                            *,
-                            retries: int = 15, timeout: int = 5,
-                            hide: bool = False) -> None:
-    from kubemarine.core.group import NodeGroup
-    group = cast(NodeGroup, g)
-
-    logger = group.cluster.log
-
-    def attempt() -> bool:
-        result = group.sudo(command, warn=True, hide=hide)
-        if hide:
-            logger.verbose(result)
-            for host in result.get_failed_hosts_list():
-                stderr = result[host].stderr.rstrip('\n')
-                if stderr:
-                    logger.debug(f"{host}: {stderr}")
-
-        return not result.is_any_failed()
-
-    _wait_command_successful(logger, attempt, retries, timeout)
-
-
-def wait_commands_successful(g: object, commands: List[str],
-                             *,
-                             retries: int = 15, timeout: int = 5) -> None:
-    from kubemarine.core.group import NodeGroup, RemoteGroupException
-    from kubemarine.core.executor import UnexpectedExit
-    group = cast(NodeGroup, g)
-
-    if group.nodes_amount() != 1:
-        raise Exception("Waiting for few commands is currently supported only for single node")
-
-    logger = group.cluster.log
-
-    remained_commands = list(commands)
-
-    def attempt() -> bool:
-        defer = group.new_defer()
-        for command in remained_commands:
-            defer.sudo(command)
-
-        try:
-            defer.flush()
-        except RemoteGroupException as e:
-            results = e.results[group.get_host()]
-            for result in results:
-                if isinstance(result, UnexpectedExit):
-                    logger.debug(result.result.stderr)
-                    break
-                elif isinstance(result, Exception):
-                    raise
-
-                del remained_commands[0]
-
-            return False
-
-        return True
-
-    _wait_command_successful(logger, attempt, retries, timeout)
-
-
-def _wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
-                             retries: int, timeout: int) -> None:
+def wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
+                            retries: int, timeout: int) -> None:
     while retries > 0:
         logger.debug("Waiting for command to succeed, %s retries left" % retries)
         result = attempt()

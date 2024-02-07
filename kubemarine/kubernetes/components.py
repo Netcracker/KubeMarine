@@ -323,7 +323,7 @@ def reconfigure_components(group: NodeGroup, components: List[str],
 def restart_components(group: NodeGroup, components: List[str]) -> None:
     """
     Currently it is supported to restart only
-    'kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', and 'kube-proxy'.
+    'kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd'.
 
     :param group: nodes to restart components on
     :param components: Kubernetes components to restart
@@ -331,21 +331,10 @@ def restart_components(group: NodeGroup, components: List[str]) -> None:
     cluster: KubernetesCluster = group.cluster
 
     for node in group.get_ordered_members_list():
-        node_name = node.get_node_name()
         is_control_plane = 'control-plane' in node.get_config()['roles']
-        _components = [c for c in components if c == 'kube-proxy'
-                       or (is_control_plane and c in CONTROL_PLANE_COMPONENTS)]
+        _components = [c for c in components if is_control_plane and c in CONTROL_PLANE_COMPONENTS]
 
-        cluster.log.debug(f"Restarting components {_components} on node: {node_name}")
-
-        defer = node.new_defer()
-        # No need to manually kill container for kube-proxy. It is restarted as soon as pod is deleted.
-        _restart_containers(cluster, defer,
-                            [c for c in _components if c in CONTROL_PLANE_COMPONENTS])
-        defer.flush()
-        # Delete pods to refresh Ready status in etcd.
-        _delete_pods(cluster, node, _components)
-
+        _restart_containers(cluster, node, _components)
         wait_for_pods(node, _components)
 
 
@@ -521,31 +510,28 @@ def _reconfigure_control_plane_components(cluster: KubernetesCluster, group: Nod
 
         defer = node.new_defer()
 
-        need_restart = OrderedSet[str]()
-        need_wait = OrderedSet[str]()
+        containers_restart = OrderedSet[str]()
+        pods_wait = OrderedSet[str]()
         for component in components:
             if component == 'kube-apiserver/cert-sans':
                 _reconfigure_apiserver_certsans(defer, reconfigure_config, backup_dir)
-                need_restart.add('kube-apiserver')
-                need_wait.add('kube-apiserver')
+                containers_restart.add('kube-apiserver')
+                pods_wait.add('kube-apiserver')
                 continue
 
             # Let's anyway wait for pods as the component may be broken due to previous runs.
-            need_wait.add(component)
+            pods_wait.add(component)
             if (_reconfigure_control_plane_component(cluster, defer, component, reconfigure_config, backup_dir)
                     or force_restart):
-                need_restart.add(component)
+                containers_restart.add(component)
             else:
                 # Manifest file may be changed in formatting but not in meaningful content.
-                # Kubelet is not observed to restart the component in this case, neither will we.
+                # Kubelet is not observed to restart the container in this case, neither will we.
                 pass
 
-        _restart_containers(cluster, defer, need_restart)
         defer.flush()
-        # Delete pods to refresh Ready status in etcd.
-        _delete_pods(cluster, node, need_restart)
-
-        wait_for_pods(node, need_wait)
+        _restart_containers(cluster, node, containers_restart)
+        wait_for_pods(node, pods_wait)
 
     return True
 
@@ -628,36 +614,37 @@ def _reconfigure_node_components(cluster: KubernetesCluster, group: NodeGroup, c
 
     for node in nodes:
         is_control_plane = 'control-plane' in node.get_config()['roles']
-        need_restart = OrderedSet[str]()
-        need_wait = OrderedSet[str]()
+        kube_proxy_restart = kube_proxy_changed or force_restart
+        containers_restart = OrderedSet[str]()
+        pods_wait = OrderedSet[str]()
         if 'kube-proxy' in components:
-            need_wait.add('kube-proxy')
-        if kube_proxy_changed or force_restart:
-            need_restart.add('kube-proxy')
+            pods_wait.add('kube-proxy')
 
         if 'kubelet' in components:
             logger.debug(f"Reconfiguring kubelet on node: {node.get_node_name()}")
 
-            need_wait.add('kube-proxy')
+            pods_wait.add('kube-proxy')
             if is_control_plane:
-                need_wait.update(CONTROL_PLANE_COMPONENTS)
+                pods_wait.update(CONTROL_PLANE_COMPONENTS)
 
             defer = node.new_defer()
             if _reconfigure_kubelet(cluster, defer, backup_dir) or force_restart:
                 system.restart_service(defer, 'kubelet')
                 # It is not clear how to check that kubelet is healthy.
                 # Let's restart and check health of all components.
-                need_restart.add('kube-proxy')
+                kube_proxy_restart = True
                 if is_control_plane:
-                    need_restart.update(CONTROL_PLANE_COMPONENTS)
-
                     # No need to manually kill container for kube-proxy. It is restarted as soon as pod is deleted.
-                    _restart_containers(cluster, defer, CONTROL_PLANE_COMPONENTS)
+                    containers_restart.update(CONTROL_PLANE_COMPONENTS)
 
             defer.flush()
 
-        _delete_pods(cluster, node, need_restart)
-        wait_for_pods(node, need_wait)
+        # Delete pod for 'kube-proxy' early while 'kube-apiserver' is expected to be available.
+        if kube_proxy_restart:
+            _delete_pods(cluster, node, control_plane, ['kube-proxy'])
+
+        _restart_containers(cluster, node, containers_restart)
+        wait_for_pods(node, pods_wait)
 
 
 def _reconfigure_kubelet(cluster: KubernetesCluster, node: DeferredGroup,
@@ -697,26 +684,68 @@ def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: st
     return True
 
 
-def _restart_containers(cluster: KubernetesCluster, node: DeferredGroup, components: Sequence[str]) -> None:
+def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components: Sequence[str]) -> None:
     if not components:
         return
 
+    logger = cluster.log
     node_name = node.get_node_name()
-    cluster.log.debug(f"Restarting containers for components {list(components)} on node: {node_name}")
+    logger.debug(f"Restarting containers for components {list(components)} on node: {node_name}")
+
+    commands = []
 
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
+    # Take into account probably missed container because kubelet may be restarting them at this moment.
+    # Though still ensure the command to delete the container successfully if it is present.
     if cri_impl == 'containerd':
-        restart_container = "crictl ps --name {component} -q | xargs -I CONTAINER sudo crictl rm -f CONTAINER"
+        restart_container = ("(set -o pipefail && sudo crictl ps --name {component} -q "
+                             "| xargs -I CONTAINER sudo crictl rm -f CONTAINER)")
     else:
-        restart_container = "docker ps -q -f 'name=k8s_{component}' | xargs -I CONTAINER sudo docker rm -f CONTAINER"
+        restart_container = ("(set -o pipefail && sudo docker ps -q -f 'name=k8s_{component}' "
+                             "| xargs -I CONTAINER sudo docker rm -f CONTAINER)")
 
     for component in components:
-        command = restart_container.format(component=component)
-        # Accept probably failed command because kubelet may be restarting the containers at this moment.
-        node.sudo(command, warn=True)
+        commands.append(restart_container.format(component=component))
+
+    if cri_impl == 'containerd':
+        get_container_from_cri = "sudo crictl ps --name {component} -q"
+    else:
+        get_container_from_cri = (
+            "sudo docker ps --no-trunc -f 'name=k8s_{component}' "
+            "| grep k8s_{component} | awk '{{{{ print $1 }}}}'")
+
+    get_container_from_pod = (
+        "sudo kubectl get pods -n kube-system {component}-{node} "
+        "-o 'jsonpath={{.status.containerStatuses[0].containerID}}{{\"\\n\"}}' "
+        "| sed 's|.\\+://\\(.\\+\\)|\\1|'")
+
+    # Wait for kubelet to refresh container status in pods.
+    # It is expected that Ready status will be refreshed at the same time,
+    # so we can safely wait_for_pods().
+    test_refreshed_container = (
+        f"("
+        f"CONTAINER=$({get_container_from_cri}); "
+        f"if [ -z \"$CONTAINER\" ]; then "
+        f"  echo \"container '{{component}}' is not created yet\" >&2 ; exit 1; "
+        f"fi "
+        f"&& "
+        f"if [ \"$CONTAINER\" != \"$({get_container_from_pod})\" ]; "
+        f"  then echo \"Pod '{{component}}-{{node}}' is not refreshed yet\" >&2; exit 1; "
+        f"fi "
+        f")")
+
+    for component in components:
+        commands.append(test_refreshed_container.format(component=component, node=node_name))
+
+    expect_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
+    node.wait_commands_successful(commands,
+                                  timeout=expect_config['timeout'],
+                                  retries=expect_config['retries'],
+                                  sudo=False)
 
 
-def _delete_pods(cluster: KubernetesCluster, node: NodeGroup, components: Sequence[str]) -> None:
+def _delete_pods(cluster: KubernetesCluster, node: AbstractGroup[RunResult],
+                 control_plane: NodeGroup, components: Sequence[str]) -> None:
     if not components:
         return
 
@@ -730,18 +759,11 @@ def _delete_pods(cluster: KubernetesCluster, node: NodeGroup, components: Sequen
         ")"
     )
 
-    commands = [restart_pod.format(pod=component, node=node_name)
-                for component in components]
+    defer = control_plane.new_defer()
+    for component in components:
+        defer.sudo(restart_pod.format(pod=component, node=node_name))
 
-    expect_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
-
-    control_plane = node
-    if 'control-plane' not in node.get_config()['roles']:
-        control_plane = cluster.nodes['control-plane'].get_first_member()
-
-    utils.wait_commands_successful(control_plane, commands,
-                                   timeout=expect_config['timeout'],
-                                   retries=expect_config['retries'])
+    defer.flush()
 
 
 # function to get dictionary of flags to be patched for a given control plane item and a given node
