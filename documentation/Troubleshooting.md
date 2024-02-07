@@ -932,13 +932,14 @@ spec:
       args:
         - '--disable-full-test'
 ```
+
 ## vIP Address is Unreachable
 
-**Symptoms**: 
+**Symptoms**:
 
 Installation failed with error:
 
-```
+```console
 .....
 <DATETIME> VERBOSE [log.verbose] I1220 14:12:57.517911    3239 waitcontrolplane.go:83] [wait-control-plane] Waiting for the API server to be healthy
 <DATETIME> VERBOSE [log.verbose] I1220 14:12:58.520621    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 1 to https://api.example.com:6443/healthz?timeout=10s
@@ -960,69 +961,68 @@ Installation failed with error:
 
 Looks like IP address for kubernetes API is unreachable.
 
-**Root Cause**: 
+**Root Cause**:
 
 1. Make shure vIP address is unreachable:
 
+    Try to check connectivity with `api.example.com`:
 
-Try to check connectivity with `api.example.com`:
-
-```
-ping -c 1 -W 2 api.example.com
-
-
-PING api.example.com (10.10.10.144) 56(84) bytes of data.
-
---- api.example.com ping statistics ---
-1 packets transmitted, 0 received, 100% packet loss, time 0ms
-```
-
-IP address `10.10.10.144` is the floating IP address for internal `192.168.0.4` and it is unreachable.
-
-2. Check vIP address is managed by keepalived and exists on the correct network interface:
-
-Check the vIP address is on the interface of node with **balancer**:
-
-```
-sudo ip a
+    ```console
+    ping -c 1 -W 2 api.example.com
 
 
-....
-2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
-    link/ether fa:16:3e:54:45:74 brd ff:ff:ff:ff:ff:ff
-    altname enp0s3
-    altname ens3
-    inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute eth0
-       valid_lft 36663sec preferred_lft 36663sec
-    inet 192.168.0.4/32 scope global vip_2910a02af7
-       valid_lft forever preferred_lft forever
-```
+    PING api.example.com (10.10.10.144) 56(84) bytes of data.
 
-3. Try to ping by internal IP address from any worker node:
+    --- api.example.com ping statistics ---
+    1 packets transmitted, 0 received, 100% packet loss, time 0ms
+    ```
 
-```
-ping -c 1 -W 2 192.168.0.4
+    IP address `10.10.10.144` is the floating IP address for internal `192.168.0.4` and it is unreachable.
+
+1. Check vIP address is managed by keepalived and exists on the correct network interface:
+
+    Check the vIP address is on the interface of node with **balancer**:
+
+      ```console
+      sudo ip a
 
 
-PING 192.168.0.4 (192.168.0.4) 56(84) bytes of data.
+      ....
+    2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+        link/ether fa:16:3e:54:45:74 brd ff:ff:ff:ff:ff:ff
+        altname enp0s3
+        altname ens3
+        inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute eth0
+          valid_lft 36663sec preferred_lft 36663sec
+        inet 192.168.0.4/32 scope global vip_2910a02af7
+          valid_lft forever preferred_lft forever
+    ```
 
---- 192.168.0.4 ping statistics ---
-1 packets transmitted, 0 received, 100% packet loss, time 0ms
-```
+1. Try to ping by internal IP address from any worker node:
 
-4. Check the ARP table for correct MAC address. Should be the same with `fa:16:3e:54:45:74`
+    ```console
+    ping -c 1 -W 2 192.168.0.4
 
-On worker node:
 
-```
-sudo arp -a | grep 192.168.0.4
+    PING 192.168.0.4 (192.168.0.4) 56(84) bytes of data.
 
-<NODENAME> (192.168.0.4) at 10:e7:c6:c0:47:35 [ether] on ens3
-```
+    --- 192.168.0.4 ping statistics ---
+    1 packets transmitted, 0 received, 100% packet loss, time 0ms
+    ```
 
-5. In case of the MAC address from arp command is different with correct value GARP protocol is disabled in environment and **keepalived** can not announce new MAC address for vIP address.
+1. Check the ARP table for correct MAC address. Should be the same with `fa:16:3e:54:45:74`
 
-**Solution**: Уou need to contact technical support and ask to enable the GARP protocol.
+    On worker node:
+
+    ```console
+    sudo arp -a | grep 192.168.0.4
+
+    <NODENAME> (192.168.0.4) at 10:e7:c6:c0:47:35 [ether] on ens3
+    ```
+
+1. In case of the MAC address from arp command is different with correct value GARP protocol is disabled in environment and **keepalived** can not announce new MAC address for vIP address.
+
+    **Solution**: Уou need to contact technical support and ask to enable the GARP protocol.
 
 ## CoreDNS Cannot Resolve the Name
 
