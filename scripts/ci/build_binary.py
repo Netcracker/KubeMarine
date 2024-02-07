@@ -15,6 +15,7 @@
 import fileinput
 import subprocess
 import sys
+import io
 from typing import List
 import tarfile
 
@@ -38,7 +39,8 @@ with open('kubemarine/version', 'r') as version_file:
 with tarfile.open(f"dist/kubemarine-{version}.tar.gz") as arch:
     file_obj = arch.extractfile("kubemarine-0.26.0/kubemarine/resources/scripts/ipip_check")
     with open('kubemarine/resources/scripts/ipip_check', 'wb') as binary:
-        binary.write(file_obj.read())
+        if file_obj is not None:
+            binary.write(file_obj.read())
 
 # Install exact version of pip, because 'scripts/ci/install_package.py' relies on its internal implementation.
 # Note that downgrade is possible.
