@@ -20,6 +20,7 @@ import os
 from kubemarine import plugins, kubernetes
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
@@ -124,7 +125,7 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
     # Try to access some projectcalico.org resource using each instance of the Kubernetes API server.
     expect_config = cluster.inventory['plugins']['calico']['apiserver']['expect']['apiservice']
     with kubernetes.local_admin_config(control_planes) as kubeconfig:
-        control_planes.call(utils.wait_command_successful,
+        control_planes.call(NodeGroup.wait_command_successful,
                             command=f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org",
                             hide=True,
                             retries=expect_config['retries'], timeout=expect_config['timeout'])
