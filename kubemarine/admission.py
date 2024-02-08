@@ -587,6 +587,13 @@ def update_finalized_inventory(cluster: KubernetesCluster, inventory_to_finalize
     return inventory_to_finalize
 
 
+def generate_pss(cluster: KubernetesCluster) -> str:
+    defaults = cluster.inventory["rbac"]["pss"]["defaults"]
+    exemptions = cluster.inventory["rbac"]["pss"]["exemptions"]
+    return Template(utils.read_internal(admission_template))\
+        .render(defaults=defaults, exemptions=exemptions)
+
+
 def copy_pss(group: NodeGroup) -> Optional[RunnersGroupResult]:
     if group.cluster.inventory['rbac']['admission'] != "pss":
         return None
@@ -595,11 +602,8 @@ def copy_pss(group: NodeGroup) -> Optional[RunnersGroupResult]:
         group.cluster.log.debug("Pod security disabled, skipping pod admission installation...")
         return None
 
-    defaults = group.cluster.inventory["rbac"]["pss"]["defaults"]
-    exemptions = group.cluster.inventory["rbac"]["pss"]["exemptions"]
     # create admission config from template and cluster.yaml
-    admission_config = Template(utils.read_internal(admission_template))\
-                       .render(defaults=defaults,exemptions=exemptions)
+    admission_config = generate_pss(group.cluster)
 
     # put admission config on every control-planes
     group.cluster.log.debug(f"Copy admission config to {admission_path}")

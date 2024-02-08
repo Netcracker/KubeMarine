@@ -493,6 +493,13 @@ def get_unified_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -
     return None
 
 
+def get_yaml_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    if yaml.safe_load(old) == yaml.safe_load(new):
+        return None
+
+    return get_unified_diff(old, new, fromfile, tofile)
+
+
 def isipv(address: str, versions: List[int]) -> bool:
     return ipaddress.ip_network(address).version in versions
 

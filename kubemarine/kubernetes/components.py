@@ -1,4 +1,8 @@
 import io
+import re
+import uuid
+from copy import deepcopy
+from textwrap import dedent
 from typing import List, Optional, Dict, Callable, Sequence
 
 import yaml
@@ -106,7 +110,7 @@ CONFIGMAPS_CONSTANTS = {
 CONTROL_PLANE_COMPONENTS = ["kube-apiserver", "kube-scheduler", "kube-controller-manager", "etcd"]
 
 
-class _KubeadmConfig:
+class KubeadmConfig:
     def __init__(self, cluster: KubernetesCluster):
         self.cluster = cluster
 
@@ -115,31 +119,35 @@ class _KubeadmConfig:
             configmap: inventory["services"][constants['section']]
             for configmap, constants in CONFIGMAPS_CONSTANTS.items()}
 
-        self.edited_maps: Dict[str, KubernetesObject] = {}
+        self.loaded_maps: Dict[str, KubernetesObject] = {}
 
-    def is_edited(self, configmap: str) -> bool:
-        return configmap in self.edited_maps
+    def is_loaded(self, configmap: str) -> bool:
+        return configmap in self.loaded_maps
 
-    def edit(self, configmap: str, edit_func: Callable[[dict], dict], control_plane: NodeGroup) -> None:
+    def load(self, configmap: str, control_plane: NodeGroup, edit_func: Callable[[dict], dict] = None) -> dict:
         """
-        Load ConfigMap as object, retrieve plain config from it, and apply `edit_func` to the plain config.
+        Load ConfigMap as object, retrieve plain config from it, and apply `edit_func` to the plain config if provided.
 
         :param configmap: name of ConfigMap
         :param edit_func: function to apply changes
         :param control_plane: Use this control plane node to fetch the ConfigMap.
         """
-        configmap_obj = KubernetesObject(self.cluster, 'ConfigMap', configmap, 'kube-system')
+        configmap_name = _get_configmap_name(self.cluster, configmap)
+
+        configmap_obj = KubernetesObject(self.cluster, 'ConfigMap', configmap_name, 'kube-system')
         configmap_obj.reload(control_plane)
 
-        self.edited_maps[configmap] = configmap_obj
+        self.loaded_maps[configmap] = configmap_obj
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         config: dict = yaml.safe_load(configmap_obj.obj["data"][key])
 
-        config = edit_func(config)
-        configmap_obj.obj["data"][key] = yaml.dump(config)
+        if edit_func is not None:
+            config = edit_func(config)
+            configmap_obj.obj["data"][key] = yaml.dump(config)
 
         self.maps[configmap] = config
+        return config
 
     def apply(self, configmap: str, control_plane: NodeGroup) -> None:
         """
@@ -149,15 +157,25 @@ class _KubeadmConfig:
         :param control_plane: Use this control plane node to apply the ConfigMap.
         :return:
         """
-        if not self.is_edited(configmap):
+        if not self.is_loaded(configmap):
             raise ValueError(f"To apply changed {configmap} ConfigMap, it is necessary to fetch it first")
 
-        self.edited_maps[configmap].apply(control_plane)
+        self.loaded_maps[configmap].apply(control_plane)
 
     def to_yaml(self, init_config: dict) -> str:
         configs = list(self.maps.values())
         configs.append(init_config)
         return yaml.dump_all(configs)
+
+    def merge_with_inventory(self, configmap: str) -> Callable[[dict], dict]:
+        def merge_func(config_: dict) -> dict:
+            patch_config: dict = KubeadmConfig(self.cluster).maps[configmap]
+            # It seems that all default lists are always overridden with custom instead of appending,
+            # and so override merger seems the most suitable.
+            config_ = override_merger.merge(config_, deepcopy(patch_config))
+            return config_
+
+        return merge_func
 
 
 def kubelet_config_unversioned(cluster: KubernetesCluster) -> bool:
@@ -166,6 +184,10 @@ def kubelet_config_unversioned(cluster: KubernetesCluster) -> bool:
 
 def kubelet_supports_patches(cluster: KubernetesCluster) -> bool:
     return kubernetes_minor_release_at_least(cluster.inventory, "v1.25")
+
+
+def kubeadm_extended_dryrun(cluster: KubernetesCluster) -> bool:
+    return kubernetes_minor_release_at_least(cluster.inventory, "v1.26")
 
 
 def is_container_runtime_not_configurable(cluster: KubernetesCluster) -> bool:
@@ -246,7 +268,7 @@ def get_init_config(cluster: KubernetesCluster, group: AbstractGroup[RunResult],
 
 
 def get_kubeadm_config(cluster: KubernetesCluster, init_config: dict) -> str:
-    return _KubeadmConfig(cluster).to_yaml(init_config)
+    return KubeadmConfig(cluster).to_yaml(init_config)
 
 
 def _configure_container_runtime(cluster: KubernetesCluster, kubeadm_config: dict) -> None:
@@ -289,9 +311,9 @@ def reconfigure_components(group: NodeGroup, components: List[str],
 
     logger.debug("Uploading cluster config to first control plane...")
 
-    kubeadm_config = _KubeadmConfig(cluster)
+    kubeadm_config = KubeadmConfig(cluster)
     for configmap, func in edit_functions.items():
-        kubeadm_config.edit(configmap, func, control_plane)
+        kubeadm_config.load(configmap, control_plane, func)
 
     # This configuration will be used for `kubeadm init phase upload-config` phase.
     # InitConfiguration is necessary to specify patches directory.
@@ -393,10 +415,12 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
 
 
 def _upload_config(cluster: KubernetesCluster, control_plane: AbstractGroup[RunResult],
-                   kubeadm_config: _KubeadmConfig, remote_path: str) -> None:
+                   kubeadm_config: KubeadmConfig, remote_path: str,
+                   *, patches_dir: str = '/etc/kubernetes/patches') -> None:
     name = remote_path.rstrip('.yaml').split('/')[-1]
 
     init_config = get_init_config(cluster, control_plane, init=True)
+    init_config['patches']['directory'] = patches_dir
     config = kubeadm_config.to_yaml(init_config)
     utils.dump_file(cluster, config, f"{name}_{control_plane.get_node_name()}.yaml")
 
@@ -411,10 +435,7 @@ def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, conf
     defer = control_plane.new_defer()
     collector = CollectorCallback(cluster)
 
-    configmap_name = configmap
-    if configmap == 'kubelet-config' and not kubelet_config_unversioned(cluster):
-        kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
-        configmap_name += '-' + utils.minor_version(kubernetes_version)[1:]
+    configmap_name = _get_configmap_name(cluster, configmap)
 
     key = CONFIGMAPS_CONSTANTS[configmap]['key'].replace('.', r'\.')
     configmap_cmd = f'sudo kubectl get cm -n kube-system {configmap_name} -o=jsonpath="{{.data.{key}}}"'
@@ -438,6 +459,15 @@ def _update_configmap(cluster: KubernetesCluster, control_plane: NodeGroup, conf
                            fromfile=backup_file, tofile=f'{configmap_name} ConfigMap')
 
 
+def _get_configmap_name(cluster: KubernetesCluster, configmap: str) -> str:
+    configmap_name = configmap
+    if configmap == 'kubelet-config' and not kubelet_config_unversioned(cluster):
+        kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+        configmap_name += '-' + utils.minor_version(kubernetes_version)[1:]
+
+    return configmap_name
+
+
 def _configmap_init_phase_uploader(configmap: str, upload_config: str) -> Callable[[DeferredGroup], None]:
     def upload(control_plane: DeferredGroup) -> None:
         init_phase = CONFIGMAPS_CONSTANTS[configmap]['init_phase']
@@ -446,7 +476,7 @@ def _configmap_init_phase_uploader(configmap: str, upload_config: str) -> Callab
     return upload
 
 
-def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: _KubeadmConfig) \
+def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: KubeadmConfig) \
         -> Callable[[DeferredGroup], None]:
 
     # Unfortunately, there is no suitable kubeadm command to upload the generated ConfigMap.
@@ -458,14 +488,8 @@ def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: _
 
         # reconfigure_components() can be called with custom editing function.
         # The ConfigMap is already fetched and changed.
-        if not kubeadm_config.is_edited('kube-proxy'):
-            def merge_with_inventory(config_: dict) -> dict:
-                patch_config: dict = kubeadm_config.maps['kube-proxy']
-                # Since default configuration does not have non-empty lists, override merger seems the most suitable.
-                config_ = override_merger.merge(config_, patch_config)
-                return config_
-
-            kubeadm_config.edit('kube-proxy', merge_with_inventory, control_plane)
+        if not kubeadm_config.is_loaded('kube-proxy'):
+            kubeadm_config.load('kube-proxy', control_plane, kubeadm_config.merge_with_inventory('kube-proxy'))
 
         # Apply updated kube-proxy ConfigMap
         kubeadm_config.apply('kube-proxy', control_plane)
@@ -475,7 +499,7 @@ def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: _
 
 def _reconfigure_control_plane_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],
                                           force_restart: bool,
-                                          kubeadm_config: _KubeadmConfig, backup_dir: str) -> bool:
+                                          kubeadm_config: KubeadmConfig, backup_dir: str) -> bool:
     logger = cluster.log
 
     candidate_group = cluster.nodes['control-plane']
@@ -575,7 +599,7 @@ def _reconfigure_control_plane_component(cluster: KubernetesCluster, node: Defer
 
 def _reconfigure_node_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],
                                  force_restart: bool, control_plane: NodeGroup,
-                                 upload_config: str, kubeadm_config: _KubeadmConfig, backup_dir: str) -> None:
+                                 upload_config: str, kubeadm_config: KubeadmConfig, backup_dir: str) -> None:
     logger = cluster.log
 
     control_planes = (cluster.nodes['control-plane']
@@ -672,16 +696,231 @@ def _reconfigure_kubelet(cluster: KubernetesCluster, node: DeferredGroup,
                            fromfile=backup_file, tofile=config)
 
 
-def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: str, tofile: str) -> bool:
-    if yaml.safe_load(old) == yaml.safe_load(new):
-        return False
+def compare_manifests(cluster: KubernetesCluster, *, with_inventory: bool) \
+        -> Dict[str, Dict[str, Optional[str]]]:
+    """
+    Generate manifests in dry-run mode for all control plane components on all control plane nodes,
+    and compare with already present manifests.
 
-    diff = utils.get_unified_diff(old, new, fromfile, tofile)
+    :param cluster: KubernetesCluster instance
+    :param with_inventory: flag if cluster configuration should be generated from the inventory
+    :return: mapping host -> component -> diff string
+    """
+    kubeadm_config = KubeadmConfig(cluster)
+    if not with_inventory:
+        kubeadm_config.load('kubeadm-config', cluster.nodes['control-plane'].get_first_member())
+
+    control_planes = cluster.nodes['control-plane'].new_defer()
+    temp_config = "/tmp/%s" % uuid.uuid4().hex
+    patches_dir = '/etc/kubernetes/patches'
+    if with_inventory:
+        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+
+    components = [c for c in CONTROL_PLANE_COMPONENTS
+                  if c != 'etcd' or kubeadm_extended_dryrun(cluster)]
+
+    tmp_dirs_cmd = "sh -c 'sudo ls /etc/kubernetes/tmp/ | grep dryrun 2>/dev/null || true'"
+    old_tmp_dirs = CollectorCallback(cluster)
+    new_tmp_dirs = CollectorCallback(cluster)
+    for defer in control_planes.get_ordered_members_list():
+        _upload_config(cluster, defer, kubeadm_config, temp_config, patches_dir=patches_dir)
+        if with_inventory:
+            defer.sudo(f'mkdir -p {patches_dir}')
+
+        for component in components:
+            if with_inventory:
+                _create_kubeadm_patches_for_component_on_node(cluster, defer, component,
+                                                              patches_dir=patches_dir, reset=False)
+
+            defer.sudo(tmp_dirs_cmd, callback=old_tmp_dirs)
+
+            init_phase = COMPONENTS_CONSTANTS[component]['init_phase']
+            defer.sudo(f'kubeadm init phase {init_phase} --dry-run --config {temp_config}')
+
+            defer.sudo(tmp_dirs_cmd, callback=new_tmp_dirs)
+
+    control_planes.flush()
+
+    stored_manifest = CollectorCallback(cluster)
+    generated_manifest = CollectorCallback(cluster)
+    for defer in control_planes.get_ordered_members_list():
+        old_tmp_dirs_results = old_tmp_dirs.results[defer.get_host()]
+        new_tmp_dirs_results = new_tmp_dirs.results[defer.get_host()]
+        for i, component in enumerate(components):
+            tmp_dir = next(iter(
+                set(new_tmp_dirs_results[i].stdout.split())
+                - set(old_tmp_dirs_results[i].stdout.split())
+            ))
+            defer.sudo(f'cat /etc/kubernetes/manifests/{component}.yaml', callback=stored_manifest)
+            defer.sudo(f'cat /etc/kubernetes/tmp/{tmp_dir}/{component}.yaml', callback=generated_manifest)
+
+    control_planes.flush()
+
+    result: Dict[str, Dict[str, Optional[str]]] = {}
+    for host in control_planes.get_hosts():
+        stored_manifest_results = stored_manifest.results[host]
+        generated_manifest_results = generated_manifest.results[host]
+        for i, component in enumerate(components):
+            tofile = (f"{component}.yaml generated from 'services.kubeadm' section"
+                      if with_inventory
+                      else f"{component}.yaml generated from kubeadm-config ConfigMap")
+            stored = stored_manifest_results[i].stdout
+            generated = generated_manifest_results[i].stdout
+            if component == 'etcd':
+                stored = _filter_etcd_initial_cluster_args(stored)
+                generated = _filter_etcd_initial_cluster_args(generated)
+
+            diff = utils.get_yaml_diff(stored, generated,
+                                       fromfile=f'/etc/kubernetes/manifests/{component}.yaml',
+                                       tofile=tofile)
+
+            result.setdefault(host, {})[component] = diff
+
+    return result
+
+
+def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) \
+        -> Dict[str, Optional[str]]:
+    """
+    Generate /var/lib/kubelet/config.yaml in dry-run mode on all nodes,
+    and compare with already present configurations.
+
+    :param cluster: KubernetesCluster instance
+    :param with_inventory: flag if patches should be taken from the inventory
+    :return: mapping host -> diff string
+    """
+    nodes = cluster.make_group_from_roles(['control-plane', 'worker']).new_defer()
+    patches_dir = '/etc/kubernetes/patches'
+    if with_inventory:
+        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+
+    tmp_dirs_cmd = "sh -c 'sudo ls /etc/kubernetes/tmp/ | grep dryrun 2>/dev/null || true'"
+    old_tmp_dirs = CollectorCallback(cluster)
+    new_tmp_dirs = CollectorCallback(cluster)
+    for defer in nodes.get_ordered_members_list():
+        if with_inventory and kubelet_supports_patches(cluster):
+            defer.sudo(f'mkdir -p {patches_dir}')
+            _create_kubeadm_patches_for_component_on_node(
+                cluster, defer, 'kubelet', patches_dir=patches_dir, reset=False)
+
+        defer.sudo(tmp_dirs_cmd, callback=old_tmp_dirs)
+
+        patches_flag = f' --patches={patches_dir}' if kubelet_supports_patches(cluster) else ''
+        defer.sudo(f'kubeadm upgrade node phase kubelet-config --dry-run{patches_flag}')
+
+        defer.sudo(tmp_dirs_cmd, callback=new_tmp_dirs)
+
+    nodes.flush()
+
+    stored_config = CollectorCallback(cluster)
+    generated_config = CollectorCallback(cluster)
+    for defer in nodes.get_ordered_members_list():
+        old_tmp_dirs_results = old_tmp_dirs.results[defer.get_host()]
+        new_tmp_dirs_results = new_tmp_dirs.results[defer.get_host()]
+        tmp_dir = next(iter(
+            set(new_tmp_dirs_results[0].stdout.split())
+            - set(old_tmp_dirs_results[0].stdout.split())
+        ))
+        defer.sudo(f'cat /var/lib/kubelet/config.yaml', callback=stored_config)
+        defer.sudo(f'cat /etc/kubernetes/tmp/{tmp_dir}/config.yaml', callback=generated_config)
+
+    nodes.flush()
+
+    result = {}
+    for host in nodes.get_hosts():
+        tofile = (f"config.yaml with patches from inventory"
+                  if with_inventory
+                  else f"config.yaml generated from kubelet-config ConfigMap")
+        stored = stored_config.results[host][0].stdout
+        generated = generated_config.results[host][0].stdout
+
+        diff = utils.get_yaml_diff(stored, generated,
+                                   fromfile='/var/lib/kubelet/config.yaml',
+                                   tofile=tofile)
+
+        result[host] = diff
+
+    return result
+
+
+def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[str]:
+    control_plane = cluster.nodes['control-plane'].get_first_member()
+    kubeadm_config = KubeadmConfig(cluster)
+
+    if configmap == 'kubelet-config' and kubeadm_extended_dryrun(cluster):
+        # Use upload-config kubelet --dry-run to catch all inserted/updated/deleted properties.
+
+        temp_config = "/tmp/%s" % uuid.uuid4().hex
+        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+
+        defer = control_plane.new_defer()
+        collector = CollectorCallback(cluster)
+
+        _upload_config(cluster, defer, kubeadm_config, temp_config, patches_dir=patches_dir)
+        defer.sudo(f'mkdir -p {patches_dir}')
+        _create_kubeadm_patches_for_component_on_node(
+            cluster, defer, 'kubelet', patches_dir=patches_dir, reset=False)
+
+        init_phase = CONFIGMAPS_CONSTANTS[configmap]['init_phase']
+        defer.sudo(f'kubeadm init phase {init_phase} --dry-run --config {temp_config}',
+                   callback=collector)
+
+        defer.flush()
+        output = collector.result[control_plane.get_host()].stdout
+
+        split_logs = re.compile(r'^\[.*].*$\n', flags=re.M)
+        cfg = next(filter(lambda ln: 'kind: KubeletConfiguration' in ln, split_logs.split(output)))
+        cfg = dedent(cfg)
+
+        key = CONFIGMAPS_CONSTANTS[configmap]['key']
+        generated_config = yaml.safe_load(cfg)['data'][key]
+
+        kubeadm_config.load(configmap, control_plane)
+        stored_config = kubeadm_config.loaded_maps[configmap].obj["data"][key]
+
+        if yaml.safe_load(generated_config) == yaml.safe_load(stored_config):
+            return None
+
+        return utils.get_unified_diff(stored_config, generated_config,
+                                      fromfile=f'{configmap} ConfigMap',
+                                      tofile="generated from 'services.kubeadm_kubelet' section")
+
+    else:
+        # Merge with inventory and check.
+        # This way it is possible to check only new or changed properties in the inventory
+        # that are still not reflected in the remote ConfigMap.
+
+        stored_config = kubeadm_config.load(configmap, control_plane)
+
+        generated_config = kubeadm_config.merge_with_inventory(configmap)\
+                (deepcopy(stored_config))
+
+        if configmap == 'kubelet-config':
+            # readOnlyPort: 0 is default value that can be omitted for some reason
+            generated_config.setdefault('readOnlyPort', 0)
+            stored_config.setdefault('readOnlyPort', 0)
+
+        if generated_config == stored_config:
+            return None
+
+        section = CONFIGMAPS_CONSTANTS[configmap]['section']
+        return utils.get_unified_diff(yaml.dump(stored_config), yaml.dump(generated_config),
+                                      fromfile=f'{configmap} ConfigMap',
+                                      tofile=f"{configmap} ConfigMap merged 'services.{section}' section")
+
+
+def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: str, tofile: str) -> bool:
+    diff = utils.get_yaml_diff(old, new, fromfile, tofile)
     if diff is not None:
         logger.debug(f"Detected changes in {tofile}")
         logger.verbose(diff)
+        return True
 
-    return True
+    return False
+
+
+def _filter_etcd_initial_cluster_args(content: str) -> str:
+    return '\n'.join(filter(lambda ln: '--initial-cluster' not in ln, content.splitlines()))
 
 
 def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components: Sequence[str]) -> None:
@@ -786,14 +1025,16 @@ def _get_patched_flags_for_section(inventory: dict, patch_section: str, node: No
 
 
 def _create_kubeadm_patches_for_component_on_node(cluster: KubernetesCluster, node: DeferredGroup, component: str,
-                                                  backup_dir: Optional[str] = None) -> None:
+                                                  backup_dir: Optional[str] = None,
+                                                  *, patches_dir: str = '/etc/kubernetes/patches', reset: bool = True) -> None:
     patch_constants = COMPONENTS_CONSTANTS[component]['patch']
-    component_patches = f"find /etc/kubernetes/patches -name {patch_constants['target_template']}"
+    component_patches = f"find {patches_dir} -name {patch_constants['target_template']}"
 
     if backup_dir is not None:
         node.sudo(f'{component_patches} -exec cp {{}} {backup_dir}/patches \\;')
 
-    node.sudo(f'{component_patches} -delete')
+    if reset:
+        node.sudo(f'{component_patches} -delete')
 
     # read patch content from inventory and upload patch files to a node
     node_config = node.get_config()
@@ -805,6 +1046,6 @@ def _create_kubeadm_patches_for_component_on_node(cluster: KubernetesCluster, no
             template_filename = 'templates/patches/control-plane-pod.json.j2'
 
         control_plane_patch = Template(utils.read_internal(template_filename)).render(flags=patched_flags)
-        patch_file = '/etc/kubernetes/patches/' + patch_constants['file']
+        patch_file = patches_dir + '/' + patch_constants['file']
         node.put(io.StringIO(control_plane_patch + "\n"), patch_file, sudo=True)
         node.sudo(f'chmod 644 {patch_file}')
