@@ -2,6 +2,8 @@ import re
 import unittest
 
 from kubemarine import demo, kubernetes
+from kubemarine.core import flow
+from kubemarine.procedures import reconfigure
 from test.unit import utils as test_utils
 
 
@@ -21,6 +23,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
 
     def test_enrich_and_finalize_inventory(self):
         self.inventory['services']['kubeadm'] = {
+            'kubernetesVersion': 'v1.25.7',
             'apiServer': {
                 'extraArgs': {'api_k1': 'api_v1'},
                 'extraVolumes': [{'name': 'api_name1', 'hostPath': '/home/path', 'mountPath': '/mount/path'}],
@@ -178,6 +181,7 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
 
     def test_error_kubelet_patch_refers_balancer(self):
         self.setUpScheme(demo.FULLHA)
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.25.7'
         self.reconfigure['services']['kubeadm_patches'] = {
             'kubelet': [
                 {'nodes': ['balancer-1'], 'patch': {'key': 'value'}},
@@ -186,6 +190,91 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         with self.assertRaisesRegex(
                 Exception, re.escape(kubernetes.ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE % 'kubelet')):
             self.new_cluster()
+
+    def test_kubeadm_before_v1_25x_supports_patches(self):
+        kubernetes_version = 'v1.24.11'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
+        self.reconfigure['services']['kubeadm_patches'] = {
+            'apiServer': [
+                {'nodes': ['master-1'], 'patch': {'api_key': 'api_value'}},
+            ],
+            'etcd': [
+                {'groups': ['control-plane'], 'patch': {'etcd_key': 'api_value'}},
+            ]
+        }
+        # No error should be raised
+        self.new_cluster()
+
+    def test_error_kubeadm_before_v1_25x_dont_support_patches_kubelet(self):
+        kubernetes_version = 'v1.24.11'
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version
+        self.reconfigure['services']['kubeadm_patches'] = {
+            'kubelet': [
+                {'nodes': ['master-1'], 'patch': {'key': 'value'}},
+            ]
+        }
+        with self.assertRaisesRegex(
+                Exception, re.escape(kubernetes.ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(version=kubernetes_version))):
+            self.new_cluster()
+
+
+class RunTasks(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.reconfigure = demo.generate_procedure_inventory('reconfigure')
+        self.reconfigure.setdefault('services', {})
+
+    def _run_tasks(self, tasks_filter: str) -> demo.FakeResources:
+        context = demo.create_silent_context(
+            ['fake.yaml', '--tasks', tasks_filter], procedure='reconfigure')
+
+        nodes_context = demo.generate_nodes_context(self.inventory)
+        resources = demo.FakeResources(context, self.inventory,
+                                       procedure_inventory=self.reconfigure, nodes_context=nodes_context)
+        flow.run_actions(resources, [reconfigure.ReconfigureAction()])
+        return resources
+
+    def test_kubernetes_reconfigure_empty_procedure_inventory(self):
+        self._run_tasks('deploy.kubernetes.reconfigure')
+
+    def test_kubernetes_reconfigure_empty_sections(self):
+        self.reconfigure['services'] = {
+            'kubeadm': {'apiServer': {}, 'scheduler': {}, 'controllerManager': {}, 'etcd': {}},
+            'kubeadm_kubelet': {},
+            'kubeadm_kube-proxy': {},
+        }
+        with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
+            self._run_tasks('deploy.kubernetes.reconfigure')
+
+            actual_called = run.call_args[1]['components'] if run.called else []
+            expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet', 'kube-proxy']
+            self.assertEqual(expected_called, actual_called,
+                             "Unexpected list of components to reconfigure")
+
+    def test_kubernetes_reconfigure_empty_patch_sections(self):
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.25.7'
+        self.reconfigure.setdefault('services', {})['kubeadm_patches'] = {
+            'apiServer': [], 'scheduler': [], 'controllerManager': [], 'etcd': [], 'kubelet': [],
+        }
+        with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
+            self._run_tasks('deploy.kubernetes.reconfigure')
+
+            actual_called = run.call_args[1]['components'] if run.called else []
+            expected_called = ['kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet']
+            self.assertEqual(expected_called, actual_called,
+                             "Unexpected list of components to reconfigure")
+
+    def test_kubernetes_reconfigure_empty_apiserver_certsans(self):
+        self.reconfigure['services'] = {
+            'kubeadm': {'apiServer': {'certSANs': []}}
+        }
+        with test_utils.mock_call(kubernetes.components.reconfigure_components) as run:
+            self._run_tasks('deploy.kubernetes.reconfigure')
+
+            actual_called = run.call_args[1]['components'] if run.called else []
+            expected_called = ['kube-apiserver/cert-sans', 'kube-apiserver']
+            self.assertEqual(expected_called, actual_called,
+                             "Unexpected list of components to reconfigure")
 
 
 if __name__ == '__main__':

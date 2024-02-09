@@ -49,6 +49,8 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 
 loaded_oob_policies = {}
 
+ERROR_INCONSISTENT_INVENTORIES = "Procedure config and cluster config are inconsistent. Please check 'admission' option"
+
 # TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
 
@@ -692,4 +694,4 @@ def check_inventory(cluster: KubernetesCluster) -> None:
     # check if 'admission' option in cluster.yaml and procedure.yaml are inconsistent 
     if cluster.context.get('initial_procedure') == 'manage_pss' and cluster.inventory["rbac"]["admission"] != "pss" or \
         cluster.context.get('initial_procedure') == 'manage_psp' and cluster.inventory["rbac"]["admission"] != "psp":
-        raise Exception("Procedure config and cluster config are inconsistent. Please check 'admission' option")
+        raise Exception(ERROR_INCONSISTENT_INVENTORIES)

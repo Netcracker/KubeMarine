@@ -13,15 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import itertools
+import json
 import random
 import re
 import unittest
 from copy import deepcopy
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
+
+import yaml
 
 from kubemarine import kubernetes
 from kubemarine.core import errors, utils as kutils, static, flow
-from kubemarine.procedures import upgrade
+from kubemarine.procedures import upgrade, install
 from kubemarine import demo
 from test.unit import utils
 
@@ -661,6 +664,161 @@ class InventoryRecreation(unittest.TestCase):
             ['plugins."io.containerd.grpc.v1.cri"']['sandbox_image']
         self.assertEqual('B', actual_image,
                          "Containerd config was not redefined in recreated inventory.")
+
+
+class RunTasks(unittest.TestCase):
+    def setUpVersions(self, old: str, new: str):
+        self.old = old
+        self.new = new
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.inventory['services']['kubeadm'] = {
+            'kubernetesVersion': old
+        }
+        self.nodes_context = demo.generate_nodes_context(self.inventory)
+        self.upgrade = demo.generate_procedure_inventory('upgrade')
+        self.upgrade['upgrade_plan'] = [new]
+
+        self.fake_shell = demo.FakeShell()
+        self.fake_fs = demo.FakeFS()
+
+    def _run_tasks(self, tasks_filter: str) -> demo.FakeResources:
+        context = demo.create_silent_context(['fake_path.yaml', '--tasks', tasks_filter], procedure='upgrade')
+
+        resources = demo.FakeResources(context, self.inventory,
+                                       procedure_inventory=self.upgrade, nodes_context=self.nodes_context,
+                                       fake_shell=self.fake_shell, fake_fs=self.fake_fs)
+
+        kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'master', 'control-plane'})]
+        with utils.mock_call(kubernetes.autodetect_non_upgraded_nodes, return_value=kubernetes_nodes):
+            flow.run_actions(resources, [upgrade.UpgradeAction(self.new, True)])
+
+        return resources
+
+    def _run_kubernetes_task(self) -> demo.FakeResources:
+        with utils.mock_call(kubernetes.upgrade_first_control_plane), \
+                utils.mock_call(install.deploy_coredns), \
+                utils.mock_call(kubernetes.upgrade_other_control_planes), \
+                utils.mock_call(kubernetes.upgrade_workers), \
+                utils.mock_call(upgrade.kubernetes_cleanup_nodes_versions):
+            return self._run_tasks('kubernetes')
+
+    def _stub_load_configmap(self, configmap: str, data: dict) -> None:
+        first_control_plane = self._first_control_plane()['address']
+        results = demo.create_hosts_result([first_control_plane], stdout=json.dumps(data))
+        cmd = f'kubectl get configmap -n kube-system {configmap} -o json'
+        self.fake_shell.add(results, 'sudo', [cmd])
+
+    def _get_nodes(self, roles: Set[str]) -> List[dict]:
+        return [node for node in self.inventory['nodes'] if set(node['roles']) & roles]
+
+    def _first_control_plane(self) -> dict:
+        return self._get_nodes({'master', 'control-plane'})[0]
+
+    def test_kubernetes_preconfigure_apiserver_feature_gates_if_necessary(self):
+        for old, new, expected_called in (
+                ('v1.26.11', 'v1.27.8', False),
+                ('v1.27.8', 'v1.28.4', True),
+                ('v1.28.3', 'v1.28.4', False),
+        ):
+            with self.subTest(f"old: {old}, new: {new}"), \
+                    utils.mock_call(kubernetes.components.reconfigure_components) as run:
+                self.setUpVersions(old, new)
+                self.inventory.setdefault('rbac', {}).update({
+                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
+                })
+
+                res = self._run_kubernetes_task()
+
+                actual_called = run.called and 'kube-apiserver' in run.call_args[1]['components']
+
+                self.assertEqual(expected_called, actual_called,
+                                 f"kube-apiserver was {'not' if expected_called else 'unexpectedly'} preconfigured")
+
+                apiserver_extra_args = res.last_cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+                feature_gates_expected = 'PodSecurity=true' if kutils.version_key(new)[:2] < (1, 28) else None
+                self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'),
+                                 "Unexpected apiserver extra args")
+
+    def test_kubernetes_preconfigure_apiserver_feature_gates_edit_func(self):
+        for custom_feature_gates in ('ServiceAccountIssuerDiscovery=true', None):
+            with self.subTest(f"custom feature-gates: {bool(custom_feature_gates)}"), \
+                    utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
+                    utils.mock_call(kubernetes.components._reconfigure_control_plane_components), \
+                    utils.mock_call(kubernetes.components._update_configmap, return_value=True):
+                self.setUpVersions('v1.27.8', 'v1.28.4')
+                self.inventory.setdefault('rbac', {}).update({
+                    'admission': 'pss', 'pss': {'pod-security': 'enabled'}
+                })
+                initial_feature_gates = 'PodSecurity=true'
+                if custom_feature_gates:
+                    self.inventory['services']['kubeadm'].update({'apiServer': {'extraArgs': {'feature-gates': custom_feature_gates}}})
+                    initial_feature_gates = custom_feature_gates + ',' + initial_feature_gates
+
+                self._stub_load_configmap('kubeadm-config', {'data': {'ClusterConfiguration': yaml.dump({
+                    'kind': 'ClusterConfiguration',
+                    'kubernetesVersion': self.old,
+                    'apiServer': {'extraArgs': {'feature-gates': initial_feature_gates}}
+                })}})
+                self._run_kubernetes_task()
+
+                upload_config = self.fake_fs.read(self._first_control_plane()['address'], '/etc/kubernetes/upload-config.yaml')
+                cluster_config = next(filter(lambda cfg: cfg['kind'] == 'ClusterConfiguration', yaml.safe_load_all(upload_config)))
+
+                actual_extra_args = cluster_config['apiServer']['extraArgs']
+                self.assertEqual(custom_feature_gates, actual_extra_args.get('feature-gates'),
+                                 "Unexpected preconfigured kube-apiserver feature gates")
+
+                self.assertEqual(self.old, cluster_config['kubernetesVersion'],
+                                 "Kubernetes version should not change during preconfiguring of kube-apiserver")
+
+    def test_kubernetes_preconfigure_kube_proxy_conntrack_min_if_necessary(self):
+        for old, new, expected_called in (
+                ('v1.27.8', 'v1.28.4', False),
+                ('v1.28.4', 'v1.29.1', True),
+        ):
+            with self.subTest(f"old: {old}, new: {new}"), \
+                    utils.mock_call(kubernetes.components.reconfigure_components) as run:
+                self.setUpVersions(old, new)
+
+                res = self._run_kubernetes_task()
+
+                actual_called = run.called and 'kube-proxy' in run.call_args[1]['components']
+
+                self.assertEqual(expected_called, actual_called,
+                                 f"kube-proxy was {'not' if expected_called else 'unexpectedly'} preconfigured")
+
+                conntrack_min_actual = res.last_cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min')
+                conntrack_min_expected = None if kutils.version_key(new)[:2] < (1, 29) else 1000000
+                self.assertEqual(conntrack_min_expected, conntrack_min_actual,
+                                 "Unexpected kubeadm_kube-proxy.conntrack.min")
+
+    def test_kubernetes_preconfigure_kube_proxy_conntrack_min_edit_func(self):
+        with utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
+                utils.mock_call(kubernetes.components._reconfigure_node_components), \
+                utils.mock_call(kubernetes.components._update_configmap, return_value=True), \
+                utils.mock_call(kubernetes.components._kube_proxy_configmap_uploader) as kube_proxy_uploader:
+            self.setUpVersions('v1.28.4', 'v1.29.1')
+
+            self._stub_load_configmap('kube-proxy', {'data': {'config.conf': yaml.dump({
+                'kind': 'KubeProxyConfiguration',
+                'conntrack': {'min': None}
+            })}})
+            self._run_kubernetes_task()
+
+            self.assertTrue(kube_proxy_uploader.called, "kube-proxy ConfigMap was not updated")
+
+            kubeadm_config: kubernetes.components.KubeadmConfig = kube_proxy_uploader.call_args[0][1]
+
+            self.assertTrue(kubeadm_config.is_loaded('kube-proxy'), "kube-proxy ConfigMap should already be loaded")
+
+            conntrack_min_actual = kubeadm_config.maps['kube-proxy'].get('conntrack', {}).get('min')
+            self.assertEqual(1000000, conntrack_min_actual,
+                             "Unexpected preconfigured kube-proxy conntrack.min")
+
+            conntrack_min_actual = yaml.safe_load(kubeadm_config.loaded_maps['kube-proxy'].obj['data']['config.conf'])\
+                .get('conntrack', {}).get('min')
+            self.assertEqual(1000000, conntrack_min_actual,
+                             "Unexpected preconfigured kube-proxy conntrack.min")
 
 
 if __name__ == '__main__':

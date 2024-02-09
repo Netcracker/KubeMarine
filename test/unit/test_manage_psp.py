@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import re
 import unittest
 from copy import deepcopy
 
-from kubemarine import demo
-from kubemarine.core import errors
+from kubemarine import demo, plugins, admission
+from kubemarine.core import errors, flow
+from kubemarine.kubernetes import components
+from kubemarine.procedures import manage_psp
+from test.unit import utils as test_utils
 
 
 class EnrichmentValidation(unittest.TestCase):
@@ -82,6 +85,109 @@ class EnrichmentValidation(unittest.TestCase):
                 'name': 'custom'
             }
         }
+
+    def test_inconsistent_config(self):
+        self.inventory['rbac']['admission'] = 'pss'
+        with self.assertRaisesRegex(Exception, re.escape(admission.ERROR_INCONSISTENT_INVENTORIES)):
+            self._create_cluster()
+
+
+class EnrichmentAndFinalization(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.24.11'
+        self.inventory['rbac'] = {
+            'admission': 'psp',
+            'psp': {
+                'pod-security': 'enabled',
+            }
+        }
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='manage_psp')
+        self.manage_psp = demo.generate_procedure_inventory('manage_psp')
+
+    def _create_cluster(self):
+        return demo.new_cluster(self.inventory, procedure_inventory=self.manage_psp,
+                                context=self.context)
+
+    def test_change_psp_state(self):
+        for target_state_enabled in (False, True):
+            target_state = 'enabled' if target_state_enabled else 'disabled'
+            previous_state = 'disabled' if target_state_enabled else 'enabled'
+            with self.subTest(f"Target state: {target_state}"):
+                self.inventory['rbac']['psp']['pod-security'] = previous_state
+                self.manage_psp['psp']['pod-security'] = target_state
+
+                admission_plugins_expected = 'NodeRestriction'
+                if target_state_enabled:
+                    admission_plugins_expected += ',PodSecurityPolicy'
+
+                cluster = self._create_cluster()
+                apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
+
+                self.assertEqual(target_state, cluster.inventory['rbac']['psp']['pod-security'])
+                self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
+
+                test_utils.stub_associations_packages(cluster, {})
+                finalized_inventory = test_utils.make_finalized_inventory(cluster)
+                apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
+
+                self.assertEqual(target_state, finalized_inventory['rbac']['psp']['pod-security'])
+                self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
+
+                final_inventory = test_utils.get_final_inventory(cluster, self.inventory)
+                apiserver_extra_args = final_inventory['services'].get('kubeadm', {}).get('apiServer', {}).get('extraArgs', {})
+
+                self.assertEqual(target_state, final_inventory['rbac']['psp']['pod-security'])
+                self.assertEqual(None, apiserver_extra_args.get('enable-admission-plugins'))
+
+
+class RunTasks(unittest.TestCase):
+    def setUp(self):
+        self.inventory = demo.generate_inventory(**demo.ALLINONE)
+        self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.24.11'
+        self.inventory['rbac'] = {
+            'admission': 'psp',
+            'psp': {
+                'pod-security': 'enabled',
+            }
+        }
+        self.manage_psp = demo.generate_procedure_inventory('manage_psp')
+
+    def _run_tasks(self, tasks_filter: str) -> demo.FakeResources:
+        context = demo.create_silent_context(
+            ['fake.yaml', '--tasks', tasks_filter], procedure='manage_psp')
+
+        nodes_context = demo.generate_nodes_context(self.inventory)
+        resources = demo.FakeResources(context, self.inventory,
+                                       procedure_inventory=self.manage_psp, nodes_context=nodes_context)
+        flow.run_actions(resources, [manage_psp.PSPAction()])
+        return resources
+
+    def test_reconfigure_plugin_disable_psp(self):
+        self.inventory['rbac']['psp']['pod-security'] = 'enabled'
+        self.manage_psp['psp']['pod-security'] = 'disabled'
+        with test_utils.mock_call(components._prepare_nodes_to_reconfigure_components), \
+                test_utils.mock_call(components._reconfigure_control_plane_component, return_value=True) as reconfigure_control_plane, \
+                test_utils.mock_call(components._update_configmap, return_value=True), \
+                test_utils.mock_call(components._restart_containers) as restart_containers, \
+                test_utils.mock_call(plugins.expect_pods) as expect_pods:
+            res = self._run_tasks('reconfigure_plugin')
+
+            self.assertTrue(reconfigure_control_plane.called,
+                            "There should be a successful attempt to reconfigure kube-apiserver")
+
+            self.assertTrue(restart_containers.called)
+            self.assertEqual(['kube-apiserver'], restart_containers.call_args[0][2],
+                             "kube-apiserver should be restarted")
+
+            self.assertTrue(expect_pods.called)
+            self.assertEqual(['kube-apiserver'], expect_pods.call_args[0][1],
+                             "kube-apiserver pods should be waited for")
+
+            admission_plugins_expected = 'NodeRestriction'
+            apiserver_extra_args = res.last_cluster.inventory['services']['kubeadm']['apiServer']['extraArgs']
+            self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'),
+                             "Unexpected apiserver extra args")
 
 
 if __name__ == '__main__':

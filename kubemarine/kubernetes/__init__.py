@@ -43,6 +43,7 @@ ERROR_NOT_LATEST_PATCH='New version \"%s\" is not the latest supported patch ver
 
 ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE = "%s patch can be uploaded only to control-plane or worker nodes"
 ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded only to control-plane nodes"
+ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET = "Patches for kubelet are not supported in Kubernetes {version}"
 
 
 def add_node_enrichment(inventory: dict, cluster: KubernetesCluster, procedure_inventory: dict = None) -> dict:
@@ -216,7 +217,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for control_plane_item, patches in inventory["services"]["kubeadm_patches"].items():
         for patch in patches:
             if control_plane_item == 'kubelet' and not components.kubelet_supports_patches(cluster):
-                raise Exception(f"Patches for kubelet are not supported in Kubernetes {kubeadm['kubernetesVersion']}")
+                raise Exception(ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(version=kubeadm['kubernetesVersion']))
 
             if 'nodes' not in patch:
                 continue
