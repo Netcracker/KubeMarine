@@ -78,19 +78,22 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+def _get_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory['upgrade_plan']:
+        for version in procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
-            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("plugins", {})))
+            upgrade_plan.append((version, procedure_inventory.get(version, {}).get("plugins", {})))
 
     elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_plugin' in context:
-        upgrade_plugins = cluster.procedure_inventory.get('upgrade', {}).get("plugins", {})
+        upgrade_plugins = procedure_inventory.get('upgrade', {}).get("plugins", {})
         upgrade_plugins = dict(item for item in upgrade_plugins.items()
                                if item[0] == context['upgrading_plugin'])
         upgrade_plan = [("", upgrade_plugins)]
@@ -159,12 +162,14 @@ def verify_image_redefined(plugin_name: str, previous_version: str, next_version
             )
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory)
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory, procedure_inventory)
 
 
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    upgrade_plan = _get_upgrade_plan(cluster)
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+    upgrade_plan = _get_upgrade_plan(cluster, procedure_inventory)
     if not upgrade_plan:
         return inventory
 

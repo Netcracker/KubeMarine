@@ -98,22 +98,26 @@ def enrich_inventory_apply_defaults(inventory: dict, _: KubernetesCluster) -> di
     return inventory
 
 
-def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict) -> List[Tuple[str, dict]]:
+def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict,
+                                   procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory['upgrade_plan']:
+        for version in procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
-            upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
+            upgrade_associations = procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
             upgrade_associations = dict(item for item in upgrade_associations.items()
                                         if item[0] in _get_system_packages_support_upgrade(inventory))
             upgrade_plan.append((version, upgrade_associations))
 
     elif context.get("initial_procedure") == "migrate_kubemarine" and "upgrading_package" in context:
-        upgrade_associations = cluster.procedure_inventory.get('upgrade', {}).get("packages", {}).get("associations", {})
+        upgrade_associations = procedure_inventory.get('upgrade', {}).get("packages", {}).get("associations", {})
         upgrade_associations = dict(item for item in upgrade_associations.items()
                                     if item[0] == context["upgrading_package"])
         upgrade_plan = [("", upgrade_associations)]
@@ -153,10 +157,13 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
     return inventory
 
 
-def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
+def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None,
                                    *, enrich_global: bool) -> None:
     # pass enriched 'cluster.inventory' instead of 'inventory' that is being finalized
-    upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory)
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
+    upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory, procedure_inventory)
     if not upgrade_plan:
         return
 
@@ -165,13 +172,16 @@ def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
                                              enrich_global=enrich_global)
 
 
-def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> None:
+def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> None:
     if cluster.context.get("initial_procedure") != "upgrade":
         return
 
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     upgrade_version = cluster.context["upgrade_version"]
     for _type in ['install', 'upgrade', 'remove']:
-        packages_section = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
+        packages_section = procedure_inventory.get(upgrade_version, {}).get("packages", {})
         upgrade_packages = packages_section.get(_type)
         if upgrade_packages is None:
             continue
@@ -309,20 +319,20 @@ def enrich_inventory_include_all(inventory: dict, _: KubernetesCluster) -> dict:
     return inventory
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
     # Despite we enrich OS specific section inside enrich_upgrade_inventory(),
     # we still merge global associations section because it has priority during enrichment.
-    upgrade_inventory_associations(cluster, inventory, enrich_global=True)
-    upgrade_inventory_packages(cluster, inventory)
+    upgrade_inventory_associations(cluster, inventory, procedure_inventory, enrich_global=True)
+    upgrade_inventory_packages(cluster, inventory, procedure_inventory)
 
     return inventory
 
 
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
 
-    procedure_associations = cluster.procedure_inventory.get("packages", {}).get("associations", {})
+    procedure_associations = procedure_inventory.get("packages", {}).get("associations", {})
     # Despite we enrich OS specific section inside enrich_migrate_cri_inventory(),
     # we still merge global associations section because it has priority during enrichment.
     return _enrich_inventory_procedure_associations(cluster, inventory, procedure_associations,

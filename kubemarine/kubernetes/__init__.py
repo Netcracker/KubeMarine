@@ -54,12 +54,15 @@ def kube_proxy_overwrites_higher_system_values(cluster: KubernetesCluster) -> bo
     return utils.version_key(kubernetes_version)[0:2] >= utils.minor_version_key("v1.29")
 
 
-def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+def add_node_enrichment(inventory: dict, cluster: KubernetesCluster, procedure_inventory: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
 
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     # adding role "new_node" for all specified new nodes and putting these nodes to all "nodes" list
-    for new_node in cluster.procedure_inventory.get("nodes", []):
+    for new_node in procedure_inventory.get("nodes", []):
         # deepcopy is necessary, otherwise role append will happen in procedure_inventory too
         node = deepcopy(new_node)
         node["roles"].append("add_node")
@@ -74,12 +77,15 @@ def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster,  procedure_inventory: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory
 
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     # adding role "remove_node" for all specified nodes
-    node_names_to_remove = [node['name'] for node in cluster.procedure_inventory.get("nodes", [])]
+    node_names_to_remove = [node['name'] for node in procedure_inventory.get("nodes", [])]
     for node_remove in node_names_to_remove:
         for i, node in enumerate(inventory['nodes']):
             # Inventory is not compiled at this step.
