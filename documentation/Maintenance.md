@@ -1043,11 +1043,7 @@ services:
           heartbeat-interval: "1000"
           election-timeout: "10000"
   kubeadm_kubelet:
-    readOnlyPort: 0
     protectKernelDefaults: true
-    podPidsLimit: 2048
-    maxPods: 100
-    cgroupDriver: systemd
   kubeadm_kube-proxy:
     conntrack:
       min: 1000000
@@ -1122,8 +1118,12 @@ To **additionally** write new certificate, pass the desirable extra SANs in `ser
 
 **Basic flow**:
 
-If the procedure affects the particular Kubernetes component, the component is reconfigured on each relevant node one by one.
-The flow proceeds to the next nodes only after the component is considered up and ready on the reconfigured node.
+If the procedure affects the particular set of Kubernetes components, all the components are reconfigured on each relevant node one by one.
+The flow proceeds to the next nodes only after the affected components are considered up and ready on the reconfigured node.
+Control plane nodes are reconfigured first.
+
+Working `kube-apiserver` is not required to reconfigure control plane components (more specifically, to change their static manifests),
+but required to reconfigure kubelet and kube-proxy.
 
 ### Reconfigure Procedure Tasks Tree
 

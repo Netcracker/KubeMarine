@@ -108,6 +108,10 @@ CONFIGMAPS_CONSTANTS = {
 
 
 CONTROL_PLANE_COMPONENTS = ["kube-apiserver", "kube-scheduler", "kube-controller-manager", "etcd"]
+CONTROL_PLANE_SPECIFIC_COMPONENTS = ['kube-apiserver/cert-sans'] + CONTROL_PLANE_COMPONENTS
+NODE_COMPONENTS = ["kubelet", "kube-proxy"]
+ALL_COMPONENTS = CONTROL_PLANE_SPECIFIC_COMPONENTS + NODE_COMPONENTS
+COMPONENTS_SUPPORT_PATCHES = CONTROL_PLANE_COMPONENTS + ['kubelet']
 
 
 class KubeadmConfig:
@@ -289,6 +293,8 @@ def reconfigure_components(group: NodeGroup, components: List[str],
                            force_restart: bool = False) -> None:
     """
     Reconfigure the specified `components` on `group` of nodes.
+    Control-plane nodes are reconfigured first.
+    The cluster is not required to be working to update control plane manifests.
 
     :param group: nodes to reconfigure components on
     :param components: List of control plane components or `kube-proxy`, or `kubelet` to reconfigure.
@@ -298,22 +304,38 @@ def reconfigure_components(group: NodeGroup, components: List[str],
                            This implies necessity of working API server.
     :param force_restart: Restart the given `components` even if nothing has changed in their configuration.
     """
+    not_supported = list(set(components) - set(ALL_COMPONENTS))
+    if not_supported:
+        raise Exception(f"Reconfiguration of {not_supported} components is currently not supported")
+
     if edit_functions is None:
         edit_functions = {}
 
     cluster: KubernetesCluster = group.cluster
     logger = cluster.log
-    control_plane = cluster.nodes['control-plane'].get_first_member()
+
+    control_planes = (cluster.nodes['control-plane']
+                      .intersection_group(group))
+    workers = (cluster.make_group_from_roles(['worker'])
+               .exclude_group(control_planes)
+               .intersection_group(group))
+
+    group = control_planes.include_group(workers)
+    if group.is_empty():
+        logger.debug("No Kubernetes nodes to reconfigure components")
+        return
+
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
+    if not control_planes.is_empty():
+        first_control_plane = control_planes.get_first_member()
 
     timestamp = utils.get_current_timestamp_formatted()
     backup_dir = '/etc/kubernetes/tmp/kubemarine-backup-' + timestamp
     logger.debug(f"Using backup directory {backup_dir}")
 
-    logger.debug("Uploading cluster config to first control plane...")
-
     kubeadm_config = KubeadmConfig(cluster)
     for configmap, func in edit_functions.items():
-        kubeadm_config.load(configmap, control_plane, func)
+        kubeadm_config.load(configmap, first_control_plane, func)
 
     # This configuration will be used for `kubeadm init phase upload-config` phase.
     # InitConfiguration is necessary to specify patches directory.
@@ -321,25 +343,67 @@ def reconfigure_components(group: NodeGroup, components: List[str],
     # Patches are used to upload KubeletConfiguration for some reason (which is likely a gap)
     # https://github.com/kubernetes/kubernetes/issues/123090
     upload_config = '/etc/kubernetes/upload-config.yaml'
-    _upload_config(cluster, control_plane, kubeadm_config, upload_config)
+    upload_config_uploaded = False
 
-    control_plane_components = [
-        c for c in components
-        if c in ('kube-apiserver/cert-sans', 'kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd')]
+    def prepare_upload_config() -> None:
+        nonlocal upload_config_uploaded
+        if upload_config_uploaded:
+            return
 
-    # Firstly reconfigure components that do not require working API server
-    if control_plane_components:
-        if _reconfigure_control_plane_components(cluster, group, control_plane_components, force_restart,
-                                                 kubeadm_config, backup_dir):
-            _update_configmap(cluster, control_plane, 'kubeadm-config',
-                              _configmap_init_phase_uploader('kubeadm-config', upload_config),
-                              backup_dir)
+        logger.debug(f"Uploading cluster config to control plane: {first_control_plane.get_node_name()}")
+        _upload_config(cluster, first_control_plane, kubeadm_config, upload_config)
 
-    node_components = [c for c in components if c in ('kubelet', 'kube-proxy')]
+        upload_config_uploaded = True
 
-    if node_components:
-        _reconfigure_node_components(cluster, group, node_components, force_restart, control_plane,
-                                     upload_config, kubeadm_config, backup_dir)
+    # This configuration will be generated for control plane nodes,
+    # and will be used to `kubeadm init phase control-plane / etcd / certs`.
+    reconfigure_config = '/etc/kubernetes/reconfigure-config.yaml'
+
+    _prepare_nodes_to_reconfigure_components(cluster, group, components,
+                                             kubeadm_config, reconfigure_config, backup_dir)
+
+    kubeadm_config_updated = False
+    kubelet_config_updated = False
+    kube_proxy_config_updated = False
+    kube_proxy_changed = False
+    for node in (control_planes.get_ordered_members_list() + workers.get_ordered_members_list()):
+        _components = _choose_components(node, components)
+        if not _components:
+            continue
+
+        # Firstly reconfigure components that do not require working API server
+        control_plane_components = list(OrderedSet[str](_components) & set(CONTROL_PLANE_SPECIFIC_COMPONENTS))
+        if control_plane_components:
+            _reconfigure_control_plane_components(cluster, node, control_plane_components, force_restart,
+                                                  reconfigure_config, backup_dir)
+
+            # Upload kubeadm-config after control plane components are successfully reconfigured on the first node.
+            if not kubeadm_config_updated:
+                prepare_upload_config()
+                _update_configmap(cluster, first_control_plane, 'kubeadm-config',
+                                  _configmap_init_phase_uploader('kubeadm-config', upload_config),
+                                  backup_dir)
+                kubeadm_config_updated = True
+
+        node_components = list(OrderedSet[str](_components) & set(NODE_COMPONENTS))
+        if node_components:
+            if 'kubelet' in node_components and not kubelet_config_updated:
+                prepare_upload_config()
+                _update_configmap(cluster, first_control_plane, 'kubelet-config',
+                                  _configmap_init_phase_uploader('kubelet-config', upload_config),
+                                  backup_dir)
+
+                kubelet_config_updated = True
+
+            if 'kube-proxy' in node_components and not kube_proxy_config_updated:
+                kube_proxy_changed = _update_configmap(cluster, first_control_plane, 'kube-proxy',
+                                                       _kube_proxy_configmap_uploader(cluster, kubeadm_config),
+                                                       backup_dir)
+
+                kube_proxy_config_updated = True
+
+            _reconfigure_node_components(cluster, node, node_components, force_restart, first_control_plane,
+                                         kube_proxy_changed, backup_dir)
 
 
 def restart_components(group: NodeGroup, components: List[str]) -> None:
@@ -350,12 +414,14 @@ def restart_components(group: NodeGroup, components: List[str]) -> None:
     :param group: nodes to restart components on
     :param components: Kubernetes components to restart
     """
+    not_supported = list(set(components) - set(CONTROL_PLANE_COMPONENTS))
+    if not_supported:
+        raise Exception(f"Restart of {not_supported} components is currently not supported")
+
     cluster: KubernetesCluster = group.cluster
 
     for node in group.get_ordered_members_list():
-        is_control_plane = 'control-plane' in node.get_config()['roles']
-        _components = [c for c in components if is_control_plane and c in CONTROL_PLANE_COMPONENTS]
-
+        _components = _choose_components(node, components)
         _restart_containers(cluster, node, _components)
         wait_for_pods(node, _components)
 
@@ -369,8 +435,13 @@ def wait_for_pods(group: NodeGroup, components: Sequence[str] = None) -> None:
     :param group: nodes to wait pods on
     :param components: Kubernetes components to wait for.
     """
-    if components is not None and len(components) == 0:
-        return
+    if components is not None:
+        if len(components) == 0:
+            return
+
+        not_supported = list(set(components) - set(CONTROL_PLANE_COMPONENTS) - {'kube-proxy'})
+        if not_supported:
+            raise Exception(f"Reconfiguration of {not_supported} components is currently not supported")
 
     cluster: KubernetesCluster = group.cluster
     first_control_plane = cluster.nodes['all'].get_first_member()
@@ -386,12 +457,7 @@ def wait_for_pods(group: NodeGroup, components: Sequence[str] = None) -> None:
         else:
             _components = ['kube-proxy']
             if is_control_plane:
-                _components.extend([
-                    'kube-apiserver',
-                    'kube-controller-manager',
-                    'kube-scheduler',
-                    'etcd'
-                ])
+                _components.extend(CONTROL_PLANE_COMPONENTS)
 
         control_plane = node
         if not is_control_plane:
@@ -408,7 +474,7 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
     cluster.log.verbose(f"Create and upload kubeadm patches to %s..." % node.get_node_name())
     node.sudo("mkdir -p /etc/kubernetes/patches")
     defer = node.new_defer()
-    for component in ('kube-apiserver', 'kube-scheduler', 'kube-controller-manager', 'etcd', 'kubelet'):
+    for component in COMPONENTS_SUPPORT_PATCHES:
         _create_kubeadm_patches_for_component_on_node(cluster, defer, component)
 
     defer.flush()
@@ -497,67 +563,73 @@ def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: K
     return upload
 
 
-def _reconfigure_control_plane_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],
-                                          force_restart: bool,
-                                          kubeadm_config: KubeadmConfig, backup_dir: str) -> bool:
+def _choose_components(node: AbstractGroup[RunResult], components: List[str]) -> List[str]:
+    is_control_plane = 'control-plane' in node.get_config()['roles']
+
+    return [c for c in components if c in NODE_COMPONENTS
+            or is_control_plane and c in CONTROL_PLANE_SPECIFIC_COMPONENTS]
+
+
+def _prepare_nodes_to_reconfigure_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],
+                                             kubeadm_config: KubeadmConfig,
+                                             reconfigure_config: str, backup_dir: str) -> None:
     logger = cluster.log
+    defer = group.new_defer()
+    for node in defer.get_ordered_members_list():
+        _components = _choose_components(node, components)
+        if not _components:
+            continue
 
-    candidate_group = cluster.nodes['control-plane']
-    group = group.intersection_group(candidate_group)
+        if set(_components) & set(CONTROL_PLANE_SPECIFIC_COMPONENTS):
+            logger.debug(f"Uploading config for control plane components on node: {node.get_node_name()}")
+            _upload_config(cluster, node, kubeadm_config, reconfigure_config)
 
-    if group.is_empty():
-        logger.debug("No control plane nodes to reconfigure control plane components")
-        return False
+        if set(_components) & set(COMPONENTS_SUPPORT_PATCHES):
+            node.sudo("mkdir -p /etc/kubernetes/patches")
+            node.sudo(f'mkdir -p {backup_dir}/patches')
 
-    reconfigure_config = '/etc/kubernetes/reconfigure-config.yaml'
+        if set(_components) & set(CONTROL_PLANE_COMPONENTS):
+            node.sudo(f'mkdir -p {backup_dir}/manifests')
 
-    patch_group = group.new_defer()
-    for defer in patch_group.get_ordered_members_list():
-        logger.debug(f"Uploading config for control plane components on node: {defer.get_node_name()}")
-        _upload_config(cluster, defer, kubeadm_config, reconfigure_config)
-
-        if components != ['kube-apiserver/cert-sans']:
-            defer.sudo("mkdir -p /etc/kubernetes/patches")
-            defer.sudo(f'mkdir -p {backup_dir}/patches')
-            defer.sudo(f'mkdir -p {backup_dir}/manifests')
-
-        for component in components:
-            if component == 'kube-apiserver/cert-sans':
+        for component in _components:
+            if component not in COMPONENTS_SUPPORT_PATCHES:
                 continue
 
-            _create_kubeadm_patches_for_component_on_node(cluster, defer, component, backup_dir)
+            _create_kubeadm_patches_for_component_on_node(cluster, node, component, backup_dir)
 
-    patch_group.flush()
+    defer.flush()
 
-    for node in group.get_ordered_members_list():
-        logger.debug(f"Reconfiguring control plane components {components} on node: {node.get_node_name()}")
 
-        defer = node.new_defer()
+def _reconfigure_control_plane_components(cluster: KubernetesCluster, node: NodeGroup, components: List[str],
+                                          force_restart: bool,
+                                          reconfigure_config: str, backup_dir: str) -> None:
+    logger = cluster.log
+    logger.debug(f"Reconfiguring control plane components {components} on node: {node.get_node_name()}")
 
-        containers_restart = OrderedSet[str]()
-        pods_wait = OrderedSet[str]()
-        for component in components:
-            if component == 'kube-apiserver/cert-sans':
-                _reconfigure_apiserver_certsans(defer, reconfigure_config, backup_dir)
-                containers_restart.add('kube-apiserver')
-                pods_wait.add('kube-apiserver')
-                continue
+    defer = node.new_defer()
 
-            # Let's anyway wait for pods as the component may be broken due to previous runs.
-            pods_wait.add(component)
-            if (_reconfigure_control_plane_component(cluster, defer, component, reconfigure_config, backup_dir)
-                    or force_restart):
-                containers_restart.add(component)
-            else:
-                # Manifest file may be changed in formatting but not in meaningful content.
-                # Kubelet is not observed to restart the container in this case, neither will we.
-                pass
+    containers_restart = OrderedSet[str]()
+    pods_wait = OrderedSet[str]()
+    for component in components:
+        if component == 'kube-apiserver/cert-sans':
+            _reconfigure_apiserver_certsans(defer, reconfigure_config, backup_dir)
+            containers_restart.add('kube-apiserver')
+            pods_wait.add('kube-apiserver')
+            continue
 
-        defer.flush()
-        _restart_containers(cluster, node, containers_restart)
-        wait_for_pods(node, pods_wait)
+        # Let's anyway wait for pods as the component may be broken due to previous runs.
+        pods_wait.add(component)
+        if (_reconfigure_control_plane_component(cluster, defer, component, reconfigure_config, backup_dir)
+                or force_restart):
+            containers_restart.add(component)
+        else:
+            # Manifest file may be changed in formatting but not in meaningful content.
+            # Kubelet is not observed to restart the container in this case, neither will we.
+            pass
 
-    return True
+    defer.flush()
+    _restart_containers(cluster, node, containers_restart)
+    wait_for_pods(node, pods_wait)
 
 
 def _reconfigure_apiserver_certsans(node: DeferredGroup, reconfigure_config: str, backup_dir: str) -> None:
@@ -597,78 +669,43 @@ def _reconfigure_control_plane_component(cluster: KubernetesCluster, node: Defer
                            fromfile=backup_file, tofile=manifest)
 
 
-def _reconfigure_node_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],
+def _reconfigure_node_components(cluster: KubernetesCluster, node: NodeGroup, components: List[str],
                                  force_restart: bool, control_plane: NodeGroup,
-                                 upload_config: str, kubeadm_config: KubeadmConfig, backup_dir: str) -> None:
+                                 kube_proxy_changed: bool, backup_dir: str) -> None:
     logger = cluster.log
 
-    control_planes = (cluster.nodes['control-plane']
-                      .intersection_group(group))
-    workers = (cluster.make_group_from_roles(['worker'])
-               .exclude_group(control_planes)
-               .intersection_group(group))
-
-    nodes = workers.get_ordered_members_list() + control_planes.get_ordered_members_list()
-
-    if not nodes:
-        logger.debug("No Kubernetes nodes to reconfigure components")
-        return
+    is_control_plane = 'control-plane' in node.get_config()['roles']
+    kube_proxy_restart = kube_proxy_changed or force_restart
+    containers_restart = OrderedSet[str]()
+    pods_wait = OrderedSet[str]()
+    if 'kube-proxy' in components:
+        pods_wait.add('kube-proxy')
 
     if 'kubelet' in components:
-        patch_group = (workers.include_group(control_planes)
-                       .include_group(control_plane)  # first control plane will be used to upload config
-                       .new_defer())
+        logger.debug(f"Reconfiguring kubelet on node: {node.get_node_name()}")
 
-        for defer in patch_group.get_ordered_members_list():
-            defer.sudo("mkdir -p /etc/kubernetes/patches")
-            defer.sudo(f'mkdir -p {backup_dir}/patches')
-            _create_kubeadm_patches_for_component_on_node(cluster, defer, 'kubelet', backup_dir)
+        pods_wait.add('kube-proxy')
+        if is_control_plane:
+            pods_wait.update(CONTROL_PLANE_COMPONENTS)
 
-        patch_group.flush()
-
-        _update_configmap(cluster, control_plane, 'kubelet-config',
-                          _configmap_init_phase_uploader('kubelet-config', upload_config),
-                          backup_dir)
-
-    kube_proxy_changed = False
-    if 'kube-proxy' in components:
-        kube_proxy_changed = _update_configmap(cluster, control_plane, 'kube-proxy',
-                                               _kube_proxy_configmap_uploader(cluster, kubeadm_config),
-                                               backup_dir)
-
-    for node in nodes:
-        is_control_plane = 'control-plane' in node.get_config()['roles']
-        kube_proxy_restart = kube_proxy_changed or force_restart
-        containers_restart = OrderedSet[str]()
-        pods_wait = OrderedSet[str]()
-        if 'kube-proxy' in components:
-            pods_wait.add('kube-proxy')
-
-        if 'kubelet' in components:
-            logger.debug(f"Reconfiguring kubelet on node: {node.get_node_name()}")
-
-            pods_wait.add('kube-proxy')
+        defer = node.new_defer()
+        if _reconfigure_kubelet(cluster, defer, backup_dir) or force_restart:
+            system.restart_service(defer, 'kubelet')
+            # It is not clear how to check that kubelet is healthy.
+            # Let's restart and check health of all components.
+            kube_proxy_restart = True
             if is_control_plane:
-                pods_wait.update(CONTROL_PLANE_COMPONENTS)
+                # No need to manually kill container for kube-proxy. It is restarted as soon as pod is deleted.
+                containers_restart.update(CONTROL_PLANE_COMPONENTS)
 
-            defer = node.new_defer()
-            if _reconfigure_kubelet(cluster, defer, backup_dir) or force_restart:
-                system.restart_service(defer, 'kubelet')
-                # It is not clear how to check that kubelet is healthy.
-                # Let's restart and check health of all components.
-                kube_proxy_restart = True
-                if is_control_plane:
-                    # No need to manually kill container for kube-proxy. It is restarted as soon as pod is deleted.
-                    containers_restart.update(CONTROL_PLANE_COMPONENTS)
+        defer.flush()
 
-            defer.flush()
+    # Delete pod for 'kube-proxy' early while 'kube-apiserver' is expected to be available.
+    if kube_proxy_restart:
+        _delete_pods(cluster, node, control_plane, ['kube-proxy'])
 
-        # Delete pod for 'kube-proxy' early while 'kube-apiserver' is expected to be available.
-        if kube_proxy_restart:
-            _delete_pods(cluster, node, control_plane, ['kube-proxy'])
-
-        _restart_containers(cluster, node, containers_restart)
-        wait_for_pods(node, pods_wait)
+    _restart_containers(cluster, node, containers_restart)
+    wait_for_pods(node, pods_wait)
 
 
 def _reconfigure_kubelet(cluster: KubernetesCluster, node: DeferredGroup,
