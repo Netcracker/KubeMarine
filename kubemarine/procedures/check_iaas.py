@@ -20,6 +20,7 @@ import random
 import re
 import sys
 import uuid
+import string
 from collections import OrderedDict
 import time
 from contextlib import contextmanager, nullcontext, AbstractContextManager
@@ -1240,6 +1241,121 @@ def vips_connectivity(cluster: KubernetesCluster) -> None:
         tc.success(results='Connected')
 
 
+def ipip_connectivity(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '017', 'Network', 'IP in IP Encapsulation', default_results='Connected') as tc,\
+            suspend_firewalld(cluster):
+
+        skipped_msgs = nodes_require_python(cluster)
+        failed_nodes: Set[str] = set()
+
+        # Check encapsulation for 'Calico' CNI
+        if not cluster.inventory['plugins']['calico']['install']:
+            skipped_msgs.append("Calico is not set as CNI for the cluster")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+
+        # Check encapsulation for clusters with two or more nodes
+        group = cluster.make_group_from_roles(['control-plane', 'worker'])
+        if group.nodes_amount() == 1:
+            skipped_msgs.append("Too few nodes, check is skipped")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+
+        enc_type = cluster.inventory['plugins']['calico']['mode']
+        if enc_type == "ipip":
+            # Check if IPv6 addresses are used
+            connect_to_ip = group.get_ordered_members_configs_list()[0]['internal_address']
+            if type(ipaddress.ip_address(connect_to_ip)) is not ipaddress.IPv4Address:
+                skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
+                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+            ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
+            if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
+                skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
+                raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+            failed_nodes = check_ipip_tunnel(group)
+        else:
+            skipped_msgs.append("Encapsulation IPIP is disabled")
+            raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
+
+        if failed_nodes:
+            raise TestFailure(f"Check firewall settings, IP in IP traffic is not allowed between nodes.",
+                              hint='\n'.join(failed_nodes))
+
+
+def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
+
+    group_to_rollback = group
+    cluster = group.cluster
+
+    # Copy binaries to the nodes
+    random_port = str(random.randint(50000, 65535))
+    failed_nodes: Set[str] = set()
+    recv_cmd: Dict[str, str] = {}
+    trns_cmd: Dict[str, str] = {}
+
+    binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check.gz')
+    ipip_check = "/tmp/%s" % uuid.uuid4().hex
+    # Random message
+    random.seed()
+    msg = ''.join(random.choices(string.ascii_letters + string.digits, k=15))
+    # Random IP from class E
+    int_ip = random.randint(4026531841, 4294967294)
+    fake_addr = str(ipaddress.IPv4Address(int_ip))
+    # That is used as number of packets for transmitter
+    timeout = int(cluster.inventory['globals']['timeout_download'])
+    for node in group.get_ordered_members_configs_list():
+        host = node['internal_address']
+        # Transmitter start command
+        # Transmitter starts first and sends IPIP packets every 1 second until the timeout comes or
+        # the process is killed by terminating command
+        trns_item_cmd: List[str] = []
+        for node_item in group.get_ordered_members_configs_list():
+            if node_item['internal_address'] != host:
+                trns_item_cmd.append(f"nohup {ipip_check} -mode client -src {host} -int {fake_addr} "
+                                     f"-ext {node_item['internal_address']} -dport {random_port} "
+                                     f"-msg {msg} -timeout {timeout} > /dev/null 2>&1 & echo $! >> {ipip_check}.pid")
+        trns_cmd[host] = '& sudo '.join(trns_item_cmd)
+        # Receiver start command
+        # Receiver starts after the transmitter and try to get IPIP packets within 3 seconds from eache node
+        recv_cmd[host] = f"{ipip_check} -mode server -ext {host} -int {fake_addr} -dport {random_port} " \
+                         f"-msg {msg} -timeout 3 2> /dev/null"
+
+    try:
+        collector = CollectorCallback(group.cluster)
+        cluster.log.debug("Copy binaries to the nodes")
+        group.put(binary_check_path, f"{ipip_check}.gz")
+        group.sudo(f"gzip -d {ipip_check}.gz")
+        group.sudo(f"sudo chmod +x {ipip_check}")
+        # Run transmitters
+        cluster.log.debug("Run transmitters")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{trns_cmd[host_int]}")
+        # Run receivers and get results
+        cluster.log.debug("Run receivers")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                host_int = node_exe.get_config()['internal_address']
+                node_exe.sudo(f"{recv_cmd[host_int]}", warn=True, callback=collector)
+
+        for host, item in collector.result.items():
+            node_name = cluster.get_node_name(host)
+            item_list: Set[str] = set()
+            if len(item.stdout) > 0:
+                for log_item in item.stdout.split("\n")[:-1]:
+                    item_list.add(log_item)
+            for node in group.get_ordered_members_configs_list():
+                if node['internal_address'] not in item_list and node['connect_to'] != host:
+                    failed_nodes.add(f"{node['name']} -> {node_name}")
+
+        return failed_nodes
+    finally:
+        # Delete binaries ang logs
+        cluster.log.debug("Delete binaries")
+        with group_to_rollback.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                node_exe.sudo(f"pkill -9 -P $(cat {ipip_check}.pid | xargs | tr ' ' ','); " \
+                              f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
+
 def make_reports(context: dict) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
         context['testsuite'].save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
@@ -1262,6 +1378,7 @@ tasks = OrderedDict({
         'service_subnet_connectivity': service_subnet_connectivity,
         'ports_connectivity': ports_connectivity,
         'vips_connectivity': vips_connectivity,
+        'ipip_connectivity': ipip_connectivity,
     },
     'hardware': {
         'members_amount': {

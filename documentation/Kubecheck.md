@@ -27,6 +27,7 @@ This section provides information about the Kubecheck functionality.
       - [010 ServiceSubnet](#010-servicesubnet)
       - [011 TCP & UDP Ports](#011-tcp--udp-ports)
       - [016 VRRP IPs](#016-vrrp-ips)
+      - [017 IP in IP Encapsulation](#017-ip-in-ip-encapsulation)
     - [012 Thirdparties Availability](#012-thirdparties-availability)
     - [013 Package Repositories](#013-package-repositories)
     - [014 Package Availability](#014-package-availability)
@@ -322,6 +323,12 @@ This test checks the connectivity between nodes for the predefined set of ports 
 *Task*: `network.vips_connectivity`
 
 This test checks the connectivity between nodes and the VRRP IPs when they are assigned to the balancer nodes.
+
+##### 017 IP in IP Encapsulation 
+
+*Task*: `network.ipip_connectivity`
+
+This test checks the connectivity between nodes by IP in IP encapsulation.
 
 ##### 012 Thirdparties Availability
 
