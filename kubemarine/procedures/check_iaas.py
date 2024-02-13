@@ -1291,7 +1291,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     recv_cmd: Dict[str, str] = {}
     trns_cmd: Dict[str, str] = {}
 
-    binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check')
+    binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check.gz')
     ipip_check = "/tmp/%s" % uuid.uuid4().hex
     # Random message
     random.seed()
@@ -1321,7 +1321,8 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     try:
         collector = CollectorCallback(group.cluster)
         cluster.log.debug("Copy binaries to the nodes")
-        group.put(binary_check_path, ipip_check)
+        group.put(binary_check_path, f"{ipip_check}.gz")
+        group.sudo(f"gzip -d {ipip_check}.gz")
         group.sudo(f"sudo chmod +x {ipip_check}")
         # Run transmitters
         cluster.log.debug("Run transmitters")
@@ -1349,10 +1350,10 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
         return failed_nodes
     finally:
         # Delete binaries ang logs
-        cluster.log.debug("Delete binaries and logs")
+        cluster.log.debug("Delete binaries")
         with group_to_rollback.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
-                node_exe.sudo(f"pkill -9 -P $(cat {ipip_check}.pid | xargs | tr ' ' ',') && " \
+                node_exe.sudo(f"pkill -9 -P $(cat {ipip_check}.pid | xargs | tr ' ' ','); " \
                               f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
 
 def make_reports(context: dict) -> None:

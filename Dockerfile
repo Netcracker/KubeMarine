@@ -8,7 +8,8 @@ WORKDIR /opt
 COPY ./kubemarine/resources/scripts/source/ipip_check ./
 
 RUN go mod download && \
-    GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false
+    GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false && \
+    gzip ipip_check
 
 FROM python:3.12-slim-bullseye AS python-build
 
@@ -20,7 +21,7 @@ ENV PYTHONUNBUFFERED 1
 ENV ANSIBLE_HOST_KEY_CHECKING False
 
 COPY . /opt/kubemarine/
-COPY --from=go-build /opt/ipip_check /opt/kubemarine/kubemarine/resources/scripts/
+COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \

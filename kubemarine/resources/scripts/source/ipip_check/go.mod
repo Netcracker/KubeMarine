@@ -1,4 +1,4 @@
-module code.google.com/p/gopacket
+module ipip_check
 
 go 1.19
 
