@@ -978,12 +978,14 @@ This procedure is aimed to reconfigure the cluster.
 It is supposed to reconfigure the cluster as a generalized concept described by the inventory file.
 Though, currently the procedure supports to reconfigure only Kubeadm-managed settings.
 If you are looking for how to reconfigure other settings, consider the following:
-* Probably some other [maintenance procedure](#provided-procedures) can do the task.
-* Some [installation tasks](Installation.md#tasks-list-redefinition) can reconfigure some system settings without full redeploy of the cluster.
+
+- Probably some other [maintenance procedure](#provided-procedures) can do the task.
+- Some [installation tasks](Installation.md#tasks-list-redefinition) can reconfigure some system settings without full redeploy of the cluster.
 
 **Basic prerequisites**:
-* Make sure to follow the [Basics](#basics).
-* Before starting the procedure, consider making a backup. For more information, see the section [Backup Procedure](#backup-procedure).
+
+- Make sure to follow the [Basics](#basics).
+- Before starting the procedure, consider making a backup. For more information, see the section [Backup Procedure](#backup-procedure).
 
 ### Reconfigure Procedure Parameters
 
@@ -996,20 +998,22 @@ For more information, see [Validation by JSON Schemas](Installation.md#inventory
 #### Reconfigure Kubeadm
 
 The following Kubeadm-managed sections can be reconfigured:
-* `services.kubeadm.apiServer`
-* `services.kubeadm.apiServer.certSANs`
-* `services.kubeadm.scheduler`
-* `services.kubeadm.controllerManager`
-* `services.kubeadm.etcd.local.extraArgs`
-* `services.kubeadm_kubelet`
-* `services.kubeadm_kube-proxy`
-* `services.kubeadm_patches`
+
+- `services.kubeadm.apiServer`
+- `services.kubeadm.apiServer.certSANs`
+- `services.kubeadm.scheduler`
+- `services.kubeadm.controllerManager`
+- `services.kubeadm.etcd.local.extraArgs`
+- `services.kubeadm_kubelet`
+- `services.kubeadm_kube-proxy`
+- `services.kubeadm_patches`
 
 For more information, refer to the description of these sections:
-* [kubeadm](Installation.md#kubeadm)
-* [kubeadm_kubelet](Installation.md#kubeadm_kubelet)
-* [kubeadm_kube-proxy](Installation.md#kubeadm_kube-proxy)
-* [kubeadm_patches](Installation.md#kubeadm_patches)
+
+- [kubeadm](Installation.md#kubeadm)
+- [kubeadm_kubelet](Installation.md#kubeadm_kubelet)
+- [kubeadm_kube-proxy](Installation.md#kubeadm_kube-proxy)
+- [kubeadm_patches](Installation.md#kubeadm_patches)
 
 Example of procedure inventory that reconfigures all the supported sections:
 
@@ -1081,6 +1085,7 @@ services:
         patch:
           maxPods: 200
 ```
+
 </details>
 
 The above configuration is merged with the corresponding sections in the main `cluster.yaml`,
@@ -1110,9 +1115,9 @@ To **additionally** write new certificate, pass the desirable extra SANs in `ser
 
 **Restrictions**:
 
-* Very few options of `services.kubeadm_kubelet` section can be reconfigured currently.
+- Very few options of `services.kubeadm_kubelet` section can be reconfigured currently.
   To learn exact set of options, refer to the JSON schema.
-* Some properties cannot be fully redefined.
+- Some properties cannot be fully redefined.
   For example, this relates to some settings in `services.kubeadm.apiServer`.
   For details, refer to the description of the corresponding sections in the installation guide.
 
@@ -1129,9 +1134,9 @@ but required to reconfigure kubelet and kube-proxy.
 
 The `reconfigure` procedure executes the following sequence of tasks:
 
-* deploy
-  * kubernetes
-    * reconfigure
+- deploy
+  - kubernetes
+    - reconfigure
 
 ## Manage PSP Procedure
 
