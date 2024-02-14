@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 from collections import OrderedDict
 from typing import List
 
@@ -67,7 +65,8 @@ def remove_kubernetes_nodes(cluster: KubernetesCluster) -> None:
     kubernetes.schedule_running_nodes_report(cluster)
 
 
-def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                                   procedure_inventory_for_finalization: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory_to_finalize
 
@@ -76,7 +75,7 @@ def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_fina
     is_finalization = any('remove_node' in node['roles'] for node in inventory_to_finalize['nodes'])
 
     if not is_finalization:
-        kubernetes.remove_node_enrichment(inventory_to_finalize, cluster)
+        kubernetes.remove_node_enrichment(inventory_to_finalize, cluster, procedure_inventory_for_finalization)
 
     # Do not remove VRRP IPs and do not change their assigned hosts.
     # If the assigned host does not exist or is not a balancer, it will be just skipped.

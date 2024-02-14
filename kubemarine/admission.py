@@ -175,10 +175,11 @@ def verify_version(owner: str, version: str, kubernetes_version: str) -> None:
             raise Exception("%s version must not be higher than Kubernetes version" % owner)
 
 
-def finalize_inventory_psp(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def finalize_inventory_psp(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                           procedure_inventory_for_finalization: dict) -> dict:
     if cluster.context.get('initial_procedure') != 'manage_psp':
         return inventory_to_finalize
-    procedure_config = cluster.procedure_inventory["psp"]
+    procedure_config = procedure_inventory_for_finalization["psp"]
 
     if "rbac" not in inventory_to_finalize:
         inventory_to_finalize["rbac"] = {}
@@ -794,21 +795,23 @@ def update_kubeadm_configmap_pss(first_control_plane: NodeGroup, target_state: s
     return final_feature_list
 
 
-def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                       procedure_inventory_for_finalization: dict) -> dict:
     admission_impl = cluster.inventory['rbac']['admission']
 
     if admission_impl == "psp":
-        return finalize_inventory_psp(cluster, inventory_to_finalize)
+        return finalize_inventory_psp(cluster, inventory_to_finalize, procedure_inventory_for_finalization)
     elif admission_impl == "pss":
-        return finalize_inventory_pss(cluster, inventory_to_finalize)
+        return finalize_inventory_pss(cluster, inventory_to_finalize, procedure_inventory_for_finalization)
 
     return inventory_to_finalize
 
 
-def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                           procedure_inventory_for_finalization: dict) -> dict:
     if cluster.context.get('initial_procedure') != 'manage_pss':
         return inventory_to_finalize
-    procedure_config = cluster.procedure_inventory["pss"]
+    procedure_config = procedure_inventory_for_finalization["pss"]
 
     current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("pss", {})
 

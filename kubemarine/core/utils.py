@@ -173,7 +173,7 @@ def get_current_timestamp_formatted() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
+def get_final_inventory(c: object, initial_inventory: dict = None, procedure_initial_inventory: dict = None) -> dict:
     from kubemarine.core.cluster import KubernetesCluster
     cluster = cast(KubernetesCluster, c)
 
@@ -182,18 +182,23 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     else:
         inventory = deepcopy(initial_inventory)
 
+    if procedure_initial_inventory is None:
+        procedure_inventory = deepcopy(cluster.procedure_inventory)
+    else:
+        procedure_inventory = deepcopy(procedure_initial_inventory)
+
     from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
     from kubemarine.core import defaults
     from kubemarine.cri import containerd
     from kubemarine.plugins import nginx_ingress
     from kubemarine.procedures import add_node, remove_node
 
-    inventory_finalize_functions = [
+    inventory_finalize_functions: List[Callable[[KubernetesCluster, dict, dict], dict]] = [
         add_node.add_node_finalize_inventory,
-        lambda cluster, inventory: defaults.calculate_node_names(inventory, cluster),
+        lambda cluster, inventory, _: defaults.calculate_node_names(inventory, cluster),
         remove_node.remove_node_finalize_inventory,
-        kubernetes.restore_finalize_inventory,
-        kubernetes.upgrade_finalize_inventory,
+        lambda cluster, inventory, _: kubernetes.restore_finalize_inventory(cluster, inventory),
+        lambda cluster, inventory, _: kubernetes.upgrade_finalize_inventory(cluster, inventory),
         thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         thirdparties.migrate_cri_finalize_inventory,
@@ -207,7 +212,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     ]
 
     for finalize_fn in inventory_finalize_functions:
-        inventory = finalize_fn(cluster, inventory)
+        inventory = finalize_fn(cluster, inventory, procedure_inventory)
 
     return inventory
 

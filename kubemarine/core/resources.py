@@ -40,6 +40,7 @@ class DynamicResources:
         self._raw_inventory: Optional[dict] = None
         self._formatted_inventory: Optional[dict] = None
         self._procedure_inventory: Optional[dict] = None
+        self._formatted_procedure_inventory: Optional[dict] = None
 
         self._nodes_context: Optional[dict] = None
         """
@@ -91,9 +92,12 @@ class DynamicResources:
         """
         if self._procedure_inventory is None:
             if self.procedure_inventory_filepath:
-                self._procedure_inventory = utils.load_yaml(self.procedure_inventory_filepath)
+                data = utils.read_external(self.procedure_inventory_filepath)
+                self._procedure_inventory = yaml.safe_load(data)
+                self._formatted_procedure_inventory = utils.yaml_structure_preserver().load(data)
             if not self._procedure_inventory:
                 self._procedure_inventory = {}
+                self._formatted_procedure_inventory = {}
 
         return self._procedure_inventory
 
@@ -116,7 +120,8 @@ class DynamicResources:
             utils.do_fail("Failed to load inventory file", exc, logger=logger)
 
     def make_final_inventory(self) -> None:
-        self._formatted_inventory = utils.get_final_inventory(self.cluster(), initial_inventory=self.formatted_inventory())
+        self._formatted_inventory = utils.get_final_inventory(self.cluster(),initial_inventory=self.formatted_inventory(),
+                                                              procedure_initial_inventory=self._formatted_procedure_inventory)
 
     def recreate_inventory(self) -> None:
         """
