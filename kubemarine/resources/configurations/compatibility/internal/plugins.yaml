@@ -101,7 +101,7 @@ nginx-ingress-controller:
     version: v1.9.4
     webhook-version: v20231011-8b53cabe0
   v1.28.6:
-    version: v1.9.4
+    version: v1.9.5
     webhook-version: v20231011-8b53cabe0
   v1.29.1:
     version: v1.9.5

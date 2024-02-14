@@ -127,7 +127,7 @@ compatibility_map:
     crictl: v1.28.0
   v1.28.6:
     calico: v3.27.0
-    nginx-ingress-controller: v1.9.4
+    nginx-ingress-controller: v1.9.5
     kubernetes-dashboard: v2.7.0
     local-path-provisioner: v0.0.26
     crictl: v1.29.0
