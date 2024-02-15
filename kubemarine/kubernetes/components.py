@@ -444,7 +444,7 @@ def wait_for_pods(group: NodeGroup, components: Sequence[str] = None) -> None:
             raise Exception(f"Reconfiguration of {not_supported} components is currently not supported")
 
     cluster: KubernetesCluster = group.cluster
-    first_control_plane = cluster.nodes['all'].get_first_member()
+    first_control_plane = cluster.nodes['control-plane'].get_first_member()
     expect_config = cluster.inventory['globals']['expect']['pods']['kubernetes']
 
     for node in group.get_ordered_members_list():
