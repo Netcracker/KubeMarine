@@ -16,6 +16,10 @@ from kubemarine.core.group import NodeConfig, NodeGroup, DeferredGroup, Collecto
 from kubemarine.core.yaml_merger import override_merger
 from kubemarine.kubernetes.object import KubernetesObject
 
+ERROR_WAIT_FOR_PODS_NOT_SUPPORTED = "Waiting for pods of {components} components is currently not supported"
+ERROR_RESTART_NOT_SUPPORTED = "Restart of {components} components is currently not supported"
+ERROR_RECONFIGURE_NOT_SUPPORTED = "Reconfiguration of {components} components is currently not supported"
+
 COMPONENTS_CONSTANTS: dict = {
     'kube-apiserver/cert-sans': {
         'sections': [
@@ -304,9 +308,9 @@ def reconfigure_components(group: NodeGroup, components: List[str],
                            This implies necessity of working API server.
     :param force_restart: Restart the given `components` even if nothing has changed in their configuration.
     """
-    not_supported = list(set(components) - set(ALL_COMPONENTS))
+    not_supported = list(OrderedSet[str](components) - set(ALL_COMPONENTS))
     if not_supported:
-        raise Exception(f"Reconfiguration of {not_supported} components is currently not supported")
+        raise Exception(ERROR_RECONFIGURE_NOT_SUPPORTED.format(components=not_supported))
 
     if edit_functions is None:
         edit_functions = {}
@@ -414,9 +418,9 @@ def restart_components(group: NodeGroup, components: List[str]) -> None:
     :param group: nodes to restart components on
     :param components: Kubernetes components to restart
     """
-    not_supported = list(set(components) - set(CONTROL_PLANE_COMPONENTS))
+    not_supported = list(OrderedSet[str](components) - set(CONTROL_PLANE_COMPONENTS))
     if not_supported:
-        raise Exception(f"Restart of {not_supported} components is currently not supported")
+        raise Exception(ERROR_RESTART_NOT_SUPPORTED.format(components=not_supported))
 
     cluster: KubernetesCluster = group.cluster
 
@@ -436,12 +440,12 @@ def wait_for_pods(group: NodeGroup, components: Sequence[str] = None) -> None:
     :param components: Kubernetes components to wait for.
     """
     if components is not None:
-        if len(components) == 0:
+        if not components:
             return
 
-        not_supported = list(set(components) - set(CONTROL_PLANE_COMPONENTS) - {'kube-proxy'})
+        not_supported = list(OrderedSet[str](components) - set(CONTROL_PLANE_COMPONENTS) - {'kube-proxy'})
         if not_supported:
-            raise Exception(f"Reconfiguration of {not_supported} components is currently not supported")
+            raise Exception(ERROR_WAIT_FOR_PODS_NOT_SUPPORTED.format(components=not_supported))
 
     cluster: KubernetesCluster = group.cluster
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
@@ -458,6 +462,10 @@ def wait_for_pods(group: NodeGroup, components: Sequence[str] = None) -> None:
             _components = ['kube-proxy']
             if is_control_plane:
                 _components.extend(CONTROL_PLANE_COMPONENTS)
+
+        _components = _choose_components(node, _components)
+        if not _components:
+            continue
 
         control_plane = node
         if not is_control_plane:
@@ -564,10 +572,10 @@ def _kube_proxy_configmap_uploader(cluster: KubernetesCluster, kubeadm_config: K
 
 
 def _choose_components(node: AbstractGroup[RunResult], components: List[str]) -> List[str]:
-    is_control_plane = 'control-plane' in node.get_config()['roles']
+    roles = node.get_config()['roles']
 
-    return [c for c in components if c in NODE_COMPONENTS
-            or is_control_plane and c in CONTROL_PLANE_SPECIFIC_COMPONENTS]
+    return [c for c in components if c in NODE_COMPONENTS and set(roles) & {'control-plane', 'worker'}
+            or 'control-plane' in roles and c in CONTROL_PLANE_SPECIFIC_COMPONENTS]
 
 
 def _prepare_nodes_to_reconfigure_components(cluster: KubernetesCluster, group: NodeGroup, components: List[str],

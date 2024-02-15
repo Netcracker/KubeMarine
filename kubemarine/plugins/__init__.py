@@ -48,6 +48,8 @@ from kubemarine.kubernetes.statefulset import StatefulSet
 oob_plugins = list(static.DEFAULTS["plugins"].keys())
 LOADED_MODULES: Dict[str, ModuleType] = {}
 
+ERROR_PODS_NOT_READY = 'In the expected time, the pods did not become ready'
+
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for plugin_name, plugin_item in inventory["plugins"].items():
@@ -509,7 +511,7 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
             cluster.log.debug(running_pods_stdout)
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the pods did not become ready')
+    raise Exception(ERROR_PODS_NOT_READY)
 
 
 def is_critical_state_in_stdout(cluster: KubernetesCluster, stdout: str) -> bool:
