@@ -167,11 +167,13 @@ class RunTasks(unittest.TestCase):
         self.inventory['rbac']['psp']['pod-security'] = 'enabled'
         self.manage_psp['psp']['pod-security'] = 'disabled'
         with test_utils.mock_call(components._prepare_nodes_to_reconfigure_components), \
+                test_utils.mock_call(admission.delete_privileged_policy), \
+                test_utils.mock_call(admission.manage_policies), \
                 test_utils.mock_call(components._reconfigure_control_plane_component, return_value=True) as reconfigure_control_plane, \
                 test_utils.mock_call(components._update_configmap, return_value=True), \
                 test_utils.mock_call(components._restart_containers) as restart_containers, \
                 test_utils.mock_call(plugins.expect_pods) as expect_pods:
-            res = self._run_tasks('reconfigure_plugin')
+            res = self._run_tasks('reconfigure_psp')
 
             self.assertTrue(reconfigure_control_plane.called,
                             "There should be a successful attempt to reconfigure kube-apiserver")

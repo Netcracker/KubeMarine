@@ -290,7 +290,19 @@ def add_custom_task(cluster: KubernetesCluster) -> None:
                       manage_scope=cluster.procedure_inventory["psp"]["add-policies"])
 
 
-def reconfigure_oob_task(cluster: KubernetesCluster) -> None:
+def reconfigure_psp_task(cluster: KubernetesCluster) -> None:
+    if is_security_enabled(cluster.inventory):
+        reconfigure_oob_policies(cluster)
+        reconfigure_plugin(cluster)
+    else:
+        # If target state is disabled, firstly remove PodSecurityPolicy admission plugin thus disabling the security.
+        # It is necessary because while security on one control-plane is disabled,
+        # it is still enabled on the other control-planes, and the policies should still work.
+        reconfigure_plugin(cluster)
+        reconfigure_oob_policies(cluster)
+
+
+def reconfigure_oob_policies(cluster: KubernetesCluster) -> None:
     target_security_state = cluster.procedure_inventory["psp"].get("pod-security")
     oob_policies = cluster.procedure_inventory["psp"].get("oob-policies")
 
@@ -320,7 +332,7 @@ def reconfigure_oob_task(cluster: KubernetesCluster) -> None:
     first_control_plane.call(manage_policies, manage_type="apply", manage_scope=resolve_oob_scope(policies_to_recreate, "all"))
 
 
-def reconfigure_plugin_task(cluster: KubernetesCluster) -> None:
+def reconfigure_plugin(cluster: KubernetesCluster) -> None:
     target_state = cluster.procedure_inventory["psp"].get("pod-security")
 
     if not target_state:

@@ -25,8 +25,7 @@ from kubemarine.core.resources import DynamicResources
 tasks = OrderedDict({
     "delete_custom": admission.delete_custom_task,
     "add_custom": admission.add_custom_task,
-    "reconfigure_oob": admission.reconfigure_oob_task,
-    "reconfigure_plugin": admission.reconfigure_plugin_task,
+    "reconfigure_psp": admission.reconfigure_psp_task,
     "restart_pods": admission.restart_pods_task
 })
 

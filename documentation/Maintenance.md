@@ -1202,9 +1202,8 @@ The `manage_psp` procedure executes the following sequence of tasks:
 
 1. delete_custom
 2. add_custom
-3. reconfigure_oob
-4. reconfigure_plugin
-5. restart_pods
+3. reconfigure_psp
+4. restart_pods
 
 ## Manage PSS Procedure
 
