@@ -182,7 +182,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
         for k8s_version, expected_num_resources in (
             (self.k8s_1_24_x, 0),
             (self.k8s_1_25_x, 9),
-            (self.k8s_1_28_x, 10),
+            (self.k8s_1_28_x, 9),
             (self.k8s_latest, 9)
         ):
             with self.subTest(k8s_version):
