@@ -884,7 +884,13 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
     control_plane = cluster.nodes['control-plane'].get_first_member()
     kubeadm_config = KubeadmConfig(cluster)
 
-    if configmap == 'kubelet-config' and kubeadm_extended_dryrun(cluster):
+    if configmap == 'kubelet-config':
+        # Do not check kubelet-config ConfigMap, because some properties may be deleted from KubeletConfiguration
+        # if set to default, for example readOnlyPort: 0, protectKernelDefaults: false
+        # Otherwise, the check would require to take into account all such default properties.
+        if not kubeadm_extended_dryrun(cluster):
+            return None
+
         # Use upload-config kubelet --dry-run to catch all inserted/updated/deleted properties.
 
         temp_config = "/tmp/%s" % uuid.uuid4().hex
@@ -931,11 +937,6 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
 
         generated_config = kubeadm_config.merge_with_inventory(configmap)\
                 (deepcopy(stored_config))
-
-        if configmap == 'kubelet-config':
-            # readOnlyPort: 0 is default value that can be omitted for some reason
-            generated_config.setdefault('readOnlyPort', 0)
-            stored_config.setdefault('readOnlyPort', 0)
 
         if generated_config == stored_config:
             return None
