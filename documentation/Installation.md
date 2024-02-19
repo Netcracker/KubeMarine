@@ -1063,8 +1063,8 @@ vrrp_ips:
 #### maintenance type
 
 Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
-The following example discribes the type of traffic that applicable for particular IP 
-in [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
+The following example describes the type of traffic that is applicable for a particular IP 
+in the [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) configuration. (`not bind` specifies that the IP receives neither TCP nor HTTP traffic):
 
 ```yaml
 vrrp_ips:
