@@ -148,11 +148,14 @@ def enrich_reconfigure_inventory(inventory: dict, cluster: KubernetesCluster) ->
     return reconfigure_finalize_inventory(cluster, inventory)
 
 
-def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     if cluster.context.get("initial_procedure") != "reconfigure":
         return inventory
 
-    kubeadm_sections = {s: v for s, v in cluster.procedure_inventory.get('services', {}).items()
+    kubeadm_sections = {s: v for s, v in procedure_inventory.get('services', {}).items()
                         if s in ('kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches')}
 
     if kubeadm_sections:
