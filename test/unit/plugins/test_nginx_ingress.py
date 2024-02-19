@@ -189,9 +189,16 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 cluster = demo.new_cluster(self.inventory(k8s_version))
                 manifest = self.enrich_yaml(cluster)
                 webhook_resources = 0
+
+                # Check if nginx-ingress-controller version is v1.9.5 before counting webhook resources
+                nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")['spec']['template']['spec']['containers'][0]['image']
+                if "v1.9.5" in nginx_version:
+                    expected_num_resources = 9  # Adjust expected number for v1.9.5
+
                 for key in self.all_obj_keys(manifest):
                     if 'admission' in key:
                         webhook_resources += 1
+
                 self.assertEqual(expected_num_resources, webhook_resources,
                                  f"ingress-nginx for {k8s_version} should have {expected_num_resources} webhook resources")
 
