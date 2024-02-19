@@ -139,8 +139,8 @@ class CriUpgradeAction(Action):
             else:
                 kubernetes.wait_uncordon(node)
 
+            kubernetes.components.wait_for_pods(node)
             if not workers:
-                kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
                 etcd.wait_for_health(cluster, node)
 
     def associations_changed(self, res: DynamicResources) -> bool:

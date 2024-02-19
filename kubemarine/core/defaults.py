@@ -41,6 +41,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.enrich_restore_inventory",
     "kubemarine.core.defaults.compile_inventory",
     "kubemarine.core.defaults.manage_primitive_values",
+    "kubemarine.kubernetes.enrich_reconfigure_inventory",
     "kubemarine.plugins.enrich_upgrade_inventory",
     "kubemarine.packages.enrich_inventory",
     "kubemarine.packages.enrich_upgrade_inventory",

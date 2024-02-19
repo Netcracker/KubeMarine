@@ -104,9 +104,19 @@ class FakeShell:
         :param args: Required command arguments
         :return: Boolean
         """
+        return self.called_times(host, do_type, args) > 0
+
+    def called_times(self, host: str, do_type: str, args: List[str]) -> int:
+        """
+        Returns number of times the specified command was executed in FakeShell for the specified connection.
+        :param host: host to check, for which the desirable command should have been executed.
+        :param do_type: The type of required command
+        :param args: Required command arguments
+        :return: number of calls
+        """
         found_entries = self.history_find(host, do_type, args)
         total_used_times: int = sum(found_entry['used_times'] for found_entry in found_entries)
-        return total_used_times > 0
+        return total_used_times
 
 
 class FakeFS:

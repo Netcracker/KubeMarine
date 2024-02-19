@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import difflib
 import hashlib
 import io
 import ipaddress
@@ -22,7 +23,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -170,7 +171,7 @@ def make_ansible_inventory(location: str, c: object) -> None:
 
 
 def get_current_timestamp_formatted() -> str:
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 
 def get_final_inventory(c: object, initial_inventory: dict = None, procedure_initial_inventory: dict = None) -> dict:
@@ -199,6 +200,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None, procedure_ini
         remove_node.remove_node_finalize_inventory,
         lambda cluster, inventory, _: kubernetes.restore_finalize_inventory(cluster, inventory),
         lambda cluster, inventory, _: kubernetes.upgrade_finalize_inventory(cluster, inventory),
+        kubernetes.reconfigure_finalize_inventory,
         thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         thirdparties.migrate_cri_finalize_inventory,
@@ -275,26 +277,13 @@ def get_dump_filepath(context: dict, filename: str) -> str:
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(g: object, command: str,
-                            retries: int = 15, timeout: int = 5,
-                            warn: bool = True, hide: bool = False) -> None:
-    from kubemarine.core.group import NodeGroup
-    group = cast(NodeGroup, g)
-
-    log = group.cluster.log
-
+def wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
+                            retries: int, timeout: int) -> None:
     while retries > 0:
-        log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide)
-        if hide:
-            log.verbose(result)
-            for host in result.get_failed_hosts_list():
-                stderr = result[host].stderr.rstrip('\n')
-                if stderr:
-                    log.debug(f"{host}: {stderr}")
-
-        if not result.is_any_failed():
-            log.debug("Command succeeded")
+        logger.debug("Waiting for command to succeed, %s retries left" % retries)
+        result = attempt()
+        if result:
+            logger.debug("Command succeeded")
             return
         retries = retries - 1
         time.sleep(timeout)
@@ -490,6 +479,25 @@ def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
     # Extra transformation to JSON is necessary,
     # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
     logger.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+
+
+def get_unified_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    diff = list(difflib.unified_diff(
+        old.splitlines(), new.splitlines(),
+        fromfile=fromfile, tofile=tofile,
+        lineterm=''))
+
+    if diff:
+        return '\n'.join(diff)
+
+    return None
+
+
+def get_yaml_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    if yaml.safe_load(old) == yaml.safe_load(new):
+        return None
+
+    return get_unified_diff(old, new, fromfile, tofile)
 
 
 def isipv(address: str, versions: List[int]) -> bool:

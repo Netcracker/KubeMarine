@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "services": {
+      "type": "object",
+      "description": "Configure settings of different services",
+      "properties": {
+        "kubeadm_kubelet": {
+          "type": "object",
+          "description": "Override the original settings for the kubelet",
+          "properties": {
+            "protectKernelDefaults": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/ProtectKernelDefaults"},
+            "serializeImagePulls": {"$ref": "definitions/services/kubeadm_kubelet.json#/definitions/SerializeImagePulls"}
+          },
+          "additionalProperties": false
+        },
+        "kubeadm_kube-proxy": {
+          "type": "object",
+          "description": "Override the original settings for the kube-proxy",
+          "allOf": [{"$ref": "definitions/services/kubeadm_kube-proxy.json#/definitions/PayloadProperties"}],
+          "propertyNames": {
+            "not": {"enum": ["apiVersion", "kind"]}
+          }
+        },
+        "kubeadm_patches": {
+          "$ref": "definitions/services/kubeadm_patches.json"
+        },
+        "kubeadm": {
+          "type": "object",
+          "description": "Override the original settings for the kubeadm",
+          "properties": {
+            "apiServer": {
+              "$ref": "definitions/services/kubeadm.json#/definitions/ApiServer"
+            },
+            "scheduler": {
+              "$ref": "definitions/services/kubeadm.json#/definitions/Scheduler"
+            },
+            "controllerManager": {
+              "$ref": "definitions/services/kubeadm.json#/definitions/ControllerManager"
+            },
+            "etcd": {
+              "type": "object",
+              "properties": {
+                "local": {
+                  "type": "object",
+                  "properties": {
+                    "extraArgs": {
+                      "$ref": "definitions/services/kubeadm.json#/definitions/ExtraArgs"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

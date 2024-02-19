@@ -23,9 +23,7 @@ from kubemarine.core.action import Action
 from kubemarine.core.resources import DynamicResources
 
 tasks = OrderedDict({
-    "check_inventory": admission.check_inventory,
-    "delete_default_pss": admission.delete_default_pss,
-    "apply_default_pss": admission.apply_default_pss,
+    "manage_pss": admission.manage_pss,
     "restart_pods": admission.restart_pods_task
 })
 

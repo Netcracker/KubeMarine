@@ -27,7 +27,7 @@ from typing import (
 from kubemarine.core import utils, log, errors
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult,
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult, UnexpectedExit,
 )
 
 NodeConfig = Dict[str, Any]
@@ -709,6 +709,62 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
 
         executor = RawExecutor(self.cluster)
         return executor.wait_for_boot(self.get_hosts(), timeout, initial_boot_history)
+
+    def wait_command_successful(self, command: str,
+                                *,
+                                retries: int = 15, timeout: int = 5,
+                                hide: bool = False) -> None:
+        logger = self.cluster.log
+
+        def attempt() -> bool:
+            result = self.sudo(command, warn=True, hide=hide)
+            if hide:
+                logger.verbose(result)
+                for host in result.get_failed_hosts_list():
+                    stderr = result[host].stderr.rstrip('\n')
+                    if stderr:
+                        logger.debug(f"{host}: {stderr}")
+
+            return not result.is_any_failed()
+
+        utils.wait_command_successful(logger, attempt, retries, timeout)
+
+    def wait_commands_successful(self, commands: List[str],
+                                 *,
+                                 retries: int = 15, timeout: int = 5,
+                                 sudo: bool = True) -> None:
+        if len(self.nodes) != 1:
+            raise Exception("Waiting for few commands is currently supported only for single node")
+
+        logger = self.cluster.log
+        remained_commands = list(commands)
+
+        def attempt() -> bool:
+            defer = self.new_defer()
+            for command in remained_commands:
+                if sudo:
+                    defer.sudo(command)
+                else:
+                    defer.run(command)
+
+            try:
+                defer.flush()
+            except RemoteGroupException as e:
+                results = e.results[self.get_host()]
+                for result in results:
+                    if isinstance(result, UnexpectedExit):
+                        logger.debug(result.result.stderr)
+                        break
+                    elif isinstance(result, Exception):
+                        raise
+
+                    del remained_commands[0]
+
+                return False
+
+            return True
+
+        utils.wait_command_successful(logger, attempt, retries, timeout)
 
     def get_local_file_sha1(self, filename: str) -> str:
         return utils.get_local_file_sha1(filename)

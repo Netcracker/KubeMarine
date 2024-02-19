@@ -41,6 +41,8 @@ This section provides information about the Kubecheck functionality.
       - [201 Kubelet Status](#201-kubelet-status)
         - [202 Nodes pid_max](#202-nodes-pid_max)
         - [203 Kubelet Version](#203-kubelet-version)
+        - [233 Kubelet Configuration](#233-kubelet-configuration)
+      - [234 kube-proxy Configuration](#234-kube-proxy-configuration)
     - [205 System Packages Versions](#205-system-packages-version)
       - [205 CRI Versions](#205-cri-versions)
       - [205 HAproxy Version](#205-haproxy-version)
@@ -388,8 +390,11 @@ The task tree is as follows:
     * configuration
   * kubelet
     * status
-    * configuration
+    * pid_max
     * version
+    * configuration
+  kube-proxy:
+    * configuration
   * packages
     * system
       * recommended_versions
@@ -462,7 +467,7 @@ This test checks the status of the Kubelet service on all hosts in the cluster w
 
 ##### 202 Nodes pid_max
 
-*Task*: `services.kubelet.configuration`
+*Task*: `services.kubelet.pid_max`
 
 This test checks that kubelet `maxPods` and `podPidsLimit` are correctly aligned with kernel `pid_max`.
 
@@ -471,6 +476,19 @@ This test checks that kubelet `maxPods` and `podPidsLimit` are correctly aligned
 *Task*: `services.kubelet.version`
 
 This test checks the Kubelet version on all hosts in a cluster.
+
+##### 233 Kubelet Configuration
+
+*Task*: `services.kubelet.configuration`
+
+This test checks the consistency of the /var/lib/kubelet/config.yaml configuration
+with `kubelet-config` ConfigMap and with the inventory.
+
+##### 234 kube-proxy Configuration
+
+*Task*: `services.kube-proxy.configuration`
+
+This test checks the consistency of the `kube-proxy` ConfigMap with the inventory.
 
 ##### 204 Container Runtime Configuration Check
 
@@ -647,13 +665,15 @@ This test verifies ETCD health.
 
 *Task*: `control_plane.configuration_status`
 
-This test verifies the consistency of the configuration (image version, `extra_args`, `extra_volumes`) of static pods of Control Plain like `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
+This test verifies the consistency of the configuration of static pods of Control Plain
+for `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, and `etcd`.
 
 ##### 221 Control Plane Health Status
 
 *Task*: `control_plane.health_status`
 
-This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager` and `kube-scheduler`.
+This test verifies the health of static pods `kube-apiserver`, `kube-controller-manager`,
+`kube-scheduler`, and `etcd`.
 
 ##### 222 Default Services Configuration Status
 
