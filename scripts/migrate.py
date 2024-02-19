@@ -7,7 +7,8 @@ import tempfile
 import requests
 import yaml
 
-KubemarineVersions:list = ["v0.25.0","v0.25.1","v0.26.0","v0.27.0"]
+KubemarineVersions:list = ["v0.25.0","v0.25.1","v0.26.0","v0.27.0"] #TODO to  get from github/gitlab/git/custom/file?
+
 Envs: list = ["src", "pip", "bin", "docker"]
 
 MigrationProcedure: dict = {
