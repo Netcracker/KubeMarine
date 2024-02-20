@@ -30,6 +30,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One Network Interface](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-network-interface)
   - [No Pod-to-Pod Traffic for Some Nodes with More Than One IPs with Different CIDR Notation](#no-pod-to-pod-traffic-for-some-nodes-with-more-than-one-ips-with-different-cidr-notation)
   - [Ingress Cannot Be Created or Updated](#ingress-cannot-be-created-or-updated)
+  - [vIP Address is Unreachable](#vip-address-is-unreachable)
   - [CoreDNS Cannot Resolve the Name](#coredns-cannot-resolve-the-name)
     - [Case 1](#case-1)
     - [Case 2](#case-2)
@@ -931,6 +932,97 @@ spec:
       args:
         - '--disable-full-test'
 ```
+
+## vIP Address is Unreachable
+
+**Symptoms**:
+
+Installation failed with error:
+
+```console
+.....
+<DATETIME> VERBOSE [log.verbose] I1220 14:12:57.517911    3239 waitcontrolplane.go:83] [wait-control-plane] Waiting for the API server to be healthy
+<DATETIME> VERBOSE [log.verbose] I1220 14:12:58.520621    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 1 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:12:59.522460    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 2 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:00.523457    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 3 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:01.524729    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 4 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:02.526164    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 5 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:03.529524    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 6 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:04.530520    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 7 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:05.531711    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 8 to https://api.example.com:6443/healthz?timeout=10s
+<DATETIME> VERBOSE [log.verbose] I1220 14:13:06.532613    3239 with_retry.go:234] Got a Retry-After 1s response for attempt 9 to https://api.example.com:6443/healthz?timeout=10s
+202
+.....
+<DATETIME> VERBOSE [log.verbose] couldn't initialize a Kubernetes cluster
+.....
+<DATETIME> CRITICAL [errors.error_logger] TASK FAILED deploy.kubernetes.init
+<DATETIME> CRITICAL [errors.error_logger] KME0002: Remote group exception
+```
+
+Looks like IP address for kubernetes API is unreachable.
+
+**Root Cause**:
+
+1. Make shure vIP address is unreachable:
+
+    Try to check connectivity with `api.example.com`:
+
+    ```console
+    ping -c 1 -W 2 api.example.com
+
+
+    PING api.example.com (10.10.10.144) 56(84) bytes of data.
+
+    --- api.example.com ping statistics ---
+    1 packets transmitted, 0 received, 100% packet loss, time 0ms
+    ```
+
+    IP address `10.10.10.144` is the floating IP address for internal `192.168.0.4` and it is unreachable.
+
+1. Check vIP address is managed by keepalived and exists on the correct network interface:
+
+    Check the vIP address is on the interface of node with **balancer**:
+
+      ```console
+      sudo ip a
+
+
+      ....
+    2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+        link/ether fa:16:3e:54:45:74 brd ff:ff:ff:ff:ff:ff
+        altname enp0s3
+        altname ens3
+        inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute eth0
+          valid_lft 36663sec preferred_lft 36663sec
+        inet 192.168.0.4/32 scope global vip_2910a02af7
+          valid_lft forever preferred_lft forever
+    ```
+
+1. Try to ping by internal IP address from any worker node:
+
+    ```console
+    ping -c 1 -W 2 192.168.0.4
+
+
+    PING 192.168.0.4 (192.168.0.4) 56(84) bytes of data.
+
+    --- 192.168.0.4 ping statistics ---
+    1 packets transmitted, 0 received, 100% packet loss, time 0ms
+    ```
+
+1. Check the ARP table for correct MAC address. Should be the same with `fa:16:3e:54:45:74`
+
+    On worker node:
+
+    ```console
+    sudo arp -a | grep 192.168.0.4
+
+    <NODENAME> (192.168.0.4) at 10:e7:c6:c0:47:35 [ether] on ens3
+    ```
+
+1. In case of the MAC address from arp command is different with correct value GARP protocol is disabled in environment and **keepalived** can not announce new MAC address for vIP address.
+
+    **Solution**: Уou need to contact technical support and ask to enable the GARP protocol.
 
 ## CoreDNS Cannot Resolve the Name
 

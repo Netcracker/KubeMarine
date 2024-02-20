@@ -43,14 +43,18 @@ ERROR_NOT_LATEST_PATCH='New version \"%s\" is not the latest supported patch ver
 
 ERROR_KUBELET_PATCH_NOT_KUBERNETES_NODE = "%s patch can be uploaded only to control-plane or worker nodes"
 ERROR_CONTROL_PLANE_PATCH_NOT_CONTROL_PLANE_NODE = "%s patch can be uploaded only to control-plane nodes"
+ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET = "Patches for kubelet are not supported in Kubernetes {version}"
 
 
-def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+def add_node_enrichment(inventory: dict, cluster: KubernetesCluster, procedure_inventory: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory
 
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     # adding role "new_node" for all specified new nodes and putting these nodes to all "nodes" list
-    for new_node in cluster.procedure_inventory.get("nodes", []):
+    for new_node in procedure_inventory.get("nodes", []):
         # deepcopy is necessary, otherwise role append will happen in procedure_inventory too
         node = deepcopy(new_node)
         node["roles"].append("add_node")
@@ -65,12 +69,15 @@ def add_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+def remove_node_enrichment(inventory: dict, cluster: KubernetesCluster,  procedure_inventory: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'remove_node':
         return inventory
 
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     # adding role "remove_node" for all specified nodes
-    node_names_to_remove = [node['name'] for node in cluster.procedure_inventory.get("nodes", [])]
+    node_names_to_remove = [node['name'] for node in procedure_inventory.get("nodes", [])]
     for node_remove in node_names_to_remove:
         for i, node in enumerate(inventory['nodes']):
             # Inventory is not compiled at this step.
@@ -141,11 +148,14 @@ def enrich_reconfigure_inventory(inventory: dict, cluster: KubernetesCluster) ->
     return reconfigure_finalize_inventory(cluster, inventory)
 
 
-def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def reconfigure_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     if cluster.context.get("initial_procedure") != "reconfigure":
         return inventory
 
-    kubeadm_sections = {s: v for s, v in cluster.procedure_inventory.get('services', {}).items()
+    kubeadm_sections = {s: v for s, v in procedure_inventory.get('services', {}).items()
                         if s in ('kubeadm', 'kubeadm_kubelet', 'kubeadm_kube-proxy', 'kubeadm_patches')}
 
     if kubeadm_sections:
@@ -210,7 +220,7 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     for control_plane_item, patches in inventory["services"]["kubeadm_patches"].items():
         for patch in patches:
             if control_plane_item == 'kubelet' and not components.kubelet_supports_patches(cluster):
-                raise Exception(f"Patches for kubelet are not supported in Kubernetes {kubeadm['kubernetesVersion']}")
+                raise Exception(ERROR_KUBEADM_DOES_NOT_SUPPORT_PATCHES_KUBELET.format(version=kubeadm['kubernetesVersion']))
 
             if 'nodes' not in patch:
                 continue

@@ -182,7 +182,7 @@ The actual information about the supported versions can be found in `compatibili
 * Opened TCP-ports:
   * Internal communication:
     * 22 : SSH 
-    * 53 : CoreDNS (TCP & UDP), if access is needed from services bound to the host network.
+    * 53 : CoreDNS, if access is needed from services bound to the host network.
     * 80 (or 20080, if balancers are presented): HTTP
     * 179 : Calico BGP
     * 443 (or 20443, if balancers are presented): HTTPS
@@ -201,6 +201,13 @@ The actual information about the supported versions can be found in `compatibili
     * 80
     * 443
     * 6443 : Kubernetes API server, if necessary to access externally. For example, using the [helm](#helm) plugin.
+* Opened UDP-ports:
+  * Internal communication:
+    * 53 : CoreDNS, if access is needed from services bound to the host network.
+    * 4789 : Calico VxLAN encapsulation, if that type of encapsulation is enabled
+* Enabled additional protocols:
+  * **VRRP**: protocol is using by keepalived to manage vIP between nodes with role **balancer**. IP protocol number - 112
+  * **IPIP**: protocol is using for communication between kubernetes nodes of several clusters in Active-Active scheme only. Make shure **IPIP** protocol is added to all Security Groups in OpenStack and allowed on all intermediate network devices. IP protocol number - 4
 * Internal network bandwidth not less than 1GBi/s.
 * Dedicated internal address, IPv4, and IPv6 are supported as well, for each VM.
 * Any network security policies are disabled or whitelisted. This is especially important for OpenStack environments.
@@ -1056,7 +1063,8 @@ vrrp_ips:
 #### maintenance type
 
 Generally, the maintenance configuration is the same as the default configuration for balancer. The `maintenance_type` option allows to change the default behavior.
-The following example discribes the type of traffic that applicable for particular IP in maintenance mode configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
+The following example discribes the type of traffic that applicable for particular IP 
+in [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) configuration. (`not bind` means that IP will not receive neither TCP nor HTTP traffic):
 
 ```yaml
 vrrp_ips:
@@ -3117,14 +3125,19 @@ will lead to the following content of /etc/hosts:
 ...
 ```
 
+**Warning**: The content of the user-defined `services.etc_hosts` section is not transmitted into the CoreDNS configmap. If you would like CoreDNS to have these records, put them into the [`services.coredns.configmap.Hosts` section](#configmap).
+
+
 #### coredns
 
 `coredns` parameter configures the Coredns service and its DNS rules in the Kubernetes cluster. It is divided into the following sections:
 
 ##### add_etc_hosts_generated
 
-This is a boolean parameter defining whether IP addresses of the cluster nodes and their generated domain names should be added to `coredns.configmap.Hosts`.
+This is a boolean parameter defining whether IP addresses of the cluster nodes and their generated domain names should be added to `services.coredns.configmap.Hosts`.
 Default is `true`.
+
+**Warning**: The `add_etc_hosts_generated: true` parameter doesn't add the user-defined hosts from `services.etc_hosts` to the CoreDNS configmap; if necessary, they must be added explicitly to `services.coredns.configmap.Hosts`.
 
 ##### configmap
 
@@ -3696,7 +3709,7 @@ As an example of a template, you can look at [default template](/kubemarine/temp
 
 #### maintenance mode
 
-Kubemarine supports maintenance mode for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
+Kubemarine supports [maintenance mode](/documentation/LoadBalancing.md#maintenance-mode) for HAproxy balancer. HAproxy balancer has additional configuration file for that purpose. The following configuration enable maintenance mode for balancer:
 
 ```yaml
 services:

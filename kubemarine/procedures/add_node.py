@@ -76,7 +76,8 @@ def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
         cluster.log.debug("Redeploy ingress-nginx-controller is not needed, skip it")
 
 
-def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                                procedure_inventory_for_finalization: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
@@ -84,7 +85,7 @@ def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finaliz
 
     if not is_finalization:
         # new nodes are not presented in final inventory - let's add it original config
-        kubernetes.add_node_enrichment(inventory_to_finalize, cluster)
+        kubernetes.add_node_enrichment(inventory_to_finalize, cluster, procedure_inventory_for_finalization)
 
     # new nodes are already presented in final inventory - ok, just remove label
     for i, node in enumerate(inventory_to_finalize['nodes']):

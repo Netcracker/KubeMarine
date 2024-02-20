@@ -116,14 +116,14 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     if cluster.nodes.get('worker', []):
         kubernetes.upgrade_workers(upgrade_group, cluster, **drain_kwargs)
 
-    cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
-    cluster.context['cached_nodes_versions_cleaned'] = True
+    kubernetes_cleanup_nodes_versions(cluster)
 
 
 def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+        cluster.context['cached_nodes_versions_cleaned'] = True
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
 
