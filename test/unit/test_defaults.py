@@ -18,6 +18,7 @@ import unittest
 
 from kubemarine.core import defaults, log
 from kubemarine import demo
+from test.unit import utils as test_utils
 
 
 class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
@@ -264,12 +265,56 @@ class PrimitiveValuesAsString(unittest.TestCase):
         self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
         self.assertEqual(20443, [port for port in nginx_ingress_ports if port['name'] == 'https'][0]['hostPort'])
 
+    def test_sysctl_override_blank(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory['services']['sysctl'] = {
+            'net.netfilter.nf_conntrack_max': ''
+        }
+
+        cluster = demo.new_cluster(inventory)
+
+        self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
+                          "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
+
+        test_utils.stub_associations_packages(cluster, {})
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
+
+        self.assertEqual('', finalized_inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
+                         "Finalized services.sysctl should have blank net.netfilter.nf_conntrack_max")
+
+        cluster = demo.new_cluster(finalized_inventory)
+        self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
+                          "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
+
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
         inventory = demo.new_cluster(inventory).inventory
 
         self.assertEqual(1000000, inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
+
+    def test_v1_29_kube_proxy_conntrack_override_blank(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory['services']['kubeadm_kube-proxy'] = {
+            'conntrack': {'min': ''}
+        }
+
+        cluster = demo.new_cluster(inventory)
+
+        self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
+
+        test_utils.stub_associations_packages(cluster, {})
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
+
+        self.assertEqual('', finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                         "Finalized services.kubeadm_kube-proxy should have blank conntrack.min")
+
+        cluster = demo.new_cluster(finalized_inventory)
+        self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
 
     def test_custom_jinja_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)

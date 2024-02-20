@@ -509,9 +509,8 @@ def _escape_jinja_character(value: str) -> str:
     return value
 
 
-@enrichment(EnrichmentStage.FULL)
-def manage_primitive_values(cluster: KubernetesCluster) -> None:
-    paths_func_strip: List[Tuple[List[str], Callable[[Any], Any], bool]] = [
+def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], Any], bool]]:
+    return [
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
           'SystemdCgroup'], utils.strtobool, False),
@@ -523,8 +522,22 @@ def manage_primitive_values(cluster: KubernetesCluster) -> None:
         (['plugins', 'calico', 'typha', 'replicas'], utils.strtoint, False),
         (['plugins', 'nginx-ingress-controller', 'ports', '*', 'hostPort'], utils.strtoint, False),
     ]
+
+
+@enrichment(EnrichmentStage.FULL)
+def manage_primitive_values(cluster: KubernetesCluster) -> None:
+    paths_func_strip = _get_primitive_values_registry()
     for search_path, func, strip in paths_func_strip:
         _convert_primitive_values(cluster.inventory, [], search_path, func, strip)
+
+
+def finalize_primitive_values(cluster: KubernetesCluster, inventory: dict) -> dict:
+    paths_func_strip = _get_primitive_values_registry()
+    for search_path, _, strip in paths_func_strip:
+        if not strip:
+            continue
+        _set_overridden_blank_primitive_values(cluster.raw_inventory, inventory, [], search_path)
+    return inventory
 
 
 def _convert_primitive_values(struct: Union[dict, list], path: List[Union[str, int]],
@@ -563,5 +576,46 @@ def _convert_primitive_value_section(struct: Union[dict, list], section: Union[s
                 struct[section] = func(value)  # type: ignore[index]
             except ValueError as e:
                 raise ValueError(f"{str(e)} in section [{']['.join(repr(p) for p in path)}]")
+
+    path.pop()
+
+
+def _set_overridden_blank_primitive_values(raw_struct: Union[dict, list], struct: Union[dict, list],
+                                           path: List[Union[str, int]],
+                                           search_path: List[str]) -> None:
+    depth = len(path)
+    section = search_path[depth]
+    if section == '*':
+        if isinstance(raw_struct, list):
+            for i in reversed(range(len(raw_struct))):
+                _set_overridden_blank_primitive_value_section(raw_struct, struct, i, path, search_path)
+
+        elif isinstance(raw_struct, dict):
+            for k in list(raw_struct):
+                _set_overridden_blank_primitive_value_section(raw_struct, struct, k, path, search_path)
+
+    # Only dict is possible here as raw_struct / struct
+    elif section in raw_struct:
+        _set_overridden_blank_primitive_value_section(raw_struct, struct, section, path, search_path)
+
+
+def _set_overridden_blank_primitive_value_section(raw_struct: Union[dict, list], struct: Union[dict, list],
+                                                  section: Union[str, int], path: List[Union[str, int]],
+                                                  search_path: List[str]) -> None:
+    raw_value = raw_struct[section]  # type: ignore[index]
+    path.append(section)
+    depth = len(path)
+    if depth < len(search_path):
+        # Items can be deleted only in leafs, so it is safe to get nested struct by key.
+        # See _convert_primitive_value_section()
+        value = struct[section]  # type: ignore[index]
+        _set_overridden_blank_primitive_values(raw_value, value, path, search_path)
+    elif isinstance(struct, dict) and section not in struct:
+        # Leaves can be stripped and deleted during enrichment.
+        # If they were redefined in raw inventory, we should return blank string in finalized inventory.
+        # If finalized inventory is used as a source inventory, it will again redefine defaults with blank strings,
+        # that will be again deleted.
+        # See _convert_primitive_value_section()
+        struct[section] = ''
 
     path.pop()
