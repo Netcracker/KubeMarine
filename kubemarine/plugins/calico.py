@@ -174,6 +174,9 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "Deployment_calico-kube-controllers"
+        service_account_name = "calico-kube-controllers"
+        source_yaml= manifest.get_obj(key, patch=True)
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
         self.enrich_node_selector(manifest, key, plugin_service='kube-controllers')
         self.enrich_tolerations(manifest, key, plugin_service='kube-controllers')
         self.enrich_resources_for_container(manifest, key,
@@ -188,6 +191,11 @@ class CalicoManifestProcessor(Processor):
         """
 
         key = "DaemonSet_calico-node"
+
+        service_account_name = "calico-node"
+        source_yaml= manifest.get_obj(key, patch=True)
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+
         for container_name in ['upgrade-ipam', 'install-cni']:
             self.enrich_image_for_container(manifest, key,
                 plugin_service='cni', container_name=container_name, is_init_container=True)
@@ -242,6 +250,10 @@ class CalicoManifestProcessor(Processor):
         if not manifest.has_obj(key):
             return None
         source_yaml = manifest.get_obj(key, patch=True)
+
+        service_account_name = "calico-node"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+        self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         default_tolerations = [{'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoSchedule'},
                                {'key': 'node.kubernetes.io/network-unavailable', 'effect': 'NoExecute'}]

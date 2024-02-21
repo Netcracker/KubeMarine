@@ -252,23 +252,8 @@ class IngressNginxManifestProcessor(Processor):
     def enrich_deployment_ingress_nginx_controller(self, manifest: Manifest) -> None:
         key = "Deployment_ingress-nginx-controller"
         source_yaml = manifest.get_obj(key, patch=True)
-
-        if 'volumes' not in source_yaml['spec']['template']['spec']:
-            source_yaml['spec']['template']['spec']['volumes'] = []
-        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
-            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
-        source_yaml['spec']['template']['spec']['volumes'].append({
-        'name': 'ingress-nginx-token',
-        'secret': {
-            'secretName': 'ingress-nginx-token'  
-        }
-        })
-
-        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
-        'name': 'ingress-nginx-token',
-        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
-        })
-       
+        service_account_name = "ingress-nginx"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
         self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         self.enrich_deamonset_ingress_nginx_controller_container(manifest)
@@ -370,12 +355,8 @@ class V1_2_X_IngressNginxManifestProcessor(IngressNginxManifestProcessor):
         super().enrich_deamonset_ingress_nginx_controller_container(manifest)
 
         source_yaml = manifest.get_obj(key, patch=True)
-        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
-            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
-        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
-        'name': 'ingress-nginx-token',
-        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
-        })
+        service_account_name = "ingress-nginx"
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
         self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
     def enrich_deamonset_ingress_nginx_controller_container_args(self, manifest: Manifest,

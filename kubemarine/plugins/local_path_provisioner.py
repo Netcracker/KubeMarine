@@ -90,25 +90,11 @@ class LocalPathProvisionerManifestProcessor(Processor):
         source_yaml['automountServiceAccountToken'] = False
 
     def enrich_deployment_local_path_provisioner(self, manifest: Manifest) -> None:
+        service_account_name = "local-path-provisioner-service-account"
         key = "Deployment_local-path-provisioner"
 
         source_yaml = manifest.get_obj(key, patch=True)
-        if 'volumes' not in source_yaml['spec']['template']['spec']:
-            source_yaml['spec']['template']['spec']['volumes'] = []
-        if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
-            source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
-        source_yaml['spec']['template']['spec']['volumes'].append({
-        'name': 'local-path-provisioner-service-account-token',
-        'secret': {
-            'secretName': 'local-path-provisioner-service-account-token'  
-        }
-        })
-
-        source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
-        'name': 'local-path-provisioner-service-account-token',
-        'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
-        })
-       
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
         self.log.verbose(f"The {key} has been updated to include the new secret volume and mount.")
 
         self.enrich_image_for_container(manifest, key,
