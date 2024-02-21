@@ -112,6 +112,7 @@ spec:
       - name: calico-apiserver-certs
         secret:
           secretName: calico-apiserver-certs
+
 ---
 
 apiVersion: v1

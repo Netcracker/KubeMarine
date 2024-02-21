@@ -4477,7 +4477,6 @@ spec:
           hostPath:
             type: DirectoryOrCreate
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
-
 ---
 
 apiVersion: v1
@@ -4485,6 +4484,7 @@ kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
+
 ---
 # Source: calico/templates/calico-kube-controllers.yaml
 # See https://github.com/projectcalico/kube-controllers
@@ -4575,5 +4575,3 @@ spec:
 
 ---
 # Source: calico/templates/configure-canal.yaml
-
-

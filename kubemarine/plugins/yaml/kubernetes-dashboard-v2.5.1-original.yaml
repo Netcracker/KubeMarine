@@ -28,15 +28,6 @@ metadata:
   namespace: kubernetes-dashboard
 
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: kubernetes-dashboard-token
-  namespace: kubernetes-dashboard
-  annotations:
-    kubernetes.io/service-account.name: kubernetes-dashboard
-type: kubernetes.io/service-account-token
----
 
 kind: Service
 apiVersion: v1

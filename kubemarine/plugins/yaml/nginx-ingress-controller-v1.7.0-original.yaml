@@ -19,16 +19,6 @@ metadata:
   name: ingress-nginx
   namespace: ingress-nginx
 ---
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ingress-nginx-token
-  namespace: ingress-nginx
-  annotations:
-    kubernetes.io/service-account.name: ingress-nginx
-type: kubernetes.io/service-account-token
----
 apiVersion: v1
 kind: ServiceAccount
 metadata:
