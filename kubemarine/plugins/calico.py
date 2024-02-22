@@ -491,12 +491,15 @@ class CalicoApiServerManifestProcessor(Processor):
 
     def enrich_deployment_calico_apiserver(self, manifest: Manifest) -> None:
         key = "Deployment_calico-apiserver"
+        source_yaml = manifest.get_obj(key, patch=True)
+        service_account_name = "calico-apiserver"
         self.enrich_node_selector(manifest, key, plugin_service='apiserver')
         self.enrich_tolerations(manifest, key, plugin_service='apiserver')
         self.enrich_image_for_container(
             manifest, key, plugin_service='apiserver', container_name='calico-apiserver', is_init_container=False)
         self.enrich_resources_for_container(
             manifest, key, plugin_service='apiserver', container_name='calico-apiserver')
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
 
         self.enrich_deployment_calico_apiserver_container(manifest)
 
