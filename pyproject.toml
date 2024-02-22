@@ -43,7 +43,7 @@ dependencies = [
     "deepdiff==6.7.*",
     "ordered-set==4.1.*",
     # Each time cryptography version is updated, need to regenerate scripts/ci/custom-hooks/hook-cryptography.py
-    "cryptography==41.0.7",
+    "cryptography==42.0.2",
     "paramiko==3.3.*",
     "jsonschema==4.17.*",
     "typing_extensions==4.7.*",
