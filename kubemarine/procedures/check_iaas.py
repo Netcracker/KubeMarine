@@ -19,7 +19,6 @@ import os
 import random
 import re
 import sys
-import uuid
 import string
 from collections import OrderedDict
 import time
@@ -335,7 +334,7 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
         # Load script for checking sources
         all_group = get_python_group(cluster, True)
         check_script = utils.read_internal("resources/scripts/check_url_availability.py")
-        random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+        random_temp_path = utils.get_remote_tmp_path(ext='py')
         all_group.put(io.StringIO(check_script), random_temp_path)
 
         for destination, config in cluster.inventory['services'].get('thirdparties', {}).items():
@@ -375,7 +374,7 @@ def check_resolv_conf(cluster: KubernetesCluster) -> None:
         group = cluster.make_group(hosts).get_accessible_nodes()
         # Create temp resolv.conf file
         resolv_conf_buffer = system.get_resolv_conf_buffer(cluster.inventory["services"].get("resolv.conf"))
-        random_resolv_conf_path = "/tmp/%s.conf" % uuid.uuid4().hex
+        random_resolv_conf_path = utils.get_remote_tmp_path(ext='conf')
         group.put(resolv_conf_buffer, random_resolv_conf_path)
 
         # Compare with existed resolv.conf
@@ -405,7 +404,7 @@ def check_package_repositories(cluster: KubernetesCluster) -> None:
             nodes_context[host]["package_repos_are_actual"] = True
     else:
         group = cluster.make_group(hosts).get_sudo_nodes()
-        random_repos_conf_path = "/tmp/%s.repo" % uuid.uuid4().hex
+        random_repos_conf_path = utils.get_remote_tmp_path(ext='repo')
         collector = CollectorCallback(cluster)
         with group.new_executor() as exe:
             for node in exe.group.get_ordered_members_list():
@@ -479,7 +478,7 @@ def check_access_to_package_repositories(cluster: KubernetesCluster) -> None:
         # Load script for checking sources
         all_group = get_python_group(cluster, True)
         check_script = utils.read_internal("resources/scripts/check_url_availability.py")
-        random_temp_path = "/tmp/%s.py" % uuid.uuid4().hex
+        random_temp_path = utils.get_remote_tmp_path(ext='py')
         all_group.put(io.StringIO(check_script), random_temp_path)
 
         if repository_urls:
@@ -948,7 +947,7 @@ def get_stop_listener_cmd(port_listener: str) -> str:
 
 def install_client(cluster: KubernetesCluster, group: DeferredGroup, proto: str, mtu: int, timeout: int) -> str:
     check_script = utils.read_internal('resources/scripts/simple_port_client.py')
-    udp_client = "/tmp/%s.py" % uuid.uuid4().hex
+    udp_client = utils.get_remote_tmp_path(ext='py')
     for node in group.get_ordered_members_list():
         rendered_script = jinja.new(cluster.log).from_string(check_script).render({
             'proto': proto,
@@ -1092,7 +1091,7 @@ def install_listeners(cluster: KubernetesCluster,
     group = cluster.make_group(host_ports)
     # currently port listener can be run on both python 2 and 3
     check_script = utils.read_internal('resources/scripts/simple_port_listener.py')
-    port_listener = "/tmp/%s.py" % uuid.uuid4().hex
+    port_listener = utils.get_remote_tmp_path(ext='py')
 
     listened_ports: Dict[str, List[Tuple[str, bool]]] = {}
     try:
@@ -1308,7 +1307,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
     trns_cmd: Dict[str, str] = {}
 
     binary_check_path = utils.get_internal_resource_path('./resources/scripts/ipip_check.gz')
-    ipip_check = "/tmp/%s" % uuid.uuid4().hex
+    ipip_check = utils.get_remote_tmp_path()
     # Random message
     random.seed()
     msg = ''.join(random.choices(string.ascii_letters + string.digits, k=15))

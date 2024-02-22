@@ -22,6 +22,7 @@ import shutil
 import sys
 import time
 import tarfile
+import uuid
 from copy import deepcopy
 
 from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
@@ -340,6 +341,16 @@ def get_local_file_sha1(filename: str) -> str:
             sha1.update(data)
 
     return sha1.hexdigest()
+
+
+def get_remote_tmp_path(filename: str = None, ext: str = None) -> str:
+    if filename is None:
+        filename = uuid.uuid4().hex
+
+    if ext is not None:
+        filename += '.' + ext
+
+    return "/tmp/" + filename
 
 
 def yaml_structure_preserver() -> ruamel.yaml.YAML:

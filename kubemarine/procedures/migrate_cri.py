@@ -17,11 +17,10 @@
 from collections import OrderedDict
 
 import io
-import uuid
 from typing import List
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow
+from kubemarine.core import flow, utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
 from kubemarine.cri import docker
@@ -143,7 +142,7 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
-    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    random_report_name = utils.get_remote_tmp_path(ext='json')
     result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
     leaked_ips = result.get_simple_out()
     leaked_ips_count = leaked_ips.count('leaked')

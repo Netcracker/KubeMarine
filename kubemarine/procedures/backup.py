@@ -558,7 +558,7 @@ class ExportKubernetesDownloader:
 
     def _download(self, task: DownloaderPayload, temp_local_filepath: str) -> None:
         namespace = task.namespace
-        temp_remote_filepath = f"/tmp/{os.path.basename(temp_local_filepath)}"
+        temp_remote_filepath = utils.get_remote_tmp_path(os.path.basename(temp_local_filepath))
 
         cmd = f'(set -o pipefail && sudo kubectl ' \
               f'{"" if namespace is None else ("-n " + namespace + " ")}' \

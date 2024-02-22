@@ -19,7 +19,6 @@ import io
 import itertools
 import os
 import random
-import uuid
 from abc import ABC, abstractmethod
 from types import FunctionType
 from typing import (
@@ -398,7 +397,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             # for unknown reason fabric v2 can't put as sudo, and we should use WA via mv
             # also, if we need to backup the file first, then we also have to upload file to tmp first
 
-            temp_filepath = "/tmp/%s" % uuid.uuid4().hex
+            temp_filepath = utils.get_remote_tmp_path()
             self.cluster.log.verbose("Uploading to temporary file '%s'..." % temp_filepath)
 
         self._put(local_stream, temp_filepath)

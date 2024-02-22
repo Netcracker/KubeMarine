@@ -23,7 +23,6 @@ from typing import List, Dict, Optional, Union
 import yaml
 import ruamel.yaml
 import ipaddress
-import uuid
 
 from ordered_set import OrderedSet
 
@@ -393,7 +392,7 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
             if is_curl:
                 cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
                 # Create tmp dir for loading thirdparty without default sha
-                random_dir = "/tmp/%s" % uuid.uuid4().hex
+                random_dir = utils.get_remote_tmp_path()
                 final_commands = "rm -r -f %s" % random_dir
                 random_path = "%s%s" % (random_dir, path)
                 cluster.log.verbose('Temporary path: %s' % random_path)

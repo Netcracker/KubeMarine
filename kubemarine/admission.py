@@ -14,7 +14,6 @@
 
 import io
 import os
-import uuid
 import re
 from typing import Dict, Any, List, Optional, Union
 
@@ -32,7 +31,6 @@ from kubemarine.plugins import builtin
 
 privileged_policy_filename = "privileged.yaml"
 policies_file_path = "./resources/psp/"
-tmp_filepath_pattern = "/tmp/%s"
 
 admission_template = "./templates/admission.yaml.j2"
 admission_dir = "/etc/kubernetes/pki"
@@ -382,7 +380,7 @@ def manage_privileged_from_file(group: NodeGroup, filename: str, manage_type: st
     if manage_type not in ["apply", "delete"]:
         raise Exception("unexpected manage type for privileged policy")
     privileged_policy = utils.read_internal(os.path.join(policies_file_path, filename))
-    remote_path = tmp_filepath_pattern % filename
+    remote_path = utils.get_remote_tmp_path(filename)
     group.put(io.StringIO(privileged_policy), remote_path, backup=True, sudo=True)
 
     return group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
@@ -429,8 +427,7 @@ def manage_policies(group: NodeGroup, manage_type: str,
         return None
 
     template = collect_policies_template(psp_to_manage, roles_to_manage, bindings_to_manage)
-    filename = uuid.uuid4().hex
-    remote_path = tmp_filepath_pattern % filename
+    remote_path = utils.get_remote_tmp_path()
     group.put(io.StringIO(template), remote_path, backup=True, sudo=True)
     result = group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
     group.sudo("rm -f %s" % remote_path)

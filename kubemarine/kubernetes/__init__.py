@@ -16,7 +16,6 @@ import io
 import math
 import os
 import time
-import uuid
 from contextlib import contextmanager
 from typing import List, Dict, Iterator, Any, Optional
 
@@ -378,7 +377,7 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
 @contextmanager
 def local_admin_config(nodes: NodeGroup) -> Iterator[str]:
-    temp_filepath = "/tmp/%s" % uuid.uuid4().hex
+    temp_filepath = utils.get_remote_tmp_path()
 
     cluster_name = nodes.cluster.inventory['cluster_name']
 
