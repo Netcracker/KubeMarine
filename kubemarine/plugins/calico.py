@@ -547,7 +547,7 @@ service_account_secret_calico_apiserver= dedent("""\
     kind: Secret
     metadata:
       name: calico-apiserver-token
-      namespace: kube-system
+      namespace: calico-apiserver
       annotations:
         kubernetes.io/service-account.name: calico-apiserver
     type: kubernetes.io/service-account-token  
