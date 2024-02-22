@@ -93,7 +93,11 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
 
     def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(VERBOSE):
-            self._log(VERBOSE, msg, args, **kwargs)
+            if sys.version_info[:2] >= (3, 11):
+                # https://github.com/python/cpython/pull/28287
+                self._log(VERBOSE, msg, args, **kwargs, stacklevel=2)
+            else:
+                self._log(VERBOSE, msg, args, **kwargs)
 
     def makeRecord(self, name: str, level: int, fn: str, lno: int, msg: object, args,  # type: ignore[no-untyped-def]
                    exc_info, func=None, extra=None,
@@ -405,7 +409,12 @@ def caller_info(logger: EnhancedLogger) -> Dict[str, object]:
     :param logger: EnhancedLogger
     :return: dictionary with the invocation metadata
     """
-    fn, lno, func, sinfo = logger.findCaller()
+    if sys.version_info[:2] >= (3, 11):
+        # https://github.com/python/cpython/pull/28287
+        fn, lno, func, sinfo = logger.findCaller(stacklevel=3)
+    else:
+        fn, lno, func, sinfo = logger.findCaller()
+
     record: logging.LogRecord = logger.makeRecord("", logging.DEBUG, fn, lno, "", (), None,
                                                   func=func, extra=None, sinfo=sinfo)
     return dict(item for item in record.__dict__.items()
