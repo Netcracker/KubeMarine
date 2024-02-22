@@ -370,7 +370,7 @@ class Processor(ABC):
 
         return image
 
-    def enrich_volume_and_volumemount(self, source_yaml, serviceaccount) -> None:
+    def enrich_volume_and_volumemount(self, source_yaml: dict, serviceaccount: str) -> None:
         """
         Add a secret as volume and mount to the specified container in the manifest.
 
@@ -384,12 +384,14 @@ class Processor(ABC):
         if 'volumeMounts' not in source_yaml['spec']['template']['spec']['containers'][0]:
             source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
 
-        source_yaml['spec']['template']['spec']['volumes'].append({
-            'name': f'{serviceaccount}-token',
-            'secret': {
-                'secretName': f'{serviceaccount}-token'  
-            }
-        })
+        volume_names = [volume["name"] for volume in source_yaml["spec"]["template"]["spec"]["volumes"]]
+        if f"{serviceaccount}-token" not in volume_names:
+            source_yaml['spec']['template']['spec']['volumes'].append({
+                'name': f'{serviceaccount}-token',
+                'secret': {
+                    'secretName': f'{serviceaccount}-token'  
+                }
+            })
         source_yaml['spec']['template']['spec']['containers'][0]['volumeMounts'].append({
             'name': f'{serviceaccount}-token',
             'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'

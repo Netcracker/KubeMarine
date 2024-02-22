@@ -55,7 +55,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
             self.enrich_namespace_local_path_storage,
             self.add_clusterrolebinding_local_path_provisioner_privileged_psp,
             self.enrich_service_account,
-            self.add_service_account_secret,
+            self.enrich_service_account_secret,
             self.enrich_deployment_local_path_provisioner,
             self.enrich_storageclass_local_path,
             self.enrich_configmap_local_path_config,
@@ -67,7 +67,7 @@ class LocalPathProvisionerManifestProcessor(Processor):
     def enrich_namespace_local_path_storage(self, manifest: Manifest) -> None:
         self.assign_default_pss_labels(manifest, 'local-path-storage')
 
-    def add_service_account_secret(self, manifest: Manifest) -> None:
+    def enrich_service_account_secret(self, manifest: Manifest) -> None:
         new_yaml = yaml.safe_load(service_account_secret)
 
         service_account_key = "ServiceAccount_local-path-provisioner-service-account"

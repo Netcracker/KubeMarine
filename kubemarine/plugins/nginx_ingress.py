@@ -16,6 +16,9 @@ import io
 import ipaddress
 from typing import Optional, List, Dict
 
+from textwrap import dedent
+import yaml
+
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
@@ -209,6 +212,7 @@ class IngressNginxManifestProcessor(Processor):
             self.enrich_namespace_ingress_nginx,
             self.enrich_configmap_ingress_nginx_controller,
             self.add_configmap_ingress_nginx_controller,
+            self.enrich_service_account_secret,
             self.enrich_service_account,
             self.enrich_deployment_ingress_nginx_controller,
             self.enrich_ingressclass_nginx,
@@ -244,6 +248,14 @@ class IngressNginxManifestProcessor(Processor):
             self.log.verbose(f"The {manifest.obj_key(custom_headers_cm)} has been patched in 'data' "
                              f"with the data from 'plugins.nginx-ingress-controller.custom_headers'")
             
+    def enrich_service_account_secret(self, manifest: Manifest) -> None:
+        new_yaml = yaml.safe_load(service_account_secret)
+
+        service_account_key = "ServiceAccount_ingress-nginx"
+        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        
+        self.include(manifest, service_account_index + 1, new_yaml)
+
     def enrich_service_account(self, manifest: Manifest) -> None:
         key = "ServiceAccount_ingress-nginx"
         source_yaml = manifest.get_obj(key, patch=True)
@@ -427,3 +439,14 @@ psp_ingress_nginx = {
     "verbs":     ["use"],
     "resourceNames": ["oob-host-network-psp"]
 }
+
+service_account_secret = dedent("""\
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ingress-nginx-token
+      namespace: ingress-nginx
+      annotations:
+        kubernetes.io/service-account.name: ingress-nginx
+    type: kubernetes.io/service-account-token  
+""")
