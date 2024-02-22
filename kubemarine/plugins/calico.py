@@ -220,8 +220,9 @@ class CalicoManifestProcessor(Processor):
         key = "DaemonSet_calico-node"
 
         service_account_name = "calico-node"
+        init_container_name = "upgrade-ipam"
         source_yaml= manifest.get_obj(key, patch=True)
-        self.enrich_volume_and_volumemount(source_yaml, service_account_name)
+        self.enrich_volume_and_volumemount(source_yaml, service_account_name, init_container_name)
 
         for container_name in ['upgrade-ipam', 'install-cni']:
             self.enrich_image_for_container(manifest, key,
