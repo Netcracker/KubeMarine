@@ -66,7 +66,10 @@ def get_patches_info(version, env):
             
             # Assuming subprocess.run returns the patches list
             patches_list = subprocess.run([filepath, "migrate_kubemarine", "--list"], capture_output=True, text=True).stdout.splitlines()
-            patches_list.remove("Available patches list:")
+            if "No patches available." in patches_list:
+                patches_list = []
+            else:
+                patches_list.remove("Available patches list:") 
             
             for patch in patches_list:
                 description = subprocess.run([filepath, "migrate_kubemarine", "--describe", patch], capture_output=True, text=True).stdout.strip()
@@ -82,6 +85,6 @@ def get_patches_info(version, env):
  
 
 
-
+# functionname, parameters ...
 print(globals()[sys.argv[1]](*sys.argv[2:]))
 
