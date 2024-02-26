@@ -225,7 +225,6 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
                 presence_checker(any(arg.startswith('--validating-webhook=') for arg in args), "Unexpected arguments")
                 presence_checker(any(arg.startswith('--validating-webhook-certificate=') for arg in args), "Unexpected arguments")
                 presence_checker(any(arg.startswith('--validating-webhook-key=') for arg in args), "Unexpected arguments")
-                # presence_checker('volumeMounts' in container, "Unexpected volumeMounts spec")
 
     def test_enrich_webhook_resources(self):
         inventory = self.inventory(self.k8s_latest)

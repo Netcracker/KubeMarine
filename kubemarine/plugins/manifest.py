@@ -397,8 +397,6 @@ class Processor(ABC):
             'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount'
         })
 
-        # if init_container_name is None:
-        #     init_container_name = "container"
         init_containers = source_yaml['spec']['template']['spec'].get('initContainers', [])
         target_container = next((c for c in init_containers if c['name'] == init_container_name), None)
         if target_container:
