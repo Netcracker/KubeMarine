@@ -8,7 +8,7 @@ from kubemarine import kubernetes, plugins
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
  
 class TheAction(Action):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Disable automount of Serice acocunt tokens")
     
     def run(self, res: DynamicResources) -> None:
@@ -18,7 +18,7 @@ class TheAction(Action):
 
 
 class DisableTokenAutomount(RegularPatch):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("disable_token_automount")
 
     @property
