@@ -299,4 +299,3 @@ subjects:
 - kind: ServiceAccount
   name: calico-apiserver
   namespace: calico-apiserver
-  
