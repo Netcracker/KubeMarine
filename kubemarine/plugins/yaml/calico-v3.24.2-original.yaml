@@ -4867,4 +4867,3 @@ spec:
             host: localhost
           periodSeconds: 10
           timeoutSeconds: 10
-   
