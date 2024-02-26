@@ -37,13 +37,20 @@ services:
     podPidsLimit: 4096
     cgroupDriver: systemd
     serializeImagePulls: false
+  kubeadm_kube-proxy:
+    apiVersion: kubeproxy.config.k8s.io/v1alpha1
+    kind: KubeProxyConfiguration
+    conntrack:
+      min: |
+        {% if services.kubeadm.kubernetesVersion | versionkey >= (1, 29, 0) %}
+        {{ services.sysctl["net.netfilter.nf_conntrack_max"] }}
+        {% endif %}
   kubeadm_flags:
     ignorePreflightErrors: Port-6443,CoreDNSUnsupportedPlugins
   kubeadm:
-    # for patches functionality we need v1beta3 which is available since k8s v1.22 only
     apiVersion: 'kubeadm.k8s.io/v1beta3'
     kind: ClusterConfiguration
-    kubernetesVersion: v1.26.7
+    kubernetesVersion: v1.26.11
     controlPlaneEndpoint: '{{ cluster_name }}:6443'
     imageRepository: registry.k8s.io
     dns: {}
@@ -53,6 +60,7 @@ services:
     apiServer:
       certSANs: []
       extraArgs:
+        tls-cipher-suites: TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384
         enable-admission-plugins: NodeRestriction
         profiling: "false"
         audit-log-path: /var/log/kubernetes/audit/audit.log
@@ -74,10 +82,12 @@ services:
     scheduler:
       extraArgs:
         profiling: "false"
+      extraVolumes: []
     controllerManager:
       extraArgs:
         profiling: "false"
         terminated-pod-gc-threshold: "1000"
+      extraVolumes: []
   kubeadm_patches:
     # bind-address flag for apiServer is set in the code
     apiServer: []
@@ -432,6 +442,9 @@ services:
     target_ports:
       http: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20080{% else %}80{% endif %}'
       https: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20443{% else %}443{% endif %}'
+    keepalived:
+      keep_configs_updated: True
+      global: {}
 
   packages:
     cache_versions: true
@@ -682,6 +695,8 @@ plugins:
               - ingress-nginx-controller
     config_map:
       use-proxy-protocol: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}true{% else %}false{% endif %}'
+      # redefine default value for controller >= v1.9.0 because we need to use snippet annotations for dashboard
+      allow-snippet-annotations: "true"
     webhook:
       image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
       # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598

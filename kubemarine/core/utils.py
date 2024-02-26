@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import difflib
 import hashlib
 import io
+import ipaddress
 import json
 import os
 import re
@@ -21,7 +23,7 @@ import sys
 import time
 import tarfile
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
@@ -169,10 +171,10 @@ def make_ansible_inventory(location: str, c: object) -> None:
 
 
 def get_current_timestamp_formatted() -> str:
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 
-def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
+def get_final_inventory(c: object, initial_inventory: dict = None, procedure_initial_inventory: dict = None) -> dict:
     from kubemarine.core.cluster import KubernetesCluster
     cluster = cast(KubernetesCluster, c)
 
@@ -181,18 +183,24 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     else:
         inventory = deepcopy(initial_inventory)
 
+    if procedure_initial_inventory is None:
+        procedure_inventory = deepcopy(cluster.procedure_inventory)
+    else:
+        procedure_inventory = deepcopy(procedure_initial_inventory)
+
     from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
     from kubemarine.core import defaults
     from kubemarine.cri import containerd
     from kubemarine.plugins import nginx_ingress
     from kubemarine.procedures import add_node, remove_node
 
-    inventory_finalize_functions = [
+    inventory_finalize_functions: List[Callable[[KubernetesCluster, dict, dict], dict]] = [
         add_node.add_node_finalize_inventory,
-        lambda cluster, inventory: defaults.calculate_node_names(inventory, cluster),
+        lambda cluster, inventory, _: defaults.calculate_node_names(inventory, cluster),
         remove_node.remove_node_finalize_inventory,
-        kubernetes.restore_finalize_inventory,
-        kubernetes.upgrade_finalize_inventory,
+        lambda cluster, inventory, _: kubernetes.restore_finalize_inventory(cluster, inventory),
+        lambda cluster, inventory, _: kubernetes.upgrade_finalize_inventory(cluster, inventory),
+        kubernetes.reconfigure_finalize_inventory,
         thirdparties.restore_finalize_inventory,
         thirdparties.upgrade_finalize_inventory,
         thirdparties.migrate_cri_finalize_inventory,
@@ -206,7 +214,7 @@ def get_final_inventory(c: object, initial_inventory: dict = None) -> dict:
     ]
 
     for finalize_fn in inventory_finalize_functions:
-        inventory = finalize_fn(cluster, inventory)
+        inventory = finalize_fn(cluster, inventory, procedure_inventory)
 
     return inventory
 
@@ -269,26 +277,13 @@ def get_dump_filepath(context: dict, filename: str) -> str:
     return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
 
 
-def wait_command_successful(g: object, command: str,
-                            retries: int = 15, timeout: int = 5,
-                            warn: bool = True, hide: bool = False) -> None:
-    from kubemarine.core.group import NodeGroup
-    group = cast(NodeGroup, g)
-
-    log = group.cluster.log
-
+def wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
+                            retries: int, timeout: int) -> None:
     while retries > 0:
-        log.debug("Waiting for command to succeed, %s retries left" % retries)
-        result = group.sudo(command, warn=warn, hide=hide)
-        if hide:
-            log.verbose(result)
-            for host in result.get_failed_hosts_list():
-                stderr = result[host].stderr.rstrip('\n')
-                if stderr:
-                    log.debug(f"{host}: {stderr}")
-
-        if not result.is_any_failed():
-            log.debug("Command succeeded")
+        logger.debug("Waiting for command to succeed, %s retries left" % retries)
+        result = attempt()
+        if result:
+            logger.debug("Command succeeded")
             return
         retries = retries - 1
         time.sleep(timeout)
@@ -454,25 +449,59 @@ def load_yaml(filepath: str) -> dict:
         return {}  # unreachable
 
 
-def true_or_false(value: Union[str, bool]) -> str:
+def strtobool(value: Union[str, bool]) -> bool:
     """
     The method check string and boolean value
     :param value: Value that should be checked
+    :param section: inventory section for debugging purpose
     """
-    input_string = str(value)
-    if input_string in ['true', 'True', 'TRUE']:
-        result = "true"
-    elif input_string in ['false', 'False', 'FALSE']:
-        result = "false"
+    val = str(value).lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
     else:
-        result = "undefined"
-    return result
+        raise ValueError(f"invalid truth value {value!r}")
+
+
+def strtoint(value: Union[str, int]) -> int:
+    if isinstance(value, int):
+        return value
+
+    try:
+        # whitespace required because python's int() ignores them
+        return int(value.replace(' ', '.'))
+    except ValueError:
+        raise ValueError(f"invalid integer value {value!r}")
 
 
 def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
     # Extra transformation to JSON is necessary,
     # because DeepDiff.to_dict() returns custom nested classes that cannot be serialized to yaml by default.
     logger.debug(yaml.safe_dump(yaml.safe_load(diff.to_json())))
+
+
+def get_unified_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    diff = list(difflib.unified_diff(
+        old.splitlines(), new.splitlines(),
+        fromfile=fromfile, tofile=tofile,
+        lineterm=''))
+
+    if diff:
+        return '\n'.join(diff)
+
+    return None
+
+
+def get_yaml_diff(old: str, new: str, fromfile: str = '', tofile: str = '') -> Optional[str]:
+    if yaml.safe_load(old) == yaml.safe_load(new):
+        return None
+
+    return get_unified_diff(old, new, fromfile, tofile)
+
+
+def isipv(address: str, versions: List[int]) -> bool:
+    return ipaddress.ip_network(address).version in versions
 
 
 def get_version_filepath() -> str:
@@ -488,6 +517,13 @@ def minor_version(version: str) -> str:
     Converts vN.N.N to vN.N
     """
     return 'v' + '.'.join(map(str, _test_version(version, 3)[0:2]))
+
+
+def major_version(version: str) -> str:
+    """
+    Converts vN.N.N to vN
+    """
+    return 'v' + '.'.join(map(str, _test_version(version, 3)[0:1]))
 
 
 def version_key(version: str) -> Tuple[int, int, int]:
@@ -508,21 +544,28 @@ def minor_version_key(version: str) -> Tuple[int, int]:
 
 def _test_version(version: str, numbers_amount: int) -> List[int]:
     # catch version without "v" at the first symbol
+    is_rc = 0
     if version.startswith('v'):
         version_list: list = version[1:].split('.')
-        # catch invalid version 'v1.16'
-        if len(version_list) == numbers_amount:
-            # parse str to int and catch invalid symbols in version number
-            try:
-                for i, value in enumerate(version_list):
-                    # whitespace required because python's int() ignores them
-                    version_list[i] = int(value.replace(' ', '.'))
-            except ValueError:
-                pass
-            else:
-                return version_list
+        # catch version with unexpected number or parts
+        parts_num = len(version_list)
+        try:
+            for i, value in enumerate(version_list):
+                # catch release candidate version like v1.29.0-rc.1
+                if parts_num == 4 and i == 2 and value.endswith('-rc'):
+                    value = value[:-3]
+                    is_rc = 1
+                # whitespace required because python's int() ignores them
+                version_list[i] = int(value.replace(' ', '.'))
+        except ValueError:
+            pass
+        else:
+            if numbers_amount == parts_num - is_rc:
+                return version_list[:numbers_amount]
 
     expected_pattern = 'v' + '.'.join('N+' for _ in range(numbers_amount))
+    if numbers_amount == 3:
+        expected_pattern += '[-rc.N+]'
     raise ValueError(f'Incorrect version \"{version}\" format, expected version pattern is \"{expected_pattern}\"')
 
 

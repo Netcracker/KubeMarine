@@ -537,6 +537,10 @@ class ExportKubernetesDownloader:
                 if task is None:
                     break
 
+                # Skip task with empty resource list
+                if not task.resources:
+                    continue
+
                 random = uuid.uuid4().hex
                 temp_local_filepath = os.path.join(self.backup_directory, random)
                 self._download(task, temp_local_filepath)
@@ -585,12 +589,12 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
 
     logger.debug('Loading namespaced resource types:')
     loaded_resources = _load_resources(logger, control_plane, True)
-    proposed_resources = backup_kubernetes.get('namespaced_resources', {}).get('resources', 'all')
+    proposed_resources = backup_kubernetes.get('namespaced_resources', {}).get('resources', [])
     namespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
     logger.debug('Loading non-namespaced resource types:')
     loaded_resources = _load_resources(logger, control_plane, False)
-    proposed_resources = backup_kubernetes.get('nonnamespaced_resources', 'all')
+    proposed_resources = backup_kubernetes.get('nonnamespaced_resources', [])
     nonnamespaced_resources = _filter_resources_by_proposed(logger, loaded_resources, proposed_resources, 'resource')
 
     logger.debug('Loading resources:')

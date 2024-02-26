@@ -27,7 +27,7 @@ from typing import (
 from kubemarine.core import utils, log, errors
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.executor import (
-    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult,
+    RawExecutor, Token, GenericResult, RunnersResult, HostToResult, Callback, TokenizedResult, UnexpectedExit,
 )
 
 NodeConfig = Dict[str, Any]
@@ -710,6 +710,62 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
         executor = RawExecutor(self.cluster)
         return executor.wait_for_boot(self.get_hosts(), timeout, initial_boot_history)
 
+    def wait_command_successful(self, command: str,
+                                *,
+                                retries: int = 15, timeout: int = 5,
+                                hide: bool = False) -> None:
+        logger = self.cluster.log
+
+        def attempt() -> bool:
+            result = self.sudo(command, warn=True, hide=hide)
+            if hide:
+                logger.verbose(result)
+                for host in result.get_failed_hosts_list():
+                    stderr = result[host].stderr.rstrip('\n')
+                    if stderr:
+                        logger.debug(f"{host}: {stderr}")
+
+            return not result.is_any_failed()
+
+        utils.wait_command_successful(logger, attempt, retries, timeout)
+
+    def wait_commands_successful(self, commands: List[str],
+                                 *,
+                                 retries: int = 15, timeout: int = 5,
+                                 sudo: bool = True) -> None:
+        if len(self.nodes) != 1:
+            raise Exception("Waiting for few commands is currently supported only for single node")
+
+        logger = self.cluster.log
+        remained_commands = list(commands)
+
+        def attempt() -> bool:
+            defer = self.new_defer()
+            for command in remained_commands:
+                if sudo:
+                    defer.sudo(command)
+                else:
+                    defer.run(command)
+
+            try:
+                defer.flush()
+            except RemoteGroupException as e:
+                results = e.results[self.get_host()]
+                for result in results:
+                    if isinstance(result, UnexpectedExit):
+                        logger.debug(result.result.stderr)
+                        break
+                    elif isinstance(result, Exception):
+                        raise
+
+                    del remained_commands[0]
+
+                return False
+
+            return True
+
+        utils.wait_command_successful(logger, attempt, retries, timeout)
+
     def get_local_file_sha1(self, filename: str) -> str:
         return utils.get_local_file_sha1(filename)
 
@@ -793,7 +849,7 @@ class RemoteExecutor(RawExecutor):
 class GroupException(Exception):
     def __init__(self, cluster: object, results: Dict[str, List[GenericResult]]):
         self.cluster = cluster
-        self._results = results
+        self.results = results
 
     def _make_group(self, hosts: Iterable[str]) -> NodeGroup:
         return NodeGroup(hosts, self.cluster)
@@ -813,7 +869,7 @@ class GroupException(Exception):
         :return: List with hosts
         """
         excepted_hosts: List[str] = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             if any(isinstance(result, Exception) for result in results):
                 excepted_hosts.append(host)
         return excepted_hosts
@@ -834,7 +890,7 @@ class GroupException(Exception):
         :return: List with hosts
         """
         exited_hosts: List[str] = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             if all(isinstance(result, RunnersResult) for result in results):
                 exited_hosts.append(host)
         return exited_hosts
@@ -853,7 +909,7 @@ class GroupException(Exception):
         # for the reason that the user code might want to print output of some commands in the batch,
         # but failed to do that because of the exception.
         host_outputs = []
-        for host, results in self._results.items():
+        for host, results in self.results.items():
             output = f"{host}:"
 
             # filter out transfer results and the last exception if present
@@ -884,4 +940,3 @@ class GroupResultException(GroupException):
 class RemoteGroupException(GroupException):
     def __init__(self, cluster: object, results: Dict[str, TokenizedResult]):
         super().__init__(cluster, {host: list(res.values()) for host, res in results.items()})
-        self.results = results

@@ -125,19 +125,22 @@ def _convert_thirdparty(thirdparties: dict, destination: str) -> dict:
     return config
 
 
-def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+def _get_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory['upgrade_plan']:
+        for version in procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
-            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("thirdparties", {})))
+            upgrade_plan.append((version, procedure_inventory.get(version, {}).get("thirdparties", {})))
 
     elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_thirdparty' in context:
-        upgrade_thirdparties = cluster.procedure_inventory.get('upgrade', {}).get("thirdparties", {})
+        upgrade_thirdparties = procedure_inventory.get('upgrade', {}).get("thirdparties", {})
         upgrade_thirdparties = dict(item for item in upgrade_thirdparties.items()
                                     if item[0] == context['upgrading_thirdparty'])
         upgrade_plan = [("", upgrade_thirdparties)]
@@ -196,12 +199,15 @@ def _verify_upgrade_plan(inventory: dict, previous_version: str,
         previous_version = version
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory)
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory, procedure_inventory)
 
 
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    upgrade_plan = _get_upgrade_plan(cluster)
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
+    upgrade_plan = _get_upgrade_plan(cluster, procedure_inventory)
     if not upgrade_plan:
         return inventory
 
@@ -213,11 +219,14 @@ def enrich_restore_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
     return restore_finalize_inventory(cluster, inventory)
 
 
-def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def restore_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     if cluster.context.get("initial_procedure") != "restore":
         return inventory
 
-    restore_thirdparties = cluster.procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
+    restore_thirdparties = procedure_inventory.get('restore_plan', {}).get('thirdparties', {})
     return _enrich_procedure_inventory(inventory, restore_thirdparties)
 
 
@@ -225,11 +234,14 @@ def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) ->
     return migrate_cri_finalize_inventory(cluster, inventory)
 
 
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
 
-    procedure_thirdparties = cluster.procedure_inventory.get("thirdparties", {})
+    procedure_thirdparties = procedure_inventory.get("thirdparties", {})
     return _enrich_procedure_inventory(inventory, procedure_thirdparties)
 
 
@@ -415,7 +427,7 @@ def install_all_thirparties(group: NodeGroup) -> None:
         if cluster.context.get("initial_procedure") in ("install", "upgrade"):
             managing_plugin = next((plugin_name
                                     for plugin_name, plugin_configs in cluster.inventory['plugins'].items()
-                                    for plugin_procedure in plugin_configs['installation']['procedures']
+                                    for plugin_procedure in plugin_configs.get('installation', {}).get('procedures', [])
                                     if plugin_procedure.get('thirdparty') == destination),
                                    None)
 

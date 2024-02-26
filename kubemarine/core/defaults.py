@@ -14,7 +14,7 @@
 import re
 from importlib import import_module
 from copy import deepcopy
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any, Tuple, List, Callable, Union
 
 import yaml
 
@@ -40,7 +40,8 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.enrich_upgrade_inventory",
     "kubemarine.kubernetes.enrich_restore_inventory",
     "kubemarine.core.defaults.compile_inventory",
-    "kubemarine.core.defaults.manage_true_false_values",
+    "kubemarine.core.defaults.manage_primitive_values",
+    "kubemarine.kubernetes.enrich_reconfigure_inventory",
     "kubemarine.plugins.enrich_upgrade_inventory",
     "kubemarine.packages.enrich_inventory",
     "kubemarine.packages.enrich_upgrade_inventory",
@@ -77,7 +78,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.plugins.builtin.verify_inventory",
     "kubemarine.k8s_certs.renew_verify",
     "kubemarine.cri.enrich_inventory",
-    "kubemarine.system.enrich_kernel_modules"
+    "kubemarine.modprobe.enrich_kernel_modules"
 ]
 
 supported_defaults = {
@@ -460,17 +461,20 @@ def compile_string(logger: log.EnhancedLogger, struct: str, root: dict,
                    ignore_jinja_escapes: bool = True) -> str:
     logger.verbose("Rendering \"%s\"" % struct)
 
+    def precompile(struct: str) -> str:
+        return compile_string(logger, struct, root)
+
     if ignore_jinja_escapes:
         iterator = escaped_expression_regex.finditer(struct)
         struct = re.sub(escaped_expression_regex, '', struct)
-        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, recursive_compiler=precompile).from_string(struct).render(**root)
 
         # TODO this does not work for {raw}{jinja}{raw}{jinja}
         for match in iterator:
             span = match.span()
             struct = struct[:span[0]] + match.group() + struct[span[0]:]
     else:
-        struct = jinja.new(logger, True, root).from_string(struct).render(**root)
+        struct = jinja.new(logger, recursive_compiler=precompile).from_string(struct).render(**root)
 
     logger.verbose("\tRendered as \"%s\"" % struct)
     return struct
@@ -508,14 +512,60 @@ def prepare_for_dump(inventory: dict, copy: bool = True) -> dict:
     return dump_inventory
 
 
-def manage_true_false_values(inventory: dict, _: KubernetesCluster) -> dict:
-    # Check undefined values for plugin.name.install and convert it to bool
-    for plugin_name, plugin_item in inventory["plugins"].items():
-        # Check install value
-        if 'install' not in plugin_item:
-            continue
-        value = utils.true_or_false(plugin_item.get('install', False))
-        if value == 'undefined':
-            raise ValueError(f"Found unsupported value for plugin.{plugin_name}.install: {plugin_item['install']}")
-        plugin_item['install'] = value == 'true'
+def manage_primitive_values(inventory: dict, _: KubernetesCluster) -> dict:
+    paths_func_strip: List[Tuple[List[str], Callable[[Any], Any], bool]] = [
+        (['services', 'cri', 'containerdConfig',
+          'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
+          'SystemdCgroup'], utils.strtobool, False),
+        (['services', 'kubeadm_kube-proxy', 'conntrack', 'min'], utils.strtoint, True),
+        (['services', 'modprobe', '*', '*'], str, True),
+        # kernel parameters are actually not always represented as integers
+        (['services', 'sysctl', '*'], utils.strtoint, True),
+        (['plugins', '*', 'install'], utils.strtobool, False),
+        (['plugins', 'calico', 'typha', 'enabled'], utils.strtobool, False),
+        (['plugins', 'calico', 'typha', 'replicas'], utils.strtoint, False),
+    ]
+    for search_path, func, strip in paths_func_strip:
+        _convert_primitive_values(inventory, [], search_path, func, strip)
+
     return inventory
+
+
+def _convert_primitive_values(struct: Union[dict, list], path: List[Union[str, int]],
+                              search_path: List[str], func: Callable[[Any], Any], strip: bool) -> None:
+    depth = len(path)
+    section = search_path[depth]
+    if section == '*':
+        if isinstance(struct, list):
+            for i in reversed(range(len(struct))):
+                _convert_primitive_value_section(struct, i, path, search_path, func, strip)
+
+        elif isinstance(struct, dict):
+            for k in list(struct):
+                _convert_primitive_value_section(struct, k, path, search_path, func, strip)
+
+    # Only dict is possible here as struct
+    elif section in struct:
+        _convert_primitive_value_section(struct, section, path, search_path, func, strip)
+
+
+def _convert_primitive_value_section(struct: Union[dict, list], section: Union[str, int],
+                                     path: List[Union[str, int]],
+                                     search_path: List[str], func: Callable[[Any], Any], strip: bool) -> None:
+    value = struct[section]  # type: ignore[index]
+    path.append(section)
+    depth = len(path)
+    if depth < len(search_path):
+        _convert_primitive_values(value, path, search_path, func, strip)
+    else:
+        if strip and isinstance(value, str):
+            value = value.strip()
+        if strip and value == '':
+            del struct[section]  # type: ignore[arg-type]
+        else:
+            try:
+                struct[section] = func(value)  # type: ignore[index]
+            except ValueError as e:
+                raise ValueError(f"{str(e)} in section [{']['.join(repr(p) for p in path)}]")
+
+    path.pop()

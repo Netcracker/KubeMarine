@@ -134,8 +134,8 @@ class NodeGroupResultsTest(unittest.TestCase):
 
         for host in cluster.nodes['master'].get_hosts():
             expected_is_called = True if host == '10.101.1.3' else False
-            self.assertEquals(expected_is_called, cluster.fake_shell.is_called(host, 'sudo', enable_command),
-                              msg="Installation task did not finished with audit enable command")
+            self.assertEqual(expected_is_called, cluster.fake_shell.is_called(host, 'sudo', enable_command),
+                             msg="Installation task did not finished with audit enable command")
 
     def test_audit_configuring(self):
         cluster = self.new_debian_cluster()

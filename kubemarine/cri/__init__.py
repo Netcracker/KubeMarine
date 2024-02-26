@@ -13,7 +13,6 @@
 # limitations under the License.
 from typing import Optional
 
-from distutils.util import strtobool
 from kubemarine.core import static
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import RunnersGroupResult, NodeGroup
@@ -49,13 +48,13 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
     return inventory
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
     if cluster.context.get("initial_procedure") != "upgrade":
         return inventory
 
     cri_impl = cluster.inventory['services']['cri']['containerRuntime']
     if cri_impl == "containerd":
-        return containerd.upgrade_finalize_inventory(cluster, inventory)
+        return containerd.upgrade_finalize_inventory(cluster, inventory, procedure_inventory)
 
     return inventory
 

@@ -15,7 +15,7 @@
 import os
 from typing import List, Tuple, Dict
 
-from kubemarine import thirdparties
+from kubemarine import thirdparties, kubernetes
 from kubemarine.core import utils
 from ..shell import curl, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
@@ -90,6 +90,9 @@ def validate_thirdparty_versions(kubernetes_versions: Dict[str, Dict[str, str]],
     for i, older_k8s_version in enumerate(k8s_versions):
         for j in range(i + 1, len(k8s_versions)):
             newer_k8s_version = k8s_versions[j]
+            if not kubernetes.is_version_upgrade_possible(older_k8s_version, newer_k8s_version):
+                continue
+
             older_version = kubernetes_versions[older_k8s_version][thirdparty_name]
             newer_version = kubernetes_versions[newer_k8s_version][thirdparty_name]
             if key(newer_version) < key(older_version):

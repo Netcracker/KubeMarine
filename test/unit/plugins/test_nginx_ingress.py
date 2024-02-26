@@ -81,8 +81,12 @@ class EnrichmentValidation(unittest.TestCase):
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def setUp(self):
         self.commonSetUp(Identity('nginx-ingress-controller'))
-        # Requires ingress-nginx v1.4.x
+        # Requires ingress-nginx >= v1.9.5
         self.k8s_latest = self.get_latest_k8s()
+        # Requires ingress-nginx < v1.9.5
+        self.k8s_1_28_x = self.get_latest_k8s("v1.28")
+        # Requires ingress-nginx < v1.9.0
+        self.k8s_1_25_x = self.get_latest_k8s("v1.25")
         # Requires ingress-nginx v1.2.x
         self.k8s_1_24_x = self.get_latest_k8s("v1.24")
 
@@ -177,15 +181,24 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
     def test_webhook_resources_difference(self):
         for k8s_version, expected_num_resources in (
             (self.k8s_1_24_x, 0),
+            (self.k8s_1_25_x, 9),
+            (self.k8s_1_28_x, 10),
             (self.k8s_latest, 9)
         ):
             with self.subTest(k8s_version):
                 cluster = demo.new_cluster(self.inventory(k8s_version))
                 manifest = self.enrich_yaml(cluster)
                 webhook_resources = 0
+
+                # Check if nginx-ingress-controller version is v1.9.5 before counting webhook resources
+                nginx_version = self.get_obj(manifest, "DaemonSet_ingress-nginx-controller")['spec']['template']['spec']['containers'][0]['image']
+                if "v1.9.5" in nginx_version:
+                    expected_num_resources = 9  # Adjust expected number for v1.9.5
+
                 for key in self.all_obj_keys(manifest):
                     if 'admission' in key:
                         webhook_resources += 1
+
                 self.assertEqual(expected_num_resources, webhook_resources,
                                  f"ingress-nginx for {k8s_version} should have {expected_num_resources} webhook resources")
 

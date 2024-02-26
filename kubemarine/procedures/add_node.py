@@ -22,6 +22,7 @@ from kubemarine.core import flow
 from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
+from kubemarine.kubernetes import components
 from kubemarine.plugins.nginx_ingress import redeploy_ingress_nginx_is_needed
 from kubemarine.procedures import install
 
@@ -31,6 +32,8 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
     group = cluster.make_group_from_roles(['control-plane', 'worker']).get_new_nodes()
 
     if group.is_empty():
+        # If balancers are added, it is necessary to reconfigure apiServer.certSANs
+        write_new_apiserver_certsans(cluster)
         cluster.log.debug("No kubernetes nodes to perform")
         return
 
@@ -40,6 +43,8 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
         cluster.nodes['worker'].get_new_nodes().exclude_group(cluster.nodes['control-plane']) \
             .call(kubernetes.init_workers)
 
+    write_new_apiserver_certsans(cluster)
+
     group.call_batch([
         kubernetes.apply_labels,
         kubernetes.apply_taints
@@ -48,6 +53,17 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Waiting for new kubernetes nodes...")
     kubernetes.wait_for_nodes(group)
     kubernetes.schedule_running_nodes_report(cluster)
+
+
+def write_new_apiserver_certsans(cluster: KubernetesCluster) -> None:
+    # If balancer or control plane is added, apiServer.certSANs are changed.
+    # See kubernetes.enrich_inventory()
+    new_nodes_require_sans = cluster.make_group_from_roles(['control-plane', 'balancer']).get_new_nodes()
+    if new_nodes_require_sans.is_empty():
+        return
+
+    cluster.log.debug("Write new certificates for kube-apiserver")
+    components.reconfigure_components(cluster.nodes['control-plane'], ['kube-apiserver/cert-sans'])
 
 
 def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
@@ -60,7 +76,8 @@ def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
         cluster.log.debug("Redeploy ingress-nginx-controller is not needed, skip it")
 
 
-def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                                procedure_inventory_for_finalization: dict = None) -> dict:
     if cluster.context.get('initial_procedure') != 'add_node':
         return inventory_to_finalize
 
@@ -68,7 +85,7 @@ def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finaliz
 
     if not is_finalization:
         # new nodes are not presented in final inventory - let's add it original config
-        kubernetes.add_node_enrichment(inventory_to_finalize, cluster)
+        kubernetes.add_node_enrichment(inventory_to_finalize, cluster, procedure_inventory_for_finalization)
 
     # new nodes are already presented in final inventory - ok, just remove label
     for i, node in enumerate(inventory_to_finalize['nodes']):

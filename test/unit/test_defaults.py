@@ -233,5 +233,60 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         self.assertEqual(inventory['control_plain']['external'], inventory['vrrp_ips'][1]['floating_ip'])
 
 
+class PrimitiveValuesAsString(unittest.TestCase):
+    def test_default_enrichment(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.26.11'
+        context = demo.create_silent_context()
+        context['nodes'] = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
+        inventory = demo.new_cluster(inventory, context=context).inventory
+
+        self.assertEqual(True, inventory['services']['cri']['containerdConfig']
+                         ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
+        self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
+        self.assertEqual(['br_netfilter', 'nf_conntrack'],
+                         inventory['services']['modprobe']['debian'])
+        self.assertEqual({'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward', 'net.ipv4.ip_nonlocal_bind',
+                          'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
+                          'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops'},
+                         set(inventory['services']['sysctl'].keys()))
+        typha = inventory['plugins']['calico']['typha']
+        self.assertEqual(False, typha['enabled'])
+        self.assertEqual(2, typha['replicas'])
+
+    def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory = demo.new_cluster(inventory).inventory
+
+        self.assertEqual(1000000, inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
+
+    def test_custom_jinja_enrichment(self):
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        inventory['services'].setdefault('modprobe', {})['debian'] = [
+            """
+            {% if true %}
+            custom_module
+            {% endif %}
+            """,
+            {'<<': 'merge'}
+        ]
+        inventory['services'].setdefault('sysctl', {})['custom_parameter'] = \
+            """
+            {% if true %}
+            1
+            {% endif %}
+            """
+        inventory.setdefault('plugins', {}).setdefault('kubernetes-dashboard', {})['install'] = "{{ true }}"
+        context = demo.create_silent_context()
+        context['nodes'] = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
+        inventory = demo.new_cluster(inventory, context=context).inventory
+
+        self.assertEqual('custom_module', inventory['services']['modprobe']['debian'][0])
+        self.assertEqual(1, inventory['services']['sysctl']['custom_parameter'])
+        self.assertEqual(True, inventory['plugins']['kubernetes-dashboard']['install'])
+
+
 if __name__ == '__main__':
     unittest.main()

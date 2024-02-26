@@ -5,7 +5,7 @@
   "properties": {
     "kubernetesVersion": {
       "type":  "string",
-      "default": "v1.26.3",
+      "default": "v1.26.11",
       "description": "Specify the version to install and maintain. This version applies into all the dependent parameters - images, binaries, rpms, configurations."
     },
     "imageRepository": {
@@ -45,7 +45,7 @@
       "$ref": "#/definitions/ControllerManager"
     },
     "etcd": {
-      "$ref": "#/definitions/ETCD"
+      "$ref": "#/definitions/Etcd"
     },
     "apiVersion": {"type": ["string"], "default": "kubeadm.k8s.io/v1beta2"},
     "kind": {"enum": ["ClusterConfiguration"], "default": "ClusterConfiguration"}
@@ -53,12 +53,12 @@
   "definitions": {
     "ApiServer": {
       "type": "object",
+      "allOf": [{"$ref": "#/definitions/ControlPlaneComponentProperties"}],
       "properties": {
         "certSANs": {
           "$ref": "../common/utils.json#/definitions/ArrayOfStrings"
         },
         "extraArgs": {
-          "type": "object",
           "properties": {
             "enable-admission-plugins": {"type": "string", "default": "NodeRestriction"},
             "profiling": {"type": "string", "default": "'false'"},
@@ -72,48 +72,39 @@
             "service-account-jwks-uri": {"type": "string"},
             "service-account-signing-key-file": {"type": "string"},
             "service-account-key-file": {"type": "string"}
-          },
-          "additionalProperties": {
-            "type": "string"
           }
         },
-        "extraVolumes": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {"$ref": "#/definitions/HostPathMount"},
-              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
-            ]
-          }
+        "timeoutForControlPlane": {
+          "type": "string"
         }
+      },
+      "propertyNames": {
+        "anyOf": [
+          {"$ref": "#/definitions/ControlPlaneComponentPropertyNames"},
+          {"enum": ["certSANs", "timeoutForControlPlane"]}
+        ]
       }
     },
     "Scheduler": {
       "type": "object",
+      "allOf": [{"$ref": "#/definitions/ControlPlaneComponentProperties"}],
       "properties": {
         "extraArgs": {
-          "type": "object",
           "properties": {
             "profiling": {"type": "string", "default": "'false'"},
             "feature-gates": {"type": "string"}
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "extraVolumes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/HostPathMount"
           }
         }
+      },
+      "propertyNames": {
+        "$ref": "#/definitions/ControlPlaneComponentPropertyNames"
       }
     },
     "ControllerManager": {
       "type": "object",
+      "allOf": [{"$ref": "#/definitions/ControlPlaneComponentProperties"}],
       "properties": {
         "extraArgs": {
-          "type": "object",
           "properties": {
             "profiling": {"type": "string", "default": "'false'"},
             "terminated-pod-gc-threshold": {"type": "string", "default": "'1000'"},
@@ -122,33 +113,52 @@
               "description": "Plugin to enable the CPP support"
             },
             "feature-gates": {"type": "string"}
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "extraVolumes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/HostPathMount"
           }
         }
+      },
+      "propertyNames": {
+        "$ref": "#/definitions/ControlPlaneComponentPropertyNames"
       }
     },
-    "ETCD": {
+    "Etcd": {
       "type": "object",
       "properties": {
         "local": {
           "type": "object",
           "properties": {
             "extraArgs": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
+              "$ref": "#/definitions/ExtraArgs"
             }
           }
         }
+      }
+    },
+    "ControlPlaneComponentProperties": {
+      "properties": {
+        "extraArgs": {
+          "$ref": "#/definitions/ExtraArgs"
+        },
+        "extraVolumes": {
+          "$ref": "#/definitions/ExtraVolumes"
+        }
+      }
+    },
+    "ControlPlaneComponentPropertyNames": {
+      "enum": ["extraArgs", "extraVolumes"]
+    },
+    "ExtraArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ExtraVolumes": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"$ref": "#/definitions/HostPathMount"},
+          {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+        ]
       }
     },
     "HostPathMount": {

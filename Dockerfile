@@ -1,4 +1,17 @@
-FROM python:3-slim-buster
+# syntax=docker/dockerfile:1
+
+# Build ipip_check binary
+FROM golang:1.21 AS go-build
+
+WORKDIR /opt
+
+COPY ./kubemarine/resources/scripts/source/ipip_check ./
+
+RUN go mod download && \
+    GOOS=linux CGO_ENABLED=1 go build -ldflags="-linkmode external -extldflags='-static'" -o ipip_check -buildvcs=false && \
+    gzip ipip_check
+
+FROM python:3.12-slim-bullseye AS python-build
 
 ARG BUILD_TYPE
 
@@ -8,6 +21,7 @@ ENV PYTHONUNBUFFERED 1
 ENV ANSIBLE_HOST_KEY_CHECKING False
 
 COPY . /opt/kubemarine/
+COPY --from=go-build /opt/ipip_check.gz /opt/kubemarine/kubemarine/resources/scripts/
 WORKDIR /opt/kubemarine/
 
 RUN apt update && \
@@ -23,7 +37,7 @@ RUN apt update && \
     else \
       pip3 install --no-cache-dir $(ls dist/*.whl)[ansible]; \
       apt install -y wget; \
-      wget -O - https://get.helm.sh/helm-v3.10.0-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1; \
+      wget -O - https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz | tar xvz -C /usr/local/bin  linux-amd64/helm --strip-components 1; \
       apt autoremove -y wget; \
       rm -r *; \
     fi && \

@@ -44,7 +44,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         print("qqq")
         print(generated_hosts)
         print("qqq")
-        self.assertEquals(configmap_hosts, cluster.inventory['services']['coredns'].get('configmap').get('Hosts') + '\n' + generated_hosts)
+        self.assertEqual(configmap_hosts, cluster.inventory['services']['coredns'].get('configmap').get('Hosts') + '\n' + generated_hosts)
 
     def test_already_defined_hosts_config_and_not_add_etc_hosts_generated(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -57,7 +57,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
         }
         inventory['services']['coredns']['add_etc_hosts_generated'] = False
         cluster = demo.new_cluster(inventory)
-        self.assertEquals('1.2.3.4 example.org', cluster.inventory['services']['coredns']['configmap']['Hosts'])
+        self.assertEqual('1.2.3.4 example.org', cluster.inventory['services']['coredns']['configmap']['Hosts'])
 
 
 class CorednsGenerator(unittest.TestCase):

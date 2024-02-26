@@ -1,6 +1,7 @@
 This section describes the features and steps for performing maintenance procedures on the existing Kubernetes cluster.
 
 - [Prerequisites](#prerequisites)
+- [Basics](#basics)
 - [Provided Procedures](#provided-procedures)
     - [Kubemarine Migration Procedure](#kubemarine-migration-procedure)
       - [Software Upgrade Patches](#software-upgrade-patches)
@@ -10,6 +11,7 @@ This section describes the features and steps for performing maintenance procedu
     - [Add Node Procedure](#add-node-procedure)
       - [Operating System Migration](#operating-system-migration)
     - [Remove Node Procedure](#remove-node-procedure)
+    - [Reconfigure Procedure](#reconfigure-procedure)
     - [Manage PSP Procedure](#manage-psp-procedure)
     - [Manage PSS Procedure](#manage-pss-procedure)
     - [Reboot Procedure](#reboot-procedure)
@@ -42,10 +44,21 @@ Before you start any maintenance procedure, you must complete the following mand
 1. If using custom RPM repositories, make sure they are online, accessible from nodes, and you are able to perform repository updates.
 1. Prepare the latest actual **cluster.yaml** that should contain information about the current cluster state. For more information, refer to the [Kubemarine Inventory Preparation](Installation.md#inventory-preparation) section in _Kubemarine Installation Procedure_.
 
-   **Note**: If you provide an incorrect config file, it can cause unknown consequences.
+   **Note**: If you provide an incorrect config file, it can cause unknown consequences. For more information, refer to [Basics](#basics). 
 
 1. Prepare **procedure.yaml** file containing the configuration for the procedure that you are about to perform. Each procedure has its own configuration format. Read documentation below to fill procedure inventory data.
 
+# Basics
+
+According to the Kubemarine concept, `cluster.yaml` is a reflection of the Kubernetes cluster state.
+Therefore, any changes on the cluster must be reflected in `cluster.yaml` in the corresponding section to be consistent with the cluster state.
+This is an important practice even if the `cluster.yaml` section or option is applicable only for the installation procedure because the particular `cluster.yaml` can be used for the reinstallation or reproduction of some cases.
+For the changes that cannot be reflected in `cluster.yaml`, the appropriate comments can be used.
+
+The maintenance of the cluster can be done in two scenarios:
+
+- It can be performed using some Kubemarine procedure. In this case, Kubemarine does its best to keep `cluster.yaml` and the cluster consistent to each other.
+- The cluster can be reconfigured manually. In this case, the user should also manually reflect the changes in the `cluster.yaml`.
 
 # Provided Procedures
 
@@ -216,7 +229,10 @@ The configuration format for the plugins is the same.
   * https://kubernetes.io/docs/tasks/run-application/configure-pdb/#unhealthy-pod-eviction-policy is configured to _AlwaysAllow_
 * API versions `extensions/v1beta1` and `networking.k8s.io/v1beta1` are not supported starting from Kubernetes 1.22 and higher. Need to update ingress to the new API `networking.k8s.io/v1`. More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122
 * Before starting the upgrade, make sure you make a backup. For more information, see the section [Backup Procedure](#backup-procedure).
-* The upgrade procedure only maintains upgrading from one `supported` version to the next `supported` version. For example, from 1.18 to 1.20 or from 1.20 to 1.21.
+* The upgrade procedure only maintains upgrading from one `supported` version to the higher `supported` version.
+  The target version must also be the latest patch version supported by Kubemarine.
+  For example, upgrade is allowed from v1.26.7 to v1.26.11, or from v1.26.7 to v1.27.8, or from v1.26.7 to v1.28.4 through v1.27.8,
+  but not from v1.26.7 to v1.27.1 as v1.27.1 is not the latest supported patch version of Kubernetes v1.27.
 * Since Kubernetes v1.25 doesn't support PSP, any clusters with `PSP` enabled must be migrated to `PSS` **before the upgrade** procedure running. For more information see the [Admission Migration Procedure](#admission-migration-procedure). The migration procedure is very important for Kubernetes cluster. If the solution doesn't have appropriate description about what `PSS` profile should be used for every namespace, it is better not to migrate from PSP for a while.  
 
 ### Upgrade Procedure Parameters
@@ -254,6 +270,12 @@ UPGRADING KUBERNETES v1.18.8 ⭢ v1.19.3
 ```
 
 The script upgrades Kubernetes versions one-by-one. After each upgrade, the `cluster.yaml` is regenerated to reflect the actual cluster state. Use the latest updated `cluster.yaml` configuration to further work with the cluster.
+
+Additionally, Kubemarine cleans up the `/etc/kubernetes/tmp` directory before the upgrade, where kubeadm stores the [backup files](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#recovering-from-a-failure-state)
+during the upgrade. For this reason, only the backups for the latest upgrade through Kubemarine are placed here after the upgrade procedure.
+
+**Note**: It is not recommended to use the backup files for rolling back after the upgrade because it can follow an inconsistent state 
+for `cluster.yaml`. Use the Kubemarine [backup](#backup-procedure) and [restore](#restore-procedure) procedures instead of manual restoration.
 
 #### Upgrading Specific Nodes
 
@@ -322,9 +344,6 @@ etcd:
       election-timeout: "10000"
 ...
 ```
-
-**Note**: All the custom settings for the system services should be properly reflected in the cluster.yaml (see [services.kubeadm parameters](Installation.md#kubeadm)) to be kept after upgrade.
-
 
 #### Thirdparties Upgrade Section and Task
 
@@ -448,7 +467,7 @@ The `upgrade` procedure executes the following sequence of tasks:
 The backup procedure automatically saves the following entities:
 * ETCD snapshot
 * Files and configs from cluster nodes
-* Kubernetes resources
+* Kubernetes resources (if it's configured in procedure.yaml)
 
 As a result of the procedure, you receive an archive with all the stored objects inside. The archive has approximately the following structure inside:
 
@@ -585,7 +604,7 @@ backup_plan:
 
 #### kubernetes Parameter
 
-The procedure exports all available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to restrict resources for export, you can specify which ones you need.
+The procedure can export any available Kubernetes resources from the cluster to yaml files. There are two types of resources - namespaced and non-namespaced. If you need to export resources, you can specify which ones you need. By default, **no** resources from **all** namespaces are exported.
 
 **Note**: If the specified resource is missing, it is skipped without an error.
 
@@ -628,6 +647,16 @@ Another example:
 backup_plan:
   kubernetes:
     nonnamespaced_resources: all
+```
+
+If you do not specify `backup_plan.kubernetes`, the following configuration will be used:
+```yaml
+backup_plan:
+  kubernetes:
+    namespaced_resources:
+      namespaces: all
+      resources: []
+    nonnamespaced_resources: []
 ```
 
 ### Backup Procedure Tasks Tree
@@ -942,6 +971,173 @@ To change the operating system on an already running cluster:
 
 **Warning**: In case when you use custom associations, you need to specify them simultaneously for all types of operating systems. For more information, refer to the [associations](Installation.md#associations) section in the _Kubemarine Installation Procedure_.
 
+## Reconfigure Procedure
+
+This procedure is aimed to reconfigure the cluster.
+
+It is supposed to reconfigure the cluster as a generalized concept described by the inventory file.
+Though, currently the procedure supports to reconfigure only Kubeadm-managed settings.
+If you are looking for how to reconfigure other settings, consider the following:
+
+- Probably some other [maintenance procedure](#provided-procedures) can do the task.
+- Some [installation tasks](Installation.md#tasks-list-redefinition) can reconfigure some system settings without full redeploy of the cluster.
+
+**Basic prerequisites**:
+
+- Make sure to follow the [Basics](#basics).
+- Before starting the procedure, consider making a backup. For more information, see the section [Backup Procedure](#backup-procedure).
+
+### Reconfigure Procedure Parameters
+
+The procedure accepts required positional argument with the path to the procedure inventory file.
+You can find description and examples of the accepted parameters in the next sections.
+
+The JSON schema for procedure inventory is available by [URL](../kubemarine/resources/schemas/reconfigure.json?raw=1).
+For more information, see [Validation by JSON Schemas](Installation.md#inventory-validation).
+
+#### Reconfigure Kubeadm
+
+The following Kubeadm-managed sections can be reconfigured:
+
+- `services.kubeadm.apiServer`
+- `services.kubeadm.apiServer.certSANs`
+- `services.kubeadm.scheduler`
+- `services.kubeadm.controllerManager`
+- `services.kubeadm.etcd.local.extraArgs`
+- `services.kubeadm_kubelet`
+- `services.kubeadm_kube-proxy`
+- `services.kubeadm_patches`
+
+For more information, refer to the description of these sections:
+
+- [kubeadm](Installation.md#kubeadm)
+- [kubeadm_kubelet](Installation.md#kubeadm_kubelet)
+- [kubeadm_kube-proxy](Installation.md#kubeadm_kube-proxy)
+- [kubeadm_patches](Installation.md#kubeadm_patches)
+
+Example of procedure inventory that reconfigures all the supported sections:
+
+<details>
+  <summary>Click to expand</summary>
+
+```yaml
+services:
+  kubeadm:
+    apiServer:
+      certSANs:
+        - k8s-lb
+      extraArgs:
+        enable-admission-plugins: NodeRestriction,PodNodeSelector
+        profiling: "false"
+        audit-log-path: /var/log/kubernetes/audit/audit.log
+        audit-policy-file: /etc/kubernetes/audit-policy.yaml
+        audit-log-maxage: "30"
+        audit-log-maxbackup: "10"
+        audit-log-maxsize: "100"
+    scheduler:
+      extraArgs:
+        profiling: "false"
+    controllerManager:
+      extraArgs:
+        profiling: "false"
+        terminated-pod-gc-threshold: "1000"
+    etcd:
+      local:
+        extraArgs:
+          heartbeat-interval: "1000"
+          election-timeout: "10000"
+  kubeadm_kubelet:
+    protectKernelDefaults: true
+  kubeadm_kube-proxy:
+    conntrack:
+      min: 1000000
+  kubeadm_patches:
+    apiServer:
+      - groups: [control-plane]
+        patch:
+          max-requests-inflight: 500
+      - nodes: [master-3]
+        patch:
+          max-requests-inflight: 600
+    etcd:
+      - nodes: [master-1]
+        patch:
+          snapshot-count: 110001
+      - nodes: [master-2]
+        patch:
+          snapshot-count: 120001
+      - nodes: [master-3]
+        patch:
+          snapshot-count: 130001
+    controllerManager:
+      - groups: [control-plane]
+        patch:
+          authorization-webhook-cache-authorized-ttl: 30s
+    scheduler:
+      - nodes: [master-2,master-3]
+        patch:
+          profiling: true
+    kubelet:
+      - nodes: [worker5]
+        patch:
+          maxPods: 100
+      - nodes: [worker6]
+        patch:
+          maxPods: 200
+```
+
+</details>
+
+The above configuration is merged with the corresponding sections in the main `cluster.yaml`,
+and the related Kubernetes components are reconfigured based on the resulting inventory.
+
+In this way it is not possible to delete some property,
+allowing the corresponding Kubernetes component to fall back to the default behaviour.
+This can be worked around by manual changing of the `cluster.yaml`
+and running the `reconfigure` procedure with **empty** necessary section.
+For example, you can delete `services.kubeadm.etcd.local.extraArgs.election-timeout` from `cluster.yaml`
+and then run the procedure with the following procedure inventory:
+
+```yaml
+services:
+  kubeadm:
+    etcd: {}
+```
+
+**Note**: It is not possible to delete default parameters offered by Kubemarine.
+
+**Note**: The mentioned hint to delete custom properties is not enough for `services.kubeadm_kube-proxy` due to existing restrictions of Kubeadm CLI tool.
+One should additionally edit the `kube-proxy` ConfigMap and set the value that is considered the default.
+
+**Note**: Passing of empty `services.kubeadm.apiServer` section reconfigures the `kube-apiserver`,
+but does not write new certificate.
+To **additionally** write new certificate, pass the desirable extra SANs in `services.kubeadm.apiServer.certSANs`.
+
+**Restrictions**:
+
+- Very few options of `services.kubeadm_kubelet` section can be reconfigured currently.
+  To learn exact set of options, refer to the JSON schema.
+- Some properties cannot be fully redefined.
+  For example, this relates to some settings in `services.kubeadm.apiServer`.
+  For details, refer to the description of the corresponding sections in the installation guide.
+
+**Basic flow**:
+
+If the procedure affects the particular set of Kubernetes components, all the components are reconfigured on each relevant node one by one.
+The flow proceeds to the next nodes only after the affected components are considered up and ready on the reconfigured node.
+Control plane nodes are reconfigured first.
+
+Working `kube-apiserver` is not required to reconfigure control plane components (more specifically, to change their static manifests),
+but required to reconfigure kubelet and kube-proxy.
+
+### Reconfigure Procedure Tasks Tree
+
+The `reconfigure` procedure executes the following sequence of tasks:
+
+- deploy
+  - kubernetes
+    - reconfigure
+
 ## Manage PSP Procedure
 
 The manage PSP procedure allows you to change PSP configuration on an already installed cluster. Using this procedure, you can:
@@ -1004,12 +1200,10 @@ To avoid this, you need to specify custom policy and bind it using `ClusterRoleB
 
 The `manage_psp` procedure executes the following sequence of tasks:
 
-1. check_inventory
 1. delete_custom
 2. add_custom
-3. reconfigure_oob
-4. reconfigure_plugin
-5. restart_pods
+3. reconfigure_psp
+4. restart_pods
 
 ## Manage PSS Procedure
 
@@ -1085,10 +1279,8 @@ application is stateless or stateful. Also shouldn't use `restart-pod: true` opt
 
 The `manage_pss procedure executes the following sequence of tasks:
 
-1. check_inventory
-2. delete_default_pss
-3. apply_default_pss
-4. restart_pods
+1. manage_pss
+2. restart_pods
 
 ## Reboot Procedure
 
@@ -1133,7 +1325,7 @@ The `cert_renew` procedure allows you to renew some certificates on an existing 
 
 For Kubernetes, most of the internal certificates could be updated, specifically: 
 `apiserver`, `apiserver-etcd-client`, `apiserver-kubelet-client`, `etcd-healthcheck-client`, `etcd-peer`, `etcd-server`,
-`admin.conf`, `controller-manager.conf`, `scheduler.conf`, `front-proxy-client`. 
+`admin.conf`, `super-admin.conf`, `controller-manager.conf`, `scheduler.conf`, `front-proxy-client`. 
 Certificate used by `kubelet.conf` by default is updated automatically by Kubernetes, 
 link to Kubernetes docs regarding `kubelet.conf` rotation: https://kubernetes.io/docs/tasks/tls/certificate-rotation/#understanding-the-certificate-rotation-configuration.
 
@@ -1205,6 +1397,7 @@ kubernetes:
     - etcd-peer
     - etcd-server
     - admin.conf
+    - super-admin.conf
     - controller-manager.conf
     - scheduler.conf
     - front-proxy-client

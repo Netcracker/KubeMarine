@@ -85,10 +85,11 @@ def cert_renew_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
+def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
+                       procedure_inventory_for_finalization: dict) -> dict:
     # check that renewal is required for nginx
     if cluster.context.get('initial_procedure') != 'cert_renew' \
-            or not cluster.procedure_inventory.get("nginx-ingress-controller"):
+            or not procedure_inventory_for_finalization.get("nginx-ingress-controller"):
         return inventory_to_finalize
 
     if not inventory_to_finalize["plugins"].get("nginx-ingress-controller"):
@@ -101,7 +102,8 @@ def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) 
         inventory_to_finalize["plugins"]["nginx-ingress-controller"]["controller"]["ssl"] = {}
 
     nginx_plugin = inventory_to_finalize["plugins"]["nginx-ingress-controller"]
-    nginx_plugin["controller"]["ssl"]["default-certificate"] = cluster.procedure_inventory["nginx-ingress-controller"]
+    nginx_plugin["controller"]["ssl"]["default-certificate"] = (
+        procedure_inventory_for_finalization)["nginx-ingress-controller"]
 
     return inventory_to_finalize
 
@@ -204,6 +206,7 @@ class IngressNginxManifestProcessor(Processor):
             "Job_ingress-nginx-admission-create",
             "Job_ingress-nginx-admission-patch",
             "IngressClass_nginx",
+            "NetworkPolicy_ingress-nginx-admission",
             "ValidatingWebhookConfiguration_ingress-nginx-admission",
         ]
 
@@ -277,6 +280,8 @@ class IngressNginxManifestProcessor(Processor):
         self.enrich_node_selector(manifest, key, plugin_service='controller')
         self.enrich_tolerations(manifest, key, plugin_service='controller')
 
+        # DeamonSet spec lacks of strategy. Discard it if present.
+        source_yaml['spec'].pop('strategy', None)
         # Patch kind in the last step to avoid sudden key change in log messages
         source_yaml['kind'] = 'DaemonSet'
         self.log.verbose(f"The {key} has been patched in 'kind' with 'DaemonSet'")

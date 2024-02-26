@@ -63,7 +63,7 @@ class TestInventoryValidation(unittest.TestCase):
         cluster.fake_shell.add(get_nodes, 'sudo', [kubernetes.get_nodes_description_cmd()])
         kubernetes.exec_running_nodes_report(cluster)
         summary_report = cluster.context.get('summary_report')
-        self.assertEquals(
+        self.assertEqual(
             {
                 summary.SummaryItem.CONTROL_PLANES: "1/2",
                 summary.SummaryItem.WORKERS: "1/3",

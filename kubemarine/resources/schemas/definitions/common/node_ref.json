@@ -4,10 +4,32 @@
     "Role": {
       "enum": ["worker", "control-plane", "master", "balancer"]
     },
+    "Kubernetes": {
+      "enum": ["worker", "control-plane"]
+    },
+    "ControlPlane": {
+      "enum": ["control-plane"]
+    },
     "Roles": {
       "type": "array",
       "items": {
         "$ref": "#/definitions/Role"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "KubernetesRoles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Kubernetes"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "ControlPlanes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ControlPlane"
       },
       "uniqueItems": true,
       "minItems": 1
@@ -22,6 +44,28 @@
       },
       "uniqueItems": true,
       "minItems": 1
+    },
+    "OneOfNodesGroupsSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "groups": {
+              "type": "array"
+            }
+          },
+          "required": ["groups"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "type": "array"
+            }
+          },
+          "required": ["nodes"]
+        }
+      ]
     }
   }
 }

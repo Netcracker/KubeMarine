@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import unittest
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import Dict
+from types import FunctionType
+from typing import Dict, Iterator, Callable, cast
+from unittest import mock
 
 from kubemarine import demo, packages
 from kubemarine.core import utils, errors, static
@@ -83,3 +86,13 @@ def backup_globals():
         yield
     finally:
         static.GLOBALS = backup
+
+
+@contextmanager
+def mock_call(call: Callable, return_value: object = None) -> Iterator[mock.MagicMock]:
+    func = cast(FunctionType, call)
+    name = func.__name__
+    module = inspect.getmodule(func)
+    with mock.patch.object(module, name, return_value=return_value) as run:
+        run.__name__ = name
+        yield run

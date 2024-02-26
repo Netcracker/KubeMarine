@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "description": "Override the original settings for the kube-proxy",
+  "allOf": [{"$ref": "#/definitions/PayloadProperties"}],
+  "properties": {
+    "apiVersion": {"enum": ["kubeproxy.config.k8s.io/v1alpha1"], "default": "kubeproxy.config.k8s.io/v1alpha1"},
+    "kind": {"enum": ["KubeProxyConfiguration"], "default": "KubeProxyConfiguration"}
+  },
+  "definitions": {
+    "PayloadProperties": {
+      "type": "object",
+      "properties": {
+        "conntrack": {
+          "type": "object",
+          "description": "Conntrack settings for the Kubernetes proxy server",
+          "properties": {
+            "min": {
+              "type": ["string", "integer"],
+              "description": "Minimum value of connect-tracking records to allocate. By default, inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value.",
+              "default": 1000000
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import copy
 from collections import OrderedDict
 from itertools import chain
-from typing import List
+from typing import List, Callable, Dict
 
 from kubemarine import kubernetes, plugins, admission
 from kubemarine.core import flow
@@ -25,6 +24,13 @@ from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
+
+
+def cleanup_tmp_dir(cluster: KubernetesCluster) -> None:
+    # Clean up kubernetes tmp dir, where backup files from previous upgrades are located
+    nodes = cluster.make_group_from_roles(roles=["control-plane", "worker"])
+    nodes.sudo("rm -rf $(sudo find /etc/kubernetes/tmp -mindepth 1 -maxdepth 1)")
+    cluster.log.debug("Backup files for previous upgrades were cleaned")
 
 
 def system_prepare_thirdparties(cluster: KubernetesCluster) -> None:
@@ -43,16 +49,54 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
-    minor_version = int(cluster.context['upgrade_version'].split('.')[1])
+    initial_kubernetes_version = cluster.context['initial_kubernetes_version']
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
-    if minor_version >= 28 and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled':
-        first_control_plane = cluster.nodes["control-plane"].get_first_member()
+    preconfigure_components = []
+    preconfigure_functions: Dict[str, Callable[[dict], dict]] = {}
+    if (admission.is_pod_security_unconditional(cluster)
+            and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.28")
+            and cluster.inventory['rbac']['pss']['pod-security'] == 'enabled'):
 
-        cluster.log.debug("Updating kubeadm config map")
-        final_features_list = first_control_plane.call(admission.update_kubeadm_configmap_pss, target_state="enabled")
-        cluster.log.debug("Updating kube-apiserver configs on control-planes")
-        cluster.nodes["control-plane"].call(admission.update_kubeapi_config_pss, features_list=final_features_list)
+        # Extra args of API server have changed, need to reconfigure the API server.
+        # See admission.enrich_inventory_pss()
+        # Still, should not reconfigure using generated ConfigMaps from inventory,
+        # because the inventory has already incremented kubernetesVersion, but the cluster is not upgraded yet.
+        # Instead, change only necessary apiServer args.
+        def reconfigure_feature_gates(cluster_config: dict) -> dict:
+            feature_gates = cluster.inventory["services"]["kubeadm"]["apiServer"]["extraArgs"].get("feature-gates")
+            if feature_gates is not None:
+                cluster_config["apiServer"]["extraArgs"]["feature-gates"] = feature_gates
+            else:
+                del cluster_config["apiServer"]["extraArgs"]["feature-gates"]
+
+            return cluster_config
+
+        preconfigure_components.append('kube-apiserver')
+        preconfigure_functions['kubeadm-config'] = reconfigure_feature_gates
+
+    if (kubernetes.components.kube_proxy_overwrites_higher_system_values(cluster)
+            and utils.version_key(initial_kubernetes_version)[0:2] < utils.minor_version_key("v1.29")):
+
+        # Defaults of KubeProxyConfiguration have changed.
+        # See services.kubeadm_kube-proxy.conntrack.min section of defaults.yaml
+        def edit_kube_proxy_conntrack_min(kube_proxy_cm: dict) -> dict:
+            expected_conntrack: dict = cluster.inventory['services']['kubeadm_kube-proxy']['conntrack']
+            if 'min' not in expected_conntrack:
+                return kube_proxy_cm
+
+            actual_conntrack = kube_proxy_cm['conntrack']
+            if expected_conntrack['min'] != actual_conntrack.get('min'):
+                actual_conntrack['min'] = expected_conntrack['min']
+
+            return kube_proxy_cm
+
+        preconfigure_components.append('kube-proxy')
+        preconfigure_functions['kube-proxy'] = edit_kube_proxy_conntrack_min
+
+    if preconfigure_components:
+        upgrade_group.call(kubernetes.components.reconfigure_components,
+                           components=preconfigure_components, edit_functions=preconfigure_functions)
 
     drain_timeout = cluster.procedure_inventory.get('drain_timeout')
     grace_period = cluster.procedure_inventory.get('grace_period')
@@ -72,17 +116,16 @@ def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
     if cluster.nodes.get('worker', []):
         kubernetes.upgrade_workers(upgrade_group, cluster, **drain_kwargs)
 
-    cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
-    cluster.context['cached_nodes_versions_cleaned'] = True
+    kubernetes_cleanup_nodes_versions(cluster)
 
 
 def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
     if not cluster.context.get('cached_nodes_versions_cleaned', False):
         cluster.log.verbose('Cached nodes versions required')
         cluster.nodes['control-plane'].get_first_member().sudo('rm -f /etc/kubernetes/nodes-k8s-versions.txt')
+        cluster.context['cached_nodes_versions_cleaned'] = True
     else:
         cluster.log.verbose('Cached nodes versions already cleaned')
-    kubernetes_apply_taints(cluster)
 
 
 def upgrade_packages(cluster: KubernetesCluster) -> None:
@@ -108,6 +151,7 @@ def upgrade_plugins(cluster: KubernetesCluster) -> None:
 
 
 tasks = OrderedDict({
+    "cleanup_tmp_dir": cleanup_tmp_dir,
     "verify_upgrade_versions": kubernetes.verify_upgrade_versions,
     "thirdparties": system_prepare_thirdparties,
     "prepull_images": prepull_images,
@@ -116,7 +160,6 @@ tasks = OrderedDict({
     "packages": upgrade_packages,
     "plugins": upgrade_plugins,
     "overview": install.overview
-
 })
 
 
@@ -142,17 +185,21 @@ class UpgradeFlow(flow.Flow):
             raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
         # todo inventory is preserved few times, probably need to preserve it once instead.
-        actions = [UpgradeAction(version) for version in upgrade_plan]
+        actions = [UpgradeAction(version, i == 0) for i, version in enumerate(upgrade_plan)]
         flow.run_actions(resources, actions)
 
 
 class UpgradeAction(Action):
-    def __init__(self, upgrade_version: str) -> None:
+    def __init__(self, upgrade_version: str, first_upgrade: bool) -> None:
         super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
         self.upgrade_version = upgrade_version
+        self.first_upgrade = first_upgrade
 
     def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        action_tasks = copy.deepcopy(tasks)
+        if not self.first_upgrade:
+            del action_tasks['cleanup_tmp_dir']
+        flow.run_tasks(res, action_tasks)
         res.make_final_inventory()
 
     def prepare_context(self, context: dict) -> None:
@@ -208,12 +255,6 @@ def fix_cri_socket(cluster: KubernetesCluster) -> None:
                            f"--overwrite kubeadm.alpha.kubernetes.io/cri-socket=/run/containerd/containerd.sock")
         upgrade_group = kubernetes.get_group_for_upgrade(cluster)
         upgrade_group.sudo("rm -rf /var/run/docker.sock")
-
-
-def kubernetes_apply_taints(cluster: KubernetesCluster) -> None:
-    # Apply taints after upgrade
-    group = cluster.nodes['control-plane']
-    kubernetes.apply_taints(group)
 
 
 if __name__ == '__main__':

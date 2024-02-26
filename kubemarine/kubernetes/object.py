@@ -17,7 +17,6 @@ from __future__ import annotations
 import io
 import json
 import uuid
-from copy import deepcopy
 from typing import TypeVar, Optional
 
 import yaml
@@ -33,7 +32,7 @@ class KubernetesObject:
     def __init__(self, cluster: KubernetesCluster, kind: str = None, name: str = None,
                  namespace: str = None, obj: dict = None) -> None:
 
-        self._cluster = cluster
+        self.cluster = cluster
         self._reload_result: Optional[RunnersResult] = None
 
         if not kind and not name and not namespace and not obj:
@@ -59,7 +58,7 @@ class KubernetesObject:
 
     @property
     def obj(self) -> dict:
-        return deepcopy(self._obj)
+        return self._obj
 
     @property
     def uid(self) -> str:
@@ -96,10 +95,10 @@ class KubernetesObject:
 
     def reload(self: _T, control_plane: NodeGroup = None, suppress_exceptions: bool = False) -> _T:
         if not control_plane:
-            control_plane = self._cluster.nodes['control-plane'].get_any_member()
+            control_plane = self.cluster.nodes['control-plane'].get_any_member()
         cmd = f'kubectl get {self.kind} -n {self.namespace} {self.name} -o json'
         result = control_plane.sudo(cmd, warn=suppress_exceptions)
-        self._cluster.log.verbose(result)
+        self.cluster.log.verbose(result)
         self._reload_result = result.get_simple_result()
         if self._reload_result:
             self._obj = json.loads(self._reload_result.stdout)
@@ -107,11 +106,13 @@ class KubernetesObject:
 
     def apply(self, control_plane: NodeGroup = None) -> None:
         if not control_plane:
-            control_plane = self._cluster.nodes['control-plane'].get_any_member()
+            control_plane = self.cluster.nodes['control-plane'].get_any_member()
 
         json_str = self.to_json()
         obj_filename = "_".join([self.kind, self.namespace, self.name, self.uid]) + '.json'
         obj_path = f'/tmp/{obj_filename}'
 
-        control_plane.put(io.StringIO(json_str), obj_path, sudo=True)
-        control_plane.sudo(f'kubectl apply -f {obj_path} && sudo rm -f {obj_path}')
+        defer = control_plane.new_defer()
+        defer.put(io.StringIO(json_str), obj_path, sudo=True)
+        defer.sudo(f'kubectl apply -f {obj_path} && sudo rm -f {obj_path}')
+        defer.flush()

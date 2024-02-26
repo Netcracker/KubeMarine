@@ -54,10 +54,10 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Download Package
         uses: actions/download-artifact@v3
         with:
@@ -105,6 +105,7 @@ jobs:
           - "3.9"
           - "3.10"
           - "3.11"
+          - "3.12"
         include:
           - wheel: 'dist/*.whl'
             remove_files_script: 'find . -not -path "./test*" -not -path "./examples*" -not -path "./scripts*" -delete'

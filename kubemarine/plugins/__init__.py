@@ -27,9 +27,6 @@ import time
 import urllib.request
 import zipfile
 from copy import deepcopy
-from distutils.dir_util import copy_tree
-from distutils.dir_util import remove_tree
-from distutils.dir_util import mkpath
 from itertools import chain
 from types import ModuleType, FunctionType
 from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast, TextIO, Optional
@@ -50,6 +47,8 @@ from kubemarine.kubernetes.statefulset import StatefulSet
 # list of plugins owned and managed by kubemarine
 oob_plugins = list(static.DEFAULTS["plugins"].keys())
 LOADED_MODULES: Dict[str, ModuleType] = {}
+
+ERROR_PODS_NOT_READY = 'In the expected time, the pods did not become ready'
 
 
 def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
@@ -81,19 +80,22 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     return inventory
 
 
-def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+def _get_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
         upgrade_plan = []
-        for version in cluster.procedure_inventory['upgrade_plan']:
+        for version in procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
-            upgrade_plan.append((version, cluster.procedure_inventory.get(version, {}).get("plugins", {})))
+            upgrade_plan.append((version, procedure_inventory.get(version, {}).get("plugins", {})))
 
     elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_plugin' in context:
-        upgrade_plugins = cluster.procedure_inventory.get('upgrade', {}).get("plugins", {})
+        upgrade_plugins = procedure_inventory.get('upgrade', {}).get("plugins", {})
         upgrade_plugins = dict(item for item in upgrade_plugins.items()
                                if item[0] == context['upgrading_plugin'])
         upgrade_plan = [("", upgrade_plugins)]
@@ -162,12 +164,14 @@ def verify_image_redefined(plugin_name: str, previous_version: str, next_version
             )
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory)
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
+    return generic_upgrade_inventory(cluster, inventory, procedure_inventory)
 
 
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    upgrade_plan = _get_upgrade_plan(cluster)
+def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+    upgrade_plan = _get_upgrade_plan(cluster, procedure_inventory)
     if not upgrade_plan:
         return inventory
 
@@ -430,7 +434,7 @@ def expect_deployment(cluster: KubernetesCluster,
 
 def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = None,
                 timeout: int = None, retries: int = None,
-                node: NodeGroup = None, apply_filter: str = None) -> None:
+                control_plane: NodeGroup = None, node_name: str = None) -> None:
 
     if timeout is None:
         timeout = cluster.inventory['globals']['expect']['pods']['plugins']['timeout']
@@ -444,20 +448,20 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
 
     failures = 0
 
-    if node is None:
-        node = cluster.nodes['control-plane'].get_first_member()
+    if control_plane is None:
+        control_plane = cluster.nodes['control-plane'].get_first_member()
 
     namespace_filter = '-A'
     if namespace is not None:
         namespace_filter = "-n " + namespace
 
     command = f"kubectl get pods {namespace_filter} -o=wide"
-    if apply_filter is not None:
-        command += ' | grep %s' % apply_filter
+    if node_name is not None:
+        command += ' | grep %s' % node_name
 
     while retries > 0:
 
-        result = node.sudo(command, warn=True)
+        result = control_plane.sudo(command, warn=True)
 
         stdout = list(result.values())[0].stdout
         running_pods_stdout = ''
@@ -466,15 +470,12 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
 
         for stdout_line in iter(stdout.splitlines()):
 
-            stdout_line_allowed = False
-
             # is current line has requested pod for verification?
             # we do not have to fail on pods with bad status which was not requested
             for pod in pods:
-                if pod + "-" in stdout_line:
-                    stdout_line_allowed = True
+                if pod + "-" not in stdout_line:
+                    continue
 
-            if stdout_line_allowed:
                 if is_critical_state_in_stdout(cluster, stdout_line):
                     cluster.log.verbose("Failed pod detected: %s\n" % stdout_line)
 
@@ -486,8 +487,10 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
                     if failures > cluster.globals['pods']['allowed_failures']:
                         raise Exception('Pod entered a state of error, further proceeding is impossible')
                 else:
-                # we have to take into account any pod in not a critical state
+                    # we have to take into account any pod in not a critical state
                     running_pods_stdout += stdout_line + '\n'
+
+                break
 
         pods_ready = False
         if running_pods_stdout and running_pods_stdout != "" and "0/1" not in running_pods_stdout:
@@ -508,7 +511,7 @@ def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = No
             cluster.log.debug(running_pods_stdout)
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the pods did not become ready')
+    raise Exception(ERROR_PODS_NOT_READY)
 
 
 def is_critical_state_in_stdout(cluster: KubernetesCluster, stdout: str) -> bool:
@@ -896,8 +899,8 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
 
     local_chart_folder = "local_chart_folder"
     if os.path.isdir(local_chart_folder):
-        remove_tree(local_chart_folder)
-    mkpath(local_chart_folder)
+        shutil.rmtree(local_chart_folder)
+    os.makedirs(local_chart_folder)
     if is_curl:
         logger.verbose('Chart download via curl detected')
         destination = os.path.basename(chart_path)
@@ -921,7 +924,7 @@ def get_local_chart_path(logger: log.EnhancedLogger, config: dict) -> str:
                 tf.extractall(local_chart_folder)
     else:
         logger.debug("Create copy of chart to work with")
-        copy_tree(chart_path, local_chart_folder)
+        shutil.copytree(chart_path, local_chart_folder, dirs_exist_ok=True)
 
     # Find all Chart.yaml files in the chart.
     glob_search = os.path.join(local_chart_folder, '**', 'Chart.yaml')

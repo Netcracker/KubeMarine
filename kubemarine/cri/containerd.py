@@ -19,7 +19,6 @@ import toml
 import yaml
 import base64
 
-from distutils.util import strtobool
 from kubemarine import system, packages
 from kubemarine.core import utils, static, errors
 from kubemarine.core.cluster import KubernetesCluster
@@ -33,11 +32,6 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     path = 'plugins."io.containerd.grpc.v1.cri"'
     kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
     containerd_config[path].setdefault('sandbox_image', get_default_sandbox_image(inventory, kubernetes_version))
-
-    runc_options_path = f'{path}.containerd.runtimes.runc.options'
-    if not isinstance(containerd_config[runc_options_path]['SystemdCgroup'], bool):
-        containerd_config[runc_options_path]['SystemdCgroup'] = \
-            bool(strtobool(containerd_config[runc_options_path]['SystemdCgroup']))
 
     # Check if field for new and old configuration formats are presented
     old_format_result, old_format_field = contains_old_format_properties(inventory)
@@ -88,16 +82,19 @@ def get_sandbox_image(cri_config: dict) -> Optional[str]:
     return sandbox_image
 
 
-def get_sandbox_image_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
+def get_sandbox_image_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
     context = cluster.context
     upgrade_plan = []
     if context.get("initial_procedure") == "upgrade":
         upgrade_version = context["upgrade_version"]
-        for version in cluster.procedure_inventory['upgrade_plan']:
+        for version in procedure_inventory['upgrade_plan']:
             if utils.version_key(version) < utils.version_key(upgrade_version):
                 continue
 
-            upgrade_config = cluster.procedure_inventory.get(version, {}).get('cri', {})
+            upgrade_config = procedure_inventory.get(version, {}).get('cri', {})
             upgrade_plan.append((version, upgrade_config))
 
     return upgrade_plan
@@ -142,8 +139,11 @@ def is_sandbox_image_upgrade_required(cluster: KubernetesCluster, inventory: dic
     return old_image != new_image
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    upgrade_plan = get_sandbox_image_upgrade_plan(cluster)
+def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
+
+    upgrade_plan = get_sandbox_image_upgrade_plan(cluster, procedure_inventory)
     if not upgrade_plan:
         return inventory
 
@@ -165,16 +165,19 @@ def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) ->
     return migrate_cri_finalize_inventory(cluster, inventory)
 
 
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
+def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
     if cluster.context.get("initial_procedure") != "migrate_cri":
         return inventory
+
+    if procedure_inventory is None:
+        procedure_inventory = cluster.procedure_inventory
 
     cri_section = inventory.setdefault("services", {}).setdefault("cri", {})
 
     if cri_section.get("dockerConfig", {}):
         del cri_section["dockerConfig"]
 
-    default_merger.merge(cri_section, deepcopy(cluster.procedure_inventory["cri"]))
+    default_merger.merge(cri_section, deepcopy(procedure_inventory["cri"]))
     return inventory
 
 

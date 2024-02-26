@@ -427,6 +427,38 @@ class TestKeepalivedConfigGeneration(unittest.TestCase):
         config_3 = keepalived.generate_config(cluster, balancers[2])
         self.assertIn(only_left_peer_template.format(peer=balancers[1]['internal_address']), config_3)
 
+    def test_default_global_defs(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
+
+        cluster = demo.new_cluster(inventory)
+
+        config_1 = keepalived.generate_config(cluster, first_balancer)
+        self.assertNotIn("global_defs", config_1)
+
+    def test_default_overriden_global_defs(self):
+        inventory = demo.generate_inventory(master=3, worker=3, balancer=1, keepalived=1)
+        first_balancer = next(node for node in inventory['nodes'] if 'balancer' in node['roles'])
+
+        vrrp_garp_master_refresh = 60
+        inventory['services'] = {
+            "loadbalancer": {
+                "keepalived": {
+                    "global": {
+                        "vrrp_garp_master_refresh": vrrp_garp_master_refresh
+                    }
+                }
+            }
+        }
+
+        cluster = demo.new_cluster(inventory)
+        only_vrrp_garp_template = """\
+global_defs {{
+    vrrp_garp_master_refresh {vrrp_garp_master_refresh}
+}}"""
+        config_1 = keepalived.generate_config(cluster, first_balancer)
+        self.assertIn(only_vrrp_garp_template.format(vrrp_garp_master_refresh=vrrp_garp_master_refresh), config_1)
+
 
 class TestKeepalivedConfigApply(unittest.TestCase):
 

@@ -9,20 +9,21 @@ Kubemarine is an open source, lightweight and powerful management tool built for
 
 ## Highlights
 - Easy to use
-- Many procedures supported:
+- Many procedures supported following the [generic maintenance approach](documentation/Maintenance.md#basics):
   - [install](documentation/Installation.md#)
   - [add_node](documentation/Maintenance.md#add-node-procedure)
   - [remove_node](documentation/Maintenance.md#remove-node-procedure)
   - [upgrade](documentation/Maintenance.md#upgrade-procedure)
   - [backup](documentation/Maintenance.md#backup-procedure)
   - [restore](documentation/Maintenance.md#restore-procedure)
+  - [reconfigure](documentation/Maintenance.md#reconfigure-procedure)
   - [check_iaas](documentation/Kubecheck.md#iaas-procedure)
   - [check_paas](documentation/Kubecheck.md#paas-procedure)
   - [migrate_kubemarine](documentation/Maintenance.md#kubemarine-migration-procedure)
   - [manage_psp](documentation/Maintenance.md#manage-psp-procedure)
   - [manage_pss](documentation/Maintenance.md#manage-pss-procedure)
   - [cert_renew](documentation/Maintenance.md#certificate-renew-procedure)
-  - [migrate_cri](documentation/Maintenance.md#migration-cri-procedure)
+  - [migrate_cri](documentation/Maintenance.md#cri-migration-procedure)
 - [Single cluster inventory](documentation/Installation.md#configuration) for all operations, highly customizable
 - Default values of all parameters in configurations with a minimum of required parameters
 - [Control planes balancing](documentation/Installation.md#full-ha-scheme) with external balancers and VRRP

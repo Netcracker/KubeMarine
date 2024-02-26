@@ -121,6 +121,9 @@ class RunnersResult:
                            f"{val.rstrip()}\n")
         return "\n".join(ret)
 
+    def grep_returned_nothing(self) -> bool:
+        return not self.stdout and not self.stderr and self.exited == 1
+
 
 class UnexpectedExit(Exception):
     def __init__(self, result: RunnersResult):
@@ -694,4 +697,3 @@ class RawExecutor:
             self.logger.verbose('Disconnected session with %s' % host)
             cxn = self.connection_pool.get_connection(host)
             cxn.close()
-            cxn._sftp = None
