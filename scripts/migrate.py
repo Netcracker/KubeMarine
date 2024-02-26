@@ -1,11 +1,13 @@
+import json
 import os
 import platform
 import subprocess
 import sys
 import tempfile
 import requests
+import yaml
 
-KubemarineVersions:list = ["v0.25.0","v0.25.1","v0.26.0"]
+KubemarineVersions:list = ["v0.25.0","v0.25.1","v0.26.0","v0.27.0"]
 Envs: list = ["src", "pip", "bin", "docker"]
 
 MigrationProcedure: dict = {
@@ -18,33 +20,25 @@ MigrationProcedure: dict = {
                    {"patch0":
                     f"Description0"},
                    {"patch1":
-                    "description1"}]
-                           }}
-
-MigrationPlan: list = [
-    {"v0.25.1":"src"},
-    {"v0.26.0":"src"},]
+                    "description1"}]}
+}
 
 
-def migrate_kubemarine(toVersion, env, procedureyaml, patches ,clusteryaml) :
+def migrate_kubemarine(toVersion, env, procedureyaml, patches ,clusteryaml):
     print(locals())
     pass
- 
-def get_set_env(version, deployment):
-    pass
+
 
 def distant_migrate():
     clusteryaml = ""
-    for plan in MigrationPlan:
+    for plan in MigrationProcedure:
         toVersion, env = next(iter(plan.items()))
-        env = get_set_env(toVersion, env)
+        env = get_patches_info(toVersion, env)
         clusteryaml = migrate_kubemarine(toVersion,
                                          env,
                                          MigrationProcedure[toVersion]["procedure"],
                                          MigrationProcedure[toVersion]["patches"],
                                          clusteryaml)
-
-
 
 def get_patches_info(version, env):
     patches_info = {"patches":[]}
@@ -80,11 +74,17 @@ def get_patches_info(version, env):
 
         finally:
             os.unlink(filepath)
-        
+
     return patches_info
  
 
 
-# functionname, parameters ...
-print(globals()[sys.argv[1]](*sys.argv[2:]))
+# function name, parameters ...
+#print(globals()[sys.argv[1]](*sys.argv[2:]))
 
+## get the patch list and  migration procedure
+for version in KubemarineVersions:
+    MigrationProcedure[version] = get_patches_info(version,"bin")
+
+
+print(json.dump(MigrationProcedure,indent=3))
