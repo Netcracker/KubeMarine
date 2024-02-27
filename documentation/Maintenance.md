@@ -423,10 +423,10 @@ Kubernetes re-creates all the pod containers. However, your custom containers ma
 
 This task is required to upgrade OOB plugins and specified user plugins.
 
-The OOB plugins are upgraded automatically if supported versions are changed for them.
-For more information about supported versions, please refer to [Supported Versions](Installation.md#supported-versions).
+The OOB plugins are upgraded automatically if the supported versions are changed for them.
+For more information about the supported versions, refer to [Supported Versions](Installation.md#supported-versions).
 
-Previously configured custom plugins are also re-installed if effectively resolved inventory configuration is changed for them.
+The previously configured custom plugins are also re-installed if the effectively resolved inventory configuration is changed for them.
 For example, they may depend on Kubernetes version using [Dynamic Variables](Installation.md#dynamic-variables).
 
 You can also configure your own plugins for the upgrade as follows:
