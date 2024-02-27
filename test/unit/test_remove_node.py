@@ -54,6 +54,21 @@ class EnrichmentAndFinalization(unittest.TestCase):
         flow.run_actions(resources, [remove_node.RemoveNodeAction()])
         return resources
 
+    def test_previous_nodes(self):
+        self._generate_inventory(demo.MINIHA_KEEPALIVED)
+        hosts = [node['address'] for node in self.inventory['nodes']]
+        node_name_remove = self.inventory['nodes'][0]['name']
+        self.remove_node['nodes'] = [{'name': node_name_remove}]
+
+        cluster = self._new_cluster()
+        self.assertIs(cluster, cluster.previous_nodes['all'].cluster,
+                      "Cluster of previous group should be the same as the main cluster")
+
+        self.assertEqual(hosts, cluster.previous_nodes['all'].get_hosts())
+
+        self.assertIs(cluster, cluster.get_nodes_for_removal().cluster)
+        self.assertEqual([node_name_remove], cluster.get_nodes_for_removal().get_nodes_names())
+
     def test_allow_omitted_name(self):
         self._generate_inventory(demo.MINIHA_KEEPALIVED)
         for node in self.inventory['nodes']:

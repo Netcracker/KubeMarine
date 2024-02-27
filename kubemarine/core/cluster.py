@@ -161,6 +161,7 @@ class KubernetesCluster(Environment):
         self._products = _EnrichmentProducts(
             utils.deepcopy_yaml(inventory), deepcopy(context), utils.deepcopy_yaml(procedure_inventory))
         self._previous_products = self._products
+        self._products.nodes['nodes'] = self._products.nodes['previous'] = {}
 
         self._logger = logger
 
@@ -194,7 +195,11 @@ class KubernetesCluster(Environment):
         if stage == EnrichmentStage.PROCEDURE and previous_cluster is not None:
             self._previous_products = previous_cluster._products
 
-        self._products.nodes['nodes'] = {}
+            # Previous nodes refer to previous cluster. Create new group to surely refer to this cluster.
+            self._products.nodes['previous'] = {
+                role: self.make_group(group.nodes)
+                for role, group in self._previous_products.nodes['nodes'].items()}
+
         if stage == EnrichmentStage.LIGHT:
             # Need different instance of previous_nodes for LIGHT
             # because we should be able to distinguish initial and final nodes at this stage solely.
@@ -262,10 +267,7 @@ class KubernetesCluster(Environment):
 
         Should be changed only during the enrichment.
         """
-        if self._enrichment_stage == EnrichmentStage.LIGHT:
-            return self._products.nodes['previous']
-
-        return self._previous_products.nodes['nodes']
+        return self._products.nodes['previous']
 
     @property
     def nodes(self) -> Dict[str, NodeGroup]:
