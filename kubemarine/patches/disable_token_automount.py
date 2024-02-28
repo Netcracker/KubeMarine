@@ -13,7 +13,7 @@ class TheAction(Action):
     
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster() 
-        cluster.log.debug("As part of this patch, all the plugins will be redpeloyed")
+        cluster.log.debug("As part of this patch, all the plugins will be redeployed")
         plugins.install(cluster)      
 
 
