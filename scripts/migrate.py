@@ -7,21 +7,17 @@ import tempfile
 import requests
 import yaml
 
-KubemarineVersions:list = ["v0.25.0","v0.25.1","v0.26.0","v0.27.0"] #TODO to  get from github/gitlab/git/custom/file?
+KubemarineVersions:list = ["0.17.0","0.18.0","0.18.1","0.18.2","0.19.0","0.20.0","0.21.0","0.21.1","0.22.0","v0.23.0","v0.24.1","v0.25.0","v0.25.1","v0.26.0","v0.27.0"] #TODO to  get from github/gitlab/git/custom/file?
 
 Envs: list = ["src", "pip", "bin", "docker"]
 
 MigrationProcedure: dict = {
-    "v0.25.0":{"procedure":{},
-               "patches":[]},
-    "v0.25.1":{"procedure":{},
-               "patches":[]},
-    "v0.26.0":{"procedure":{},
-               "patches":[
-                   {"patch0":
-                    f"Description0"},
-                   {"patch1":
-                    "description1"}]}
+#    "v0.25.1":{"procedure":{},
+#               "patches":[]},
+#    "v0.26.0":{"procedure":{},
+#               "patches":[
+#                   {"patch0":
+#                    f"Description0"}}
 }
 
 
@@ -80,12 +76,17 @@ def get_patches_info(version, env):
  
 
 
+def list(old_version='', new_version=''):
+    ## get the patch list and  migration procedure
+    index_from = KubemarineVersions.index(old_version) if old_version in KubemarineVersions else 0
+    index_to =  KubemarineVersions.index(new_version)+1 if new_version in KubemarineVersions else -1
+
+    for version in KubemarineVersions[index_from:index_to]:
+        print(version,file=sys.stderr)
+        MigrationProcedure[version] = get_patches_info(version,"bin")
+
+    return MigrationProcedure
+
+
 # function name, parameters ...
-#print(globals()[sys.argv[1]](*sys.argv[2:]))
-
-## get the patch list and  migration procedure
-for version in KubemarineVersions:
-    MigrationProcedure[version] = get_patches_info(version,"bin")
-
-
-print(json.dump(MigrationProcedure,indent=3))
+print(json.dumps(globals()[sys.argv[1]](*sys.argv[2:]),indent=3))
