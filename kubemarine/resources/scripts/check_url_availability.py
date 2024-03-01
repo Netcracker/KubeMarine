@@ -21,13 +21,24 @@ import sys
 major_version = sys.version_info.major
 if major_version == 3:
     import urllib.request as urllib
+    import urllib.parse as urlparse
 else:
     import urllib2 as urllib  # type: ignore[import-not-found, no-redef]
+    import urlparse as urlparse
 
 try:
     source = sys.argv[1]
     timeout = int(sys.argv[2])
-    status_code = urllib.urlopen(source, timeout=timeout).getcode()
+    parsed_url = urlparse.urlparse(source)
+    no_auth_netloc = parsed_url.netloc.split('@')[-1]
+    no_auth_url = parsed_url._replace(netloc="{}".format(no_auth_netloc)).geturl()
+
+    password_mgr = urllib.HTTPPasswordMgrWithDefaultRealm()
+    password_mgr.add_password(None, no_auth_url, parsed_url.username, parsed_url.password)
+    handler = urllib.HTTPBasicAuthHandler(password_mgr)
+    opener = urllib.build_opener(handler)
+
+    status_code = opener.open(no_auth_url, timeout=timeout).getcode()
     if status_code != 200:
         sys.stderr.write("Error status code: %s" % status_code)
         exit(1)
