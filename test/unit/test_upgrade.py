@@ -25,7 +25,7 @@ from unittest import mock
 import yaml
 from ordered_set import OrderedSet
 
-from kubemarine import kubernetes, system, plugins
+from kubemarine import kubernetes, system, plugins, thirdparties
 from kubemarine.core import errors, utils as kutils, static, log, flow, schema
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.procedures import upgrade, install
@@ -874,6 +874,20 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
         with utils.assert_raises_kme(self, "KME0011",
                                      key='sha1', thirdparty='/usr/bin/kubectl',
                                      previous_version_spec='.*', next_version_spec='.*'):
+            self.new_cluster()
+
+    def test_require_sha1_change_if_source_changed(self):
+        self.inventory['services']['thirdparties']['/usr/bin/kubectl'] = {
+            'source': 'kubectl-redefined',
+            'sha1': 'sha1-redefined'
+        }
+        self.upgrade[self.new]['thirdparties']['/usr/bin/kubectl'] = {
+            'source': 'kubectl-new',
+            'sha1': 'sha1-redefined'
+        }
+
+        with self.assertRaisesRegex(Exception, re.escape(thirdparties.ERROR_SHA1_NOT_CHANGED.format(
+                thirdparty='/usr/bin/kubectl', previous_version=self.old, version=self.new))):
             self.new_cluster()
 
     def test_require_source_redefinition_version_templates(self):

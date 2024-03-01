@@ -20,6 +20,10 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 
+ERROR_SHA1_NOT_CHANGED = (
+    "Key 'source' was changed for third-party {thirdparty!r} during upgrade {previous_version} -> {version}, "
+    "but 'sha1' was not changed.")
+
 
 def is_default_thirdparty(destination: str) -> bool:
     return destination in static.GLOBALS['thirdparties']
@@ -222,6 +226,12 @@ def _verify_upgrade_plan(cluster: KubernetesCluster, previous_version: str,
                                      key=key, thirdparty=destination,
                                      previous_version_spec=f" for version {previous_version}" if previous_version else "",
                                      next_version_spec=f" for next version {version}" if version else "")
+
+            if (config.get('source') and previous_config['source'] != config['source']
+                    and 'sha1' in previous_config and 'sha1' in config
+                    and previous_config['sha1'] == config['sha1']):
+                raise Exception(ERROR_SHA1_NOT_CHANGED.format(
+                    thirdparty=destination, previous_version=previous_version, version=version))
 
             default_merger.merge(raw_config, upgrade_config)
 
