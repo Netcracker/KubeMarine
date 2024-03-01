@@ -63,6 +63,9 @@ mypy = [
     "types-jsonschema==4.*",
     "types-pyinstaller==6.2.0.*",
 ]
+pylint = [
+    "pylint==3.1.*"
+]
 
 # Auxiliary executable roughly equivalent to python -m kubemarine
 # Allows to not worry about exact path to python executable on the client machine
@@ -93,6 +96,59 @@ push = true
 ]
 "kubemarine/version" = [
     '^{version}$'
+]
+
+[tool.pylint.main]
+py-version = "3.7"
+init-hook = 'import sys; sys.path.append("scripts/thirdparties")'
+
+# If pylint fails, check that the code is rated higher than `fail-under`,
+# and search for messages from `fail-on`.
+fail-under = 9.9
+fail-on = [
+    # Messages with numerical IDs `E\d+` or `F\d+`.
+    "E", "F",
+    # https://github.com/pyinstaller/pyinstaller/issues/1687
+    "consider-using-sys-exit",
+]
+
+[tool.pylint.format]
+max-line-length = 130
+
+[tool.pylint."messages control"]
+disable = [
+    # Refactor
+    "duplicate-code",
+    "inconsistent-return-statements",
+    "no-else-raise",
+    "no-else-return",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-public-methods",
+    "too-many-statements",
+    # Convention
+    "consider-using-f-string",
+    "import-outside-toplevel",
+    "invalid-name",
+    "missing-final-newline",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "trailing-newlines",
+    "trailing-whitespace",
+    "typevar-name-incorrect-variance",
+    # Warnings
+    "broad-exception-caught",
+    "broad-exception-raised",
+    "f-string-without-interpolation",
+    "fixme",
+    "redefined-outer-name",
+    "unnecessary-pass",
+    "unused-import",
 ]
 
 [tool.mypy]

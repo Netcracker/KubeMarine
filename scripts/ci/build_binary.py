@@ -19,11 +19,6 @@ from typing import List
 import tarfile
 
 PIP_VERSION = "23.3.1"
-PYINSTALLER_VERSION = "6.2.0"
-# Pinned version is used because scripts/ci/custom-hooks/hook-cryptography.py
-# relies on internal implementation of pyinstaller-hooks-contrib.
-# Need to regenerate scripts/ci/custom-hooks/hook-cryptography.py each time the version is upgraded.
-PYINSTALLER_HOOK_CONTRIB_VERSION = "2023.10"
 
 
 def call(args: List[str]) -> None:
@@ -57,7 +52,7 @@ call(install_package)
 
 # To avoid ambiguity, remove Kubemarine package to surely run PyInstaller on sources.
 call(['pip', 'uninstall', '-y', 'kubemarine'])
-call(['pip', 'install', f'pyinstaller=={PYINSTALLER_VERSION}', f'pyinstaller-hooks-contrib=={PYINSTALLER_HOOK_CONTRIB_VERSION}'])
+call(['pip', 'install', '-r', 'requirements-pyinstaller.txt'])
 
 if target_arch:
     with fileinput.FileInput('kubemarine.spec', inplace=True) as file:

@@ -44,8 +44,12 @@ jobs:
           python-version: "3.9"
       # Install pylint and kubemarine with all dependencies except ansible.
       # Then uninstall only kubemarine to avoid ambiguity and to surely run pylint on sources.
-      - run: pip install pylint . && pip uninstall -y kubemarine
-      - run: pylint kubemarine scripts test --disable fixme || exit 0
+      - run: pip install .[pylint] && pip install -r requirements-pyinstaller.txt && pip uninstall -y kubemarine
+      - run: |
+          if ! pylint kubemarine scripts ; then
+            echo -e "\033[91mCheck [tool.pylint.main] in pyproject.toml for how to fix pylint check\033[0m"
+            exit 1
+          fi
   radon:
     runs-on: ubuntu-latest
     steps:
