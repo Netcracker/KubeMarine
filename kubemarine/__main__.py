@@ -115,6 +115,10 @@ procedures = OrderedDict({
         'description': "Print current release version",
         'group': 'other'
     },
+    'config': {
+        'description': "Print supported configurations of 3rd-parties with versions compatibility",
+        'group': 'other'
+    },
     'do': {
         'description': "Execute shell command on cluster nodes",
         'group': 'other'
@@ -198,7 +202,7 @@ def selftest() -> None:
 
         if "main" not in dir(module):
             raise Exception("No main method in %s" % procedure)
-        if procedure not in ["do", "migrate_kubemarine"]:
+        if procedure not in ["do", "migrate_kubemarine", "config"]:
             if "tasks" not in dir(module):
                 raise Exception("Tasks tree is not presented in %s" % procedure)
             if not isinstance(module.tasks, OrderedDict):
