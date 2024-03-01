@@ -1333,8 +1333,8 @@ def _check_calico_env(cluster: KubernetesCluster, manifest_: manifest.Manifest) 
             stderr = str(k8s_object).rstrip('\n')
             failed_messages.append(f"failed to load {service_name}: {stderr}")
             continue
-        else:
-            actual_env = get_envs(k8s_object.obj)
+
+        actual_env = get_envs(k8s_object.obj)
 
         expected_obj = manifest_.get_obj(f"{type_}_{service_name}", patch=False)
         buf = io.StringIO()

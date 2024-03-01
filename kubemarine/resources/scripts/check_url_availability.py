@@ -23,8 +23,10 @@ if major_version == 3:
     import urllib.request as urllib
     import urllib.parse as urlparse
 else:
+    # pylint: disable-next=import-error
     import urllib2 as urllib  # type: ignore[import-not-found, no-redef]
-    import urlparse as urlparse # type: ignore[import-not-found, no-redef]
+    # pylint: disable-next=import-error
+    import urlparse  # type: ignore[import-not-found, no-redef]
 
 try:
     source = sys.argv[1]
