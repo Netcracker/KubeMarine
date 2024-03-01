@@ -13,6 +13,7 @@
 # limitations under the License.
 import argparse
 import re
+import sys
 from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import List, Union
@@ -454,32 +455,32 @@ def run(context: dict) -> None:
                 print(patch_id)
         else:
             print("No patches available.")
-        exit(0)
+        sys.exit(0)
 
     if args['describe']:
         for patch in patches:
             if patch.identifier == args['describe']:
                 print(patch.description)
-                exit(0)
+                sys.exit(0)
         print(f"Unknown patch '{args['describe']}'")
-        exit(1)
+        sys.exit(1)
 
     skip = [] if not args['skip'] else args['skip'].split(",")
     apply = [] if not args['apply'] else args['apply'].split(",")
 
     if apply and (set(apply) - set(patch_ids)):
         print(f"Unknown patches {list(set(apply) - set(patch_ids))}")
-        exit(1)
+        sys.exit(1)
 
     if skip and (set(skip) - set(patch_ids)):
         print(f"Unknown patches {list(set(skip) - set(patch_ids))}")
-        exit(1)
+        sys.exit(1)
 
     if apply:
         positions = [patch_ids.index(apply_id) for apply_id in apply]
         if not all(positions[i] < positions[i + 1] for i in range(len(positions) - 1)):
             print("Incorrect order of patches to apply. See --list for correct order of patches.")
-            exit(1)
+            sys.exit(1)
 
     actions = []
     for patch in patches:
@@ -494,7 +495,7 @@ def run(context: dict) -> None:
 
     if not actions:
         print("No patches to apply")
-        exit(0)
+        sys.exit(0)
 
     flow.ActionsFlow(actions).run_flow(context)
 

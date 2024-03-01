@@ -53,4 +53,4 @@ finally:
 if action == 'send' and len(data) != sz:
     sys.stdout.write("Data is lost\n")
     sys.stdout.flush()
-    exit(1)
+    sys.exit(1)

@@ -29,7 +29,7 @@ PYINSTALLER_HOOK_CONTRIB_VERSION = "2023.10"
 def call(args: List[str]) -> None:
     return_code = subprocess.call(args)
     if return_code != 0:
-        exit(return_code)
+        sys.exit(return_code)
 
 # Copy ipip_check from package
 with open('kubemarine/version', 'r') as version_file:
