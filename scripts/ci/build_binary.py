@@ -28,8 +28,9 @@ def call(args: List[str]) -> None:
     if return_code != 0:
         sys.exit(return_code)
 
+
 # Copy ipip_check from package
-with open('kubemarine/version', 'r') as version_file:
+with open('kubemarine/version', 'r', encoding='utf-8') as version_file:
     version = version_file.readline().split('\n')[0].split('v')[1]
 
 with tarfile.open(f"dist/kubemarine-{version}.tar.gz") as arch:
