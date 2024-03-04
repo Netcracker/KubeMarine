@@ -126,6 +126,7 @@ fail-on = [
     "arguments-differ",
     "arguments-renamed",
     "cell-var-from-loop",
+    "implicit-str-concat",
     "undefined-loop-variable",
     # List of other non-critical warnings that rarely appear
     "useless-parent-delegation",
