@@ -117,6 +117,7 @@ fail-on = [
     # https://github.com/pyinstaller/pyinstaller/issues/1687
     "consider-using-sys-exit",
     # List of other warnings that are considered more error prone
+    "arguments-differ",
     "undefined-loop-variable",
     # List of other non-critical warnings that rarely appear
     "useless-parent-delegation",

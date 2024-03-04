@@ -326,10 +326,10 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
         return self._do("sudo", command, **kwargs)
 
     # not implemented
-    def get(self, remote_file: str, local_file: str, **kwargs: Any) -> None:
+    def get(self, remote_file: str, local_file: str, **kwargs: Any) -> None:  # pylint: disable=arguments-differ
         raise NotImplementedError("Stub for fabric Connection.get() is not implemented")
 
-    def put(self, data: Union[io.BytesIO, str], filename: str, **kwargs: Any) -> None:
+    def put(self, data: Union[io.BytesIO, str], filename: str, **kwargs: Any) -> None:  # pylint: disable=arguments-differ
         # It should return fabric.transfer.Result, but currently returns None.
         # Transfer Result is currently never handled.
         self.fake_fs.write(self.host, filename, data)
