@@ -118,6 +118,7 @@ fail-on = [
     "consider-using-sys-exit",
     # List of other warnings that are considered more error prone
     "arguments-differ",
+    "cell-var-from-loop",
     "undefined-loop-variable",
     # List of other non-critical warnings that rarely appear
     "useless-parent-delegation",

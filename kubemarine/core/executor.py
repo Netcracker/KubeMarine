@@ -533,6 +533,7 @@ class RawExecutor:
         for host, payloads in batch.items():
             cxn = self.connection_pool.get_connection(host)
             do_type, args, kwargs = self._prepare_merged_action(host, payloads)
+            # pylint: disable-next=cell-var-from-loop
             safe_exec(futures, host, lambda: tpe.submit(getattr(cxn, do_type), *args, **kwargs))
 
         for host, future in futures.items():
@@ -540,6 +541,8 @@ class RawExecutor:
             # This makes usage of future timeout useless, as the operation is not stopped.
             # Instead, we always pass timeout for run/sudo and so have CommandTimedOut.
             # For put/get fabric & paramiko do not offer timeout, so transfer cannot be stopped currently.
+
+            # pylint: disable-next=cell-var-from-loop
             safe_exec(results, host, lambda: future.result(timeout=None))
 
         self._flush_logger_writers(batch)
