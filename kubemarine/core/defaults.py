@@ -40,6 +40,7 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.kubernetes.enrich_upgrade_inventory",
     "kubemarine.kubernetes.enrich_restore_inventory",
     "kubemarine.core.defaults.compile_inventory",
+    "kubemarine.core.defaults.manage_primitive_values",
     "kubemarine.kubernetes.enrich_reconfigure_inventory",
     "kubemarine.plugins.enrich_upgrade_inventory",
     "kubemarine.packages.enrich_inventory",
@@ -58,7 +59,6 @@ DEFAULT_ENRICHMENT_FNS = [
     "kubemarine.keepalived.enrich_inventory_apply_defaults",
     "kubemarine.haproxy.enrich_inventory",
     "kubemarine.kubernetes.enrich_inventory",
-    "kubemarine.core.defaults.manage_primitive_values",
     "kubemarine.admission.enrich_inventory",
     "kubemarine.kubernetes_accounts.enrich_inventory",
     "kubemarine.plugins.calico.enrich_inventory",
@@ -517,7 +517,6 @@ def manage_primitive_values(inventory: dict, _: KubernetesCluster) -> dict:
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
           'SystemdCgroup'], utils.strtobool, False),
-        (['services', 'kubeadm_kube-proxy', 'conntrack', 'min'], utils.strtoint, True),
         (['services', 'modprobe', '*', '*'], str, True),
         # kernel parameters are actually not always represented as integers
         (['services', 'sysctl', '*'], utils.strtoint, True),
