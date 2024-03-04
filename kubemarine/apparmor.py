@@ -13,27 +13,26 @@
 # limitations under the License.
 
 import json
-from typing import Dict
+from typing import Dict, List
 
 from kubemarine import system
 from kubemarine.core import log
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
 
-def get_status(group: NodeGroup) -> Dict[str, dict]:
+def get_status(group: NodeGroup) -> Dict[str, Dict[str, List[str]]]:
     log = group.cluster.log
     result = group.sudo("apparmor_status --json")
     parsed_result = {}
-    if result:
-        for host, node_result in result.items():
-            log.verbose('Parsing status for %s...' % host)
-            parsed_result[host] = parse_status(log, node_result.stdout)
+    for host, node_result in result.items():
+        log.verbose('Parsing status for %s...' % host)
+        parsed_result[host] = parse_status(log, node_result.stdout)
     print_status(log, parsed_result)
     return parsed_result
 
 
-def parse_status(logger: log.EnhancedLogger, result_stdout: str) -> dict:
-    result = {}
+def parse_status(logger: log.EnhancedLogger, result_stdout: str) -> Dict[str, List[str]]:
+    result: Dict[str, List[str]] = {}
     # Temporary workaround as long as we support OS with AppArmor from 3.0.0 to 3.0.8
     # Ubuntu 22.04.1 has 3.0.4
     # Malformed output is caused by false start `], ` delimiter
@@ -42,16 +41,11 @@ def parse_status(logger: log.EnhancedLogger, result_stdout: str) -> dict:
     if '"processes": {], ' in result_stdout:
         logger.debug("Patching malformed apparmor_status --json output")
         result_stdout = result_stdout.replace('"processes": {], ', '"processes": {')
+
     parsed_data = json.loads(result_stdout)
-    modes_set = set()
-    for mode in parsed_data['profiles'].values():
-        modes_set.add(mode)
-    for mode in modes_set:
-        profile_list = []
-        for profile_name, profile_state in parsed_data['profiles'].items():
-            if profile_state == mode:
-                profile_list.append(profile_name)
-        result[profile_state] = profile_list
+    for profile_name, profile_state in parsed_data['profiles'].items():
+        result.setdefault(profile_state, []).append(profile_name)
+
     return result
 
 
@@ -64,7 +58,7 @@ def print_status(logger: log.EnhancedLogger, parsed_result: dict) -> None:
     logger.verbose(res)
 
 
-def is_state_valid(group: NodeGroup, expected_profiles: dict) -> bool:
+def is_state_valid(group: NodeGroup, expected_profiles: Dict[str, List[str]]) -> bool:
     log = group.cluster.log
 
     log.verbose('Verifying Apparmor modes...')

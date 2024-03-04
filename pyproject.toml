@@ -116,6 +116,8 @@ fail-on = [
     "bad-builtin",
     # https://github.com/pyinstaller/pyinstaller/issues/1687
     "consider-using-sys-exit",
+    # List of other warnings that are considered more error prone
+    "undefined-loop-variable",
 ]
 
 [tool.pylint.format]

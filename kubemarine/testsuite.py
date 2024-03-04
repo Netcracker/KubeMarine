@@ -232,14 +232,16 @@ class TestSuite:
             result += "   Recommended"
         result += "\n"
 
+        colorize = False
         for tc in self.tcs:
             result += "\n" + tc.get_summary(show_minimal=show_minimal, show_recommended=show_recommended)
+            colorize = tc.check_color()
 
         result += "\n\nOVERALL RESULTS: "
 
         for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
             colors = ''
-            if tc.check_color():
+            if colorize:
                 if key == 'succeeded':
                     colors = "\x1b[48;5;041m\x1b[38;5;232m"
                 if key == 'failed':

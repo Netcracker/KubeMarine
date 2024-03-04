@@ -665,7 +665,7 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                     if result.failed:
                         cluster.log.debug(f'Can not get dashboard service IP: {result.stderr} ')
                         raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
-                found_url = result.stdout
+                found_url = results.get_simple_out()
                 if ipaddress.ip_address(found_url).version == 4:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I https://{found_url}:443 -s -S  -w "%{{http_code}}"', warn=True)
                 else:
@@ -690,7 +690,7 @@ def kubernetes_dashboard_status(cluster: KubernetesCluster) -> None:
                     if result.failed:
                         cluster.log.debug(f'Can not get dashboard ingress hostname: {result.stderr} ')
                         raise TestFailure("not available",hint=f"Please verify the following Kubernetes Dashboard status and fix this issue")
-                found_url = result.stdout
+                found_url = results.get_simple_out()
                 
                 if ipaddress.ip_address(ingress_ip).version == 4:
                     check_url = cluster.nodes['control-plane'].get_first_member().sudo(f'curl -k -I -L --resolve {found_url}:443:{ingress_ip} https://{found_url} -s -S -w "%{{http_code}}"', warn=True)
