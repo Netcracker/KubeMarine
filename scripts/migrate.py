@@ -43,19 +43,17 @@ MigrationProcedure: dict = {
 }
 
 
-def distant_migrate(MigrationProcedure):
+def distant_migrate(MigrationProcedure:dict):
     MigrationProcedure = json.loads(MigrationProcedure)
     for version in MigrationProcedure:
         if MigrationProcedure[version]["patches"]:
-            path = download_kubemarine(version, "bin")  # TODO check cache
+            path = get_kubemarine_env(version, "bin")
             print(version, path, get_patches_info(path))  #
             if MigrationProcedure[version]["procedure"]:
                 with open("procedure.yaml", "w") as file:
                     file.write(MigrationProcedure[version]["procedure"])
-            process = subprocess.Popen(
-                [path, "migrate_kubemarine", "procedure.yaml"],
-                stdout=subprocess.PIPE, text=True,
-            )
+
+            process = subprocess.Popen([path, "migrate_kubemarine", "procedure.yaml"],stdout=subprocess.PIPE, text=True,)
             for line in process.stdout:
                 print(line.strip())
             process.wait()
@@ -63,23 +61,20 @@ def distant_migrate(MigrationProcedure):
         else:
             print(f"No patches. Skipping migration for {version}")
 
-    #    clusteryaml = migrate_kubemarine(toVersion,
-    #                                     env,
-    #                                     MigrationProcedure[toVersion]["procedure"],
-    #                                     MigrationProcedure[toVersion]["patches"],
-    #                                     clusteryaml)
 
-
-def download_kubemarine(version, env):
-    filename = f"kubemarine-{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-{platform.machine().lower()}"
-    filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}")
+def get_kubemarine_env(version, env):
 
     if env in "bin":
+
+        filename = f"kubemarine-{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-{platform.machine().lower()}"
+        filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}")
+
+        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: #caching 
+            return filepath
+
         try:
             # Download the file
-            response = requests.get(
-                f"https://github.com/Netcracker/KubeMarine/releases/download/{version}/{filename}"
-            )
+            response = requests.get(f"https://github.com/Netcracker/KubeMarine/releases/download/{version}/{filename}")
             response.raise_for_status()
 
             with open(filepath, "wb") as file:
@@ -88,7 +83,7 @@ def download_kubemarine(version, env):
             os.chmod(filepath, os.stat(filepath).st_mode | 0o111)  # Set executable
             return filepath
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error: {e}", file=sys.stderr)
             return None
     return None
 
@@ -99,20 +94,16 @@ def get_patches_info(filepath):
     try:
         if filepath:
             # Assuming subprocess.run returns the patches list
-            patches_list = subprocess.run(
-                [filepath, "migrate_kubemarine", "--list"],
-                capture_output=True, text=True,
-            ).stdout.splitlines()
+            patches_list = subprocess.run([filepath, "migrate_kubemarine", "--list"],capture_output=True, text=True,
+                                          ).stdout.splitlines()
             if "No patches available." in patches_list:
                 patches_list = []
             else:
                 patches_list.remove("Available patches list:")
 
             for patch in patches_list:
-                description = subprocess.run(
-                    [filepath, "migrate_kubemarine", "--describe", patch],
-                    capture_output=True, text=True,
-                ).stdout.strip()
+                description = subprocess.run([filepath, "migrate_kubemarine", "--describe", patch],capture_output=True, text=True,
+                                             ).stdout.strip()
                 patches_info["patches"].append({patch.strip(): description})
     except Exception as e:
         print(f"Error: {e}")
@@ -120,25 +111,22 @@ def get_patches_info(filepath):
     return patches_info
 
 
-def list(old_version: str = "", new_version: str = "") -> dict:
-    index_from = (
-        KubemarineVersions.index(old_version)
-        if old_version in KubemarineVersions
-        else 0
-    )
-    index_to = (
-        KubemarineVersions.index(new_version) + 1
-        if new_version in KubemarineVersions
-        else -1
-    )
+def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = KubemarineVersions[-1]) -> dict:
+    index_from = KubemarineVersions.index(old_version) if old_version in KubemarineVersions else None
+    index_to = KubemarineVersions.index(new_version) if new_version in KubemarineVersions else None
+
+    # error handling
+    if ( index_from is None or index_to is None ) or  index_from > index_to:
+        print(f"Not supported combination of versions {old_version}, {new_version}", file=sys.stderr)
+        return {}
 
     ## get the patch list and  migration procedure
-    for version in KubemarineVersions[index_from:index_to]:
-        filepath = download_kubemarine(version, "bin")
+    for version in KubemarineVersions[index_from:index_to + 1]:
+        filepath = get_kubemarine_env(version, "bin")
         MigrationProcedure[version] = get_patches_info(filepath)
 
     return MigrationProcedure
 
-
-# function name, parameters ...
-print(json.dumps(globals()[sys.argv[1]](*sys.argv[2:])))
+if __name__ == "__main__":
+    # function name, parameters ...
+    print(json.dumps(globals()[sys.argv[1]](*sys.argv[2:])))
