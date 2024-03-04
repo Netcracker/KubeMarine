@@ -1537,13 +1537,8 @@ services:
 
 In the `services.kubeadm_kube-proxy` section, you can override the original settings for kube-proxy.
 For more information about these settings, refer to the official Kubernetes documentation at [https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration](https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration).
-By default, the installer uses the following parameters:
 
-|Parameter|Default Value|
-|---|---|
-|conntrack.min|1000000|
-
-`conntrack.min` inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value from [sysctl](#sysctl).
+**Note**: `conntrack.min` inherits the `services.sysctl.net.netfilter.nf_conntrack_max` value from [sysctl](#sysctl), therefore if you would like to change this variable, set the desired value in `services.sysctl.net.netfilter.nf_conntrack_max`.
 
 **Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
@@ -1604,9 +1599,7 @@ By default Kubemarine sets `bind-address` parameter of `kube-apiserver` to `node
 
 **Note**: These parameters can be reconfigured after installation using [Reconfigure Procedure](Maintenance.md#reconfigure-procedure).
 
-**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `services.kubeadm_patches`,
-the pod manifest file will contain the same flag twice and the running pod will take into account the last mentioned value (taken from `services.kubeadm_patches`).
-This behaviour persists at the moment: https://github.com/kubernetes/kubeadm/issues/1601.
+**Note**: If a parameter of control-plane pods is defined in `kubeadm.<service>.extraArgs` or is set by default by kubeadm and then redefined in `services.kubeadm_patches`, the pod manifest file will contain the same flag twice, the value taken from services.kubeadm_patches will be in the end of the arguments list.
 
 #### kernel_security
 

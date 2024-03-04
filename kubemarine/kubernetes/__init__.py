@@ -241,6 +241,13 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     preflight_errors.extend(default_preflight_errors)
     inventory["services"]["kubeadm_flags"]["ignorePreflightErrors"] = ",".join(set(preflight_errors))
 
+    # override kubeadm_kube-proxy.conntrack.min with sysctl.net.netfilter.nf_conntrack_max since they define the same kernel variable
+    version_key = utils.version_key(get_initial_kubernetes_version(inventory))
+    if version_key >= (1, 29, 0):
+        inventory["services"]["kubeadm_kube-proxy"]["conntrack"]["min"] = inventory["services"]["sysctl"]["net.netfilter.nf_conntrack_max"]
+    else:
+        inventory["services"]["kubeadm_kube-proxy"]["conntrack"]["min"] = ''
+
     return inventory
 
 
