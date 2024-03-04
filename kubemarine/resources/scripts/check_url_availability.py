@@ -30,7 +30,7 @@ try:
     status_code = urllib.urlopen(source, timeout=timeout).getcode()
     if status_code != 200:
         sys.stderr.write("Error status code: %s" % status_code)
-        exit(1)
+        sys.exit(1)
 except Exception as e:
     sys.stderr.write(str(e))
-    exit(1)
+    sys.exit(1)

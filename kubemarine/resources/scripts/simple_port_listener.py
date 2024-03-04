@@ -41,7 +41,7 @@ try:
         if "Address already in use" in str(e):
             sys.stdout.write("In use\n")
             sys.stdout.flush()
-            exit(1)
+            sys.exit(1)
         else:
             raise
 
