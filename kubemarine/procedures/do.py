@@ -42,7 +42,7 @@ class CLIAction(Action):
         cluster = res.cluster()
         executors_group = get_executors_group(cluster, self.do_args)
         if executors_group.is_empty():
-            print('Failed to find any of specified nodes or groups')
+            print('Failed to find any of specified nodes or groups')  # pylint: disable=bad-builtin
             sys.exit(1)
 
         no_stream: bool = self.do_args['no_stream']

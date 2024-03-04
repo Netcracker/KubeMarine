@@ -18,6 +18,8 @@ import sys
 from typing import List
 from urllib import request
 
+# pylint: disable=bad-builtin
+
 SYNC_CACHE = os.path.abspath(f"{__file__}/../../.synccache")
 TEMP_FILE = os.path.join(SYNC_CACHE, "tempfile")
 

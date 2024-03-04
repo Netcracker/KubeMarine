@@ -18,6 +18,8 @@ from kubemarine.core import utils
 from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
 from ..tracker import SummaryTracker, ComposedTracker
 
+# pylint: disable=bad-builtin
+
 
 class UpgradePackages(UpgradeSoftware):
     def prepare(self, summary_tracker: SummaryTracker) -> None:

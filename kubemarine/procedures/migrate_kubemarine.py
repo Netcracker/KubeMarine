@@ -475,6 +475,8 @@ def new_parser() -> argparse.ArgumentParser:
 
 
 def run(context: dict) -> None:
+    # pylint: disable=bad-builtin
+
     args = context['execution_arguments']
 
     patches = load_patches()

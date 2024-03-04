@@ -55,7 +55,7 @@ class TestCase:
             self.warn(value)
         else:
             self.exception(value)
-        print(self.get_summary(show_hint=True))
+        print(self.get_summary(show_hint=True))  # pylint: disable=bad-builtin
         return True
 
     def __init__(self, cluster: KubernetesCluster, id: str, category: str, name: str,
@@ -224,7 +224,7 @@ class TestSuite:
                 return True
         return False
 
-    def get_final_summary(self, show_minimal: bool = True, show_recommended: bool = True) -> str:
+    def print_final_summary(self, show_minimal: bool = True, show_recommended: bool = True) -> None:
         result = "          Group    Status   ID    Test                                                               Actual result"
         if show_minimal:
             result += "        Minimal"
@@ -254,7 +254,7 @@ class TestSuite:
 
         result += "\n"
 
-        return result
+        print(result)  # pylint: disable=bad-builtin
 
     def print_final_status(self, logger: log.EnhancedLogger) -> None:
         if self.is_any_test_failed():

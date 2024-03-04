@@ -25,6 +25,8 @@ import yaml
 
 from kubemarine import procedures as proc
 
+# pylint: disable=bad-builtin
+
 # Don't remove this line. The idna encoding
 # is used by getaddrinfo when dealing with unicode hostnames,
 # and in some cases, there appears to be a race condition

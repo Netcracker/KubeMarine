@@ -102,12 +102,18 @@ push = true
 py-version = "3.7"
 init-hook = 'import sys; sys.path.append("scripts/thirdparties")'
 
+load-plugins = [
+    "pylint.extensions.bad_builtin"
+]
+
 # If pylint fails, check that the code is rated higher than `fail-under`,
 # and search for messages from `fail-on`.
 fail-under = 9.9
 fail-on = [
     # Messages with numerical IDs `E\d+` or `F\d+`.
     "E", "F",
+    # Use logging framework as much as possible instead of print().
+    "bad-builtin",
     # https://github.com/pyinstaller/pyinstaller/issues/1687
     "consider-using-sys-exit",
 ]
@@ -150,6 +156,9 @@ disable = [
     "unnecessary-pass",
     "unused-import",
 ]
+
+[tool.pylint.deprecated_builtins]
+bad-functions = ["print"]
 
 [tool.mypy]
 files = ["kubemarine", "scripts"]

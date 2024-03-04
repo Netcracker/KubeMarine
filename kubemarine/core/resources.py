@@ -135,7 +135,7 @@ class DynamicResources:
         msg = "Loading inventory file '%s'" % self.inventory_filepath
         if logger is None:
             if not self.context['load_inventory_silent']:
-                print(msg)
+                print(msg)  # pylint: disable=bad-builtin
         else:
             logger.info(msg)
         try:

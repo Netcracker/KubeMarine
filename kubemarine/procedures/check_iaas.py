@@ -1532,7 +1532,7 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
 
     # Final summary should be printed only to stdout with custom formatting
     # If test results are required for parsing, they can be found in the test results files
-    print(testsuite.get_final_summary())
+    testsuite.print_final_summary()
     testsuite.print_final_status(result.logger)
     make_reports(context, testsuite)
     return testsuite

@@ -23,6 +23,8 @@ from kubemarine.procedures import migrate_kubemarine
 from ..shell import info, run
 from ..tracker import SummaryTracker, ChangesTracker
 
+# pylint: disable=bad-builtin
+
 YAML = utils.yaml_structure_preserver()
 SOFTWARE_UPGRADE_PATH = migrate_kubemarine.SOFTWARE_UPGRADE_PATH
 

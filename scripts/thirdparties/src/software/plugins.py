@@ -25,6 +25,8 @@ from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeSoft
 from ..shell import curl, info, run, TEMP_FILE, SYNC_CACHE
 from ..tracker import SummaryTracker, ComposedTracker
 
+# pylint: disable=bad-builtin
+
 ERROR_UNEXPECTED_IMAGE = "Image '{image}' for manifest '{manifest}' is not expected"
 ERROR_ASCENDING_VERSIONS = \
     "Plugins should have non-decreasing versions. " \

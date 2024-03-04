@@ -18,6 +18,8 @@ import sys
 from typing import List
 import tarfile
 
+# pylint: disable=bad-builtin
+
 PIP_VERSION = "23.3.1"
 
 

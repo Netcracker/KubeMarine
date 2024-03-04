@@ -21,6 +21,8 @@ from ordered_set import OrderedSet
 from kubemarine.core import static, utils
 from .shell import info
 
+# pylint: disable=bad-builtin
+
 ERROR_PREVIOUS_MINOR = "Kubernetes version '{version}' is deleted. " \
                        "Need to delete all versions having the same or lower minor version. " \
                        "Not deleted versions: {previous_versions}."

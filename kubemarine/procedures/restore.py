@@ -42,6 +42,8 @@ def missing_or_empty(file: str) -> bool:
 
 
 def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str) -> None:
+    # pylint: disable=bad-builtin
+
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
         procedure = utils.load_yaml(procedure_inventory_filepath)
