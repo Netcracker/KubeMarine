@@ -33,7 +33,7 @@ class Action(ABC):
         self.recreate_inventory = recreate_inventory
 
     @abstractmethod
-    def run(self, res: DynamicResources) -> None:
+    def run(self, _res: DynamicResources) -> None:
         """
         Do some work based on provided DynamicResources. If any action fails, further actions are not run.
 

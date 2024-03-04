@@ -219,8 +219,8 @@ class TasksAction(action.Action):
         proceed_cumulative_point(cluster, self.cumulative_points, END_OF_TASKS,
                                  force=args.get('force_cumulative_points', False))
 
-    def cluster(self, resources: res.DynamicResources) -> c.KubernetesCluster:
-        return resources.cluster()
+    def cluster(self, _res: res.DynamicResources) -> c.KubernetesCluster:
+        return _res.cluster()
 
 
 def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None) -> None:
