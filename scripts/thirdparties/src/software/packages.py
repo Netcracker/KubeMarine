@@ -44,9 +44,6 @@ class UpgradePackages(UpgradeSoftware):
 
 
 class Packages(SoftwareType):
-    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig):
-        super().__init__(compatibility, upgrade_config)
-
     @property
     def name(self) -> str:
         return 'packages'

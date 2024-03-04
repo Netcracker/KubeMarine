@@ -184,9 +184,6 @@ class FakeFS:
 
 
 class FakeClusterStorage(utils.ClusterStorage):
-    def __init__(self, cluster: object, context: dict):
-        super().__init__(cluster, context)
-
     def make_dir(self) -> None:
         pass
 
