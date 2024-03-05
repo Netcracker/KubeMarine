@@ -9,7 +9,7 @@ from kubemarine import plugins
 from kubemarine.core import static, utils
 
 HELP_DESCRIPTION = """\
-Print supported configurations of 3rd-parties with versions compatibility.
+Print the supported k8s versions with the respective configurations of third-parties.
 
 How to use:
 
