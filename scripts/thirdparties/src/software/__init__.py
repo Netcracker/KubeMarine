@@ -90,7 +90,7 @@ class CompatibilityMap:
                 print(f"Deleted '{software_name}.{key}' from {self.name}")
 
         sorted_map = utils.map_sorted(software_mapping, key=utils.version_key)
-        if not (sorted_map is software_mapping):
+        if sorted_map is not software_mapping:
             self.compatibility_map[software_name] = sorted_map
             print(f"Reordered {software_name!r} in {self.name}")
 

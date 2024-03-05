@@ -15,7 +15,7 @@
 import os
 import sys
 
-# pylint: disable=bad-builtin
+# pylint: disable=bad-builtin,wrong-import-position
 
 # Ensure to take Kubemarine modules from the project root.
 # !!! This should be a very first line of the script !!!

@@ -15,7 +15,7 @@ from copy import deepcopy
 from typing import List
 
 from kubemarine.core import utils
-from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
+from . import SoftwareType, CompatibilityMap, UpgradeSoftware
 from ..tracker import SummaryTracker, ComposedTracker
 
 # pylint: disable=bad-builtin

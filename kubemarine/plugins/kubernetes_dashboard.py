@@ -121,7 +121,8 @@ class DashboardManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
 
-        self.enrich_resources_for_container(manifest, key, container_name='dashboard-metrics-scraper', plugin_service="metrics-scraper")
+        self.enrich_resources_for_container(
+            manifest, key, container_name='dashboard-metrics-scraper', plugin_service="metrics-scraper")
         self.enrich_node_selector(manifest, key, plugin_service='metrics-scraper')
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 

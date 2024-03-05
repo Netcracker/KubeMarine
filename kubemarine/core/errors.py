@@ -90,7 +90,7 @@ def get_kme_dictionary() -> dict:
 
 
 class _BaseKME(RuntimeError, ABC):
-    def __init__(self, code: str, **kwargs: object):
+    def __init__(self, code: str):
         self.code = code
         if self.code not in get_kme_dictionary():
             raise ValueError('An error was raised with an unknown error code')

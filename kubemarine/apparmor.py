@@ -71,11 +71,10 @@ def is_state_valid(group: NodeGroup, expected_profiles: Dict[str, List[str]]) ->
                 continue
             if state == 'disable':
                 for profile in profiles:
-                    for remote_profiles in status.values():
-                        if profile in remote_profiles:
-                            valid = False
-                            log.verbose('Mode %s is enabled on remote host %s' % (state, host))
-                            break
+                    if any(profile in remote_profiles for remote_profiles in status.values()):
+                        valid = False
+                        log.verbose('Mode %s is enabled on remote host %s' % (state, host))
+                        break
             else:
                 if not status.get(state):
                     valid = False
@@ -103,13 +102,16 @@ def configure_apparmor(group: NodeGroup, expected_profiles: dict) -> RunnersGrou
     cmd = ''
     for profile in expected_profiles.get('enforce', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/disable/%s; sudo rm -f /etc/apparmor.d/force-complain/%s; ' % (profile, profile)
+        cmd += (f'sudo rm -f /etc/apparmor.d/disable/{profile}; '
+                f'sudo rm -f /etc/apparmor.d/force-complain/{profile}; ')
     for profile in expected_profiles.get('complain', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/disable/%s; sudo ln -s /etc/apparmor.d/%s /etc/apparmor.d/force-complain/; ' % (profile, profile)
+        cmd += (f'sudo rm -f /etc/apparmor.d/disable/{profile}; '
+                f'sudo ln -s /etc/apparmor.d/{profile} /etc/apparmor.d/force-complain/; ')
     for profile in expected_profiles.get('disable', []):
         profile = convert_profile(profile)
-        cmd += 'sudo rm -f /etc/apparmor.d/force-complain/%s; sudo ln -s /etc/apparmor.d/%s /etc/apparmor.d/disable/; ' % (profile, profile)
+        cmd += (f'sudo rm -f /etc/apparmor.d/force-complain/{profile}; '
+                f'sudo ln -s /etc/apparmor.d/{profile} /etc/apparmor.d/disable/; ')
     cmd += 'sudo systemctl reload apparmor.service && sudo apparmor_status'
     return group.sudo(cmd)
 

@@ -44,7 +44,8 @@ import kubemarine.plugins.nginx_ingress
 import kubemarine.system
 import kubemarine.thirdparties
 
-from kubemarine.core import utils, cluster as c, log, errors, static
+from kubemarine.core import cluster as c  # pylint: disable=reimported
+from kubemarine.core import utils, log, errors, static
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.yaml_merger import default_merger
 
@@ -146,7 +147,6 @@ class DynamicResources:
             return inventory
         except ruamel.yaml.YAMLError as exc:
             utils.do_fail("Failed to load inventory file", exc, logger=logger)
-            return {}  # unreachable
 
     def recreate_inventory(self) -> None:
         """

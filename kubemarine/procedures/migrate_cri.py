@@ -54,7 +54,6 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         cluster.log.debug(f'Updating thirdparties for node "{node_name}"...')
         thirdparties.install_all_thirparties(node)
 
-        version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
         cluster.log.debug("Migrating \"%s\"..." % node_name)
         drain_cmd = kubernetes.prepare_drain_command(cluster, node_name, disable_eviction=True)
         control_plane.sudo(drain_cmd, hide=False)
@@ -135,15 +134,18 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
 
 def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
-    During drain command we ignore daemon sets, as result this such pods as ingress-nginx-controller arent't deleted before migration.
-    For this reason their ips can stay in calico ipam despite they aren't used. You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
+    During drain command we ignore daemon sets,
+    as result this such pods as ingress-nginx-controller arent't deleted before migration.
+    For this reason their ips can stay in calico ipam despite they aren't used.
+    You can check this, if you run "calicoctl ipam check --show-problem-ips" right after apply_new_cri task.
     Those ips are cleaned by calico garbage collector, but it can take about 20 minutes.
     This task releases problem ips with force.
     """
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
     random_report_name = utils.get_remote_tmp_path(ext='json')
-    result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
+    result = first_control_plane.sudo(
+        f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
     leaked_ips = result.get_simple_out()
     leaked_ips_count = leaked_ips.count('leaked')
     cluster.log.debug(f"Found {leaked_ips_count} leaked ips")

@@ -193,7 +193,7 @@ class KubernetesCluster(Environment):
         if stage == EnrichmentStage.DEFAULT:
             self._products.procedure_inventory = None
         if stage == EnrichmentStage.PROCEDURE and previous_cluster is not None:
-            self._previous_products = previous_cluster._products
+            self._previous_products = previous_cluster._products  # pylint: disable=protected-access
 
             # Previous nodes refer to previous cluster. Create new group to surely refer to this cluster.
             self._products.nodes['previous'] = {
@@ -254,9 +254,9 @@ class KubernetesCluster(Environment):
                 ips[role] = OrderedSet(group.get_hosts())
 
         self.log.debug("Inventory file loaded:")
-        for role in ips.keys():
-            self.log.debug("  %s %i" % (role, len(ips[role])))
-            for ip in ips[role]:
+        for role, hosts in ips.items():
+            self.log.debug("  %s %i" % (role, len(hosts)))
+            for ip in hosts:
                 self.log.debug("    %s" % ip)
 
     @property

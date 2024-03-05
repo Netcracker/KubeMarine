@@ -570,9 +570,7 @@ def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker:
 
     id_roles_map: Dict[str, List[str]] = {}
 
-    for role_name in ['balancer', 'master', 'worker']:
-
-        item = locals()[role_name]
+    for role_name, item in (('balancer', balancer), ('master', master), ('worker', worker)):
 
         if isinstance(item, int):
             ids = []

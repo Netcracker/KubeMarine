@@ -50,4 +50,4 @@ class Action(ABC):
 
         :param context: mutable context instance.
         """
-        return
+        pass

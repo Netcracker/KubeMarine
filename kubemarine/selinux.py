@@ -188,10 +188,11 @@ def setup_selinux(group: NodeGroup) -> Optional[RunnersGroupResult]:
     expected_policy = get_expected_policy(group.cluster.inventory)
     expected_permissive = get_expected_permissive(group.cluster.inventory)
 
-    valid, result, parsed_result = is_config_valid(group,
-                                                   state=expected_state,
-                                                   policy=expected_policy,
-                                                   permissive=expected_permissive)
+    valid, result, _ = \
+        is_config_valid(group,
+                        state=expected_state,
+                        policy=expected_policy,
+                        permissive=expected_permissive)
 
     if valid:
         log.debug("Skipped - selinux already correctly configured")

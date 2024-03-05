@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 from io import StringIO
 from typing import Dict, List, Tuple, Optional
 
 import toml
 import yaml
-import base64
 
 from kubemarine import system, packages, jinja
 from kubemarine.core import utils, static, errors
@@ -143,8 +143,10 @@ def calculate_sandbox_image_upgrade_required(cluster: KubernetesCluster) -> None
 
 @enrichment(EnrichmentStage.PROCEDURE, procedures=['migrate_cri'])
 def enrich_migrate_cri_inventory(cluster: KubernetesCluster) -> None:
-    if cluster.previous_inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
-        raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
+    if (cluster.previous_inventory["services"]["cri"]["containerRuntime"]
+            == cluster.procedure_inventory["cri"]["containerRuntime"]):
+        raise Exception("You already have such cri "
+                        "or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
 
     cri_section = cluster.inventory.setdefault("services", {}).setdefault("cri", {})
 

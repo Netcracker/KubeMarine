@@ -18,14 +18,13 @@ import random
 import re
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from types import TracebackType
 from typing import Tuple, List, Dict, Callable, Any, Optional, Union, OrderedDict, TypeVar, Type, Mapping, Iterable
 
 import fabric  # type: ignore[import-untyped]
 import fabric.transfer  # type: ignore[import-untyped]
-
-from concurrent.futures.thread import ThreadPoolExecutor
 
 import invoke
 
@@ -257,7 +256,7 @@ class RawExecutor:
             reparsed_results[host] = conn_results
 
             runner_exception = None
-            if isinstance(raw_result, invoke.UnexpectedExit) or isinstance(raw_result, invoke.CommandTimedOut):
+            if isinstance(raw_result, (invoke.UnexpectedExit, invoke.CommandTimedOut)):
                 runner_exception = raw_result
                 raw_result = raw_result.result
 
@@ -391,9 +390,9 @@ class RawExecutor:
                     batch[host] = actions[i]
             if not batch:
                 break
-            else:
-                i += 1
-                batches.append(batch)
+
+            i += 1
+            batches.append(batch)
 
         return batches
 
