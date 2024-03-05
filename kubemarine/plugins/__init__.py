@@ -26,7 +26,6 @@ import tarfile
 import time
 import urllib.request
 import zipfile
-from copy import deepcopy
 from itertools import chain
 from types import ModuleType, FunctionType
 from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast, TextIO, Optional
@@ -34,7 +33,7 @@ from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, 
 import yaml
 import inspect
 
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine import jinja, thirdparties
 from kubemarine.core import utils, static, errors, os as kos, log
 from kubemarine.core.yaml_merger import default_merger
@@ -51,17 +50,18 @@ LOADED_MODULES: Dict[str, ModuleType] = {}
 ERROR_PODS_NOT_READY = 'In the expected time, the pods did not become ready'
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for plugin_name, plugin_item in inventory["plugins"].items():
+@enrichment(EnrichmentStage.FULL)
+def verify_inventory(cluster: KubernetesCluster) -> None:
+    for plugin_name, plugin_item in cluster.inventory["plugins"].items():
         for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
                 if procedure_types()[procedure_type].get('verify') is not None:
                     procedure_types()[procedure_type]['verify'](cluster, configs, plugin_name)
 
-    return inventory
 
-
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     # it is necessary to convert URIs from quay.io/xxx:v1 to example.com:XXXX/xxx:v1
     plugins_default_registry = inventory['plugin_defaults']['installation'].get('registry')
 
@@ -77,65 +77,70 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             for procedure_type, configs in step.items():
                 if procedure_types()[procedure_type].get('convert') is not None:
                     step[procedure_type] = procedure_types()[procedure_type]['convert'](cluster, configs)
-    return inventory
 
 
-def _get_upgrade_plan(cluster: KubernetesCluster, procedure_inventory: dict = None) -> List[Tuple[str, dict]]:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-
+def _get_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     context = cluster.context
-    if context.get("initial_procedure") == "upgrade":
-        upgrade_version = context["upgrade_version"]
-        upgrade_plan = []
-        for version in procedure_inventory['upgrade_plan']:
-            if utils.version_key(version) < utils.version_key(upgrade_version):
-                continue
+    procedure = context["initial_procedure"]
+    procedure_inventory = cluster.procedure_inventory
+    upgrade_plan = []
+    if procedure == "upgrade":
+        kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        for i, v in enumerate(procedure_inventory['upgrade_plan'][context['upgrade_step']:]):
+            # Take the target (probably) compiled version and the remained not yet compiled
+            version = kubernetes_version if i == 0 else v
+            upgrade_plan.append((version, procedure_inventory.get(v, {}).get("plugins", {})))
 
-            upgrade_plan.append((version, procedure_inventory.get(version, {}).get("plugins", {})))
-
-    elif context.get("initial_procedure") == "migrate_kubemarine" and 'upgrading_plugin' in context:
+    elif 'upgrading_plugin' in context:
         upgrade_plugins = procedure_inventory.get('upgrade', {}).get("plugins", {})
-        upgrade_plugins = dict(item for item in upgrade_plugins.items()
-                               if item[0] == context['upgrading_plugin'])
+        upgrade_plugins = utils.subdict_yaml(upgrade_plugins, [context['upgrading_plugin']])
         upgrade_plan = [("", upgrade_plugins)]
-    else:
-        upgrade_plan = []
 
     return upgrade_plan
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
+def enrich_upgrade_inventory(cluster: KubernetesCluster) -> None:
+    upgrade_plan = _get_upgrade_plan(cluster)
+    upgrade_plugins = {} if not upgrade_plan else upgrade_plan[0][1]
+
+    if upgrade_plugins:
+        default_merger.merge(cluster.inventory.setdefault("plugins", {}), utils.deepcopy_yaml(upgrade_plugins))
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
+def verify_upgrade_inventory(cluster: KubernetesCluster) -> None:
     upgrade_plan = _get_upgrade_plan(cluster)
     if not upgrade_plan:
-        return inventory
+        return
 
     context = cluster.context
     if context.get("initial_procedure") == "upgrade":
-        previous_version = context['initial_kubernetes_version']
+        previous_version = cluster.previous_inventory['services']['kubeadm']['kubernetesVersion']
         plugins_verify = oob_plugins
     else:  # migrate_kubemarine procedure
         previous_version = ""
         plugins_verify = [context['upgrading_plugin']]
 
-    _verify_upgrade_plan(cluster.raw_inventory, previous_version, plugins_verify, upgrade_plan)
-
-    return generic_upgrade_inventory(cluster, inventory)
+    _verify_upgrade_plan(cluster, previous_version, plugins_verify, upgrade_plan)
 
 
-def _verify_upgrade_plan(raw_inventory: dict, previous_version: str,
+def _verify_upgrade_plan(cluster: KubernetesCluster, previous_version: str,
                          plugins_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
-    raw_plugins = deepcopy(raw_inventory.get('plugins', {}))
+    raw_plugins = utils.deepcopy_yaml(cluster.previous_raw_inventory.get('plugins', {}))
 
     # validate all plugin sections in procedure inventory
     for version, upgrade_plugins in upgrade_plan:
+        if version != '' and jinja.is_template(version):
+            break
+
         for plugin_name in plugins_verify:
             verify_image_redefined(plugin_name,
                                    previous_version,
                                    version,
                                    raw_plugins.get(plugin_name, {}),
                                    upgrade_plugins.get(plugin_name, {}))
-        default_merger.merge(raw_plugins, upgrade_plugins)
+        default_merger.merge(raw_plugins, utils.deepcopy_yaml(upgrade_plugins))
         previous_version = version
 
 
@@ -162,24 +167,6 @@ def verify_image_redefined(plugin_name: str, previous_version: str, next_version
                              previous_version_spec=f" for version {previous_version}" if previous_version else "",
                              next_version_spec=f" for next version {next_version}" if next_version else ""
             )
-
-
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict) -> dict:
-    return generic_upgrade_inventory(cluster, inventory, procedure_inventory)
-
-
-def generic_upgrade_inventory(cluster: KubernetesCluster, inventory: dict, procedure_inventory: dict = None) -> dict:
-    if procedure_inventory is None:
-        procedure_inventory = cluster.procedure_inventory
-    upgrade_plan = _get_upgrade_plan(cluster, procedure_inventory)
-    if not upgrade_plan:
-        return inventory
-
-    _, upgrade_plugins = upgrade_plan[0]
-    if upgrade_plugins:
-        default_merger.merge(inventory.setdefault("plugins", {}), upgrade_plugins)
-
-    return inventory
 
 
 def _get_plugin_priority(plugin_item: dict, default: int) -> int:
@@ -676,7 +663,7 @@ def verify_shell(cluster: KubernetesCluster, config: dict, plugin_name: Optional
         raise Exception('Shell output variables could be used for single-node groups, but multi-node group was found')
 
     in_vars = config.get('in_vars', [])
-    words_splitter = re.compile('\W')
+    words_splitter = re.compile(r'\W')
     for var in chain(in_vars, out_vars):
         var_name = var['name']
         if len(words_splitter.split(var_name)) > 1:

@@ -12,16 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
+import itertools
+import os
 from collections import OrderedDict
-from itertools import chain
 from typing import List, Callable, Dict
 
-from kubemarine import kubernetes, plugins, admission
-from kubemarine.core import flow
+from kubemarine import kubernetes, plugins, admission, jinja
+from kubemarine.core import flow, log, resources as res
 from kubemarine.core import utils
-from kubemarine.core.action import Action
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 
@@ -49,7 +48,7 @@ def prepull_images(cluster: KubernetesCluster) -> None:
 
 
 def kubernetes_upgrade(cluster: KubernetesCluster) -> None:
-    initial_kubernetes_version = cluster.context['initial_kubernetes_version']
+    initial_kubernetes_version = kubernetes.get_kubernetes_version(cluster.previous_inventory)
 
     upgrade_group = kubernetes.get_group_for_upgrade(cluster)
     preconfigure_components = []
@@ -129,7 +128,7 @@ def kubernetes_cleanup_nodes_versions(cluster: KubernetesCluster) -> None:
 
 
 def upgrade_packages(cluster: KubernetesCluster) -> None:
-    upgrade_version = cluster.context["upgrade_version"]
+    upgrade_version = kubernetes.get_procedure_upgrade_version(cluster)
 
     packages = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
     if packages.get("install") is not None or packages.get("upgrade") is not None or packages.get("remove") is not None:
@@ -137,15 +136,23 @@ def upgrade_packages(cluster: KubernetesCluster) -> None:
 
 
 def upgrade_plugins(cluster: KubernetesCluster) -> None:
-    upgrade_version = cluster.context["upgrade_version"]
+    upgrade_version = kubernetes.get_procedure_upgrade_version(cluster)
 
     # upgrade_candidates is a source of upgradeable plugins, not list of plugins to upgrade.
     # Some plugins from upgrade_candidates will not be upgraded, because they have "install: false"
     upgrade_candidates = {}
-    defined_plugins = cluster.procedure_inventory.get(upgrade_version, {}).get("plugins", {}).keys()
-    for plugin in chain(defined_plugins, plugins.oob_plugins):
-        # TODO: use only OOB plugins that have changed version so that we do not perform redundant installations
-        upgrade_candidates[plugin] = cluster.inventory["plugins"][plugin]
+    for plugin, plugin_item in cluster.inventory["plugins"].items():
+        # Both OOB and custom plugins can have templates dependent on the inventory.
+        # By default, let's do not re-install plugins if inventory does not change for them.
+        #
+        # Still there should be an ability to force re-install them with the same target inventory configuration,
+        # using just empty spec in the procedure inventory.
+        #
+        # This requirement makes it impossible to turn off re-installation of OOB plugins,
+        # if compatibility map changes, but target inventory does not (e.g. if all images are redefined).
+        if (plugin in cluster.procedure_inventory.get(upgrade_version, {}).get("plugins", {})
+                or cluster.previous_inventory["plugins"].get(plugin) != plugin_item):
+            upgrade_candidates[plugin] = cluster.inventory["plugins"][plugin]
 
     plugins.install(cluster, upgrade_candidates)
 
@@ -170,41 +177,56 @@ class UpgradeFlow(flow.Flow):
     def _run(self, resources: DynamicResources) -> None:
         logger = resources.logger()
 
-        previous_version = kubernetes.get_initial_kubernetes_version(resources.raw_inventory())
+        previous_version = kubernetes.get_kubernetes_version(resources.inventory())
         upgrade_plan = resources.procedure_inventory().get('upgrade_plan')
         if not upgrade_plan:
             raise Exception('Upgrade plan is not specified in procedure')
-        upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan)
-        logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
-
-        self.target_version = upgrade_plan[-1]
-        kubernetes.verify_supported_version(self.target_version, logger)
+        upgrade_plan = verify_upgrade_plan(previous_version, upgrade_plan, logger)
 
         args = resources.context['execution_arguments']
         if (args['tasks'] or args['exclude']) and len(upgrade_plan) > 1:
             raise Exception("Usage of '--tasks' and '--exclude' is not allowed when upgrading to more than one version")
 
         # todo inventory is preserved few times, probably need to preserve it once instead.
-        actions = [UpgradeAction(version, i == 0) for i, version in enumerate(upgrade_plan)]
+        actions = [UpgradeAction(version, i) for i, version in enumerate(upgrade_plan)]
         flow.run_actions(resources, actions)
+        self.target_version = actions[-1].upgrade_version
 
 
-class UpgradeAction(Action):
-    def __init__(self, upgrade_version: str, first_upgrade: bool) -> None:
-        super().__init__('upgrade to ' + upgrade_version, recreate_inventory=True)
+class UpgradeAction(flow.TasksAction):
+    def __init__(self, upgrade_version: str, upgrade_step: int) -> None:
+        super().__init__(f'upgrade step {upgrade_step + 1}', tasks,
+                         recreate_inventory=True)
         self.upgrade_version = upgrade_version
-        self.first_upgrade = first_upgrade
+        self.upgrade_step = upgrade_step
 
-    def run(self, res: DynamicResources) -> None:
-        action_tasks = copy.deepcopy(tasks)
-        if not self.first_upgrade:
-            del action_tasks['cleanup_tmp_dir']
-        flow.run_tasks(res, action_tasks)
-        res.make_final_inventory()
+        if upgrade_step > 0:
+            del self.tasks['cleanup_tmp_dir']
+
+    def cluster(self, res: DynamicResources) -> KubernetesCluster:
+        # Make sure to enrich at DEFAULT stage without impact from changed context
+        res.cluster(EnrichmentStage.DEFAULT)
+
+        context = res.context
+        context['upgrade_step'] = self.upgrade_step
+        res.reset_cluster(EnrichmentStage.DEFAULT)
+        # This starts PROCEDURE enrichment
+        cluster = super().cluster(res)
+
+        # New version is enriched and compiled
+        self.upgrade_version = kubernetes.get_kubernetes_version(cluster.inventory)
+        self.identifier = f'upgrade to {self.upgrade_version}'
+
+        return cluster
+
+    def run(self, resources: res.DynamicResources) -> None:
+        super().run(resources)
+        # Change context back, but do not DynamicResources.reset_cluster().
+        # Once the inventory is recreated, the reset context will be picked up during new cluster initialization.
+        del resources.context['upgrade_step']
 
     def prepare_context(self, context: dict) -> None:
-        context['upgrade_version'] = self.upgrade_version
-        context['dump_filename_prefix'] = self.upgrade_version
+        context['dump_subdir'] = 'upgrade' if jinja.is_template(self.upgrade_version) else self.upgrade_version
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:
@@ -229,16 +251,25 @@ def main(cli_arguments: List[str] = None) -> None:
     kubernetes.verify_supported_version(flow_.target_version, result.logger)
 
 
-def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str]) -> List[str]:
-    kubernetes.verify_allowed_version(previous_version)
-    for version in upgrade_plan:
-        kubernetes.verify_allowed_version(version)
+def verify_upgrade_plan(previous_version: str, upgrade_plan: List[str], logger: log.EnhancedLogger) -> List[str]:
+    # This validates upgrade possibility only partially, and lacks of CRI, PSP/PSS or other validations.
+    # It could be better to run enrichment for all the versions before even one upgrade.
+    is_any_template = False
+    for version in itertools.chain((previous_version,), upgrade_plan):
+        if not jinja.is_template(version):
+            kubernetes.verify_allowed_version(version)
+        else:
+            is_any_template = True
 
-    upgrade_plan.sort(key=utils.version_key)
+    if not is_any_template:
+        pv = previous_version
+        for version in upgrade_plan:
+            kubernetes.test_version_upgrade_possible(pv, version)
+            pv = version
 
-    for version in upgrade_plan:
-        kubernetes.test_version_upgrade_possible(previous_version, version)
-        previous_version = version
+        logger.debug(f"Loaded upgrade plan: current ({previous_version}) ⭢ {' ⭢ '.join(upgrade_plan)}")
+    else:
+        logger.debug(f"Cannot early validate upgrade versions for jinja templates")
 
     return upgrade_plan
 

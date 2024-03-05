@@ -108,11 +108,10 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         services = cluster.inventory['services']
         self._test_enrich_and_finalize_inventory_check(services, True)
 
-        test_utils.stub_associations_packages(cluster, {})
         services = test_utils.make_finalized_inventory(cluster)['services']
         self._test_enrich_and_finalize_inventory_check(services, True)
 
-        services = test_utils.get_final_inventory(cluster, self.inventory)['services']
+        services = cluster.formatted_inventory['services']
         self._test_enrich_and_finalize_inventory_check(services, False)
 
     def _test_enrich_and_finalize_inventory_check(self, services: dict, enriched: bool):
@@ -166,6 +165,20 @@ class ReconfigureKubeadmEnrichment(unittest.TestCase):
         ], kubeadm_patches['apiServer'])
 
         self.assertEqual([{'groups': ['worker'], 'patch': {'kubelet_kp1': 'kubelet_vp1_new'}}], kubeadm_patches['kubelet'])
+
+    def test_change_apiserver_args_check_jinja_dependent_parameters(self):
+        self.reconfigure['services']['kubeadm'] = {
+            'apiServer': {
+                'extraArgs': {'audit-policy-file': '/changed/path'},
+            }
+        }
+
+        cluster = self.new_cluster()
+
+        apiserver = cluster.inventory['services']['kubeadm']['apiServer']
+        self.assertEqual('/changed/path', apiserver['extraArgs']['audit-policy-file'])
+        self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['hostPath'])
+        self.assertEqual('/changed/path', apiserver['extraVolumes'][0]['mountPath'])
 
     def test_pss_managed_arg_not_redefined(self):
         self.inventory.setdefault('rbac', {})['admission'] = 'pss'

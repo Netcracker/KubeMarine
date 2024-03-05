@@ -20,7 +20,7 @@ from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils, static
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import (
     NodeGroup, RunnersGroupResult, NodeConfig, DeferredGroup, RunResult, AbstractGroup, CollectorCallback
 )
@@ -35,8 +35,8 @@ ERROR_NO_BOUND_VRRP_CONFIGURED_MNTC = \
 
 
 def is_maintenance_mode(cluster: KubernetesCluster) -> bool:
-    return bool(cluster.raw_inventory.get('services', {}).get('loadbalancer', {})
-                .get('haproxy', {}).get('maintenance_mode', False))
+    maintenance_mode: bool = cluster.inventory['services']['loadbalancer']['haproxy']['maintenance_mode']
+    return maintenance_mode
 
 
 def _get_associations_for_node(node: AbstractGroup[RunResult]) -> dict:
@@ -51,7 +51,7 @@ def is_vrrp_not_bind(vrrp_item: dict) -> bool:
 def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> List[str]:
     # bindings list for common config and maintenance should be different
 
-    is_combined = len([role for role in node['roles'] if role != 'add_node']) > 1
+    is_combined = len(node['roles']) > 1
 
     if not maintenance and not is_combined:
         return ["0.0.0.0", '::']
@@ -78,11 +78,12 @@ def _get_bindings(inventory: dict, node: NodeConfig, *, maintenance: bool) -> Li
     return list(set(bindings))
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
 
-    for node in inventory["nodes"]:
-        if 'balancer' not in node['roles'] or 'remove_node' in node['roles']:
-            continue
+    for group in cluster.make_group_from_roles(['balancer']).get_accessible_nodes().get_ordered_members_list():
+        node = group.get_config()
 
         regular_bindings = _get_bindings(inventory, node, maintenance=False)
         if not regular_bindings:
@@ -98,7 +99,6 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             raise Exception("Haproxy maintenance mode should be used when and only when "
                             "there is at least one VRRP IP with 'maintenance-type: not bind'")
 
-        group = cluster.make_group([node['connect_to']])
         os_family = group.get_nodes_os()
         if is_mntc_mode and os_family not in ('unknown', 'unsupported'):
             config_location = _get_associations_for_node(group)['config_location']
@@ -106,8 +106,6 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             # if 'maintenance_mode' is True then maintenance config and default config must be stored in different files'
             if mntc_config_location == config_location:
                 raise Exception("Maintenance mode configuration file must be different with default configuration file")
-
-    return inventory
 
 
 def get_config_path(group: NodeGroup) -> RunnersGroupResult:
@@ -185,7 +183,7 @@ def enable(node: DeferredGroup) -> None:
 
 
 def get_config(cluster: KubernetesCluster, node: NodeConfig, maintenance: bool = False) -> str:
-    future_nodes = cluster.nodes['all'].get_final_nodes().get_ordered_members_configs_list()
+    future_nodes = cluster.nodes['all'].get_ordered_members_configs_list()
 
     inventory = cluster.inventory
     bindings = _get_bindings(inventory, node, maintenance=maintenance)
@@ -241,7 +239,7 @@ def override_haproxy18(group: DeferredGroup) -> None:
     any_host = rhel_nodes.get_first_member().get_host()
     package_associations = group.cluster.get_associations_for_node(any_host, 'haproxy')
     # TODO: Do not replace the whole file, replace only parameter
-    group.put(
+    rhel_nodes.put(
         io.StringIO("CONFIG=%s\n" % package_associations['config_location']),
         '/etc/sysconfig/%s' % package_associations['service_name'],
         backup=True, sudo=True)

@@ -19,17 +19,15 @@ from typing import Any, OrderedDict, List
 
 from kubemarine import kubernetes, packages, plugins
 from kubemarine.core import flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.resources import DynamicResources
 from kubemarine.kubernetes import components
-from kubemarine.plugins.nginx_ingress import redeploy_ingress_nginx_is_needed
+from kubemarine.plugins import calico
 from kubemarine.procedures import install
 
 
 def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
 
-    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_new_nodes()
+    group = cluster.get_new_nodes().having_roles(['control-plane', 'worker'])
 
     if group.is_empty():
         # If balancers are added, it is necessary to reconfigure apiServer.certSANs
@@ -37,11 +35,9 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
         cluster.log.debug("No kubernetes nodes to perform")
         return
 
-    cluster.nodes['control-plane'].get_new_nodes().call(kubernetes.join_new_control_plane)
-
-    if "worker" in cluster.nodes:
-        cluster.nodes['worker'].get_new_nodes().exclude_group(cluster.nodes['control-plane']) \
-            .call(kubernetes.init_workers)
+    group.having_roles(['control-plane']).call(kubernetes.join_new_control_plane)
+    group.having_roles(['worker']).exclude_group(cluster.nodes['control-plane']) \
+        .call(kubernetes.init_workers)
 
     write_new_apiserver_certsans(cluster)
 
@@ -58,7 +54,7 @@ def deploy_kubernetes_join(cluster: KubernetesCluster) -> None:
 def write_new_apiserver_certsans(cluster: KubernetesCluster) -> None:
     # If balancer or control plane is added, apiServer.certSANs are changed.
     # See kubernetes.enrich_inventory()
-    new_nodes_require_sans = cluster.make_group_from_roles(['control-plane', 'balancer']).get_new_nodes()
+    new_nodes_require_sans = cluster.get_new_nodes().having_roles(['control-plane', 'balancer'])
     if new_nodes_require_sans.is_empty():
         return
 
@@ -67,32 +63,17 @@ def write_new_apiserver_certsans(cluster: KubernetesCluster) -> None:
 
 
 def redeploy_plugins_if_needed(cluster: KubernetesCluster) -> None:
-    # redeploy ingress-nginx-controller if needed
-    if redeploy_ingress_nginx_is_needed(cluster):
-        cluster.log.debug("Redeploy ingress-nginx-controller plugin")
-        plugins.install_plugin(cluster, 'nginx-ingress-controller',
-                               cluster.inventory['plugins']['nginx-ingress-controller']['installation']['procedures'])
-    else:
-        cluster.log.debug("Redeploy ingress-nginx-controller is not needed, skip it")
+    # redeploy_candidates is a source of plugins that may be redeployed.
+    # Some plugins from redeploy_candidates will not be redeployed, because they have "install: false"
+    redeploy_candidates = {}
+    for plugin, plugin_item in cluster.inventory["plugins"].items():
+        if (cluster.previous_inventory["plugins"][plugin] != plugin_item
+                # New route reflectors are added with disabled fullmesh
+                or (plugin == 'calico' and calico.new_route_reflectors_added(cluster))):
+            cluster.log.debug(f"Configuration of {plugin!r} plugin has changed, scheduling it for redeploy")
+            redeploy_candidates[plugin] = cluster.inventory["plugins"][plugin]
 
-
-def add_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
-                                procedure_inventory_for_finalization: dict = None) -> dict:
-    if cluster.context.get('initial_procedure') != 'add_node':
-        return inventory_to_finalize
-
-    is_finalization = any('add_node' in node['roles'] for node in inventory_to_finalize['nodes'])
-
-    if not is_finalization:
-        # new nodes are not presented in final inventory - let's add it original config
-        kubernetes.add_node_enrichment(inventory_to_finalize, cluster, procedure_inventory_for_finalization)
-
-    # new nodes are already presented in final inventory - ok, just remove label
-    for i, node in enumerate(inventory_to_finalize['nodes']):
-        if 'add_node' in node['roles']:
-            node['roles'].remove('add_node')
-
-    return inventory_to_finalize
+    plugins.install(cluster, redeploy_candidates)
 
 
 def cache_installed_packages(cluster: KubernetesCluster) -> None:
@@ -112,13 +93,10 @@ tasks["cache_packages"] = cache_installed_packages
 tasks.move_to_end("cache_packages", last=False)
 
 
-class AddNodeAction(Action):
+class AddNodeAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('add node', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks, cumulative_points=install.cumulative_points)
-        res.make_final_inventory()
+        super().__init__('add node', tasks,
+                         cumulative_points=install.cumulative_points, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

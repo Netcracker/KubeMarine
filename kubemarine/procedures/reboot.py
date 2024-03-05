@@ -18,9 +18,7 @@ from collections import OrderedDict
 from typing import List
 
 from kubemarine.core import flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install
 from kubemarine import system
 
@@ -51,12 +49,9 @@ tasks = OrderedDict({
 })
 
 
-class RebootAction(Action):
+class RebootAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('reboot')
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        super().__init__('reboot', tasks)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

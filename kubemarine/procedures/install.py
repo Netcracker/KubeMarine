@@ -18,7 +18,6 @@ from collections import OrderedDict
 from types import FunctionType
 from typing import Callable, List, Dict, cast
 
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.errors import KME
 from kubemarine import (
@@ -51,7 +50,7 @@ def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GRO
 
     def roles_wrapper(fn: DECORATED_GROUP_CALLABLE) -> TASK_CALLABLE:
         def cluster_wrapper(cluster: KubernetesCluster) -> None:
-            candidate_group = cluster.nodes['all'].get_new_nodes_or_self()
+            candidate_group = cluster.get_new_nodes_or_self()
             group = cluster.make_group_from_roles(roles)
             group = group.intersection_group(candidate_group)
             if not group.is_empty():
@@ -68,7 +67,7 @@ def _applicable_for_new_nodes_with_roles(*roles: str) -> Callable[[DECORATED_GRO
 
 def system_prepare_check_sudoer(cluster: KubernetesCluster) -> None:
     not_sudoers = []
-    for host, node_context in cluster.context['nodes'].items():
+    for host, node_context in cluster.nodes_context.items():
         access_info = node_context['access']
         if access_info['online'] and access_info['sudo'] == 'Root':
             cluster.log.debug("%s online and has root" % host)
@@ -83,7 +82,7 @@ def system_prepare_check_sudoer(cluster: KubernetesCluster) -> None:
 def system_prepare_check_system(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     cluster.log.debug(system.fetch_os_versions(cluster))
-    for address, context in cluster.context["nodes"].items():
+    for address, context in cluster.nodes_context.items():
         if address not in group.nodes:
             continue
         if context["os"]["family"] == "unsupported":
@@ -225,7 +224,7 @@ def system_prepare_dns_etc_hosts(cluster: KubernetesCluster) -> None:
     utils.dump_file(cluster, config, 'etc_hosts')
     cluster.log.debug("\nUploading...")
 
-    group = cluster.nodes['all'].get_final_nodes()
+    group = cluster.nodes['all']
 
     system.update_etc_hosts(group, config=config)
     cluster.log.debug(group.sudo("ls -la /etc/hosts"))
@@ -351,6 +350,18 @@ def deploy_loadbalancer_haproxy_install(group: NodeGroup) -> None:
     group.call(haproxy.install)
 
 
+def get_haproxy_configure_group(cluster: KubernetesCluster) -> NodeGroup:
+    changed_nodes = cluster.get_changed_nodes()
+    balancers = cluster.make_group_from_roles(['balancer'])
+    if not changed_nodes.having_roles(['control-plane', 'worker']).is_empty():
+        return balancers
+    elif cluster.context['initial_procedure'] != 'remove_node':
+        new_nodes = cluster.get_new_nodes_or_self()
+        return balancers.intersection_group(new_nodes)
+    else:
+        return cluster.make_group([])
+
+
 def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
 
     if not cluster.inventory['services'].get('loadbalancer', {}) \
@@ -358,14 +369,7 @@ def deploy_loadbalancer_haproxy_configure(cluster: KubernetesCluster) -> None:
         cluster.log.debug('Skipped - haproxy balancers configs update manually disabled')
         return
 
-    balancers = cluster.make_group_from_roles(['balancer'])
-    if not cluster.make_group_from_roles(['control-plane', 'worker']).get_changed_nodes().is_empty():
-        group = balancers.get_final_nodes()
-    elif cluster.context['initial_procedure'] != 'remove_node':
-        new_nodes = cluster.nodes['all'].get_new_nodes_or_self()
-        group = balancers.intersection_group(new_nodes)
-    else:
-        group = cluster.make_group([])
+    group = get_haproxy_configure_group(cluster)
 
     if group.is_empty():
         cluster.log.debug('Skipped - no balancers to perform')
@@ -385,18 +389,23 @@ def deploy_loadbalancer_keepalived_install(group: NodeGroup) -> None:
     group.call(keepalived.install)
 
 
+def get_keepalived_configure_group(cluster: KubernetesCluster) -> NodeGroup:
+    # For install procedure, configure all keepalives.
+    # If balancer with VRPP IP is added or removed, reconfigure all keepalives
+    changed_nodes = cluster.get_changed_nodes()
+    if cluster.context['initial_procedure'] != 'install' and changed_nodes.having_roles(['keepalived']).is_empty():
+        return cluster.make_group([])
+    else:
+        return cluster.make_group_from_roles(['keepalived'])
+
+
 def deploy_loadbalancer_keepalived_configure(cluster: KubernetesCluster) -> None:
     if not cluster.inventory['services'].get('loadbalancer', {}) \
             .get('keepalived', {}).get('keep_configs_updated', True):
         cluster.log.debug('Skipped - keepalived balancers configs update manually disabled')
         return
-    # For install procedure, configure all keepalives.
-    # If balancer with VRPP IP is added or removed, reconfigure all keepalives
-    keepalived_nodes = cluster.make_group_from_roles(['keepalived'])
-    if cluster.context['initial_procedure'] != 'install' and keepalived_nodes.get_changed_nodes().is_empty():
-        group = cluster.make_group([])
-    else:
-        group = keepalived_nodes.get_final_nodes()
+
+    group = get_keepalived_configure_group(cluster)
 
     if group.is_empty():
         cluster.log.debug('Skipped - no VRRP IPs to perform')
@@ -460,7 +469,7 @@ def deploy_accounts(cluster: KubernetesCluster) -> None:
 
 def overview(cluster: KubernetesCluster) -> None:
     cluster.log.debug("Retrieving cluster status...")
-    control_plane = cluster.nodes["control-plane"].get_final_nodes().get_first_member()
+    control_plane = cluster.nodes["control-plane"].get_first_member()
     cluster.log.debug("\nNAMESPACES:")
     control_plane.sudo("kubectl get namespaces", hide=False)
     cluster.log.debug("\nNODES:")
@@ -563,19 +572,18 @@ cumulative_points = {
 
 
 def run_tasks(res: DynamicResources, tasks_filter: List[str] = None) -> None:
-    flow.run_tasks(res, tasks, cumulative_points=cumulative_points, tasks_filter=tasks_filter)
+    InstallAction(tasks_filter).run(res)
 
 
-class InstallAction(Action):
-    def __init__(self) -> None:
-        super().__init__('install')
+class InstallAction(flow.TasksAction):
+    def __init__(self, tasks_filter: List[str] = None) -> None:
+        super().__init__('install', tasks, cumulative_points=cumulative_points, tasks_filter=tasks_filter)
         self.target_version = "not supported"
 
-    def run(self, res: DynamicResources) -> None:
-        self.target_version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
-        kubernetes.verify_supported_version(self.target_version, res.logger())
-
-        run_tasks(res)
+    def cluster(self, resources: DynamicResources) -> KubernetesCluster:
+        cluster = super().cluster(resources)
+        self.target_version = kubernetes.get_kubernetes_version(cluster.inventory)
+        return cluster
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

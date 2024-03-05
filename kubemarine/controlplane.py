@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 
 
-def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.ALL)
+def controlplane_node_enrichment(cluster: KubernetesCluster) -> None:
     """
     Enriched inventory should have both the 'master' and the 'control-plane' roles for backward compatibility
     The 'control-plane' role is used instead of 'master' role since Kubernetes v1.24
     """
-    for node in inventory["nodes"]:
+    for node in cluster.inventory["nodes"]:
         node_info = node['name']
         if "master" in node["roles"] and "control-plane" not in node["roles"]:
             cluster.log.debug(f"The 'control-plane' role will be added for {node_info}")
@@ -30,8 +31,6 @@ def controlplane_node_enrichment(inventory: dict, cluster: KubernetesCluster) ->
             cluster.log.debug(f"The 'master' role will be added for {node_info}")
             node["roles"].append("master")
 
-    return inventory
-
 
 def controlplane_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
     """
@@ -41,7 +40,7 @@ def controlplane_finalize_inventory(cluster: KubernetesCluster, inventory: dict)
     for node in inventory["nodes"]:
         if 'master' in node["roles"]:
             node_info = node['name']
-            cluster.log.debug(f"The 'master' role will be removed for {node_info} node before saving")
+            cluster.log.verbose(f"The 'master' role will be removed for {node_info} node before saving")
             node["roles"].remove("master")
 
     return inventory

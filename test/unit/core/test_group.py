@@ -23,7 +23,7 @@ from kubemarine import demo
 class NodeGroupResultsTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
+        self.cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
 
     def test_nodegroup_result_to_str(self):
         expected_results_str = ("""\
@@ -73,7 +73,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         masters_group = self.cluster.make_group(['10.101.1.2', '10.101.1.3', '10.101.1.4'])
         results: NodeGroupResult = demo.create_nodegroup_result(masters_group, code=0, stdout='foo bar')
         group_from_results: NodeGroup = results.get_group()
-        self.assertEqual(masters_group, group_from_results, msg="Group from nodegroup is not the same as manual group")
+        self.assertEqual(masters_group.nodes, group_from_results.nodes,
+                         msg="Group from nodegroup is not the same as manual group")
 
     def test_any_failed_via_bad_code(self):
         host_to_result = {
@@ -114,7 +115,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         exception = GroupResultException(results)
         actual_group = exception.get_exited_nodes_group()
-        self.assertEqual(expected_exited_group, actual_group, msg="Actual group contains different nodes than expected")
+        self.assertEqual(expected_exited_group.nodes, actual_group.nodes,
+                         msg="Actual group contains different nodes than expected")
 
     def test_get_excepted_nodes_list(self):
         expected_excepted_hosts_list = [
@@ -142,7 +144,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         exception = GroupResultException(results)
         actual_group = exception.get_excepted_nodes_group()
-        self.assertEqual(expected_excepted_group, actual_group, msg="Actual group contains different nodes than expected")
+        self.assertEqual(expected_excepted_group.nodes, actual_group.nodes,
+                         msg="Actual group contains different nodes than expected")
 
     def test_get_failed_nodes_list(self):
         expected_nonzero_hosts_list = [
@@ -168,7 +171,8 @@ class NodeGroupResultsTest(unittest.TestCase):
         }
         results = demo.create_nodegroup_result_by_hosts(self.cluster, host_to_result)
         actual_group = results.get_failed_nodes_group()
-        self.assertEqual(expected_nonzero_group, actual_group, msg="Actual group contains different nodes than expected")
+        self.assertEqual(expected_nonzero_group.nodes, actual_group.nodes,
+                         msg="Actual group contains different nodes than expected")
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@
 # limitations under the License.
 import argparse
 import re
+import sys
 from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import List, Union
@@ -23,7 +24,7 @@ import kubemarine.patches
 from kubemarine import kubernetes, plugins, cri, packages, etcd, thirdparties, haproxy, keepalived
 from kubemarine.core import flow, static, utils, errors
 from kubemarine.core.action import Action
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.group import NodeGroup
 from kubemarine.core.patch import Patch, _SoftwareUpgradePatch
 from kubemarine.core.resources import DynamicResources
@@ -38,19 +39,42 @@ class SoftwareUpgradeAction(Action, ABC):
         self.k8s_versions = k8s_versions
 
     def run(self, res: DynamicResources) -> None:
-        # We should not call DynamicResources.cluster() and should only access the raw inventory,
-        # because otherwise enrichment will start with probably not relevant validation.
-        version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
-        if version not in self.k8s_versions:
-            res.logger().info(f"Patch is not relevant for Kubernetes {version}")
+        # Use DEFAULT enrichment to compile inventory, but not apply procedure inventory.
+        cluster = res.cluster(EnrichmentStage.DEFAULT)
+        if not self.is_patch_relevant(cluster):
             return
 
-        self.specific_run(res)
-        res.make_final_inventory()
+        self.recreate_inventory = True
+
+        self._prepare_upgrade_context(res.context)
+        res.reset_cluster(EnrichmentStage.DEFAULT)
+
+        # Run full enrichment to apply procedure inventory based on new context.
+        cluster = res.cluster(EnrichmentStage.PROCEDURE)
+        self._upgrade(cluster)
+        # Change context back, but do not DynamicResources.reset_cluster().
+        # Once the inventory is recreated, the reset context will be picked up during new cluster initialization.
+        self._reset_upgrade_context(res.context)
+
+    def is_patch_relevant(self, cluster: KubernetesCluster) -> bool:
+        version = kubernetes.get_kubernetes_version(cluster.inventory)
+        if version not in self.k8s_versions:
+            cluster.log.info(f"Patch is not relevant for Kubernetes {version}")
+            return False
+
+        return True
 
     @abstractmethod
-    def specific_run(self, res: DynamicResources) -> None:
+    def _prepare_upgrade_context(self, context: dict) -> None:
         pass
+
+    @abstractmethod
+    def _upgrade(self, cluster: KubernetesCluster) -> None:
+        pass
+
+    @abstractmethod
+    def _reset_upgrade_context(self, context: dict) -> None:
+        return
 
 
 class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
@@ -58,26 +82,27 @@ class ThirdpartyUpgradeAction(SoftwareUpgradeAction):
         super().__init__(software_name, k8s_versions)
         self._destination = thirdparties.get_thirdparty_destination(self.software_name)
 
-    def specific_run(self, res: DynamicResources) -> None:
-        logger = res.logger()
-        cluster = res.cluster()
-        if self._destination not in cluster.inventory['services']['thirdparties']:
-            version = kubernetes.get_initial_kubernetes_version(cluster.inventory)
-            cri_impl = cri.get_initial_cri_impl(cluster.inventory)
-            logger.info(f"Patch is not relevant for Kubernetes {version}, based on {cri_impl}")
-            return
+    def is_patch_relevant(self, cluster: KubernetesCluster) -> bool:
+        relevant = super().is_patch_relevant(cluster)
+        if relevant and self._destination not in cluster.inventory['services']['thirdparties']:
+            version = kubernetes.get_kubernetes_version(cluster.inventory)
+            cri_impl = cri.get_cri_impl(cluster.inventory)
+            cluster.log.info(f"Patch is not relevant for Kubernetes {version}, based on {cri_impl}")
+            relevant = False
 
-        self.recreate_inventory = True
-        logger.info(f"Reinstalling third-party {self._destination!r}")
+        return relevant
+
+    def _upgrade(self, cluster: KubernetesCluster) -> None:
+        cluster.log.info(f"Reinstalling third-party {self._destination!r}")
         self._run(cluster)
 
     def _run(self, cluster: KubernetesCluster) -> None:
         thirdparties.install_thirdparty(cluster.nodes['all'], self._destination)
 
-    def prepare_context(self, context: dict) -> None:
+    def _prepare_upgrade_context(self, context: dict) -> None:
         context['upgrading_thirdparty'] = self._destination
 
-    def reset_context(self, context: dict) -> None:
+    def _reset_upgrade_context(self, context: dict) -> None:
         del context['upgrading_thirdparty']
 
 
@@ -87,25 +112,31 @@ class CriUpgradeAction(Action):
         self.upgrade_config = upgrade_config
 
     def run(self, res: DynamicResources) -> None:
-        # Access only to raw inventory to prepare context
-        cri_impl = cri.get_initial_cri_impl(res.raw_inventory())
-        res.context['upgrading_package'] = cri_impl
+        # Use DEFAULT enrichment to compile inventory, but not apply procedure inventory.
+        cluster = res.cluster(EnrichmentStage.DEFAULT)
 
-        if not self.associations_changed(res):
+        if not self._associations_changed(cluster):
             return
 
-        # Only now the cluster is initialized and full enrichment is run.
-        cluster = res.cluster()
+        cri_impl = cri.get_cri_impl(cluster.inventory)
+        res.context['upgrading_package'] = cri_impl
+        res.reset_cluster(EnrichmentStage.DEFAULT)
+
+        # Run full enrichment to apply procedure inventory based on new context.
+        cluster = res.cluster(EnrichmentStage.PROCEDURE)
         if cri_impl not in cluster.context["upgrade"]["required"]['packages']:
             res.logger().info(f"Nothing has changed in associations of {cri_impl!r}. Upgrade is not required.")
+            self._reset_upgrade_context(res.context)
+            res.reset_cluster(EnrichmentStage.DEFAULT)
             return
 
         self.recreate_inventory = True
         self._run(cluster)
+        # Change context back, but do not DynamicResources.reset_cluster().
+        # Once the inventory is recreated, the reset context will be picked up during new cluster initialization.
+        self._reset_upgrade_context(res.context)
 
-        res.make_final_inventory()
-
-    def reset_context(self, context: dict) -> None:
+    def _reset_upgrade_context(self, context: dict) -> None:
         del context['upgrading_package']
 
     def _run(self, cluster: KubernetesCluster) -> None:
@@ -143,19 +174,16 @@ class CriUpgradeAction(Action):
             if not workers:
                 etcd.wait_for_health(cluster, node)
 
-    def associations_changed(self, res: DynamicResources) -> bool:
+    def _associations_changed(self, cluster: KubernetesCluster) -> bool:
         """
         Detects if upgrade is required for the given Kubernetes version, OS family and CRI implementation.
-        The method should not run full enrichment, and run only light enrichment to detect OS family.
         """
-        version = kubernetes.get_initial_kubernetes_version(res.raw_inventory())
-        cri_impl = cri.get_initial_cri_impl(res.raw_inventory())
+        version = kubernetes.get_kubernetes_version(cluster.inventory)
+        cri_impl = cri.get_cri_impl(cluster.inventory)
 
-        nodes_context = res.get_nodes_context()
-        os_families = list({ctx['os']['family'] for ctx in nodes_context.values()})
-        if len(os_families) != 1 or os_families[0] not in packages.get_associations_os_family_keys():
-            raise errors.KME("KME0012")
-        os_family = os_families[0]
+        os_family = cluster.get_os_family()
+        if os_family not in packages.get_associations_os_family_keys():
+            raise errors.KME("KME0012", procedure='migrate_kubemarine')
         version_key = packages.get_compatibility_version_key(os_family)
 
         changes_detected = False
@@ -166,8 +194,8 @@ class CriUpgradeAction(Action):
             changes_detected = changes_detected or version in kubernetes_upgrade_list
 
         if not changes_detected:
-            res.logger().info(f"Patch is not relevant for Kubernetes {version}, "
-                              f"based on {cri_impl} and {os_family!r} OS family")
+            cluster.log.info(f"Patch is not relevant for Kubernetes {version}, "
+                             f"based on {cri_impl} and {os_family!r} OS family")
 
         return changes_detected
 
@@ -179,14 +207,11 @@ class BalancerUpgradeAction(Action):
         self.package_name = package_name
 
     def run(self, res: DynamicResources) -> None:
-        if not self.associations_changed(res):
-            return
-
-        # Only now the cluster is initialized and full enrichment is run.
-        cluster = res.cluster()
+        # Use DEFAULT enrichment to compile inventory, but not apply procedure inventory.
+        cluster = res.cluster(EnrichmentStage.DEFAULT)
         logger = res.logger()
-        if self.package_name not in cluster.context["upgrade"]["required"]['packages']:
-            logger.info(f"Nothing has changed in associations of {self.package_name!r}. Upgrade is not required.")
+
+        if not self._associations_changed(cluster):
             return
 
         role = 'balancer' if self.package_name == 'haproxy' else 'keepalived'
@@ -195,11 +220,24 @@ class BalancerUpgradeAction(Action):
             logger.info(f"No nodes to install {self.package_name!r}.")
             return
 
+        self._prepare_upgrade_context(res.context)
+        res.reset_cluster(EnrichmentStage.DEFAULT)
+
+        # Run full enrichment to apply procedure inventory based on new context.
+        cluster = res.cluster(EnrichmentStage.PROCEDURE)
+        if self.package_name not in cluster.context["upgrade"]["required"]['packages']:
+            logger.info(f"Nothing has changed in associations of {self.package_name!r}. Upgrade is not required.")
+            self._reset_upgrade_context(res.context)
+            res.reset_cluster(EnrichmentStage.DEFAULT)
+            return
+
         logger.info(f"Reinstalling {self.package_name} on nodes: {group.get_nodes_names()}")
         self.recreate_inventory = True
 
         self._run(group)
-        res.make_final_inventory()
+        # Change context back, but do not DynamicResources.reset_cluster().
+        # Once the inventory is recreated, the reset context will be picked up during new cluster initialization.
+        self._reset_upgrade_context(res.context)
 
     def _run(self, group: NodeGroup) -> None:
         cluster: KubernetesCluster = group.cluster
@@ -209,38 +247,33 @@ class BalancerUpgradeAction(Action):
         else:
             keepalived.restart(group)
 
-    def associations_changed(self, res: DynamicResources) -> bool:
+    def _associations_changed(self, cluster: KubernetesCluster) -> bool:
         """
         Detects if upgrade is required for the given OS family.
-        The method should not run full enrichment, and run only light enrichment to detect OS family.
         """
-        nodes_context = res.get_nodes_context()
-        os_families = list({ctx['os']['family'] for ctx in nodes_context.values()})
-        if len(os_families) != 1 or os_families[0] not in packages.get_associations_os_family_keys():
-            raise errors.KME("KME0012")
-        os_family = os_families[0]
+        os_family = cluster.get_os_family()
+        if os_family not in packages.get_associations_os_family_keys():
+            raise errors.KME("KME0012", procedure='migrate_kubemarine')
         version_key = packages.get_compatibility_version_key(os_family)
 
         changes_detected: Union[List[str], bool] = self.upgrade_config['packages'][self.package_name][version_key]
         if not changes_detected:
-            res.logger().info(f"Patch is not relevant for {os_family!r} OS family")
+            cluster.log.info(f"Patch is not relevant for {os_family!r} OS family")
 
         return bool(changes_detected)
 
-    def prepare_context(self, context: dict) -> None:
+    def _prepare_upgrade_context(self, context: dict) -> None:
         context['upgrading_package'] = self.package_name
 
-    def reset_context(self, context: dict) -> None:
+    def _reset_upgrade_context(self, context: dict) -> None:
         del context['upgrading_package']
 
 
 class PluginUpgradeAction(SoftwareUpgradeAction):
-    def specific_run(self, res: DynamicResources) -> None:
-        self.recreate_inventory = True
-
-        cluster = res.cluster()
-        # TODO despite that we are sure that the recommended version has changed,
-        #  upgrade might still be not required if the effective configuration did not change.
+    def _upgrade(self, cluster: KubernetesCluster) -> None:
+        # Recommended version is changed in globals.
+        # In general, there can be arbitrary references to globals using jinja templates in the inventory,
+        # So let's always run upgrade.
         upgrade_candidates = {
             self.software_name: cluster.inventory['plugins'][self.software_name]
         }
@@ -249,12 +282,12 @@ class PluginUpgradeAction(SoftwareUpgradeAction):
     def _run(self, cluster: KubernetesCluster, upgrade_candidates: dict) -> None:
         plugins.install(cluster, upgrade_candidates)
 
-    def prepare_context(self, context: dict) -> None:
+    def _prepare_upgrade_context(self, context: dict) -> None:
         context['upgrading_plugin'] = self.software_name
         if self.software_name == 'calico':
             context['upgrading_thirdparty'] = thirdparties.get_thirdparty_destination('calicoctl')
 
-    def reset_context(self, context: dict) -> None:
+    def _reset_upgrade_context(self, context: dict) -> None:
         del context['upgrading_plugin']
         if self.software_name == 'calico':
             del context['upgrading_thirdparty']
@@ -454,32 +487,32 @@ def run(context: dict) -> None:
                 print(patch_id)
         else:
             print("No patches available.")
-        exit(0)
+        sys.exit(0)
 
     if args['describe']:
         for patch in patches:
             if patch.identifier == args['describe']:
                 print(patch.description)
-                exit(0)
+                sys.exit(0)
         print(f"Unknown patch '{args['describe']}'")
-        exit(1)
+        sys.exit(1)
 
     skip = [] if not args['skip'] else args['skip'].split(",")
     apply = [] if not args['apply'] else args['apply'].split(",")
 
     if apply and (set(apply) - set(patch_ids)):
         print(f"Unknown patches {list(set(apply) - set(patch_ids))}")
-        exit(1)
+        sys.exit(1)
 
     if skip and (set(skip) - set(patch_ids)):
         print(f"Unknown patches {list(set(skip) - set(patch_ids))}")
-        exit(1)
+        sys.exit(1)
 
     if apply:
         positions = [patch_ids.index(apply_id) for apply_id in apply]
         if not all(positions[i] < positions[i + 1] for i in range(len(positions) - 1)):
             print("Incorrect order of patches to apply. See --list for correct order of patches.")
-            exit(1)
+            sys.exit(1)
 
     actions = []
     for patch in patches:
@@ -494,7 +527,7 @@ def run(context: dict) -> None:
 
     if not actions:
         print("No patches to apply")
-        exit(0)
+        sys.exit(0)
 
     flow.ActionsFlow(actions).run_flow(context)
 

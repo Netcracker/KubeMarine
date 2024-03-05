@@ -59,7 +59,7 @@ class SHACalculationTest(unittest.TestCase):
         # Add custom parameters with version and override thirdparties info
         inventory['services'] = self.customized_services
 
-        cluster = demo.new_cluster(inventory, fake=False)
+        cluster = demo.new_cluster(inventory)
 
         self.assertIsNone(thirdparties.get_thirdparty_recommended_sha("/usr/bin/etcdctl", cluster))
         self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.2']['sha1'],
@@ -79,7 +79,7 @@ class SHACalculationTest(unittest.TestCase):
         # Add custom parameters with version and override thirdparties info
         inventory['services'] = self.customized_services
 
-        cluster = demo.new_cluster(inventory, fake=False)
+        cluster = demo.new_cluster(inventory)
 
         self.assertNotIn('sha1', cluster.inventory['services']['thirdparties']["/usr/bin/etcdctl"])
         self.assertEqual(cluster.globals['compatibility_map']['software']['kubeadm']['v1.24.2']['sha1'],

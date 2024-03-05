@@ -22,34 +22,52 @@ from jinja2 import Template
 
 from kubemarine import system, packages
 from kubemarine.core import utils, static
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, NodeConfig, RunnersGroupResult, CollectorCallback, DeferredGroup
 
 
 def autodetect_interface(cluster: KubernetesCluster, name: str) -> str:
-    node = cluster.get_node_by_name(name)
-    if node is not None:
-        address = cluster.get_access_address_from_node(node)
-        interface: Optional[str] = cluster.context['nodes'].get(address, {}).get('active_interface')
-        if interface is not None:
-            return interface
+    address = cluster.nodes['all'].get_member_by_name(name).get_host()
+    interface: str = cluster.nodes_context.get(address, {}).get('active_interface')
+    # If undefined, still return it. The error about inaccessible nodes will be raised later.
+    if interface:
+        return interface
 
     raise Exception('Failed to autodetect active interface for %s' % name)
 
 
-def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['add_node'])
+def enrich_add_node_vrrp_ips(_: KubernetesCluster) -> None:
+    # If "vrrp_ips" section is ever supported when adding node,
+    # It will be necessary to more accurately install and reconfigure the keepalived on existing nodes.
+
+    # if "vrrp_ips" in cluster.procedure_inventory:
+    #     utils.merge_vrrp_ips(cluster.procedure_inventory, inventory)
+    pass
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['remove_node'])
+def enrich_remove_node_vrrp_ips(_: KubernetesCluster) -> None:
+    # Do not remove VRRP IPs and do not change their assigned hosts.
+    # If the assigned host does not exist or is not a balancer, it will be just skipped.
+    pass
+
+
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory_apply_defaults(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
-        return inventory
+        return
 
     logger = cluster.log
 
-    initial_balancers = get_all_balancer_names(inventory, final=False)
-    final_balancers = get_all_balancer_names(inventory, final=True)
+    balancers = get_all_balancer_names(inventory)
 
-    logger.verbose("Detected default keepalived hosts: %s" % initial_balancers)
-    if not final_balancers:
-        logger.warning("VRRP IPs are specified, but there are no final balancers. Keepalived will not be configured.")
+    logger.verbose("Detected default keepalived hosts: %s" % balancers)
+    if not balancers:
+        logger.warning("VRRP IPs are specified, but there are no balancers. Keepalived will not be configured.")
 
     # iterate over each vrrp_ips item and check if any hosts defined to be used in it
     for i, item in enumerate(inventory['vrrp_ips']):
@@ -84,25 +102,18 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
             item['password'] = ("%032x" % random.getrandbits(128))[:password_size]
 
         # if nothing defined then use default names
-        default_hosts = False
         if item.get('hosts') is None:
             # Assign default list of all the balancer names. It can be an empty list.
-            # Assigning of initial balancers is necessary to property calculate 'keepalived' NodeGroup.
-            item['hosts'] = list(initial_balancers)
-            default_hosts = True
+            item['hosts'] = list(balancers)
 
         for j, record in enumerate(item['hosts']):
             if isinstance(record, str):
                 item['hosts'][j] = record = {
                     'name': record
                 }
-            if record['name'] not in final_balancers:
-                # If default hosts are assigned,
-                # the temporarily assigned host to be removed will be removed later from finalized inventory.
-                # See remove_node.remove_node_finalize_inventory().
-                if not default_hosts:
-                    cluster.log.warning(f"Host {record['name']!r} for VRRP IP {item['ip']} is not among the balancers. "
-                                        f"This VRRP IP will not be installed on this host.")
+            if record['name'] not in balancers:
+                cluster.log.warning(f"Host {record['name']!r} for VRRP IP {item['ip']} is not among the balancers. "
+                                    f"This VRRP IP will not be installed on this host.")
                 continue
             if not record.get('priority'):
                 priority_settings = static.GLOBALS['keepalived']['defaults']['priority']
@@ -112,47 +123,40 @@ def enrich_inventory_apply_defaults(inventory: dict, cluster: KubernetesCluster)
             if record.get('interface', 'auto') == 'auto':
                 record['interface'] = autodetect_interface(cluster, record['name'])
 
-    return inventory
-
 
 def get_all_balancer_names(inventory: dict, *, final: bool = True) -> List[str]:
     default_names = []
 
     # well, vrrp_ips is not empty, let's find balancers defined in config-file
     for i, node in enumerate(inventory['nodes']):
-        if 'balancer' in node['roles'] and (not final or 'remove_node' not in node['roles']):
+        if 'balancer' in node['roles']:
             default_names.append(node['name'])
 
     return default_names
 
 
-def enrich_inventory_calculate_nodegroup(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory_calculate_nodegroup(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
     # if vrrp_ips is empty, then nothing to do
     if not inventory['vrrp_ips']:
-        return inventory
+        return
 
     # Calculate group, where keepalived should be installed:
     names = []
 
-    for i, item in enumerate(cluster.inventory['vrrp_ips']):
+    for i, item in enumerate(inventory['vrrp_ips']):
         for record in item['hosts']:
             names.append(record['name'])
 
-    # it is important to remove duplicates
-    names = list(set(names))
-
-    # Create new group from balancers with Keepalived (to be) on them. This includes nodes to be removed.
-    cluster.nodes['keepalived'] = cluster.make_group_from_roles(['balancer']).new_group(apply_filter={
+    # Create new group from balancers with Keepalived (to be) on them.
+    keepalived_group = cluster.make_group_from_roles(['balancer']).new_group(apply_filter={
         'name': names
     })
 
-    # create new role
-    cluster.roles.append('keepalived')
-
-    # fill in ips
-    cluster.ips['keepalived'] = cluster.nodes['keepalived'].get_hosts()
-
-    return inventory
+    if not keepalived_group.is_empty():
+        cluster.nodes['keepalived'] = keepalived_group
 
 
 def install(group: NodeGroup) -> RunnersGroupResult:
@@ -235,7 +239,7 @@ def generate_config(cluster: KubernetesCluster, node: NodeConfig) -> str:
         return config_string
 
     vrrps_ips = []
-    keepalived_nodes = cluster.nodes['keepalived'].get_final_nodes().get_ordered_members_configs_list()
+    keepalived_nodes = cluster.nodes['keepalived'].get_ordered_members_configs_list()
     for item in cluster.inventory['vrrp_ips']:
         host = next((record for record in item['hosts'] if record['name'] == node['name']), None)
         if not host:

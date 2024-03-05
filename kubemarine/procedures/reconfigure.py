@@ -19,9 +19,7 @@ from ordered_set import OrderedSet
 
 from kubemarine import kubernetes
 from kubemarine.core import flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.resources import DynamicResources
 
 
 def deploy_kubernetes_reconfigure(cluster: KubernetesCluster) -> None:
@@ -53,13 +51,9 @@ tasks = OrderedDict({
 })
 
 
-class ReconfigureAction(Action):
+class ReconfigureAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('reconfigure', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('reconfigure', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

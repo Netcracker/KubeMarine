@@ -11,60 +11,392 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import dataclasses
 from copy import deepcopy
-from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable
+from enum import Flag, auto, IntFlag
+from types import FunctionType
+from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, cast, Sequence
 
-import yaml
+from ordered_set import OrderedSet
+from typing_extensions import Protocol
 
-from kubemarine.core import log, utils, static, connections
+from kubemarine.core import log, utils, static
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
+from kubemarine.core.errors import KME0006
 from kubemarine.core.group import NodeGroup, NodeConfig
 
 _AnyConnectionTypes = Union[str, NodeGroup]
 
 
+class EnrichmentStage(IntFlag):
+    """
+    The class acts both as a descriptor of a desirable state of the `KubernetesCluster` object,
+    and as a selector of `@enrichment` functions.
+
+    For each stage, the cluster is enriched from the beginning selecting suitable enrichment functions.
+
+    To enrich the cluster at some stage, it must first be enriched at all the previous stages
+    unless certain optimizations are applied.
+    """
+
+    LIGHT = auto()
+    """
+    The KubernetesCluster enriched at this stage can only be used to connect to nodes
+    to fetch and store data not related to the inventory.
+    
+    For enrichment function, you rarely need this flag as the only selector,
+    but likely need `EnrichmentStage.ALL` instead.
+    
+    Procedure inventory can be taken into account to enrich connections.
+    """
+
+    DEFAULT = auto()
+    """
+    The KubernetesCluster is enriched at this stage not taking into account the procedure inventory.
+    After enrichment, the cluster and its enrichment products should be fully read-only.
+    Only enriched inventory can be inspected in this state, but neither context, nor the procedure inventory.
+    
+    The KubernetesCluster object in this state can be used as backup before running of the `Action`.
+    It can also be `evolved` to this state from PROCEDURE state.
+    Either evolved (if necessary) or not, it can be used to dump the finalized inventory.
+    
+    For enrichment function, you never need this flag as the only selector.
+    Use `EnrichmentStage.FULL` or other compound selectors.
+    """
+
+    PROCEDURE = auto()
+    """
+    The KubernetesCluster is finally enriched at this stage taking into account the procedure inventory.
+    Execution on the cluster must be performed only in ths state.
+    
+    For enrichment function, you can use this flag as the only selector to only merge the procedure inventory,
+    or to only verify the result of the merge.
+    In this case, it is necessary to specify procedures for which the function is applicable.
+    See also `@enrichment`.
+    """
+
+    # Some useful compound selectors of enrichment functions.
+    FULL = DEFAULT | PROCEDURE
+    ALL = LIGHT | DEFAULT | PROCEDURE
+    NONE = 0
+    """Special flag typically denoting that nothing is enriched."""
+
+    __str__ = Flag.__str__
+
+    @staticmethod
+    def values() -> List['EnrichmentStage']:
+        return list(EnrichmentStage)
+
+
+class _Enrichment(Protocol):
+    # The method intentionally lacks of `EnrichmentStage` argument for proper encapsulation
+    def __call__(self, __cluster: 'KubernetesCluster') -> Optional[dict]: ...
+
+
+class EnrichmentFunction(_Enrichment):
+    """
+    Wrapper around callable that performs enrichment with selectors.
+    See `@enrichment`.
+    """
+
+    def __init__(self, delegate: _Enrichment, stages: EnrichmentStage, procedures: List[str] = None):
+        if EnrichmentStage.DEFAULT in stages:
+            if EnrichmentStage.PROCEDURE not in stages:
+                raise ValueError("If enrichment function is applied at DEFAULT stage, "
+                                 "it should also be applied at PROCEDURE stage")
+            if procedures is not None:
+                raise ValueError("Enrichment function can be restricted to some procedures "
+                                 "only if it is applied at PROCEDURE and/or LIGHT stages")
+        elif EnrichmentStage.PROCEDURE in stages and procedures is None:
+            raise ValueError("If enrichment function is applied at PROCEDURE stage, but not at DEFAULT stage, "
+                             "it should be restricted to some procedures")
+
+        self.delegate = delegate
+        self.stages = stages
+        self.procedures: Optional[List[str]] = procedures
+
+    # The method intentionally lacks of `EnrichmentStage` argument for proper encapsulation
+    def __call__(self, cluster: 'KubernetesCluster') -> Optional[dict]:
+        return self.delegate(cluster)
+
+    @property
+    def name(self) -> str:
+        func = cast(FunctionType, self.delegate)
+        return f"{func.__module__}.{func.__qualname__}"
+
+
+def enrichment(stages: EnrichmentStage, procedures: List[str] = None) -> Callable[[_Enrichment], EnrichmentFunction]:
+    """
+    Wraps callable that performs enrichment, persisting selectors as the wrapper attributes.
+    The selectors are supplied as the arguments of this decorator.
+
+    :param stages: `EnrichmentStage` stages to run this function at.
+    :param procedures: list of procedures for which the function is applicable.
+    """
+    return lambda fn: EnrichmentFunction(fn, stages, procedures)
+
+
+@dataclasses.dataclass(repr=False)
+class _EnrichmentProducts:
+    """States of inventory and context at the particular `EnrichmentStage` of enrichment."""
+    inventory: dict
+    context: Optional[dict]
+    procedure_inventory: Optional[dict]
+
+    nodes: Dict[str, Dict[str, NodeGroup]] = dataclasses.field(default_factory=dict)
+
+    formatted_inventory: Optional[dict] = None
+    raw_inventory: Optional[dict] = None
+
+
 class KubernetesCluster(Environment):
 
-    def __init__(self, inventory: dict, context: dict, procedure_inventory: dict = None,
-                 logger: log.EnhancedLogger = None) -> None:
-        self.roles: List[str] = []
-        self.ips: Dict[str, List[str]] = {
-            "all": []
-        }
-        self.nodes: Dict[str, NodeGroup] = {}
+    def __init__(self, inventory: dict, context: dict, procedure_inventory: dict,
+                 logger: log.EnhancedLogger,
+                 connection_pool: ConnectionPool = None, nodes_context: Dict[str, Any] = None) -> None:
+        # Enrichment stage field should not be opened even for read only aims.
+        # Such encapsulation ensures that enrichment functions do not know about at what stage they are currently run.
+        self._enrichment_stage = EnrichmentStage.NONE
+        self._products = _EnrichmentProducts(
+            utils.deepcopy_yaml(inventory), deepcopy(context), utils.deepcopy_yaml(procedure_inventory))
+        self._previous_products = self._products
+        self._products.nodes['nodes'] = self._products.nodes['previous'] = {}
 
-        self.raw_inventory = deepcopy(inventory)
-        # Should not be copied. Can be used after successful of failed execution and might store intermediate result.
-        self.context = context
-        self.procedure_inventory = {} if procedure_inventory is None else deepcopy(procedure_inventory)
+        self._logger = logger
 
-        self._connection_pool: ConnectionPool = connections.EMPTY_POOL
+        self._connection_pool: Optional[ConnectionPool] = connection_pool
+        self._nodes_context: Optional[Dict[str, Any]] = nodes_context
 
-        self._logger = logger if logger is not None \
-            else log.init_log_from_context_args(self.globals, self.context, self.raw_inventory).logger
+    def enrich(self, stage: EnrichmentStage,
+               *,
+               enrichment_fns: List[EnrichmentFunction],
+               previous_cluster: Optional['KubernetesCluster']) -> 'KubernetesCluster':
+        """
+        Enrich the cluster to the state represented by the specified enrichment `stage`.
 
-        self._inventory: dict = {}
+        :param stage: desirable state of the cluster object.
+        :param enrichment_fns: enrichment functions to run.
+        :param previous_cluster: cluster enriched at the previous stage.
+        :return: this cluster object enriched at the specified stage.
+        """
+        if stage not in EnrichmentStage.values():
+            raise ValueError(f"Target state should be one of ({', '.join(map(str, EnrichmentStage))}), got: {stage}")
 
-    def enrich(self, custom_enrichment_fns: List[str] = None) -> None:
-        # do not make dumps for custom enrichment functions, because result is generally undefined
-        make_dumps = custom_enrichment_fns is None
-        from kubemarine.core import defaults
-        self._inventory = defaults.enrich_inventory(
-            self, deepcopy(self.raw_inventory), make_dumps=make_dumps, enrichment_functions=custom_enrichment_fns)
+        if self._enrichment_stage != EnrichmentStage.NONE:
+            raise ValueError("The cluster is already enriched")
 
-        self._connection_pool = self.create_connection_pool(self.ips['all'])
+        # Flag.name is not None for not compound values in any Python version.
+        self.log.verbose(f"Starting {cast(str, stage.name).lower()!r} enrichment")
+
+        self._enrichment_stage = stage
+        if stage == EnrichmentStage.DEFAULT:
+            self._products.procedure_inventory = None
+        if stage == EnrichmentStage.PROCEDURE and previous_cluster is not None:
+            self._previous_products = previous_cluster._products
+
+            # Previous nodes refer to previous cluster. Create new group to surely refer to this cluster.
+            self._products.nodes['previous'] = {
+                role: self.make_group(group.nodes)
+                for role, group in self._previous_products.nodes['nodes'].items()}
+
+        if stage == EnrichmentStage.LIGHT:
+            # Need different instance of previous_nodes for LIGHT
+            # because we should be able to distinguish initial and final nodes at this stage solely.
+            # Still have the same instance of inventory holding all (added & removed) nodes.
+            self._products.nodes['previous'] = {}
+
+        # run required fields calculation
+        for enrichment_fn in enrichment_fns:
+            self.log.verbose(f'Calling fn "{enrichment_fn.name}"')
+            inventory = enrichment_fn(self)
+
+            if inventory is not None:
+                self._products.inventory = inventory
+
+        # For DEFAULT stage, KubernetesCluster.context should be available during enrichment,
+        # but should not be accessed after it to exclude an opportunity of it being dependent on the inventory.
+        # This is necessary for proper implementation of KubernetesCluster.evolve().
+        if stage == EnrichmentStage.DEFAULT:
+            self._products.context = None
+
+        self.log.verbose('Enrichment finished!')
+
+        return self
+
+    @enrichment(EnrichmentStage.ALL)
+    def convert_formatted_inventory(self) -> dict:
+        products = self._products
+        products.formatted_inventory = self.inventory
+        products.raw_inventory = utils.convert_native_yaml(self.inventory)
+        if products.procedure_inventory is not None:
+            products.procedure_inventory = utils.convert_native_yaml(self.procedure_inventory)
+
+        return utils.deepcopy_yaml(products.raw_inventory)
+
+    @enrichment(EnrichmentStage.LIGHT)
+    def init_nodes_context(self) -> None:
+        self._connection_pool = self.create_connection_pool(self._get_all_nodes().get_hosts())
+        self._nodes_context = {node['connect_to']: {} for node in self.inventory["nodes"]}
+
+    def print_roles_summary(self) -> None:
+        ips: Dict[str, OrderedSet[str]] = {}
+        for nodes in (self.previous_nodes, self.nodes):
+            for role, group in nodes.items():
+                if role != 'all':
+                    ips.setdefault(role, OrderedSet()).update(group.get_hosts())
+
+        for role, group in (
+                ('add_node', self.get_new_nodes()),
+                ('remove_node', self.get_nodes_for_removal()),
+        ):
+            if not group.is_empty():
+                ips[role] = OrderedSet(group.get_hosts())
+
+        self.log.debug("Inventory file loaded:")
+        for role in ips.keys():
+            self.log.debug("  %s %i" % (role, len(ips[role])))
+            for ip in ips[role]:
+                self.log.debug("    %s" % ip)
+
+    @property
+    def previous_nodes(self) -> Dict[str, NodeGroup]:
+        """
+        Previous nodes of the cluster.
+        For the cluster enriched at PROCEDURE stage, this includes nodes to be removed, but does not include added nodes.
+
+        Should be changed only during the enrichment.
+        """
+        return self._products.nodes['previous']
+
+    @property
+    def nodes(self) -> Dict[str, NodeGroup]:
+        """
+        Final nodes of the cluster.
+        For the cluster enriched at PROCEDURE stage, this includes added nodes, but does not include nodes to be removed.
+
+        Should be changed only during the enrichment.
+        """
+        return self._products.nodes['nodes']
+
+    @property
+    def previous_inventory(self) -> dict:
+        """
+        The previous resulting inventory before procedure inventory is applied.
+        For `install` and some other procedures this equals to the resulting `KubernetesCluster.inventory`.
+
+        The property should be read only, and should be examined primarily at PROCEDURE stage or inside the flow.
+        """
+        return self._previous_products.inventory
 
     @property
     def inventory(self) -> dict:
-        return self._inventory
+        """
+        The resulting inventory describing the cluster.
+
+        Should be changed only during the enrichment.
+        """
+        return self._products.inventory
+
+    @property
+    def context(self) -> dict:
+        """
+        Context that stores an intermediate enrichment and execution result.
+
+        At DEFAULT stage, the context is available only during enrichment.
+        """
+        context = self._products.context
+        if context is None:
+            raise ValueError("Context is not available after 'default' enrichment stage")
+
+        return context
+
+    @property
+    def procedure_inventory(self) -> dict:
+        procedure_inventory = self._products.procedure_inventory
+        if procedure_inventory is None:
+            raise ValueError("Procedure inventory is not available at 'default' enrichment stage")
+
+        return procedure_inventory
+
+    @property
+    def previous_raw_inventory(self) -> dict:
+        """
+        Inventory represented in python native objects before applying of any enrichment.
+
+        The property should be read only.
+        """
+        raw_inventory = self._previous_products.raw_inventory
+        if raw_inventory is None:
+            raise ValueError("Enrichment is not yet started")
+
+        return raw_inventory
+
+    @property
+    def raw_inventory(self) -> dict:
+        """
+        Inventory represented in python native objects after only procedure inventory is applied,
+        but without applying of any other enrichment.
+
+        The property should be read only.
+        """
+        raw_inventory = self._products.raw_inventory
+        if raw_inventory is None:
+            raise ValueError("Enrichment is not yet started")
+
+        return raw_inventory
+
+    @property
+    def formatted_inventory(self) -> dict:
+        """
+        Formatted inventory after only procedure inventory is applied,
+        but without applying of any other enrichment.
+
+        The property can be examined after 'procedure' enrichment stage
+        for maintenance procedures that have specific enrichment functions,
+        and that support inventory recreation.
+
+        The property should be read only.
+        """
+        formatted_inventory = self._products.formatted_inventory
+        if formatted_inventory is None:
+            raise ValueError("Enrichment is not yet started")
+
+        return formatted_inventory
+
+    @property
+    def nodes_context(self) -> Dict[str, Any]:
+        """Various information about nodes that is not changed during Kubemarine run."""
+        if self._nodes_context is None:
+            raise ValueError("Nodes' context is available only after 'light' enrichment stage is finished")
+
+        return self._nodes_context
 
     @property
     def connection_pool(self) -> ConnectionPool:
+        if self._connection_pool is None:
+            raise ValueError("Connection pool is available only after 'light' enrichment stage is finished")
+
         return self._connection_pool
 
     def create_connection_pool(self, hosts: List[str]) -> ConnectionPool:
-        return ConnectionPool(self.inventory, hosts)
+        nodes = {}
+        gateway_nodes = {}
+        # iterate over inventory last because it redefines previous inventory
+        for inventory in (self.previous_inventory, self.inventory):
+            for node in inventory.get('nodes', []):
+                nodes[node['connect_to']] = node
+
+            for gateway_node in inventory.get('gateway_nodes', []):
+                gateway_nodes[gateway_node['name']] = gateway_node
+
+        return self._create_connection_pool(nodes, gateway_nodes, hosts)
+
+    def _create_connection_pool(self, nodes: Dict[str, dict], gateway_nodes: Dict[str, dict], hosts: List[str]) -> ConnectionPool:
+        return ConnectionPool(nodes, gateway_nodes, hosts)
+
+    def _create_cluster_storage(self, context: dict) -> utils.ClusterStorage:
+        return utils.ClusterStorage(self, context)
 
     @property
     def log(self) -> log.EnhancedLogger:
@@ -92,7 +424,7 @@ class KubernetesCluster(Environment):
 
         return address
 
-    def get_nodes_by_names(self, node_names: List[str]) -> List[dict]:
+    def get_nodes_by_names(self, node_names: List[str]) -> List[NodeConfig]:
         result = []
         for node in self.inventory["nodes"]:
             if node['name'] in node_names:
@@ -100,7 +432,7 @@ class KubernetesCluster(Environment):
 
         return result
 
-    def get_node_by_name(self, node_name: str) -> Optional[dict]:
+    def get_node_by_name(self, node_name: str) -> Optional[NodeConfig]:
         nodes = self.get_nodes_by_names([node_name])
         return next(iter(nodes), None)
 
@@ -119,16 +451,30 @@ class KubernetesCluster(Environment):
         ips = self.get_addresses_from_node_names(node_names)
         return self.make_group(ips)
 
-    def make_group_from_roles(self, roles: Iterable[str]) -> NodeGroup:
-        group = self.make_group([])
-        for role in roles:
-            if role not in self.nodes:
-                self.log.verbose(f'Group {role!r} is requested for usage, but this group does not exist.')
-                continue
+    def make_group_from_roles(self, roles: Sequence[str]) -> NodeGroup:
+        return self.nodes['all'].having_roles(roles)
 
-            group = group.include_group(self.nodes[role])
+    def get_new_nodes(self) -> NodeGroup:
+        return self.nodes['all'].exclude_group(self.previous_nodes['all'])
 
-        return group
+    def get_new_nodes_or_self(self) -> NodeGroup:
+        new_nodes = self.get_new_nodes()
+        if not new_nodes.is_empty():
+            return new_nodes
+        return self.nodes['all']
+
+    def get_nodes_for_removal(self) -> NodeGroup:
+        return self.previous_nodes['all'].exclude_group(self.nodes['all'])
+
+    def get_changed_nodes(self) -> NodeGroup:
+        return self.get_new_nodes().include_group(self.get_nodes_for_removal())
+
+    def get_unchanged_nodes(self) -> NodeGroup:
+        return self._get_all_nodes().exclude_group(self.get_changed_nodes())
+
+    def _get_all_nodes(self) -> NodeGroup:
+        """Returns literally all nodes including added or removed"""
+        return self.nodes['all'].include_group(self.previous_nodes['all'])
 
     def create_group_from_groups_nodes_names(self, groups_names: List[str], nodes_names: List[str]) -> NodeGroup:
         common_group = self.make_group_from_roles(groups_names)
@@ -146,71 +492,25 @@ class KubernetesCluster(Environment):
         from kubemarine.core import flow
         return flow.is_task_completed(self, task_path)
 
-    def get_facts_enrichment_fns(self) -> List[str]:
-        return [
-            "kubemarine.core.schema.verify_inventory",
-            "kubemarine.core.defaults.merge_defaults",
-            "kubemarine.kubernetes.verify_initial_version",
-            "kubemarine.kubernetes.add_node_enrichment",
-            "kubemarine.core.defaults.calculate_node_names",
-            "kubemarine.kubernetes.remove_node_enrichment",
-            "kubemarine.controlplane.controlplane_node_enrichment",
-            "kubemarine.core.defaults.append_controlplain",
-            "kubemarine.core.defaults.compile_inventory",
-            "kubemarine.core.defaults.verify_node_names",
-            "kubemarine.core.defaults.apply_defaults",
-            "kubemarine.core.defaults.calculate_nodegroups"
-        ]
+    def check_nodes_accessibility(self, skip_check_iaas: bool = True) -> None:
+        """Check nodes access statuses"""
 
-    def detect_nodes_context(self) -> dict:
-        """The method should fetch only node specific information that is not changed during Kubemarine run"""
-        self.log.debug('Start detecting nodes context...')
+        procedure: str = self.context['initial_procedure']
+        if procedure == 'check_iaas' and skip_check_iaas:
+            return
 
-        from kubemarine import system
-        system.whoami(self)
-        self.log.verbose('Whoami check finished')
+        # Check that only subset of nodes for removal can be offline
+        remained_offline = self.nodes['all'].get_online_nodes(False)
 
-        self._check_online_nodes()
-        self._check_accessible_nodes()
+        # Check that all online nodes are accessible.
+        all_nodes = self._get_all_nodes()
+        inaccessible_online = all_nodes.get_online_nodes(True).exclude_group(all_nodes.get_accessible_nodes())
 
-        system.detect_active_interface(self)
-        self.log.verbose('Interface check finished')
-        system.detect_os_family(self)
-        self.log.verbose('OS family check finished')
-
-        self.log.debug('Detecting nodes context finished!')
-        return deepcopy(self.context['nodes'])
-
-    def _check_online_nodes(self) -> None:
-        """
-        Check that only subset of nodes for removal can be offline
-        """
-        all = self.nodes['all']
-        for_removal = all.get_nodes_for_removal()
-        remained = all.exclude_group(for_removal)
-        offline = all.get_online_nodes(False)
-        remained_offline = remained.intersection_group(offline)
-        if not remained_offline.is_empty():
-            raise Exception(f"{remained_offline.get_hosts()} are not reachable. "
-                            "Probably they are turned off or something is incorrect with ssh daemon, "
-                            "or incorrect ssh port is specified.")
-
-    # todo this check can probably be moved to prepare.check tasks group of each procedure
-    def _check_accessible_nodes(self) -> None:
-        """
-        Check that all online nodes are accessible.
-        """
-        all = self.nodes['all']
-        online = all.get_online_nodes(True)
-        accessible = all.get_accessible_nodes()
-        not_accessible = all.exclude_group(accessible)
-        not_accessible_online = online.intersection_group(not_accessible)
-        if not not_accessible_online.is_empty():
-            raise Exception(f"{not_accessible_online.get_hosts()} are not accessible through ssh. "
-                            f"Check ssh credentials.")
+        if not remained_offline.is_empty() or not inaccessible_online.is_empty():
+            raise KME0006(remained_offline.get_hosts(), inaccessible_online.get_hosts())
 
     def get_os_family_for_node(self, host: str) -> str:
-        os_family: Optional[str] = self.context['nodes'].get(host, {}).get('os', {}).get('family')
+        os_family: Optional[str] = self.nodes_context.get(host, {}).get('os', {}).get('family')
         if os_family is None:
             raise Exception('Node %s do not contain necessary context data' % host)
         return os_family
@@ -218,10 +518,16 @@ class KubernetesCluster(Environment):
     def get_os_family_for_nodes(self, hosts: Iterable[str]) -> str:
         """
         Returns the detected operating system family for hosts.
+        The method skips inaccessible nodes unless all nodes are inaccessible.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+                 "multiple", "unknown", "unsupported", "<undefined>".
         """
         os_families = {self.get_os_family_for_node(host) for host in hosts}
+        if os_families == {'<undefined>'}:
+            return '<undefined>'
+        os_families.discard('<undefined>')
+
         if len(os_families) > 1:
             return 'multiple'
         elif len(os_families) == 0:
@@ -232,36 +538,34 @@ class KubernetesCluster(Environment):
     def get_os_family(self) -> str:
         """
         Returns common OS family name from all final remote hosts.
-        The method can be used during enrichment when NodeGroups are not yet calculated.
+        The method skips inaccessible nodes unless all nodes are inaccessible.
 
-        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9", "multiple", "unknown", "unsupported".
+        :return: Detected OS family, possible values: "debian", "rhel", "rhel8", "rhel9",
+                 "multiple", "unknown", "unsupported", "<undefined>".
         """
-        hosts_detect_os_family = []
-        for node in self.inventory['nodes']:
-            host = self.get_access_address_from_node(node)
-            if 'remove_node' not in node['roles']:
-                hosts_detect_os_family.append(host)
-
-        return self.get_os_family_for_nodes(hosts_detect_os_family)
+        return self.nodes['all'].get_nodes_os()
 
     def get_os_identifiers(self) -> Dict[str, Tuple[str, str]]:
         """
-        For each final node of the cluster, returns a tuple of OS (family, version).
+        For each final and accessible node of the cluster, returns a tuple of OS (family, version).
         """
-        nodes_check_os = self.nodes['all'].get_final_nodes()
         os_ids = {}
-        for host in nodes_check_os.get_hosts():
-            os_details = self.context['nodes'][host]['os']
+        for host in self.nodes['all'].get_accessible_nodes().get_hosts():
+            os_details = self.nodes_context[host]['os']
             os_ids[host] = (os_details['family'], os_details['version'])
 
         return os_ids
 
     def _get_associations(self, os_family: str) -> Dict[str, dict]:
-        if os_family in ('unknown', 'unsupported', 'multiple'):
-            raise Exception("Failed to get associations for unsupported or multiple OS families")
+        # Iterate over the resulting inventory first because it has priority.
+        # Still need to check previous inventory if it contains OS specific section for nodes to be removed.
+        for inventory in (self.inventory, self.previous_inventory):
+            associations: Optional[dict] = (inventory.get('services', {}).get('packages', {})
+                                            .get('associations', {}).get(os_family))
+            if associations is not None:
+                return associations
 
-        associations: dict = self.inventory['services']['packages']['associations'][os_family]
-        return associations
+        raise Exception(f"Failed to get associations for {os_family!r} OS family")
 
     def get_associations(self) -> Dict[str, dict]:
         """
@@ -323,42 +627,37 @@ class KubernetesCluster(Environment):
         os_family = self.get_os_family_for_node(host)
         return self._get_package_associations_for_os(os_family, package, association_key)
 
-    def make_finalized_inventory(self) -> dict:
-        from kubemarine.core import defaults
-        from kubemarine.procedures import add_node, remove_node
-        from kubemarine import admission, controlplane, cri, packages
+    def evolve(self) -> 'KubernetesCluster':
+        """
+        If the cluster was enriched at PROCEDURE stage, make the cluster be enriched at DEFAULT stage.
 
-        cluster_finalized_functions: List[Callable[[KubernetesCluster, dict], dict]] = [
-            packages.cache_package_versions,
-            packages.remove_unused_os_family_associations,
-            cri.remove_invalid_cri_config,
-            add_node.add_node_finalize_inventory,
-            remove_node.remove_node_finalize_inventory,
-            admission.update_finalized_inventory,
-            defaults.escape_jinja_characters_for_inventory,
-            controlplane.controlplane_finalize_inventory,
-        ]
+        This allows to perform iterative changes in the inventory by sequentially applying the procedure enrichment.
+        :return: this cluster object enriched at DEFAULT stage.
+        """
+        if self._enrichment_stage not in (EnrichmentStage.DEFAULT, EnrichmentStage.PROCEDURE):
+            raise ValueError("Cluster instance can be evolved only if being in DEFAULT or PROCEDURE state")
 
-        # copying is currently not necessary, but it is possible in general.
-        prepared_inventory = self.inventory
-        for finalize_fn in cluster_finalized_functions:
+        self._enrichment_stage = EnrichmentStage.DEFAULT
+        self._products.context = None
+        self._products.procedure_inventory = None
+        self._previous_products = self._products
+
+        return self
+
+    def make_finalized_inventory(self, finalization_functions: List[Callable[['KubernetesCluster', dict], dict]]) \
+            -> dict:
+        prepared_inventory = utils.deepcopy_yaml(self.inventory)
+        for finalize_fn in finalization_functions:
             prepared_inventory = finalize_fn(self, prepared_inventory)
 
-        return defaults.prepare_for_dump(prepared_inventory, copy=False)
+        return prepared_inventory
 
-    def dump_finalized_inventory(self) -> None:
-        inventory_for_dump = self.make_finalized_inventory()
-        data = yaml.dump(inventory_for_dump)
-        finalized_filename = "cluster_finalized.yaml"
-        utils.dump_file(self, data, finalized_filename)
-        utils.dump_file(self, data, finalized_filename, dump_location=False)
-
-    def preserve_inventory(self) -> None:
+    def preserve_inventory(self, context: dict) -> None:
         self.log.debug("Start preserving of the information about the procedure.")
-        cluster_storage = utils.ClusterStorage(self)
+        cluster_storage = self._create_cluster_storage(context)
         cluster_storage.make_dir()
         if self.context.get('initial_procedure') == 'add_node':
             cluster_storage.upload_info_new_control_planes()
         cluster_storage.collect_procedure_info()
-        cluster_storage.compress_and_upload_archive()
-        cluster_storage.rotation_file()
+        cluster_storage.compress_archive()
+        cluster_storage.upload_and_rotate()

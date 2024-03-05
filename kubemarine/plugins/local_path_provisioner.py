@@ -18,20 +18,20 @@ from typing import List, Optional, Dict
 import yaml
 
 from kubemarine.core import log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     if not inventory["plugins"]["local-path-provisioner"]["install"]:
-        return inventory
+        return
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_plugin = cluster.raw_inventory.get("plugins", {}).get("local-path-provisioner", {})
     if "resources" in raw_plugin:
         inventory["plugins"]["local-path-provisioner"]["resources"] = raw_plugin["resources"]
-
-    return inventory
 
 
 class LocalPathProvisionerManifestProcessor(Processor):
