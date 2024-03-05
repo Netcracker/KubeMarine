@@ -25,7 +25,6 @@ from typing import List
 import yaml
 
 from kubemarine.core import utils, flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, backup
@@ -291,13 +290,9 @@ class RestoreFlow(flow.Flow):
         flow.run_actions(resources, [RestoreAction()])
 
 
-class RestoreAction(Action):
+class RestoreAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('restore', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('restore', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

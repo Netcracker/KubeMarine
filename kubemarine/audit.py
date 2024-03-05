@@ -23,12 +23,13 @@ from typing import Optional, Tuple, List, Set
 
 from kubemarine import system, packages
 from kubemarine.core import utils
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 
 
-def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    for node in cluster.nodes['all'].get_final_nodes().get_ordered_members_list():
+@enrichment(EnrichmentStage.FULL)
+def verify_inventory(cluster: KubernetesCluster) -> None:
+    for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_accessible_nodes().get_ordered_members_list():
         if node.get_nodes_os() in ('unknown', 'unsupported'):
             continue
         host = node.get_host()
@@ -40,8 +41,6 @@ def verify_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
             os_family = cluster.get_os_family_for_node(host)
             raise Exception(f'Audit has multiple associated packages {package_name} for OS {os_family!r} '
                             f'that is currently not supported')
-
-    return inventory
 
 
 def install(group: NodeGroup) -> Optional[RunnersGroupResult]:

@@ -19,6 +19,7 @@ import unittest
 from kubemarine import demo, kubernetes
 from kubemarine.core import flow
 from kubemarine.kubernetes import components
+from kubemarine.procedures import install
 from kubemarine.procedures.add_node import AddNodeAction
 from test.unit import utils as test_utils
 
@@ -35,9 +36,15 @@ class EnrichmentAndFinalization(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
+    def _new_resources(self) -> demo.FakeResources:
+        return test_utils.FakeResources(self.context, self.inventory,
+                                        procedure_inventory=self.add_node, nodes_context=self.nodes_context)
+
+    def _new_cluster(self) -> demo.FakeKubernetesCluster:
+        return self._new_resources().cluster()
+
     def _run_action(self) -> demo.FakeResources:
-        resources = demo.FakeResources(self.context, self.inventory,
-                                       procedure_inventory=self.add_node, nodes_context=self.nodes_context)
+        resources = self._new_resources()
         flow.run_actions(resources, [AddNodeAction()])
         return resources
 
@@ -47,29 +54,40 @@ class EnrichmentAndFinalization(unittest.TestCase):
         args['ansible_inventory_location'] = ansible_inventory_location
 
         res = self._run_action()
-        cluster = res.last_cluster
 
         self.assertTrue(os.path.exists(ansible_inventory_location),
                         "Ansible inventory was not created")
 
-        self.assertIn('add_node', cluster.inventory['nodes'][2]['roles'],
-                      "'add_node' role was not added in inventory")
-        self.assertNotIn('add_node', res.stored_inventory['nodes'][2]['roles'],
+        self.assertNotIn('add_node',res.working_inventory['nodes'][2]['roles'],
+                         "'add_node' role should not be in inventory")
+        self.assertNotIn('add_node', res.inventory()['nodes'][2]['roles'],
                          "'add_node' role should not be in recreated inventory")
 
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = cluster.make_finalized_inventory()
-        self.assertNotIn('add_node', finalized_inventory['nodes'][2]['roles'],
+        self.assertNotIn('add_node', res.finalized_inventory['nodes'][2]['roles'],
                          "'add_node' role should not be in finalized inventory")
 
-    def test_enrich_inventory_generate_ansible_new_nodes_group(self):
+    def test_enrich_inventory_generate_ansible_nodes_groups(self):
         args = self.context['execution_arguments']
         args['ansible_inventory_location'] = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
 
-        res = self._run_action()
-        new_nodes = res.last_cluster.nodes['all'].get_new_nodes()
-        self.assertEqual({self.add_node['nodes'][0]['address']}, new_nodes.nodes,
+        cluster = self._new_cluster()
+        new_node_name = self.add_node['nodes'][0]['name']
+        all_names = [node['name'] for node in self.inventory['nodes']] + [new_node_name]
+        self.assertEqual([new_node_name], cluster.get_new_nodes().get_nodes_names(),
                          "Unexpected group with new nodes")
+
+        for role in ('balancer', 'keepalived', 'control-plane', 'worker'):
+            self.assertEqual(all_names, cluster.make_group_from_roles([role]).get_nodes_names(),
+                             f"Unexpected final nodes for {role!r} group")
+
+            self.assertEqual([new_node_name], cluster.get_new_nodes().having_roles([role]).get_nodes_names(),
+                             f"Added nodes should present among {role!r} group of new nodes")
+
+        all_names = [node['name'] for node in self.inventory['nodes']] + [new_node_name]
+        self.assertEqual(all_names, install.get_keepalived_configure_group(cluster).get_nodes_names(),
+                         "Unexpected nodes to reconfigure keepalived")
+        self.assertEqual(all_names, install.get_haproxy_configure_group(cluster).get_nodes_names(),
+                         "Unexpected nodes to reconfigure haproxy")
 
 
 class RunTasks(unittest.TestCase):
@@ -119,7 +137,7 @@ class RunTasks(unittest.TestCase):
                 if expected_called:
                     self.assertEqual(['master-1', 'master-2'], run.call_args[0][0].get_nodes_names())
 
-                certsans = res.last_cluster.inventory['services']['kubeadm']['apiServer']['certSANs']
+                certsans = res.working_inventory['services']['kubeadm']['apiServer']['certSANs']
                 self.assertEqual(expected_called, new_node_name in certsans,
                                  "New certificate should be written if and only if new cert SAN appears")
 

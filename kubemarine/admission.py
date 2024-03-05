@@ -14,7 +14,6 @@
 
 import io
 import os
-import uuid
 import re
 from typing import Dict, Any, List, Optional, Union
 
@@ -24,7 +23,7 @@ from jinja2 import Template
 
 from kubemarine import kubernetes
 from kubemarine.core import utils
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.kubernetes import components
@@ -32,7 +31,6 @@ from kubemarine.plugins import builtin
 
 privileged_policy_filename = "privileged.yaml"
 policies_file_path = "./resources/psp/"
-tmp_filepath_pattern = "/tmp/%s"
 
 admission_template = "./templates/admission.yaml.j2"
 admission_dir = "/etc/kubernetes/pki"
@@ -50,6 +48,9 @@ valid_versions_templ = r"^v1\.\d{1,2}$"
 loaded_oob_policies = {}
 
 ERROR_INCONSISTENT_INVENTORIES = "Procedure config and cluster config are inconsistent. Please check 'admission' option"
+ERROR_CHANGE_OOB_PSP_DISABLED = "OOB policies can not be configured when security is disabled"
+ERROR_PSS_BOTH_STATES_DISABLED = ("both 'pod-security' in procedure config and current config are 'disabled'. "
+                                  "There is nothing to change")
 
 # TODO: When KubeMarine is not support Kubernetes version lower than 1.25, the PSP implementation code should be deleted 
 
@@ -62,7 +63,10 @@ def is_pod_security_unconditional(cluster: KubernetesCluster) -> bool:
     return components.kubernetes_minor_release_at_least(cluster.inventory, "v1.28")
 
 
-def enrich_inventory_psp(inventory: dict, _: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory_psp(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+
     global loaded_oob_policies
     loaded_oob_policies = load_oob_policies_files()
 
@@ -72,25 +76,27 @@ def enrich_inventory_psp(inventory: dict, _: KubernetesCluster) -> dict:
 
     # do not perform enrichment if security disabled
     if not is_security_enabled(inventory):
-        return inventory
+        return
 
     # if security enabled, then add PodSecurityPolicy admission plugin
     enabled_admissions = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"]
     if 'PodSecurityPolicy' not in enabled_admissions:
         enabled_admissions = "%s,PodSecurityPolicy" % enabled_admissions
         inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]["enable-admission-plugins"] = enabled_admissions
-        
-    return inventory
 
 
-def enrich_inventory_pss(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if not is_security_enabled(inventory):
-        return inventory
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory_pss(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     # check flags, enforce and logs parameters
     kubernetes_version = inventory["services"]["kubeadm"]["kubernetesVersion"]
-    for item in inventory["rbac"]["pss"]["defaults"]:
+
+    for item, state in cluster.inventory["rbac"]["pss"]["defaults"].items():
         if item.endswith("version"):
-            verify_version(item, inventory["rbac"]["pss"]["defaults"][item], kubernetes_version)
+            verify_version(item, state, kubernetes_version)
+
+    if not is_security_enabled(inventory):
+        return
 
     # add extraArgs to kube-apiserver config
     extra_args = inventory["services"]["kubeadm"]["apiServer"]["extraArgs"]
@@ -106,27 +112,29 @@ def enrich_inventory_pss(inventory: dict, cluster: KubernetesCluster) -> dict:
 
     extra_args["admission-control-config-file"] = admission_path
 
-    return inventory
 
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    default_admission = "pss" if support_pss_only(cluster) else "psp"
+    admission_impl = cluster.inventory["rbac"].setdefault("admission", default_admission)
 
-def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
-    admission_impl = inventory['rbac']['admission']
-    if admission_impl == "psp":
-        return enrich_inventory_psp(inventory, _)
-    elif admission_impl == "pss":
-        return enrich_inventory_pss(inventory, _)
-
-    return inventory
-
-
-def manage_psp_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if support_pss_only(cluster):
+    if support_pss_only(cluster) and (
+            admission_impl == "psp"
+            or cluster.previous_inventory["rbac"]["admission"] == "psp"
+    ):
         raise Exception("PSP is not supported in Kubernetes v1.25 or higher")
-    if cluster.context.get('initial_procedure') != 'manage_psp':
-        return inventory
 
+    if admission_impl == "psp":
+        del cluster.inventory["rbac"]["pss"]
+        enrich_inventory_psp(cluster)
+    elif admission_impl == "pss":
+        del cluster.inventory["rbac"]["psp"]
+        enrich_inventory_pss(cluster)
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_psp'])
+def verify_psp_enrichment(cluster: KubernetesCluster) -> None:
     procedure_config = cluster.procedure_inventory["psp"]
-    current_config = cluster.inventory["rbac"]["psp"]
 
     # validate added custom
     custom_add_policies = procedure_config.get("add-policies", {})
@@ -137,15 +145,10 @@ def manage_psp_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
     verify_custom(custom_delete_policies)
 
     # forbid managing OOB if security will be disabled
-    current_security_state = current_config["pod-security"]
-    final_security_state = procedure_config.get("pod-security", current_security_state)
-    if final_security_state == "disabled" and procedure_config.get("oob-policies"):
-        raise Exception("OOB policies can not be configured when security is disabled")
-
-    cluster.context['initial_pod_security'] = current_security_state
-    current_config["pod-security"] = final_security_state
-
-    return inventory
+    previous_psp = cluster.previous_inventory["rbac"]["psp"]
+    psp = cluster.inventory["rbac"]["psp"]
+    if psp["pod-security"] == "disabled" and previous_psp["oob-policies"] != psp["oob-policies"]:
+        raise Exception(ERROR_CHANGE_OOB_PSP_DISABLED)
 
 
 def verify_custom(custom_scope: Dict[str, List[dict]]) -> None:
@@ -179,17 +182,11 @@ def verify_version(owner: str, version: str, kubernetes_version: str) -> None:
             raise Exception("%s version must not be higher than Kubernetes version" % owner)
 
 
-def finalize_inventory_psp(cluster: KubernetesCluster, inventory_to_finalize: dict,
-                           procedure_inventory_for_finalization: dict) -> dict:
-    if cluster.context.get('initial_procedure') != 'manage_psp':
-        return inventory_to_finalize
-    procedure_config = procedure_inventory_for_finalization["psp"]
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_psp'])
+def manage_psp_enrichment(cluster: KubernetesCluster) -> None:
+    procedure_config = cluster.procedure_inventory["psp"]
 
-    if "rbac" not in inventory_to_finalize:
-        inventory_to_finalize["rbac"] = {}
-    if "psp" not in inventory_to_finalize["rbac"]:
-        inventory_to_finalize["rbac"]["psp"] = {}
-    current_config = inventory_to_finalize["rbac"]["psp"]
+    current_config = cluster.inventory.setdefault("rbac", {}).setdefault("psp", {})
 
     # Perform custom-policies lists changes.
     # Perform changes only if there are any "custom-policies" or "add-policies" in inventory,
@@ -199,38 +196,26 @@ def finalize_inventory_psp(cluster: KubernetesCluster, inventory_to_finalize: di
     existing_custom_policies = current_config.get("custom-policies", {})
     if existing_custom_policies or adding_custom_policies:
         # if custom policies are not defined in inventory, then we need to create custom policies ourselves
-        if not existing_custom_policies:
-            current_config["custom-policies"] = {}
-        current_config["custom-policies"] = merge_custom_policies(existing_custom_policies,
-                                                                  adding_custom_policies,
-                                                                  deleting_custom_policies)
+        current_config["custom-policies"] = merge_custom_policies(
+            existing_custom_policies,
+            utils.deepcopy_yaml(adding_custom_policies),
+            utils.deepcopy_yaml(deleting_custom_policies))
 
     # merge flags from procedure config and cluster config
     current_config["pod-security"] = procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
     if "oob-policies" in procedure_config:
-        if "oob-policies" not in current_config:
-            current_config["oob-policies"] = procedure_config["oob-policies"]
-        else:
-            for oob_policy in procedure_config["oob-policies"]:
-                current_config["oob-policies"][oob_policy] = procedure_config["oob-policies"][oob_policy]
-
-    return inventory_to_finalize
+        default_merger.merge(current_config.setdefault("oob-policies", {}), procedure_config["oob-policies"])
 
 
 def merge_custom_policies(old_policies: Dict[str, List[dict]],
                           added_policies: Dict[str, List[dict]],
                           deleted_policies: Dict[str, List[dict]]) -> Dict[str, List[dict]]:
-    return {
-        psp_list_option: merge_policy_lists(old_policies.get(psp_list_option, []),
-                                            added_policies.get(psp_list_option, []),
-                                            deleted_policies.get(psp_list_option, [])),
-        roles_list_option: merge_policy_lists(old_policies.get(roles_list_option, []),
-                                              added_policies.get(roles_list_option, []),
-                                              deleted_policies.get(roles_list_option, [])),
-        bindings_list_option: merge_policy_lists(old_policies.get(bindings_list_option, []),
-                                                 added_policies.get(bindings_list_option, []),
-                                                 deleted_policies.get(bindings_list_option, []))
-    }
+    for option in (psp_list_option, roles_list_option, bindings_list_option):
+        old_policies[option] = merge_policy_lists(old_policies.get(option, []),
+                                                  added_policies.get(option, []),
+                                                  deleted_policies.get(option, []))
+
+    return old_policies
 
 
 def merge_policy_lists(old_list: List[dict], added_list: List[dict], deleted_list: List[dict]) -> List[dict]:
@@ -303,11 +288,13 @@ def reconfigure_psp_task(cluster: KubernetesCluster) -> None:
 
 
 def reconfigure_oob_policies(cluster: KubernetesCluster) -> None:
-    target_security_state = cluster.procedure_inventory["psp"].get("pod-security")
-    oob_policies = cluster.procedure_inventory["psp"].get("oob-policies")
+    previous_psp = cluster.previous_inventory["rbac"]["psp"]
+    psp = cluster.inventory["rbac"]["psp"]
+    target_state = psp["pod-security"]
+    target_config = psp["oob-policies"]
 
     # reconfigure OOB only if state will be changed, or OOB configuration was changed
-    if not target_security_state and not oob_policies:
+    if previous_psp["pod-security"] == target_state and previous_psp["oob-policies"] == target_config:
         cluster.log.debug("No need to reconfigure OOB policies, skipping...")
         return
 
@@ -317,25 +304,22 @@ def reconfigure_oob_policies(cluster: KubernetesCluster) -> None:
     first_control_plane.call(delete_privileged_policy)
     first_control_plane.call(manage_policies, manage_type="delete", manage_scope=resolve_oob_scope(loaded_oob_policies, "all"))
 
-    if target_security_state == "disabled":
+    if target_state == "disabled":
         cluster.log.debug("Security disabled, OOB will not be recreated")
         return
 
     cluster.log.debug("Recreating all OOB policies...")
-    policies_to_recreate = {}
-    procedure_config = cluster.procedure_inventory["psp"].get("oob-policies", {})
-    current_config = cluster.inventory["rbac"]["psp"]["oob-policies"]
-    for policy in provided_oob_policies:
-        if procedure_config.get(policy, current_config[policy]) == "enabled":
-            policies_to_recreate[policy] = True
     first_control_plane.call(apply_privileged_policy)
-    first_control_plane.call(manage_policies, manage_type="apply", manage_scope=resolve_oob_scope(policies_to_recreate, "all"))
+    first_control_plane.call(manage_policies,
+                             manage_type="apply",
+                             manage_scope=resolve_oob_scope(target_config, "enabled"))
 
 
 def reconfigure_plugin(cluster: KubernetesCluster) -> None:
-    target_state = cluster.procedure_inventory["psp"].get("pod-security")
+    previous_psp = cluster.previous_inventory["rbac"]["psp"]
+    psp = cluster.inventory["rbac"]["psp"]
 
-    if not target_state:
+    if previous_psp["pod-security"] == psp["pod-security"]:
         cluster.log.debug("Security plugin will not be reconfigured")
         return
 
@@ -399,7 +383,7 @@ def manage_privileged_from_file(group: NodeGroup, filename: str, manage_type: st
     if manage_type not in ["apply", "delete"]:
         raise Exception("unexpected manage type for privileged policy")
     privileged_policy = utils.read_internal(os.path.join(policies_file_path, filename))
-    remote_path = tmp_filepath_pattern % filename
+    remote_path = utils.get_remote_tmp_path(filename)
     group.put(io.StringIO(privileged_policy), remote_path, backup=True, sudo=True)
 
     return group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
@@ -446,8 +430,7 @@ def manage_policies(group: NodeGroup, manage_type: str,
         return None
 
     template = collect_policies_template(psp_to_manage, roles_to_manage, bindings_to_manage)
-    filename = uuid.uuid4().hex
-    remote_path = tmp_filepath_pattern % filename
+    remote_path = utils.get_remote_tmp_path()
     group.put(io.StringIO(template), remote_path, backup=True, sudo=True)
     result = group.sudo("kubectl %s -f %s" % (manage_type, remote_path), warn=True)
     group.sudo("rm -f %s" % remote_path)
@@ -481,27 +464,15 @@ def install(cluster: KubernetesCluster) -> None:
         install_psp_task(cluster)
 
 
-def manage_pss_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get('initial_procedure') != 'manage_pss':
-        return inventory
-
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_pss'])
+def verify_pss_enrichment(cluster: KubernetesCluster) -> None:
     procedure_config = cluster.procedure_inventory["pss"]
-    kubernetes_version = cluster.inventory["services"]["kubeadm"]["kubernetesVersion"]
+    kubernetes_version = cluster.previous_inventory["services"]["kubeadm"]["kubernetesVersion"]
 
-    if not is_security_enabled(inventory) and procedure_config["pod-security"] == "disabled":
-        raise Exception("both 'pod-security' in procedure config and current config are 'disabled'. There is nothing to change")
+    if (cluster.previous_inventory["rbac"]["pss"]["pod-security"] == "disabled"
+            and cluster.inventory["rbac"]["pss"]["pod-security"] == "disabled"):
+        raise Exception(ERROR_PSS_BOTH_STATES_DISABLED)
 
-    # check flags, profiles; enrich inventory
-    cluster.context['initial_pod_security'] = inventory["rbac"]["pss"]["pod-security"]
-    inventory["rbac"]["pss"]["pod-security"] = procedure_config["pod-security"]
-
-    if "defaults" in procedure_config:
-        for item in procedure_config["defaults"]:
-            if item.endswith("version"):
-                verify_version(item, procedure_config["defaults"][item], kubernetes_version)
-            inventory["rbac"]["pss"]["defaults"][item] = procedure_config["defaults"][item]
-    if "exemptions" in procedure_config:
-        default_merger.merge(inventory["rbac"]["pss"]["exemptions"], procedure_config["exemptions"])
     if "namespaces" in procedure_config:
         for namespace_item in procedure_config["namespaces"]:
             # check if the namespace has its own profiles
@@ -516,24 +487,24 @@ def manage_pss_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
             if item.endswith("version"):
                 verify_version(item, procedure_config["namespaces_defaults"][item], kubernetes_version)
 
-    return inventory
 
-
-def enrich_default_admission(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if not inventory["rbac"].get("admission"):
-        inventory["rbac"]["admission"] = "psp" if not support_pss_only(cluster) else "pss"
-    return inventory
-
-
-def manage_enrichment(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_psp', 'manage_pss'])
+def manage_enrichment(cluster: KubernetesCluster) -> None:
     check_inventory(cluster)
-    admission_impl = inventory['rbac']['admission']
+    admission_impl = cluster.previous_inventory['rbac']['admission']
     if admission_impl == "psp":
-        return manage_psp_enrichment(inventory, cluster)
+        manage_psp_enrichment(cluster)
     elif admission_impl == "pss":
-        return manage_pss_enrichment(inventory, cluster)
+        manage_pss_enrichment(cluster)
 
-    return inventory
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_psp', 'manage_pss'])
+def verify_manage_enrichment(cluster: KubernetesCluster) -> None:
+    admission_impl = cluster.previous_inventory['rbac']['admission']
+    if admission_impl == "psp":
+        verify_psp_enrichment(cluster)
+    elif admission_impl == "pss":
+        verify_pss_enrichment(cluster)
 
 
 def manage_pss(cluster: KubernetesCluster) -> None:
@@ -562,43 +533,18 @@ def manage_pss(cluster: KubernetesCluster) -> None:
         control_planes.sudo("rm -f %s" % admission_path, warn=True)
 
 
-def finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict,
-                       procedure_inventory_for_finalization: dict) -> dict:
-    admission_impl = cluster.inventory['rbac']['admission']
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['manage_pss'])
+def manage_pss_enrichment(cluster: KubernetesCluster) -> None:
+    procedure_config = cluster.procedure_inventory["pss"]
 
-    if admission_impl == "psp":
-        return finalize_inventory_psp(cluster, inventory_to_finalize, procedure_inventory_for_finalization)
-    elif admission_impl == "pss":
-        return finalize_inventory_pss(cluster, inventory_to_finalize, procedure_inventory_for_finalization)
-
-    return inventory_to_finalize
-
-
-def finalize_inventory_pss(cluster: KubernetesCluster, inventory_to_finalize: dict,
-                           procedure_inventory_for_finalization: dict) -> dict:
-    if cluster.context.get('initial_procedure') != 'manage_pss':
-        return inventory_to_finalize
-    procedure_config = procedure_inventory_for_finalization["pss"]
-
-    current_config = inventory_to_finalize.setdefault("rbac", {}).setdefault("pss", {})
+    current_config = cluster.inventory.setdefault("rbac", {}).setdefault("pss", {})
 
     # merge flags from procedure config and cluster config
-    current_config["pod-security"] = procedure_config.get("pod-security", current_config.get("pod-security", "enabled"))
+    current_config["pod-security"] = procedure_config["pod-security"]
     if "defaults" in procedure_config:
         default_merger.merge(current_config.setdefault("defaults", {}), procedure_config["defaults"])
     if "exemptions" in procedure_config:
         default_merger.merge(current_config.setdefault("exemptions", {}), procedure_config["exemptions"])
-
-    return inventory_to_finalize
-
-
-# update PSP/PSS fields in the inventory dumped to cluster_finalized.yaml
-def update_finalized_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
-    # remove PSP section from cluster_finalyzed.yaml
-    if support_pss_only(cluster):
-        del inventory_to_finalize["rbac"]["psp"]
-
-    return inventory_to_finalize
 
 
 def generate_pss(cluster: KubernetesCluster) -> str:
@@ -703,7 +649,9 @@ def label_namespace_pss(cluster: KubernetesCluster) -> None:
 
 
 def check_inventory(cluster: KubernetesCluster) -> None:
-    # check if 'admission' option in cluster.yaml and procedure.yaml are inconsistent 
-    if cluster.context.get('initial_procedure') == 'manage_pss' and cluster.inventory["rbac"]["admission"] != "pss" or \
-        cluster.context.get('initial_procedure') == 'manage_psp' and cluster.inventory["rbac"]["admission"] != "psp":
+    # check if 'admission' option in cluster.yaml and procedure.yaml are inconsistent
+    previous_admission = cluster.previous_inventory["rbac"]["admission"]
+    procedure = cluster.context['initial_procedure']
+    if (procedure == 'manage_pss' and previous_admission != "pss"
+            or procedure == 'manage_psp' and previous_admission != "psp"):
         raise Exception(ERROR_INCONSISTENT_INVENTORIES)

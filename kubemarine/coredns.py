@@ -149,10 +149,10 @@ data:'''
 def apply_configmap(cluster: KubernetesCluster, config: str) -> RunnersGroupResult:
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
-    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_final_nodes()
+    group = cluster.make_group_from_roles(['control-plane', 'worker'])
     group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True)
 
-    return cluster.nodes['control-plane'].get_final_nodes().get_first_member()\
+    return cluster.nodes['control-plane'].get_first_member()\
         .sudo('kubectl apply -f /etc/kubernetes/coredns-configmap.yaml && '
              'sudo kubectl rollout restart -n kube-system deployment/coredns')
 
@@ -174,7 +174,7 @@ def apply_patch(cluster: KubernetesCluster) -> Union[RunnersGroupResult, str]:
 
         utils.dump_file(cluster, config, filename)
 
-        group = cluster.make_group_from_roles(['control-plane', 'worker']).get_final_nodes()
+        group = cluster.make_group_from_roles(['control-plane', 'worker'])
         group.put(io.StringIO(config), filepath, backup=True, sudo=True)
 
         apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)
@@ -182,4 +182,4 @@ def apply_patch(cluster: KubernetesCluster) -> Union[RunnersGroupResult, str]:
     if apply_command == '':
         return 'Nothing to patch'
 
-    return cluster.nodes['control-plane'].get_final_nodes().get_first_member().sudo(apply_command)
+    return cluster.nodes['control-plane'].get_first_member().sudo(apply_command)

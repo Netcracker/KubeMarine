@@ -22,13 +22,14 @@ import shutil
 import sys
 import time
 import tarfile
+import uuid
+from copy import deepcopy
 
 from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
 import ruamel.yaml
-from copy import deepcopy
 from datetime import datetime
 from collections import OrderedDict
 
@@ -79,18 +80,23 @@ def get_elapsed_string(start: float, end: float) -> str:
     return '{:02}h {:02}m {:02}s'.format(int(hours), int(minutes), int(seconds))
 
 
-def prepare_dump_directory(location: str, reset_directory: bool = True) -> None:
+def prepare_dump_directory(context: dict) -> None:
+    args: dict = context['execution_arguments']
+    location = args['dump_location']
+    reset_directory = not args['disable_dump_cleanup']
     dumpdir = os.path.join(location, 'dump')
     if reset_directory and os.path.exists(dumpdir) and os.path.isdir(dumpdir):
         shutil.rmtree(dumpdir)
-    os.makedirs(dumpdir, exist_ok=True)
+
+    if not args['disable_dump']:
+        os.makedirs(dumpdir, exist_ok=True)
 
 
 def make_ansible_inventory(location: str, c: object) -> None:
     from kubemarine.core.cluster import KubernetesCluster
     cluster = cast(KubernetesCluster, c)
 
-    inventory = get_final_inventory(cluster)
+    inventory = cluster.inventory
     roles = []
     for node in inventory['nodes']:
         for role in node['roles']:
@@ -109,7 +115,7 @@ def make_ansible_inventory(location: str, c: object) -> None:
     for role in roles:
         config[role] = []
         config['cluster:children'].append(role)
-        for node in cluster.nodes[role].get_final_nodes().get_ordered_members_configs_list():
+        for node in cluster.nodes[role].get_ordered_members_configs_list():
             record = "%s ansible_host=%s ansible_ssh_user=%s ansible_ssh_pass=%s ansible_ssh_private_key_file=%s ip=%s" % \
                      (node['name'],
                       node['connect_to'],
@@ -141,12 +147,10 @@ def make_ansible_inventory(location: str, c: object) -> None:
 
                     if isinstance(service_configs, dict):
 
-                        if service_configs.get('installation') is not None:
-                            del service_configs['installation']
-                        if service_configs.get('install') is not None:
-                            del service_configs['install']
-
                         for config_name, config_value in service_configs.items():
+                            if config_name in ('installation', 'install'):
+                                continue
+
                             if isinstance(config_value, dict) or isinstance(config_value, list):
                                 config_value = json.dumps(config_value)
                             config['cluster:vars'].append('%s_%s=%s' % (
@@ -174,51 +178,6 @@ def get_current_timestamp_formatted() -> str:
     return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 
-def get_final_inventory(c: object, initial_inventory: dict = None, procedure_initial_inventory: dict = None) -> dict:
-    from kubemarine.core.cluster import KubernetesCluster
-    cluster = cast(KubernetesCluster, c)
-
-    if initial_inventory is None:
-        inventory = deepcopy(cluster.inventory)
-    else:
-        inventory = deepcopy(initial_inventory)
-
-    if procedure_initial_inventory is None:
-        procedure_inventory = deepcopy(cluster.procedure_inventory)
-    else:
-        procedure_inventory = deepcopy(procedure_initial_inventory)
-
-    from kubemarine import admission, cri, kubernetes, packages, plugins, thirdparties
-    from kubemarine.core import defaults
-    from kubemarine.cri import containerd
-    from kubemarine.plugins import nginx_ingress
-    from kubemarine.procedures import add_node, remove_node
-
-    inventory_finalize_functions: List[Callable[[KubernetesCluster, dict, dict], dict]] = [
-        add_node.add_node_finalize_inventory,
-        lambda cluster, inventory, _: defaults.calculate_node_names(inventory, cluster),
-        remove_node.remove_node_finalize_inventory,
-        lambda cluster, inventory, _: kubernetes.restore_finalize_inventory(cluster, inventory),
-        lambda cluster, inventory, _: kubernetes.upgrade_finalize_inventory(cluster, inventory),
-        kubernetes.reconfigure_finalize_inventory,
-        thirdparties.restore_finalize_inventory,
-        thirdparties.upgrade_finalize_inventory,
-        thirdparties.migrate_cri_finalize_inventory,
-        plugins.upgrade_finalize_inventory,
-        packages.upgrade_finalize_inventory,
-        packages.migrate_cri_finalize_inventory,
-        admission.finalize_inventory,
-        nginx_ingress.finalize_inventory,
-        containerd.migrate_cri_finalize_inventory,
-        cri.upgrade_finalize_inventory,
-    ]
-
-    for finalize_fn in inventory_finalize_functions:
-        inventory = finalize_fn(cluster, inventory, procedure_inventory)
-
-    return inventory
-
-
 def merge_vrrp_ips(procedure_inventory: dict, inventory: dict) -> None:
     # This method is currently unused.
     # If it is ever supported when adding and removing node,
@@ -234,8 +193,19 @@ def merge_vrrp_ips(procedure_inventory: dict, inventory: dict) -> None:
         inventory.move_to_end("vrrp_ips", last=False)
 
 
+def is_dump_allowed(context: dict, filename: str) -> bool:
+    args = context['execution_arguments']
+    if args['disable_dump'] \
+            and not (filename in ClusterStorage.PRESERVED_DUMP_FILES
+                     and context['preserve_inventory']
+                     and not args.get('without_act', False)):
+        return False
+
+    return True
+
+
 def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: str,
-              *, dump_location: bool = True, create_subdir: bool = False) -> None:
+              *, dump_location: bool = True) -> None:
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
@@ -243,12 +213,9 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
             cluster = cast(KubernetesCluster, context)
             context = cluster.context
 
-        args = context['execution_arguments']
-        if args['disable_dump'] \
-                and not (filename in ClusterStorage.PRESERVED_DUMP_FILES and context['preserve_inventory']):
+        if not is_dump_allowed(context, filename):
             return
 
-        prepare_dump_directory(args['dump_location'], reset_directory=False)
         target_path = get_dump_filepath(context, filename)
     else:
         target_path = get_external_resource_path(filename)
@@ -256,8 +223,7 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
     # but they can appear in target path. They will be replaced with '_'
     target_path = sanitize_filepath(target_path, replacement_text='_')
 
-    if create_subdir:
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     if isinstance(data, io.StringIO):
         text = data.getvalue()
@@ -270,11 +236,17 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
         file.write(text)
 
 
-def get_dump_filepath(context: dict, filename: str) -> str:
-    if context.get("dump_filename_prefix"):
-        filename = f"{context['dump_filename_prefix']}_{filename}"
+def get_dump_directory(context: dict) -> str:
+    parts = [context['execution_arguments']['dump_location'], 'dump']
+    if 'dump_subdir' in context:
+        parts.append(context['dump_subdir'])
 
-    return get_external_resource_path(os.path.join(context['execution_arguments']['dump_location'], 'dump', filename))
+    dump_directory: str = os.path.join(*parts)
+    return dump_directory
+
+
+def get_dump_filepath(context: dict, filename: str) -> str:
+    return get_external_resource_path(os.path.join(get_dump_directory(context), filename))
 
 
 def wait_command_successful(logger: log.EnhancedLogger, attempt: Callable[[], bool],
@@ -376,11 +348,51 @@ def get_local_file_sha1(filename: str) -> str:
     return sha1.hexdigest()
 
 
+def get_remote_tmp_path(filename: str = None, ext: str = None) -> str:
+    if filename is None:
+        filename = uuid.uuid4().hex
+
+    if ext is not None:
+        filename += '.' + ext
+
+    return "/tmp/" + filename
+
+
 def yaml_structure_preserver() -> ruamel.yaml.YAML:
     """YAML loader and dumper which saves original structure"""
     ruamel_yaml = ruamel.yaml.YAML()
     ruamel_yaml.preserve_quotes = True
     return ruamel_yaml
+
+
+def deepcopy_yaml(data: dict) -> dict:
+    if isinstance(data, CommentedMap):
+        ruamel_yaml = yaml_structure_preserver()
+        # Dump and parse yaml object to work around ruamel.yaml bug
+        # https://sourceforge.net/p/ruamel-yaml/tickets/410/
+        buf = io.StringIO()
+        ruamel_yaml.dump(data, buf)
+        data = ruamel_yaml.load(buf.getvalue())
+        return data
+
+    return deepcopy(data)
+
+
+def subdict_yaml(data: dict, keys: Sequence[str]) -> dict:
+    items = (item for item in data.items() if item[0] in keys)
+    if isinstance(data, CommentedMap):
+        return CommentedMap(items)
+    else:
+        return dict(items)
+
+
+def convert_native_yaml(data: dict) -> dict:
+    if isinstance(data, CommentedMap):
+        buf = io.StringIO()
+        yaml_structure_preserver().dump(data, buf)
+        data = yaml.safe_load(io.StringIO(buf.getvalue()))
+
+    return data
 
 
 def is_sorted(l: Sequence[str], key: Callable[[str], SupportsAllComparisons] = None) -> bool:
@@ -621,37 +633,48 @@ class ClusterStorage:
     4- Copying dumps to new nodes
     """
 
-    PRESERVED_DUMP_FILES = ['procedure.yaml', 'procedure_parameters', 'cluster_precompiled.yaml',
-                            'cluster.yaml','cluster_initial.yaml', 'cluster_finalized.yaml']
+    PRESERVED_DUMP_FILES = ['procedure.yaml', 'procedure_parameters',
+                            'cluster.yaml', 'cluster_initial.yaml', 'cluster_finalized.yaml']
 
-    def __init__(self, cluster: object):
+    def __init__(self, cluster: object, context: dict):
         from kubemarine.core.cluster import KubernetesCluster
         self.cluster = cast(KubernetesCluster, cluster)
+        self.context = context
         self.dir_path = "/etc/kubemarine/procedures/"
-        self.dir_name = ''
         self.dir_location = ''
+        self.local_archive_path = ''
 
     def make_dir(self) -> None:
         """
         This method creates a directory in which logs about operations on the cluster will be stored.
         """
         readable_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        initial_procedure = self.cluster.context["initial_procedure"]
-        self.dir_name = readable_timestamp + "_" + initial_procedure + "/"
-        self.dir_location = self.dir_path + self.dir_name
-        self.cluster.nodes['control-plane'].get_final_nodes().sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
+        initial_procedure = self.context["initial_procedure"]
+        dir_name = readable_timestamp + "_" + initial_procedure + "/"
+        self.dir_location = self.dir_path + dir_name
+        self.cluster.nodes['control-plane'].sudo(f"mkdir -p {self.dir_location} ; sudo rm {self.dir_path + 'latest_dump'} ;"
                                                  f" sudo ln -s {self.dir_location} {self.dir_path + 'latest_dump'}")
 
-    def rotation_file(self) -> None:
+    def upload_and_rotate(self) -> None:
         """
-        This method packs files with logs and maintains a structured storage of logs on the cluster.
+        This method uploads and unpacks the archive,
+        then packs files with logs and maintains a structured storage of logs on the cluster.
         """
+        control_planes = self.cluster.nodes["control-plane"]
+
+        self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
+        remote_archive = self.dir_location + "local.tar.gz"
+        control_planes.put(self.local_archive_path, remote_archive, sudo=True)
+        control_planes.sudo(
+            f'tar -C {self.dir_location} -xzv --no-same-owner -f {remote_archive}  && '
+            f'sudo rm -f {remote_archive} ')
+
         not_pack_file = self.cluster.inventory['procedure_history']['archive_threshold']
         delete_old = self.cluster.inventory['procedure_history']['delete_threshold']
 
         command = f'ls {self.dir_path} | grep -v latest_dump'
-        node_group_results = self.cluster.nodes["control-plane"].get_final_nodes().sudo(command)
-        with node_group_results.get_group().new_executor() as exe:
+        node_group_results = control_planes.sudo(command)
+        with control_planes.new_executor() as exe:
             for control_plane in exe.group.get_ordered_members_list():
                 result = node_group_results[control_plane.get_host()]
                 files = result.stdout.split()
@@ -665,13 +688,13 @@ class ClusterStorage:
                     elif i >= delete_old:
                         control_plane.sudo(f'rm -rf {self.dir_path + file}')
 
-    def compress_and_upload_archive(self) -> None:
+    def compress_archive(self) -> None:
         """
-        This method compose dump files and sends the collected files to the nodes.
+        This method compose dump files in the local archive.
         """
-        context = self.cluster.context
-        archive = get_dump_filepath(context, "local.tar.gz")
-        with tarfile.open(archive, "w:gz") as tar:
+        context = self.context
+        self.local_archive_path = get_dump_filepath(context, "local.tar.gz")
+        with tarfile.open(self.local_archive_path, "w:gz") as tar:
             for name in ClusterStorage.PRESERVED_DUMP_FILES:
                 source = get_dump_filepath(context, name)
                 if os.path.exists(source):
@@ -679,16 +702,11 @@ class ClusterStorage:
             tar.add(context['execution_arguments']['config'], 'cluster.yaml')
             tar.add(get_version_filepath(), 'version')
 
-        self.cluster.log.debug('Uploading archive with preserved information about the procedure.')
-        self.cluster.nodes['control-plane'].get_final_nodes().put(archive, self.dir_location + 'local.tar.gz', sudo=True)
-        self.cluster.nodes['control-plane'].get_final_nodes().sudo(f'tar -C {self.dir_location} -xzv --no-same-owner -f {self.dir_location + "local.tar.gz"}  && '
-                                                 f'sudo rm -f {self.dir_location + "local.tar.gz"} ')
-
     def collect_procedure_info(self) -> None:
         """
         This method collects information about the type of procedure and the version of the tool we are working with.
         """
-        context = self.cluster.context
+        context = self.context
         out = dict()
         out['arguments'] = context['initial_cli_arguments']
         if 'proceeded_tasks' in context:
@@ -703,16 +721,16 @@ class ClusterStorage:
         """
         This method is used to transfer backup logs from the initial control-plane to the new control-planes.
         """
-        new_control_planes = self.cluster.nodes['control-plane'].get_new_nodes()
+        new_control_planes = self.cluster.get_new_nodes().having_roles(['control-plane'])
         if new_control_planes.is_empty():
             return
 
         archive_name = 'dump_log_cluster.tar.gz'
-        archive_dump_path = get_dump_filepath(self.cluster.context, archive_name)
+        archive_dump_path = get_dump_filepath(self.context, archive_name)
         archive_remote_path = f"/tmp/{archive_name}"
         log = self.cluster.log
 
-        control_plane = self.cluster.nodes['control-plane'].get_initial_nodes().get_first_member()
+        control_plane = self.cluster.previous_nodes['control-plane'].get_first_member()
         data_copy_res = control_plane.sudo(f'tar -czvf {archive_remote_path} {self.dir_path}')
         log.verbose("Archive with procedures history is created:\n%s" % data_copy_res)
         control_plane.get(archive_remote_path, archive_dump_path)

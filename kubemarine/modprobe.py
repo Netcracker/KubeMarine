@@ -16,24 +16,22 @@ import io
 from typing import Tuple, List
 
 from kubemarine.core import utils
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, DeferredGroup, CollectorCallback
 
 predefined_file_path = "/etc/modules-load.d/predefined.conf"
 
 
-def enrich_kernel_modules(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_kernel_modules(cluster: KubernetesCluster) -> None:
     """
     The method enrich the list of kernel modules ('services.modprobe') according to OS family
     """
 
-    final_nodes = cluster.nodes['all'].get_final_nodes()
     for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
         # Remove the section for OS families if no node has these OS families.
-        if final_nodes.get_subgroup_with_os(os_family).is_empty():
-            del inventory["services"]["modprobe"][os_family]
-
-    return inventory
+        if cluster.nodes['all'].get_subgroup_with_os(os_family).is_empty():
+            del cluster.inventory["services"]["modprobe"][os_family]
 
 
 def generate_config(node: DeferredGroup) -> str:

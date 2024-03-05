@@ -17,7 +17,7 @@ import unittest
 from copy import deepcopy
 
 from kubemarine import demo
-from kubemarine.core import errors, utils
+from kubemarine.core import errors
 from test.unit import utils as test_utils
 
 
@@ -27,7 +27,7 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(master=0, balancer=1, worker=0)
         inventory["nodes"][0]["labels"] = {"should": "fail"}
         with self.assertRaises(Exception) as context:
-            demo.new_cluster(inventory, fake=False)
+            demo.new_cluster(inventory)
 
         self.assertIn("Only 'worker' or 'control-plane' nodes can have labels", str(context.exception))
 
@@ -35,7 +35,7 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(master=0, balancer=1, worker=0)
         inventory["nodes"][0]["taints"] = ["should fail"]
         with self.assertRaises(Exception) as context:
-            demo.new_cluster(inventory, fake=False)
+            demo.new_cluster(inventory)
 
         self.assertIn("Only 'worker' or 'control-plane' nodes can have taints", str(context.exception))
 
@@ -44,12 +44,12 @@ class TestInventoryValidation(unittest.TestCase):
         inventory["nodes"][0]["name"] = "bad_node/name"
 
         with self.assertRaises(Exception):
-            demo.new_cluster(inventory, fake=False)
+            demo.new_cluster(inventory)
 
     def test_correct_node_name(self):
         inventory = demo.generate_inventory(master=1, balancer=0, worker=0)
         inventory["nodes"][0]["name"] = "correct-node.name123"
-        demo.new_cluster(inventory, fake=False)
+        demo.new_cluster(inventory)
 
     def test_missed_roles(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
@@ -68,7 +68,6 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['nodes'][1]['roles'].append('add_node')
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
-        context['nodes'] = demo.generate_nodes_context(inventory)
         procedure_inventory = demo.generate_procedure_inventory('add_node')
         procedure_inventory['nodes'] = [inventory['nodes'].pop(0)]
         with self.assertRaisesRegex(errors.FailException, error_regex):
@@ -77,7 +76,6 @@ class TestInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         inventory['nodes'][1]['roles'].append('remove_node')
         context = demo.create_silent_context(['fake.yaml'], procedure='remove_node')
-        context['nodes'] = demo.generate_nodes_context(inventory)
         procedure_inventory = demo.generate_procedure_inventory('remove_node')
         procedure_inventory['nodes'] = [inventory['nodes'][0]]
         with self.assertRaisesRegex(errors.FailException, error_regex):
@@ -105,12 +103,12 @@ class TestInventoryValidation(unittest.TestCase):
     def test_missed_any_address(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         context = demo.create_silent_context()
-        context['nodes'] = demo.generate_nodes_context(inventory)
+        nodes_context = demo.generate_nodes_context(inventory)
         del inventory['nodes'][0]['address']
         del inventory['nodes'][0]['internal_address']
         with self.assertRaisesRegex(errors.FailException, r"'internal_address' is a required property"):
-            cluster = demo.FakeKubernetesCluster(inventory, context)
-            cluster.enrich()
+            resources = demo.FakeResources(context, inventory, nodes_context=nodes_context)
+            resources.cluster()
 
     def test_mix_registry_approaches(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
@@ -233,9 +231,6 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertEqual(3, len(nodes))
         nodes = cluster.nodes['control-plane'].get_ordered_members_list()
         self.assertEqual(3, len(nodes))
-        roles = cluster.roles
-        self.assertIn('master', roles)
-        self.assertIn('control-plane', roles)
 
     def test_internal_address_inventory(self):
         inventory = demo.generate_inventory()
@@ -246,8 +241,8 @@ class TestInventoryValidation(unittest.TestCase):
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
 
-        final_inventory = utils.get_final_inventory(cluster, inventory)
-        for node in final_inventory['nodes']:
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
+        for node in finalized_inventory['nodes']:
             self.assertNotIn('address', node)
 
     def test_internal_address_remove_node_inventory(self):
@@ -263,8 +258,11 @@ class TestInventoryValidation(unittest.TestCase):
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
 
-        final_inventory = utils.get_final_inventory(cluster)
-        for node in final_inventory['nodes']:
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
+        for node in finalized_inventory['nodes']:
+            self.assertNotIn('address', node)
+
+        for node in cluster.formatted_inventory['nodes']:
             self.assertNotIn('address', node)
 
     def test_internal_address_add_node_inventory(self):
@@ -274,26 +272,18 @@ class TestInventoryValidation(unittest.TestCase):
 
         # Add node inventory
         context = demo.create_silent_context(['fake.yaml'], procedure='add_node')
-        host_different_os = inventory['nodes'][0]['internal_address']
-        context['nodes'] = self._nodes_context_one_different_os(inventory, host_different_os)
         procedure_inventory = demo.generate_procedure_inventory('add_node')
         procedure_inventory['nodes'] = [inventory['nodes'].pop(0)]
         cluster = demo.new_cluster(inventory, procedure_inventory=procedure_inventory, context=context)
         for node in cluster.inventory['nodes']:
             self.assertNotIn('address', node)
 
-        final_inventory = utils.get_final_inventory(cluster)
-        for node in final_inventory['nodes']:
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
+        for node in finalized_inventory['nodes']:
             self.assertNotIn('address', node)
 
-    def _nodes_context_one_different_os(self, inventory, host_different_os):
-        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='20.04')
-        nodes_context[host_different_os]['os'] = {
-            'name': 'centos',
-            'family': 'rhel',
-            'version': '7.9'
-        }
-        return nodes_context
+        for node in cluster.formatted_inventory['nodes']:
+            self.assertNotIn('address', node)
 
     def test_allow_omitted_name(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
@@ -419,82 +409,11 @@ class TestInventoryValidation(unittest.TestCase):
         self.assertIn('custom', certsans)
         self.assertEqual(1, len([san for san in certsans if san == first_node_name]))
 
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = cluster.make_finalized_inventory()
+        finalized_inventory = test_utils.make_finalized_inventory(cluster)
         certsans = finalized_inventory["services"]["kubeadm"]['apiServer']['certSANs']
 
         self.assertIn('custom', certsans)
         self.assertEqual(1, len([san for san in certsans if san == first_node_name]))
-
-    def test_enrich_psp_extra_args_plugins_list(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.24.11'
-        inventory['rbac'] = {
-            'admission': 'psp',
-            'psp': {'pod-security': 'enabled'}
-        }
-
-        admission_plugins_expected = 'NodeRestriction,PodSecurityPolicy'
-
-        cluster = demo.new_cluster(inventory)
-        apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
-
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = test_utils.make_finalized_inventory(cluster)
-        apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual(admission_plugins_expected, apiserver_extra_args.get('enable-admission-plugins'))
-
-    def test_conditional_enrich_pss_extra_args_feature_gates(self):
-        for k8s_version, feature_gates_enriched in (('v1.27.8', True), ('v1.28.4', False)):
-            with self.subTest(f"Kubernetes: {k8s_version}"):
-                inventory = demo.generate_inventory(**demo.ALLINONE)
-                inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
-                inventory['rbac'] = {
-                    'admission': 'pss',
-                    'pss': {'pod-security': 'enabled'}
-                }
-
-                feature_gates_expected = 'PodSecurity=true' if feature_gates_enriched else None
-
-                cluster = demo.new_cluster(inventory)
-                apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-                self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
-                self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args['admission-control-config-file'])
-
-                test_utils.stub_associations_packages(cluster, {})
-                finalized_inventory = test_utils.make_finalized_inventory(cluster)
-                apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-                self.assertEqual(feature_gates_expected, apiserver_extra_args.get('feature-gates'))
-                self.assertEqual('/etc/kubernetes/pki/admission.yaml', apiserver_extra_args['admission-control-config-file'])
-                self.assertNotIn('psp', finalized_inventory['rbac'])
-
-    def test_enrich_pss_extra_args_feature_gates_custom(self):
-        inventory = demo.generate_inventory(**demo.ALLINONE)
-        inventory['services']['kubeadm'] = {
-            'kubernetesVersion': 'v1.27.8',
-            'apiServer': {'extraArgs': {'feature-gates': 'ServiceAccountIssuerDiscovery=true'}},
-        }
-        inventory['rbac'] = {
-            'admission': 'pss',
-            'pss': {'pod-security': 'enabled'}
-        }
-
-        cluster = demo.new_cluster(inventory)
-        apiserver_extra_args = cluster.inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual('ServiceAccountIssuerDiscovery=true,PodSecurity=true', apiserver_extra_args.get('feature-gates'))
-
-        test_utils.stub_associations_packages(cluster, {})
-        finalized_inventory = test_utils.make_finalized_inventory(cluster)
-        apiserver_extra_args = finalized_inventory["services"]["kubeadm"]['apiServer']['extraArgs']
-
-        self.assertEqual('ServiceAccountIssuerDiscovery=true,PodSecurity=true', apiserver_extra_args.get('feature-gates'))
-        self.assertNotIn('psp', finalized_inventory['rbac'])
 
 
 if __name__ == '__main__':

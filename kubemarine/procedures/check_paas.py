@@ -23,7 +23,6 @@ from typing import List, Dict, Optional, Union
 import yaml
 import ruamel.yaml
 import ipaddress
-import uuid
 
 from ordered_set import OrderedSet
 
@@ -31,10 +30,8 @@ from kubemarine import (
     packages as pckgs, system, selinux, etcd, thirdparties, apparmor, kubernetes, sysctl, audit,
     plugins, modprobe, admission
 )
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.group import NodeGroup
-from kubemarine.core.resources import DynamicResources
+from kubemarine.core.group import NodeGroup, CollectorCallback
 from kubemarine.cri import containerd
 from kubemarine.kubernetes import components
 from kubemarine.plugins import calico, builtin, manifest
@@ -51,11 +48,6 @@ from deepdiff import DeepDiff  # type: ignore[import-untyped]
 def services_status(cluster: KubernetesCluster, service_type: str) -> None:
     with TestCase(cluster, '201', "Services", "%s Status" % service_type.capitalize(),
                   default_results='active (running)'):
-        service_name = service_type
-
-        if cluster.get_os_family() != 'multiple' and service_type != 'kubelet':
-            service_name = cluster.get_package_association(service_type, 'service_name')
-
         group = cluster.nodes['all']
         if service_type == 'haproxy':
             group = cluster.make_group_from_roles(['balancer'])
@@ -68,14 +60,22 @@ def services_status(cluster: KubernetesCluster, service_type: str) -> None:
             raise TestWarn("No nodes to check service status",
                            hint="The node group to check the service is empty. Check skipped.")
 
-        result = group.sudo('systemctl status %s' % service_name, warn=True)
-        cluster.log.verbose(result)
+        collector = CollectorCallback(cluster)
+        with group.new_executor() as exe:
+            for node in exe.group.get_ordered_members_list():
+                service_name = service_type
+                if service_type != 'kubelet':
+                    service_name = cluster.get_package_association_for_node(
+                        node.get_host(), service_type, 'service_name')
+                system.service_status(node, name=service_name, callback=collector)
 
-        status_regexp = re.compile("Active:\s([a-z\s()]*)(\ssince|$)", re.M)
+        cluster.log.verbose(collector.result)
+
+        status_regexp = re.compile(r"Active:\s([a-z\s()]*)(\ssince|$)", re.M)
 
         statuses = []
         failed = False
-        for host, node_result in result.items():
+        for host, node_result in collector.result.items():
             if node_result.return_code == 4:
                 statuses.append('service is missing')
                 failed = True
@@ -392,7 +392,7 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
             if is_curl:
                 cluster.log.verbose(f"Thirdparty {path} doesn't have default sha, download it...")
                 # Create tmp dir for loading thirdparty without default sha
-                random_dir = "/tmp/%s" % uuid.uuid4().hex
+                random_dir = utils.get_remote_tmp_path()
                 final_commands = "rm -r -f %s" % random_dir
                 random_path = "%s%s" % (random_dir, path)
                 cluster.log.verbose('Temporary path: %s' % random_path)
@@ -814,11 +814,10 @@ def verify_selinux_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() not in ('rhel', 'rhel8', 'rhel9'):
-        return
-
     with TestCase(cluster, '213', "Security", "Selinux security policy") as tc:
-        group = cluster.nodes['all']
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
+        if group.is_empty():
+            return tc.success("No RHEL nodes found")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
                                     state=selinux.get_expected_state(cluster.inventory),
@@ -873,11 +872,10 @@ def verify_selinux_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() not in ('rhel', 'rhel8', 'rhel9'):
-        return
-
     with TestCase(cluster, '214', "Security", "Selinux configuration") as tc:
-        group = cluster.nodes['all']
+        group = cluster.nodes['all'].get_subgroup_with_os(['rhel', 'rhel8', 'rhel9'])
+        if group.is_empty():
+            return tc.success("No RHEL nodes found")
         selinux_configured, selinux_result, selinux_parsed_result = \
             selinux.is_config_valid(group,
                                     state=selinux.get_expected_state(cluster.inventory),
@@ -1606,18 +1604,17 @@ def verify_apparmor_status(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() in ['rhel', 'rhel8', 'rhel9']:
-        return
-
     with TestCase(cluster, '227', "Security", "Apparmor security policy") as tc:
-        group = cluster.nodes['all'].get_accessible_nodes()
+        group = cluster.nodes['all'].get_subgroup_with_os('debian')
+        if group.is_empty():
+            return tc.success("No Debian nodes found")
         results = group.sudo("aa-enabled")
         enabled_nodes: List[str] = []
         invalid_nodes: List[str] = []
         for host, item in results.items():
             apparmor_status = item.stdout
             cluster.log.warning(f"Apparmor on node: {host} enabled: {apparmor_status}")
-            if apparmor_status ==  "Yes":
+            if apparmor_status == "Yes":
                 enabled_nodes.append(host)
             else:
                 enabled_nodes.append(host)
@@ -1634,12 +1631,11 @@ def verify_apparmor_config(cluster: KubernetesCluster) -> None:
     :param cluster: KubernetesCluster object
     :return: None
     """
-    if cluster.get_os_family() in ['rhel', 'rhel8', 'rhel9']:
-        return
-
-    with TestCase(cluster, '228', "Security", "Apparmor security policy") as tc:
+    with TestCase(cluster, '228', "Security", "Apparmor Configuration") as tc:
+        group = cluster.nodes['all'].get_subgroup_with_os('debian')
+        if group.is_empty():
+            return tc.success("No Debian nodes found")
         expected_profiles = cluster.inventory['services']['kernel_security'].get('apparmor', {})
-        group = cluster.nodes['all'].get_accessible_nodes()
         if expected_profiles:
             apparmor_configured = apparmor.is_state_valid(group, expected_profiles)
             if apparmor_configured:
@@ -1761,12 +1757,9 @@ tasks = OrderedDict({
 })
 
 
-class PaasAction(Action):
+class PaasAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('check paas')
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
+        super().__init__('check paas', tasks)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:
@@ -1802,6 +1795,7 @@ def create_context(cli_arguments: List[str] = None) -> dict:
     context = flow.create_context(parser, cli_arguments, procedure='check_paas')
     context['testsuite'] = TestSuite()
     context['preserve_inventory'] = False
+    context['result'].append('testsuite')
 
     return context
 
@@ -1811,14 +1805,13 @@ def main(cli_arguments: List[str] = None) -> TestSuite:
     flow_ = flow.ActionsFlow([PaasAction()])
     result = flow_.run_flow(context, print_summary=False)
 
-    context = result.context
-    testsuite: TestSuite = context['testsuite']
+    testsuite: TestSuite = result.context['testsuite']
 
     # Final summary should be printed only to stdout with custom formatting
     # If tests results required for parsing, they can be found in test results files
     print(testsuite.get_final_summary(show_minimal=False, show_recommended=False))
     testsuite.print_final_status(result.logger)
-    check_iaas.make_reports(context)
+    check_iaas.make_reports(context, testsuite)
     return testsuite
 
 

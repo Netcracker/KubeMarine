@@ -438,10 +438,11 @@ services:
         timeout_client_fin: '1m'
         maxconn: 10000
       keep_configs_updated: True
+      maintenance_mode: False
       mntc_config_location: '/etc/haproxy/haproxy_mntc.cfg'
     target_ports:
-      http: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20080{% else %}80{% endif %}'
-      https: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}20443{% else %}443{% endif %}'
+      http: '{% if nodes | select("has_role", "balancer") | first %}20080{% else %}80{% endif %}'
+      https: '{% if nodes | select("has_role", "balancer") | first %}20443{% else %}443{% endif %}'
     keepalived:
       keep_configs_updated: True
       global: {}
@@ -521,7 +522,7 @@ plugin_defaults:
 plugins:
 
   calico:
-    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion].version }}'
+    version: '{{ globals.compatibility_map.software["calico"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
     install: true
     installation:
       priority: 0
@@ -582,9 +583,9 @@ plugins:
     globalBgpPeers: []
     typha:
       # enabled by default for envs with nodes > 3
-      enabled: '{% if (nodes|length) < 4 %}false{% else %}true{% endif %}'
+      enabled: '{% if (nodes | select("has_roles", ["control-plane", "worker"]) | list | length) < 4 %}false{% else %}true{% endif %}'
       # let's start from 2 replicas and increment it every 50 nodes
-      replicas: '{{ (((nodes|length)/50) + 2) | round(1) | int }}'
+      replicas: '{{ (((nodes | select("has_roles", ["control-plane", "worker"]) | list | length) / 50) + 2) | round(0, "floor") | int }}'
       image: 'calico/typha:{{ plugins.calico.version }}'
       nodeSelector:
         kubernetes.io/os: linux
@@ -670,7 +671,7 @@ plugins:
           retries: 40
 
   nginx-ingress-controller:
-    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion].version }}'
+    version: '{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
     install: true
     installation:
       registry: registry.k8s.io
@@ -694,11 +695,11 @@ plugins:
             pods:
               - ingress-nginx-controller
     config_map:
-      use-proxy-protocol: '{% if nodes | select("has_role", "balancer") | reject("has_role", "remove_node") | first %}true{% else %}false{% endif %}'
+      use-proxy-protocol: '{% if nodes | select("has_role", "balancer") | first %}true{% else %}false{% endif %}'
       # redefine default value for controller >= v1.9.0 because we need to use snippet annotations for dashboard
       allow-snippet-annotations: "true"
     webhook:
-      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion]["webhook-version"] }}'
+      image: 'ingress-nginx/kube-webhook-certgen:{{ globals.compatibility_map.software["nginx-ingress-controller"][services.kubeadm.kubernetesVersion|kubernetes_version]["webhook-version"] }}'
       # resources values are based on https://github.com/kubernetes/ingress-nginx/blob/helm-chart-4.7.1/charts/ingress-nginx/values.yaml#L598
       resources:
         requests:
@@ -738,7 +739,7 @@ plugins:
         protocol: TCP
 
   kubernetes-dashboard:
-    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion].version }}'
+    version: '{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
     install: false
     installation:
       priority: 2
@@ -775,7 +776,7 @@ plugins:
           cpu: 1
           memory: 200Mi
     metrics-scraper:
-      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion]["metrics-scraper-version"] }}'
+      image: 'kubernetesui/metrics-scraper:{{ globals.compatibility_map.software["kubernetes-dashboard"][services.kubeadm.kubernetesVersion|kubernetes_version]["metrics-scraper-version"] }}'
       nodeSelector:
         kubernetes.io/os: linux
       resources:
@@ -815,7 +816,7 @@ plugins:
                         number: 443
 
   local-path-provisioner:
-    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion].version }}'
+    version: '{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|kubernetes_version].version }}'
     install: false
     installation:
       priority: 2
@@ -833,7 +834,7 @@ plugins:
       is-default: "false"
     volume-dir: /opt/local-path-provisioner
     image: 'rancher/local-path-provisioner:{{ plugins["local-path-provisioner"].version }}'
-    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion]["busybox-version"] }}'
+    helper-pod-image: 'library/busybox:{{ globals.compatibility_map.software["local-path-provisioner"][services.kubeadm.kubernetesVersion|kubernetes_version]["busybox-version"] }}'
     # resources values are based on https://github.com/rancher/local-path-provisioner/blob/v0.0.24/deploy/chart/local-path-provisioner/values.yaml#L69
     resources:
       requests:

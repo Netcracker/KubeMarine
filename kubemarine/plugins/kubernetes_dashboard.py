@@ -14,13 +14,15 @@
 from typing import List, Optional, Dict
 
 from kubemarine.core import summary, utils, log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     if not inventory["plugins"]["kubernetes-dashboard"]["install"]:
-        return inventory
+        return
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_dashboard = cluster.raw_inventory.get("plugins", {}).get("kubernetes-dashboard", {}).get("dashboard", {})
@@ -29,8 +31,6 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     raw_metrics_scrapper = cluster.raw_inventory.get("plugins", {}).get("kubernetes-dashboard", {}).get("metrics-scraper", {})
     if "resources" in raw_metrics_scrapper:
         inventory["plugins"]["kubernetes-dashboard"]["metrics-scraper"]["resources"] = raw_metrics_scrapper["resources"]
-
-    return inventory
 
 
 def schedule_summary_report(cluster: KubernetesCluster) -> None:

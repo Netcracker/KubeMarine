@@ -20,13 +20,13 @@ from kubemarine.core.resources import DynamicResources
 class Action(ABC):
     """Base class for doing some work based on provided DynamicResources"""
 
-    def __init__(self, identifier: str, recreate_inventory: bool = False) -> None:
+    def __init__(self, identifier: str, *, recreate_inventory: bool = False) -> None:
         """
         Constructor of Action to be invoked from derived classes.
 
-        :param identifier action identifier, which will be preserved on nodes
-                          if the action is successfully performed.
-        :param recreate_inventory specifies if inventory should be recreated after the action succeeds.
+        :param identifier: action identifier, which will be preserved on nodes
+                           if the action is successfully performed.
+        :param recreate_inventory: Specifies if inventory should be recreated after the action succeeds.
         """
 
         self.identifier = identifier
@@ -47,16 +47,6 @@ class Action(ABC):
         """
         Enrich context if necessary before the action is run.
         The changes are remained after action is executed, and will be visible to further actions.
-        To revert the changes, implement Action.reset_context().
-
-        :param context: mutable context instance.
-        """
-        return
-
-    def reset_context(self, context: dict) -> None:
-        """
-        Reset changes in the context if necessary.
-        The method is called only if the action is executed successfully.
 
         :param context: mutable context instance.
         """

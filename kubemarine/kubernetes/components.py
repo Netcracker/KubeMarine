@@ -14,8 +14,6 @@
 
 import io
 import re
-import uuid
-from copy import deepcopy
 from textwrap import dedent
 from typing import List, Optional, Dict, Callable, Sequence
 
@@ -194,7 +192,7 @@ class KubeadmConfig:
             patch_config: dict = KubeadmConfig(self.cluster).maps[configmap]
             # It seems that all default lists are always overridden with custom instead of appending,
             # and so override merger seems the most suitable.
-            config_ = override_merger.merge(config_, deepcopy(patch_config))
+            config_ = override_merger.merge(config_, utils.deepcopy_yaml(patch_config))
             return config_
 
         return merge_func
@@ -770,10 +768,10 @@ def compare_manifests(cluster: KubernetesCluster, *, with_inventory: bool) \
         kubeadm_config.load('kubeadm-config', cluster.nodes['control-plane'].get_first_member())
 
     control_planes = cluster.nodes['control-plane'].new_defer()
-    temp_config = "/tmp/%s" % uuid.uuid4().hex
+    temp_config = utils.get_remote_tmp_path()
     patches_dir = '/etc/kubernetes/patches'
     if with_inventory:
-        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+        patches_dir = utils.get_remote_tmp_path()
 
     components = [c for c in CONTROL_PLANE_COMPONENTS
                   if c != 'etcd' or kubeadm_extended_dryrun(cluster)]
@@ -851,7 +849,7 @@ def compare_kubelet_config(cluster: KubernetesCluster, *, with_inventory: bool) 
     nodes = cluster.make_group_from_roles(['control-plane', 'worker']).new_defer()
     patches_dir = '/etc/kubernetes/patches'
     if with_inventory:
-        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+        patches_dir = utils.get_remote_tmp_path()
 
     tmp_dirs_cmd = "sh -c 'sudo ls /etc/kubernetes/tmp/ | grep dryrun 2>/dev/null || true'"
     old_tmp_dirs = CollectorCallback(cluster)
@@ -915,8 +913,8 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
 
         # Use upload-config kubelet --dry-run to catch all inserted/updated/deleted properties.
 
-        temp_config = "/tmp/%s" % uuid.uuid4().hex
-        patches_dir = "/tmp/%s" % uuid.uuid4().hex
+        temp_config = utils.get_remote_tmp_path()
+        patches_dir = utils.get_remote_tmp_path()
 
         defer = control_plane.new_defer()
         collector = CollectorCallback(cluster)
@@ -958,7 +956,7 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
         stored_config = kubeadm_config.load(configmap, control_plane)
 
         generated_config = kubeadm_config.merge_with_inventory(configmap)\
-                (deepcopy(stored_config))
+                (utils.deepcopy_yaml(stored_config))
 
         if generated_config == stored_config:
             return None

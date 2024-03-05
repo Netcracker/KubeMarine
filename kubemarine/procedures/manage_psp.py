@@ -19,8 +19,6 @@ from typing import List
 
 from kubemarine import admission
 from kubemarine.core import flow
-from kubemarine.core.action import Action
-from kubemarine.core.resources import DynamicResources
 
 tasks = OrderedDict({
     "delete_custom": admission.delete_custom_task,
@@ -30,13 +28,9 @@ tasks = OrderedDict({
 })
 
 
-class PSPAction(Action):
+class PSPAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('manage psp', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('manage psp', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

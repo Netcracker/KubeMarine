@@ -22,7 +22,8 @@ from kubemarine.core import log, utils
 
 
 def new(_: log.EnhancedLogger, *,
-        recursive_compiler: Callable[[str], str] = None) -> jinja2.Environment:
+        recursive_compiler: Callable[[str], str] = None,
+        precompile_filters: Dict[str, Callable[[str], Any]] = None) -> jinja2.Environment:
     def _precompile(filter_: str, struct: str) -> str:
         if not isinstance(struct, str):
             raise ValueError(f"Filter {filter_!r} can be applied only on string")
@@ -32,7 +33,8 @@ def new(_: log.EnhancedLogger, *,
 
     env = jinja2.Environment()
 
-    precompile_filters: Dict[str, Callable[[str], Any]] = {}
+    if precompile_filters is None:
+        precompile_filters = {}
     precompile_filters['isipv4'] = lambda ip: utils.isipv(ip, [4])
     precompile_filters['minorversion'] = utils.minor_version
     precompile_filters['majorversion'] = utils.major_version
@@ -46,6 +48,7 @@ def new(_: log.EnhancedLogger, *,
 
     env.filters['toyaml'] = lambda data: yaml.dump(data, default_flow_style=False)
     env.tests['has_role'] = lambda node, role: role in node['roles']
+    env.tests['has_roles'] = lambda node, roles: bool(set(node['roles']) & set(roles))
 
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'

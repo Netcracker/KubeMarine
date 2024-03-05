@@ -14,7 +14,7 @@
 from typing import List
 
 from kubemarine import kubernetes
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
 
 
@@ -24,14 +24,13 @@ def k8s_certs_overview(control_planes: NodeGroup) -> None:
         control_plane.sudo("kubeadm certs check-expiration", hide=False)
 
 
-def renew_verify(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get('initial_procedure') != 'cert_renew' or "kubernetes" not in cluster.procedure_inventory:
-        return inventory
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
+def renew_verify(cluster: KubernetesCluster) -> None:
+    if "kubernetes" not in cluster.procedure_inventory:
+        return
 
     cert_list = cluster.procedure_inventory["kubernetes"].get("cert-list")
     verify_all_is_absent_or_single(cert_list)
-
-    return inventory
 
 
 def renew_apply(control_planes: NodeGroup) -> None:

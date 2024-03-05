@@ -14,14 +14,15 @@
 
 import unittest
 from copy import deepcopy
+from typing import Tuple
 
 from kubemarine import demo
 from kubemarine.core import errors, flow
 from kubemarine.procedures import migrate_cri
-from test.unit import utils
+from test.unit import utils as test_utils
 
 
-def generate_migrate_cri_environment() -> (dict, dict):
+def generate_migrate_cri_environment() -> Tuple[dict, dict]:
     inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
     inventory['services']['cri'] = {
         'containerRuntime': 'docker'
@@ -78,8 +79,7 @@ class MigrateCriPackagesEnrichment(unittest.TestCase):
         inventory, context = generate_migrate_cri_environment()
         migrate_cri = self.prepare_procedure_inventory()
         cluster = demo.new_cluster(deepcopy(inventory), procedure_inventory=deepcopy(migrate_cri), context=context)
-        final_inventory = utils.get_final_inventory(cluster, inventory)
-        self.assertEqual(migrate_cri['packages'], final_inventory['services']['packages'],
+        self.assertEqual(migrate_cri['packages'], cluster.formatted_inventory['services']['packages'],
                          "Final inventory is recreated incorrectly")
 
 
@@ -90,9 +90,9 @@ class MigrateCriThirdpartiesEnrichment(unittest.TestCase):
         self.migrate_cri['thirdparties'] = {}
 
     def _run(self) -> demo.FakeResources:
-        resources = demo.FakeResources(self.context, self.inventory,
-                                       procedure_inventory=self.migrate_cri,
-                                       nodes_context=demo.generate_nodes_context(self.inventory))
+        resources = test_utils.FakeResources(self.context, self.inventory,
+                                             procedure_inventory=self.migrate_cri,
+                                             nodes_context=demo.generate_nodes_context(self.inventory))
         flow.run_actions(resources, [migrate_cri.MigrateCRIAction()])
         return resources
 
@@ -100,20 +100,16 @@ class MigrateCriThirdpartiesEnrichment(unittest.TestCase):
         self.migrate_cri['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-new'
 
         resources = self._run()
-        cluster = resources.last_cluster
 
-        thirdparties_section = cluster.inventory['services']['thirdparties']
+        thirdparties_section = resources.working_inventory['services']['thirdparties']
         self.assertEqual('crictl-new', thirdparties_section['/usr/bin/crictl.tar.gz']['source'])
         self.assertEqual('/usr/bin/', thirdparties_section['/usr/bin/crictl.tar.gz'].get('unpack'))
 
-        utils.stub_associations_packages(cluster, {})
-        finalized_inventory = utils.make_finalized_inventory(cluster)
-
-        thirdparties_section = finalized_inventory['services']['thirdparties']
+        thirdparties_section = resources.finalized_inventory['services']['thirdparties']
         self.assertEqual('crictl-new', thirdparties_section['/usr/bin/crictl.tar.gz']['source'])
         self.assertEqual('/usr/bin/', thirdparties_section['/usr/bin/crictl.tar.gz'].get('unpack'))
 
-        thirdparties_section = resources.stored_inventory['services']['thirdparties']
+        thirdparties_section = resources.inventory()['services']['thirdparties']
         self.assertEqual('crictl-new', thirdparties_section['/usr/bin/crictl.tar.gz']['source'])
         self.assertIsNone(thirdparties_section['/usr/bin/crictl.tar.gz'].get('unpack'))
 
@@ -124,9 +120,9 @@ class MigrateCriRegistryEnrichment(unittest.TestCase):
         self.migrate_cri = demo.generate_procedure_inventory('migrate_cri')
 
     def _run(self) -> demo.FakeResources:
-        resources = demo.FakeResources(self.context, self.inventory,
-                                       procedure_inventory=self.migrate_cri,
-                                       nodes_context=demo.generate_nodes_context(self.inventory))
+        resources = test_utils.FakeResources(self.context, self.inventory,
+                                             procedure_inventory=self.migrate_cri,
+                                             nodes_context=demo.generate_nodes_context(self.inventory))
         flow.run_actions(resources, [migrate_cri.MigrateCRIAction()])
         return resources
 
@@ -137,13 +133,12 @@ class MigrateCriRegistryEnrichment(unittest.TestCase):
             'ssl': True
         }
         resources = self._run()
-        cluster = resources.last_cluster
 
-        containerd_config = cluster.inventory['services']['cri']['containerdConfig']
+        containerd_config = resources.working_inventory['services']['cri']['containerdConfig']
         path = 'plugins."io.containerd.grpc.v1.cri"'
         self.assertEqual(f'/etc/containerd/certs.d', containerd_config[f'{path}.registry'].get('config_path'))
 
-        containerd_reg_config = cluster.inventory['services']['cri']['containerdRegistriesConfig']
+        containerd_reg_config = resources.working_inventory['services']['cri']['containerdRegistriesConfig']
         registry_settings = containerd_reg_config.get('example.registry:8080')
         self.assertIsNotNone(registry_settings)
 
@@ -173,13 +168,12 @@ class MigrateCriRegistryEnrichment(unittest.TestCase):
             }
         }
         resources = self._run()
-        cluster = resources.last_cluster
 
-        containerd_config = cluster.inventory['services']['cri']['containerdConfig']
+        containerd_config = resources.working_inventory['services']['cri']['containerdConfig']
         path = 'plugins."io.containerd.grpc.v1.cri"'
         self.assertEqual(f'/etc/containerd/certs.d', containerd_config[f'{path}.registry'].get('config_path'))
 
-        containerd_reg_config = cluster.inventory['services']['cri']['containerdRegistriesConfig']
+        containerd_reg_config = resources.working_inventory['services']['cri']['containerdRegistriesConfig']
         registry_settings_1 = containerd_reg_config.get('example.registry-1:8080')
         self.assertIsNotNone(registry_settings_1)
 
@@ -195,6 +189,16 @@ class MigrateCriRegistryEnrichment(unittest.TestCase):
 
         self.assertIn('host."https://example.another-registry:8080"', registry_settings_2)
         self.assertEqual(['pull'], registry_settings_2['host."https://example.another-registry:8080"'].get('capabilities'))
+
+    def test_remove_docker_config(self):
+        self.inventory.setdefault('services', {}).setdefault('cri', {})['dockerConfig'] = {
+            'registry-mirrors': ['http://example.registry']
+        }
+        resources = self._run()
+
+        self.assertNotIn('dockerConfig', resources.working_inventory['services']['cri'])
+        self.assertNotIn('dockerConfig', resources.inventory()['services']['cri'])
+        self.assertNotIn('dockerConfig', resources.finalized_inventory['services']['cri'])
 
 
 if __name__ == '__main__':

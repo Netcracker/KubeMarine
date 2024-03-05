@@ -14,12 +14,16 @@
 
 import io
 import unittest
+from unittest import mock
 
 import yaml
 
-from kubemarine import demo
+from kubemarine import demo, plugins
+from kubemarine.core import flow
 from kubemarine.plugins.manifest import Manifest, Identity
+from kubemarine.procedures import add_node, remove_node
 from test.unit.plugins import _AbstractManifestEnrichmentTest
+from test.unit import utils as test_utils
 
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):
@@ -408,6 +412,156 @@ class APIServerManifestEnrichment(_AbstractManifestEnrichmentTest):
                 container = self.get_obj(manifest, "Deployment_calico-apiserver")['spec']['template']['spec']['containers'][0]
                 self.assertEqual({'requests': {'cpu': '100m'}},
                     container['resources'], "Unexpected calico-apiserver resources")
+
+
+class RedeployIfNeeded(unittest.TestCase):
+    def prepare_context(self, procedure: str):
+        task = 'deploy.plugins' if procedure == 'add_node' else 'update.plugins'
+        self.context = demo.create_silent_context(['fake_path.yaml', '--tasks', task], procedure=procedure)
+        self.action = add_node.AddNodeAction() if procedure == 'add_node' else remove_node.RemoveNodeAction()
+
+    def prepare_inventory(self, scheme: dict, procedure: str, changed_node_name: str):
+        self.inventory = demo.generate_inventory(**scheme)
+        self.inventory.setdefault('plugins', {})['calico'] = {
+            'install': True,
+            'typha': {}
+        }
+
+        changed_node_idx = next(i for i, node in enumerate(self.inventory['nodes'])
+                                if node['name'] == changed_node_name)
+        changed_node = (self.inventory['nodes'].pop(changed_node_idx) if procedure == 'add_node'
+                        else self.inventory['nodes'][changed_node_idx])
+        self.procedure_inventory = demo.generate_procedure_inventory(procedure)
+        self.procedure_inventory['nodes'] = [changed_node]
+
+    def _run_and_check(self, called: bool) -> demo.FakeResources:
+        nodes_context = demo.generate_nodes_context(
+            self.inventory, procedure_inventory=self.procedure_inventory, context=self.context)
+        resources = test_utils.FakeResources(self.context, self.inventory,
+                                             procedure_inventory=self.procedure_inventory, nodes_context=nodes_context)
+        with mock.patch.object(plugins, plugins.install_plugin.__name__) as run:
+            flow.run_actions(resources, [self.action])
+            actual_called = any(call_args[0][1] == 'calico' for call_args in run.call_args_list)
+            self.assertEqual(called, actual_called,
+                             f"Re-install of 'calico' was {'not' if called else 'unexpectedly'} run")
+
+        return resources
+
+    def test_add_fourth_kubernetes_node_redeploy_needed(self):
+        for role in ('master', 'worker'):
+            for typha_disabled_redefined in (False, True):
+                with self.subTest(f'Role: {role}, Typha disabled: {typha_disabled_redefined}'):
+                    scheme = {'balancer': ['balancer-1'],
+                              'master': ['master-1', 'master-2'],
+                              'worker': ['worker-1', 'worker-2']}
+                    add_node_name = 'master-2' if role == 'master' else 'worker-2'
+                    self.prepare_context('add_node')
+                    self.prepare_inventory(scheme, 'add_node', add_node_name)
+                    if typha_disabled_redefined:
+                        self.inventory['plugins']['calico']['typha']['enabled'] = False
+
+                    res = self._run_and_check(not typha_disabled_redefined)
+
+                    typha_enabled = res.working_inventory['plugins']['calico']['typha']['enabled']
+                    self.assertEqual(not typha_disabled_redefined, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+                    typha_enabled = res.finalized_inventory['plugins']['calico']['typha']['enabled']
+                    self.assertEqual(not typha_disabled_redefined, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+                    typha_enabled = res.inventory()['plugins']['calico']['typha'].get('enabled')
+                    expected_enabled = None if not typha_disabled_redefined else False
+                    self.assertEqual(expected_enabled, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+    def test_remove_fourth_kubernetes_node_redeploy_not_needed(self):
+        for role in ('master', 'worker'):
+            for typha_enabled_redefined in (False, True):
+                with self.subTest(f'Role: {role}, Typha enabled: {typha_enabled_redefined}'):
+                    scheme = {'balancer': ['balancer-1'],
+                              'master': ['master-1', 'master-2'],
+                              'worker': ['worker-1', 'worker-2']}
+                    remove_node_name = 'master-2' if role == 'master' else 'worker-2'
+                    self.prepare_context('remove_node')
+                    self.prepare_inventory(scheme, 'remove_node', remove_node_name)
+                    if typha_enabled_redefined:
+                        self.inventory['plugins']['calico']['typha']['enabled'] = True
+
+                    res = self._run_and_check(False)
+
+                    typha_enabled = res.working_inventory['plugins']['calico']['typha']['enabled']
+                    self.assertEqual(True, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+                    typha_enabled = res.finalized_inventory['plugins']['calico']['typha']['enabled']
+                    self.assertEqual(True, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+                    typha_enabled = res.inventory()['plugins']['calico']['typha'].get('enabled')
+                    self.assertEqual(True, typha_enabled,
+                                     "Typha is not enabled in enriched inventory")
+
+    def test_add_remove_balancer_redeploy_not_needed(self):
+        scheme = {'balancer': ['balancer-1', 'balancer-2'],
+                  'master': ['master-1', 'master-2'],
+                  'worker': ['worker-1']}
+        self.prepare_context('add_node')
+        self.prepare_inventory(scheme, 'add_node', 'balancer-2')
+
+        res = self._run_and_check(False)
+
+        self.inventory = res.inventory()
+        self.prepare_context('remove_node')
+
+        self._run_and_check(False)
+
+    def test_add_remove_50th_kubernetes_node_redeploy_needed(self):
+        for role in ('master', 'worker'):
+            for typha_replicas_redefined in (False, True):
+                with self.subTest(f'Role: {role}, Typha replicas redefined: {typha_replicas_redefined}'):
+                    scheme = {'balancer': 1, 'master': 25, 'worker': 25}
+                    add_node_name = 'master-25' if role == 'master' else 'worker-25'
+                    self.prepare_context('add_node')
+                    self.prepare_inventory(scheme, 'add_node', add_node_name)
+                    if typha_replicas_redefined:
+                        self.inventory['plugins']['calico']['typha']['replicas'] = 2
+
+                    res = self._run_and_check(not typha_replicas_redefined)
+
+                    self.inventory = res.inventory()
+                    self.prepare_context('remove_node')
+
+                    self._run_and_check(not typha_replicas_redefined)
+
+    def test_add_route_reflector_redeploy_needed(self):
+        for fullmesh in (False, True):
+            with self.subTest(f'fullmesh: {fullmesh}'):
+                self.prepare_context('add_node')
+                self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+                self.inventory['plugins']['calico']['fullmesh'] = fullmesh
+
+                self.procedure_inventory['nodes'][0].setdefault('labels', {})['route-reflector'] = True
+
+                self._run_and_check(not fullmesh)
+
+    def test_add_simple_node_fullmesh_disabled_redeploy_not_needed(self):
+        self.prepare_context('add_node')
+        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+        self.inventory['plugins']['calico']['fullmesh'] = False
+        self._run_and_check(False)
+
+    def test_add_route_reflector_custom_procedures_redeploy_not_needed(self):
+        self.prepare_context('add_node')
+        self.prepare_inventory(demo.MINIHA_KEEPALIVED, 'add_node', 'master-3')
+        self.inventory['plugins']['calico']['fullmesh'] = False
+        self.inventory['plugins']['calico']['installation'] = {'procedures': [
+            {'shell': 'whoami'}
+        ]}
+
+        self.procedure_inventory['nodes'][0].setdefault('labels', {})['route-reflector'] = True
+
+        self._run_and_check(False)
 
 
 if __name__ == '__main__':
