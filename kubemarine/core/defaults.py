@@ -515,7 +515,6 @@ def manage_primitive_values(cluster: KubernetesCluster) -> None:
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
           'SystemdCgroup'], utils.strtobool, False),
-        (['services', 'kubeadm_kube-proxy', 'conntrack', 'min'], utils.strtoint, True),
         (['services', 'modprobe', '*', '*'], str, True),
         # kernel parameters are actually not always represented as integers
         (['services', 'sysctl', '*'], utils.strtoint, True),
