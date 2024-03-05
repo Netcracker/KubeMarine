@@ -21,7 +21,6 @@ from typing import List, Dict, Iterator, Any, Optional
 
 import yaml
 from jinja2 import Template
-import ipaddress
 
 from kubemarine import system, admission, etcd, packages, jinja
 from kubemarine.core import utils, static, summary, log, errors
@@ -393,7 +392,7 @@ def local_admin_config(nodes: NodeGroup) -> Iterator[str]:
         with nodes.new_executor() as exe:
             for defer in exe.group.get_ordered_members_list():
                 internal_address = defer.get_config()['internal_address']
-                if type(ipaddress.ip_address(internal_address)) is ipaddress.IPv6Address:
+                if utils.isipv(internal_address, [6]):
                     internal_address = f"[{internal_address}]"
 
                 defer.sudo(
@@ -421,7 +420,7 @@ def fetch_admin_config(cluster: KubernetesCluster) -> str:
     # Replace cluster FQDN with ip
     public_cluster_ip = cluster.inventory.get('public_cluster_ip')
     if public_cluster_ip:
-        if type(ipaddress.ip_address(public_cluster_ip)) is ipaddress.IPv6Address:
+        if utils.isipv(public_cluster_ip, [6]):
             public_cluster_ip = f"[{public_cluster_ip}]"
         cluster_name = cluster.inventory['cluster_name']
         kubeconfig = kubeconfig.replace(cluster_name, public_cluster_ip)

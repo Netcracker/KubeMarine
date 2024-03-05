@@ -1278,11 +1278,11 @@ def ipip_connectivity(cluster: KubernetesCluster) -> None:
         if enc_type == "ipip":
             # Check if IPv6 addresses are used
             connect_to_ip = group.get_ordered_members_configs_list()[0]['internal_address']
-            if type(ipaddress.ip_address(connect_to_ip)) is not ipaddress.IPv4Address:
+            if utils.isipv(connect_to_ip, [6]):
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             ip = cluster.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-            if type(ipaddress.ip_address(ip)) is not ipaddress.IPv4Address:
+            if utils.isipv(ip, [6]):
                 skipped_msgs.append("IPv6 is not supported by IP in IP encapsulation")
                 raise TestWarn("Check cannot be completed", hint='\n'.join(skipped_msgs))
             failed_nodes = check_ipip_tunnel(group)

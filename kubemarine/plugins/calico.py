@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import ipaddress
 from textwrap import dedent
 from typing import Optional, List, Dict
 
@@ -201,7 +200,7 @@ class CalicoManifestProcessor(Processor):
         self.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
         string_part = source_yaml['data']['cni_network_config']
         ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        if utils.isipv(ip, [4]):
             val = self.inventory['plugins']['calico']['cni']['ipam']['ipv4']
         else:
             val = self.inventory['plugins']['calico']['cni']['ipam']['ipv6']
@@ -292,7 +291,7 @@ class CalicoManifestProcessor(Processor):
         key = "DaemonSet_calico-node"
         env_delete: List[str] = []
         ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        if utils.isipv(ip, [4]):
             env_delete.extend([
                 'CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD',
                 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'

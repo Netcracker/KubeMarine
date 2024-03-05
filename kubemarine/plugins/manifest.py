@@ -548,9 +548,9 @@ class Processor(ABC):
         env_update: Dict[str, dict] = {}
 
         def update_env(name: str, value: Union[str, dict]) -> None:
-            if type(value) is str:
+            if isinstance(value, str):
                 env_update[name] = {'value': value}
-            elif type(value) is dict:
+            elif isinstance(value, dict):
                 env_update[name] = {'valueFrom': value}
             self.log.verbose(f"The {key} has been patched in "
                              f"'spec.template.spec.containers.[{container_pos}].env.{name}' with '{value}'")
