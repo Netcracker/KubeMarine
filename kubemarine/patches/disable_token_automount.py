@@ -4,7 +4,7 @@ from typing import List
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
 from kubemarine.core.resources import DynamicResources
-# from kubemarine import plugins
+from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.plugins import install 
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
  
@@ -14,7 +14,7 @@ class TheAction(Action):
     
     def run(self, res: DynamicResources) -> None:
         cluster = res.cluster() 
-        def redeploy_oob_plugins( cluster, plugin_names: List[str]) -> None:
+        def redeploy_oob_plugins(cluster: KubernetesCluster, plugin_names: List[str]) -> None:
             plugins = cluster.inventory["plugins"]
             specific_plugins = {name: plugins[name] for name in plugin_names if name in plugins}
             install(cluster, specific_plugins)
