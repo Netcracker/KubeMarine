@@ -21,10 +21,6 @@ def make_config() -> dict:
     for version, compatibility_map in static.KUBERNETES_VERSIONS['compatibility_map'].items():
         kubernetes_version = kubernetes_versions.setdefault(version, {})
 
-        minor_version = utils.minor_version(version)
-        supported = static.KUBERNETES_VERSIONS['kubernetes_versions'][minor_version]
-        kubernetes_version['supported'] = bool(supported)
-
         plugins_ = plugins.oob_plugins
         thirdparties_ = ['crictl']
 
