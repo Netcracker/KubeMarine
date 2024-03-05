@@ -58,7 +58,7 @@ class CLIAction(Action):
 
 def main(cli_arguments: List[str] = None) -> None:
 
-    if not cli_arguments:
+    if cli_arguments is None:
         cli_arguments = sys.argv[1:]
 
     if '--' in cli_arguments:
