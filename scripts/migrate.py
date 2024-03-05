@@ -44,16 +44,21 @@ MigrationProcedure: dict = {
 
 
 def distant_migrate(MigrationProcedure:dict):
+
     MigrationProcedure = json.loads(MigrationProcedure)
     for version in MigrationProcedure:
         if MigrationProcedure[version]["patches"]:
+            procedure_yaml  = False
+            if MigrationProcedure[version].get("procedure") and MigrationProcedure[version]["procedure"]:
+                procedure_yaml  = True
             path = get_kubemarine_env(version, "bin")
-            print(version, path, get_patches_info(path))  #
-            if MigrationProcedure[version]["procedure"]:
+            print(version, path, get_patches_info(path), MigrationProcedure[version]["procedure"] if procedure_yaml else "" )  #
+            input()
+            if procedure_yaml:
                 with open("procedure.yaml", "w") as file:
                     file.write(MigrationProcedure[version]["procedure"])
 
-            process = subprocess.Popen([path, "migrate_kubemarine", "procedure.yaml"],stdout=subprocess.PIPE, text=True,)
+            process = subprocess.Popen([path, "migrate_kubemarine", "procedure.yaml" if procedure_yaml else ""],stdout=subprocess.PIPE, text=True,)
             for line in process.stdout:
                 print(line.strip())
             process.wait()
