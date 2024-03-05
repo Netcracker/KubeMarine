@@ -276,12 +276,15 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
         self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
                           "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
+        self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
         self.assertEqual('', finalized_inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
                          "Finalized services.sysctl should have blank net.netfilter.nf_conntrack_max")
+        self.assertIsNone(finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
 
         cluster = demo.new_cluster(finalized_inventory)
         self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
@@ -294,27 +297,25 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
         self.assertEqual(1000000, inventory['services']['kubeadm_kube-proxy']['conntrack'].get('min'))
 
-    def test_v1_29_kube_proxy_conntrack_override_blank(self):
+    def test_v1_29_kube_proxy_conntrack_overridden(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory['services']['sysctl'] = {
+            'net.netfilter.nf_conntrack_max': 1
+        }
         inventory['services']['kubeadm_kube-proxy'] = {
-            'conntrack': {'min': ''}
+            'conntrack': {'min': 2}
         }
 
         cluster = demo.new_cluster(inventory)
 
-        self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
-                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
+        self.assertEqual(1, cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                         "services.kubeadm_kube-proxy should always be overridden with net.netfilter.nf_conntrack_max")
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
-        self.assertEqual('', finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
-                         "Finalized services.kubeadm_kube-proxy should have blank conntrack.min")
-
-        cluster = demo.new_cluster(finalized_inventory)
-        self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
-                          "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
+        self.assertEqual(1, finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
+                         "Finalized services.kubeadm_kube-proxy should always be overridden with net.netfilter.nf_conntrack_max")
 
     def test_custom_jinja_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
