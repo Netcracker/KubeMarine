@@ -116,7 +116,7 @@ procedures = OrderedDict({
         'group': 'other'
     },
     'config': {
-        'description': "Print supported configurations of 3rd-parties with versions compatibility",
+        'description': "Print the supported k8s versions with the respective configurations of third-parties",
         'group': 'other'
     },
     'do': {
