@@ -571,7 +571,8 @@ services:
 
 Service account token authentication should not be used for users
 Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of service account tokens.
-Here we are suggesting using OAuth authorization using Keycloak in kubernetes cluster.
+Here is list of available tools which can be used for Identity and Access Management in kubernetes cluster.
 
-Please refer below guide for implemention this-
-[OAuth2 authorization in Kubernetes](/documentation/internal/OAuth.md)
+1. Dex https://github.com/dexidp/dexhttps://dexidp.io/docs/kubernetes/
+2. OpenUnison https://github.com/OpenUnison/openunison-k8s-idm-oidc https://openunison.github.io/ 
+3. Keycloak https://www.keycloak.org/ https://medium.com/elmo-software/kubernetes-authenticating-to-your-cluster-using-keycloak-eba81710f49b 
