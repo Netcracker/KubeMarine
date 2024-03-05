@@ -306,7 +306,7 @@ class Processor(ABC):
         key = f"Namespace_{namespace}"
         rbac = self.inventory['rbac']
         if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled':
-            from kubemarine import admission
+            from kubemarine import admission  # pylint: disable=cyclic-import
 
             profile = self.get_namespace_to_necessary_pss_profiles()[namespace]
             target_labels = admission.get_labels_to_ensure_profile(self.inventory, profile)

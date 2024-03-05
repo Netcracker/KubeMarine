@@ -21,7 +21,6 @@ import ruamel.yaml
 import yaml
 from jinja2 import Template
 
-from kubemarine import kubernetes
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
@@ -327,6 +326,8 @@ def reconfigure_plugin(cluster: KubernetesCluster) -> None:
 
 
 def restart_pods_task(cluster: KubernetesCluster) -> None:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     if cluster.context.get('initial_procedure') == 'manage_pss':
         # check if pods restart is enabled
         is_restart = cluster.procedure_inventory.get("restart-pods", False)
@@ -524,7 +525,7 @@ def manage_pss(cluster: KubernetesCluster) -> None:
 
     # Extra args of API may change, need to reconfigure the API server.
     # See enrich_inventory_pss()
-    control_planes.call(kubernetes.components.reconfigure_components,
+    control_planes.call(components.reconfigure_components,
                         components=['kube-apiserver'], force_restart=force_restart)
 
     if target_state == 'disabled':

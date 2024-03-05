@@ -273,7 +273,7 @@ GROUP_SELF = TypeVar('GROUP_SELF', bound='AbstractGroup[Union[RunnersGroupResult
 
 class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def __init__(self, ips: Iterable[Union[str, GROUP_SELF]], cluster: object):
-        from kubemarine.core.cluster import KubernetesCluster
+        from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
 
         self.cluster = cast(KubernetesCluster, cluster)
         self.nodes: Set[str] = set()

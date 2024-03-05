@@ -17,7 +17,7 @@ from typing import Optional, List, Dict
 import os
 import yaml
 
-from kubemarine import plugins, kubernetes
+from kubemarine import plugins
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
@@ -115,6 +115,8 @@ def is_apiserver_enabled(inventory: dict) -> bool:
 
 
 def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     logger = cluster.log
     if not is_apiserver_enabled(cluster.inventory):
         logger.debug("Calico API server is disabled. Skip renewing of the key and certificate.")

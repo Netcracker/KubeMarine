@@ -19,8 +19,7 @@ import sys
 import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from types import FunctionType
-from typing import Optional, List, Union, Sequence, Tuple, cast, Callable, Dict, Any
+from typing import Optional, List, Union, Sequence, Tuple, Dict, Any
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log, defaults
 
@@ -470,30 +469,6 @@ def parse_args(parser: argparse.ArgumentParser, arguments: list) -> argparse.Nam
     return args
 
 
-def schedule_cumulative_point(cluster: c.KubernetesCluster, point_method: Callable) -> None:
-    _check_within_flow(cluster)
-
-    func = cast(FunctionType, point_method)
-    point_fullname = func.__module__ + '.' + func.__qualname__
-
-    if cluster.context['execution_arguments'].get('disable_cumulative_points', False):
-        cluster.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
-        return
-
-    if point_fullname in cluster.context['execution_arguments']['exclude_cumulative_points_methods']:
-        cluster.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
-        return
-
-    scheduled_points = cluster.context.get('scheduled_cumulative_points', [])
-
-    if point_method not in scheduled_points:
-        scheduled_points.append(point_method)
-        cluster.context['scheduled_cumulative_points'] = scheduled_points
-        cluster.log.verbose('Method %s scheduled' % point_fullname)
-    else:
-        cluster.log.verbose('Method %s already scheduled' % point_fullname)
-
-
 def proceed_cumulative_point(cluster: c.KubernetesCluster, points_list: dict,
                              point_task_name: Union[str, object], force: bool = False) -> Dict[str, Any]:
     _check_within_flow(cluster)
@@ -530,14 +505,9 @@ def init_tasks_flow(cluster: c.KubernetesCluster) -> None:
 
 
 def add_task_to_proceeded_list(cluster: c.KubernetesCluster, task_path: str) -> None:
-    if not is_task_completed(cluster, task_path):
+    if not cluster.is_task_completed(task_path):
         cluster.context['proceeded_tasks'].append(task_path)
         utils.dump_file(cluster, "\n".join(cluster.context['proceeded_tasks'])+"\n", 'finished_tasks')
-
-
-def is_task_completed(cluster: c.KubernetesCluster, task_path: str) -> bool:
-    _check_within_flow(cluster)
-    return task_path in cluster.context['proceeded_tasks']
 
 
 def _check_within_flow(cluster: c.KubernetesCluster, check: bool = True) -> None:

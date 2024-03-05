@@ -93,7 +93,7 @@ def prepare_dump_directory(context: dict) -> None:
 
 
 def make_ansible_inventory(location: str, c: object) -> None:
-    from kubemarine.core.cluster import KubernetesCluster
+    from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
     cluster = cast(KubernetesCluster, c)
 
     inventory = cluster.inventory
@@ -209,7 +209,7 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
-            from kubemarine.core.cluster import KubernetesCluster
+            from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
             cluster = cast(KubernetesCluster, context)
             context = cluster.context
 
@@ -637,7 +637,7 @@ class ClusterStorage:
                             'cluster.yaml', 'cluster_initial.yaml', 'cluster_finalized.yaml']
 
     def __init__(self, cluster: object, context: dict):
-        from kubemarine.core.cluster import KubernetesCluster
+        from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
         self.cluster = cast(KubernetesCluster, cluster)
         self.context = context
         self.dir_path = "/etc/kubemarine/procedures/"

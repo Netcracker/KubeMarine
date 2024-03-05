@@ -23,7 +23,7 @@ from typing import Dict, Tuple, Optional, List
 from dateutil.parser import parse
 from ordered_set import OrderedSet
 
-from kubemarine import selinux, kubernetes, apparmor, sysctl, modprobe
+from kubemarine import selinux, apparmor, sysctl, modprobe
 from kubemarine.core import utils, static
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, GenericResult, Callback, RawExecutor
@@ -333,6 +333,8 @@ def reboot_nodes(cluster: KubernetesCluster) -> None:
 
 
 def reboot_group(group: NodeGroup, try_graceful: bool = None) -> RunnersGroupResult:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 

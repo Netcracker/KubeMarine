@@ -23,7 +23,7 @@ from kubemarine.core import log as klog
 
 
 def get_kme_dictionary() -> dict:
-    from kubemarine.core.group import GroupException
+    from kubemarine.core.group import GroupException  # pylint: disable=cyclic-import
     return {
         "KME0000": {
             "name": "Test exception"

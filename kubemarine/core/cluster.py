@@ -485,12 +485,35 @@ class KubernetesCluster(Environment):
         return common_group
 
     def schedule_cumulative_point(self, point_method: Callable) -> None:
-        from kubemarine.core import flow
-        flow.schedule_cumulative_point(self, point_method)
+        self._check_within_flow()
+
+        func = cast(FunctionType, point_method)
+        point_fullname = func.__module__ + '.' + func.__qualname__
+
+        if self.context['execution_arguments'].get('disable_cumulative_points', False):
+            self.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
+            return
+
+        if point_fullname in self.context['execution_arguments']['exclude_cumulative_points_methods']:
+            self.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
+            return
+
+        scheduled_points = self.context.get('scheduled_cumulative_points', [])
+
+        if point_method not in scheduled_points:
+            scheduled_points.append(point_method)
+            self.context['scheduled_cumulative_points'] = scheduled_points
+            self.log.verbose('Method %s scheduled' % point_fullname)
+        else:
+            self.log.verbose('Method %s already scheduled' % point_fullname)
 
     def is_task_completed(self, task_path: str) -> bool:
-        from kubemarine.core import flow
-        return flow.is_task_completed(self, task_path)
+        self._check_within_flow()
+        return task_path in self.context['proceeded_tasks']
+
+    def _check_within_flow(self, check: bool = True) -> None:
+        if check != ('proceeded_tasks' in self.context):
+            raise NotImplementedError(f"The method is called {'not ' if check else ''}within tasks flow execution")
 
     def check_nodes_accessibility(self, skip_check_iaas: bool = True) -> None:
         """Check nodes access statuses"""

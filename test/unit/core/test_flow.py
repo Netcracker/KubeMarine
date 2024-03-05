@@ -163,7 +163,7 @@ class FlowTest(unittest.TestCase):
     def test_schedule_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
-        flow.schedule_cumulative_point(cluster, test_func)
+        cluster.schedule_cumulative_point(test_func)
         points = cluster.context["scheduled_cumulative_points"]
         self.assertIn(test_func, points, "Test cumulative point was not added to cluster context")
 
@@ -182,7 +182,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['prepare.system.modprobe']
         }
         flow.init_tasks_flow(cluster)
-        flow.schedule_cumulative_point(cluster, test_func)
+        cluster.schedule_cumulative_point(test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
         self.assertEqual(1, cluster.context.get("test_info"),
@@ -245,7 +245,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
@@ -265,7 +265,7 @@ class FlowTest(unittest.TestCase):
             cumulative_func: [flow.END_OF_TASKS]
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, cumulative_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(cumulative_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),

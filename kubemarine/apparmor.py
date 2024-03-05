@@ -15,7 +15,6 @@
 import json
 from typing import Dict, List
 
-from kubemarine import system
 from kubemarine.core import log
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
@@ -116,6 +115,8 @@ def configure_apparmor(group: NodeGroup, expected_profiles: dict) -> RunnersGrou
 
 
 def setup_apparmor(group: NodeGroup) -> None:
+    from kubemarine import system  # pylint: disable=cyclic-import
+
     log = group.cluster.log
 
     if group.get_nodes_os() != 'debian':

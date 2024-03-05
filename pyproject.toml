@@ -116,6 +116,8 @@ fail-on = [
     "bad-builtin",
     # https://github.com/pyinstaller/pyinstaller/issues/1687
     "consider-using-sys-exit",
+    # Considered more error prone because we have __main__ startup dependent on the initial procedure.
+    "cyclic-import",
     # Since we use ruamel.yaml, using of `type() == ` checks is considered more error prone.
     "unidiomatic-typecheck",
     # Consider using kubemarine.core.utils.open_(external|internal).
