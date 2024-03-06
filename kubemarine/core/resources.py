@@ -484,6 +484,7 @@ class DynamicResources:
         return [
             kubemarine.packages.cache_package_versions,
             kubemarine.core.defaults.escape_jinja_characters_for_inventory,
+            kubemarine.core.defaults.finalize_primitive_values,
             kubemarine.controlplane.controlplane_finalize_inventory,
         ]
 
