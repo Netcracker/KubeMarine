@@ -528,15 +528,18 @@ plugins:
             method: apply_yaml
             arguments:
               plugin_name: calico
-        - expect:
+        - &plugins-calico-expect
+          expect:
             daemonsets:
               - calico-node
             deployments:
               - calico-kube-controllers
+              - '{% if plugins.calico.typha.enabled | is_true %}calico-typha{% endif %}'
             pods:
               - coredns
               - calico-kube-controllers
               - calico-node
+              - '{% if plugins.calico.typha.enabled | is_true %}calico-typha{% endif %}'
         - thirdparty: /usr/bin/calicoctl
         - template:
             source: templates/plugins/calicoctl.cfg.j2
@@ -551,15 +554,7 @@ plugins:
             source: templates/plugins/calico-rr.sh.j2
             destination: /tmp/calico_rr.sh
             apply_command: /bin/sh /tmp/calico_rr.sh
-        - expect:
-            daemonsets:
-              - calico-node
-            deployments:
-              - calico-kube-controllers
-            pods:
-              - coredns
-              - calico-kube-controllers
-              - calico-node
+        - *plugins-calico-expect
         - python:
             module: plugins/builtin.py
             method: apply_yaml
