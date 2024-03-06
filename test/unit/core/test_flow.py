@@ -279,7 +279,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster,  test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(num_tasks - 1, resources.cluster_if_initialized().context.get("test_info"),

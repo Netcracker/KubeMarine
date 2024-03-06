@@ -51,6 +51,8 @@ def make_config() -> dict:
 
 
 def print_config(cfg: dict, arguments: dict) -> None:
+    # pylint: disable=bad-builtin
+
     format_ = arguments['output']
     if format_ == 'yaml':
         print(yaml.safe_dump(cfg, sort_keys=False), end='')

@@ -201,7 +201,8 @@ class IngressNginxManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret)
 
         service_account_key = "ServiceAccount_ingress-nginx"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 
