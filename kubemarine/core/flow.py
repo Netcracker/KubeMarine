@@ -24,6 +24,9 @@ from typing import Optional, List, Union, Sequence, Tuple, cast, Callable, Dict,
 
 from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log, defaults
 
+ERROR_UNRECOGNIZED_CUMULATIVE_POINT_EXCLUDE = "Unrecognized cumulative point to exclude: {point}"
+ERROR_UNRECOGNIZED_TASKS_FILTER = "Unrecognized tasks filter: {tasks}"
+
 TASK_DESCRIPTION_TEMPLATE = """
 tasks list:
     %s
@@ -194,13 +197,14 @@ class TasksAction(action.Action):
 
         args: dict = resources.context['execution_arguments']
 
-        tasks_filter = self.tasks_filter if self.tasks_filter is not None \
-            else [] if not args.get('tasks') else args['tasks'].split(",")
-        excluded_tasks = [] if not args.get('exclude') else args['exclude'].split(",")
+        check_cumulative_points(args, self.cumulative_points)
+
+        joined_tasks_filter = ','.join(self.tasks_filter) if self.tasks_filter is not None else args.get('tasks')
+        excluded_tasks = args.get('exclude')
 
         logger = resources.logger()
         logger.debug("Excluded tasks:")
-        filtered_tasks, final_list = filter_flow(self.tasks, tasks_filter, excluded_tasks, logger)
+        filtered_tasks, final_list = filter_flow(self.tasks, joined_tasks_filter, excluded_tasks, logger)
         if filtered_tasks == self.tasks:
             logger.debug("\tNo excluded tasks")
 
@@ -234,11 +238,16 @@ def create_empty_context(args: dict, procedure: str) -> dict:
     }
 
 
-def get_task_list(tasks: dict, _task_path: str = '') -> List[str]:
+def get_task_list(tasks: dict, _task_path: str = '', leafs_only: bool = True) -> List[str]:
     result = []
     for task_name, task in tasks.items():
         __task_path = _task_path + "." + task_name if _task_path != '' else task_name
-        result.extend(get_task_list(task, __task_path) if not callable(task) else [__task_path])
+        if callable(task) or not leafs_only:
+            result.append(__task_path)
+
+        if not callable(task):
+            result.extend(get_task_list(task, __task_path, leafs_only))
+
     return result
 
 
@@ -250,22 +259,52 @@ def create_context(parser: argparse.ArgumentParser, cli_arguments: Optional[list
     parser.prog = procedure
     args = vars(parse_args(parser, args_list))
 
-    if args.get('exclude_cumulative_points_methods', '').strip() != '':
-        args['exclude_cumulative_points_methods'] = args['exclude_cumulative_points_methods'].strip().split(",")
-    else:
-        args['exclude_cumulative_points_methods'] = []
-
     context = create_empty_context(args=args, procedure=procedure)
     context["initial_cli_arguments"] = ' '.join(map(shlex.quote, args_list))
 
     return context
 
 
-def filter_flow(tasks: dict, tasks_filter: List[str], excluded_tasks: List[str],
+def split_strings_list(string_list: Optional[str]) -> List[str]:
+    if string_list is None:
+        string_list = ''
+
+    return [] if not string_list.strip() else \
+        list(filter(bool, map(str.strip, string_list.split(","))))
+
+
+def check_cumulative_points(args: dict, cumulative_points: dict) -> None:
+    exclude_points = args.get('exclude_cumulative_points_methods')
+    if not isinstance(exclude_points, list):
+        exclude_points = split_strings_list(exclude_points)
+
+    points_list = [point_method.__module__ + '.' + point_method.__qualname__ for point_method in cumulative_points]
+
+    for exclude_point in exclude_points:
+        if exclude_point not in points_list:
+            raise Exception(ERROR_UNRECOGNIZED_CUMULATIVE_POINT_EXCLUDE.format(point=exclude_point))
+
+    args['exclude_cumulative_points_methods'] = exclude_points
+
+
+def check_tasks_filter(tasks: dict, tasks_filter: List[str]) -> List[str]:
+    tasks_list = get_task_list(tasks, leafs_only=False)
+
+    for tasks_ in tasks_filter:
+        if tasks_ not in tasks_list:
+            raise Exception(ERROR_UNRECOGNIZED_TASKS_FILTER.format(tasks=tasks_))
+
+    return tasks_filter
+
+
+def filter_flow(tasks: dict, tasks_filter: Optional[str], excluded_tasks: Optional[str],
                 logger: log.EnhancedLogger = None) -> Tuple[dict, List[str]]:
     # Remove any whitespaces from filters, and split by '.'
-    tasks_path_filter = [tasks.split(".") for tasks in list(map(str.strip, tasks_filter))]
-    excluded_path_tasks = [tasks.split(".") for tasks in list(map(str.strip, excluded_tasks))]
+    tasks_path_filter = [tasks_.split(".") for tasks_ in check_tasks_filter(
+        tasks, split_strings_list(tasks_filter))]
+
+    excluded_path_tasks = [tasks_.split(".") for tasks_ in check_tasks_filter(
+        tasks, split_strings_list(excluded_tasks))]
 
     return _filter_flow_internal(tasks, tasks_path_filter, excluded_path_tasks, [], logger)
 
