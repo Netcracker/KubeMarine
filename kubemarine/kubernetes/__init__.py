@@ -491,7 +491,10 @@ def init_first_control_plane(group: NodeGroup) -> None:
     kubeconfig_filepath = fetch_admin_config(cluster)
     summary.schedule_report(cluster.context, summary.SummaryItem.KUBECONFIG, kubeconfig_filepath)
 
-    # Invoke method from admission module for applying default PSS or privileged PSP if they are enabled
+    # Remove default resolvConf from kubelet-config ConfigMap for debian OS family
+    first_control_plane.call(components.patch_kubelet_configmap)
+
+    # Invoke method from admission module for applying the privileged PSP if it is enabled
     first_control_plane.call(admission.apply_admission)
 
     # Preparing join_dict to init other nodes

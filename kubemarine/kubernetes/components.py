@@ -500,6 +500,26 @@ def create_kubeadm_patches_for_node(cluster: KubernetesCluster, node: NodeGroup)
     defer.flush()
 
 
+def patch_kubelet_configmap(control_plane: AbstractGroup[RunResult]) -> None:
+    """
+    Apply W/A until https://github.com/kubernetes/kubeadm/issues/3034 is resolved
+    for all the supported Kubernetes versions.
+
+    :param control_plane: control plane to operate on
+    """
+    # Make sure to check kubeadm_kubelet in the inventory.
+    cluster: KubernetesCluster = control_plane.cluster
+    kubeadm_config = KubeadmConfig(cluster)
+    if 'resolvConf' in kubeadm_config.maps['kubelet-config']:
+        return
+
+    configmap_name = _get_configmap_name(cluster, 'kubelet-config')
+    control_plane.sudo(
+        f'kubectl get cm -n kube-system {configmap_name} -o yaml '
+        '| grep -v "resolvConf:" '
+        '| sudo kubectl apply -f -')
+
+
 def _upload_config(cluster: KubernetesCluster, control_plane: AbstractGroup[RunResult],
                    kubeadm_config: KubeadmConfig, remote_path: str,
                    *, patches_dir: str = '/etc/kubernetes/patches') -> None:
@@ -558,6 +578,8 @@ def _configmap_init_phase_uploader(configmap: str, upload_config: str) -> Callab
     def upload(control_plane: DeferredGroup) -> None:
         init_phase = CONFIGMAPS_CONSTANTS[configmap]['init_phase']
         control_plane.run(f'sudo kubeadm init phase {init_phase} --config {upload_config}')
+        if configmap == 'kubelet-config':
+            patch_kubelet_configmap(control_plane)
 
     return upload
 
@@ -937,8 +959,11 @@ def compare_configmap(cluster: KubernetesCluster, configmap: str) -> Optional[st
 
         key = CONFIGMAPS_CONSTANTS[configmap]['key']
         generated_config = yaml.safe_load(cfg)['data'][key]
+        if 'resolvConf' not in kubeadm_config.maps[configmap]:
+            generated_config = _filter_kubelet_configmap_resolv_conf(generated_config)
 
         kubeadm_config.load(configmap, control_plane)
+        # Use loaded_maps that preserve original formatting
         stored_config = kubeadm_config.loaded_maps[configmap].obj["data"][key]
 
         if yaml.safe_load(generated_config) == yaml.safe_load(stored_config):
@@ -978,7 +1003,11 @@ def _detect_changes(logger: log.EnhancedLogger, old: str, new: str, fromfile: st
 
 
 def _filter_etcd_initial_cluster_args(content: str) -> str:
-    return '\n'.join(filter(lambda ln: '--initial-cluster' not in ln, content.splitlines()))
+    return '\n'.join(ln for ln in content.splitlines() if '--initial-cluster' not in ln)
+
+
+def _filter_kubelet_configmap_resolv_conf(content: str) -> str:
+    return '\n'.join(ln for ln in content.splitlines() if 'resolvConf:' not in ln)
 
 
 def _restart_containers(cluster: KubernetesCluster, node: NodeGroup, components: Sequence[str]) -> None:
