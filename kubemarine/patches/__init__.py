@@ -23,9 +23,11 @@ from typing import List
 
 from kubemarine.core.patch import Patch
 from kubemarine.patches.disable_token_automount import DisableTokenAutomount
+from kubemarine.patches.strong_ciphers_patch import UpdateApiServerCipherSuites
 
 patches: List[Patch] = [
-    DisableTokenAutomount(),  # Add the new patch to the list
+    DisableTokenAutomount(), 
+    UpdateApiServerCipherSuites(),# Add the new patch to the list
 ]
 """
 List of patches that is sorted according to the Patch.priority() before execution.
