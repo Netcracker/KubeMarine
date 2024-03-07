@@ -12,12 +12,81 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
-import types
+from typing import List, OrderedDict, Any
+
+from typing_extensions import Protocol, runtime_checkable
+
+NO_TASKS_PROCEDURES = ["do", "migrate_kubemarine", "config"]
 
 
-def import_procedure(name: str) -> types.ModuleType:
-    module_name = 'kubemarine.procedures.%s' % name
-    return __import__(module_name, fromlist=['object'])
+@runtime_checkable
+class Procedure(Protocol):
+    def create_context(self, cli_arguments: List[str] = None) -> dict: ...
+
+    def main(self, cli_arguments: List[str] = None) -> Any: ...
+
+
+@runtime_checkable
+class TasksProcedure(Procedure, Protocol):
+    @property
+    def tasks(self) -> OrderedDict[str, Any]: ...
+
+
+def import_procedure(name: str) -> Procedure:
+    if name in NO_TASKS_PROCEDURES:
+        return _import_no_tasks_procedure(name)
+
+    return _import_tasks_procedure(name)
+
+
+def _import_tasks_procedure(name: str) -> TasksProcedure:
+    procedure: TasksProcedure
+    if name == "add_node":
+        from kubemarine.procedures import add_node as procedure
+    elif name == "backup":
+        from kubemarine.procedures import backup as procedure
+    elif name == "cert_renew":
+        from kubemarine.procedures import cert_renew as procedure
+    elif name == "check_iaas":
+        from kubemarine.procedures import check_iaas as procedure
+    elif name == "check_paas":
+        from kubemarine.procedures import check_paas as procedure
+    elif name == "install":
+        from kubemarine.procedures import install as procedure
+    elif name == "manage_psp":
+        from kubemarine.procedures import manage_psp as procedure
+    elif name == "manage_pss":
+        from kubemarine.procedures import manage_pss as procedure
+    elif name == "migrate_cri":
+        from kubemarine.procedures import migrate_cri as procedure
+    elif name == "reboot":
+        from kubemarine.procedures import reboot as procedure
+    elif name == "reconfigure":
+        from kubemarine.procedures import reconfigure as procedure
+    elif name == "remove_node":
+        from kubemarine.procedures import remove_node as procedure
+    elif name == "restore":
+        from kubemarine.procedures import restore as procedure
+    elif name == "upgrade":
+        from kubemarine.procedures import upgrade as procedure
+    else:
+        raise NotImplementedError(f"Procedure {name!r} is not implemented yet")
+
+    return procedure
+
+
+def _import_no_tasks_procedure(name: str) -> Procedure:
+    procedure: Procedure
+    if name == "do":
+        from kubemarine.procedures import do as procedure
+    elif name == "migrate_kubemarine":
+        from kubemarine.procedures import migrate_kubemarine as procedure
+    elif name == "config":
+        from kubemarine.procedures import config as procedure
+    else:
+        raise NotImplementedError(f"Procedure {name!r} is not implemented yet")
+
+    return procedure
 
 
 def deimport_procedure(name: str) -> None:
