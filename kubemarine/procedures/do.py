@@ -48,7 +48,7 @@ class CLIAction(Action):
         no_stream: bool = self.do_args['no_stream']
         result = executors_group.sudo(" ".join(self.remote_args), hide=no_stream, warn=True)
         if no_stream:
-            print(result)
+            print(result)  # pylint: disable=bad-builtin
 
         if result.is_any_failed():
             sys.exit(1)
