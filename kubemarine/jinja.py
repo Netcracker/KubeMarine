@@ -52,8 +52,8 @@ def new(_: log.EnhancedLogger, *,
 
     # we need these filters because rendered cluster.yaml can contain variables like 
     # enable: 'true'
-    env.filters['is_true'] = lambda v: v is True or utils.strtobool(_precompile('is_true', v))
-    env.filters['is_false'] = lambda v: v is False or not utils.strtobool(_precompile('is_false', v))
+    env.filters['is_true'] = lambda v: v if isinstance(v, bool) else utils.strtobool(_precompile('is_true', v))
+    env.filters['is_false'] = lambda v: not v if isinstance(v, bool) else not utils.strtobool(_precompile('is_false', v))
     return env
 
 
