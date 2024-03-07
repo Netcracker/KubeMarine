@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import itertools
 import re
+import sys
 import threading
 import time
 from abc import ABC
@@ -219,7 +220,7 @@ class FakeKubernetesCluster(KubernetesCluster):
 class FakeResources(DynamicResources):
     def __init__(self, context: dict, inventory: dict = None, procedure_inventory: dict = None,
                  nodes_context: Dict[str, Any] = None,
-                 fake_shell: FakeShell = None, fake_fs: FakeFS = None, make_finalized_inventory: bool = False):
+                 fake_shell: FakeShell = None, fake_fs: FakeFS = None, make_finalized_inventory: Optional[bool] = False):
         super().__init__(context)
         self.inventory_filepath = None
         self.procedure_inventory_filepath = None
@@ -249,13 +250,15 @@ class FakeResources(DynamicResources):
     def _store_inventory(self, inventory: dict) -> None:
         pass
 
-    def dump_finalized_inventory(self, cluster: KubernetesCluster) -> None:
-        if self.make_finalized_inventory:
-            super().dump_finalized_inventory(cluster)
+    def _make_finalized_inventory(self, finalized_filename: str) -> bool:
+        if self.make_finalized_inventory is None:
+            return super()._make_finalized_inventory(finalized_filename)
 
-    def _store_finalized_inventory(self, finalized_inventory: dict) -> None:
+        return self.make_finalized_inventory
+
+    def _store_finalized_inventory(self, finalized_inventory: dict, finalized_filename: str) -> None:
         self.finalized_inventory = finalized_inventory
-        utils.dump_file(self, yaml.dump(finalized_inventory), "cluster_finalized.yaml")
+        utils.dump_file(self, yaml.dump(finalized_inventory), finalized_filename)
 
     def cluster(self, stage: EnrichmentStage = EnrichmentStage.PROCEDURE) -> FakeKubernetesCluster:
         return cast(FakeKubernetesCluster, super().cluster(stage))
@@ -347,13 +350,25 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
                 else:
                     raise found_result
 
+            hide = kwargs.get('hide', False)
+            if found_result.hide != hide:
+                raise Exception(f"Fake result has hide={found_result.hide} while hide={hide} was requested")
+
             if i > 0:
                 final_res.stdout += command_sep + '\n' + str(prev_exited) + '\n' + command_sep + '\n'
                 final_res.stderr += command_sep + '\n'
             i += 1
 
-            final_res.stdout += found_result.stdout
-            final_res.stderr += found_result.stderr
+            for stream_t in ('stdout', 'stderr'):
+                output = getattr(found_result, stream_t)
+                if output and not hide:
+                    stream = getattr(sys, stream_t)
+                    stream.write(output)
+                    stream.flush()
+
+                final_output = getattr(final_res, stream_t)
+                setattr(final_res, stream_t, final_output + output)
+
             final_res.exited = prev_exited = found_result.exited
 
             if timeout_exception is not None:
@@ -640,21 +655,22 @@ def create_hosts_exception_result(hosts: List[str], exception: Exception) -> Dic
     return {host: exception for host in hosts}
 
 
-def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout: str = '', stderr: str = '',
+def create_nodegroup_result(group_: AbstractGroup[RunResult], stdout: str = '', stderr: str = '', hide: bool = True,
                             code: int = 0, timeout: int = None) -> NodeGroupResult:
-    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, code, timeout)
+    hosts_to_result = create_hosts_result(group_.get_hosts(), stdout, stderr, hide, code, timeout)
     return create_nodegroup_result_by_hosts(group_.cluster, hosts_to_result)
 
 
-def create_hosts_result(hosts: List[str], stdout: str = '', stderr: str = '',
+def create_hosts_result(hosts: List[str], stdout: str = '', stderr: str = '', hide: bool = True,
                         code: int = 0, timeout: int = None) -> Dict[str, GenericResult]:
     # each host should have its own result instance.
-    return {host: create_result(stdout, stderr, code, timeout) for host in hosts}
+    return {host: create_result(stdout, stderr, hide, code, timeout) for host in hosts}
 
 
-def create_result(stdout: str = '', stderr: str = '', code: int = 0, timeout: int = None) -> GenericResult:
+def create_result(stdout: str = '', stderr: str = '', hide: bool = True,
+                  code: int = 0, timeout: int = None) -> GenericResult:
     # command and 'hide' option will be later replaced with actual
-    result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr)
+    result = RunnersResult(["fake command"], [code], stdout=stdout, stderr=stderr, hide=hide)
     if timeout is None:
         return result
 

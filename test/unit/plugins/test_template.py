@@ -107,7 +107,7 @@ class TestTemplate(unittest.TestCase):
                 }
 
                 for file in tc["apply_files"]:
-                    result = demo.create_nodegroup_result(cluster.nodes["master"])
+                    result = demo.create_nodegroup_result(cluster.nodes["master"], hide=False)
                     cluster.fake_shell.add(result, "sudo", [f"kubectl apply -f /etc/kubernetes/{file}"], usage_limit=1)
 
                 # If test case is valid just run the function
