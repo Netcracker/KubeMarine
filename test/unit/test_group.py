@@ -128,7 +128,7 @@ class TestGroupCall(unittest.TestCase):
 
     def test_represent_group_exception_with_hide_false(self):
         one_node = self.cluster.nodes["all"].get_first_member()
-        results = demo.create_hosts_result(one_node.get_hosts(), stderr='command failed', code=1)
+        results = demo.create_hosts_result(one_node.get_hosts(), stderr='command failed', hide=False, code=1)
         self.cluster.fake_shell.add(results, "run", ['some command'])
 
         exception = None
