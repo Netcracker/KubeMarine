@@ -10,6 +10,7 @@ import yaml
 # TODO
 # update /etc/kubemarine/procedures/latest_dump/version every migrate even when no patches
 # software upgrade patches --describe doesn't print exact 3rd party version, only patched k8s
+# to use kubemarine config feature to avoid migration to not supported k8s in migrated kubemarine
 
 KubemarineVersions: list = [
     "0.17.0",
@@ -74,7 +75,7 @@ def get_kubemarine_env(version, env):
         filename = f"kubemarine-{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-{platform.machine().lower()}"
         filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}")
 
-        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: #caching 
+        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: # Сaching 
             return filepath
 
         try:
@@ -122,7 +123,7 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
 
     # error handling
     if ( index_from is None or index_to is None ) or  index_from > index_to:
-        print(f"Not supported combination of versions {old_version}, {new_version}", file=sys.stderr)
+        print(f"Not supported combination of versions {old_version}, {new_version} or outdated version list {KubemarineVersions}", file=sys.stderr)
         return {}
 
     ## get the patch list and  migration procedure
