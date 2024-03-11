@@ -239,10 +239,12 @@ def check_packages_versions(cluster: KubernetesCluster, tc: TestCase, hosts_to_p
             if version.startswith(package_name):
                 good_results.append(version)
             else:
-                bad_results.append(f"{package} (Actual version: {version}, Expected package version: {package})")
+                bad_results.append(f"Actual version: {version} doesn't match expected package version: {package}")
+
+
     if bad_results:
         hint_message = f'Check the presence and correctness of the version of the following packages on the ' \
-                       f'system: {bad_results}'
+                       f'system: {bad_results}\n'
         if warn_on_bad_result:
             raise TestWarn("detected incorrect packages versions", hint=hint_message)
         raise TestFailure("detected incorrect packages versions", hint=hint_message)
