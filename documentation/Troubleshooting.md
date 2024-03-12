@@ -3,7 +3,7 @@ This section provides troubleshooting information for Kubemarine and Kubernetes 
 - [Kubemarine Errors](#kubemarine-errors)
   - [KME0001: Unexpected exception](#kme0001-unexpected-exception)
   - [KME0002: Remote group exception](#kme0002-remote-group-exception)
-  - [KME0003: Action took too long to complete and timed out](#kme0003-action-took-too-long-to-complete-and-timed-out)
+    - [Command did not complete within a number of seconds](#command-did-not-complete-within-a-number-of-seconds)
   - [KME0004: There are no workers defined in the cluster scheme](#kme0004-there-are-no-workers-defined-in-the-cluster-scheme)
   - [KME0005: {hostnames} are not sudoers](#kme0005-hostnames-are-not-sudoers)
 - [Troubleshooting Tools](#troubleshooting-tools)
@@ -114,23 +114,8 @@ KME0002: Remote group exception
 	
 	Exit code: 127
 	
-	Stdout:
-	
-	
-	
-	Stderr:
-	
+	=== stderr ===
 	bash: apt: command not found
-```
-
-Hierarchical error:
-
-```
-FAILURE!
-TASK FAILED xxx
-KME0002: Remote group exception
-10.101.10.1:
-	KME0003: Action took too long to complete and timed out
 ```
 
 An error indicating an unexpected runtime bash command exit on a remote cluster host. This error 
@@ -138,7 +123,7 @@ occurs when a command is terminated unexpectedly with a non-zero error code.
 
 The error prints the status of the command execution for each node in the group on which the bash command 
 was executed. The status can be a correct result (shell results), a result with an error 
-(shell error), as well as a hierarchical KME with its own code.
+(shell error), as well as a [timeout](#command-did-not-complete-within-a-number-of-seconds) error.
 
 To fix it, first try checking the nodes and the cluster with 
 [IAAS checker](Kubecheck.md#iaas-procedure) and [PAAS checker](Kubecheck.md#paas-procedure). If you 
@@ -152,14 +137,20 @@ If you still can't resolve this error yourself, start
 error with its stacktrace. We will try to help as soon as possible.
 
 
-## KME0003: Action took too long to complete and timed out
+### Command did not complete within a number of seconds
 
 ```
 FAILURE!
 TASK FAILED xxx
 KME0002: Remote group exception
 10.101.10.1:
-	KME0003: Action took too long to complete and timed out
+ 	Command did not complete within 2700 seconds!
+ 	
+ 	Command: 'echo "sleeping..." && sleep 3000'
+ 	
+ 	=== stdout ===
+ 	sleeping...
+	
 ```
 
 An error that occurs when a command did not have time to execute at the specified time.
