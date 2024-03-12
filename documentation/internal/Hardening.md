@@ -570,9 +570,18 @@ services:
 - 3.1.2
 
 Service account token authentication should not be used for users
+
 Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of service account tokens.
+
 Here is list of available tools which can be used for Identity and Access Management in kubernetes cluster.
 
-1. Dex https://github.com/dexidp/dexhttps://dexidp.io/docs/kubernetes/
-2. OpenUnison https://github.com/OpenUnison/openunison-k8s-idm-oidc https://openunison.github.io/ 
-3. Keycloak https://www.keycloak.org/ https://medium.com/elmo-software/kubernetes-authenticating-to-your-cluster-using-keycloak-eba81710f49b 
+1. Dex - A lightweight OIDC provider server that can be configured to work with various identity providers. More information about this tool can be found on https://github.com/dexidp/dex
+
+Documentation for configuring Dex with your k8s cluster can be found at https://dexidp.io/docs/kubernetes/
+2. OpenUnison  - An open-source OIDC provider, focusing on security and ease of use. More inforamtion about this tool can be found at https://github.com/OpenUnison/openunison-k8s-idm-oidc
+
+Official documentation for configuring OpenUnsion with your k8s cluster can be found at https://openunison.github.io/ 
+3. Keycloak - An open source identity and access management solution. More inforamtion about this tool can be found at https://www.keycloak.org/ 
+
+Documentation for configuring Keycloak with your k8s cluster can be found at https://medium.com/elmo-software/kubernetes-authenticating-to-your-cluster-using-keycloak-eba81710f49b 
+4. JWT Authenticator - Kubernetes itself offers a built-in "JWT Authenticator". This authenticator validates tokens issued by an OIDC provider based on the configured issuer and retrieves the public key for verification through OIDC discovery. More information about this tool can be found at https://kubernetes.io/docs/reference/access-authn-authz/authentication/ 
