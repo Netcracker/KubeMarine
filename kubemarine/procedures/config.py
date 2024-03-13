@@ -20,7 +20,7 @@ from typing import List
 import yaml
 
 from kubemarine import plugins
-from kubemarine.core import static, utils
+from kubemarine.core import static
 
 HELP_DESCRIPTION = """\
 Print the supported k8s versions with the respective configurations of third-parties.

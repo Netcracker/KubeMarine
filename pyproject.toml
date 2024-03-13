@@ -106,9 +106,10 @@ load-plugins = [
     "pylint.extensions.bad_builtin"
 ]
 
-# If pylint fails, check that the code is rated higher than `fail-under`,
-# and search for messages from `fail-on`.
-fail-under = 9.9
+# Without `fail-under`, pylint fails if at least one message is printed.
+# Still, do not remove `fail-on` section, because it has precedence over `disable`,
+# and thus prevents from accidental disabling.
+# Also, it contains inline recommendations about particular messages.
 fail-on = [
     # Messages with numerical IDs `E\d+` or `F\d+`.
     "E", "F",
@@ -128,8 +129,6 @@ fail-on = [
     "cell-var-from-loop",
     "implicit-str-concat",
     "undefined-loop-variable",
-    # List of other non-critical warnings that rarely appear
-    "useless-parent-delegation",
 ]
 
 [tool.pylint.format]
@@ -168,7 +167,6 @@ disable = [
     "fixme",
     "redefined-outer-name",
     "unnecessary-pass",
-    "unused-import",
 ]
 
 [tool.pylint.deprecated_builtins]

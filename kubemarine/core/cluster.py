@@ -20,7 +20,8 @@ from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, 
 from ordered_set import OrderedSet
 from typing_extensions import Protocol
 
-from kubemarine.core import log, utils, static
+from kubemarine.core import log  # pylint: disable=unused-import
+from kubemarine.core import utils, static
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.errors import KME0006
