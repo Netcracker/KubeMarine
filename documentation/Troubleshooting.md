@@ -1058,6 +1058,15 @@ $ nslookup kubernetes.default.svc.cluster.local
 
 **Solution**: Change the cloud provider configuration to allow the traffic on the IaaS layer. In OpenStack, the Security Groups manage the allowed traffic.
 
+## Pods do not start properly
+
+**Symptoms**: Pods do not start properly and `Audit` daemon has the following messages in log:
+`Error receiving audit netlink packet (No buffer space available)`
+
+**Root cause**: `Audit` daemon internal issue.
+
+**Solution**: Change `Audit` daemon configuation or disable it.
+
 # Troubleshooting Kubemarine
 
 This section provides troubleshooting information for Kubemarine-specific or installation-specific issues.
