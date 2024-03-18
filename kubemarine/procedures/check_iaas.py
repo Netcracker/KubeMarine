@@ -1372,6 +1372,36 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
                               f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
 
 
+def fs_mount_options(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc,\
+            suspend_firewalld(cluster):
+
+        warn_nodes: Set[str] = set()
+        # Only Kubernetes nodes should be checked
+        group = cluster.make_group_from_roles(['control-plane', 'worker']).get_sudo_nodes()
+        collector = CollectorCallback(group.cluster)
+        cluster.log.debug("The '/etc/fstab' file check")
+        with group.new_executor() as exe:
+            for node_exe in exe.group.get_ordered_members_list():
+                # Check if '/etc/fstab' has 'nosuid' option 
+                # That option affects securityContext application on containers
+                node_exe.sudo(f"grep 'nosuid' /etc/fstab | grep -v -e '^#'", warn=True, callback=collector)
+
+        # Check output and create result message
+        for host, item in collector.result.items():
+            node_name = cluster.get_node_name(host)
+            item_list: Set[str] = set()
+            if len(item.stdout) > 0:
+                warn_nodes.add(f"{node_name}")
+
+        if warn_nodes:
+            raise TestWarn(f"Some of the filesystems are mounted with options that might "
+                           f"affect container functionality. Please make sure that following "
+                           f"nodes do not use 'nosuid' option for filesystems where "
+                           f"'containerd' root is located",
+                           hint='\n'.join(warn_nodes))
+
+
 def make_reports(context: dict, testsuite: TestSuite) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
         testsuite.save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
@@ -1412,7 +1442,8 @@ tasks = OrderedDict({
             'balancers': lambda cluster: hardware_ram(cluster, 'balancer'),
             'control-planes': lambda cluster: hardware_ram(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_ram(cluster, 'worker')
-        }
+        },
+        'fs_mount_options': fs_mount_options
     },
     'system': {
         'distributive': system_distributive
