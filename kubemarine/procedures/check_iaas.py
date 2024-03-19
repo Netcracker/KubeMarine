@@ -1395,10 +1395,9 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
                 warn_nodes.add(f"{node_name}")
 
         if warn_nodes:
-            raise TestWarn(f"Some of the filesystems are mounted with options that might "
-                           f"affect container functionality. Please make sure that following "
-                           f"nodes do not use 'nosuid' option for filesystems where "
-                           f"'containerd' root is located",
+            raise TestWarn(f"The 'nosuid' mount option affect container functionality. "
+                           f"Please make sure that following nodes do not use that option "
+                           f"for filesystems where 'containerd' root is located",
                            hint='\n'.join(warn_nodes))
 
 
