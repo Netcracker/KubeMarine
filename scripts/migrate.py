@@ -8,7 +8,7 @@ import requests
 import yaml
 
 # TODO
-# update /etc/kubemarine/procedures/latest_dump/version every migrate even when no patches
+# update /etc/kubemarine/procedures/latest_dump/version every migrate even when no patches ?
 # software upgrade patches --describe doesn't print exact 3rd party version, only patched k8s
 # to use kubemarine config feature to avoid migration to not supported k8s in migrated kubemarine
 
@@ -28,6 +28,7 @@ KubemarineVersions: list = [
     "v0.25.1",
     "v0.26.0",
     "v0.27.0",
+    "v0.28.0"
 ]  # TODO to  get from github/gitlab/git/custom/file?
 
 Envs: list = ["src", "pip", "bin", "docker", "brew"]
@@ -46,24 +47,26 @@ MigrationProcedure: dict = {
 
 def distant_migrate(MigrationProcedure:dict):
 
-    MigrationProcedure = json.loads(MigrationProcedure)
     for version in MigrationProcedure:
         if MigrationProcedure[version]["patches"]:
-            procedure_yaml  = False
-            if MigrationProcedure[version].get("procedure") and MigrationProcedure[version]["procedure"]:
-                procedure_yaml  = True
-            path = get_kubemarine_env(version, "bin")
-            print(version, path, get_patches_info(path), MigrationProcedure[version]["procedure"] if procedure_yaml else "" )  #
-            input()
-            if procedure_yaml:
-                with open("procedure.yaml", "w") as file:
-                    file.write(MigrationProcedure[version]["procedure"])
+                procedure_yaml  = False
+                if MigrationProcedure[version].get("procedure") and MigrationProcedure[version]["procedure"]:
+                    procedure_yaml  = True
 
-            process = subprocess.Popen([path, "migrate_kubemarine", "procedure.yaml" if procedure_yaml else ""],stdout=subprocess.PIPE, text=True,)
-            for line in process.stdout:
-                print(line.strip())
-            process.wait()
-            os.remove("procedure.yaml") if os.path.exists("procedure.yaml") else None
+                if not MigrationProcedure[version].get("env") or MigrationProcedure[version]["env"] in "bin": #TODO default is bin only
+                    path = get_kubemarine_env(version, "bin")
+                    print(version, path, get_patches_info(path), MigrationProcedure[version]["procedure"] if procedure_yaml else "" )  #
+                    input()
+                    if procedure_yaml:
+                        with open("procedure.yaml", "w") as file:
+                            file.write(MigrationProcedure[version]["procedure"])
+
+                    process = subprocess.Popen([path, "migrate_kubemarine", "procedure.yaml" if procedure_yaml else ""],stdout=subprocess.PIPE, text=True,)
+                    for line in process.stdout:
+                        print(line.strip())
+                    exit_status = process.wait()
+                    os.remove("procedure.yaml") if os.path.exists("procedure.yaml") else None
+                    return exit_status
         else:
             print(f"No patches. Skipping migration for {version}")
 
@@ -73,9 +76,9 @@ def get_kubemarine_env(version, env):
     if env in "bin":
 
         filename = f"kubemarine-{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-{platform.machine().lower()}"
-        filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}")
+        filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}") #TODO caching 
 
-        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: # Сaching 
+        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: # Сaching TODO to rework to use existing downloaded versions
             return filepath
 
         try:
@@ -104,7 +107,7 @@ def get_patches_info(filepath):
                                           ).stdout.splitlines()
             if "No patches available." in patches_list:
                 patches_list = []
-            else:
+            elif "Available patches list:" in patches_list:
                 patches_list.remove("Available patches list:")
 
             for patch in patches_list:
@@ -113,6 +116,7 @@ def get_patches_info(filepath):
                 patches_info["patches"].append({patch.strip(): description})
     except Exception as e:
         print(f"Error: {e}")
+        return {}
 
     return patches_info
 
@@ -135,4 +139,14 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
 
 if __name__ == "__main__":
     # function name, parameters ...
-    print(json.dumps(globals()[sys.argv[1]](*sys.argv[2:])))
+    
+    if 'json' in sys.argv[1]:
+        if sys.argv[2] in 'distant_migrate':
+            sys.argv[3] = json.load(open(sys.argv[3],'r'))
+        print(json.dumps(globals()[sys.argv[2]](*sys.argv[3:])))
+    elif 'yaml' in sys.argv[1]:
+        if sys.argv[2] in 'distant_migrate':
+            sys.argv[3] = yaml.safe_load(open(sys.argv[3],"r"))
+        print(yaml.dump(globals()[sys.argv[2]](*sys.argv[3:])))
+    else:
+        print(f"Error: incorrect {sys.argv[1]}", file=sys.stderr)

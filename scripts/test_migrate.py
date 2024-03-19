@@ -11,4 +11,17 @@ def test_list_version():
     assert not list_versions(1,"")
     assert not list_versions(1,2)
     assert not list_versions("1","2")
+
+def test_get_patches_info():
+    assert get_patches_info("/tmp/kubemarine-linux-x86_64-v0.28.0").get("patches") # some patches
+    assert not get_patches_info("/tmp/kubemarine-linux-x86_64-v0.27.0").get("patches") # no patches
+    assert not get_patches_info("no file") 
+    assert not get_patches_info("/bin/ls").get("patches")
+    
+
+def test_get_kubemarine_env():
+    assert get_kubemarine_env("v0.28.0","bin")
+    assert not get_kubemarine_env("none","bin")
+    assert not get_kubemarine_env("v0.28.0","None")
+
     
