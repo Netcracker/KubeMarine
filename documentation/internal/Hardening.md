@@ -18,11 +18,11 @@
   - [Disable Auto-Mounting](#disable-auto-mounting)
   - [Create Secret](#create-secret)
   - [Mount the Token Through Secrets](#mount-the-token-through-secrets)
-- [Use strong cryptographic ciphers for API server](#use-strong-cryptographic-ciphers-for-api-server)
-  - [Strong Cyrptographic Ciphers suggested by CIS](#strong-cyrptographic-ciphers-suggested-by-cis)
-  - [Manual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster](#manual-application-for-strong-cyrptographic-ciphers-for-api-server-on-pr-installed-cluster)
-  - [Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation](#automated-application-for-strong-cyrptographic-ciphers-for-api-server-during-new-cluster-installation)
-- [Implementing OAuth2 authorization in Kubernetes](#implementing-oauth2-authorization-in-kubernetes)
+- [Use Strong Cryptographic Ciphers for API Server](#use-strong-cryptographic-ciphers-for-api-server)
+  - [Strong Cryptographic Ciphers Suggested by CIS](#strong-cryptographic-ciphers-suggested-by-cis)
+  - [Manual Application for Strong Cryptographic Ciphers for API Server on Pre-installed Cluster](#manual-application-for-strong-cryptographic-ciphers-for-api-server-on-pre-installed-cluster)
+  - [Automated Application for Strong Cryptographic Ciphers for API Server During New Cluster Installation](#automated-application-for-strong-cryptographic-ciphers-for-api-server-during-new-cluster-installation)
+- [Implementing OAuth2 Authorization in Kubernetes](#implementing-oauth2-authorization-in-kubernetes)
 
 <!-- /TOC -->
 
@@ -507,13 +507,13 @@ volumes:
 
 After this, restart the pod to reflect the changes and verify that the secret is mounted to the pod at the specified mount point.
 
-## Use strong cryptographic ciphers for API server
+## Use Strong Cryptographic Ciphers for API Server
 
 **Kube-bench Identifier**:
 
 - 1.2.31
 
-### Strong Cyrptographic Ciphers suggested by CIS
+### Strong Cryptographic Ciphers Suggested by CIS
 
 - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
 - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
@@ -522,7 +522,7 @@ After this, restart the pod to reflect the changes and verify that the secret is
 - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
 - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
 
-### Manual Application for Strong Cyrptographic Ciphers for API server on pr-installed cluster
+### Manual Application for Strong Cryptographic Ciphers for API Server on Pre-installed Cluster
 
 Edit the API server pod specification file `/etc/kubernetes/manifests/kube-apiserver.yaml` on the control all plane nodes and add below parameter to the API server arguments
 
@@ -543,12 +543,12 @@ Also make sure to update `kubeadm-config` configmap in kube-system namespace to 
 
 `kubectl edit cm kubeadm-config -n kube-system`
 
-### Automated Application for Strong Cyrptographic Ciphers for API server during new cluster installation
+### Automated Application for Strong Cryptographic Ciphers for API Server During New Cluster Installation
 
-For applying Strong Cyrptographic Ciphers for API server at the time of installation of cluster itself, then it can be done thourgh kubemarine.
-To do so follow below procdure
+For applying Strong Cryptographic Ciphers for API server at the time of installation of cluster itself, then it can be done through Kubemarine.
+To do so, follow the below procedure:
 
-- Add cryptographic chipers suites to the kubeadm config as extra arguments for API server in `cluster.yaml` file
+- Add cryptographic ciphers suites to the kubeadm config as extra arguments for API server in `cluster.yaml` file
 
 ```yaml
 services:
@@ -561,21 +561,21 @@ services:
     ...
 ```
 
-- Run kubemarine install procedure using above config added to `cluster.yaml` file
+- Run Kubemarine install procedure using above config added to `cluster.yaml` file
 
-## Implementing OAuth2 authorization in Kubernetes
+## Implementing OAuth2 Authorization in Kubernetes
 
 **Kube-bench Identifier**:
 
 - 3.1.2
 
-Service account token authentication should not be used for users
+Service account token authentication should not be used for users.
 
 Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of service account tokens.
 
-Here is list of available tools which can be used for Identity and Access Management in kubernetes cluster.
+Here is a list of available tools that can be used for Identity and Access Management in Kubernetes cluster.
 
-1. **Dex** - A lightweight OIDC provider server that can be configured to work with various identity providers. More information about this tool can be found on https://github.com/dexidp/dex. Documentation for configuring Dex with your k8s cluster can be found at https://dexidp.io/docs/kubernetes/
-2. **OpenUnison**  - An open-source OIDC provider, focusing on security and ease of use. More inforamtion about this tool can be found at https://github.com/OpenUnison/openunison-k8s-idm-oidc. Documentation for configuring OpenUnsion with your k8s cluster can be found at https://openunison.github.io/ 
-3. **Keycloak** - An open source identity and access management solution. More inforamtion about this tool can be found at https://www.keycloak.org. Documentation for configuring Keycloak with your k8s cluster can be found at https://medium.com/elmo-software/kubernetes-authenticating-to-your-cluster-using-keycloak-eba81710f49b 
-4. **JWT Authenticator** - Kubernetes itself offers a built-in "JWT Authenticator". This authenticator validates tokens issued by an OIDC provider based on the configured issuer and retrieves the public key for verification through OIDC discovery. More information about this tool can be found at https://kubernetes.io/docs/reference/access-authn-authz/authentication/ 
+1. **Dex** - A lightweight OIDC provider server that can be configured to work with various identity providers. More information about this tool can be found on https://github.com/dexidp/dex. The documentation for configuring Dex with your k8s cluster can be found at https://dexidp.io/docs/kubernetes/.
+2. **OpenUnison** - An open-source OIDC provider, focusing on security and ease of use. More information about this tool can be found at https://github.com/OpenUnison/openunison-k8s-idm-oidc. The documentation for configuring OpenUnison with your k8s cluster can be found at https://openunison.github.io/. 
+3. **Keycloak** - An open source identity and access management solution. More information about this tool can be found at https://www.keycloak.org. The documentation for configuring Keycloak with your k8s cluster can be found at https://medium.com/elmo-software/kubernetes-authenticating-to-your-cluster-using-keycloak-eba81710f49b. 
+4. **JWT Authenticator** - Kubernetes itself offers a built-in "JWT Authenticator". This authenticator validates tokens issued by an OIDC provider based on the configured issuer and retrieves the public key for verification through OIDC discovery. More information about this tool can be found at https://kubernetes.io/docs/reference/access-authn-authz/authentication/. 
