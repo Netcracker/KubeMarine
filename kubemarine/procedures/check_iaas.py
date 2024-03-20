@@ -1376,29 +1376,49 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc,\
             suspend_firewalld(cluster):
 
-        warn_nodes: Set[str] = set()
+        failed_nodes: Set[str] = set()
         # Only Kubernetes nodes should be checked
         group = cluster.make_group_from_roles(['control-plane', 'worker']).get_sudo_nodes()
         collector = CollectorCallback(group.cluster)
-        cluster.log.debug("The '/etc/fstab' file check")
+        # Get CRI root
+        if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
+            # Containerd root
+            if cluster.inventory['services']['cri']['containerdConfig'].get('root', ""):
+                cri_root = cluster.inventory['services']['cri']['containerdConfig']['root']
+            else:
+                cri_root = "/var/lib/containerd"
+        # Get rid of that part after KubeMarine stop supporting Kubernetes version lower v1.24
+        if cluster.inventory['services']['cri']['containerRuntime'] == "docker":
+            # Docker
+            if cluster.inventory['services']['cri']['dockerConfig'].get('data-root', ""):
+                cri_root = cluster.inventory['services']['cri']['dockerConfig']['data-root']
+            else:
+                cri_root = "/var/lib/docker"
+        cluster.log.debug("Mount options check")
+        # Check the mount options for filesystem where containerd root is located.
+        # If containerd root doesn't exist the script check the parent directory and so forth.
+        # At the end of the script 'findmnt' return the filesytem mount point, device,
+        # and mount options for nearest parent directory of containerd root.
+        # 'findmnt' perform the recursive search of mount point for filesystem
+        # from the given path to the root, that's exactly what we need.
+        cmd = f"CRI_PATH={cri_root}; while [ ! -d \"${{CRI_PATH}}\" ]; do CRI_PATH=$(dirname \"${{CRI_PATH}}\"); " \
+              f"done; findmnt -T \"${{CRI_PATH}}\" | grep 'nosuid'"
         with group.new_executor() as exe:
             for node_exe in exe.group.get_ordered_members_list():
-                # Check if '/etc/fstab' has 'nosuid' option 
-                # That option affects securityContext application on containers
-                node_exe.sudo(f"grep 'nosuid' /etc/fstab | grep -v -e '^#'", warn=True, callback=collector)
+                node_exe.run(f"{cmd}", warn=True, callback=collector)
 
         # Check output and create result message
         for host, item in collector.result.items():
             node_name = cluster.get_node_name(host)
             item_list: Set[str] = set()
             if len(item.stdout) > 0:
-                warn_nodes.add(f"{node_name}")
+                failed_nodes.add(f"{node_name}")
 
-        if warn_nodes:
-            raise TestWarn(f"The 'nosuid' mount option affect container functionality. "
-                           f"Please make sure that following nodes do not use that option "
-                           f"for filesystems where 'containerd' root is located",
-                           hint='\n'.join(warn_nodes))
+        if failed_nodes:
+            raise TestFailure(f"The 'nosuid' mount option affects container functionality. "
+                              f"Please change mount options for filesystem where 'containerd' "
+                              f"root is located on the following nodes.",
+                              hint='\n'.join(failed_nodes))
 
 
 def make_reports(context: dict, testsuite: TestSuite) -> None:
