@@ -1389,7 +1389,7 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
                 cri_root = "/var/lib/containerd"
         # Get rid of that part after KubeMarine stop supporting Kubernetes version lower v1.24
         if cluster.inventory['services']['cri']['containerRuntime'] == "docker":
-            # Docker
+            # Docker root
             if cluster.inventory['services']['cri']['dockerConfig'].get('data-root', ""):
                 cri_root = cluster.inventory['services']['cri']['dockerConfig']['data-root']
             else:
@@ -1462,10 +1462,10 @@ tasks = OrderedDict({
             'control-planes': lambda cluster: hardware_ram(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_ram(cluster, 'worker')
         },
-        'fs_mount_options': fs_mount_options
     },
     'system': {
-        'distributive': system_distributive
+        'distributive': system_distributive,
+        'fs_mount_options': fs_mount_options
     },
     'software': {
         'kernel': {

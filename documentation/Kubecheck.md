@@ -22,6 +22,7 @@ This section provides information about the Kubecheck functionality.
       - [007 RAM Amount - Control-planes](#007-ram-amount---control-planes)
       - [007 RAM Amount - Workers](#007-ram-amount---workers)
     - [008 Distributive](#008-distributive)
+    - [018 FS mount options](#018-fs-mount-options)
     - Network
       - [009 PodSubnet](#009-podsubnet)
       - [010 ServiceSubnet](#010-servicesubnet)
@@ -296,11 +297,18 @@ This test checks the amount of RAM on nodes with the `control-plane` role.
 
 This test checks the amount of RAM on nodes with the `worker` role.
 
+
 ##### 008 Distributive
 
 *Task*: `system.distributive`
 
 This test checks the family and release version of the operating system on the hosts.
+
+##### 018 FS mount options
+
+*Task*: `system.fs_mount_options`
+
+This test checks the presence of filesystem mount option that affects contatiner functionality
 
 ##### 009 PodSubnet
 
