@@ -1060,12 +1060,12 @@ $ nslookup kubernetes.default.svc.cluster.local
 
 ## Pods do not start properly
 
-**Symptoms**: Pods do not start properly and `Audit` daemon has the following messages in log:
+**Symptoms**: Pods do not start properly and `Audit` daemon has the following messages in the log:
 `Error receiving audit netlink packet (No buffer space available)`
 
 **Root cause**: `Audit` daemon internal issue.
 
-**Solution**: Change `Audit` daemon configuation or disable it.
+**Solution**: Change the `Audit` daemon configuration or disable it.
 
 # Troubleshooting Kubemarine
 
