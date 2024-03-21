@@ -27,7 +27,7 @@ This section describes the features and steps for performing maintenance procedu
       - [Images Prepull](#images-prepull)
 - [Additional Procedures](#additional-procedures)
     - [Changing Calico Settings](#changing-calico-settings)
-    - [Data Encryption in Kubernetes](#data-encryption-in-kubernetes)
+    - [Data Encryption in Kubernetes](internal/Hardening.md#data-encryption-in-kubernetes)
     - [Changing Cluster CIDR](#changing-cluster-cidr)
     - [Kubelet Server Certificate Approval](#kubelet-server-certificate-approval)
 - [Common Practice](#common-practice)
