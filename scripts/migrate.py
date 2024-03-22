@@ -89,13 +89,13 @@ def get_kubemarine_env(version, env:Filepath):
             print(f"Error: {e}", file=sys.stderr)
             return None
     elif env.type == "git":
-        process = subprocess.Popen(['git', "checkout", version],stdout=subprocess.PIPE, text=True,)
-        for line in process.stdout:
-            print(line.strip())
         
-        if process.wait():
-            env.path = "kubemarine"
-        
+        process = subprocess.run(['git', "checkout", version],stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      
+        if process.returncode == os.EX_OK:
+            env.path = "bin/kubemarine"
+            return env
+                
     return None
 
 
@@ -105,7 +105,7 @@ def get_patches_info(env:Filepath):
     try:
         if env and env.path:
             # Assuming subprocess.run returns the patches list
-            patches_list = subprocess.run([env.path, "migrate_kubemarine", "--list"],capture_output=True, text=True,
+            patches_list = subprocess.run([env.path, "migrate_kubemarine", "--list"],capture_output=True, text=True
                                           ).stdout.splitlines()
             if "No patches available." in patches_list:
                 patches_list = []
@@ -113,7 +113,7 @@ def get_patches_info(env:Filepath):
                 patches_list.remove("Available patches list:")
 
             for patch in patches_list:
-                description = subprocess.run([env.path, "migrate_kubemarine", "--describe", patch],capture_output=True, text=True,
+                description = subprocess.run([env.path, "migrate_kubemarine", "--describe", patch],capture_output=True, text=True
                                              ).stdout.strip()
                 patches_info["patches"].append({patch.strip(): description})
     except Exception as e:
