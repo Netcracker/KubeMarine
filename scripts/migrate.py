@@ -12,23 +12,10 @@ import yaml
 # software upgrade patches --describe doesn't print exact 3rd party version, only patched k8s
 # to use kubemarine config feature to avoid migration to not supported k8s in migrated kubemarine
 
-KubemarineVersions: list = [
-    "0.17.0",
-    "0.18.0",
-    "0.18.1",
-    "0.18.2",
-    "0.19.0",
-    "0.20.0",
-    "0.21.0",
-    "0.21.1",
-    "0.22.0",
-    "v0.23.0",
-    "v0.24.1",
-    "v0.25.0",
-    "v0.25.1",
-    "v0.26.0",
-    "v0.27.0",
-    "v0.28.0"
+KubemarineVersions: list = [ "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.7.1", "0.8.0", "0.9.0", "0.10.0", "0.11.0",
+                            "0.11.1", "0.12.0", "0.12.1", "0.13.0", "0.13.1", "0.14.0", "0.15.0", "0.15.1", "0.16.0", "0.17.0",
+                            "0.18.0", "0.18.1", "0.18.2", "0.19.0", "0.20.0", "0.21.0", "0.21.1", "0.22.0", "v0.23.0",
+                            "v0.24.1", "v0.25.0", "v0.25.1", "v0.26.0", "v0.27.0", "v0.28.0"
 ]  # TODO to  get from github/gitlab/git/custom/file?
 
 Envs: list = ["src", "pip", "bin", "docker", "brew"]
