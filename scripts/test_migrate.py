@@ -13,21 +13,24 @@ def test_list_version():
     assert not list_versions("1","2")
 
 def test_get_patches_info():
-    get_kubemarine_env("v0.28.0","bin")
-    get_kubemarine_env("v0.27.0","bin")
-assert (get_patches_info(
-    f"{tempfile.gettempdir()}/kubemarine-"
-    f"{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-"
-    f"{platform.machine().lower()}-v0.28.0").get("patches")) #some patches
-assert not get_patches_info(
-    f"{tempfile.gettempdir()}/kubemarine-"
-    f"{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-"
-    f"{platform.machine().lower()}-v0.27.0").get("patches") # no patches
-assert not get_patches_info("no file") 
-assert not get_patches_info("/bin/ls").get("patches")
+    get_kubemarine_env("v0.28.0",Filepath("bin"))
+    get_kubemarine_env("v0.27.0",Filepath("bin"))
+    
+    assert (get_patches_info(Filepath("bin",
+        f"{tempfile.gettempdir()}/kubemarine-"
+        f"{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-"
+        f"{platform.machine().lower()}-v0.28.0")).get("patches")) #some patches
+    
+    assert not get_patches_info(Filepath("bin",
+        f"{tempfile.gettempdir()}/kubemarine-"
+        f"{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-"
+        f"{platform.machine().lower()}-v0.27.0")).get("patches") # no patches
+
+    assert not get_patches_info(Filepath("bin","none")) 
+    assert not get_patches_info(Filepath("bin","/bin/ls")).get("patches")
     
 
 def test_get_kubemarine_env():
-    assert get_kubemarine_env("v0.28.0","bin")
-    assert not get_kubemarine_env("none","bin")
-    assert not get_kubemarine_env("v0.28.0","None")
+    assert get_kubemarine_env("v0.28.0",Filepath("bin"))
+    assert not get_kubemarine_env("none",Filepath("bin"))
+    assert not get_kubemarine_env("v0.28.0",Filepath("None"))

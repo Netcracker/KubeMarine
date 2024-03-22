@@ -18,8 +18,6 @@ KubemarineVersions: list = [ "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.7.1
                             "v0.24.1", "v0.25.0", "v0.25.1", "v0.26.0", "v0.27.0", "v0.28.0"
 ]  # TODO to  get from github/gitlab/git/custom/file?
 
-Envs: list = ["src", "pip", "bin", "docker", "brew"]
-
 MigrationProcedure: dict = {
     #    "v0.25.1":{"procedure":"",
     #               "patches":[],
@@ -30,6 +28,15 @@ MigrationProcedure: dict = {
     #                    f"Description0"},
     #               "env":"docker"}
 }
+
+class Filepath:
+    Envs: list = ["git", "pip", "bin", "docker", "brew"]
+
+    def __init__(self,env="bin",path=""):
+        if env not in self.Envs:
+            raise f"Env {self.Envs} is not supported."
+        self.type = env
+        self.path = path
 
 
 def distant_migrate(MigrationProcedure:dict):
@@ -58,39 +65,47 @@ def distant_migrate(MigrationProcedure:dict):
             print(f"No patches. Skipping migration for {version}")
 
 
-def get_kubemarine_env(version, env):
+def get_kubemarine_env(version, env:Filepath):
 
-    if env in "bin":
+    if env.type == "bin":
 
         filename = f"kubemarine-{'macos11' if platform.system().lower() == 'darwin' else 'linux'}-{platform.machine().lower()}"
-        filepath = os.path.join(tempfile.gettempdir(), filename + f"-{version}") #TODO caching 
+        env.path = os.path.join(tempfile.gettempdir(), filename + f"-{version}") #TODO caching 
 
-        if os.path.exists(filepath) and os.stat(filepath).st_mode | 0o111: # Сaching TODO to rework to use existing downloaded versions
-            return filepath
+        if os.path.exists(env.path) and os.stat(env.path).st_mode | 0o111: # Сaching TODO to rework to use existing downloaded versions
+            return env
 
         try:
             # Download the file
             response = requests.get(f"https://github.com/Netcracker/KubeMarine/releases/download/{version}/{filename}")
             response.raise_for_status()
 
-            with open(filepath, "wb") as file:
+            with open(env.path, "wb") as file:
                 file.write(response.content)
 
-            os.chmod(filepath, os.stat(filepath).st_mode | 0o111)  # Set executable
-            return filepath
+            os.chmod(env.path, os.stat(env.path).st_mode | 0o111)  # Set executable
+            return env
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             return None
+    elif env.type == "git":
+        process = subprocess.Popen(['git', "checkout", version],stdout=subprocess.PIPE, text=True,)
+        for line in process.stdout:
+            print(line.strip())
+        
+        if process.wait():
+            env.path = "kubemarine"
+        
     return None
 
 
-def get_patches_info(filepath,env="bin"):
+def get_patches_info(env:Filepath):
     patches_info = {"patches": []}
 
     try:
-        if filepath:
+        if env and env.path:
             # Assuming subprocess.run returns the patches list
-            patches_list = subprocess.run([filepath, "migrate_kubemarine", "--list"],capture_output=True, text=True,
+            patches_list = subprocess.run([env.path, "migrate_kubemarine", "--list"],capture_output=True, text=True,
                                           ).stdout.splitlines()
             if "No patches available." in patches_list:
                 patches_list = []
@@ -98,7 +113,7 @@ def get_patches_info(filepath,env="bin"):
                 patches_list.remove("Available patches list:")
 
             for patch in patches_list:
-                description = subprocess.run([filepath, "migrate_kubemarine", "--describe", patch],capture_output=True, text=True,
+                description = subprocess.run([env.path, "migrate_kubemarine", "--describe", patch],capture_output=True, text=True,
                                              ).stdout.strip()
                 patches_info["patches"].append({patch.strip(): description})
     except Exception as e:
@@ -119,8 +134,9 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
 
     ## get the patch list and  migration procedure
     for version in KubemarineVersions[index_from:index_to + 1]:
-        filepath = get_kubemarine_env(version, env)
-        MigrationProcedure[version] = get_patches_info(filepath, env)
+        filepath = get_kubemarine_env(version, Filepath(env))
+        if filepath:
+            MigrationProcedure[version] = get_patches_info(filepath)
 
     return MigrationProcedure
 
