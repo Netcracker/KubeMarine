@@ -150,6 +150,6 @@ if __name__ == "__main__":
     elif 'yaml' in sys.argv[1]:
         if sys.argv[2] in 'distant_migrate':
             sys.argv[3] = yaml.safe_load(open(sys.argv[3],"r"))
-        print(yaml.dump(globals()[sys.argv[2]](*sys.argv[3:])))
+        print(yaml.safe_dump(globals()[sys.argv[2]](*sys.argv[3:]),sort_keys=False))
     else:
         print(f"Error: incorrect {sys.argv[1]}", file=sys.stderr)
