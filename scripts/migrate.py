@@ -84,7 +84,7 @@ def get_kubemarine_env(version, env):
     return None
 
 
-def get_patches_info(filepath):
+def get_patches_info(filepath,env="bin"):
     patches_info = {"patches": []}
 
     try:
@@ -108,7 +108,7 @@ def get_patches_info(filepath):
     return patches_info
 
 
-def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = KubemarineVersions[-1]) -> dict:
+def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = KubemarineVersions[-1], env="bin") -> dict:
     index_from = KubemarineVersions.index(old_version) if old_version in KubemarineVersions else None
     index_to = KubemarineVersions.index(new_version) if new_version in KubemarineVersions else None
 
@@ -119,13 +119,13 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
 
     ## get the patch list and  migration procedure
     for version in KubemarineVersions[index_from:index_to + 1]:
-        filepath = get_kubemarine_env(version, "bin")
-        MigrationProcedure[version] = get_patches_info(filepath)
+        filepath = get_kubemarine_env(version, env)
+        MigrationProcedure[version] = get_patches_info(filepath, env)
 
     return MigrationProcedure
 
 if __name__ == "__main__":
-    # function name, parameters ...
+    # format: yaml/json, function name, parameters ...
     
     if 'json' in sys.argv[1]:
         if sys.argv[2] in 'distant_migrate':
