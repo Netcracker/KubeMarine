@@ -41,7 +41,7 @@ class Filepath:
 
 def distant_migrate(MigrationProcedure:dict) -> int:
     """ run migrate_kubemarine according to {MigrationProcedure} """
-    for version,details in MigrationProcedure:
+    for version,details in MigrationProcedure.items():
         patches = details.get("patches", [])
         if patches:
             procedure_yaml  = details.get("procedure","")
@@ -49,8 +49,8 @@ def distant_migrate(MigrationProcedure:dict) -> int:
             env_type = details.get("env", "bin")  # bin is default
             
             env = get_kubemarine_env(version, Filepath(env_type))
-            logging.info(version, env, get_patches_info(env), procedure_yaml or "" )
-            input()  
+            logging.debug(f"{version}, {env.path}, {get_patches_info(env)}, {procedure_yaml or ''} ")
+            #input()  
             
             if procedure_yaml:
                 with open("procedure.yaml", "w") as file:
@@ -159,7 +159,7 @@ def list_versions(old_version: str =  KubemarineVersions[0], new_version: str = 
 
     return MigrationProcedure
 
-if __name__ == "__main__":
+if __name__ == "__main__": #temporary TODO to rework 
     # format: yaml/json, function name, parameters ...
     logging.root.setLevel(logging.DEBUG)
 
