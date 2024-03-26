@@ -1373,8 +1373,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
 
 def fs_mount_options(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc,\
-            suspend_firewalld(cluster):
+    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc:
 
         failed_nodes: Set[str] = set()
         # Only Kubernetes nodes should be checked
@@ -1398,7 +1397,7 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
         # Check the mount options for filesystem where containerd root is located.
         # If containerd root doesn't exist the script check the parent directory and so forth.
         # At the end of the script 'findmnt' return the filesytem mount point, device,
-        # and mount options for nearest parent directory of containerd root.
+        # and mount options for nearest parent directory of CRI root.
         # 'findmnt' perform the recursive search of mount point for filesystem
         # from the given path to the root, that's exactly what we need.
         cmd = f"CRI_PATH={cri_root}; while [ ! -d \"${{CRI_PATH}}\" ]; do CRI_PATH=$(dirname \"${{CRI_PATH}}\"); " \
@@ -1416,8 +1415,8 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
 
         if failed_nodes:
             raise TestFailure(f"The 'nosuid' mount option affects container functionality. "
-                              f"Please change mount options for filesystem where 'containerd' "
-                              f"root is located on the following nodes.",
+                              f"Please change mount options for filesystem where CRI "
+                              f"root is located on the following nodes. CRI root path is '{cri_root}'",
                               hint='\n'.join(failed_nodes))
 
 
