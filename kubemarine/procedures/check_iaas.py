@@ -1378,7 +1378,6 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
         failed_nodes: Set[str] = set()
         # Only Kubernetes nodes should be checked
         group = cluster.make_group_from_roles(['control-plane', 'worker']).get_sudo_nodes()
-        collector = CollectorCallback(group.cluster)
         # Get CRI root
         if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
             # Containerd root
@@ -1402,14 +1401,11 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
         # from the given path to the root, that's exactly what we need.
         cmd = f"CRI_PATH={cri_root}; while [ ! -d \"${{CRI_PATH}}\" ]; do CRI_PATH=$(dirname \"${{CRI_PATH}}\"); " \
               f"done; findmnt -T \"${{CRI_PATH}}\" | grep 'nosuid'"
-        with group.new_executor() as exe:
-            for node_exe in exe.group.get_ordered_members_list():
-                node_exe.run(f"{cmd}", warn=True, callback=collector)
+        results = group.run(f"{cmd}", warn=True)
 
         # Check output and create result message
-        for host, item in collector.result.items():
+        for host, item in results.items():
             node_name = cluster.get_node_name(host)
-            item_list: Set[str] = set()
             if len(item.stdout) > 0:
                 failed_nodes.add(f"{node_name}")
 
