@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import re
 import unittest
 from copy import deepcopy
+from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import errors
-from test.unit import utils as test_utils
 
 
 class TestInventoryValidation(unittest.TestCase):
@@ -60,7 +61,8 @@ class TestInventoryValidation(unittest.TestCase):
     def test_not_supported_role(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['nodes'][0]['roles'] = ['test']
-        with self.assertRaisesRegex(errors.FailException, r"Value should be one of \['worker', 'control-plane', 'master', 'balancer']"):
+        with self.assertRaisesRegex(errors.FailException,
+                                    re.escape("Value should be one of ['worker', 'control-plane', 'master', 'balancer']")):
             demo.new_cluster(inventory)
 
     def test_explicitly_added_service_role(self):

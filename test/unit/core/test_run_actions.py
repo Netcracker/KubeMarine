@@ -15,12 +15,12 @@ import collections
 import io
 import os
 import tarfile
-import tempfile
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 from typing import Set, List, Optional
 from unittest import mock
+from test.unit import utils as test_utils
 
 import yaml
 
@@ -30,7 +30,6 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.procedures import upgrade, install, check_iaas, check_paas, migrate_kubemarine
 from kubemarine.procedures.migrate_kubemarine import CriUpgradeAction, PluginUpgradeAction
-from test.unit import utils as test_utils
 
 
 class ActionsFlowTest(unittest.TestCase):
@@ -79,34 +78,29 @@ class FakeResources(test_utils.FakeResources):
         self.procedure_inventory_filepath: Optional[str] = args.get('procedure_config')
 
 
-class RunActionsTest(unittest.TestCase):
+class RunActionsTest(test_utils.CommonTest):
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.procedure_inventory = None
 
-        self.tmpdir = tempfile.TemporaryDirectory()
-
     def prepare_context(self, args: list = None, procedure: str = 'install'):
         args = list(args) if args else []
         args.extend([
-            '--ansible-inventory-location', os.path.join(self.tmpdir.name, 'ansible-inventory.ini'),
-            '--dump-location', self.tmpdir.name,
-            '-c', os.path.join(self.tmpdir.name, 'cluster.yaml')
+            '--ansible-inventory-location', os.path.join(self.tmpdir, 'ansible-inventory.ini'),
+            '--dump-location', self.tmpdir,
+            '-c', os.path.join(self.tmpdir, 'cluster.yaml')
         ])
         if self.procedure_inventory is not None:
-            args.insert(0, os.path.join(self.tmpdir.name, 'procedure.yaml'))
+            args.insert(0, os.path.join(self.tmpdir, 'procedure.yaml'))
 
+        # pylint: disable-next=attribute-defined-outside-init
         self.context: dict = procedures.import_procedure(procedure).create_context(args)
         args = self.context['execution_arguments']
 
-        test_utils.prepare_dump_directory(self.context)
+        utils.prepare_dump_directory(self.context)
         utils.dump_file(self.context, yaml.dump(self.inventory), args['config'], dump_location=False)
         if self.procedure_inventory is not None:
             utils.dump_file(self.context, yaml.dump(self.procedure_inventory), args['procedure_config'], dump_location=False)
-
-    def tearDown(self):
-        test_utils.prepare_dump_directory(self.context)
-        self.tmpdir.cleanup()
 
     def _new_resources(self) -> demo.FakeResources:
         return FakeResources(self.context, nodes_context=demo.generate_nodes_context(self.inventory))
@@ -144,7 +138,7 @@ class RunActionsTest(unittest.TestCase):
         return action_
 
     def _list_dump_content(self) -> Set[str]:
-        dump_location = os.path.join(self.tmpdir.name, 'dump')
+        dump_location = os.path.join(self.tmpdir, 'dump')
         if os.path.exists(dump_location):
             return set(os.listdir(dump_location))
 
@@ -152,7 +146,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_install_action_preserve_inventory(self):
         for disable_dump in (False, True):
-            with self.subTest(f"Disable dump: {disable_dump}"):
+            with self.subTest(f"Disable dump: {disable_dump}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 args = []
                 if disable_dump:
@@ -175,7 +169,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_install_action_disable_dump(self):
         for without_act in (False, True):
-            with self.subTest(f"Without act: {without_act}"):
+            with self.subTest(f"Without act: {without_act}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 args = ['--disable-dump']
                 if without_act:
@@ -194,18 +188,20 @@ class RunActionsTest(unittest.TestCase):
                 actual_dump_content = self._list_dump_content()
                 self.assertEqual(expected_dump_content, actual_dump_content)
 
+    @test_utils.temporary_directory
     def test_cluster_finalized_disable_dump_without_act(self):
         self.prepare_context(['--disable-dump', '--without-act'], procedure='install')
 
-        with test_utils.chdir(self.tmpdir.name):
+        with test_utils.chdir(self.tmpdir):
             resources = test_utils.PackageStubResources(
                 self.context, nodes_context=demo.generate_nodes_context(self.inventory))
 
             self._run_actions([self._prepare_action(install.InstallAction())],
                               resources=resources)
 
-        self.assertTrue(os.path.exists(os.path.join(self.tmpdir.name, 'cluster_finalized.yaml')))
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir, 'cluster_finalized.yaml')))
 
+    @test_utils.temporary_directory
     def test_install_action_failed_task(self):
         self.prepare_context(procedure='install')
 
@@ -216,9 +212,10 @@ class RunActionsTest(unittest.TestCase):
             self._prepare_action(install.InstallAction(), {"test": failed_task}),
         ], exception_message="test")
         self.assertEqual(0, len(uploaded_archives))
-        self.assertTrue(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'cluster.yaml')))
-        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'cluster_finalized.yaml')))
+        self.assertTrue(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'cluster.yaml')))
+        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'cluster_finalized.yaml')))
 
+    @test_utils.temporary_directory
     def test_upgrade_templates_two_versions(self):
         before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.6'
         self.inventory['values'] = {
@@ -250,6 +247,7 @@ class RunActionsTest(unittest.TestCase):
             version = [through, after][i]
             self.assertEqual([f'upgrade to {version}'], procedure_parameters.get('successfully_performed', []))
 
+    @test_utils.temporary_directory
     def test_upgrade_templates_second_version_failed_task(self):
         before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.6'
         self.inventory['values'] = {
@@ -280,11 +278,12 @@ class RunActionsTest(unittest.TestCase):
 
         self.assertEqual({'debug.log', through, after}, self._list_dump_content())
         for i, version in enumerate((through, after)):
-            self.assertTrue(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', version, 'cluster.yaml')))
+            self.assertTrue(os.path.isfile(os.path.join(self.tmpdir, 'dump', version, 'cluster.yaml')))
             finalized_inventory_dumped = [True, False][i]
             self.assertEqual(finalized_inventory_dumped,
-                             os.path.isfile(os.path.join(self.tmpdir.name, 'dump', version, 'cluster_finalized.yaml')))
+                             os.path.isfile(os.path.join(self.tmpdir, 'dump', version, 'cluster_finalized.yaml')))
 
+    @test_utils.temporary_directory
     def test_upgrade_failed_enrichment(self):
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': 'v1.26.11'
@@ -296,12 +295,12 @@ class RunActionsTest(unittest.TestCase):
 
         dump_content = {'debug.log', 'v1.27.8'}
         self.assertEqual(dump_content, self._list_dump_content())
-        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'v1.27.8', 'cluster.yaml')))
-        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'v1.27.8', 'cluster_finalized.yaml')))
+        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.8', 'cluster.yaml')))
+        self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'v1.27.8', 'cluster_finalized.yaml')))
 
     def test_upgrade_templates_failed_enrichment(self):
         for verified in (False, True):
-            with self.subTest(f"version verified: {verified}"):
+            with self.subTest(f"version verified: {verified}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {
                     'before': 'v1.26.11', 'after': 'v1.27.8'
@@ -320,8 +319,8 @@ class RunActionsTest(unittest.TestCase):
 
                 dump_content = {'debug.log', dump_subdir}
                 self.assertEqual(dump_content, self._list_dump_content())
-                self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', dump_subdir, 'cluster.yaml')))
-                self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', dump_subdir, 'cluster_finalized.yaml')))
+                self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', dump_subdir, 'cluster.yaml')))
+                self.assertFalse(os.path.isfile(os.path.join(self.tmpdir, 'dump', dump_subdir, 'cluster_finalized.yaml')))
 
     def _run_upgrade_with_failed_enrichment(self, *, version_verified: bool):
         self.prepare_context(procedure='upgrade')
@@ -339,6 +338,7 @@ class RunActionsTest(unittest.TestCase):
             resources, exception_message="test")
         self.assertEqual(0, len(uploaded_archives))
 
+    @test_utils.temporary_directory
     def test_upgrade_formatted_procedure_inventory(self):
         self.inventory['services']['kubeadm'] = {
             'kubernetesVersion': 'v1.26.11'
@@ -367,7 +367,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_check_collect_test_cases(self):
         for i, procedure in enumerate(('check_iaas', 'check_paas')):
-            with self.subTest(f"procedure: {procedure}"):
+            with self.subTest(f"procedure: {procedure}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.prepare_context(procedure=procedure)
 
@@ -385,8 +385,8 @@ class RunActionsTest(unittest.TestCase):
                 self.assertEqual(0, len(uploaded_archives),
                                  "Check procedures should not preserve inventory")
 
-                self.assertTrue(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'cluster.yaml')))
-                self.assertTrue(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'cluster_finalized.yaml')))
+                self.assertTrue(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'cluster.yaml')))
+                self.assertTrue(os.path.isfile(os.path.join(self.tmpdir, 'dump', 'cluster_finalized.yaml')))
 
                 self.assertIn('testsuite', result.context)
                 testsuite_: testsuite.TestSuite = result.context['testsuite']
@@ -399,7 +399,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_run_two_cluster_actions_collect_summary(self):
         for recreate_inventory in (False, True):
-            with self.subTest(f"inventory recreated: {recreate_inventory}"):
+            with self.subTest(f"inventory recreated: {recreate_inventory}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {}
                 self.prepare_context(procedure='migrate_kubemarine')
@@ -413,7 +413,7 @@ class RunActionsTest(unittest.TestCase):
                                                      enrich_inventory_from_context,
                                                      procedure='migrate_kubemarine')
 
-                def get_action_summary(property_: summary.SummaryItem, value: str):
+                def get_action_summary(property_: summary.SummaryItem, value: str, recreate_inventory=recreate_inventory):
                     def action_summary(resources_: res.DynamicResources):
                         if recreate_inventory:
                             resources_.cluster(EnrichmentStage.DEFAULT)
@@ -443,6 +443,7 @@ class RunActionsTest(unittest.TestCase):
                 self.assertEqual('/path/to/kubeconfig', result_context.get(summary.SummaryItem.KUBECONFIG))
                 self.assertIn(summary.SummaryItem.EXECUTION_TIME, result_context)
 
+    @test_utils.temporary_directory
     def test_run_two_cluster_actions_second_failed(self):
         self.prepare_context(procedure='migrate_kubemarine')
 
@@ -462,7 +463,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_inventory_action_succeeded_cluster_action_failed_enrichment(self):
         for recreate_inventory in (False, True):
-            with self.subTest(f"inventory recreated: {recreate_inventory}"):
+            with self.subTest(f"inventory recreated: {recreate_inventory}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.prepare_context(procedure='migrate_kubemarine')
 
@@ -472,7 +473,7 @@ class RunActionsTest(unittest.TestCase):
                 resources = self._new_resources()
                 resources.insert_enrichment_function(schema.verify_inventory, EnrichmentStage.FULL, default_enrichment_failed)
 
-                def inventory_action(resources_: res.DynamicResources):
+                def inventory_action(resources_: res.DynamicResources, recreate_inventory=recreate_inventory):
                     if recreate_inventory:
                         resources_.inventory().setdefault('values', {})['k'] = 'v'
 
@@ -488,11 +489,11 @@ class RunActionsTest(unittest.TestCase):
 
     def test_inventory_action_succeeded_cluster_action_failed(self):
         for recreate_inventory in (False, True):
-            with self.subTest(f"inventory recreated: {recreate_inventory}"):
+            with self.subTest(f"inventory recreated: {recreate_inventory}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.prepare_context(procedure='migrate_kubemarine')
 
-                def inventory_action(resources_: res.DynamicResources):
+                def inventory_action(resources_: res.DynamicResources, recreate_inventory=recreate_inventory):
                     if recreate_inventory:
                         resources_.inventory().setdefault('values', {})['k'] = 'v'
 
@@ -511,7 +512,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_procedure_enrich_inventory_dump_cluster_state(self):
         for sequential in (False, True):
-            with self.subTest(f"sequential enrichment: {sequential}"):
+            with self.subTest(f"sequential enrichment: {sequential}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {'k': 'v1'}
                 self.inventory['services']['kubeadm'] = {
@@ -530,7 +531,7 @@ class RunActionsTest(unittest.TestCase):
                                                      enrich_inventory,
                                                      procedure='upgrade')
 
-                def cluster_action(resources_: res.DynamicResources):
+                def cluster_action(resources_: res.DynamicResources, sequential=sequential):
                     if sequential:
                         resources_.cluster(EnrichmentStage.DEFAULT)
 
@@ -554,7 +555,7 @@ class RunActionsTest(unittest.TestCase):
 
     def test_second_action_failed_dump_cluster_state_previous_action(self):
         for stage in (EnrichmentStage.DEFAULT, EnrichmentStage.PROCEDURE):
-            with self.subTest(f"stage: {stage}"):
+            with self.subTest(f"stage: {stage}"), test_utils.temporary_directory(self):
                 self.inventory = demo.generate_inventory(**demo.ALLINONE)
                 self.inventory['values'] = {'k': 'v1'}
                 self.prepare_context(procedure='migrate_kubemarine')
@@ -568,7 +569,7 @@ class RunActionsTest(unittest.TestCase):
                                                      enrich_inventory_from_context,
                                                      procedure='migrate_kubemarine')
 
-                def cluster_successful_action(resources_: res.DynamicResources):
+                def cluster_successful_action(resources_: res.DynamicResources, stage=stage):
                     cluster = resources_.cluster(stage)
                     self.assertEqual('v1', cluster.inventory['values']['k'])
 
@@ -664,6 +665,8 @@ class ClusterEnrichOptimization(unittest.TestCase):
             ])
 
     def test_migrate_kubemarine_upgrade_two_patches_evolve(self):
+        # pylint: disable=protected-access
+
         inventory = demo.generate_inventory(**demo.ALLINONE)
         kubernetes_version = 'v1.27.8'
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = kubernetes_version

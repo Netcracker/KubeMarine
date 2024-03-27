@@ -46,7 +46,7 @@ jobs:
       # Then uninstall only kubemarine to avoid ambiguity and to surely run pylint on sources.
       - run: pip install .[pylint] && pip install -r requirements-pyinstaller.txt && pip uninstall -y kubemarine
       - run: |
-          if ! pylint kubemarine scripts ; then
+          if ! pylint kubemarine scripts test ; then
             echo -e "\033[91mCheck [tool.pylint.main] in pyproject.toml for how to fix pylint check\033[0m"
             exit 1
           fi

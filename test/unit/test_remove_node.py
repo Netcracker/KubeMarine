@@ -14,27 +14,22 @@
 
 import json
 import os
-import tempfile
 import unittest
 from typing import List, Dict
+from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import utils, flow
 from kubemarine.procedures import remove_node, install
-from test.unit import utils as test_utils
 
 
-class EnrichmentAndFinalization(unittest.TestCase):
+class EnrichmentAndFinalization(test_utils.CommonTest):
     def setUp(self) -> None:
-        self.tmpdir = tempfile.TemporaryDirectory()
         self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='remove_node')
 
         self.nodes_context = {}
         self.inventory = {}
         self.remove_node = demo.generate_procedure_inventory('remove_node')
-
-    def tearDown(self) -> None:
-        self.tmpdir.cleanup()
 
     def _generate_inventory(self, scheme: Dict[str, demo._ROLE_SPEC]) -> dict:
         self.inventory = demo.generate_inventory(**scheme)
@@ -86,9 +81,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
 
         self.assertEqual(['control-plane-1', 'control-plane-3'], [node['name'] for node in cluster.formatted_inventory['nodes']])
 
+    @test_utils.temporary_directory
     def test_ansible_inventory_no_removed_node(self):
         args = self.context['execution_arguments']
-        ansible_inventory_location = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
+        ansible_inventory_location = os.path.join(self.tmpdir, 'ansible-inventory.ini')
         args['ansible_inventory_location'] = ansible_inventory_location
 
         self._generate_inventory(demo.MINIHA_KEEPALIVED)
@@ -134,9 +130,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
         self.assertEqual([], install.get_haproxy_configure_group(cluster).get_nodes_names(),
                          "Unexpected nodes to reconfigure haproxy")
 
+    @test_utils.temporary_directory
     def test_enrich_certsans_with_custom(self):
         args = self.context['execution_arguments']
-        ansible_inventory_location = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
+        ansible_inventory_location = os.path.join(self.tmpdir, 'ansible-inventory.ini')
         args['ansible_inventory_location'] = ansible_inventory_location
 
         self._generate_inventory(demo.MINIHA_KEEPALIVED)

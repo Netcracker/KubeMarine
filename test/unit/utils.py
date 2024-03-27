@@ -16,11 +16,12 @@ import inspect
 import logging
 import os
 import re
+import tempfile
 import unittest
 from contextlib import contextmanager
 from copy import deepcopy
 from types import FunctionType
-from typing import Dict, Iterator, Callable, cast, Any, List
+from typing import Dict, Iterator, Callable, cast, Any, List, Optional, Union
 from unittest import mock
 
 import yaml
@@ -48,6 +49,53 @@ class PackageStubResources(demo.FakeClusterResources):
 
 class FakeResources(demo.FakeResources, PackageStubResources):
     pass
+
+
+class CommonTest(unittest.TestCase):
+    def __init__(self, methodName='runTest'):
+        super().__init__(methodName)
+        self._tmpdir: Optional[str] = None
+
+    @contextmanager
+    def temporary_directory(self, _tmpdir: str) -> Iterator[None]:
+        if self._tmpdir is not None:
+            self.fail("Temporary directory is already initialized")
+
+        try:
+            self._tmpdir = _tmpdir
+            yield
+        finally:
+            self._tmpdir = None
+
+    @property
+    def tmpdir(self) -> str:
+        if self._tmpdir is None:
+            self.fail("Temporary directory is not initialized")
+
+        return self._tmpdir
+
+
+def temporary_directory(wrapped: Union[CommonTest, Callable[[CommonTest], None]]):
+    @contextmanager
+    def helper(ct: CommonTest):
+        with tempfile.TemporaryDirectory() as tmpdir, ct.temporary_directory(tmpdir):
+            try:
+                yield ct.tmpdir
+            finally:
+                logger = logging.getLogger("k8s.fake.local")
+                for h in logger.handlers:
+                    if isinstance(h, log.FileHandlerWithHeader):
+                        h.close()
+
+    if isinstance(wrapped, CommonTest):
+        return helper(wrapped)
+    else:
+        @functools.wraps(wrapped)
+        def wrapper(ct: CommonTest):
+            with helper(ct):
+                return wrapped(ct)
+
+        return wrapper
 
 
 def make_finalized_inventory(cluster: demo.FakeKubernetesCluster,
@@ -90,15 +138,6 @@ def stub_associations_packages(cluster: demo.FakeKubernetesCluster, packages_hos
     stub_detect_packages(cluster, packages_hosts_stub)
 
 
-def prepare_dump_directory(context: dict):
-    logger = logging.getLogger("k8s.fake.local")
-    for h in logger.handlers:
-        if isinstance(h, log.FileHandlerWithHeader):
-            h.close()
-
-    utils.prepare_dump_directory(context)
-
-
 def increment_version(version: str, minor=False):
     new_version = list(utils.version_key(version))
     if minor:
@@ -137,7 +176,7 @@ def backup_globals():
 @contextmanager
 def backup_software_upgrade_config() -> Iterator[dict]:
     with utils.open_internal('resources/etalons/patches/software_upgrade.yaml') as stream:
-       clean_config = yaml.safe_load(stream)
+        clean_config = yaml.safe_load(stream)
 
     def load_upgrade_config_mocked() -> dict:
         return clean_config
