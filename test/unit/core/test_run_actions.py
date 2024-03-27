@@ -600,11 +600,7 @@ class RunActionsTest(unittest.TestCase):
 class ClusterEnrichOptimization(unittest.TestCase):
     @contextmanager
     def _expected_calls(self, expected_calls: int):
-        call_orig = defaults.compile_inventory.delegate
-
-        with mock.patch.object(defaults.compile_inventory, 'delegate', side_effect=call_orig) as run:
-            run.__name__ = call_orig.__name__
-            run.__qualname__ = call_orig.__qualname__
+        with test_utils.mock_call(defaults.compile_inventory, side_effect=defaults.compile_inventory) as run:
             try:
                 yield
             finally:
@@ -661,8 +657,8 @@ class ClusterEnrichOptimization(unittest.TestCase):
         procedure_inventory['upgrade_plan'] = upgrade_plan
 
         context = demo.create_silent_context(['fake.yaml', '--without-act'], procedure='upgrade')
-        resources = demo.new_resources(inventory, procedure_inventory=procedure_inventory, context=context)
         with self._expected_calls(4):
+            resources = demo.new_resources(inventory, procedure_inventory=procedure_inventory, context=context)
             flow.run_actions(resources, [
                 upgrade.UpgradeAction(version, i) for i, version in enumerate(upgrade_plan)
             ])
@@ -676,7 +672,6 @@ class ClusterEnrichOptimization(unittest.TestCase):
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
 
         context = demo.create_silent_context(procedure='migrate_kubemarine')
-        resources = demo.new_resources(inventory, context=context, nodes_context=nodes_context)
 
         changed_upgrade_config = {
             'packages': {
@@ -693,6 +688,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
             default_merger.merge(upgrade_config, changed_upgrade_config)
             actions = [p.action for p in migrate_kubemarine.load_patches()
                        if p.identifier in ['upgrade_cri', 'upgrade_local_path_provisioner']]
+            resources = demo.new_resources(inventory, context=context, nodes_context=nodes_context)
             flow.run_actions(resources, actions)
 
 

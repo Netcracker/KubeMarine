@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import inspect
 import logging
 import os
@@ -147,12 +148,11 @@ def backup_software_upgrade_config() -> Iterator[dict]:
 
 
 @contextmanager
-def mock_call(call: Callable, return_value: object = None) -> Iterator[mock.MagicMock]:
+def mock_call(call: Callable, return_value: object = None, side_effect: object = None) -> Iterator[mock.MagicMock]:
     func = cast(FunctionType, call)
-    name = func.__name__
     module = inspect.getmodule(func)
-    with mock.patch.object(module, name, return_value=return_value) as run:
-        run.__name__ = name
+    with mock.patch.object(module, func.__name__, return_value=return_value, side_effect=side_effect) as run:
+        functools.update_wrapper(run, func)
         yield run
 
 

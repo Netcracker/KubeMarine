@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import dataclasses
+import functools
 from copy import deepcopy
 from enum import Flag, auto, IntFlag
 from types import FunctionType
@@ -135,7 +136,7 @@ def enrichment(stages: EnrichmentStage, procedures: List[str] = None) -> Callabl
     :param stages: `EnrichmentStage` stages to run this function at.
     :param procedures: list of procedures for which the function is applicable.
     """
-    return lambda fn: EnrichmentFunction(fn, stages, procedures)
+    return lambda fn: functools.wraps(fn)(EnrichmentFunction(fn, stages, procedures))
 
 
 @dataclasses.dataclass(repr=False)
