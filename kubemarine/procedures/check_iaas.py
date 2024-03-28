@@ -1387,7 +1387,7 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
 
 
 def fs_mount_options(cluster: KubernetesCluster) -> None:
-    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc:
+    with TestCase(cluster, '018', 'System', 'Filesystem mount options'):
 
         failed_nodes: Set[str] = set()
         cri_root = ""
@@ -1408,7 +1408,7 @@ def fs_mount_options(cluster: KubernetesCluster) -> None:
             else:
                 cri_root = "/var/lib/docker"
         if not cri_root:
-                raise TestWarn("Check cannot be completed, unknown CRI")
+            raise TestWarn("Check cannot be completed, unknown CRI")
         cluster.log.debug("Mount options check")
         # Check the mount options for filesystem where containerd root is located.
         # If containerd root doesn't exist the script check the parent directory and so forth.
