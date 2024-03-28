@@ -57,8 +57,12 @@ def distant_migrate(MigrationProcedure:dict) -> int:
                     file.write(procedure_yaml)
             
             try:
-                process = subprocess.Popen([env.path, "migrate_kubemarine", "procedure.yaml" if procedure_yaml else ""],
-                                           stdout=subprocess.PIPE, text=True) # TODO --force-apply 
+                patch_names = []
+                for patch in patches: 
+                    patch_names.extend(patch.keys())
+
+                process = subprocess.Popen([env.path, "migrate_kubemarine","--force-apply", ",".join(patch_names), "procedure.yaml" if procedure_yaml else ""],
+                                        stdout=subprocess.PIPE, text=True) # TODO --force-apply 
                 
                 if process.stdout is not None:
                     for line in process.stdout:
