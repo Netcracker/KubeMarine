@@ -13,6 +13,7 @@
 # limitations under the License.
 import inspect
 import logging
+import os
 import re
 import unittest
 from contextlib import contextmanager
@@ -29,16 +30,23 @@ from kubemarine.core.action import Action
 from kubemarine.procedures import migrate_kubemarine
 
 
-class FakeResources(demo.FakeResources):
-    def __init__(self, *args: Any, **kwargs: Any):
-        kwargs['make_finalized_inventory'] = True
-        super().__init__(*args, **kwargs)
+class PackageStubResources(demo.FakeClusterResources):
+    def __init__(self, context: dict,
+                 *,
+                 nodes_context: Dict[str, Any] = None,
+                 fake_shell: demo.FakeShell = None, fake_fs: demo.FakeFS = None):
+        super().__init__(context, nodes_context=nodes_context, fake_shell=fake_shell, fake_fs=fake_fs)
+        context['make_finalized_inventory'] = True
 
     def collect_action_result(self) -> None:
         super().collect_action_result()
         cluster = self.cluster_if_initialized()
-        if isinstance(cluster, demo.FakeKubernetesCluster):
+        if cluster is not None:
             stub_associations_packages(cluster, {})
+
+
+class FakeResources(demo.FakeResources, PackageStubResources):
+    pass
 
 
 def make_finalized_inventory(cluster: demo.FakeKubernetesCluster,
@@ -48,9 +56,7 @@ def make_finalized_inventory(cluster: demo.FakeKubernetesCluster,
         stub_associations_packages(cluster, {})
 
     resources = cluster.resources
-    resources.make_finalized_inventory = True
-    resources.dump_finalized_inventory(cluster)
-    return resources.finalized_inventory
+    return resources.make_finalized_inventory(cluster)
 
 
 def stub_detect_packages(cluster: demo.FakeKubernetesCluster, packages_hosts_stub: Dict[str, Dict[str, str]]):
@@ -169,6 +175,16 @@ def mock_remote_tmp_paths(filenames: List[str]) -> Iterator[None]:
     with mock_call(utils.get_remote_tmp_path) as run:
         run.side_effect = mocked
         yield
+
+
+@contextmanager
+def chdir(dir_: str) -> Iterator[None]:
+    orig_cwd = os.getcwd()
+    os.chdir(dir_)
+    try:
+        yield
+    finally:
+        os.chdir(orig_cwd)
 
 
 def new_action(id_: str, *,

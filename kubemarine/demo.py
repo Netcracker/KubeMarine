@@ -201,7 +201,7 @@ class FakeClusterStorage(utils.ClusterStorage):
 class FakeKubernetesCluster(KubernetesCluster):
 
     def __init__(self, *args: Any, **kwargs: Any):
-        self.resources: FakeResources = kwargs.pop("resources")
+        self.resources: FakeClusterResources = kwargs.pop("resources")
         self.fake_shell = self.resources.fake_shell
         self.fake_fs = self.resources.fake_fs
         self.uploaded_archives: List[str] = []
@@ -217,20 +217,16 @@ class FakeKubernetesCluster(KubernetesCluster):
         return FakeNodeGroup(ips, self)
 
 
-class FakeResources(DynamicResources):
-    def __init__(self, context: dict, inventory: dict = None, procedure_inventory: dict = None,
+class FakeClusterResources(DynamicResources):
+    def __init__(self, context: dict,
+                 *,
                  nodes_context: Dict[str, Any] = None,
-                 fake_shell: FakeShell = None, fake_fs: FakeFS = None, make_finalized_inventory: Optional[bool] = False):
+                 fake_shell: FakeShell = None, fake_fs: FakeFS = None):
         super().__init__(context)
-        self.inventory_filepath = None
-        self.procedure_inventory_filepath = None
         self.fake_shell = fake_shell if fake_shell else FakeShell()
         self.fake_fs = fake_fs if fake_fs else FakeFS()
-        self._inventory = inventory
-        self._procedure_inventory = procedure_inventory
 
         self.finalized_inventory: dict = {}
-        self.make_finalized_inventory = make_finalized_inventory
 
         self._enrichment_functions = super().enrichment_functions()
         # Let's do not assign self._nodes_context directly to make it more close to the real enrichment.
@@ -247,18 +243,13 @@ class FakeResources(DynamicResources):
 
         return {}
 
-    def _store_inventory(self, inventory: dict) -> None:
-        pass
-
-    def _make_finalized_inventory(self, finalized_filename: str) -> bool:
-        if self.make_finalized_inventory is None:
-            return super()._make_finalized_inventory(finalized_filename)
-
-        return self.make_finalized_inventory
-
     def _store_finalized_inventory(self, finalized_inventory: dict, finalized_filename: str) -> None:
         self.finalized_inventory = finalized_inventory
-        utils.dump_file(self, yaml.dump(finalized_inventory), finalized_filename)
+        super()._store_finalized_inventory(finalized_inventory, finalized_filename)
+
+    def cluster_if_initialized(self) -> Optional[FakeKubernetesCluster]:
+        cluster = super().cluster_if_initialized()
+        return None if cluster is None else cast(FakeKubernetesCluster, cluster)
 
     def cluster(self, stage: EnrichmentStage = EnrichmentStage.PROCEDURE) -> FakeKubernetesCluster:
         return cast(FakeKubernetesCluster, super().cluster(stage))
@@ -288,6 +279,26 @@ class FakeResources(DynamicResources):
 
     def enrichment_functions(self) -> List[EnrichmentFunction]:
         return self._enrichment_functions
+
+
+class FakeResources(FakeClusterResources):
+    def __init__(self, context: dict, inventory: dict = None,
+                 *,
+                 procedure_inventory: dict = None,
+                 nodes_context: Dict[str, Any] = None,
+                 fake_shell: FakeShell = None, fake_fs: FakeFS = None):
+        super().__init__(context, nodes_context=nodes_context, fake_shell=fake_shell, fake_fs=fake_fs)
+        self.inventory_filepath = None
+        self.procedure_inventory_filepath = None
+        self._inventory = inventory
+        self._procedure_inventory = procedure_inventory
+
+    def _store_inventory(self, inventory: dict) -> None:
+        pass
+
+    def _store_finalized_inventory(self, finalized_inventory: dict, finalized_filename: str) -> None:
+        self.finalized_inventory = finalized_inventory
+        utils.dump_file(self, yaml.dump(finalized_inventory), finalized_filename)
 
 
 class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
@@ -462,6 +473,7 @@ def create_silent_context(args: list = None, procedure: str = 'install') -> dict
 
     context: dict = procedures.import_procedure(procedure).create_context(args)
     context['preserve_inventory'] = False
+    context['make_finalized_inventory'] = False
     context['load_inventory_silent'] = True
 
     parsed_args: dict = context['execution_arguments']
