@@ -1372,6 +1372,53 @@ def check_ipip_tunnel(group: NodeGroup) -> Set[str]:
                               f"sudo rm -f {ipip_check} {ipip_check}.pid", warn=True)
 
 
+def fs_mount_options(cluster: KubernetesCluster) -> None:
+    with TestCase(cluster, '018', 'System', 'Filesystem mount options') as tc:
+
+        failed_nodes: Set[str] = set()
+        cri_root = ""
+        # Only Kubernetes nodes should be checked
+        group = cluster.make_group_from_roles(['control-plane', 'worker']).get_sudo_nodes()
+        # Get CRI root
+        if cluster.inventory['services']['cri']['containerRuntime'] == "containerd":
+            # Containerd root
+            if cluster.inventory['services']['cri']['containerdConfig'].get('root', ""):
+                cri_root = cluster.inventory['services']['cri']['containerdConfig']['root']
+            else:
+                cri_root = "/var/lib/containerd"
+        # Get rid of that part after KubeMarine stop supporting Kubernetes version lower v1.24
+        if cluster.inventory['services']['cri']['containerRuntime'] == "docker":
+            # Docker root
+            if cluster.inventory['services']['cri']['dockerConfig'].get('data-root', ""):
+                cri_root = cluster.inventory['services']['cri']['dockerConfig']['data-root']
+            else:
+                cri_root = "/var/lib/docker"
+        if not cri_root:
+                raise TestWarn("Check cannot be completed, unknown CRI")
+        cluster.log.debug("Mount options check")
+        # Check the mount options for filesystem where containerd root is located.
+        # If containerd root doesn't exist the script check the parent directory and so forth.
+        # At the end of the script 'findmnt' return the filesytem mount point, device,
+        # and mount options for nearest parent directory of CRI root.
+        # 'findmnt' perform the recursive search of mount point for filesystem
+        # from the given path to the root, that's exactly what we need.
+        cmd = f"CRI_PATH={cri_root}; while [ ! -d \"${{CRI_PATH}}\" ]; do CRI_PATH=$(dirname \"${{CRI_PATH}}\"); " \
+              f"done; findmnt -T \"${{CRI_PATH}}\" | grep 'nosuid'"
+        results = group.run(f"{cmd}", warn=True)
+
+        # Check output and create result message
+        for host, item in results.items():
+            node_name = cluster.get_node_name(host)
+            if len(item.stdout) > 0:
+                failed_nodes.add(f"{node_name}")
+
+        if failed_nodes:
+            raise TestFailure(f"The 'nosuid' mount option affects container functionality. "
+                              f"Please change mount options for filesystem where CRI "
+                              f"root is located on the following nodes. CRI root path is '{cri_root}'",
+                              hint='\n'.join(failed_nodes))
+
+
 def make_reports(context: dict, testsuite: TestSuite) -> None:
     if not context['execution_arguments'].get('disable_csv_report', False):
         testsuite.save_csv(context['execution_arguments']['csv_report'], context['execution_arguments']['csv_report_delimiter'])
@@ -1412,10 +1459,11 @@ tasks = OrderedDict({
             'balancers': lambda cluster: hardware_ram(cluster, 'balancer'),
             'control-planes': lambda cluster: hardware_ram(cluster, 'control-plane'),
             'workers': lambda cluster: hardware_ram(cluster, 'worker')
-        }
+        },
     },
     'system': {
-        'distributive': system_distributive
+        'distributive': system_distributive,
+        'fs_mount_options': fs_mount_options
     },
     'software': {
         'kernel': {
