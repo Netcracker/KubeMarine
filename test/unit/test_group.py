@@ -77,7 +77,7 @@ class TestGroupCall(unittest.TestCase):
 
     def test_run_empty_group(self):
         # bug reproduces inside _do(), that is why it is necessary to use real cluster
-        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA), fake=False)
+        cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         empty_group = cluster.nodes["worker"].new_group(apply_filter=lambda node: 'xxx' in node['roles'])
         # if there no nodes in empty group - an exception should not be produced - empty result should be returned
         empty_group.run('whoami')
@@ -183,6 +183,27 @@ class TestGroupCall(unittest.TestCase):
 
             for host in all_nodes.get_hosts():
                 self.assertEqual('a' * 100000, self.cluster.fake_fs.read(host, '/fake/path'))
+
+    def test_wait_commands_successful_intermediate_failed(self):
+        node = self.cluster.nodes["all"].get_first_member()
+
+        results = demo.create_hosts_result(node.get_hosts(), stdout='result1')
+        TestGroupCall.cluster.fake_shell.add(results, "run", ['command1'], usage_limit=1)
+
+        results = demo.create_hosts_result(node.get_hosts(), stderr='error2', code=1)
+        TestGroupCall.cluster.fake_shell.add(results, "run", ['command2'], usage_limit=1)
+
+        results = demo.create_hosts_result(node.get_hosts(), stdout='result2')
+        TestGroupCall.cluster.fake_shell.add(results, "run", ['command2'], usage_limit=1)
+
+        results = demo.create_hosts_result(node.get_hosts(), stdout='result3')
+        TestGroupCall.cluster.fake_shell.add(results, "run", ['command3'], usage_limit=1)
+
+        node.wait_commands_successful(['command1', 'command2', 'command3'], sudo=False, timeout=0)
+
+        for cmd, expected_calls in (('command1', 1), ('command2', 2), ('command3', 1)):
+            actual_calls = TestGroupCall.cluster.fake_shell.called_times(node.get_host(), 'run', [cmd])
+            self.assertEqual(expected_calls, actual_calls, "Number of calls is not expected")
 
 
 if __name__ == '__main__':

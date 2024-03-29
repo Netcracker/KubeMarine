@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import itertools
 import re
 import unittest
@@ -20,9 +19,6 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Dict, ContextManager
 from unittest import mock
-
-import yaml
-from ruamel.yaml import CommentedMap
 
 from kubemarine.core import utils, static
 from kubemarine.plugins import builtin
@@ -510,7 +506,7 @@ class SynchronizationTest(unittest.TestCase):
     def _mock_globals_load_kubernetes_versions(self):
         backup = deepcopy(static.KUBERNETES_VERSIONS)
         def load_kubernetes_versions_mocked() -> dict:
-            return self._convert_ruamel_pyyaml(self.kubernetes_versions.stored)
+            return utils.convert_native_yaml(self.kubernetes_versions.stored)
 
         try:
             with mock.patch.object(static, static.load_kubernetes_versions.__name__,
@@ -522,17 +518,12 @@ class SynchronizationTest(unittest.TestCase):
     @contextmanager
     def _mock_globals_load_compatibility_map(self):
         def load_compatibility_map_mocked(filename: str) -> dict:
-            return self._convert_ruamel_pyyaml(self.compatibility.stored[filename])
+            return utils.convert_native_yaml(self.compatibility.stored[filename])
 
         with test_utils.backup_globals(), \
                 mock.patch.object(static, static.load_compatibility_map.__name__,
                                   side_effect=load_compatibility_map_mocked):
             yield
-
-    def _convert_ruamel_pyyaml(self, source: CommentedMap) -> dict:
-        stream = io.StringIO()
-        utils.yaml_structure_preserver().dump(source, stream)
-        return yaml.safe_load(io.StringIO(stream.getvalue()))
 
     def run_sync(self) -> SummaryTracker:
         return FakeSynchronization(

@@ -19,9 +19,7 @@ from typing import List
 
 from kubemarine import plugins, k8s_certs
 from kubemarine.core import flow
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
-from kubemarine.core.resources import DynamicResources
 from kubemarine.plugins import calico
 
 
@@ -71,13 +69,9 @@ tasks = OrderedDict({
 })
 
 
-class CertRenewAction(Action):
+class CertRenewAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('cert renew', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('cert renew', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

@@ -17,27 +17,26 @@
 import unittest
 
 from kubemarine import demo, audit, packages, apt, yum
-from kubemarine.core.executor import RunnersResult
 from kubemarine.demo import FakeKubernetesCluster
 
 
-class NodeGroupResultsTest(unittest.TestCase):
+class TestAuditInstallation(unittest.TestCase):
 
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA)
 
     def new_debian_cluster(self) -> FakeKubernetesCluster:
         context = demo.create_silent_context()
-        context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
-        return demo.new_cluster(self.inventory, context=context)
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        return demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
     def get_detect_package_version_cmd(self, os_family: str, package_name: str):
         return packages.get_detect_package_version_cmd(os_family, package_name)
 
     def test_audit_installation_for_centos(self):
         context = demo.create_silent_context()
-        context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
-        cluster = demo.new_cluster(self.inventory, context=context)
+        nodes_context = demo.generate_nodes_context(self.inventory, os_name='centos', os_version='7.9')
+        cluster = demo.new_cluster(self.inventory, context=context, nodes_context=nodes_context)
 
         package_associations = cluster.inventory['services']['packages']['associations']['rhel']['audit']
 

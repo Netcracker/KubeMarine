@@ -20,11 +20,10 @@ import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
 from types import FunctionType
-from typing import Type, Optional, List, Union, Sequence, Tuple, cast, Callable, Dict, Any
+from typing import Optional, List, Union, Sequence, Tuple, cast, Callable, Dict, Any
 
-from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log
+from kubemarine.core import utils, cluster as c, action, resources as res, errors, summary, log, defaults
 
-DEFAULT_CLUSTER_OBJ: Optional[Type[c.KubernetesCluster]] = None
 TASK_DESCRIPTION_TEMPLATE = """
 tasks list:
     %s
@@ -46,15 +45,12 @@ class Flow(ABC):
         if isinstance(context, res.DynamicResources):
             resources = context
         else:
-            resources = res.DynamicResources(context)
+            resources = res.RESOURCES_FACTORY(context)
 
         context = resources.context
-        args: dict = context['execution_arguments']
 
         try:
-            if not args['disable_dump']:
-                utils.prepare_dump_directory(args['dump_location'],
-                                             reset_directory=not args['disable_dump_cleanup'])
+            utils.prepare_dump_directory(context)
             resources.logger()
             self._run(resources)
         except Exception as exc:
@@ -69,12 +65,12 @@ class Flow(ABC):
         logger = resources.logger()
 
         if print_summary:
-            summary.schedule_report(resources.working_context, summary.SummaryItem.EXECUTION_TIME,
+            summary.schedule_report(resources.result_context, summary.SummaryItem.EXECUTION_TIME,
                                     utils.get_elapsed_string(time_start, time_end))
-            summary.print_summary(resources.working_context, logger)
+            summary.print_summary(resources.result_context, logger)
             logger.info("SUCCESSFULLY FINISHED")
 
-        return FlowResult(resources.working_context, logger)
+        return FlowResult(resources.result_context, logger)
 
     @abstractmethod
     def _run(self, resources: res.DynamicResources) -> None:
@@ -92,16 +88,16 @@ class ActionsFlow(Flow):
 def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action]) -> None:
     """
     Runs actions one by one, recreates inventory when necessary,
-    managing such resources as cluster object and raw inventory.
+    managing such resources as cluster object and inventory.
 
-    For each initialized cluster object, preserves inventory if any action is succeeded.
+    Preserve inventory each time it is recreated, or in the end if any actions are successful.
     """
 
     context = resources.context
     logger = resources.logger()
 
     successfully_performed: List[str] = []
-    last_cluster = None
+    cluster: Optional[c.KubernetesCluster] = None
     for act in actions:
         act.prepare_context(context)
 
@@ -114,18 +110,23 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
             if resources.procedure_inventory_filepath:
                 with utils.open_external(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
+
+        if cluster is None:
+            # We currently do not support inventory preservation for actions that only change the inventory
+            successfully_performed = []
+
         try:
             logger.info(f"Running action '{act.identifier}'")
             act.run(resources)
-            act.reset_context(context)
+            resources.collect_action_result()
             successfully_performed.append(act.identifier)
         except Exception:
             if successfully_performed:
-                _post_process_actions_group(last_cluster, context, successfully_performed, failed=True)
+                _post_process_actions_group(resources, successfully_performed, failed=True)
 
             raise
 
-        last_cluster = resources.cluster_if_initialized()
+        cluster = resources.cluster_if_initialized()
 
         if act.recreate_inventory:
             if resources.inventory_filepath:
@@ -136,70 +137,100 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
                     utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
 
             resources.recreate_inventory()
-            _post_process_actions_group(last_cluster, context, successfully_performed)
+            _post_process_actions_group(resources, successfully_performed)
             successfully_performed = []
-            last_cluster = None
 
     if successfully_performed:
-        _post_process_actions_group(last_cluster, context, successfully_performed)
+        _post_process_actions_group(resources, successfully_performed)
 
 
-def _post_process_actions_group(last_cluster: Optional[c.KubernetesCluster], context: dict,
-                                successfully_performed: list, failed: bool = False) -> None:
-    if last_cluster is None:
+def _post_process_actions_group(resources: res.DynamicResources, successfully_performed: List[str],
+                                *,
+                                failed: bool = False) -> None:
+    if resources.cluster_if_initialized() is None:
         return
+
+    context = resources.context
+
+    # If cluster is initialized, it is fully enriched at least to DEFAULT state.
+    # Use this state to dump all effective inventories.
+    # This is acceptable due to the following assumptions for the last action:
+    # * If successful, changes in the inventory should be moved to this state in DynamicResources.recreate_inventory().
+    # * If failed, switch to this state effectively restores the cluster to the state after previous action succeeded.
+    cluster = resources.cluster(c.EnrichmentStage.DEFAULT)
     try:
-        last_cluster.dump_finalized_inventory()
+        if failed:
+            # Preserve effective inventory for the last succeeded action.
+            # For debug aims, cluster_procedure.yaml can still be used.
+            defaults.dump_inventory(cluster, context, 'cluster.yaml')
+
+        resources.dump_finalized_inventory(cluster)
     finally:
-        if context['preserve_inventory']:
-            last_cluster.context['successfully_performed'] = successfully_performed
-            last_cluster.context['status'] = 'failed' if failed else 'successful'
-            last_cluster.preserve_inventory()
+        context['successfully_performed'] = successfully_performed
+        context['status'] = 'failed' if failed else 'successful'
+
+        if (resources.context['preserve_inventory']
+                and not resources.context['execution_arguments'].get('without_act', False)):
+            # If the main cluster is initialized, light cluster is initialized for sure
+            cluster = resources.cluster(c.EnrichmentStage.LIGHT)
+            cluster.preserve_inventory(context)
 
 
-def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None,
-              tasks_filter: List[str] = None) -> None:
-    """
-    Filters and runs tasks.
-    """
+class TasksAction(action.Action):
+    def __init__(self, identifier: str, tasks: dict,
+                 *,
+                 cumulative_points: dict = None,
+                 tasks_filter: List[str] = None,
+                 recreate_inventory: bool = False):
+        super().__init__(identifier, recreate_inventory=recreate_inventory)
+        self.tasks = deepcopy(tasks)
+        self.cumulative_points = cumulative_points or {}
+        self.tasks_filter = tasks_filter
 
-    if cumulative_points is None:
-        cumulative_points = {}
+    def run(self, resources: res.DynamicResources) -> None:
+        """
+        Filters and runs tasks.
+        """
 
-    args: dict = resources.context['execution_arguments']
+        args: dict = resources.context['execution_arguments']
 
-    tasks_filter = tasks_filter if tasks_filter is not None \
-        else [] if not args.get('tasks') else args['tasks'].split(",")
-    excluded_tasks = [] if not args.get('exclude') else args['exclude'].split(",")
+        tasks_filter = self.tasks_filter if self.tasks_filter is not None \
+            else [] if not args.get('tasks') else args['tasks'].split(",")
+        excluded_tasks = [] if not args.get('exclude') else args['exclude'].split(",")
 
-    logger = resources.logger()
-    logger.debug("Excluded tasks:")
-    filtered_tasks, final_list = filter_flow(tasks, tasks_filter, excluded_tasks, logger)
-    if filtered_tasks == tasks:
-        logger.debug("\tNo excluded tasks")
+        logger = resources.logger()
+        logger.debug("Excluded tasks:")
+        filtered_tasks, final_list = filter_flow(self.tasks, tasks_filter, excluded_tasks, logger)
+        if filtered_tasks == self.tasks:
+            logger.debug("\tNo excluded tasks")
 
-    cluster = resources.cluster()
+        cluster = self.cluster(resources)
 
-    if args.get('without_act', False):
-        resources.context['preserve_inventory'] = False
-        cluster.log.debug('\nFurther acting manually disabled')
-        return
+        if args.get('without_act', False):
+            cluster.log.debug('\nFurther acting manually disabled')
+            return
 
-    init_tasks_flow(cluster)
-    run_tasks_recursive(tasks, final_list, cluster, cumulative_points, [])
-    proceed_cumulative_point(cluster, cumulative_points, END_OF_TASKS,
-                             force=args.get('force_cumulative_points', False))
+        init_tasks_flow(cluster)
+        run_tasks_recursive(self.tasks, final_list, cluster, self.cumulative_points, [])
+        proceed_cumulative_point(cluster, self.cumulative_points, END_OF_TASKS,
+                                 force=args.get('force_cumulative_points', False))
+
+    def cluster(self, resources: res.DynamicResources) -> c.KubernetesCluster:
+        return resources.cluster()
 
 
-def create_empty_context(args: dict = None, procedure: str = None) -> dict:
-    if args is None:
-        args = {}
+def run_tasks(resources: res.DynamicResources, tasks: dict, cumulative_points: dict = None) -> None:
+    return TasksAction("", tasks, cumulative_points=cumulative_points).run(resources)
+
+
+def create_empty_context(args: dict, procedure: str) -> dict:
     return {
         "execution_arguments": deepcopy(args),
-        "nodes": {},
         'initial_procedure': procedure,
         'preserve_inventory': True,
-        'runtime_vars': {}
+        'load_inventory_silent': False,
+        'runtime_vars': {},
+        'result': ['summary_report'],
     }
 
 
@@ -316,11 +347,11 @@ def new_common_parser(cli_help: str) -> argparse.ArgumentParser:
                         help='define main cluster configuration file')
 
     parser.add_argument('--ansible-inventory-location',
-                        default='./ansible-inventory.ini',
+                        default='ansible-inventory.ini',
                         help='auto-generated ansible-compatible inventory file location')
 
     parser.add_argument('--dump-location',
-                        default='./',
+                        default='.',
                         help='dump directory for intermediate files')
 
     parser.add_argument('--disable-dump',

@@ -24,7 +24,7 @@ def main():
     context = flow.create_empty_context(args={
         'config': 'cluster.yaml',
         'dump_location': './dump/'
-    })
+    }, procedure='install')
     resources = DynamicResources(context)
     results = resources.cluster().nodes['control-plane'].sudo('whoami')
     print(results)

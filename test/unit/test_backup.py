@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import gzip
-import logging
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -23,8 +22,9 @@ from typing import Optional
 from unittest import mock
 
 from kubemarine import demo
-from kubemarine.core import flow, utils, log
+from kubemarine.core import utils, flow
 from kubemarine.procedures import backup
+from test.unit import utils as test_utils
 
 
 class TestBackupTasks(unittest.TestCase):
@@ -33,30 +33,25 @@ class TestBackupTasks(unittest.TestCase):
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.hosts = [node['address'] for node in self.inventory['nodes']]
 
-        self.context = backup.create_context(['fake.yaml'])
-        self.context['preserve_inventory'] = False
+        self.context = demo.create_silent_context(['fake.yaml'], procedure='backup')
 
         self.args = self.context['execution_arguments']
-        del self.args['ansible_inventory_location']
         self.args['disable_dump'] = False
         self.args['dump_location'] = self.tmpdir.name
-        utils.prepare_dump_directory(self.args['dump_location'])
+        test_utils.prepare_dump_directory(self.context)
 
         self.fake_shell = demo.FakeShell()
         self.resources: Optional[demo.FakeResources] = None
 
     def tearDown(self):
-        logger = logging.getLogger("k8s.fake.local")
-        for h in logger.handlers:
-            if isinstance(h, log.FileHandlerWithHeader):
-                h.close()
+        test_utils.prepare_dump_directory(self.context)
         self.tmpdir.cleanup()
 
     def _run(self, procedure_inventory: dict):
-        self.resources = demo.FakeResources(self.context, self.inventory,
-                                            procedure_inventory=procedure_inventory,
-                                            nodes_context=demo.generate_nodes_context(self.inventory),
-                                            fake_shell=self.fake_shell)
+        self.resources = test_utils.FakeResources(self.context, self.inventory,
+                                                  procedure_inventory=procedure_inventory,
+                                                  nodes_context=demo.generate_nodes_context(self.inventory),
+                                                  fake_shell=self.fake_shell)
 
         flow.run_actions(self.resources, [backup.BackupAction()])
 
@@ -71,10 +66,10 @@ class TestBackupTasks(unittest.TestCase):
         backup_all_procedure.setdefault('backup_plan', {}).setdefault('kubernetes', {}) \
             .setdefault('nonnamespaced_resources', 'all')
 
-        with self._mock_manifest_processor_enrich():
+        with self._mock_download():
             self._run(backup_all_procedure)
 
-        descriptor = self.resources.last_cluster.context['backup_descriptor']['kubernetes']['resources']
+        descriptor = self.resources.cluster_if_initialized().context['backup_descriptor']['kubernetes']['resources']
         self.assertEqual({'kube-system': ['configmaps', 'configmaps.example.com', 'roles.rbac.authorization.k8s.io']},
                          descriptor.get('namespaced'),
                          "Not expected resulting list of namespaced resources")
@@ -186,10 +181,10 @@ class TestBackupTasks(unittest.TestCase):
 
         backup_all_procedure = demo.generate_procedure_inventory('backup')
 
-        with self._mock_manifest_processor_enrich():
+        with self._mock_download():
             self._run(backup_all_procedure)
 
-        descriptor = self.resources.last_cluster.context['backup_descriptor']['kubernetes']['resources']
+        descriptor = self.resources.cluster_if_initialized().context['backup_descriptor']['kubernetes']['resources']
         self.assertEqual({}, descriptor, "Not expected resulting list of resources")
 
         resources_path = Path(self.tmpdir.name) / 'dump' / 'backup' / 'kubernetes_resources'
@@ -229,7 +224,7 @@ class TestBackupTasks(unittest.TestCase):
                             ['kubectl api-resources --verbs=list --sort-by=name --namespaced=false'])
 
     @contextmanager
-    def _mock_manifest_processor_enrich(self):
+    def _mock_download(self):
         download_orig = backup.ExportKubernetesDownloader._download
 
         def download_stub(location: str, data: str):

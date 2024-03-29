@@ -19,7 +19,6 @@ from abc import ABC, abstractmethod
 
 from pygelf import gelf, GelfTcpHandler, GelfUdpHandler, GelfTlsHandler, GelfHttpHandler  # type: ignore[import-untyped]
 
-from copy import deepcopy
 from typing import Any, List, Optional, cast, Dict, Union
 
 VERBOSE = 5
@@ -93,7 +92,11 @@ class EnhancedLogger(logging.Logger, VerboseLogger):
 
     def verbose(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(VERBOSE):
-            self._log(VERBOSE, msg, args, **kwargs)
+            if sys.version_info[:2] >= (3, 11):
+                # https://github.com/python/cpython/pull/28287
+                self._log(VERBOSE, msg, args, **kwargs, stacklevel=2)
+            else:
+                self._log(VERBOSE, msg, args, **kwargs)
 
     def makeRecord(self, name: str, level: int, fn: str, lno: int, msg: object, args,  # type: ignore[no-untyped-def]
                    exc_info, func=None, extra=None,
@@ -272,8 +275,8 @@ class LogHandler:
 
 class Log:
 
-    def __init__(self, raw_inventory: dict, handlers: List[LogHandler]):
-        logger = logging.getLogger(raw_inventory.get('cluster_name', 'cluster.local'))
+    def __init__(self, name: str, handlers: List[LogHandler]):
+        logger = logging.getLogger(name)
         self._logger = cast(EnhancedLogger, logger)
         self._logger.setLevel(VERBOSE)
 
@@ -359,7 +362,7 @@ def get_dump_debug_filepath(context: dict) -> Optional[str]:
     return os.path.join(args['dump_location'], 'dump', 'debug.log')
 
 
-def init_log_from_context_args(globals: dict, context: dict, raw_inventory: dict) -> Log:
+def init_log_from_context_args(globals: dict, context: dict, name: str) -> Log:
     """
     Create Log from raw CLI arguments in Cluster context
     :param globals: parsed globals collection
@@ -388,10 +391,10 @@ def init_log_from_context_args(globals: dict, context: dict, raw_inventory: dict
                                    **globals['logging']['default_targets']['dump']))
 
     if not stdout_specified:
-        stdout_settings = deepcopy(globals['logging']['default_targets']['stdout'])
+        stdout_settings = globals['logging']['default_targets']['stdout']
         handlers.append(LogHandler(target='stdout', **stdout_settings))
 
-    log = Log(raw_inventory, handlers)
+    log = Log(name, handlers)
 
     log.logger.verbose('Using the following loggers: \n\t%s' % "\n\t".join("- " + str(x) for x in handlers))
 
@@ -405,7 +408,12 @@ def caller_info(logger: EnhancedLogger) -> Dict[str, object]:
     :param logger: EnhancedLogger
     :return: dictionary with the invocation metadata
     """
-    fn, lno, func, sinfo = logger.findCaller()
+    if sys.version_info[:2] >= (3, 11):
+        # https://github.com/python/cpython/pull/28287
+        fn, lno, func, sinfo = logger.findCaller(stacklevel=3)
+    else:
+        fn, lno, func, sinfo = logger.findCaller()
+
     record: logging.LogRecord = logger.makeRecord("", logging.DEBUG, fn, lno, "", (), None,
                                                   func=func, extra=None, sinfo=sinfo)
     return dict(item for item in record.__dict__.items()

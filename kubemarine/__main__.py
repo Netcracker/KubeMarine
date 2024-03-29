@@ -83,6 +83,10 @@ procedures = OrderedDict({
         'description': "Remove existing nodes from cluster",
         'group': 'maintenance'
     },
+    'reconfigure': {
+        'description': "Reconfigure managed Kubernetes cluster",
+        'group': 'maintenance'
+    },
     'manage_psp': {
         'description': "Manage PSP on Kubernetes cluster",
         'group': 'maintenance'
@@ -109,6 +113,10 @@ procedures = OrderedDict({
     },
     'version': {
         'description': "Print current release version",
+        'group': 'other'
+    },
+    'config': {
+        'description': "Print the supported k8s versions with the respective configurations of third-parties",
         'group': 'other'
     },
     'do': {
@@ -194,7 +202,7 @@ def selftest() -> None:
 
         if "main" not in dir(module):
             raise Exception("No main method in %s" % procedure)
-        if procedure not in ["do", "migrate_kubemarine"]:
+        if procedure not in ["do", "migrate_kubemarine", "config"]:
             if "tasks" not in dir(module):
                 raise Exception("Tasks tree is not presented in %s" % procedure)
             if not isinstance(module.tasks, OrderedDict):

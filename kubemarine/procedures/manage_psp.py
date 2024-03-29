@@ -19,26 +19,18 @@ from typing import List
 
 from kubemarine import admission
 from kubemarine.core import flow
-from kubemarine.core.action import Action
-from kubemarine.core.resources import DynamicResources
 
 tasks = OrderedDict({
-    "check_inventory": admission.check_inventory,
     "delete_custom": admission.delete_custom_task,
     "add_custom": admission.add_custom_task,
-    "reconfigure_oob": admission.reconfigure_oob_task,
-    "reconfigure_plugin": admission.reconfigure_plugin_task,
+    "reconfigure_psp": admission.reconfigure_psp_task,
     "restart_pods": admission.restart_pods_task
 })
 
 
-class PSPAction(Action):
+class PSPAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('manage psp', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('manage psp', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

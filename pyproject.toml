@@ -2,6 +2,9 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["kubemarine*"]
+
 [project]
 dynamic = ["version", "readme"]
 name = "kubemarine"
@@ -40,7 +43,7 @@ dependencies = [
     "deepdiff==6.7.*",
     "ordered-set==4.1.*",
     # Each time cryptography version is updated, need to regenerate scripts/ci/custom-hooks/hook-cryptography.py
-    "cryptography==41.0.7",
+    "cryptography==42.0.4",
     "paramiko==3.3.*",
     "jsonschema==4.17.*",
     "typing_extensions==4.7.*",
@@ -77,7 +80,7 @@ Issues = "https://github.com/Netcracker/KubeMarine/issues/"
 # 1. pip install bumpver
 # 2. bumpver update --set-version <new version>
 [tool.bumpver]
-current_version = "v0.26.0"
+current_version = "v0.27.0"
 version_pattern = "vMAJOR.MINOR.PATCH"
 commit_message = "bump version to {new_version}"
 commit = true

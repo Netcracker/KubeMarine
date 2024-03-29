@@ -19,7 +19,7 @@ from unittest import mock
 import yaml
 
 from kubemarine import demo, coredns, __main__
-from kubemarine.core import errors, schema
+from kubemarine.core import errors
 from kubemarine.procedures import install
 from test.unit import utils as test_utils
 
@@ -35,13 +35,11 @@ class FinalizedInventoryValidation(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
         # check that enrichment of finalized inventory is successful and the inventory is valid against the schema
         cluster = self._check_finalized_validation(finalized_inventory)
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
         # check that enrichment is idempotent and double-finalized inventory still valid against the schema
@@ -52,7 +50,6 @@ class FinalizedInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         coredns.generate_configmap(cluster.inventory)
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
         # check that generation of coredns does not break finalized inventory
@@ -64,7 +61,6 @@ class FinalizedInventoryValidation(unittest.TestCase):
         cluster = demo.new_cluster(inventory)
         install.deploy_plugins(cluster)
 
-        test_utils.stub_associations_packages(cluster, {})
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
         # check that plugins installation does not break finalized inventory
@@ -82,11 +78,8 @@ class TestValidExamples(unittest.TestCase):
                 inventory = yaml.safe_load(stream)
 
             # check that enrichment is successful and the inventory is valid against the schema
-            context = demo.create_silent_context()
-            context['nodes'] = demo.generate_nodes_context(inventory)
             try:
-                cluster = demo.FakeKubernetesCluster(inventory, context=context)
-                schema.verify_inventory(cluster.raw_inventory, cluster)
+                demo.new_cluster(inventory)
             except Exception as e:
                 self.fail(f"Enrichment of {os.path.relpath(inventory_filepath, start=inventories_dir)} failed: {e}")
 
@@ -214,6 +207,21 @@ class TestErrorHeuristics(unittest.TestCase):
         }
         with self.assertRaisesRegex(errors.FailException, r"'address' was unexpected"):
             demo.new_cluster(inventory)
+
+    def test_propertyNames_not_enum(self):
+        """
+        'services.kubeadm_kube-proxy' section is an example where propertyNames are configured as not(enum).
+        Specify unexpected property to check correctly generated error.
+        See kubemarine.core.schema._friendly_msg
+        """
+        inventory = demo.generate_inventory(**demo.ALLINONE)
+        context = demo.create_silent_context(["fake.yaml"], procedure='reconfigure')
+
+        reconfigure = demo.generate_procedure_inventory(procedure='reconfigure')
+        reconfigure.setdefault('services', {}).setdefault('kubeadm_kube-proxy', {})['kind'] = 'unsupported'
+
+        with self.assertRaisesRegex(errors.FailException, "Property name 'kind' is unexpected"):
+            demo.new_cluster(inventory, procedure_inventory=reconfigure, context=context)
 
 
 if __name__ == '__main__':

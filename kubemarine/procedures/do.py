@@ -58,7 +58,7 @@ class CLIAction(Action):
 
 def main(cli_arguments: List[str] = None) -> None:
 
-    if not cli_arguments:
+    if cli_arguments is None:
         cli_arguments = sys.argv[1:]
 
     if '--' in cli_arguments:
@@ -96,8 +96,9 @@ def main(cli_arguments: List[str] = None) -> None:
             ['stdout;level=error;colorize=true;correct_newlines=true']
         ],
         'config': configfile_path,
-    })
+    }, procedure='do')
     context['preserve_inventory'] = False
+    context['load_inventory_silent'] = True
 
     def node_group_provider(cluster: KubernetesCluster) -> NodeGroup:
         if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
@@ -119,8 +120,7 @@ def main(cli_arguments: List[str] = None) -> None:
 
     no_stream: bool = arguments['no_stream']
     action = CLIAction(node_group_provider, remote_args, no_stream)
-    res = resources.DynamicResources(context, silent=True)
-    flow.ActionsFlow([action]).run_flow(res, print_summary=False)
+    flow.ActionsFlow([action]).run_flow(context, print_summary=False)
 
 
 if __name__ == '__main__':

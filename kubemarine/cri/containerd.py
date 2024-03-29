@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from copy import deepcopy
 from io import StringIO
 from typing import Dict, List, Tuple, Optional
 
@@ -19,14 +18,16 @@ import toml
 import yaml
 import base64
 
-from kubemarine import system, packages
+from kubemarine import system, packages, jinja
 from kubemarine.core import utils, static, errors
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback
 from kubemarine.core.yaml_merger import default_merger
 
 
-def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     containerd_config = inventory['services']['cri']['containerdConfig']
 
     path = 'plugins."io.containerd.grpc.v1.cri"'
@@ -46,7 +47,6 @@ def enrich_inventory(inventory: dict, _: KubernetesCluster) -> dict:
     if not old_format_result and 'containerdRegistriesConfig' in inventory['services']['cri']:
         containerd_config.setdefault('plugins."io.containerd.grpc.v1.cri".registry', {})\
             .setdefault('config_path', '/etc/containerd/certs.d')
-    return inventory
 
 
 def contains_old_format_properties(inventory: dict) -> Tuple[bool, Optional[str]]:
@@ -84,30 +84,43 @@ def get_sandbox_image(cri_config: dict) -> Optional[str]:
 
 def get_sandbox_image_upgrade_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     context = cluster.context
+    procedure_inventory = cluster.procedure_inventory
     upgrade_plan = []
-    if context.get("initial_procedure") == "upgrade":
-        upgrade_version = context["upgrade_version"]
-        for version in cluster.procedure_inventory['upgrade_plan']:
-            if utils.version_key(version) < utils.version_key(upgrade_version):
-                continue
 
-            upgrade_config = cluster.procedure_inventory.get(version, {}).get('cri', {})
+    if context["initial_procedure"] == "upgrade":
+        kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        for i, v in enumerate(procedure_inventory['upgrade_plan'][context['upgrade_step']:]):
+            # Take the target (probably) compiled version and the remained not yet compiled
+            version = kubernetes_version if i == 0 else v
+            upgrade_config = procedure_inventory.get(v, {}).get('cri', {})
             upgrade_plan.append((version, upgrade_config))
 
     return upgrade_plan
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
+def enrich_upgrade_inventory(cluster: KubernetesCluster) -> None:
+    upgrade_plan = get_sandbox_image_upgrade_plan(cluster)
+    upgrade_config = {} if not upgrade_plan else upgrade_plan[0][1]
+
+    if upgrade_config:
+        default_merger.merge(cluster.inventory.setdefault("services", {}).setdefault("cri", {}), upgrade_config)
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
+def verify_upgrade_inventory(cluster: KubernetesCluster) -> None:
     upgrade_plan = get_sandbox_image_upgrade_plan(cluster)
     if not upgrade_plan:
-        return inventory
+        return
 
-    context = cluster.context
-    previous_version = context["initial_kubernetes_version"]
-    sandbox_image = get_sandbox_image(inventory['services']['cri'])
+    previous_version = cluster.previous_inventory['services']['kubeadm']['kubernetesVersion']
+    sandbox_image = get_sandbox_image(cluster.previous_raw_inventory.get('services', {}).get('cri', {}))
     for version, upgrade_config in upgrade_plan:
+        if version != '' and jinja.is_template(version):
+            break
+
         upgrade_sandbox_image = get_sandbox_image(upgrade_config)
-        if sandbox_image is not None and upgrade_sandbox_image is None:
+        if sandbox_image and not upgrade_sandbox_image:
             raise errors.KME("KME0013",
                              previous_version_spec=f' for version {previous_version}',
                              next_version_spec=f' for version {version}')
@@ -115,61 +128,30 @@ def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dic
         sandbox_image = upgrade_sandbox_image
         previous_version = version
 
-    context.setdefault("upgrade", {}).setdefault('required', {})['containerdConfig'] \
-        = is_sandbox_image_upgrade_required(cluster, inventory)
 
-    return upgrade_finalize_inventory(cluster, inventory)
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade'])
+def calculate_sandbox_image_upgrade_required(cluster: KubernetesCluster) -> None:
+    cri_impl = cluster.inventory['services']['cri']['containerRuntime']
+    if cri_impl != "containerd":
+        return
 
+    upgrade_required = (get_sandbox_image(cluster.previous_inventory['services']['cri'])
+                        != get_sandbox_image(cluster.inventory['services']['cri']))
 
-def is_sandbox_image_upgrade_required(cluster: KubernetesCluster, inventory: dict) -> bool:
-    previous_ver = cluster.context["initial_kubernetes_version"]
-    old_image = get_sandbox_image(inventory['services']['cri'])
-    if old_image is None:
-        old_image = get_default_sandbox_image(inventory, previous_ver)
-
-    upgrade_ver = inventory['services']['kubeadm']['kubernetesVersion']
-    _, upgrade_config = get_sandbox_image_upgrade_plan(cluster)[0]
-    new_image = get_sandbox_image(upgrade_config)
-    if new_image is None:
-        new_image = get_default_sandbox_image(inventory, upgrade_ver)
-
-    return old_image != new_image
+    cluster.context.setdefault("upgrade", {}).setdefault('required', {})['containerdConfig'] = upgrade_required
 
 
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    upgrade_plan = get_sandbox_image_upgrade_plan(cluster)
-    if not upgrade_plan:
-        return inventory
-
-    _, upgrade_config = upgrade_plan[0]
-    if upgrade_config:
-        default_merger.merge(inventory.setdefault("services", {}).setdefault("cri", {}), upgrade_config)
-
-    return inventory
-
-
-def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    # This method should be before defaults.apply_registry
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    if inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['migrate_cri'])
+def enrich_migrate_cri_inventory(cluster: KubernetesCluster) -> None:
+    if cluster.previous_inventory["services"]["cri"]["containerRuntime"] == cluster.procedure_inventory["cri"]["containerRuntime"]:
         raise Exception("You already have such cri or you should explicitly specify 'cri.containerRuntime: docker' in cluster.yaml")
 
-    return migrate_cri_finalize_inventory(cluster, inventory)
-
-
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    cri_section = inventory.setdefault("services", {}).setdefault("cri", {})
+    cri_section = cluster.inventory.setdefault("services", {}).setdefault("cri", {})
 
     if cri_section.get("dockerConfig", {}):
         del cri_section["dockerConfig"]
 
-    default_merger.merge(cri_section, deepcopy(cluster.procedure_inventory["cri"]))
-    return inventory
+    default_merger.merge(cri_section, utils.deepcopy_yaml(cluster.procedure_inventory["cri"]))
 
 
 def fetch_containerd_config(group: NodeGroup) -> Tuple[Dict[str, dict], Dict[str, dict]]:
@@ -315,7 +297,7 @@ def configure_containerd(group: NodeGroup) -> RunnersGroupResult:
             .get('containerdRegistriesConfig', {}).items():
         registry_host_toml = get_config_as_toml(host_config)
         registries_config[registry] = toml.dumps(registry_host_toml)
-        utils.dump_file(cluster, registries_config[registry], f"registries/{registry}/hosts.toml", create_subdir=True)
+        utils.dump_file(cluster, registries_config[registry], f"registries/{registry}/hosts.toml")
 
     collector = CollectorCallback(cluster)
     with group.new_executor() as exe:

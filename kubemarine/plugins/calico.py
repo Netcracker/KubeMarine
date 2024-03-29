@@ -19,14 +19,17 @@ import os
 
 from kubemarine import plugins, kubernetes
 from kubemarine.core import utils, log
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
+from kubemarine.core.group import NodeGroup
 from kubemarine.kubernetes import secrets
 from kubemarine.plugins.manifest import Processor, EnrichmentFunction, Manifest, Identity
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
     if not inventory["plugins"]["calico"]["install"]:
-        return inventory
+        return
 
     # if user defined resources himself, we should use them as is, instead of merging with our defaults
     raw_calico_node = cluster.raw_inventory.get("plugins", {}).get("calico", {}).get("node", {})
@@ -42,7 +45,46 @@ def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
     if "resources" in raw_apiserver:
         inventory["plugins"]["calico"]["apiserver"]["resources"] = raw_apiserver["resources"]
 
-    return inventory
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['remove_node'])
+def enrich_remove_node_set_previous_typha_enabled(cluster: KubernetesCluster) -> None:
+    if not cluster.previous_inventory["plugins"]["calico"]["install"]:
+        return
+
+    # If Typha was (effectively) enabled before removing of node and `enabled` value is not explicitly provided,
+    # Let's set previous flag in all inventories including final, as we are not able to fully remove Typha.
+    typha_enabled_before = is_typha_enabled(cluster.previous_inventory)
+    if typha_enabled_before and 'enabled' not in cluster.inventory.get('plugins', {}).get('calico', {}).get('typha', {}):
+        cluster.inventory.setdefault('plugins', {}).setdefault('calico', {})\
+            .setdefault('typha', {})['enabled'] = typha_enabled_before
+
+
+def new_route_reflectors_added(cluster: KubernetesCluster) -> bool:
+    procedure = cluster.context['initial_procedure']
+    if procedure != 'add_node':
+        return False
+
+    calico = cluster.inventory['plugins']['calico']
+    if calico['fullmesh']:
+        return False
+
+    for node in cluster.get_new_nodes().having_roles(['control-plane', 'worker']).get_ordered_members_configs_list():
+        if node.get('labels', {}).get('route-reflector') is True:
+            break
+    else:
+        return False
+
+    steps = calico['installation']['procedures']
+    for step in steps:
+        if 'template' not in step:
+            continue
+
+        if step['template']['source'] == 'templates/plugins/calico-rr.sh.j2':
+            break
+    else:
+        return False
+
+    return True
 
 
 # DEPRECATED
@@ -124,7 +166,7 @@ def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
     # Try to access some projectcalico.org resource using each instance of the Kubernetes API server.
     expect_config = cluster.inventory['plugins']['calico']['apiserver']['expect']['apiservice']
     with kubernetes.local_admin_config(control_planes) as kubeconfig:
-        control_planes.call(utils.wait_command_successful,
+        control_planes.call(NodeGroup.wait_command_successful,
                             command=f"kubectl --kubeconfig {kubeconfig} get ippools.projectcalico.org",
                             hide=True,
                             retries=expect_config['retries'], timeout=expect_config['timeout'])

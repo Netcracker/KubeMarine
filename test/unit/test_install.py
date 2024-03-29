@@ -23,7 +23,7 @@ class ManageMandatoryPackages(unittest.TestCase):
     def setUp(self) -> None:
         self.inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         self.context = demo.create_silent_context()
-        self.context['nodes'] = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
+        self.nodes_context = demo.generate_nodes_context(self.inventory, os_name='ubuntu', os_version='20.04')
         self.mandatory_pkgs_setup = {}
         for package in static.DEFAULTS["services"]["packages"]['mandatory'].keys():
             self.mandatory_pkgs_setup[package] = []
@@ -36,7 +36,7 @@ class ManageMandatoryPackages(unittest.TestCase):
                 self.mandatory_pkgs_setup[pkg].append(host)
 
     def _new_cluster(self):
-        cluster = demo.new_cluster(self.inventory, context=self.context)
+        cluster = demo.new_cluster(self.inventory, context=self.context, nodes_context=self.nodes_context)
         for node in cluster.nodes['all'].get_ordered_members_list():
             installation_command = self._get_install_cmd(cluster, node.get_host())
             results = demo.create_hosts_result([node.get_host()], stdout=f'Successfully installed')
@@ -67,7 +67,7 @@ class ManageMandatoryPackages(unittest.TestCase):
         self._assert_installed(cluster)
 
     def test_default_install_rhel(self):
-        self.context['nodes'] = demo.generate_nodes_context(self.inventory)
+        self.nodes_context = demo.generate_nodes_context(self.inventory)
         for node in self.inventory['nodes']:
             self.mandatory_pkgs_setup.setdefault('semanage', []).append(node['address'])
         cluster = self._new_cluster()

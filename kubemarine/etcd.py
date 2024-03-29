@@ -27,10 +27,10 @@ def remove_members(group: NodeGroup) -> None:
     cluster: KubernetesCluster = group.cluster
     log = cluster.log
 
-    control_planes = cluster.nodes["control-plane"]
-    managing_control_plane = control_planes.get_unchanged_nodes().get_any_member()
+    initial_control_planes = cluster.previous_nodes["control-plane"]
+    managing_control_plane = cluster.get_unchanged_nodes().having_roles(['control-plane']).get_any_member()
 
-    log.verbose(f"etcd will be managed using {managing_control_plane.get_nodes_names()[0]}.")
+    log.verbose(f"etcd will be managed using {managing_control_plane.get_node_name()}.")
     output = managing_control_plane.sudo("etcdctl member list").get_simple_out().splitlines()
 
     etcd_members = {}
@@ -43,7 +43,7 @@ def remove_members(group: NodeGroup) -> None:
             log.warning("Unexpected line in 'etcdctl member list' output: " + line)
 
     log.verbose(f"Found etcd members {list(etcd_members.keys())}")
-    unexpected_members = etcd_members.keys() - set(control_planes.get_nodes_names())
+    unexpected_members = etcd_members.keys() - set(initial_control_planes.get_nodes_names())
     if unexpected_members:
         log.warning(f"Found unexpected etcd members {list(unexpected_members)}")
 

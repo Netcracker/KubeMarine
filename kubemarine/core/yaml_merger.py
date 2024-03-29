@@ -54,3 +54,12 @@ default_merger: Merger = Merger(
     ["override"],
     ["override"]
 )
+
+override_merger: Merger = Merger(
+    [
+        (list, ["override"]),
+        (dict, ["merge"])
+    ],
+    ["override"],
+    ["override"]
+)

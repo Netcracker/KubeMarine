@@ -22,7 +22,7 @@ from copy import deepcopy
 
 import invoke
 
-from kubemarine.core import flow, static, errors, utils
+from kubemarine.core import flow, static, utils
 from kubemarine import demo
 from test.unit import utils as test_utils
 
@@ -209,7 +209,7 @@ class FlowTest(unittest.TestCase):
         inventory = demo.generate_inventory(**demo.FULLHA)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks)
-        self.assertEqual(1, resources.working_context["test_info"],
+        self.assertEqual(1, resources.cluster_if_initialized().context["test_info"],
                          "It had to be one call of test_func for deploy.loadbalancer.haproxy action")
 
     def test_force_proceed_cumulative_point_task_present(self):
@@ -220,7 +220,7 @@ class FlowTest(unittest.TestCase):
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
-        self.assertEqual(2, resources.working_context.get("test_info"),
+        self.assertEqual(2, resources.cluster_if_initialized().context.get("test_info"),
                          f"Both task and cumulative points should be run")
 
     def test_force_proceed_cumulative_point_task_absent(self):
@@ -231,7 +231,7 @@ class FlowTest(unittest.TestCase):
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
-        self.assertEqual(1, resources.working_context.get("test_info"),
+        self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
                          f"Cumulative point should be skipped as task is not run")
 
     def test_force_proceed_cumulative_point_end_of_tasks(self):
@@ -242,7 +242,7 @@ class FlowTest(unittest.TestCase):
         }
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks, cumulative_points=cumulative_points)
-        self.assertEqual(2, resources.working_context.get("test_info"),
+        self.assertEqual(2, resources.cluster_if_initialized().context.get("test_info"),
                          f"Cumulative point should be executed at the end of tasks")
 
     def test_scheduled_cumulative_point_task_absent(self):
@@ -255,7 +255,7 @@ class FlowTest(unittest.TestCase):
         tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
-        self.assertEqual(1, resources.working_context.get("test_info"),
+        self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
                          f"Cumulative point should be executed despite the related task is not run")
 
     def test_scheduled_cumulative_point_end_of_tasks(self):
@@ -275,7 +275,7 @@ class FlowTest(unittest.TestCase):
         tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, cumulative_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
-        self.assertEqual(1, resources.working_context.get("test_info"),
+        self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
                          f"Cumulative point should be executed at the end of tasks")
 
     def test_detect_nodes_context(self):
@@ -291,7 +291,8 @@ class FlowTest(unittest.TestCase):
                          "Here should be all 4 calls of test_func")
 
         self.assertEqual("rhel", cluster.get_os_family())
-        for host, node_context in cluster.context["nodes"].items():
+        self.assertEqual(len(hosts), len(cluster.nodes_context))
+        for host, node_context in cluster.nodes_context.items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
@@ -308,7 +309,7 @@ class FlowTest(unittest.TestCase):
                          "Here should be all 4 calls of test_func")
 
         self.assertEqual("rhel", cluster.get_os_family())
-        for host, node_context in cluster.context["nodes"].items():
+        for host, node_context in cluster.nodes_context.items():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
@@ -322,15 +323,58 @@ class FlowTest(unittest.TestCase):
         context = demo.create_silent_context()
         res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
 
-        exc = None
-        try:
+        with test_utils.assert_raises_kme(self, 'KME0006', escape=True, offline=[offline], inaccessible=[]):
             flow.run_tasks(res, tasks)
-        except Exception as e:
-            exc = e
 
-        self.assertIsNotNone(exc, msg="Exception should be raised")
-        self.assertIsInstance(exc, errors.FailException, msg="Exception should be raised")
-        self.assertTrue(f"['{offline}'] are not reachable." in str(exc.reason))
+    def test_upgrade_all_nodes_inaccessible(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['services']['kubeadm'] = {
+            'kubernetesVersion': 'v1.27.8'
+        }
+        procedure_inventory = demo.generate_procedure_inventory('upgrade')
+        procedure_inventory['upgrade_plan'] = ['v1.28.6']
+
+        self._stub_detect_nodes_context(inventory, [], [])
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='upgrade')
+        context['upgrade_step'] = 0
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        with test_utils.assert_raises_kme(self, 'KME0006', escape=True,
+                                          offline=[node['address'] for node in inventory['nodes']], inaccessible=[]):
+            flow.run_tasks(res, tasks)
+
+    def test_migrate_cri_all_nodes_inaccessible(self):
+        inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
+        inventory['services']['cri'] = {
+            'containerRuntime': 'docker'
+        }
+        procedure_inventory = demo.generate_procedure_inventory('migrate_cri')
+
+        self._stub_detect_nodes_context(inventory, [], [])
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='migrate_cri')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        with test_utils.assert_raises_kme(self, 'KME0006', escape=True,
+                                          offline=[node['address'] for node in inventory['nodes']], inaccessible=[]):
+            flow.run_tasks(res, tasks)
+
+    def test_all_nodes_offline_check_iaas(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        self._stub_detect_nodes_context(inventory, [], [])
+        context = demo.create_silent_context(procedure='check_iaas')
+        res = demo.FakeResources(context, inventory, fake_shell=self.light_fake_shell)
+        flow.run_tasks(res, tasks)
+        cluster = res.cluster()
+        self.assertEqual(4, cluster.context["test_info"],
+                         "Here should be all 4 calls of test_func")
+
+        self.assertEqual("<undefined>", cluster.get_os_family())
+        for host, node_context in cluster.nodes_context.items():
+            self.assertEqual({'online': False, 'accessible': False, 'sudo': "No"}, node_context["access"])
+            self.assertEqual({'name': "<undefined>", 'version': "<undefined>", 'family': "<undefined>"}, node_context["os"])
+            self.assertEqual("<undefined>", node_context["active_interface"])
 
     def test_any_removed_node_can_be_offline(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
@@ -349,10 +393,35 @@ class FlowTest(unittest.TestCase):
         # no exception should occur
         flow.run_tasks(res, tasks)
 
+    def test_detect_nodes_context_removed_node_online(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        hosts = [node["address"] for node in inventory["nodes"]]
+        self._stub_detect_nodes_context(inventory, hosts, hosts)
+
+        i = random.randrange(len(inventory["nodes"]))
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory["nodes"] = [{"name": inventory["nodes"][i]["name"]}]
+
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        flow.run_tasks(res, tasks)
+        cluster = res.cluster()
+        self.assertEqual(4, cluster.context["test_info"],
+                         "Here should be all 4 calls of test_func")
+
+        self.assertEqual("rhel", cluster.get_os_family())
+        self.assertEqual(len(hosts), len(cluster.nodes_context))
+        for host, node_context in cluster.nodes_context.items():
+            self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
+            self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
+            self.assertEqual('eth0', node_context["active_interface"])
+
     def test_kubernetes_version_not_allowed(self):
         k8s_versions = list(sorted(static.KUBERNETES_VERSIONS["compatibility_map"], key=utils.version_key))
         k8s_latest = k8s_versions[-1]
-        not_allowed_version =  test_utils.increment_version(k8s_latest)
+        not_allowed_version = test_utils.increment_version(k8s_latest)
 
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = not_allowed_version

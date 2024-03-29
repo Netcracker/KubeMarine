@@ -14,7 +14,7 @@
 from typing import List
 
 from kubemarine import kubernetes
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
 
 
@@ -24,14 +24,13 @@ def k8s_certs_overview(control_planes: NodeGroup) -> None:
         control_plane.sudo("kubeadm certs check-expiration", hide=False)
 
 
-def renew_verify(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get('initial_procedure') != 'cert_renew' or "kubernetes" not in cluster.procedure_inventory:
-        return inventory
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['cert_renew'])
+def renew_verify(cluster: KubernetesCluster) -> None:
+    if "kubernetes" not in cluster.procedure_inventory:
+        return
 
     cert_list = cluster.procedure_inventory["kubernetes"].get("cert-list")
     verify_all_is_absent_or_single(cert_list)
-
-    return inventory
 
 
 def renew_apply(control_planes: NodeGroup) -> None:
@@ -48,21 +47,8 @@ def renew_apply(control_planes: NodeGroup) -> None:
         kubernetes.copy_admin_config(log, control_planes)
 
     # for some reason simple pod delete do not work for certs update - we need to delete containers themselves
-    control_planes.call(force_restart_control_plane)
-
-    for control_plane in control_planes.get_ordered_members_list():
-        kubernetes.wait_for_any_pods(control_planes.cluster, control_plane, apply_filter=control_plane.get_node_name())
-
-
-def force_restart_control_plane(control_planes: NodeGroup) -> None:
-    cri_impl = control_planes.cluster.inventory['services']['cri']['containerRuntime']
-    restart_containers = ["etcd", "kube-scheduler", "kube-apiserver", "kube-controller-manager"]
-    c_filter = "grep -e %s" % " -e ".join(restart_containers)
-
-    if cri_impl == "docker":
-        control_planes.sudo("sudo docker container rm -f $(sudo docker ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
-    else:
-        control_planes.sudo("sudo crictl rm -f $(sudo crictl ps -a | %s | awk '{ print $1 }')" % c_filter, warn=True)
+    control_planes.call(kubernetes.components.restart_components,
+                        components=kubernetes.components.CONTROL_PLANE_COMPONENTS)
 
 
 def verify_all_is_absent_or_single(cert_list: List[str]) -> None:

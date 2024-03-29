@@ -21,6 +21,7 @@ from typing import TypeVar, Optional
 
 import yaml
 
+from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.executor import RunnersResult
 from kubemarine.core.group import NodeGroup
@@ -110,7 +111,7 @@ class KubernetesObject:
 
         json_str = self.to_json()
         obj_filename = "_".join([self.kind, self.namespace, self.name, self.uid]) + '.json'
-        obj_path = f'/tmp/{obj_filename}'
+        obj_path = utils.get_remote_tmp_path(obj_filename)
 
         defer = control_plane.new_defer()
         defer.put(io.StringIO(json_str), obj_path, sudo=True)

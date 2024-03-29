@@ -16,11 +16,16 @@
 
 import unittest
 
-from kubemarine.core import defaults
+from kubemarine.core import defaults, log
 from kubemarine import demo
 
 
 class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
+    logger: log.EnhancedLogger = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.logger = demo.new_cluster(demo.generate_inventory(**demo.ALLINONE)).log
 
     def test_controlplain_already_defined(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -28,7 +33,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
             'internal': '1.1.1.1',
             'external': '2.2.2.2'
         }
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '1.1.1.1')
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
@@ -37,7 +42,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         inventory['control_plain'] = {
             'internal': '1.1.1.1'
         }
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '1.1.1.1')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
@@ -46,13 +51,13 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         inventory['control_plain'] = {
             'external': '2.2.2.2'
         }
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0])
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
     def test_controlplain_calculated_half_vrrp_half_master(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0])
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
@@ -62,13 +67,13 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
             'ip': '192.168.0.1',
             'floating_ip': inventory['vrrp_ips'][0]
         }
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['vrrp_ips'][0]['ip'])
         self.assertEqual(inventory['control_plain']['external'], inventory['vrrp_ips'][0]['floating_ip'])
 
     def test_controlplain_calculated_half_fully_master(self):
         inventory = demo.generate_inventory(**demo.MINIHA)
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], inventory['nodes'][0]['internal_address'])
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
@@ -85,7 +90,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
                 'control_endpoint': True
             }
         ]
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
@@ -101,7 +106,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
                 'control_endpoint': True
             }
         ]
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], '1.1.1.1')
 
@@ -116,7 +121,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
                 'control_endpoint': True
             }
         ]
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
@@ -132,7 +137,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
             }
         ]
         inventory['nodes'][1]['control_endpoint'] = True
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.0.2')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][1]['address'])
 
@@ -151,7 +156,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
                 'floating_ip': '2.2.2.2',
             }
         ]
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
         self.assertEqual(inventory['control_plain']['external'], '2.2.2.2')
 
@@ -169,7 +174,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
                 'ip': '192.168.2.1',
             }
         ]
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], '192.168.2.1')
         self.assertEqual(inventory['control_plain']['external'], inventory['nodes'][0]['address'])
 
@@ -177,7 +182,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
         inventory = demo.generate_inventory(master=3, worker=3, balancer=0, keepalived=1)
         first_control_plane = next(node for node in inventory['nodes'] if 'master' in node['roles'])
 
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], first_control_plane['internal_address'])
         self.assertEqual(inventory['control_plain']['external'], first_control_plane['address'])
 
@@ -190,7 +195,7 @@ class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
             'hosts': [first_control_plane['name']]
         }
 
-        inventory = defaults.append_controlplain(inventory, None)
+        defaults._append_controlplain(inventory, self.logger)
         self.assertEqual(inventory['control_plain']['internal'], balancer['internal_address'])
         self.assertEqual(inventory['control_plain']['external'], balancer['address'])
 
@@ -239,8 +244,8 @@ class PrimitiveValuesAsString(unittest.TestCase):
         inventory['services'].setdefault('cri', {})['containerRuntime'] = 'containerd'
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.26.11'
         context = demo.create_silent_context()
-        context['nodes'] = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
-        inventory = demo.new_cluster(inventory, context=context).inventory
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
+        inventory = demo.new_cluster(inventory, context=context, nodes_context=nodes_context).inventory
 
         self.assertEqual(True, inventory['services']['cri']['containerdConfig']
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
@@ -254,6 +259,10 @@ class PrimitiveValuesAsString(unittest.TestCase):
         typha = inventory['plugins']['calico']['typha']
         self.assertEqual(False, typha['enabled'])
         self.assertEqual(2, typha['replicas'])
+
+        nginx_ingress_ports = inventory['plugins']['nginx-ingress-controller']['ports']
+        self.assertEqual(20080, [port for port in nginx_ingress_ports if port['name'] == 'http'][0]['hostPort'])
+        self.assertEqual(20443, [port for port in nginx_ingress_ports if port['name'] == 'https'][0]['hostPort'])
 
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
@@ -280,8 +289,8 @@ class PrimitiveValuesAsString(unittest.TestCase):
             """
         inventory.setdefault('plugins', {}).setdefault('kubernetes-dashboard', {})['install'] = "{{ true }}"
         context = demo.create_silent_context()
-        context['nodes'] = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
-        inventory = demo.new_cluster(inventory, context=context).inventory
+        nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
+        inventory = demo.new_cluster(inventory, context=context, nodes_context=nodes_context).inventory
 
         self.assertEqual('custom_module', inventory['services']['modprobe']['debian'][0])
         self.assertEqual(1, inventory['services']['sysctl']['custom_parameter'])

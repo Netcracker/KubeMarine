@@ -12,22 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 from collections import OrderedDict
 from typing import List
 
 from kubemarine import kubernetes, haproxy, keepalived
 from kubemarine.core import flow, summary
-from kubemarine.core.action import Action
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.core.resources import DynamicResources
 from kubemarine.procedures import install, add_node
 
 
 def get_active_nodes(node_type: str, cluster: KubernetesCluster) -> NodeGroup:
-    all_nodes = cluster.make_group_from_roles([node_type]).get_nodes_for_removal()
+    all_nodes = cluster.get_nodes_for_removal().having_roles([node_type])
     if all_nodes.is_empty():
         cluster.log.debug("Skipped - no %s to remove" % node_type)
         return all_nodes
@@ -57,7 +53,7 @@ def loadbalancer_remove_keepalived(cluster: KubernetesCluster) -> None:
 
 
 def remove_kubernetes_nodes(cluster: KubernetesCluster) -> None:
-    group = cluster.make_group_from_roles(['control-plane', 'worker']).get_nodes_for_removal()
+    group = cluster.get_nodes_for_removal().having_roles(['control-plane', 'worker'])
 
     if group.is_empty():
         cluster.log.debug("No kubernetes nodes to perform")
@@ -65,40 +61,6 @@ def remove_kubernetes_nodes(cluster: KubernetesCluster) -> None:
 
     group.call(kubernetes.reset_installation_env)
     kubernetes.schedule_running_nodes_report(cluster)
-
-
-def remove_node_finalize_inventory(cluster: KubernetesCluster, inventory_to_finalize: dict) -> dict:
-    if cluster.context.get('initial_procedure') != 'remove_node':
-        return inventory_to_finalize
-
-    final_nodes = cluster.nodes['all'].get_final_nodes()
-
-    is_finalization = any('remove_node' in node['roles'] for node in inventory_to_finalize['nodes'])
-
-    if not is_finalization:
-        kubernetes.remove_node_enrichment(inventory_to_finalize, cluster)
-
-    # Do not remove VRRP IPs and do not change their assigned hosts.
-    # If the assigned host does not exist or is not a balancer, it will be just skipped.
-    # Though it is necessary to remove hosts from the VRRP IP of finalized inventory if they were enriched ourselves.
-    if is_finalization:
-        for i, item in enumerate(inventory_to_finalize.get('vrrp_ips', [])):
-            raw_item = cluster.raw_inventory['vrrp_ips'][i]
-            # If redefined, it was not enriched. See keepalived.enrich_inventory_apply_defaults().
-            if not isinstance(raw_item, str) and 'hosts' in raw_item:
-                continue
-
-            item['hosts'] = [host for host in item['hosts'] if final_nodes.has_node(host['name'])]
-
-    # remove nodes from inventory if they in nodes for removal
-    size = len(inventory_to_finalize['nodes'])
-    for i in range(size):
-        for j, node in enumerate(inventory_to_finalize['nodes']):
-            if 'remove_node' in node['roles']:
-                del inventory_to_finalize['nodes'][j]
-                break
-
-    return inventory_to_finalize
 
 
 tasks = OrderedDict({
@@ -129,13 +91,10 @@ cumulative_points = {
 }
 
 
-class RemoveNodeAction(Action):
+class RemoveNodeAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('remove node', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks, cumulative_points=cumulative_points)
-        res.make_final_inventory()
+        super().__init__('remove node', tasks,
+                         cumulative_points=cumulative_points, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

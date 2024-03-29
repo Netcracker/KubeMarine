@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from copy import deepcopy
 from typing import List, Dict, Tuple, Optional, Union, Mapping, Set
 
 from typing_extensions import Protocol
 
-from kubemarine import yum, apt
-from kubemarine.core import errors, utils, static
-from kubemarine.core.cluster import KubernetesCluster
+from kubemarine import yum, apt, jinja
+from kubemarine.core import errors, static, utils
+from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.executor import RunnersResult, Token, Callback
 from kubemarine.core.group import (
     NodeGroup, DeferredGroup, AbstractGroup, RunResult, GROUP_RUN_TYPE,
@@ -40,25 +39,35 @@ ERROR_MULTIPLE_PACKAGE_VERSIONS_DETECTED = \
 ERROR_SEMANAGE_NOT_MANAGED_DEBIAN = "semanage is not managed for debian OS family by KubeMarine"
 
 
-def enrich_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    enrich_inventory_associations(inventory, cluster)
-    enrich_inventory_packages(inventory, cluster)
+@enrichment(EnrichmentStage.FULL)
+def enrich_inventory(cluster: KubernetesCluster) -> None:
+    enrich_inventory_associations(cluster)
+    enrich_inventory_packages(cluster)
 
-    return inventory
 
-
-def enrich_inventory_associations(inventory: dict, cluster: KubernetesCluster) -> None:
+def enrich_inventory_associations(cluster: KubernetesCluster) -> None:
+    inventory = cluster.inventory
+    kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
     associations: dict = inventory['services']['packages']['associations']
-    enriched_associations = {}
+    inventory['services']['packages']['associations'] = enriched_associations = {}
 
     # Move associations for OS families and merge with globals
     for association_name in get_associations_os_family_keys():
-        os_associations: dict = deepcopy(cluster.globals['packages']['common_associations'])
+        redefined_associations = associations.pop(association_name)
+        if cluster.nodes['all'].get_subgroup_with_os(association_name).is_empty():
+            continue
+
+        os_associations = utils.deepcopy_yaml(static.GLOBALS['packages']['common_associations'])
         if association_name == 'debian':
             del os_associations['semanage']
         for association_params in os_associations.values():
             del association_params['groups']
-        default_merger.merge(os_associations, associations.pop(association_name))
+
+        for package in static.GLOBALS['packages'][association_name]:
+            os_associations[package]['package_name']\
+                = get_default_package_names(association_name, package, kubernetes_version)
+
+        default_merger.merge(os_associations, redefined_associations)
         enriched_associations[association_name] = os_associations
 
     # Check remained associations section if they are customized at global level.
@@ -66,119 +75,118 @@ def enrich_inventory_associations(inventory: dict, cluster: KubernetesCluster) -
         os_family = cluster.get_os_family()
         if os_family == 'multiple':
             raise Exception(ERROR_GLOBAL_ASSOCIATIONS_REDEFINED_MULTIPLE_OS)
-        elif os_family not in ('unknown', 'unsupported'):
+        elif os_family not in ('unknown', 'unsupported', '<undefined>'):
             # move remained associations properties to the specific OS family section and merge with priority
             default_merger.merge(enriched_associations[os_family], associations)
 
-    if 'semanage' in enriched_associations['debian']:
+    if 'semanage' in enriched_associations.get('debian', {}):
         raise Exception(ERROR_SEMANAGE_NOT_MANAGED_DEBIAN)
 
-    inventory['services']['packages']['associations'] = enriched_associations
 
-
-def enrich_inventory_packages(inventory: dict, _: KubernetesCluster) -> None:
+def enrich_inventory_packages(cluster: KubernetesCluster) -> None:
     for _type in ['install', 'upgrade', 'remove']:
-        packages_list = inventory['services']['packages'].get(_type)
+        packages_list = cluster.inventory['services']['packages'].get(_type)
         if isinstance(packages_list, list):
-            inventory['services']['packages'][_type] = {
+            cluster.inventory['services']['packages'][_type] = {
                 'include': packages_list
             }
 
-
-def enrich_inventory_apply_defaults(inventory: dict, _: KubernetesCluster) -> dict:
-    kubernetes_version = inventory['services']['kubeadm']['kubernetesVersion']
-
-    for os_family in get_associations_os_family_keys():
-        cluster_associations = inventory["services"]["packages"]["associations"][os_family]
-        for package in static.GLOBALS['packages'][os_family]:
-            if cluster_associations[package].get('package_name') is None:
-                cluster_associations[package]['package_name'] = \
-                    get_default_package_names(os_family, package, kubernetes_version)
-
-    return inventory
+    for _type in ['upgrade', 'remove']:
+        packages: dict = cluster.inventory['services']['packages'].get(_type)
+        if packages is not None:
+            packages.setdefault('include', ['*'])
 
 
-def _get_associations_upgrade_plan(cluster: KubernetesCluster, inventory: dict) -> List[Tuple[str, dict]]:
+def _get_associations_procedure_plan(cluster: KubernetesCluster) -> List[Tuple[str, dict]]:
     context = cluster.context
-    if context.get("initial_procedure") == "upgrade":
-        upgrade_version = context["upgrade_version"]
-        upgrade_plan = []
-        for version in cluster.procedure_inventory['upgrade_plan']:
-            if utils.version_key(version) < utils.version_key(upgrade_version):
-                continue
+    procedure = context["initial_procedure"]
+    procedure_inventory = cluster.procedure_inventory
+    upgrade_plan = []
+    if procedure == "upgrade":
+        kubernetes_version = cluster.inventory['services']['kubeadm']['kubernetesVersion']
+        for i, v in enumerate(procedure_inventory['upgrade_plan'][context['upgrade_step']:]):
+            # Take the target (probably) compiled version and the remained not yet compiled
+            version = kubernetes_version if i == 0 else v
+            procedure_associations = procedure_inventory.get(v, {}).get("packages", {}).get("associations", {})
+            procedure_associations = utils.subdict_yaml(procedure_associations,
+                                                        _get_system_packages_support_upgrade(cluster))
 
-            upgrade_associations = cluster.procedure_inventory.get(version, {}).get("packages", {}).get("associations", {})
-            upgrade_associations = dict(item for item in upgrade_associations.items()
-                                        if item[0] in _get_system_packages_support_upgrade(inventory))
-            upgrade_plan.append((version, upgrade_associations))
+            upgrade_plan.append((version, procedure_associations))
 
-    elif context.get("initial_procedure") == "migrate_kubemarine" and "upgrading_package" in context:
-        upgrade_associations = cluster.procedure_inventory.get('upgrade', {}).get("packages", {}).get("associations", {})
-        upgrade_associations = dict(item for item in upgrade_associations.items()
-                                    if item[0] == context["upgrading_package"])
-        upgrade_plan = [("", upgrade_associations)]
-    else:
-        upgrade_plan = []
+    elif procedure == "migrate_kubemarine" and "upgrading_package" in context:
+        procedure_associations = procedure_inventory.get('upgrade', {}).get("packages", {}).get("associations", {})
+        procedure_associations = utils.subdict_yaml(procedure_associations,
+                                                    _get_system_packages_support_upgrade(cluster))
+        upgrade_plan = [("", procedure_associations)]
+    elif procedure == "migrate_cri":
+        procedure_associations = procedure_inventory.get("packages", {}).get("associations", {})
+        upgrade_plan = [("", procedure_associations)]
 
     return upgrade_plan
 
 
-def enrich_upgrade_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    upgrade_plan = _get_associations_upgrade_plan(cluster, inventory)
-    if not upgrade_plan:
-        return inventory
+def _get_redefined_package_name(cluster: KubernetesCluster, associations: dict, package: str) \
+        -> Optional[List[str]]:
+    # Global section has priority
+    package_name: Union[str, List[str], None] = associations.get(package, {}).get('package_name')
+    if not package_name:
+        package_name = associations.get(cluster.get_os_family(), {}).get(package, {}).get('package_name')
+
+    return [package_name] if isinstance(package_name, str) else package_name
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+def enrich_procedure_inventory(cluster: KubernetesCluster) -> None:
+    procedure_plan = _get_associations_procedure_plan(cluster)
+    procedure_associations = {} if not procedure_plan else procedure_plan[0][1]
+
+    if procedure_associations:
+        # Merge global associations section because it has priority during enrichment.
+        cluster_associations = cluster.inventory.setdefault("services", {}).setdefault("packages", {}) \
+            .setdefault("associations", {})
+        default_merger.merge(cluster_associations, utils.deepcopy_yaml(procedure_associations))
+
+    if cluster.context['initial_procedure'] == 'upgrade':
+        upgrade_inventory_packages(cluster)
+
+
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine', 'migrate_cri'])
+def verify_procedure_inventory(cluster: KubernetesCluster) -> None:
+    context = cluster.context
+    procedure = context["initial_procedure"]
 
     os_family = cluster.get_os_family()
     if os_family not in get_associations_os_family_keys():
-        raise errors.KME("KME0012", procedure='upgrade')
+        raise errors.KME("KME0012", procedure=procedure)
 
-    context = cluster.context
-    if context.get("initial_procedure") == "upgrade":
-        previous_version = context["initial_kubernetes_version"]
-        packages_verify = _get_system_packages_support_upgrade(inventory)
-    else:  # migrate_kubemarine procedure
-        previous_version = ""
-        packages_verify = [context["upgrading_package"]]
+    if procedure == 'migrate_cri':
+        return
 
-    cluster_associations = inventory["services"]["packages"]["associations"][os_family]
-    _verify_upgrade_plan(cluster_associations, previous_version, packages_verify, upgrade_plan)
-
-    upgrade_required = get_system_packages_for_upgrade(cluster, inventory)
-    context.setdefault("upgrade", {}).setdefault('required', {})['packages'] = upgrade_required
-
-    # Merge procedure associations with the OS family specific section of associations in the inventory.
-    upgrade_inventory_associations(cluster, inventory, enrich_global=False)
-    upgrade_inventory_packages(cluster, inventory)
-
-    return inventory
-
-
-def upgrade_inventory_associations(cluster: KubernetesCluster, inventory: dict,
-                                   *, enrich_global: bool) -> None:
-    # pass enriched 'cluster.inventory' instead of 'inventory' that is being finalized
-    upgrade_plan = _get_associations_upgrade_plan(cluster, cluster.inventory)
+    upgrade_plan = _get_associations_procedure_plan(cluster)
     if not upgrade_plan:
         return
 
-    _, upgrade_associations = upgrade_plan[0]
-    _enrich_inventory_procedure_associations(cluster, inventory, upgrade_associations,
-                                             enrich_global=enrich_global)
+    if procedure == "upgrade":
+        previous_version = cluster.previous_inventory['services']['kubeadm']['kubernetesVersion']
+    else:  # migrate_kubemarine procedure
+        previous_version = ""
+
+    packages_verify = _get_system_packages_support_upgrade(cluster)
+    _verify_upgrade_plan(cluster, previous_version, packages_verify, upgrade_plan)
 
 
-def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> None:
-    if cluster.context.get("initial_procedure") != "upgrade":
-        return
-
-    upgrade_version = cluster.context["upgrade_version"]
+def upgrade_inventory_packages(cluster: KubernetesCluster) -> None:
+    procedure_inventory = cluster.procedure_inventory
+    upgrade_version = cluster.procedure_inventory['upgrade_plan'][cluster.context['upgrade_step']]
     for _type in ['install', 'upgrade', 'remove']:
-        packages_section = cluster.procedure_inventory.get(upgrade_version, {}).get("packages", {})
+        packages_section = procedure_inventory.get(upgrade_version, {}).get("packages", {})
         upgrade_packages = packages_section.get(_type)
         if upgrade_packages is None:
             continue
         if isinstance(upgrade_packages, list):
             upgrade_packages = {'include': upgrade_packages}
 
-        packages_section = inventory.setdefault("services", {}).setdefault("packages", {})
+        packages_section = cluster.inventory.setdefault("services", {}).setdefault("packages", {})
         inventory_packages = packages_section.setdefault(_type, {})
         if isinstance(inventory_packages, list):
             packages_section[_type] = inventory_packages = {
@@ -188,21 +196,24 @@ def upgrade_inventory_packages(cluster: KubernetesCluster, inventory: dict) -> N
         default_merger.merge(inventory_packages, upgrade_packages)
 
 
-def _verify_upgrade_plan(cluster_associations: dict, previous_version: str,
+def _verify_upgrade_plan(cluster: KubernetesCluster, previous_version: str,
                          packages_verify: List[str], upgrade_plan: List[Tuple[str, dict]]) -> None:
-    cluster_associations = deepcopy(cluster_associations)
+    raw_associations = utils.deepcopy_yaml(cluster.previous_raw_inventory.get('services', {}).get('packages', {})
+                                           .get('associations', {}))
 
     # validate all packages sections in procedure inventory
     for version, upgrade_associations in upgrade_plan:
+        if version != '' and jinja.is_template(version):
+            break
+
         for package in packages_verify:
             upgrade_package_name = upgrade_associations.get(package, {}).get('package_name')
-            # Here default package names are not yet enriched and thus hold the custom supplied package names.
-            if cluster_associations[package].get('package_name') and not upgrade_package_name:
+            if _get_redefined_package_name(cluster, raw_associations, package) and not upgrade_package_name:
                 raise errors.KME("KME0010", package=package,
                                  previous_version_spec=f' for version {previous_version}' if previous_version else "",
                                  next_version_spec=f' for version {version}' if version else "")
-            if upgrade_package_name:
-                cluster_associations[package]['package_name'] = upgrade_package_name
+
+        default_merger.merge(raw_associations, utils.deepcopy_yaml(upgrade_associations))
         previous_version = version
 
 
@@ -224,112 +235,45 @@ def get_default_package_names(os_family: str, package: str, kubernetes_version: 
     return package_versions
 
 
-def get_system_packages_for_upgrade(cluster: KubernetesCluster, inventory: dict) -> List[str]:
-    undefined_package_name = object()
+@enrichment(EnrichmentStage.PROCEDURE, procedures=['upgrade', 'migrate_kubemarine'])
+def calculate_upgrade_required(cluster: KubernetesCluster) -> None:
+    os_family = cluster.get_os_family()
 
     context = cluster.context
-    os_family = cluster.get_os_family()
-
-    cluster_associations = inventory['services']['packages']['associations'][os_family]
-    _, upgrade_associations = _get_associations_upgrade_plan(cluster, inventory)[0]
-
-    # Resolve old and new packages with versions and schedule for upgrade if they are not equal.
-    system_packages = _get_system_packages_support_upgrade(inventory)
-    upgrade_required = []
+    system_packages = _get_system_packages_support_upgrade(cluster)
+    upgrade_required = context.setdefault("upgrade", {}).setdefault('required', {}).setdefault('packages', [])
     for package in system_packages:
-        # Here default package names are not yet enriched and thus hold the custom supplied package names.
-        old_package_name = cluster_associations[package].get('package_name')
-        if old_package_name is None:
-            # Trying enrichment before upgrade
-            if context.get("initial_procedure") == "migrate_kubemarine":
-                # Recommended versions have changed, and we forgot about what versions were previously recommended.
-                old_package_name = undefined_package_name
-            else:
-                # upgrade procedure
-                previous_ver = context["initial_kubernetes_version"]
-                old_package_name = get_default_package_names(os_family, package, previous_ver)
+        if (cluster.previous_inventory["services"]["packages"]["associations"][os_family][package]['package_name']
+                != cluster.inventory["services"]["packages"]["associations"][os_family][package]['package_name']):
+            upgrade_required.append(package)
+            continue
 
-        new_package_name = cluster_associations[package].get('package_name')
-        # associations from procedure inventory have priority
-        upgrade_package_name = upgrade_associations.get(package, {}).get('package_name')
-        if upgrade_package_name:
-            new_package_name = upgrade_package_name
-        if new_package_name is None:
-            # For upgrade procedure, services.kubeadm.kubernetesVersion is equal to 'upgrade_version',
-            # because the version was already enriched.
-            upgrade_ver = inventory['services']['kubeadm']['kubernetesVersion']
-            new_package_name = get_default_package_names(os_family, package, upgrade_ver)
-
-        if old_package_name is undefined_package_name or old_package_name != new_package_name:
+        raw_associations = (cluster.previous_raw_inventory.get('services', {}).get('packages', {})
+                            .get('associations', {}))
+        raw_package_name = _get_redefined_package_name(cluster, raw_associations, package)
+        if (context['initial_procedure'] == 'migrate_kubemarine'
+                and (not raw_package_name or any(jinja.is_template(pkg) for pkg in raw_package_name))):
+            # If package name is redefined with template,
+            # upgrade may be required as we have lost previous compilation result.
             upgrade_required.append(package)
 
-    return upgrade_required
 
+def _get_system_packages_support_upgrade(cluster: KubernetesCluster) -> List[str]:
+    context = cluster.context
+    procedure = context["initial_procedure"]
+    if procedure == 'upgrade':
+        return [cluster.previous_inventory['services']['cri']['containerRuntime']]
+    elif procedure == "migrate_kubemarine" and "upgrading_package" in context:
+        return [context['upgrading_package']]
 
-def _get_system_packages_support_upgrade(inventory: dict) -> List[str]:
-    return [inventory['services']['cri']['containerRuntime'], 'haproxy', 'keepalived']
-
-
-def enrich_migrate_cri_inventory(inventory: dict, cluster: KubernetesCluster) -> dict:
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    os_family = cluster.get_os_family()
-    if os_family not in get_associations_os_family_keys():
-        raise errors.KME("KME0012", procedure='migrate_cri')
-
-    procedure_associations = cluster.procedure_inventory.get("packages", {}).get("associations", {})
-    # Merge OS family specific section. It is already enriched in enrich_inventory_associations()
-    # This effectively allows to specify only global section but not for specific OS family.
-    # This restriction is because enrich_migrate_cri_inventory() goes after enrich_inventory_associations(),
-    # but in future the restriction can be eliminated.
-    return _enrich_inventory_procedure_associations(cluster, inventory, procedure_associations,
-                                                    enrich_global=False)
-
-
-def _enrich_inventory_procedure_associations(cluster: KubernetesCluster, inventory: dict,
-                                             procedure_associations: dict,
-                                             *, enrich_global: bool) -> dict:
-    if procedure_associations:
-        cluster_associations = inventory.setdefault("services", {}).setdefault("packages", {}) \
-            .setdefault("associations", {})
-        if not enrich_global:
-            cluster_associations = cluster_associations.setdefault(cluster.get_os_family(), {})
-        default_merger.merge(cluster_associations, deepcopy(procedure_associations))
-
-    return inventory
-
-
-def enrich_inventory_include_all(inventory: dict, _: KubernetesCluster) -> dict:
-    for _type in ['upgrade', 'remove']:
-        packages: dict = inventory['services']['packages'].get(_type)
-        if packages is not None:
-            packages.setdefault('include', ['*'])
-
-    return inventory
-
-
-def upgrade_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    # Despite we enrich OS specific section inside enrich_upgrade_inventory(),
-    # we still merge global associations section because it has priority during enrichment.
-    upgrade_inventory_associations(cluster, inventory, enrich_global=True)
-    upgrade_inventory_packages(cluster, inventory)
-
-    return inventory
-
-
-def migrate_cri_finalize_inventory(cluster: KubernetesCluster, inventory: dict) -> dict:
-    if cluster.context.get("initial_procedure") != "migrate_cri":
-        return inventory
-
-    procedure_associations = cluster.procedure_inventory.get("packages", {}).get("associations", {})
-    # Despite we enrich OS specific section inside enrich_migrate_cri_inventory(),
-    # we still merge global associations section because it has priority during enrichment.
-    return _enrich_inventory_procedure_associations(cluster, inventory, procedure_associations,
-                                                    enrich_global=True)
+    return []
 
 
 def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initial_nodes: bool = False) -> dict:
+    if cluster.get_os_family() == '<undefined>':
+        # All nodes are inaccessible. This is possible only in check_iaas.
+        return inventory
+
     os_ids = cluster.get_os_identifiers()
     different_os = list(set(os_ids.values()))
     if len(different_os) > 1:
@@ -344,16 +288,13 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initi
         cluster.log.debug("Skip caching of packages for unsupported OS.")
         return inventory
 
-    group = cluster.nodes['all'].get_final_nodes()
+    group = (cluster.previous_nodes if by_initial_nodes else cluster.nodes)['all']
     if group.nodes_amount() != group.get_sudo_nodes().nodes_amount():
         # For add_node/install procedures we check that all nodes are sudoers in prepare.check.sudoer task.
         # For check_iaas procedure the nodes might still be not sudoers.
         # Skip caching if any not-sudoer node found.
         cluster.log.debug(f"Some nodes are not sudoers, packages will not be cached.")
         return inventory
-
-    if by_initial_nodes:
-        group = group.get_initial_nodes()
 
     hosts_to_packages = get_all_managed_packages_for_group(group, inventory, by_initial_nodes)
     detected_packages = detect_installed_packages_version_hosts(cluster, hosts_to_packages)
@@ -513,16 +454,6 @@ def _detect_final_package(cluster: KubernetesCluster, detected_packages: Dict[st
             return package
     else:
         return detected_package_versions[0]
-
-
-def remove_unused_os_family_associations(cluster: KubernetesCluster, inventory: dict) -> dict:
-    final_nodes = cluster.nodes['all'].get_final_nodes()
-    for os_family in get_associations_os_family_keys():
-        # Do not remove OS family associations section in finalized inventory if any node has this OS family.
-        if final_nodes.get_subgroup_with_os(os_family).is_empty():
-            del inventory['services']['packages']['associations'][os_family]
-
-    return inventory
 
 
 def get_associations_os_family_keys() -> Set[str]:

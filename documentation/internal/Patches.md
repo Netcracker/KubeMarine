@@ -54,16 +54,22 @@ Below are the actual templates for `InventoryOnlyPatch` and `RegularPatch` patch
 Also see the inline comments.
 <details>
   <summary>Inventory only patch</summary>
-<pre>
-from textwrap import dedent<br>
+
+```python
+from textwrap import dedent
+
 from kubemarine.core.action import Action
 from kubemarine.core.patch import InventoryOnlyPatch
-from kubemarine.core.resources import DynamicResources<br><br>
+from kubemarine.core.resources import DynamicResources
+
+
 class TheAction(Action):
     def __init__(self) -> None:
-        super().__init__("&lt;Short description of action&gt;")<br>
+        super().__init__("<Short description of action>")
+
     def run(self, res: DynamicResources) -> None:
-        inventory = res.formatted_inventory()<br>
+        inventory = res.inventory()
+
         # patch_is_applicable(), do_some_changes_in_inventory() are some methods for you to implement.
         # You may also follow the different ways:
         # 1) always recreate the inventory even if there are no real changes;
@@ -73,60 +79,75 @@ class TheAction(Action):
             self.recreate_inventory = True
             do_some_changes_in_inventory(inventory)
         else:
-            res.logger().info("Nothing has changed")<br>
+            res.logger().info("Nothing has changed")
+
         # Calling of the below method is prohibited!
-        # cluster = res.cluster()<br><br>
+        # cluster = res.cluster()
+
+
 class MyPatch(InventoryOnlyPatch):
     def __init__(self) -> None:
-        super().__init__("&lt;patch_id&gt;")<br>
+        super().__init__("<patch_id>")
+    
     @property
     def action(self) -> Action:
-        return TheAction()<br>
+        return TheAction()
+    
     @property
     def description(self) -> str:
         return dedent(
             f"""\
-            &lt;Comprehensive 
+            <Comprehensive
             multiline
-            description of the patch&gt;
+            description of the patch>
             """.rstrip()
         )
-</pre>
+```
 </details>
 
 <details>
   <summary>Regular patch</summary>
-<pre>
-from textwrap import dedent<br>
+
+```python
+from textwrap import dedent
+
 from kubemarine.core.action import Action
 from kubemarine.core.patch import RegularPatch
-from kubemarine.core.resources import DynamicResources<br><br>
+from kubemarine.core.resources import DynamicResources
+
+
 class TheAction(Action):
     def __init__(self) -> None:
-        super().__init__("&lt;Short description of action&gt;")<br>
+        super().__init__("<Short description of action>")
+
     def run(self, res: DynamicResources) -> None:
-        cluster = res.cluster()<br>
+        cluster = res.cluster()
+
         # patch_is_applicable(), do_some_changes_on_cluster() are some methods for you to implement.
         if patch_is_applicable(cluster):
             do_some_changes_on_cluster(cluster)
         else:
-            cluster.log.info("Nothing has changed")<br><br>
+            cluster.log.info("Nothing has changed")
+
+
 class MyPatch(RegularPatch):
     def __init__(self) -> None:
-        super().__init__("&lt;patch_id&gt;")<br>
+        super().__init__("<patch_id>")
+
     @property
     def action(self) -> Action:
-        return TheAction()<br>
+        return TheAction()
+
     @property
     def description(self) -> str:
         return dedent(
             f"""\
-            &lt;Comprehensive 
+            <Comprehensive
             multiline
-            description of the patch&gt;
+            description of the patch>
             """.rstrip()
         )
-</pre>
+```
 </details>
 
 As you can see, the main code is located in custom implementation of `Action.run()`.
@@ -198,5 +219,5 @@ class TheAction(Action):
         super().__init__("Ensure backward compatibility", recreate_inventory=True)
     
     def run(self, res: DynamicResources) -> None:
-        res.formatted_inventory()['property_that_sets_previous_default_behaviour'] = True
+        res.inventory()['property_that_sets_previous_default_behaviour'] = True
 ```

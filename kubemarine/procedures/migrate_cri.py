@@ -17,15 +17,12 @@
 from collections import OrderedDict
 
 import io
-import uuid
 from typing import List
 
 from kubemarine import kubernetes, etcd, thirdparties, cri
-from kubemarine.core import flow
-from kubemarine.core.action import Action
+from kubemarine.core import flow, utils
 from kubemarine.core.cluster import KubernetesCluster
 from kubemarine.core.group import NodeGroup
-from kubemarine.core.resources import DynamicResources
 from kubemarine.cri import docker
 from kubemarine.procedures import install
 from kubemarine import packages
@@ -93,7 +90,7 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         if docker_disk:
             node.sudo(
                 "umount /var/lib/docker && "
-                "sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
+                r"sudo sed -i 's/ \/var\/lib\/docker / \/var\/lib\/containerd /' /etc/fstab && "
                 "sudo sh -c 'rm -rf /var/lib/containerd/*' && "
                 "sudo mount -a && "
                 "sudo systemctl restart containerd")
@@ -115,8 +112,8 @@ def _migrate_cri(cluster: KubernetesCluster, node_group: List[NodeGroup]) -> Non
         else:
             control_plane.sudo(f"kubectl uncordon {node_name}", hide=False)
 
+        kubernetes.components.wait_for_pods(node)
         if is_control_plane:
-            kubernetes.wait_for_any_pods(cluster, node, apply_filter=node_name)
             # check ETCD health
             etcd.wait_for_health(cluster, node)
 
@@ -145,7 +142,7 @@ def release_calico_leaked_ips(cluster: KubernetesCluster) -> None:
     """
     first_control_plane = cluster.nodes['control-plane'].get_first_member()
     cluster.log.debug("Getting leaked ips...")
-    random_report_name = "/tmp/%s.json" % uuid.uuid4().hex
+    random_report_name = utils.get_remote_tmp_path(ext='json')
     result = first_control_plane.sudo(f"calicoctl ipam check --show-problem-ips -o {random_report_name} | grep 'leaked' || true", hide=False)
     leaked_ips = result.get_simple_out()
     leaked_ips_count = leaked_ips.count('leaked')
@@ -169,13 +166,9 @@ tasks = OrderedDict({
 })
 
 
-class MigrateCRIAction(Action):
+class MigrateCRIAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('migrate cri', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('migrate cri', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:

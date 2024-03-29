@@ -19,24 +19,16 @@ from typing import List
 
 from kubemarine import admission
 from kubemarine.core import flow
-from kubemarine.core.action import Action
-from kubemarine.core.resources import DynamicResources
 
 tasks = OrderedDict({
-    "check_inventory": admission.check_inventory,
-    "delete_default_pss": admission.delete_default_pss,
-    "apply_default_pss": admission.apply_default_pss,
+    "manage_pss": admission.manage_pss,
     "restart_pods": admission.restart_pods_task
 })
 
 
-class PSSAction(Action):
+class PSSAction(flow.TasksAction):
     def __init__(self) -> None:
-        super().__init__('manage pss', recreate_inventory=True)
-
-    def run(self, res: DynamicResources) -> None:
-        flow.run_tasks(res, tasks)
-        res.make_final_inventory()
+        super().__init__('manage pss', tasks, recreate_inventory=True)
 
 
 def create_context(cli_arguments: List[str] = None) -> dict:
