@@ -62,6 +62,7 @@ mypy = [
     "types-paramiko==3.*",
     "types-jsonschema==4.*",
     "types-pyinstaller==6.2.0.*",
+    "types-requests==2.31.*"
 ]
 
 # Auxiliary executable roughly equivalent to python -m kubemarine
