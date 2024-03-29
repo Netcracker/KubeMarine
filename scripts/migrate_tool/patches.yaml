@@ -1,0 +1,253 @@
+0.3.0:
+  patches: []
+0.4.0:
+  patches:
+  - upgrade_cri_versions: 'Upgrade cri versions for clusters based on containerd.
+
+      Note that you may probably need to update services.packages.package_manager.repositories
+      section preliminarily.
+
+      Equivalent to ''kubemarine install --tasks=prepare.package_manager.configure,prepare.cri''
+      for that clusters.'
+0.5.0:
+  patches: []
+0.6.0:
+  patches: []
+0.7.0:
+  patches: []
+0.7.1:
+  patches:
+  - upgrade_calico_version: 'Upgrade calico plugin to v3.24.1 for kubernetes clusters
+      on v1.22.X or v1.23.X or v1.24.X.
+
+      Note that you may probably need to update plugins.calico section preliminarily.
+
+      Equivalent to ''kubemarine install --tasks=deploy.plugins'' for that clusters.'
+0.8.0:
+  patches: []
+0.9.0:
+  patches:
+  - migrate_not_bind_vrrp: 'Migrate from VRRP IP with maintenance-type: not-bind if
+      it was previously chosen as control_plain.
+
+      The patch should be run only on cluster with active haproxy mode.
+
+      The patch internally runs ''kubemarine install --tasks=prepare.dns.etc_hosts,deploy.coredns''.'
+  - haproxy_maintenance_listen_internal: 'Turn on listening of internal address in
+      haproxy maintenance mode for full-HA or non-HA clusters with balancers.
+
+      The patch internally runs ''kubemarine install --tasks=deploy.loadbalancer.haproxy.configure''.'
+0.10.0:
+  patches:
+  - upgrade_crictl_version: 'Upgrade crictl thirdparty to v1.25.0 for kubernetes clusters
+      on v1.24.X.
+
+      Note that you may probably need to update services.thirdparties section preliminarily.
+
+      Equivalent to ''kubemarine install --tasks=prepare.thirdparties'' for that clusters.'
+  - upgrade_calico_version: 'Upgrade calico plugin to v3.24.2 for kubernetes clusters
+      on v1.22.X or v1.23.X or v1.24.X.
+
+      Note that you may probably need to update plugins.calico section preliminarily.
+
+      Equivalent to ''kubemarine install --tasks=deploy.plugins'' for that clusters.'
+0.11.0:
+  patches: []
+0.11.1:
+  patches: []
+0.12.0:
+  patches:
+  - mandatory_packages_off: 'New KubeMarine automatically installs and manages all
+      mandatory packages.
+
+      Old users had to specify them inside services.packages.install section.
+
+      For backward compatibility KubeMarine should not manage mandatory packages for
+      old clusters.
+
+      The patch turns off the management in the inventory.'
+0.12.1:
+  patches:
+  - do_render_config: 'KubeMarine declares that do_render parameter can be specified
+      only for config procedure type of plugins.
+
+      But technically it was possible to specify the parameter for template procedure
+      type as well.
+
+      The patch automatically changes template to config procedure type in the inventory
+      where necessary.'
+0.13.0:
+  patches: []
+0.13.1:
+  patches: []
+0.14.0:
+  patches:
+  - correct_ingress_nginx: "Reinstall nginx-ingress-controller plugin for kubernetes\
+      \ clusters on v1.25.X using corrected template."
+  - correct_haproxy_user: "Reconfigure loadbalancer haproxy for kubernetes clusters\
+      \ using corrected template."
+0.15.0:
+  patches: []
+0.15.1:
+  patches:
+  - calico_fixes: "Reinstall calico plugin. Correct environment variables of 'calico-node'\
+      \ pods."
+0.16.0:
+  patches:
+  - helm_values: "KubeMarine used to allow both 'values' and 'values_file' in helm\
+      \ procedure types of plugins,\nbut only 'values' was picked up in this case.\n\
+      Now both sections can be used, and they will be picked up.\nThe patch migrates\
+      \ old inventories with possible wrong configurations."
+0.17.0:
+  patches: []
+0.18.0:
+  patches: []
+0.18.1:
+  patches: []
+0.18.2:
+  patches: []
+0.19.0:
+  patches: []
+0.20.0:
+  patches:
+  - kubeadm_flags: Patch to update --pod-infra-contianer-image version after upgrading
+      the k8s version.
+0.21.0:
+  patches:
+  - plugins_resources: Update user inventory to keep backward-compatible resources
+      requests/limits for plugins
+  - upgrade_crictl: "Upgrade 'crictl' for the following Kubernetes versions:\n - v1.27.1\n\
+      Roughly equivalent to 'kubemarine install --tasks=prepare.thirdparties'\nprovided\
+      \ that all third-parties except the 'crictl' are already actual."
+  - upgrade_calico: "Upgrade 'calico' for the following Kubernetes versions:\n - v1.27.1\n\
+      Roughly equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins\
+      \ disabled except the 'calico'."
+  - upgrade_nginx_ingress_controller: "Upgrade 'nginx-ingress-controller' for the\
+      \ following Kubernetes versions:\n - v1.27.1\nRoughly equivalent to 'kubemarine\
+      \ install --tasks=deploy.plugins' with all plugins disabled except the 'nginx-ingress-controller'."
+  - replace_podman_to_ctr: 'This patch does following changes for containerd cri:
+
+      1. Load ctr options file to control-plane and worker nodes
+
+      2. Reinstall /usr/bin/etcdctl thirdparty to use ctr tool inside'
+  - reconfigure_audit_policy: 'Reconfigure Kubernetes audit policy.
+
+      To find new default target configuration, refer to kubemarine/resources/configurations/defaults.yaml
+
+      - services.kubeadm.apiServer.extraArgs.audit-*
+
+      - services.audit.cluster_policy
+
+      The patch is equivalent to `kubemarine install --tasks deploy.kubernetes.audit`.'
+0.21.1:
+  patches:
+  - mark_proxy_protocol_disabled_minha_scheme: 'This patch marks proxy protocol disabled
+      in cluster inventory (by default it''s enabled by kubemarine),
+
+      if cluster is in minHA scheme or doesn''t have any balancers.'
+  - enable_proxy_protocol_fullha_scheme: 'This patch enables proxy protocol in ingress-nginx
+      and haproxy (by default it''s enabled by kubemarine),
+
+      if cluster is in fullHA scheme.
+
+      The patch does following steps:
+
+      1. Reconfigure HAProxy
+
+      2. Redeploy nginx-ingress-controller plugin'
+  - manage_containerd_sandbox_image: 'Make
+
+      - sandbox_image of containerd configuration, and
+
+      - --pod-infra-container-image flag of kubelet
+
+      the same and fully controlled by Kubemarine.'
+0.22.0:
+  patches:
+  - override_target_ports: "This patch overrides target ports (services.loadbalancer.target_ports)\
+      \ for existed clusters \nbecause of new defaults"
+  - reconfigure_audit_policy: 'Disable logging of Kubernetes audit events for the
+      Calico API server''s checking API access.
+
+
+      If the Calico plugin or its API server are disabled, the policy is still reconfigured,
+
+      but new rules do not affect anything and are only reserved for possible future
+      extensions.
+
+
+      The patch is equivalent to `kubemarine install --tasks deploy.kubernetes.audit`.'
+v0.23.0:
+  patches:
+  - enable_calico_audit: 'Enable logging of Kubernetes audit events for changes of
+      the Calico resources.
+
+
+      If the Calico plugin or its API server are disabled, the policy is still reconfigured,
+
+      but new rules do not affect anything and are only reserved for possible future
+      extensions.
+
+
+      The patch is equivalent to `kubemarine install --tasks deploy.kubernetes.audit`.'
+  - calico_typha_metrics: 'The patch enables and exposes the Calico Typha metrics
+      via the Kubernetes service.
+
+
+      Roughly equivalent to ''kubemarine install --tasks=deploy.plugins''
+
+      with all plugins disabled except the ''calico''.'
+  - reconfigure_registries: This patch reconfigure containerd registries configuration
+      and migrate it to new format.
+  - reinstall_etcdctl: This patch reinstalls etcdctl thirdparty.
+v0.24.1:
+  patches:
+  - fix_vrrp_ips_interfaces: 'The patch sets previously resolved interfaces for the
+      VRRP IPs
+
+      in the inventory to preserve the backward compatibility.'
+  - set_sysctl_variables: This patch sets kernel variables with sysctl at all the
+      nodes according to the new defaults.
+v0.25.0:
+  patches:
+  - pin_kubernetes_version: The patch sets previous default Kubernetes version in
+      the inventory if the version was not explicitly specified.
+  - upgrade_crictl: "Upgrade 'crictl' for the following Kubernetes versions:\n - v1.27.1\n\
+      \ - v1.27.4\n - v1.28.0\n - v1.28.3\nRoughly equivalent to 'kubemarine install\
+      \ --tasks=prepare.thirdparties'\nprovided that all third-parties except the\
+      \ 'crictl' are already actual."
+  - upgrade_calico: "Upgrade 'calico' for the following Kubernetes versions:\n - v1.27.1\n\
+      \ - v1.27.4\n - v1.28.0\n - v1.28.3\nRoughly equivalent to 'kubemarine install\
+      \ --tasks=deploy.plugins' with all plugins disabled except the 'calico'."
+  - upgrade_nginx_ingress_controller: "Upgrade 'nginx-ingress-controller' for the\
+      \ following Kubernetes versions:\n - v1.27.1\n - v1.27.4\n - v1.28.0\n - v1.28.3\n\
+      Roughly equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins\
+      \ disabled except the 'nginx-ingress-controller'."
+  - upgrade_local_path_provisioner: "Upgrade 'local-path-provisioner' for the following\
+      \ Kubernetes versions:\n - v1.27.1\n - v1.27.4\n - v1.28.0\n - v1.28.3\nRoughly\
+      \ equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins\
+      \ disabled except the 'local-path-provisioner'."
+v0.25.1:
+  patches: []
+v0.26.0:
+  patches:
+  - upgrade_crictl: "Upgrade 'crictl' for the following Kubernetes versions:\n - v1.29.1\n\
+      Roughly equivalent to 'kubemarine install --tasks=prepare.thirdparties'\nprovided\
+      \ that all third-parties except the 'crictl' are already actual."
+  - upgrade_calico: "Upgrade 'calico' for the following Kubernetes versions:\n - v1.29.1\n\
+      Roughly equivalent to 'kubemarine install --tasks=deploy.plugins' with all plugins\
+      \ disabled except the 'calico'."
+  - upgrade_nginx_ingress_controller: "Upgrade 'nginx-ingress-controller' for the\
+      \ following Kubernetes versions:\n - v1.29.1\nRoughly equivalent to 'kubemarine\
+      \ install --tasks=deploy.plugins' with all plugins disabled except the 'nginx-ingress-controller'."
+  - upgrade_local_path_provisioner: "Upgrade 'local-path-provisioner' for the following\
+      \ Kubernetes versions:\n - v1.29.1\nRoughly equivalent to 'kubemarine install\
+      \ --tasks=deploy.plugins' with all plugins disabled except the 'local-path-provisioner'."
+v0.27.0:
+  patches: []
+v0.28.0:
+  patches:
+  - disable_token_automount: Patch to redeploy of plugins to disable automounting
+      of service account tokens
+  - apiserver_cipher_suites: Patch to update the API server TLS cipher suites.
+
