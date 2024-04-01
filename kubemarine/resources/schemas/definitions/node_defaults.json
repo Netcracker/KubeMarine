@@ -40,20 +40,9 @@
     "SSHAccessCommonPropertyNames": {
       "enum": ["keyfile", "password", "username", "connection_port", "connection_timeout"]
     },
-    "CommonNodeProperties": {
+    "CommonNodeAccessProperties": {
       "allOf": [{"$ref": "#/definitions/SSHAccessCommonProperties"}],
       "properties": {
-        "labels": {
-          "type": "object",
-          "description": "Additional labels for node(s)",
-          "additionalProperties": {
-            "type": ["string", "boolean", "integer"]
-          }
-        },
-        "taints": {
-          "$ref": "common/utils.json#/definitions/ArrayOfStrings",
-          "description": "Additional taints for node(s). Caution: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences."
-        },
         "gateway": {
           "type": "string",
           "description": "Gateway that should be used to connect to node(s)"
@@ -73,10 +62,54 @@
          }
       }
     },
-    "CommonNodePropertyNames": {
+    "CommonNodeAccessPropertyNames": {
       "anyOf": [
         {"$ref": "#/definitions/SSHAccessCommonPropertyNames"},
-        {"enum": ["labels", "taints", "gateway", "boot"]}
+        {"enum": ["gateway", "boot"]}
+      ]
+    },
+    "CommonNodeProperties": {
+      "allOf": [{"$ref": "#/definitions/CommonNodeAccessProperties"}],
+      "properties": {
+        "labels": {
+          "type": "object",
+          "description": "Additional labels for node(s)",
+          "additionalProperties": {
+            "type": ["string", "boolean", "integer"]
+          }
+        },
+        "taints": {
+          "$ref": "common/utils.json#/definitions/ArrayOfStrings",
+          "description": "Additional taints for node(s). Caution: Use at your own risk. It can cause unexpected behavior. No support is provided for consequences."
+        }
+      }
+    },
+    "CommonNodePropertyNames": {
+      "anyOf": [
+        {"$ref": "#/definitions/CommonNodeAccessPropertyNames"},
+        {"enum": ["labels", "taints"]}
+      ]
+    },
+    "OneOfKeyfilePasswordSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "keyfile": {
+              "type": "string"
+            }
+          },
+          "required": ["keyfile"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": ["password"]
+        }
       ]
     }
   }

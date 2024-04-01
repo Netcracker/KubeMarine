@@ -24,12 +24,33 @@ from kubemarine.core.yaml_merger import default_merger
 from kubemarine.cri.containerd import contains_old_format_properties
 
 
+supported_connection_defaults = {
+    'node_defaults': 'nodes',
+}
+
 supported_defaults = {
     'rbac': {
         'account_defaults': 'accounts'
     },
-    'node_defaults': 'nodes',
 }
+
+connection_sections = [
+    'nodes', 'node_defaults', 'gateway_nodes',
+    'procedure_history',  # Required to preserve inventory
+    'values', 'cluster_name'  # May be referred to in jinja expressions
+]
+
+ssh_access_default_properties = [
+    'keyfile', 'password', 'username', 'connection_port', 'connection_timeout', 'gateway',
+    'boot'  # Participates in workarounds and reboot. This dependency can potentially be avoided
+]
+
+ssh_access_node_properties = ssh_access_default_properties + [
+    'address', 'internal_address', 'connect_to',
+    'name',  # In context of connections, the name is used only in logging. This dependency can potentially be avoided.
+    'roles'  # Required to distinguish control planes to preserve inventory.
+]
+
 
 invalid_node_name_regex = re.compile("[^a-z-.\\d]", re.M)
 escaped_expression_regex = re.compile('({%[\\s*|]raw[\\s*|]%}.*?{%[\\s*|]endraw[\\s*|]%})', re.M)
@@ -92,6 +113,11 @@ def remove_service_roles(cluster: KubernetesCluster) -> None:
 
 
 @enrichment(EnrichmentStage.ALL)
+def apply_connection_defaults(cluster: KubernetesCluster) -> None:
+    recursive_apply_defaults(supported_connection_defaults, cluster.inventory)
+
+
+@enrichment(EnrichmentStage.FULL)
 def apply_defaults(cluster: KubernetesCluster) -> None:
     recursive_apply_defaults(supported_defaults, cluster.inventory)
 
@@ -236,7 +262,7 @@ def apply_registry_endpoints(inventory: dict) -> Tuple[str, List[str], Optional[
     return registry_mirror_address, containerd_endpoints, thirdparties_address
 
 
-@enrichment(EnrichmentStage.ALL)
+@enrichment(EnrichmentStage.FULL)
 def append_controlplain(cluster: KubernetesCluster) -> None:
     _append_controlplain(cluster.inventory, cluster.log)
 
@@ -316,8 +342,9 @@ def _append_controlplain(inventory: dict, logger: log.EnhancedLogger) -> None:
 
 def recursive_apply_defaults(defaults: dict, section: dict) -> None:
     for key, value in defaults.items():
-        if isinstance(value, dict) and section.get(key) is not None and section[key]:
-            recursive_apply_defaults(value, section[key])
+        if isinstance(value, dict):
+            if section.get(key) is not None and section[key]:
+                recursive_apply_defaults(value, section[key])
         # check if target section exists and not empty
         elif section.get(value) is not None:
             for i, custom_value in enumerate(section[value]):
@@ -336,8 +363,8 @@ def recursive_apply_defaults(defaults: dict, section: dict) -> None:
 def calculate_node_names(cluster: KubernetesCluster) -> None:
     roles_iterators: Dict[str, int] = {}
     for node in cluster.inventory['nodes']:
-        # 'master' role is not deleted because calculate_node_names() can be run over initial inventory,
-        # that still supports the old role.
+        # 'master' role is not deleted because calculate_node_names() can be run over old inventory,
+        # that may still have the old role (LIGHT enrichment).
         for role_name in ['control-plane', 'master', 'worker', 'balancer']:
             if role_name in node['roles']:
                 # The idea is this:
@@ -399,20 +426,64 @@ def verify_nodes(cluster: KubernetesCluster) -> None:
         known_gateway_node_names.append(node_name)
 
 
-@enrichment(EnrichmentStage.ALL)
+def restrict_connection_sections(inventory: dict) -> dict:
+    """
+    Returns shallow copy of the inventory with only those sections
+    that participate in the enrichment of connections.
+    """
+    inventory = utils.subdict_yaml(inventory, connection_sections)
+    node_defaults = inventory.get('node_defaults', {})
+    if node_defaults:
+        inventory['node_defaults'] = utils.subdict_yaml(node_defaults, ssh_access_default_properties)
+
+    nodes = inventory.get('nodes', [])
+    if nodes:
+        inventory['nodes'] = nodes = list(nodes)
+        for i, node in enumerate(nodes):
+            nodes[i] = utils.subdict_yaml(node, ssh_access_node_properties)
+
+    return inventory
+
+
+@enrichment(EnrichmentStage.LIGHT)
+def restrict_connections(cluster: KubernetesCluster) -> dict:
+    return restrict_connection_sections(cluster.inventory)
+
+
+@enrichment(EnrichmentStage.LIGHT)
+def merge_connection_defaults(cluster: KubernetesCluster) -> dict:
+    connection_defaults = restrict_connection_sections(static.DEFAULTS)
+    return _merge_inventory(cluster, connection_defaults)
+
+
+@enrichment(EnrichmentStage.FULL)
 def merge_defaults(cluster: KubernetesCluster) -> dict:
-    base_inventory = utils.deepcopy_yaml(static.DEFAULTS)
+    return _merge_inventory(cluster, static.DEFAULTS)
+
+
+def _merge_inventory(cluster: KubernetesCluster, base: dict) -> dict:
+    base_inventory = utils.deepcopy_yaml(base)
     inventory: dict = default_merger.merge(base_inventory, cluster.inventory)
     return inventory
 
 
-@enrichment(EnrichmentStage.ALL)
+@enrichment(EnrichmentStage.LIGHT)
+def compile_connections(cluster: KubernetesCluster) -> None:
+    return _compile_inventory(cluster, inject_globals=False)
+
+
+@enrichment(EnrichmentStage.FULL)
 def compile_inventory(cluster: KubernetesCluster) -> None:
+    return _compile_inventory(cluster, inject_globals=True)
+
+
+def _compile_inventory(cluster: KubernetesCluster, *, inject_globals: bool) -> None:
     inventory = cluster.inventory
     # convert references in yaml to normal values
     iterations = 100
     root = utils.deepcopy_yaml(inventory)
-    root['globals'] = static.GLOBALS
+    if inject_globals:
+        root['globals'] = static.GLOBALS
     root['env'] = os.Environ()
 
     while iterations > 0:

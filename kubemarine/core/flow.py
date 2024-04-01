@@ -113,9 +113,8 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
                 with utils.open_external(resources.procedure_inventory_filepath, "r") as stream:
                     utils.dump_file(context, stream, "procedure.yaml")
 
-        if cluster is None:
-            # We currently do not support inventory preservation for actions that only change the inventory
-            successfully_performed = []
+        # Initialize connections early, in particular for inventory preservation.
+        resources.cluster(c.EnrichmentStage.LIGHT)
 
         try:
             logger.info(f"Running action '{act.identifier}'")
@@ -124,7 +123,7 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
             successfully_performed.append(act.identifier)
         except Exception:
             if successfully_performed:
-                _post_process_actions_group(resources, successfully_performed, failed=True)
+                _post_process_actions_group(resources, cluster, successfully_performed, failed=True)
 
             raise
 
@@ -139,19 +138,27 @@ def run_actions(resources: res.DynamicResources, actions: Sequence[action.Action
                     utils.dump_file(context, stream, "%s_%s" % (inventory_file_basename, str(timestamp)))
 
             resources.recreate_inventory()
-            _post_process_actions_group(resources, successfully_performed)
+            _post_process_actions_group(resources, cluster, successfully_performed)
             successfully_performed = []
+            cluster = None
 
     if successfully_performed:
-        _post_process_actions_group(resources, successfully_performed)
+        _post_process_actions_group(resources, cluster, successfully_performed)
 
 
-def _post_process_actions_group(resources: res.DynamicResources, successfully_performed: List[str],
+def _post_process_actions_group(resources: res.DynamicResources, cluster: Optional[c.KubernetesCluster],
+                                successfully_performed: List[str],
                                 *,
                                 failed: bool = False) -> None:
-    if resources.cluster_if_initialized() is None:
-        return
+    previous_successful_cluster = cluster is not None
+    try:
+        if previous_successful_cluster:
+            _dump_inventory(resources, failed)
+    finally:
+        _preserve_inventory(resources, successfully_performed, failed=failed, enriched=previous_successful_cluster)
 
+
+def _dump_inventory(resources: res.DynamicResources, failed: bool) -> None:
     context = resources.context
 
     # If cluster is initialized, it is fully enriched at least to DEFAULT state.
@@ -160,22 +167,28 @@ def _post_process_actions_group(resources: res.DynamicResources, successfully_pe
     # * If successful, changes in the inventory should be moved to this state in DynamicResources.recreate_inventory().
     # * If failed, switch to this state effectively restores the cluster to the state after previous action succeeded.
     cluster = resources.cluster(c.EnrichmentStage.DEFAULT)
-    try:
-        if failed:
-            # Preserve effective inventory for the last succeeded action.
-            # For debug aims, cluster_procedure.yaml can still be used.
-            defaults.dump_inventory(cluster, context, 'cluster.yaml')
 
-        resources.dump_finalized_inventory(cluster)
-    finally:
-        context['successfully_performed'] = successfully_performed
-        context['status'] = 'failed' if failed else 'successful'
+    if failed:
+        # Preserve effective inventory for the last succeeded action.
+        # For debug aims, cluster_procedure.yaml can still be used.
+        defaults.dump_inventory(cluster, context, 'cluster.yaml')
 
-        if (resources.context['preserve_inventory']
-                and not resources.context['execution_arguments'].get('without_act', False)):
-            # If the main cluster is initialized, light cluster is initialized for sure
-            cluster = resources.cluster(c.EnrichmentStage.LIGHT)
-            cluster.preserve_inventory(context)
+    resources.dump_finalized_inventory(cluster)
+
+
+def _preserve_inventory(resources: res.DynamicResources, successfully_performed: List[str],
+                        *,
+                        failed: bool, enriched: bool) -> None:
+    context = resources.context
+
+    context['successfully_performed'] = successfully_performed
+    context['status'] = 'failed' if failed else 'successful'
+
+    if (resources.context['preserve_inventory']
+            and not resources.context['execution_arguments'].get('without_act', False)):
+        # Light cluster is always pre-initialized before running of any action.
+        cluster = resources.cluster(c.EnrichmentStage.LIGHT)
+        cluster.preserve_inventory(context, enriched=enriched)
 
 
 class TasksAction(action.Action):

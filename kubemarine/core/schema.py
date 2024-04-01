@@ -26,6 +26,22 @@ from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichme
 
 
 @enrichment(EnrichmentStage.LIGHT)
+def verify_connections(cluster: KubernetesCluster) -> None:
+    inventory = utils.convert_native_yaml(cluster.inventory)
+    # Run restricted validation of sections that participate in the enrichment of connections.
+    # This is primarily needed for `do`, and `migrate_kubemarine` procedures.
+    _verify_inventory_by_schema(cluster, inventory, 'internal/connections')
+    context = cluster.context
+    args: dict = context['execution_arguments']
+    procedure = context["initial_procedure"]
+    if args.get('procedure_config') and procedure in ('add_node', 'remove_node'):
+        # Run full validation for add_node/remove_node
+        # It is currently not necessary to restrict validation to connections only as for inventory.
+        procedure_inventory = utils.convert_native_yaml(cluster.procedure_inventory)
+        _verify_inventory_by_schema(cluster, procedure_inventory, context["initial_procedure"])
+
+
+@enrichment(EnrichmentStage.FULL)
 def verify_inventory(cluster: KubernetesCluster) -> None:
     inventory = utils.convert_native_yaml(cluster.inventory)
     _verify_inventory_by_schema(cluster, inventory, 'cluster')
@@ -38,7 +54,9 @@ def verify_inventory(cluster: KubernetesCluster) -> None:
 
 
 def _verify_inventory_by_schema(cluster: KubernetesCluster, inventory: dict, schema_name: str) -> None:
-    for_procedure = "" if schema_name == 'cluster' else f" for procedure '{schema_name}'"
+    for_procedure = ("" if schema_name == 'cluster'
+                     else " for connections" if schema_name == 'internal/connections'
+                     else f" for procedure '{schema_name}'")
 
     root_schema_resource = f'resources/schemas/{schema_name}.json'
     root_schema_path = utils.get_internal_resource_path(root_schema_resource)
