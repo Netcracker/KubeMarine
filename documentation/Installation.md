@@ -95,6 +95,7 @@ This section provides information about the inventory, features, and steps for i
       - [Merge Strategy Positioning](#merge-strategy-positioning)
       - [List Merge Allowed Sections](#list-merge-allowed-sections)
     - [Dynamic Variables](#dynamic-variables)
+      - [Compilation Stages](#compilation-stages)
       - [Limitations](#limitations)
       - [Jinja2 Expressions Escaping](#jinja2-expressions-escaping)
     - [Environment Variables](#environment-variables)
@@ -5734,11 +5735,47 @@ section:
 - variable: hello
 ```
 
+#### Compilation Stages
+
+The inventory is compiled in two stages:
+1. Lightweight compilation of only those sections that participate in the enrichment of SSH connections.
+2. Full compilation of the inventory.
+
+This introduces some restrictions to the sections that make up the connections.
+Such sections must not refer to the other sections of the inventory.
+
+For example, the following snippet shows illegal references:
+
+```yaml
+values:
+  kubernetesVersion: '{{ services.kubeadm.kubernetesVersion }}'
+ 
+nodes:
+- name: 'node-on-{{ services.cri.containerRuntime }}'
+  internal_address: 192.168.0.1
+  roles: [worker]
+```
+
+Back references are still possible.
+
+A complete subset of connection-making sections and properties is the following:
+* `node_defaults`
+    * `keyfile`, `password`, `username`, `connection_port`, `connection_timeout`, `gateway`, `boot`
+* `nodes`
+    * `keyfile`, `password`, `username`, `connection_port`, `connection_timeout`, `gateway`, `boot`,
+      `address`, `internal_address`, `connect_to`, `name`, `roles`
+* `gateway_nodes`
+* `cluster_name`
+* `values`
+* `procedure_history`
+
 #### Limitations
 
 Dynamic variables have some limitations that should be considered when working with them:
 
-* Dynamic variables are not supported in inventory files of maintenance procedures like upgrade.
+* Limitations due to pecularities of [Compilation Stages](#compilation-stages).
+* Dynamic variables have restricted support in inventory files of maintenance procedures (e.g. upgrade, etc.).
+  The references are supported only in those sections that are merged with the main inventory.
 * All variables should be either valid variables that Kubemarine understands,
   or custom variables defined in the dedicated `values` section.
   ```yaml
