@@ -5758,7 +5758,7 @@ nodes:
 
 Back references are still possible.
 
-A complete subset of connection-making sections and properties is the following:
+A complete subset of connection-making sections and properties is as follows:
 * `node_defaults`
     * `keyfile`, `password`, `username`, `connection_port`, `connection_timeout`, `gateway`, `boot`
 * `nodes`
