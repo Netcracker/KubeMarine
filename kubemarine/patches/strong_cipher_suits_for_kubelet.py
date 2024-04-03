@@ -9,7 +9,7 @@ class TheAction(Action):
         super().__init__("Update kubelet TLS cipher suites (if necessary)")
 
     def run(self, res: DynamicResources) -> None:
-        kubernetes_nodes = res.cluster().make_group_from_roles(['worker'])
+        kubernetes_nodes = res.cluster().make_group_from_roles(['control-plane', 'worker'])
         reconfigure_components(kubernetes_nodes, ['kubelet'])
 
 class UpdatekubeletCipherSuites(RegularPatch):
