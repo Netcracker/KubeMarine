@@ -61,7 +61,7 @@ class ManifestEnrichment(_AbstractManifestEnrichmentTest):
 
     def _test_common_calico_config(self, manifest: Manifest):
         data = self.get_obj(manifest, "ConfigMap_calico-config")['data']
-        self.assertEqual('1440', data['veth_mtu'],
+        self.assertEqual('1430', data['veth_mtu'],
                          "Unexpected veth_mtu configuration in calico-config ConfigMap")
 
     def _test_deployment_calico_kube_controllers(self, manifest: Manifest, k8s_version: str):
