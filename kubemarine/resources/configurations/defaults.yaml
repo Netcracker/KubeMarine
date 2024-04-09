@@ -567,7 +567,7 @@ plugins:
     mode: ipip
     crossSubnet: true
     natOutgoing: true
-    mtu: 1440
+    mtu: 1430
     fullmesh: true
     announceServices: false
     defaultAsNumber: 64512

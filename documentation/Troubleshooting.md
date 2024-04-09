@@ -323,11 +323,11 @@ kubectl patch crontab/my-new-cron-object -p '{"metadata":{"finalizers":[]}}' --t
 **Solution**: To change MTU size to required value run following command on any control-plane node:
 
 ```
-# kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1440"}}'
+# kubectl patch configmap/calico-config -n kube-system --type merge -p '{"data":{"veth_mtu": "1430"}}'
 ```
 
 where:
-  - **1440** is the size of MTU. For MTU 1450 on interface eth0 you should set MTU size 1430 for calico-config.
+  - **1430** is the size of MTU. For MTU 1450 on interface eth0 you should set MTU size 1430 for calico-config.
 
 
 After updating the ConfigMap, perform a rolling restart of all calico/node pods. For example:
