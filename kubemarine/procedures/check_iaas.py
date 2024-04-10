@@ -341,8 +341,27 @@ def check_kernel_version(cluster: KubernetesCluster) -> None:
 def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
     with TestCase(cluster, '012', 'Software', 'Thirdparties Availability') as tc:
         detect_preinstalled_python(cluster)
-        broken = []
-        skipped_msgs = nodes_require_python(cluster)
+        check_resolv_conf(cluster)
+        broken: List[str] = []
+        warnings = nodes_require_python(cluster)
+
+        problem_handlers: Dict[str, List[str]] = {}
+
+        def resolve_problem_handler(host: str) -> List[str]:
+            handler = problem_handlers.get(host)
+            if handler is None:
+                resolv_conf_actual = cluster.nodes_context[host]['resolv_conf_is_actual']
+                if not resolv_conf_actual:
+                    warnings.append(f"resolv.conf is not installed for node {host}: "
+                                    f"Thirdparties can be unavailable. You can install resolv.conf using task "
+                                    f"`install --tasks prepare.dns.resolv_conf`")
+                    handler = warnings
+                else:
+                    handler = broken
+
+                problem_handlers[host] = handler
+
+            return handler
 
         # Load script for checking sources
         all_group = get_python_group(cluster, True)
@@ -361,8 +380,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
                 python_executable = cluster.nodes_context[host]['python']['executable']
                 res = node.run("%s %s %s %s" % (python_executable, random_temp_path, config['source'],
                                                 cluster.inventory['globals']['timeout_download']), warn=True)
+                problem_handler = resolve_problem_handler(host)
                 if res.is_any_failed():
-                    broken.append(f"{host}, {destination}: {res[host].stderr}")
+                    problem_handler.append(f"{host}, {destination}: {res[host].stderr}")
 
         # Remove file
         rm_command = "rm %s" % random_temp_path
@@ -370,9 +390,9 @@ def check_access_to_thirdparties(cluster: KubernetesCluster) -> None:
 
         if broken:
             raise TestFailure('Required thirdparties are unavailable', hint=yaml.safe_dump(broken))
-        if skipped_msgs:
+        if warnings:
             raise TestWarn("Can't detect python version for some nodes",
-                           hint='\n'.join(skipped_msgs))
+                           hint='\n'.join(warnings))
         tc.success('All thirdparties are available')
 
 
