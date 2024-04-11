@@ -833,7 +833,8 @@ nodes:
 * If you intend to add the new `balancer` node with VRRP IP, and have previously not configured the `vrrp_ips` section, you need to do the following preliminarily:
   * And the section to the main `cluster.yaml`.
   * If you already have balancers without VRRP IPs, reconfigure the balancers and DNS,
-    for example, using `kubemarine install --tasks prepare.dns.etc_hosts,deploy.loadbalancer.haproxy.configure,deploy.loadbalancer.keepalived,deploy.coredns`
+    for example, using `kubemarine install --tasks prepare.dns.etc_hosts,deploy.loadbalancer.haproxy.configure,deploy.loadbalancer.keepalived,deploy.coredns`.
+* If you intend to add the new `balancer` node with VRRP IP, and have previously configured the `vrrp_ips` section in the `cluster.yaml`, you have to add the adding node to the `vrrp_ips` section in the `cluster.yaml` the same way as the old balancer nodes.
 
 ### Add Node Tasks Tree
 
