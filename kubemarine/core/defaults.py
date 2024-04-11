@@ -648,7 +648,7 @@ def _convert_primitive_value_section(struct: Union[dict, list], section: Union[s
             try:
                 struct[section] = func(value)  # type: ignore[index]
             except ValueError as e:
-                raise ValueError(f"{str(e)} in section [{']['.join(repr(p) for p in path)}]") from None
+                raise ValueError(f"{str(e)} in section {utils.pretty_path(path)}") from None
 
     path.pop()
 

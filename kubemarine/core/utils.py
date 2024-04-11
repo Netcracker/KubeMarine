@@ -464,6 +464,12 @@ def load_yaml(filepath: str) -> dict:
         do_fail(f"Failed to load {filepath}", exc)
 
 
+def pretty_path(path: Sequence[Union[str, int]]) -> str:
+    if not path:
+        return ""
+    return f"[{']['.join(map(repr, path))}]"
+
+
 def strtobool(value: Union[str, bool]) -> bool:
     """
     The method check string and boolean value

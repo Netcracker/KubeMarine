@@ -301,19 +301,19 @@ def _error_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Validati
     return dedent(
         f"""\
         {_friendly_msg(validator, error)}
-        On inventory{_convert_to_indices(error.absolute_path)}
+        On inventory{utils.pretty_path(error.absolute_path)}
         """.rstrip()
     )
 
 
 def _verbose_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError) -> str:
-    schema_path = _convert_to_indices(list(error.absolute_schema_path)[:-1])
+    schema_path = utils.pretty_path(list(error.absolute_schema_path)[:-1])
     return dedent(
         f"""\
         {_friendly_msg(validator, error)}
         
         Failed validating {error.validator!r} in {schema_path}
-        On inventory{_convert_to_indices(error.absolute_path)}
+        On inventory{utils.pretty_path(error.absolute_path)}
         """.rstrip()
     )
 
@@ -362,9 +362,3 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
 
 def _validated_by(error: jsonschema.ValidationError, expected: str) -> bool:
     return error.validator == expected  # type: ignore[comparison-overlap]
-
-
-def _convert_to_indices(path: Sequence[Union[str, int]]) -> str:
-    if not path:
-        return ""
-    return f"[{']['.join(repr(p) for p in path)}]"
