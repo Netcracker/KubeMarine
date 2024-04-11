@@ -41,6 +41,7 @@ import kubemarine.plugins.calico
 import kubemarine.plugins.kubernetes_dashboard
 import kubemarine.plugins.local_path_provisioner
 import kubemarine.plugins.nginx_ingress
+import kubemarine.sysctl
 import kubemarine.system
 import kubemarine.thirdparties
 
@@ -453,11 +454,14 @@ class DynamicResources:
             kubemarine.core.defaults.apply_defaults,
             kubemarine.packages.enrich_inventory,
             kubemarine.core.defaults.apply_registry,
+            kubemarine.sysctl.enrich_inventory,
             kubemarine.keepalived.enrich_inventory_apply_defaults,
             kubemarine.keepalived.enrich_inventory_calculate_nodegroup,
             # Depends on kubemarine.keepalived.enrich_inventory_apply_defaults
             kubemarine.haproxy.enrich_inventory,
-            # Depends on kubemarine.core.defaults.apply_registry
+            # Depends on
+            # * kubemarine.core.defaults.apply_registry
+            # * kubemarine.sysctl.enrich_inventory
             kubemarine.kubernetes.enrich_inventory,
             kubemarine.admission.enrich_inventory,
             # Depends on kubemarine.core.defaults.apply_defaults
@@ -496,7 +500,6 @@ class DynamicResources:
         return [
             kubemarine.packages.cache_package_versions,
             kubemarine.core.defaults.escape_jinja_characters_for_inventory,
-            kubemarine.core.defaults.finalize_primitive_values,
             kubemarine.controlplane.controlplane_finalize_inventory,
         ]
 

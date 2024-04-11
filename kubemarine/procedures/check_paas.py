@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 import re
 from textwrap import dedent
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, cast
 
 import yaml
 import ruamel.yaml
@@ -773,6 +773,7 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
         control_plane = cluster.nodes['control-plane'].get_any_member()
         yaml = ruamel.yaml.YAML()
         nodes_failed_pid_max_check = {}
+        nodes_warned_pid_max_check = {}
         for node in cluster.make_group_from_roles(['control-plane', 'worker']).get_ordered_members_list():
             node_name = node.get_node_name()
 
@@ -795,12 +796,9 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
                                   % (max_pods, pod_pids_limit, pid_max))
                     cluster.log.debug("Required pid_max for current kubelet configuration is %s for node '%s'"
                                   % (required_pid_max, node_name))
-                    if cluster.inventory['services']['sysctl'].get("kernel.pid_max"):
-                        inventory_pid_max = cluster.inventory['services']['sysctl'].get("kernel.pid_max")
-                        if pid_max != inventory_pid_max:
-                            raise TestWarn("The 'kernel.pid_max' value defined in system = %s, "
-                                       "but 'kernel.pid_max', which defined in cluster.yaml = %s"
-                                       % (pid_max, inventory_pid_max))
+                    inventory_pid_max = cast(int, sysctl.get_parameter(cluster, node, 'kernel.pid_max'))
+                    if pid_max != inventory_pid_max:
+                        nodes_warned_pid_max_check[node_name] = [pid_max, inventory_pid_max]
                     if pid_max < required_pid_max:
                         nodes_failed_pid_max_check[node_name] = [pid_max, required_pid_max]
                 else:
@@ -813,13 +811,23 @@ def nodes_pid_max(cluster: KubernetesCluster) -> None:
 
         if nodes_failed_pid_max_check:
             output = "The requirement for the 'pid_max' value is not met for nodes:\n"
-            for node_name, pid_max_check in nodes_failed_pid_max_check.items():
-                if pid_max_check[1] == -1:
-                    output += ("For node %s podPidsLimit is unlimited" % node_name)
+            for node_name, (pid_max, required_pid_max) in nodes_failed_pid_max_check.items():
+                if required_pid_max == -1:
+                    output += ("For node %s podPidsLimit is unlimited\n" % node_name)
                 else:
                     output += ("For node %s pid_max value = '%s', but it should be >= then '%s'\n"
-                               % (node_name, pid_max_check[0], pid_max_check[1]))
-            raise TestFailure(output)
+                               % (node_name, pid_max, required_pid_max))
+            raise TestFailure('invalid', hint=output)
+
+        if nodes_warned_pid_max_check:
+            output = ''
+            for node_name, (pid_max, inventory_pid_max) in nodes_warned_pid_max_check.items():
+                output += ("For node %s the 'kernel.pid_max' value defined in system = %s, "
+                           "but 'kernel.pid_max', which defined in cluster.yaml = %s\n"
+                           % (node_name, pid_max, inventory_pid_max))
+
+            raise TestWarn('found warnings', hint=output)
+
         tc.success(results="pid_max correctly installed on all nodes")
 
 

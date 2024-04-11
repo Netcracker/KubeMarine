@@ -2677,6 +2677,34 @@ services:
     net.ipv4.ip_nonlocal_bind: 0
 ```
 
+There is also an extended format that allows to choose nodes on which the parameters should be managed.
+For example:
+
+```yaml
+services:
+  sysctl:
+    net.netfilter.nf_conntrack_max:
+      value: 1000000
+      groups: [control-plane, worker]
+      nodes: [balancer-1]
+      install: true
+    vm.max_map_count:
+      value: 262144
+```
+
+The following settings are supported in the extended format:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**value**|**yes**| |The value of the parameter. The property is mandatory for custom parameters, and calculated for standard parameters. To learn how values are calculated for the standard parameters, refer to their description in the previous table.|
+|**groups**|no|`None`|The list of group names to whose hosts the parameter should be set.|
+|**nodes**|no|`None`|The list of node names where the parameter should be set.|
+|**install**|no|`true`|Whether the parameter is managed (installed, checked) by Kubemarine. The property is `true` for custom parameters by default, and calculated for standard parameters. To learn what parameters are installed by default, refer to their description in the previous table.|
+
+**Note**: You can specify nodes and groups at the same time.
+
+**Note**: If no groups or nodes are specified, then the parameter is installed on all nodes.
+
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 
 **Warning**: If the changes to the hosts `sysctl` configurations are detected, a reboot is scheduled. After the reboot, the new parameters are validated to match the expected configuration.

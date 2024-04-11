@@ -16,7 +16,7 @@ import json
 import pathlib
 from collections.abc import Hashable
 from textwrap import dedent
-from typing import List, Dict, Callable, Union, Sequence
+from typing import List, Dict, Callable, Union
 
 import jsonschema
 from ordered_set import OrderedSet

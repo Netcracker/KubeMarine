@@ -15,10 +15,12 @@
 
 
 import unittest
+from typing import Set
 from test.unit import utils as test_utils
 
 from kubemarine.core import defaults, log
-from kubemarine import demo
+from kubemarine import demo, sysctl, kubernetes
+from kubemarine.core.group import NodeGroup
 
 
 class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
@@ -248,17 +250,24 @@ class PrimitiveValuesAsString(unittest.TestCase):
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.26.11'
         context = demo.create_silent_context()
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
-        inventory = demo.new_cluster(inventory, context=context, nodes_context=nodes_context).inventory
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        inventory = cluster.inventory
 
         self.assertEqual(True, inventory['services']['cri']['containerdConfig']
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
         self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
         self.assertEqual(['br_netfilter', 'nf_conntrack'],
                          inventory['services']['modprobe']['debian'])
-        self.assertEqual({'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward', 'net.ipv4.ip_nonlocal_bind',
-                          'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
-                          'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops'},
-                         set(inventory['services']['sysctl'].keys()))
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            expected_params = {
+                'net.bridge.bridge-nf-call-iptables', 'net.ipv4.ip_forward', 'net.ipv4.ip_nonlocal_bind',
+                'net.ipv4.conf.all.route_localnet', 'net.netfilter.nf_conntrack_max',
+                'kernel.panic', 'vm.overcommit_memory', 'kernel.panic_on_oops', 'kernel.pid_max'}
+            actual_params = self._actual_sysctl_params(cluster, node)
+            self.assertEqual(expected_params, actual_params)
+
         typha = inventory['plugins']['calico']['typha']
         self.assertEqual(False, typha['enabled'])
         self.assertEqual(2, typha['replicas'])
@@ -276,21 +285,23 @@ class PrimitiveValuesAsString(unittest.TestCase):
 
         cluster = demo.new_cluster(inventory)
 
-        self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
-                          "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            self.assertNotIn('net.netfilter.nf_conntrack_max', self._actual_sysctl_params(cluster, node),
+                             "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
         self.assertIsNone(cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
                           "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
 
         finalized_inventory = test_utils.make_finalized_inventory(cluster)
 
-        self.assertEqual('', finalized_inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
+        self.assertFalse(finalized_inventory['services']['sysctl']['net.netfilter.nf_conntrack_max']['install'],
                          "Finalized services.sysctl should have blank net.netfilter.nf_conntrack_max")
         self.assertIsNone(finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
                           "services.kubeadm_kube-proxy should not have conntrack.min if blank string is provided")
 
         cluster = demo.new_cluster(finalized_inventory)
-        self.assertIsNone(cluster.inventory['services']['sysctl'].get('net.netfilter.nf_conntrack_max'),
-                          "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            self.assertNotIn('net.netfilter.nf_conntrack_max', self._actual_sysctl_params(cluster, node),
+                             "services.sysctl should not have net.netfilter.nf_conntrack_max if blank string is provided")
 
     def test_default_v1_29_kube_proxy_conntrack_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
@@ -319,6 +330,32 @@ class PrimitiveValuesAsString(unittest.TestCase):
         self.assertEqual(1, finalized_inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'),
                          "Finalized services.kubeadm_kube-proxy should always be overridden with net.netfilter.nf_conntrack_max")
 
+    def test_ambiguous_conntrack_max(self):
+        inventory = demo.generate_inventory(master=1, worker=1)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory['services']['sysctl'] = {
+            'net.netfilter.nf_conntrack_max': {
+                'value': 1000000,
+                'groups': ['control-plane']
+            }
+        }
+
+        with self.assertRaisesRegex(Exception, kubernetes.ERROR_AMBIGUOUS_CONNTRACK_MAX.format(values='.*')):
+            demo.new_cluster(inventory)
+
+    def test_correct_conntrack_max_kubernetes_nodes(self):
+        inventory = demo.generate_inventory(master=1, worker=1)
+        inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.29.1'
+        inventory['services']['sysctl'] = {
+            'net.netfilter.nf_conntrack_max': {
+                'value': 1000000,
+                'groups': ['control-plane', 'worker']
+            }
+        }
+
+        cluster = demo.new_cluster(inventory)
+        self.assertEqual(1000000, cluster.inventory['services']['kubeadm_kube-proxy'].get('conntrack', {}).get('min'))
+
     def test_custom_jinja_enrichment(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         inventory['services'].setdefault('modprobe', {})['debian'] = [
@@ -329,20 +366,48 @@ class PrimitiveValuesAsString(unittest.TestCase):
             """,
             {'<<': 'merge'}
         ]
-        inventory['services'].setdefault('sysctl', {})['custom_parameter'] = \
+
+        inventory['services']['sysctl'] = {}
+        inventory['services']['sysctl']['custom_parameter1'] = \
             """
             {% if true %}
             1
             {% endif %}
             """
+        inventory['services']['sysctl']['custom_parameter2'] = {
+            'value': "{% if true %}2{% endif %}",
+            'install': '{{ "true" }}'
+        }
+        inventory['services']['sysctl']['custom_parameter3'] = {
+            'value': 3,
+            'install': '{{ "false" }}'
+        }
+
         inventory.setdefault('plugins', {}).setdefault('kubernetes-dashboard', {})['install'] = "{{ true }}"
         context = demo.create_silent_context()
         nodes_context = demo.generate_nodes_context(inventory, os_name='ubuntu', os_version='22.04')
-        inventory = demo.new_cluster(inventory, context=context, nodes_context=nodes_context).inventory
+
+        cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
+        inventory = cluster.inventory
 
         self.assertEqual('custom_module', inventory['services']['modprobe']['debian'][0])
-        self.assertEqual(1, inventory['services']['sysctl']['custom_parameter'])
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            self.assertEqual(1, sysctl.get_parameter(cluster, node, 'custom_parameter1'))
+            self.assertEqual(2, sysctl.get_parameter(cluster, node, 'custom_parameter2'))
+            self.assertIsNone(sysctl.get_parameter(cluster, node, 'custom_parameter3'))
+
+            sysctl_config = sysctl.make_config(cluster, node)
+            self.assertIn('custom_parameter1 = 1', sysctl_config)
+            self.assertIn('custom_parameter2 = 2', sysctl_config)
+            self.assertNotIn('custom_parameter3', sysctl_config)
+
         self.assertEqual(True, inventory['plugins']['kubernetes-dashboard']['install'])
+
+    def _actual_sysctl_params(self, cluster: demo.FakeKubernetesCluster, node: NodeGroup) -> Set[str]:
+        return {
+            record.split(' = ')[0]
+            for record in sysctl.make_config(cluster, node).rstrip('\n').split('\n')
+        }
 
 
 if __name__ == '__main__':

@@ -6,15 +6,17 @@
     "readOnlyPort": {"type": "integer", "default": 0},
     "enableDebuggingHandlers": {"type": "boolean", "default": true},
     "protectKernelDefaults": {"$ref": "#/definitions/ProtectKernelDefaults"},
-    "podPidsLimit": {"type": "integer", "default": 4096},
+    "podPidsLimit": {"$ref": "#/definitions/PodPidsLimit"},
     "cgroupDriver": {"type": "string", "default": "systemd"},
-    "maxPods": {"type": "integer", "default": 110},
+    "maxPods": {"$ref": "#/definitions/MaxPods"},
     "serializeImagePulls": {"$ref": "#/definitions/SerializeImagePulls"},
     "apiVersion": {"type": ["string"], "default": "kubelet.config.k8s.io/v1beta1"},
     "kind": {"enum": ["KubeletConfiguration"], "default": "KubeletConfiguration"}
   },
   "definitions": {
     "ProtectKernelDefaults": {"type": "boolean", "default": true},
+    "PodPidsLimit": {"type": "integer", "default": 4096},
+    "MaxPods": {"type": "integer", "default": 110},
     "SerializeImagePulls": {"type": "boolean", "default": false}
   }
 }
