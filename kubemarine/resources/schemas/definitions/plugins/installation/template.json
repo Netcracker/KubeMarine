@@ -38,7 +38,7 @@
           "description": "A switch for the command execution from the sudoer"
         },
         "destination_groups": {
-          "$ref": "../../common/node_ref.json#/definitions/Roles",
+          "$ref": "../../common/node_ref.json#/definitions/DeprecatedRoles",
           "description": "List of groups on which the compiled template needs to be uploaded"
         },
         "destination_nodes": {
@@ -46,7 +46,7 @@
           "description": "List of nodes on which the compiled template needs to be uploaded"
         },
         "apply_groups": {
-          "$ref": "../../common/node_ref.json#/definitions/Roles",
+          "$ref": "../../common/node_ref.json#/definitions/DeprecatedRoles",
           "description": "List of groups on which the template apply command needs to be executed"
         },
         "apply_nodes": {
