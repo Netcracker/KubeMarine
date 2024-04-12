@@ -28,8 +28,6 @@ class DoTest(unittest.TestCase):
         hosts = [node['address'] for node in inventory['nodes']]
         context = do.create_context(['--', 'whoami'])
         resources = demo.new_resources(inventory, context=context)
-        # Set make_finalized_inventory=None to invoke real method making it closer to the real work
-        resources.make_finalized_inventory = None
 
         results = demo.create_hosts_result(hosts, stdout='root\n', hide=False)
         resources.fake_shell.add(results, 'sudo', ['whoami'])

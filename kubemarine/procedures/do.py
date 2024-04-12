@@ -97,6 +97,7 @@ def create_context(cli_arguments: List[str] = None) -> dict:
         'config': configfile_path,
     }, procedure='do')
     context['preserve_inventory'] = False
+    context['make_finalized_inventory'] = False
     context['load_inventory_silent'] = True
 
     context['do_arguments'] = arguments

@@ -164,6 +164,7 @@ The task tree is as follows:
   * service_subnet_connectivity
   * ports_connectivity
   * vips_connectivity
+  * ipip_connectivity
 * hardware
   * members_amount
     * vips
@@ -181,6 +182,7 @@ The task tree is as follows:
     * workers
 * system
   * distributive
+  * fs_mount_options 
 * software
   * kernel
     * version

@@ -284,14 +284,14 @@ class DynamicResources:
 
     def dump_finalized_inventory(self, cluster: c.KubernetesCluster) -> None:
         finalized_filename = "cluster_finalized.yaml"
-        if not self._make_finalized_inventory(finalized_filename):
+        if not self.context['make_finalized_inventory']:
             return
 
-        finalized_inventory = cluster.make_finalized_inventory(self.finalization_functions())
+        finalized_inventory = self.make_finalized_inventory(cluster)
         self._store_finalized_inventory(finalized_inventory, finalized_filename)
 
-    def _make_finalized_inventory(self, finalized_filename: str) -> bool:
-        return utils.is_dump_allowed(self.context, finalized_filename)
+    def make_finalized_inventory(self, cluster: c.KubernetesCluster) -> dict:
+        return cluster.make_finalized_inventory(self.finalization_functions())
 
     def _store_finalized_inventory(self, finalized_inventory: dict, finalized_filename: str) -> None:
         data = yaml.dump(finalized_inventory)
