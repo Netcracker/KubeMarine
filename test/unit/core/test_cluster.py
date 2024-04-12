@@ -245,6 +245,7 @@ class LightClusterTest(unittest.TestCase):
     def test_legacy_role(self):
         inventory = demo.generate_inventory(**demo.ALLINONE)
         del inventory['nodes'][0]['name']
+        # pylint: disable-next=implicit-str-concat
         inventory['nodes'][0]['roles'] = ['balancer', 'm''a''s''t''e''r', 'worker']
 
         cluster = demo.new_resources(inventory).cluster(EnrichmentStage.LIGHT)

@@ -640,6 +640,7 @@ class RunActionsTest(test_utils.CommonTest):
 class ClusterEnrichOptimization(unittest.TestCase):
     @contextmanager
     def _expected_calls(self, expected_calls: int):
+        # pylint: disable-next=protected-access
         with test_utils.mock_call(defaults._compile_inventory, side_effect=defaults._compile_inventory) as run:
             try:
                 yield
