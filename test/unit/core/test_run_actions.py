@@ -112,7 +112,7 @@ class RunActionsTest(unittest.TestCase):
         return FakeResources(self.context, nodes_context=demo.generate_nodes_context(self.inventory))
 
     def _run_actions(self, actions: List[action.Action],
-                     resources: FakeResources = None,
+                     resources: res.DynamicResources = None,
                      exception_message: str = None) -> List[str]:
         if resources is None:
             resources = self._new_resources()
@@ -193,6 +193,18 @@ class RunActionsTest(unittest.TestCase):
 
                 actual_dump_content = self._list_dump_content()
                 self.assertEqual(expected_dump_content, actual_dump_content)
+
+    def test_cluster_finalized_disable_dump_without_act(self):
+        self.prepare_context(['--disable-dump', '--without-act'], procedure='install')
+
+        with test_utils.chdir(self.tmpdir.name):
+            resources = test_utils.PackageStubResources(
+                self.context, nodes_context=demo.generate_nodes_context(self.inventory))
+
+            self._run_actions([self._prepare_action(install.InstallAction())],
+                              resources=resources)
+
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir.name, 'cluster_finalized.yaml')))
 
     def test_install_action_failed_task(self):
         self.prepare_context(procedure='install')
@@ -489,7 +501,7 @@ class RunActionsTest(unittest.TestCase):
                     raise Exception("test")
 
                 resources = self._new_resources()
-                resources.make_finalized_inventory = False
+                resources.context['make_finalized_inventory'] = False
                 uploaded_archives = self._run_actions([
                     test_utils.new_action("test_inventory1", action=inventory_action, recreate_inventory=recreate_inventory),
                     test_utils.new_action("test_cluster1", action=cluster_action),

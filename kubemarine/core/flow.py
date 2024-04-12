@@ -232,6 +232,7 @@ def create_empty_context(args: dict, procedure: str) -> dict:
         "execution_arguments": deepcopy(args),
         'initial_procedure': procedure,
         'preserve_inventory': True,
+        'make_finalized_inventory': True,
         'load_inventory_silent': False,
         'runtime_vars': {},
         'result': ['summary_report'],
