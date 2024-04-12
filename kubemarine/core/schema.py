@@ -14,8 +14,9 @@
 
 import json
 import pathlib
+from collections.abc import Hashable
 from textwrap import dedent
-from typing import List, Dict, Callable, Union, Sequence, Hashable
+from typing import List, Dict, Callable, Union, Sequence
 
 import jsonschema
 from ordered_set import OrderedSet
@@ -300,13 +301,15 @@ def _verbose_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valida
 
 
 def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.ValidationError) -> str:
+    # pylint: disable=too-many-return-statements
+
     if _validated_by(error, 'minProperties'):
         return f"Number of properties is less than the minimum of {error.validator_value!r}. " \
-               f"Property names: {[prop for prop in error.instance]!r}"
+               f"Property names: {list(error.instance)!r}"
 
     if _validated_by(error, 'maxProperties'):
         return f"Number of properties is greater than the maximum of {error.validator_value!r}. " \
-               f"Property names: {[prop for prop in error.instance]!r}"
+               f"Property names: {list(error.instance)!r}"
 
     if _validated_by(error, 'minItems'):
         return f"Number of items equal to {len(error.instance)} is less than the minimum of {error.validator_value!r}"
@@ -319,9 +322,9 @@ def _friendly_msg(validator: jsonschema.Draft7Validator, error: jsonschema.Valid
         expected_types = [value] if isinstance(value, str) else value
         reprs = ", ".join(repr(type) for type in expected_types)
         try:
-            for type in validator.TYPE_CHECKER._type_checkers:
-                if validator.is_type(error.instance, type):  # type: ignore[no-untyped-call]
-                    return f"Actual instance type is {type!r}. Expected: {reprs}."
+            for type_ in validator.TYPE_CHECKER._type_checkers:  # pylint: disable=protected-access
+                if validator.is_type(error.instance, type_):  # type: ignore[no-untyped-call]
+                    return f"Actual instance type is {type_!r}. Expected: {reprs}."
         except (AttributeError, TypeError, jsonschema.exceptions.UnknownType):
             # In current 3rd-party version the error should not appear, but let's still fall back to default behaviour
             pass

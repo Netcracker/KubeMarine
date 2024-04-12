@@ -24,7 +24,7 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
     def test_add_hosts_config(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         cluster = demo.new_cluster(inventory)
-        configmap_hosts = '''127.0.0.1 localhost localhost.localdomain
+        configmap_hosts = '''127.0.0.1  localhost localhost.localdomain
 10.101.2.1   k8s.fake.local control-plain
 192.168.0.1  master-1.k8s.fake.local master-1
 10.101.1.1   master-1-external.k8s.fake.local master-1-external
@@ -34,17 +34,8 @@ class CorednsDefaultsEnrichment(unittest.TestCase):
 10.101.1.3   master-3-external.k8s.fake.local master-3-external
 '''
         generated_hosts = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts_generated')
-        cluster.inventory['services'] = {
-            'coredns': {
-                'configmap': {
-                    'Hosts': '127.0.0.1 localhost localhost.localdomain'
-                }
-            }
-        }
-        print("qqq")
-        print(generated_hosts)
-        print("qqq")
-        self.assertEqual(configmap_hosts, cluster.inventory['services']['coredns'].get('configmap').get('Hosts') + '\n' + generated_hosts)
+        default_hosts = system.generate_etc_hosts_config(cluster.inventory, 'etc_hosts')
+        self.assertEqual(configmap_hosts, default_hosts + generated_hosts)
 
     def test_already_defined_hosts_config_and_not_add_etc_hosts_generated(self):
         inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -92,7 +83,7 @@ class CorednsGenerator(unittest.TestCase):
                                     'type': 'A',
                                     'zone': 'test',
                                     'data': {
-                                        'match': '^(.*\.)?localhost\.$',
+                                        'match': r'^(.*\.)?localhost\.$',
                                         'answer': '{{ .Name }} 3600 IN A 1.1.1.1'
                                     }
                                 }
@@ -119,7 +110,7 @@ class CorednsGenerator(unittest.TestCase):
 
         inventory['services']['coredns']['add_etc_hosts_generated'] = True
         config = coredns.generate_configmap(inventory)
-        self.assertEqual('''apiVersion: v1
+        self.assertEqual(r'''apiVersion: v1
 
 kind: ConfigMap
 metadata:

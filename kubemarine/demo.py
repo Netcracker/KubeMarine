@@ -184,9 +184,6 @@ class FakeFS:
 
 
 class FakeClusterStorage(utils.ClusterStorage):
-    def __init__(self, cluster: object, context: dict):
-        super().__init__(cluster, context)
-
     def make_dir(self) -> None:
         pass
 
@@ -329,10 +326,10 @@ class FakeConnection(fabric.connection.Connection):  # type: ignore[misc]
         return self._do("sudo", command, **kwargs)
 
     # not implemented
-    def get(self, remote_file: str, local_file: str, **kwargs: Any) -> None:
+    def get(self, remote_file: str, local_file: str, **kwargs: Any) -> None:  # pylint: disable=arguments-differ
         raise NotImplementedError("Stub for fabric Connection.get() is not implemented")
 
-    def put(self, data: Union[io.BytesIO, str], filename: str, **kwargs: Any) -> None:
+    def put(self, data: Union[io.BytesIO, str], filename: str, **kwargs: Any) -> None:  # pylint: disable=arguments-differ
         # It should return fabric.transfer.Result, but currently returns None.
         # Transfer Result is currently never handled.
         self.fake_fs.write(self.host, filename, data)
@@ -573,9 +570,7 @@ def generate_inventory(balancer: _ROLE_SPEC = 1, master: _ROLE_SPEC = 1, worker:
 
     id_roles_map: Dict[str, List[str]] = {}
 
-    for role_name in ['balancer', 'master', 'worker']:
-
-        item = locals()[role_name]
+    for role_name, item in (('balancer', balancer), ('master', master), ('worker', worker)):
 
         if isinstance(item, int):
             ids = []

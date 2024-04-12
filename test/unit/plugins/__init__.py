@@ -22,6 +22,8 @@ from kubemarine.plugins.manifest import Manifest, Identity
 
 class _AbstractManifestEnrichmentTest(unittest.TestCase):
     def commonSetUp(self, manifest_identity: Identity):
+        # pylint: disable=attribute-defined-outside-init
+
         self.manifest_identity = manifest_identity
         self.plugin_name = manifest_identity.plugin_name
         self.k8s_versions = list(static.GLOBALS['compatibility_map']['software']['kubeadm'].keys())
@@ -65,6 +67,8 @@ class _AbstractManifestEnrichmentTest(unittest.TestCase):
         #         "source": f"templates/plugins/<paste template filename>.yaml.j2"
         #     }
         #     plugins.apply_template(cluster, config)
+
+        # pylint: disable-next=protected-access
         processor = builtin._get_manifest_processor(cluster.log, cluster.inventory, self.manifest_identity)
         return processor.enrich()
 

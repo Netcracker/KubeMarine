@@ -135,14 +135,11 @@ class FakeThirdpartyResolver(ThirdpartyResolver):
                 return software_settings['sha1']
             if thirdparty_name in ('calicoctl', 'crictl') and version == software_settings['version']:
                 return software_settings['sha1']
-        else:
-            return 'fake-sha1'
+
+        return 'fake-sha1'
 
 
 class NoneManifestsEnrichment(ManifestsEnrichment):
-    def __init__(self):
-        super().__init__()
-
     def run(self, tracker: SummaryTracker) -> None:
         return
 

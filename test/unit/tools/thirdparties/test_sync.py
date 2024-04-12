@@ -19,6 +19,11 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import List, Dict, ContextManager
 from unittest import mock
+from test.unit import utils as test_utils
+from test.unit.tools.thirdparties.stub import (
+    FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
+    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig
+)
 
 from kubemarine.core import utils, static
 from kubemarine.plugins import builtin
@@ -30,11 +35,6 @@ from scripts.thirdparties.src.software.plugins import (
 )
 from scripts.thirdparties.src.tracker import (
     SummaryTracker, ERROR_PREVIOUS_MINOR
-)
-from test.unit import utils as test_utils
-from test.unit.tools.thirdparties.stub import (
-    FakeSynchronization, FakeInternalCompatibility, FakeKubernetesVersions,
-    FAKE_CACHED_MANIFEST_RESOLVER, FakeManifest, NoneManifestsEnrichment, FakeUpgradeConfig
 )
 
 
@@ -153,7 +153,7 @@ class SynchronizationTest(unittest.TestCase):
                                  actual_mapping.get('version'),
                                  f"Version for {thirdparty!r} and Kubernetes {ver} was not synced")
 
-    def _check_added_k8s_images(self, ver: str, from_ver: str):
+    def _check_added_k8s_images(self, ver: str, _: str):
         for k8s_image in ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler', 'kube-proxy',
                           'pause', 'etcd', 'coredns/coredns'):
             software_mapping = self.compatibility.stored['kubernetes_images.yaml'][k8s_image]
@@ -267,8 +267,10 @@ class SynchronizationTest(unittest.TestCase):
         for test_identity in builtin.MANIFEST_PROCESSOR_PROVIDERS:
             with self.subTest(test_identity.name):
                 class FakeManifestResolver(ManifestResolver):
-                    def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
+                    def _resolve(self, manifest_identity: Identity, plugin_version: str,
+                                 test_identity=test_identity) -> Manifest:
                         if manifest_identity != test_identity:
+                            # pylint: disable-next=protected-access
                             return FAKE_CACHED_MANIFEST_RESOLVER._resolve(manifest_identity, plugin_version)
 
                         manifest = FakeManifest(manifest_identity, plugin_version)
@@ -288,6 +290,7 @@ class SynchronizationTest(unittest.TestCase):
 
             def _resolve(self, manifest_identity: Identity, plugin_version: str) -> Manifest:
                 if manifest_identity != Identity('calico'):
+                    # pylint: disable-next=protected-access
                     return FAKE_CACHED_MANIFEST_RESOLVER._resolve(manifest_identity, plugin_version)
 
                 manifest = FakeManifest(manifest_identity, plugin_version)

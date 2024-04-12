@@ -19,13 +19,13 @@ import unittest
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import List
+from test.unit import utils as test_utils
 
 import yaml
 from ordered_set import OrderedSet
 
 from kubemarine import demo, plugins, system
 from kubemarine.kubernetes import components
-from test.unit import utils as test_utils
 
 
 class KubeadmConfigTest(unittest.TestCase):
@@ -141,6 +141,7 @@ class WaitForPodsTest(unittest.TestCase):
         internal_address = cluster.get_node_by_name(node_name)['internal_address']
         ready_string = '1/1' if ready else '0/1'
         output = '\n'.join((
+            # pylint: disable-next=line-too-long
             f'{pod}            {ready_string}     Running   0          1s   {internal_address}   {node_name}   <none>           <none>'
             for pod in pods
         ))
@@ -225,6 +226,8 @@ class WaitForPodsTest(unittest.TestCase):
 
 
 class RestartComponentsTest(unittest.TestCase):
+    # pylint: disable=protected-access
+
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA)
         random.shuffle(self.inventory['nodes'])
@@ -240,7 +243,8 @@ class RestartComponentsTest(unittest.TestCase):
         cluster = self._new_cluster()
         with self.assertRaisesRegex(Exception, re.escape(components.ERROR_RESTART_NOT_SUPPORTED.format(
                 components=['kube-apiserver/cert-sans', 'kubelet', 'kube-proxy', 'unexpected-component']))):
-            components.restart_components(cluster.nodes['all'].get_any_member(), components.ALL_COMPONENTS + ['unexpected-component'])
+            components.restart_components(cluster.nodes['all'].get_any_member(),
+                                          components.ALL_COMPONENTS + ['unexpected-component'])
 
     def test_restart_all_supported(self):
         cluster = self._new_cluster()
@@ -286,6 +290,8 @@ class RestartComponentsTest(unittest.TestCase):
 
 
 class ReconfigureComponentsTest(unittest.TestCase):
+    # pylint: disable=protected-access
+
     def setUp(self):
         self.inventory = demo.generate_inventory(**demo.FULLHA)
         random.shuffle(self.inventory['nodes'])
@@ -305,7 +311,8 @@ class ReconfigureComponentsTest(unittest.TestCase):
         cluster = self._new_cluster()
         with self.assertRaisesRegex(Exception, re.escape(components.ERROR_RECONFIGURE_NOT_SUPPORTED.format(
                 components=['unexpected-component']))):
-            components.reconfigure_components(cluster.nodes['all'].get_any_member(), components.ALL_COMPONENTS + ['unexpected-component'])
+            components.reconfigure_components(cluster.nodes['all'].get_any_member(),
+                                              components.ALL_COMPONENTS + ['unexpected-component'])
 
     def test_reconfigure_all_supported(self):
         for changes_detected, force_restart in (

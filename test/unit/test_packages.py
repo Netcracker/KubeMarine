@@ -15,13 +15,13 @@
 import unittest
 from copy import deepcopy
 from typing import Optional
+from test.unit import utils
 
 from kubemarine import demo, packages
 from kubemarine.core import static, errors
 from kubemarine.core.yaml_merger import default_merger
 from kubemarine.demo import FakeKubernetesCluster
 from kubemarine.procedures import add_node
-from test.unit import utils
 
 
 def new_debian_cluster(inventory: dict) -> FakeKubernetesCluster:
@@ -505,7 +505,7 @@ class CacheVersions(unittest.TestCase):
         cluster = self._new_cluster()
         containerd_hosts_stub = {}
         last_k8s_host = ''
-        for i, node in enumerate(self.inventory['nodes']):
+        for node in self.inventory['nodes']:
             if 'master' in node['roles'] or 'worker' in node['roles']:
                 last_k8s_host = node['address']
                 containerd_hosts_stub[last_k8s_host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
@@ -520,7 +520,7 @@ class CacheVersions(unittest.TestCase):
         cluster = self._new_cluster()
         conntrack_hosts_stub = {}
         last_k8s_host = ''
-        for i, node in enumerate(self.inventory['nodes']):
+        for node in self.inventory['nodes']:
             if 'master' in node['roles'] or 'worker' in node['roles']:
                 last_k8s_host = node['address']
                 conntrack_hosts_stub[last_k8s_host] = 'conntrack=1:1.4.5-2'
@@ -534,7 +534,7 @@ class CacheVersions(unittest.TestCase):
     def test_add_node_success_cache_by_initial_nodes(self):
         cluster = self._new_cluster()
         packages_hosts_stub = {'containerd': {}, 'conntrack': {}}
-        for i, node in enumerate(self.inventory['nodes']):
+        for node in self.inventory['nodes']:
             host = node['address']
             if 'master' in node['roles'] or 'worker' in node['roles']:
                 packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'
@@ -556,7 +556,7 @@ class CacheVersions(unittest.TestCase):
     def test_add_node_success_cache_versions_managed_nodes(self):
         cluster = self._new_cluster()
         packages_hosts_stub = {'containerd': {}, 'conntrack': {}}
-        for i, node in enumerate(self.inventory['nodes']):
+        for node in self.inventory['nodes']:
             host = node['address']
             if 'master' in node['roles'] or 'worker' in node['roles']:
                 packages_hosts_stub['containerd'][host] = 'containerd=1.5.9-0ubuntu1~20.04.4'

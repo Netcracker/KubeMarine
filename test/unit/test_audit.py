@@ -132,7 +132,7 @@ class TestAuditInstallation(unittest.TestCase):
         audit.install(cluster.nodes['master'])
 
         for host in cluster.nodes['master'].get_hosts():
-            expected_is_called = True if host == '10.101.1.3' else False
+            expected_is_called = host == '10.101.1.3'
             self.assertEqual(expected_is_called, cluster.fake_shell.is_called(host, 'sudo', enable_command),
                              msg="Installation task did not finished with audit enable command")
 

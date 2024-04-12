@@ -16,7 +16,6 @@ import io
 import re
 from typing import Tuple, Optional, Dict, List
 
-from kubemarine import system
 from kubemarine.core import utils, log
 from kubemarine.core.group import NodeGroup, RunnersGroupResult
 
@@ -176,6 +175,8 @@ def is_config_valid(group: NodeGroup, state: str = None, policy: str = None, per
 
 
 def setup_selinux(group: NodeGroup) -> Optional[RunnersGroupResult]:
+    from kubemarine import system  # pylint: disable=cyclic-import
+
     log = group.cluster.log
 
     # this method handles cluster with multiple os, suppressing should be enabled
@@ -187,10 +188,11 @@ def setup_selinux(group: NodeGroup) -> Optional[RunnersGroupResult]:
     expected_policy = get_expected_policy(group.cluster.inventory)
     expected_permissive = get_expected_permissive(group.cluster.inventory)
 
-    valid, result, parsed_result = is_config_valid(group,
-                                                   state=expected_state,
-                                                   policy=expected_policy,
-                                                   permissive=expected_permissive)
+    valid, result, _ = \
+        is_config_valid(group,
+                        state=expected_state,
+                        policy=expected_policy,
+                        permissive=expected_permissive)
 
     if valid:
         log.debug("Skipped - selinux already correctly configured")

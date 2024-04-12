@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
 from typing import List, Dict, Tuple, Optional, Union, Mapping, Set
 
 from typing_extensions import Protocol
@@ -648,8 +649,6 @@ def get_package_name(os_family: str, package: str) -> str:
     """
     Return the pure package name, without any part of version
     """
-
-    import re
 
     package_name = ""
 

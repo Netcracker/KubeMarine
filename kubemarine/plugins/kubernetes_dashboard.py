@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from textwrap import dedent
 from typing import List, Optional, Dict
 import yaml
-from textwrap import dedent
 
 from kubemarine.core import summary, utils, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
@@ -84,7 +84,8 @@ class DashboardManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret_kubernetes_dashboard)
 
         service_account_key = "ServiceAccount_kubernetes-dashboard"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 
@@ -121,7 +122,8 @@ class DashboardManifestProcessor(Processor):
         self.enrich_image_for_container(manifest, key,
             plugin_service='metrics-scraper', container_name='dashboard-metrics-scraper', is_init_container=False)
 
-        self.enrich_resources_for_container(manifest, key, container_name='dashboard-metrics-scraper', plugin_service="metrics-scraper")
+        self.enrich_resources_for_container(
+            manifest, key, container_name='dashboard-metrics-scraper', plugin_service="metrics-scraper")
         self.enrich_node_selector(manifest, key, plugin_service='metrics-scraper')
         self.enrich_tolerations(manifest, key, plugin_service='metrics-scraper', override=True)
 

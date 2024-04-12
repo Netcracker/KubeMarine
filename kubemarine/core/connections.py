@@ -79,7 +79,6 @@ class ConnectionPool:
     def _get_gateway_node_connection(self, name: str) -> fabric.connection.Connection:
         # Create new connection instance each time even if it is the same gateway node.
         # This is necessary to not share the same gateway connection instance in multiple threads
-        gateway_conn = None
 
         gateway = self._gateway_nodes.get(name)
         if gateway is None:

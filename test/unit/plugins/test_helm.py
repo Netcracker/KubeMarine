@@ -13,23 +13,23 @@
 # limitations under the License.
 
 import os.path
-import tempfile
 import unittest
+from test.unit import utils as test_utils
 
 import yaml
 
 from kubemarine import demo, plugins
 
 
-class TestHelmProcessChartValues(unittest.TestCase):
+class TestHelmProcessChartValues(test_utils.CommonTest):
     def setUp(self) -> None:
-        self.tmpdir = tempfile.TemporaryDirectory()
-        self.chart_path = os.path.join(self.tmpdir.name, 'chart')
+        self.chart_path = os.path.join(self.tmpdir, 'chart')
         os.makedirs(self.chart_path)
         self.chart_values = os.path.join(self.chart_path, 'values.yaml')
 
-    def tearDown(self) -> None:
-        self.tmpdir.cleanup()
+    def run(self, *args, **kwargs):
+        with test_utils.temporary_directory(self):
+            return super().run(*args, **kwargs)
 
     def test_values(self):
         self._set_chart_values({'var1': '0', 'var2': 'A'})
@@ -67,11 +67,11 @@ class TestHelmProcessChartValues(unittest.TestCase):
             .setdefault('installation', {}).setdefault('procedures', [])
 
     def _get_chart_values(self):
-        with open(self.chart_values, 'r') as stream:
+        with open(self.chart_values, 'r', encoding='utf-8') as stream:
             return yaml.safe_load(stream.read())
 
     def _set_chart_values(self, values: dict):
-        with open(self.chart_values, 'w') as stream:
+        with open(self.chart_values, 'w', encoding='utf-8') as stream:
             stream.write(yaml.dump(values))
 
     def _prepare_helm_procedure(self, values_file: dict = None, values: dict = None) -> dict:
@@ -81,8 +81,8 @@ class TestHelmProcessChartValues(unittest.TestCase):
         if values is not None:
             config['values'] = values
         if values_file is not None:
-            override = os.path.join(self.tmpdir.name, 'override.yaml')
-            with open(override, 'w') as stream:
+            override = os.path.join(self.tmpdir, 'override.yaml')
+            with open(override, 'w', encoding='utf-8') as stream:
                 stream.write(yaml.dump(values_file))
 
             config['values_file'] = override

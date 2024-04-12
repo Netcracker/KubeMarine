@@ -16,8 +16,9 @@
 
 import unittest
 
+from paramiko import SSHException
+
 from kubemarine import demo
-from paramiko.ssh_exception import SSHException
 
 from kubemarine.core import static
 from kubemarine.core.group import CollectorCallback

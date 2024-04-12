@@ -15,12 +15,12 @@
 import unittest
 from copy import deepcopy
 from unittest import mock
+from test.unit import utils as test_utils
 
 from kubemarine import demo, plugins
 from kubemarine.core import flow, errors
 from kubemarine.plugins import nginx_ingress
 from kubemarine.procedures import cert_renew
-from test.unit import utils as test_utils
 
 supported_k8s_certs = ["apiserver", "apiserver-etcd-client", "apiserver-kubelet-client",
                        "etcd-healthcheck-client", "etcd-peer", "etcd-server",

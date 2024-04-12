@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import ipaddress
 from textwrap import dedent
 from typing import Optional, List, Dict
 
 import os
 import yaml
 
-from kubemarine import plugins, kubernetes
+from kubemarine import plugins
 from kubemarine.core import utils, log
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine.core.group import NodeGroup
@@ -116,6 +115,8 @@ def is_apiserver_enabled(inventory: dict) -> bool:
 
 
 def renew_apiserver_certificate(cluster: KubernetesCluster) -> None:
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
+
     logger = cluster.log
     if not is_apiserver_enabled(cluster.inventory):
         logger.debug("Calico API server is disabled. Skip renewing of the key and certificate.")
@@ -201,7 +202,7 @@ class CalicoManifestProcessor(Processor):
         self.log.verbose(f"The {key} has been patched in 'data.typha_service_name' with '{val}'")
         string_part = source_yaml['data']['cni_network_config']
         ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        if utils.isipv(ip, [4]):
             val = self.inventory['plugins']['calico']['cni']['ipam']['ipv4']
         else:
             val = self.inventory['plugins']['calico']['cni']['ipam']['ipv6']
@@ -214,7 +215,8 @@ class CalicoManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret_calico_kube_controllers)
 
         service_account_key = "ServiceAccount_calico-kube-controllers"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 
@@ -244,7 +246,8 @@ class CalicoManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret_calico_node)
 
         service_account_key = "ServiceAccount_calico-node"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 
@@ -292,7 +295,7 @@ class CalicoManifestProcessor(Processor):
         key = "DaemonSet_calico-node"
         env_delete: List[str] = []
         ip = self.inventory['services']['kubeadm']['networking']['podSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv4Address:
+        if utils.isipv(ip, [4]):
             env_delete.extend([
                 'CALICO_IPV6POOL_CIDR', 'IP6', 'IP6_AUTODETECTION_METHOD',
                 'CALICO_IPV6POOL_IPIP', 'CALICO_IPV6POOL_VXLAN'
@@ -522,7 +525,8 @@ class CalicoApiServerManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret_calico_apiserver)
 
         service_account_key = "ServiceAccount_calico-apiserver"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 

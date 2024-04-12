@@ -1,0 +1,5 @@
+pyinstaller==6.2.0
+# Pinned version is used because scripts/ci/custom-hooks/hook-cryptography.py
+# relies on internal implementation of `pyinstaller-hooks-contrib`.
+# Need to regenerate scripts/ci/custom-hooks/hook-cryptography.py each time the version is upgraded.
+pyinstaller-hooks-contrib==2023.10

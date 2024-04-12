@@ -23,15 +23,15 @@ import sys
 import time
 import tarfile
 import uuid
+from collections import OrderedDict
 from copy import deepcopy
+from datetime import datetime
 
-from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional
+from typing import Tuple, Callable, List, TextIO, cast, Union, TypeVar, Dict, Sequence, Optional, NoReturn
 
 import deepdiff  # type: ignore[import-untyped]
 import yaml
 import ruamel.yaml
-from datetime import datetime
-from collections import OrderedDict
 
 from pathvalidate import sanitize_filepath
 from ruamel.yaml import CommentedMap
@@ -54,7 +54,7 @@ class SupportsAllComparisons(Protocol[_T_contra]):
     def __ge__(self, __other: _T_contra) -> bool: ...
 
 
-def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> None:
+def do_fail(message: str = '', reason: Exception = None, hint: str = '', logger: log.EnhancedLogger = None) -> NoReturn:
 
     if not logger:
         sys.stderr.write("\033[91m")
@@ -93,7 +93,7 @@ def prepare_dump_directory(context: dict) -> None:
 
 
 def make_ansible_inventory(location: str, c: object) -> None:
-    from kubemarine.core.cluster import KubernetesCluster
+    from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
     cluster = cast(KubernetesCluster, c)
 
     inventory = cluster.inventory
@@ -138,31 +138,31 @@ def make_ansible_inventory(location: str, c: object) -> None:
     ]
 
     for group in ['services', 'plugins']:
-        if inventory.get(group) is not None:
-            for service_name, service_configs in inventory[group].items():
-                # write to inventory only plugins, which will be installed
-                if group != 'plugins' or service_configs.get('install', False):
+        for service_name, service_configs in inventory.get(group, {}).items():
+            # write to inventory only plugins, which will be installed
+            if group == 'plugins' and not service_configs.get('install', False):
+                continue
 
-                    config['cluster:vars'].append('\n# %s.%s' % (group, service_name))
+            config['cluster:vars'].append('\n# %s.%s' % (group, service_name))
 
-                    if isinstance(service_configs, dict):
+            if isinstance(service_configs, dict):
 
-                        for config_name, config_value in service_configs.items():
-                            if config_name in ('installation', 'install'):
-                                continue
+                for config_name, config_value in service_configs.items():
+                    if config_name in ('installation', 'install'):
+                        continue
 
-                            if isinstance(config_value, dict) or isinstance(config_value, list):
-                                config_value = json.dumps(config_value)
-                            config['cluster:vars'].append('%s_%s=%s' % (
-                                # TODO: Rewrite replace using regex
-                                service_name.replace('-', '_').replace('.', '_').replace('/', '_'),
-                                config_name.replace('-', '_').replace('.', '_').replace('/', '_'),
-                                config_value))
-                    else:
-                        config_value = json.dumps(service_configs)
-                        config['cluster:vars'].append('%s=%s' % (
-                            service_name.replace('-', '_').replace('.', '_'),
-                            config_value))
+                    if isinstance(config_value, (dict, list)):
+                        config_value = json.dumps(config_value)
+                    config['cluster:vars'].append('%s_%s=%s' % (
+                        # TODO: Rewrite replace using regex
+                        service_name.replace('-', '_').replace('.', '_').replace('/', '_'),
+                        config_name.replace('-', '_').replace('.', '_').replace('/', '_'),
+                        config_value))
+            else:
+                config_value = json.dumps(service_configs)
+                config['cluster:vars'].append('%s=%s' % (
+                    service_name.replace('-', '_').replace('.', '_'),
+                    config_value))
 
     config_compiled = ''
     for section_name, strings in config.items():
@@ -209,7 +209,7 @@ def dump_file(context: Union[dict, object], data: Union[TextIO, str], filename: 
     if dump_location:
         if not isinstance(context, dict):
             # cluster is passed instead of the context directly
-            from kubemarine.core.cluster import KubernetesCluster
+            from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
             cluster = cast(KubernetesCluster, context)
             context = cluster.context
 
@@ -395,6 +395,10 @@ def convert_native_yaml(data: dict) -> dict:
     return data
 
 
+def identity(x: str) -> str:
+    return x
+
+
 def is_sorted(l: Sequence[str], key: Callable[[str], SupportsAllComparisons] = None) -> bool:
     """
     Check that the specified list is sorted.
@@ -404,7 +408,7 @@ def is_sorted(l: Sequence[str], key: Callable[[str], SupportsAllComparisons] = N
     :return: boolean flag if the list is sorted
     """
     if key is None:
-        key = lambda x: x
+        key = identity
     return all(key(l[i]) <= key(l[i + 1]) for i in range(len(l) - 1))
 
 
@@ -419,7 +423,7 @@ def map_sorted(map_: CommentedMap, key: Callable[[str], SupportsAllComparisons] 
     if key is not None:
         _key = key
     else:
-        _key = lambda x: x
+        _key = identity
     map_keys: List[str] = list(map_)
     if not is_sorted(map_keys, key=_key):
         map_ = CommentedMap(sorted(map_.items(), key=lambda item: _key(item[0])))
@@ -442,7 +446,7 @@ def insert_map_sorted(map_: CommentedMap, k: str, v: object, key: Callable[[str]
         return
 
     if key is None:
-        key = lambda x: x
+        key = identity
     # Find position to insert new item maintaining the order
     pos = max((mi + 1 for mi, mv in enumerate(map_)
                if key(mv) < key(k)),
@@ -458,14 +462,12 @@ def load_yaml(filepath: str) -> dict:
             return data
     except yaml.YAMLError as exc:
         do_fail(f"Failed to load {filepath}", exc)
-        return {}  # unreachable
 
 
 def strtobool(value: Union[str, bool]) -> bool:
     """
     The method check string and boolean value
     :param value: Value that should be checked
-    :param section: inventory section for debugging purpose
     """
     val = str(value).lower()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
@@ -484,7 +486,7 @@ def strtoint(value: Union[str, int]) -> int:
         # whitespace required because python's int() ignores them
         return int(value.replace(' ', '.'))
     except ValueError:
-        raise ValueError(f"invalid integer value {value!r}")
+        raise ValueError(f"invalid integer value {value!r}") from None
 
 
 def print_diff(logger: log.EnhancedLogger, diff: deepdiff.DeepDiff) -> None:
@@ -637,7 +639,7 @@ class ClusterStorage:
                             'cluster.yaml', 'cluster_initial.yaml', 'cluster_finalized.yaml']
 
     def __init__(self, cluster: object, context: dict):
-        from kubemarine.core.cluster import KubernetesCluster
+        from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
         self.cluster = cast(KubernetesCluster, cluster)
         self.context = context
         self.dir_path = "/etc/kubemarine/procedures/"
@@ -680,7 +682,7 @@ class ClusterStorage:
                 files = result.stdout.split()
                 files.sort(reverse=True)
                 for i, file in enumerate(files):
-                    if i >= not_pack_file and i < delete_old:
+                    if not_pack_file <= i < delete_old:
                         if 'tar.gz' not in file:
                             control_plane.sudo(
                                 f'tar -czvf {self.dir_path + file + ".tar.gz"} {self.dir_path + file} &&'
@@ -707,7 +709,7 @@ class ClusterStorage:
         This method collects information about the type of procedure and the version of the tool we are working with.
         """
         context = self.context
-        out = dict()
+        out = {}
         out['arguments'] = context['initial_cli_arguments']
         if 'proceeded_tasks' in context:
             out['finished_tasks'] = context['proceeded_tasks']

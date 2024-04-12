@@ -547,7 +547,7 @@ class ExportKubernetesDownloader:
         except BaseException as e:
             self.parser.finish(graceful=False)
             if task is not None:
-                raise DownloadException(task, e)
+                raise DownloadException(task, e) from None
             else:
                 raise
         else:
@@ -630,7 +630,8 @@ def export_kubernetes(cluster: KubernetesCluster) -> None:
                 except BaseException as e:
                     logger.verbose(e)
                     if isinstance(e, DownloadException):
-                        logger.error(f"Failed to download resources {','.join(e.task.resources)} for namespace {e.task.namespace}")
+                        logger.error(f"Failed to download resources {','.join(e.task.resources)} "
+                                     f"for namespace {e.task.namespace}")
                         exc = e.reason
                     else:
                         exc = e
@@ -692,7 +693,7 @@ def pack_data(cluster: KubernetesCluster) -> None:
 
 def pack_to_tgz(target_archive: str, source_dir: str) -> None:
     with tarfile.open(target_archive, "w:gz") as tar_handle:
-        for root, dirs, files in os.walk(source_dir):
+        for root, _, files in os.walk(source_dir):
             for file in files:
                 pathname = os.path.join(root, file)
                 tar_handle.add(pathname, pathname.replace(source_dir, ''))

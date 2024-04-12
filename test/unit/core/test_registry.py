@@ -57,7 +57,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         self.assertEqual('example.registry:443', inventory['services']['kubeadm']['imageRepository'])
         self.assertEqual('example.registry:443/coredns', inventory['services']['kubeadm']['dns']['imageRepository'])
         self.assertEqual('example.registry:443', inventory['plugin_defaults']['installation']['registry'])
-        for plugin_name, plugin_params in inventory['plugins'].items():
+        for plugin_params in inventory['plugins'].values():
             self.assertEqual('example.registry:443', plugin_params['installation']['registry'])
 
         containerd_config = inventory['services']['cri']['containerdConfig']
@@ -87,7 +87,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         self.assertEqual('example.registry:443', inventory['services']['kubeadm']['imageRepository'])
         self.assertEqual('example.registry:443/coredns', inventory['services']['kubeadm']['dns']['imageRepository'])
         self.assertEqual('example.registry:443', inventory['plugin_defaults']['installation']['registry'])
-        for plugin_name, plugin_params in inventory['plugins'].items():
+        for plugin_params in inventory['plugins'].values():
             self.assertEqual('example.registry:443', plugin_params['installation']['registry'])
 
         containerd_config = inventory['services']['cri']['containerdConfig']
@@ -176,7 +176,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         inventory.setdefault('plugin_defaults', {}).setdefault('installation', {})['registry'] = 'example.registry:443'
         inventory = demo.new_cluster(inventory).inventory
 
-        for plugin_name, plugin_params in inventory['plugins'].items():
+        for plugin_params in inventory['plugins'].values():
             self.assertEqual('example.registry:443', plugin_params['installation']['registry'])
 
     def test_custom_plugin_defaults_has_priority_over_unified_registry(self):
@@ -188,7 +188,7 @@ class TestRegistryEnrichment(unittest.TestCase):
         inventory.setdefault('plugin_defaults', {}).setdefault('installation', {})['registry'] = 'example2.registry:443'
         inventory = demo.new_cluster(inventory).inventory
 
-        for plugin_name, plugin_params in inventory['plugins'].items():
+        for plugin_params in inventory['plugins'].values():
             self.assertEqual('example2.registry:443', plugin_params['installation']['registry'])
 
     def test_plugin_defaults_custom_registry_plugins_other_custom_registry(self):

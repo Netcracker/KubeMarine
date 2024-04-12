@@ -102,8 +102,8 @@ def get_thirdparty_destination(software_name: str) -> str:
     for destination, thirdparty_settings in static.GLOBALS['thirdparties'].items():
         if thirdparty_settings['software_name'] == software_name:
             return destination
-    else:
-        raise Exception(f"Failed to find third-party destination for {software_name!r}")
+
+    raise Exception(f"Failed to find third-party destination for {software_name!r}")
 
 
 def get_thirdparty_recommended_sha(destination: str, cluster: KubernetesCluster) -> Optional[str]:
@@ -283,7 +283,7 @@ def enrich_inventory_apply_defaults(cluster: KubernetesCluster) -> None:
     crictl_key = '/usr/bin/crictl.tar.gz'
     if cri_name == "docker" and \
             crictl_key not in cluster.raw_inventory.get('services', {}).get('thirdparties', {}):
-        del(thirdparties[crictl_key])
+        del thirdparties[crictl_key]
 
 
 def get_install_group(cluster: KubernetesCluster, config: dict) -> NodeGroup:
@@ -345,7 +345,8 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
             # if hash equal, then stop further actions immediately! unpack should not be performed too
             remote_commands += ' && FILE_HASH=$(sudo openssl sha1 %s | sed "s/^.* //"); ' \
                                '[ "%s" == "${FILE_HASH}" ] && exit 0 || true ' % (destination, config['sha1'])
-        remote_commands += ' && sudo rm -f %s && sudo curl --max-time %d -f -g -L %s -o %s && ' % (destination, cluster.inventory['globals']['timeout_download'], config['source'], destination)
+        remote_commands += (' && sudo rm -f %s && sudo curl --max-time %d -f -g -L %s -o %s && '
+                            % (destination, cluster.inventory['globals']['timeout_download'], config['source'], destination))
     else:
         cluster.log.verbose('Installation via sftp upload detected')
         cluster.log.debug(common_group.sudo(remote_commands))
@@ -374,7 +375,8 @@ def install_thirdparty(filter_group: NodeGroup, destination: str) -> Optional[Ru
                    % (destination, config['mode'], config['unpack'])
             remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo chown -R %s %s/FILE' \
                    % (destination, config['owner'], config['unpack'])
-            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo ls -la %s/FILE' % (destination, config['unpack'])
+            remote_commands += ' && sudo unzip -qq -l %s | awk \'NF > 3 { print $4 }\'| xargs -I FILE sudo ls -la %s/FILE' \
+                   % (destination, config['unpack'])
             
         else:
             cluster.log.verbose('Tar will be used for unpacking')

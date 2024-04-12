@@ -15,6 +15,7 @@
 
 import glob
 import importlib.util
+import inspect
 import io
 import os
 import re
@@ -31,7 +32,6 @@ from types import ModuleType, FunctionType
 from typing import Dict, List, Tuple, Callable, Union, no_type_check, Set, Any, cast, TextIO, Optional
 
 import yaml
-import inspect
 
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
 from kubemarine import jinja, thirdparties
@@ -73,7 +73,7 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
                 plugin_item.setdefault('installation', {})['registry'] = plugins_default_registry
 
     for plugin_name, plugin_item in inventory["plugins"].items():
-        for i, step in enumerate(plugin_item.get('installation', {}).get('procedures', [])):
+        for step in plugin_item.get('installation', {}).get('procedures', []):
             for procedure_type, configs in step.items():
                 if procedure_types()[procedure_type].get('convert') is not None:
                     step[procedure_type] = procedure_types()[procedure_type]['convert'](cluster, configs)
@@ -206,7 +206,7 @@ def install(cluster: KubernetesCluster, plugins_: Dict[str, dict] = None) -> Non
 def install_plugin(cluster: KubernetesCluster, plugin_name: str, installation_procedure: List[dict]) -> None:
     cluster.log.debug("**** INSTALLING PLUGIN %s ****" % plugin_name)
 
-    for current_step_i, step in enumerate(installation_procedure):
+    for step in installation_procedure:
         for apply_type, configs in step.items():
             procedure_types()[apply_type]['apply'](cluster, configs)
 
@@ -260,7 +260,10 @@ def expect_daemonset(cluster: KubernetesCluster,
             cluster.log.debug(f"DaemonSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the DaemonSets did not become ready. Try to increase number of retries in expect.daemonsets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+    raise Exception('In the expected time, the DaemonSets did not become ready. '
+                    'Try to increase number of retries in expect.daemonsets: '
+                    # pylint: disable-next=line-too-long
+                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_replicaset(cluster: KubernetesCluster,
@@ -312,7 +315,10 @@ def expect_replicaset(cluster: KubernetesCluster,
             cluster.log.debug(f"ReplicaSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the ReplicaSets did not become ready. Try to increase number of retries in expect.replicasets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+    raise Exception('In the expected time, the ReplicaSets did not become ready. '
+                    'Try to increase number of retries in expect.replicasets: '
+                    # pylint: disable-next=line-too-long
+                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_statefulset(cluster: KubernetesCluster,
@@ -364,7 +370,10 @@ def expect_statefulset(cluster: KubernetesCluster,
             cluster.log.debug(f"StatefulSets are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the StatefulSets did not become ready. Try to increase number of retries in expect.statefulsets: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+    raise Exception('In the expected time, the StatefulSets did not become ready. '
+                    'Try to increase number of retries in expect.statefulsets: '
+                    # pylint: disable-next=line-too-long
+                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_deployment(cluster: KubernetesCluster,
@@ -416,7 +425,10 @@ def expect_deployment(cluster: KubernetesCluster,
             cluster.log.debug(f"Deployments are not up to date yet... ({retries * timeout}s left)")
             time.sleep(timeout)
 
-    raise Exception('In the expected time, the Deployments did not become ready. Try to increase number of retries in expect.deployments: https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
+    raise Exception('In the expected time, the Deployments did not become ready. '
+                    'Try to increase number of retries in expect.deployments: '
+                    # pylint: disable-next=line-too-long
+                    'https://github.com/Netcracker/KubeMarine/blob/main/documentation/Installation.md#expect-deploymentsdaemonsetsreplicasetsstatefulsets')
 
 
 def expect_pods(cluster: KubernetesCluster, pods: List[str], namespace: str = None,
@@ -514,7 +526,7 @@ def convert_template(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     return _convert_file(config)
 
 
-def verify_template(_: KubernetesCluster, config: dict, plugin_name: Optional[str] = None) -> None:
+def verify_template(_: KubernetesCluster, config: dict, _plugin_name: Optional[str] = None) -> None:
     _verify_file(config, "Template")
 
 
@@ -551,7 +563,7 @@ def convert_expect(_: KubernetesCluster, config: dict) -> dict:
 def apply_expect(cluster: KubernetesCluster, config: dict) -> None:
     # TODO: Add support for expect services and expect nodes
 
-    for expect_type, expect_conf in config.items():
+    for expect_type in config:
         if expect_type == 'daemonsets':
             expect_daemonset(cluster, config['daemonsets']['list'],
                              timeout=config['daemonsets'].get('timeout'),
@@ -591,7 +603,7 @@ def get_python_module(module_path: str) -> ModuleType:
         spec.loader.exec_module(module)
         LOADED_MODULES[module_path] = module
     except Exception as e:
-        raise ValueError(f"Could not import module {module_path}: {e}")
+        raise ValueError(f"Could not import module {module_path}: {e}") from None
     return module 
 
 
@@ -622,7 +634,8 @@ def verify_python(cluster: KubernetesCluster, step: dict, plugin_name: Optional[
     try:
         signature.bind(cluster, **method_arguments)
     except TypeError as e:
-        raise ValueError(f"Invalid arguments for python method {method.__name__} for {plugin_name!r} plugin: {e}")
+        raise ValueError(f"Invalid arguments for python method {method.__name__} for {plugin_name!r} plugin: {e}") \
+            from None
 
 
 def apply_python(cluster: KubernetesCluster, step: dict) -> None:
@@ -633,7 +646,7 @@ def apply_python(cluster: KubernetesCluster, step: dict) -> None:
 
 # **** THIRDPARTIES ****
 
-def verify_thirdparty(cluster: KubernetesCluster, thirdparty: str, plugin_name: Optional[str] = None) -> None:
+def verify_thirdparty(cluster: KubernetesCluster, thirdparty: str, _plugin_name: Optional[str] = None) -> None:
     defined_thirdparties = list(cluster.inventory['services'].get('thirdparties', {}).keys())
     if thirdparty not in defined_thirdparties:
         raise Exception('Specified thirdparty %s not found in thirdpartirs definition. Expected any of %s.'
@@ -654,7 +667,7 @@ def convert_shell(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     return config
 
 
-def verify_shell(cluster: KubernetesCluster, config: dict, plugin_name: Optional[str] = None) -> None:
+def verify_shell(cluster: KubernetesCluster, config: dict, _plugin_name: Optional[str] = None) -> None:
     out_vars = config.get('out_vars', [])
     groups = config.get('groups', [])
     nodes = config.get('nodes', [])
@@ -749,7 +762,7 @@ def _get_absolute_playbook(config: dict) -> str:
     return utils.determine_resource_absolute_file(config['playbook'])[0]
 
 
-def verify_ansible(cluster: KubernetesCluster, config: dict, plugin_name: Optional[str] = None) -> None:
+def verify_ansible(cluster: KubernetesCluster, config: dict, _plugin_name: Optional[str] = None) -> None:
     _get_absolute_playbook(config)
     if cluster.is_deploying_from_windows():
         raise Exception("Executing of playbooks on Windows deployer is currently not supported")
@@ -780,7 +793,7 @@ def apply_ansible(cluster: KubernetesCluster, step: dict) -> None:
 
     cluster.log.verbose("Running shell \"%s\"" % command)
 
-    result = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    result = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr, shell=True, check=False)
     if result.returncode != 0:
         raise Exception("Failed to apply ansible plugin, see error above")
 
@@ -789,7 +802,7 @@ def apply_helm(cluster: KubernetesCluster, config: dict) -> None:
     chart_path = get_local_chart_path(cluster.log, config)
     process_chart_values(config, chart_path)
 
-    from kubemarine import kubernetes
+    from kubemarine import kubernetes  # pylint: disable=cyclic-import
     local_config_path = kubernetes.fetch_admin_config(cluster)
 
     with utils.open_external(os.path.join(chart_path, 'Chart.yaml'), 'r') as stream:
@@ -937,7 +950,7 @@ def convert_config(_: KubernetesCluster, config: Union[str, dict]) -> dict:
     return _convert_file(config)
 
 
-def verify_config(_: KubernetesCluster, config: dict, plugin_name: Optional[str] = None) -> None:
+def verify_config(_: KubernetesCluster, config: dict, _plugin_name: Optional[str] = None) -> None:
     _verify_file(config, "Config")
 
 

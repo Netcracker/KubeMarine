@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import io
-import ipaddress
 from typing import Optional, List, Dict
 
 from textwrap import dedent
@@ -202,7 +201,8 @@ class IngressNginxManifestProcessor(Processor):
         new_yaml = yaml.safe_load(service_account_secret)
 
         service_account_key = "ServiceAccount_ingress-nginx"
-        service_account_index = manifest.all_obj_keys().index(service_account_key) if service_account_key in manifest.all_obj_keys() else -1
+        service_account_index = manifest.all_obj_keys().index(service_account_key) \
+            if service_account_key in manifest.all_obj_keys() else -1
         
         self.include(manifest, service_account_index + 1, new_yaml)
 
@@ -291,7 +291,7 @@ class IngressNginxManifestProcessor(Processor):
         # The method needs some rework in case of dual stack support
         key = "Service_ingress-nginx-controller"
         ip = self.inventory['services']['kubeadm']['networking']['serviceSubnet'].split('/')[0]
-        if type(ipaddress.ip_address(ip)) is ipaddress.IPv6Address:
+        if utils.isipv(ip, [6]):
             source_yaml = manifest.get_obj(key, patch=True)
             source_yaml['spec']['ipFamilies'] = ['IPv6']
             self.log.verbose(f"The {key} has been patched in 'spec.ipFamilies' with 'IPv6'")
