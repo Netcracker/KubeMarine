@@ -830,11 +830,26 @@ nodes:
 **Note**:
 
 * The connection information for new nodes can be used from defaults as described in the [Kubemarine Inventory Node Defaults](Installation.md#nodedefaults) section in _Kubemarine Installation Procedure_. If the connection information is not present by default, define the information in each new node configuration.
-* If you intend to add the new `balancer` node with VRRP IP, and have previously not configured the `vrrp_ips` section, you need to do the following preliminarily:
+* If you intend to add a new `balancer` node with VRRP IP, and have previously not configured the `vrrp_ips` section, you need to do the following preliminarily:
   * And the section to the main `cluster.yaml`.
   * If you already have balancers without VRRP IPs, reconfigure the balancers and DNS,
     for example, using `kubemarine install --tasks prepare.dns.etc_hosts,deploy.loadbalancer.haproxy.configure,deploy.loadbalancer.keepalived,deploy.coredns`.
-* If you intend to add the new `balancer` node with VRRP IP, and have previously configured the `vrrp_ips` section in the `cluster.yaml`, you have to add the adding node to the `vrrp_ips` section in the `cluster.yaml` the same way as the old balancer nodes.
+* If you intend to add a new `balancer` node with VRRP IP, and have previously configured the `vrrp_ips` section in the `cluster.yaml` with `hosts` subsection, you should add the new balancer node to the `vrrp_ips.*.hosts` section in the `cluster.yaml` the same way as the old balancer nodes, if this new node has to share the same VRRP IP address.
+
+For example, if you want the `new-balancer-node-1` to be added to a subset of balancer nodes who share VRRP IP `192.168.0.100`:
+
+```
+vrrp_ips:
+- hosts:
+  - name: balancer-node-1
+    priority: 254
+  - name: balancer-node-2
+    priority: 253
+  - name: new-balancer-node-1
+  ip: 192.168.0.100
+```
+
+It may be useful, if you have some VRRP IPs working at different subsets of balancer nodes. If you have one VRRP IP and all the balancer nodes must share it, just remove `hosts` section from `vrrp_ips`.
 
 ### Add Node Tasks Tree
 
