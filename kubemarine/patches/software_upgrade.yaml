@@ -35,6 +35,7 @@ packages:
     version_debian: false
 plugins:
   calico: []
-  nginx-ingress-controller: []
+  nginx-ingress-controller:
+  - v1.29.1
   kubernetes-dashboard: []
   local-path-provisioner: []
