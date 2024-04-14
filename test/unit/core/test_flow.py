@@ -428,6 +428,54 @@ class FlowTest(unittest.TestCase):
         # no exception should occur
         flow.run_tasks(res, tasks)
 
+    def test_remove_node_if_worker_offline(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        online_hosts = [node["address"] for node in inventory["nodes"]]
+        workers = [i for i, node in enumerate(inventory["nodes"]) if 'worker' in node['roles']]
+
+        i = random.randrange(len(workers))
+        online_hosts.pop(workers[i])
+
+        j = random.randrange(len(workers))
+        while j == i:
+            j = random.randrange(len(workers))
+
+        procedure_inventory = demo.generate_procedure_inventory('remove_node')
+        procedure_inventory["nodes"] = [{"name": inventory["nodes"][workers[j]]["name"]}]
+
+        self._stub_detect_nodes_context(inventory, online_hosts, [])
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='remove_node')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        # no exception should occur
+        flow.run_tasks(res, tasks)
+
+    def test_add_node_if_worker_offline(self):
+        inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
+        online_hosts = [node["address"] for node in inventory["nodes"]]
+        workers = [i for i, node in enumerate(inventory["nodes"]) if 'worker' in node['roles']]
+
+        i = random.randrange(len(workers))
+        online_hosts.pop(workers[i])
+
+        j = random.randrange(len(workers))
+        while j == i:
+            j = random.randrange(len(workers))
+
+        self._stub_detect_nodes_context(inventory, online_hosts, [])
+
+        added_node = inventory['nodes'].pop(workers[j])
+        procedure_inventory = demo.generate_procedure_inventory('add_node')
+        procedure_inventory['nodes'] = [added_node]
+
+        context = demo.create_silent_context(['fake_path.yaml'], procedure='add_node')
+        res = demo.FakeResources(context, inventory, procedure_inventory=procedure_inventory,
+                                 fake_shell=self.light_fake_shell)
+
+        # no exception should occur
+        flow.run_tasks(res, tasks)
+
     def test_detect_nodes_context_removed_node_online(self):
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         hosts = [node["address"] for node in inventory["nodes"]]

@@ -148,7 +148,7 @@ data:'''
 def apply_configmap(cluster: KubernetesCluster, config: str) -> RunnersGroupResult:
     utils.dump_file(cluster, config, 'coredns-configmap.yaml')
 
-    group = cluster.make_group_from_roles(['control-plane', 'worker'])
+    group = cluster.make_group_from_roles(['control-plane'])
     group.put(io.StringIO(config), '/etc/kubernetes/coredns-configmap.yaml', backup=True, sudo=True)
 
     return cluster.nodes['control-plane'].get_first_member()\
@@ -173,7 +173,7 @@ def apply_patch(cluster: KubernetesCluster) -> Union[RunnersGroupResult, str]:
 
         utils.dump_file(cluster, config, filename)
 
-        group = cluster.make_group_from_roles(['control-plane', 'worker'])
+        group = cluster.make_group_from_roles(['control-plane'])
         group.put(io.StringIO(config), filepath, backup=True, sudo=True)
 
         apply_command = 'kubectl patch %s coredns -n kube-system --type merge -p \"$(sudo cat %s)\"' % (config_type, filepath)

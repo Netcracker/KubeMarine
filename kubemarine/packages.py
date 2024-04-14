@@ -289,7 +289,9 @@ def cache_package_versions(cluster: KubernetesCluster, inventory: dict, by_initi
         cluster.log.debug("Skip caching of packages for unsupported OS.")
         return inventory
 
-    group = (cluster.previous_nodes if by_initial_nodes else cluster.nodes)['all']
+    group = (cluster.previous_nodes if by_initial_nodes else cluster.nodes)['all'] \
+        .exclude_group(cluster.nodes['all'].get_online_nodes(False))
+
     if group.nodes_amount() != group.get_sudo_nodes().nodes_amount():
         # For add_node/install procedures we check that all nodes are sudoers in prepare.check.sudoer task.
         # For check_iaas procedure the nodes might still be not sudoers.
