@@ -13,13 +13,16 @@
 # limitations under the License.
 
 import io
-from typing import Tuple, List
+from typing import Tuple, List, Union, Optional
 
 from kubemarine.core import utils
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage, enrichment
-from kubemarine.core.group import NodeGroup, RunnersGroupResult, DeferredGroup, CollectorCallback
+from kubemarine.core.group import NodeGroup, RunnersGroupResult, CollectorCallback, AbstractGroup, RunResult
 
 predefined_file_path = "/etc/modules-load.d/predefined.conf"
+
+ERROR_BLANK_MODULE = "Found blank kernel module at path {path}"
+ERROR_DUPLICATE_MODULE = "Kernel module {module_name!r} is duplicated in the inventory"
 
 
 @enrichment(EnrichmentStage.FULL)
@@ -30,16 +33,88 @@ def enrich_kernel_modules(cluster: KubernetesCluster) -> None:
 
     for os_family in ('debian', 'rhel', 'rhel8', 'rhel9'):
         # Remove the section for OS families if no node has these OS families.
+        modprobe_config = cluster.inventory["services"]["modprobe"]
         if cluster.nodes['all'].get_subgroup_with_os(os_family).is_empty():
-            del cluster.inventory["services"]["modprobe"][os_family]
+            del modprobe_config[os_family]
+            continue
+
+        modprobe_config[os_family] = modules_list = _convert_modprobe_config(cluster, os_family)
+
+        _verify_modules_list(modules_list)
+        _apply_defaults(cluster, modules_list)
 
 
-def generate_config(node: DeferredGroup) -> str:
+def _convert_modprobe_config(cluster: KubernetesCluster, os_family: str) -> List[dict]:
+    modprobe_config: List[Union[str, dict]] = cluster.inventory["services"]["modprobe"][os_family]
+
+    modules_list: List[dict] = []
+    for i, module_name in enumerate(modprobe_config):
+        config = _convert_module(module_name, ["services", "modprobe", os_family, i])
+        if config is not None:
+            modules_list.append(config)
+
+    return modules_list
+
+
+def _convert_module(module_name: Union[str, dict], path: List[Union[str, int]]) -> Optional[dict]:
+    if isinstance(module_name, str):
+        # Obsolete approach to render values. Empty modules should be removed from the list.
+        module_name = module_name.strip()
+        if module_name == '':
+            return None
+
+        config = {
+            'modulename': module_name,
+        }
+    else:
+        config = module_name
+
+    config['modulename'] = config['modulename'].strip()
+    if config['modulename'] == '':
+        raise Exception(ERROR_BLANK_MODULE.format(path=utils.pretty_path(path + ['modulename'])))
+
+    return config
+
+
+def _verify_modules_list(modules_list: List[dict]) -> None:
+    known_modules = set()
+    for config in modules_list:
+        module_name = config['modulename']
+        if module_name in known_modules:
+            raise Exception(ERROR_DUPLICATE_MODULE.format(module_name=module_name))
+
+        known_modules.add(module_name)
+
+
+def _apply_defaults(cluster: KubernetesCluster, modules_list: List[dict]) -> None:
+    for config in modules_list:
+        if config.get('groups') is None and config.get('nodes') is None:
+            config['groups'] = ['control-plane', 'worker', 'balancer']
+
+        config.setdefault('install', True)
+
+        if config.get('nodes') is not None:
+            all_nodes_names = cluster.nodes['all'].get_nodes_names()
+            unknown_nodes = set(config['nodes']) - set(all_nodes_names)
+            if unknown_nodes:
+                # Only warn instead of raising an error to allow remove & add the same node.
+                cluster.log.warning(
+                    f"Unknown node names {', '.join(map(repr, unknown_nodes))} "
+                    f"provided for kernel module {config['modulename']!r}. ")
+
+
+def generate_config(node: AbstractGroup[RunResult]) -> str:
     cluster: KubernetesCluster = node.cluster
     config = ''
-    modprobe_config: List[str] = cluster.inventory['services']['modprobe'][node.get_nodes_os()]
-    for module_name in modprobe_config:
-        config += module_name + "\n"
+    modprobe_config: List[dict] = cluster.inventory['services']['modprobe'][node.get_nodes_os()]
+    for module_config in modprobe_config:
+        group = cluster.create_group_from_groups_nodes_names(
+            module_config.get('groups', []), module_config.get('nodes', []))
+
+        if not module_config['install'] or not group.has_node(node.get_node_name()):
+            continue
+
+        config += module_config['modulename'] + "\n"
 
     return config
 
@@ -47,7 +122,6 @@ def generate_config(node: DeferredGroup) -> str:
 def setup_modprobe(group: NodeGroup) -> bool:
     cluster: KubernetesCluster = group.cluster
     logger = cluster.log
-    group_os_family = group.get_nodes_os()
 
     is_valid, is_config_valid, result = is_modprobe_valid(group)
 
@@ -59,12 +133,12 @@ def setup_modprobe(group: NodeGroup) -> bool:
     defer = group.new_defer()
     for node in defer.get_ordered_members_list():
         config = generate_config(node)
+        if not config:
+            continue
         raw_config = config.replace('\n', ' ')
 
         logger.debug("Uploading config...")
-        dump_filename = 'modprobe_predefined.conf'
-        if group_os_family == 'multiple':
-            dump_filename = f'modprobe_predefined_{node.get_node_name()}.conf'
+        dump_filename = f'modprobe/modprobe_predefined_{node.get_node_name()}.conf'
 
         utils.dump_file(cluster, config, dump_filename)
         node.put(io.StringIO(config), predefined_file_path, backup=True, sudo=True)

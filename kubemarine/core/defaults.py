@@ -587,7 +587,7 @@ def _get_primitive_values_registry() -> List[Tuple[List[str], Callable[[Any], An
         (['services', 'cri', 'containerdConfig',
           'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options',
           'SystemdCgroup'], utils.strtobool, False),
-        (['services', 'modprobe', '*', '*'], str, True),
+        (['services', 'modprobe', '*', '*', 'install'], utils.strtobool, False),
         # kernel parameters are actually not always represented as integers
         (['services', 'sysctl', '*', 'value'], utils.strtoint, False),
         (['services', 'sysctl', '*', 'install'], utils.strtobool, False),

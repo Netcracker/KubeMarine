@@ -15,11 +15,11 @@
 
 
 import unittest
-from typing import Set
+from typing import Set, List
 from test.unit import utils as test_utils
 
 from kubemarine.core import defaults, log
-from kubemarine import demo, sysctl, kubernetes
+from kubemarine import demo, sysctl, kubernetes, modprobe
 from kubemarine.core.group import NodeGroup
 
 
@@ -257,8 +257,10 @@ class PrimitiveValuesAsString(unittest.TestCase):
         self.assertEqual(True, inventory['services']['cri']['containerdConfig']
                          ['plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options']['SystemdCgroup'])
         self.assertNotIn('min', inventory['services']['kubeadm_kube-proxy']['conntrack'])
-        self.assertEqual(['br_netfilter', 'nf_conntrack'],
-                         inventory['services']['modprobe']['debian'])
+
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            modules_list = self._actual_kernel_modules(node)
+            self.assertEqual(['br_netfilter', 'nf_conntrack'], modules_list)
 
         for node in cluster.nodes['all'].get_ordered_members_list():
             expected_params = {
@@ -361,9 +363,25 @@ class PrimitiveValuesAsString(unittest.TestCase):
         inventory['services'].setdefault('modprobe', {})['debian'] = [
             """
             {% if true %}
-            custom_module
+            custom_module1
             {% endif %}
             """,
+            """
+            {% if false %}
+            custom_module2
+            {% endif %}
+            """,
+            {
+                'modulename':
+                    """
+                    {{ 'custom_module3' }}
+                    """,
+                'install': '{{ "true" }}'
+            },
+            {
+                'modulename': 'custom_module4',
+                'install': '{{ "false" }}'
+            },
             {'<<': 'merge'}
         ]
 
@@ -390,7 +408,11 @@ class PrimitiveValuesAsString(unittest.TestCase):
         cluster = demo.new_cluster(inventory, context=context, nodes_context=nodes_context)
         inventory = cluster.inventory
 
-        self.assertEqual('custom_module', inventory['services']['modprobe']['debian'][0])
+        for node in cluster.nodes['all'].get_ordered_members_list():
+            modules_list = self._actual_kernel_modules(node)
+            self.assertEqual(['custom_module1', 'custom_module3', 'br_netfilter', 'nf_conntrack'],
+                             modules_list)
+
         for node in cluster.nodes['all'].get_ordered_members_list():
             self.assertEqual(1, sysctl.get_parameter(cluster, node, 'custom_parameter1'))
             self.assertEqual(2, sysctl.get_parameter(cluster, node, 'custom_parameter2'))
@@ -408,6 +430,9 @@ class PrimitiveValuesAsString(unittest.TestCase):
             record.split(' = ')[0]
             for record in sysctl.make_config(cluster, node).rstrip('\n').split('\n')
         }
+
+    def _actual_kernel_modules(self, node: NodeGroup) -> List[str]:
+        return modprobe.generate_config(node).rstrip('\n').split('\n')
 
 
 if __name__ == '__main__':

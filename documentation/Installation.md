@@ -2583,10 +2583,16 @@ services:
   modprobe:
     rhel:
     - br_netfilter
+    - nf_conntrack
     rhel8:
     - br_netfilter
+    - nf_conntrack
+    rhel9:
+    - br_netfilter
+    - nf_conntrack
     debian:
     - br_netfilter
+    - nf_conntrack
 ```
 
 IPv6:
@@ -2601,6 +2607,13 @@ services:
     - nf_reject_ipv6
     - nf_defrag_ipv6
     rhel8:
+    - br_netfilter
+    - ip6table_filter
+    - nf_conntrack
+    - nf_nat
+    - nf_reject_ipv6
+    - nf_defrag_ipv6
+    rhel9:
     - br_netfilter
     - ip6table_filter
     - nf_conntrack
@@ -2625,6 +2638,31 @@ services:
       - my_own_module1
       - my_own_module2
 ```
+
+There is also an extended format that allows to choose nodes on which the modules should be loaded. For example:
+
+```yaml
+services:
+  modprobe:
+    debian:
+      - modulename: my_own_module1
+        groups: [control-plane, worker]
+      - modulename: my_own_module2
+        nodes: [balancer-1, balancer-2]
+```
+
+The following settings are supported in the extended format:
+
+|Parameter|Mandatory|Default Value|Description|
+|---|---|---|---|
+|**modulename**|**yes**| |Module name.|
+|**groups**|no|`None`|The list of group names in whose hosts the module should be loaded.|
+|**nodes**|no|`None`|The list of node names where the module should be loaded.|
+|**install**|no|`true`|Whether the module is managed (installed, checked) by Kubemarine.|
+
+**Note**: You can specify nodes and groups at the same time.
+
+**Note**: If no groups or nodes are specified, then the module is loaded on all nodes.
 
 **Warning**: Be careful with these settings, they directly affect the hosts operating system.
 

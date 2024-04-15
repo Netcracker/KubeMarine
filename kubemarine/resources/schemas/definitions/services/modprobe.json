@@ -15,7 +15,7 @@
   "definitions": {
     "OSFamilyModules": {
       "type": "array",
-      "description": "Manage Linux Kernel modules to be loaded in the host operating system",
+      "description": "Manage Linux Kernel modules to be loaded in the host operating system. Each item can be either a module name, or dictionary with the module name and additional parameters.",
       "items": {
         "anyOf": [
           {
@@ -23,10 +23,40 @@
             "enum": ["br_netfilter", "ip6table_filter", "nf_conntrack_ipv6", "nf_nat_masquerade_ipv6", "nf_reject_ipv6", "nf_defrag_ipv6", "nf_nat", "nf_conntrack"]
           },
           {"type": "string"},
-          {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+          {
+            "oneOf": [
+              {"$ref": "#/definitions/FilteredModule"},
+              {"$ref": "../common/utils.json#/definitions/ListMergingSymbol"}
+            ]
+          }
         ]
       },
       "uniqueItems": true
+    },
+    "FilteredModule": {
+      "type": "object",
+      "properties": {
+        "modulename": {
+          "type": "string",
+          "description": "Module name in extended format"
+        },
+        "groups": {
+          "$ref": "../common/node_ref.json#/definitions/Roles",
+          "default": ["worker", "control-plane", "balancer"],
+          "description": "The list of group names in whose hosts the module should be loaded"
+        },
+        "nodes": {
+          "$ref": "../common/node_ref.json#/definitions/Names",
+          "description": "The list of node names where the module should be loaded"
+        },
+        "install": {
+          "type": ["string", "boolean"],
+          "default": "true",
+          "description": "Whether the module is managed (installed, checked) by Kubemarine"
+        }
+      },
+      "required": ["modulename"],
+      "additionalProperties": false
     }
   }
 }
