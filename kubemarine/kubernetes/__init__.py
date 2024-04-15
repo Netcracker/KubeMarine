@@ -382,6 +382,8 @@ def join_control_plane(cluster: KubernetesCluster, node: NodeGroup, join_dict: d
 
     components.wait_for_pods(node)
 
+    # modifies file permissions for kubelet configuration file
+    node.sudo("chmod 600 /var/lib/kubelet/config.yaml")
 
 @contextmanager
 def local_admin_config(nodes: NodeGroup) -> Iterator[str]:
@@ -519,6 +521,9 @@ def init_first_control_plane(group: NodeGroup) -> None:
     # refresh cluster installation status in cluster context
     is_cluster_installed(cluster)
 
+    # modifies file permissions for kubelet configuration file
+    first_control_plane.sudo("chmod 600 /var/lib/kubelet/config.yaml")
+
 
 def wait_uncordon(node: NodeGroup) -> None:
     cluster = node.cluster
@@ -607,6 +612,9 @@ def init_workers(group: NodeGroup) -> None:
             hide=False)
 
         components.wait_for_pods(node)
+
+        # modifies file permissions for kubelet configuration file
+        node.sudo("chmod 600 /var/lib/kubelet/config.yaml")
 
 
 def apply_labels(group: NodeGroup) -> RunnersGroupResult:
