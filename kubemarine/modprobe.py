@@ -97,11 +97,15 @@ def is_modprobe_valid(group: NodeGroup) -> Tuple[bool, bool, RunnersGroupResult]
         expected_modules = expected_config.rstrip('\n').split('\n')
 
         host = node.get_host()
+
         lsmod_result = lsmod_collector.result[host]
+        actual_modules = {mod.split()[0]
+                          for mod in lsmod_result.stdout.rstrip('\n').split('\n')[1:]}
+
         actual_config = config_collector.result[host]
 
         for module_name in expected_modules:
-            if module_name not in lsmod_result.stdout:
+            if module_name not in actual_modules:
                 logger.debug(f'Kernel module {module_name} is not found at {host}')
                 is_valid = False
 
