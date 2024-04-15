@@ -399,7 +399,7 @@ def thirdparties_hashes(cluster: KubernetesCluster) -> None:
                 cluster.log.verbose('Temporary path: %s' % random_path)
                 remote_commands = "mkdir -p %s" % ('/'.join(random_path.split('/')[:-1]))
                 # Load thirdparty to temporary dir
-                remote_commands += "&& sudo curl -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
+                remote_commands += "&& sudo curl -k -f -g -s --show-error -L %s -o %s" % (config['source'], random_path)
                 results = first_control_plane.sudo(remote_commands, warn=True)
                 if results.is_any_failed():
                     host = first_control_plane_host

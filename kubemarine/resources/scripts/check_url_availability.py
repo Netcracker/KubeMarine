@@ -16,6 +16,7 @@
 # The script is for testing purpose only.
 # The first argv parameter is source. The second argv parameter is the timeout.
 
+import ssl
 import sys
 
 major_version = sys.version_info.major
@@ -37,8 +38,14 @@ try:
 
     password_mgr = urllib.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, no_auth_url, parsed_url.username or '', parsed_url.password or '')
-    handler = urllib.HTTPBasicAuthHandler(password_mgr)
-    opener = urllib.build_opener(handler)
+    basic_auth_handler = urllib.HTTPBasicAuthHandler(password_mgr)
+
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+    https_handler = urllib.HTTPSHandler(context=ssl_ctx)
+
+    opener = urllib.build_opener(https_handler, basic_auth_handler)
 
     status_code = opener.open(no_auth_url, timeout=timeout).getcode()
     if status_code != 200:
