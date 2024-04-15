@@ -15,13 +15,15 @@
 
 
 import unittest
+from test.unit import utils as test_utils
 
 from kubemarine.core import defaults, log
 from kubemarine import demo
-from test.unit import utils as test_utils
 
 
 class DefaultsEnrichmentAppendControlPlain(unittest.TestCase):
+    # pylint: disable=protected-access
+
     logger: log.EnhancedLogger = None
 
     @classmethod

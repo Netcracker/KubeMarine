@@ -13,28 +13,23 @@
 # limitations under the License.
 
 import os.path
-import tempfile
 import unittest
+from test.unit import utils as test_utils
 
 from kubemarine import demo, kubernetes
 from kubemarine.core import flow
 from kubemarine.kubernetes import components
 from kubemarine.procedures import install
 from kubemarine.procedures.add_node import AddNodeAction
-from test.unit import utils as test_utils
 
 
-class EnrichmentAndFinalization(unittest.TestCase):
+class EnrichmentAndFinalization(test_utils.CommonTest):
     def setUp(self) -> None:
-        self.tmpdir = tempfile.TemporaryDirectory()
         self.context = demo.create_silent_context(['fake_path.yaml', '--without-act'], procedure='add_node')
         self.inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
         self.nodes_context = demo.generate_nodes_context(self.inventory)
         self.add_node = demo.generate_procedure_inventory('add_node')
         self.add_node['nodes'] = [self.inventory['nodes'].pop(0)]
-
-    def tearDown(self) -> None:
-        self.tmpdir.cleanup()
 
     def _new_resources(self) -> demo.FakeResources:
         return test_utils.FakeResources(self.context, self.inventory,
@@ -48,9 +43,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
         flow.run_actions(resources, [AddNodeAction()])
         return resources
 
+    @test_utils.temporary_directory
     def test_enrich_inventory_generate_ansible_add_role(self):
         args = self.context['execution_arguments']
-        ansible_inventory_location = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
+        ansible_inventory_location = os.path.join(self.tmpdir, 'ansible-inventory.ini')
         args['ansible_inventory_location'] = ansible_inventory_location
 
         res = self._run_action()
@@ -66,9 +62,10 @@ class EnrichmentAndFinalization(unittest.TestCase):
         self.assertNotIn('add_node', res.finalized_inventory['nodes'][2]['roles'],
                          "'add_node' role should not be in finalized inventory")
 
+    @test_utils.temporary_directory
     def test_enrich_inventory_generate_ansible_nodes_groups(self):
         args = self.context['execution_arguments']
-        args['ansible_inventory_location'] = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
+        args['ansible_inventory_location'] = os.path.join(self.tmpdir, 'ansible-inventory.ini')
 
         cluster = self._new_cluster()
         new_node_name = self.add_node['nodes'][0]['name']

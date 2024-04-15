@@ -19,12 +19,12 @@ import socket
 import unittest
 import ast
 from copy import deepcopy
+from test.unit import utils as test_utils
 
 import invoke
 
 from kubemarine.core import flow, static, utils
 from kubemarine import demo
-from test.unit import utils as test_utils
 
 
 test_msg = "test_function_return_result"
@@ -163,7 +163,7 @@ class FlowTest(unittest.TestCase):
     def test_schedule_cumulative_point(self):
         cluster = demo.new_cluster(demo.generate_inventory(**demo.FULLHA))
         flow.init_tasks_flow(cluster)
-        flow.schedule_cumulative_point(cluster, test_func)
+        cluster.schedule_cumulative_point(test_func)
         points = cluster.context["scheduled_cumulative_points"]
         self.assertIn(test_func, points, "Test cumulative point was not added to cluster context")
 
@@ -182,7 +182,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['prepare.system.modprobe']
         }
         flow.init_tasks_flow(cluster)
-        flow.schedule_cumulative_point(cluster, test_func)
+        cluster.schedule_cumulative_point(test_func)
         res = flow.proceed_cumulative_point(cluster, cumulative_points, "prepare.system.modprobe")
         self.assertIn(test_msg, str(res.get(method_full_name)))
         self.assertEqual(1, cluster.context.get("test_info"),
@@ -245,7 +245,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
@@ -265,7 +265,7 @@ class FlowTest(unittest.TestCase):
             cumulative_func: [flow.END_OF_TASKS]
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster, cumulative_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(cumulative_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(1, resources.cluster_if_initialized().context.get("test_info"),
@@ -279,7 +279,7 @@ class FlowTest(unittest.TestCase):
             test_func: ['overview']
         }
         tasks_copy = deepcopy(tasks)
-        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster,  test_func)
+        tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: cluster.schedule_cumulative_point(test_func)
         resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
         flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
         self.assertEqual(num_tasks - 1, resources.cluster_if_initialized().context.get("test_info"),
@@ -306,9 +306,11 @@ class FlowTest(unittest.TestCase):
                 test_func: ['overview']
             }
             tasks_copy = deepcopy(tasks)
-            tasks_copy['deploy']['loadbalancer']['haproxy'] = lambda cluster: flow.schedule_cumulative_point(cluster,  test_func)
+            tasks_copy['deploy']['loadbalancer']['haproxy'] \
+                = lambda cluster: cluster.schedule_cumulative_point(cluster, test_func)
             resources = demo.FakeResources(context, inventory, nodes_context=demo.generate_nodes_context(inventory))
-            with self.assertRaisesRegex(Exception, re.escape(flow.ERROR_UNRECOGNIZED_CUMULATIVE_POINT_EXCLUDE.format(point=invalid_point))):
+            with self.assertRaisesRegex(
+                    Exception, re.escape(flow.ERROR_UNRECOGNIZED_CUMULATIVE_POINT_EXCLUDE.format(point=invalid_point))):
                 flow.run_tasks(resources, tasks_copy, cumulative_points=cumulative_points)
 
     def test_detect_nodes_context(self):
@@ -325,7 +327,7 @@ class FlowTest(unittest.TestCase):
 
         self.assertEqual("rhel", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
-        for host, node_context in cluster.nodes_context.items():
+        for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
@@ -342,7 +344,7 @@ class FlowTest(unittest.TestCase):
                          "Here should be all 4 calls of test_func")
 
         self.assertEqual("rhel", cluster.get_os_family())
-        for host, node_context in cluster.nodes_context.items():
+        for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'No'}, node_context["access"])
             # continue to collect info
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
@@ -404,7 +406,7 @@ class FlowTest(unittest.TestCase):
                          "Here should be all 4 calls of test_func")
 
         self.assertEqual("<undefined>", cluster.get_os_family())
-        for host, node_context in cluster.nodes_context.items():
+        for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': False, 'accessible': False, 'sudo': "No"}, node_context["access"])
             self.assertEqual({'name': "<undefined>", 'version': "<undefined>", 'family': "<undefined>"}, node_context["os"])
             self.assertEqual("<undefined>", node_context["active_interface"])
@@ -446,7 +448,7 @@ class FlowTest(unittest.TestCase):
 
         self.assertEqual("rhel", cluster.get_os_family())
         self.assertEqual(len(hosts), len(cluster.nodes_context))
-        for host, node_context in cluster.nodes_context.items():
+        for node_context in cluster.nodes_context.values():
             self.assertEqual({'online': True, 'accessible': True, 'sudo': 'Root'}, node_context["access"])
             self.assertEqual({'name': 'centos', 'version': '7.6', 'family': 'rhel'}, node_context["os"])
             self.assertEqual('eth0', node_context["active_interface"])
@@ -480,7 +482,7 @@ class FlowTest(unittest.TestCase):
             self._stub_result([node["address"]], sudoer_nodes, online_nodes, "run",
                               ["/usr/sbin/ip -o a | grep %s | awk '{print $2}'" % node["internal_address"]], 'eth0')
 
-        with open(os.path.dirname(__file__) + "/../../resources/fetch_os_versions_example.txt") as f:
+        with open(os.path.dirname(__file__) + "/../../resources/fetch_os_versions_example.txt", encoding='utf-8') as f:
             fetch_os_versions = f.read()
 
         self._stub_result(hosts, sudoer_nodes, online_nodes, "run",

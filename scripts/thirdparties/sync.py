@@ -15,6 +15,8 @@
 import os
 import sys
 
+# pylint: disable=bad-builtin,wrong-import-position
+
 # Ensure to take Kubemarine modules from the project root.
 # !!! This should be a very first line of the script !!!
 ROOT = os.path.abspath(f"{__file__}/../../..")
@@ -30,6 +32,7 @@ from src.software import InternalCompatibility, UpgradeConfig
 from src.software.kubernetes_images import KubernetesImagesResolver
 from src.software.plugins import ManifestResolver, ManifestsEnrichment
 from src.software.thirdparties import ThirdpartyResolver
+
 
 if __name__ == '__main__':
     if platform.system() != 'Linux':

@@ -20,6 +20,8 @@ from ruamel.yaml import CommentedMap
 from kubemarine.core import utils, static
 from .shell import info, run
 
+# pylint: disable=bad-builtin
+
 YAML = utils.yaml_structure_preserver()
 RESOURCE_PATH = utils.get_internal_resource_path("resources/configurations/compatibility/kubernetes_versions.yaml")
 

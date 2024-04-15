@@ -13,7 +13,7 @@
 # limitations under the License.
 import io
 import textwrap
-from traceback import *
+from traceback import print_exc
 import csv
 from datetime import datetime
 from types import TracebackType
@@ -44,7 +44,7 @@ class TestCase:
     def __enter__(self) -> 'TestCase':
         return self
 
-    def __exit__(self, type: Optional[Type[Exception]], value: Optional[Exception],
+    def __exit__(self, _: Optional[Type[Exception]], value: Optional[Exception],
                  traceback: Optional[TracebackType]) -> bool:
         if value is None:
             if self.status is TC_UNKNOWN:
@@ -55,14 +55,14 @@ class TestCase:
             self.warn(value)
         else:
             self.exception(value)
-        print(self.get_summary(show_hint=True))
+        print(self.get_summary(show_hint=True))  # pylint: disable=bad-builtin
         return True
 
-    def __init__(self, cluster: KubernetesCluster, id: str, category: str, name: str,
+    def __init__(self, cluster: KubernetesCluster, id_: str, category: str, name: str,
                  default_results: str = None, minimal: int = None, recommended: int = None):
         self.include_in_ts(cluster.context['testsuite'])
         self.category = category
-        self.id = str(id)
+        self.id = str(id_)
         self.name = name
         self.status = TC_UNKNOWN
         self.results: Union[str, BaseException, None] = default_results
@@ -152,7 +152,7 @@ class TestCase:
                 recommended = str(self.recommended)
                 output += ' ' * (14-len(recommended)) + recommended
 
-        if show_hint and (isinstance(self.results, TestFailure) or isinstance(self.results, TestWarn)) and self.results.hint is not None:
+        if (show_hint and isinstance(self.results, (TestFailure, TestWarn)) and self.results.hint is not None):
             output += "\n                  HINT:\n" + textwrap.indent(str(self.results.hint), "                       ")
 
         return output
@@ -224,7 +224,8 @@ class TestSuite:
                 return True
         return False
 
-    def get_final_summary(self, show_minimal: bool = True, show_recommended: bool = True) -> str:
+    def print_final_summary(self, show_minimal: bool = True, show_recommended: bool = True) -> None:
+        # pylint: disable-next=line-too-long
         result = "          Group    Status   ID    Test                                                               Actual result"
         if show_minimal:
             result += "        Minimal"
@@ -232,14 +233,16 @@ class TestSuite:
             result += "   Recommended"
         result += "\n"
 
+        colorize = False
         for tc in self.tcs:
             result += "\n" + tc.get_summary(show_minimal=show_minimal, show_recommended=show_recommended)
+            colorize = tc.check_color()
 
         result += "\n\nOVERALL RESULTS: "
 
         for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
             colors = ''
-            if tc.check_color():
+            if colorize:
                 if key == 'succeeded':
                     colors = "\x1b[48;5;041m\x1b[38;5;232m"
                 if key == 'failed':
@@ -254,7 +257,7 @@ class TestSuite:
 
         result += "\n"
 
-        return result
+        print(result)  # pylint: disable=bad-builtin
 
     def print_final_status(self, logger: log.EnhancedLogger) -> None:
         if self.is_any_test_failed():
@@ -263,7 +266,8 @@ class TestSuite:
             return
         if self.is_any_test_warned():
             logger.warning("\nTEST PASSED WITH WARNINGS"
-                        "\nThe environment meets the minimal requirements, but is not as recommended. Try to check the test report and resolve the issues.")
+                           "\nThe environment meets the minimal requirements, but is not as recommended. "
+                           "Try to check the test report and resolve the issues.")
             return
         logger.info("\nTEST PASSED")
 
@@ -304,11 +308,13 @@ class TestSuite:
     def save_html(self, destination_file_path: str, check_type: str, append_styles: bool = True) -> None:
         stream = io.StringIO()
 
-        stream.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s Check Report</title></head><body><div id="date">%s</div><div id="stats">' % (check_type, datetime.utcnow()))
+        stream.write(f'<!DOCTYPE html><html><head><meta charset="utf-8"><title>{check_type} Check Report</title></head>'
+                     f'<body><div id="date">{datetime.utcnow()}</div><div id="stats">')
         for key, value in sorted(self.get_stats_data().items(), key=lambda _key: badges_weights[_key[0]]):
             stream.write('<div class="%s">%s %s</div>' % (key, value, key))
         stream.write('</div><h1>%s Check Report</h1><table>' % check_type)
-        stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td><td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
+        stream.write('<thead><tr><td>Group</td><td>Status</td><td>ID</td><td>Test</td>'
+                     '<td>Actual Result</td><td>Minimal</td><td>Recommended</td></tr></thead><tbody>')
         for tc in self.tcs:
             minimal = ''
             if tc.minimal is not None:
@@ -316,7 +322,8 @@ class TestSuite:
             recommended = ''
             if tc.recommended is not None:
                 recommended = str(tc.recommended)
-            stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
+            stream.write('<tr class="%s"><td>%s</td><td><div>%s</div></td>'
+                         '<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' %
                          (tc.get_readable_status(),
                           tc.category.lower(),
                           tc.get_readable_status(),

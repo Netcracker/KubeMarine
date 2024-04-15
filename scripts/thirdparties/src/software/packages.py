@@ -15,8 +15,10 @@ from copy import deepcopy
 from typing import List
 
 from kubemarine.core import utils
-from . import SoftwareType, InternalCompatibility, CompatibilityMap, UpgradeConfig, UpgradeSoftware
+from . import SoftwareType, CompatibilityMap, UpgradeSoftware
 from ..tracker import SummaryTracker, ComposedTracker
+
+# pylint: disable=bad-builtin
 
 
 class UpgradePackages(UpgradeSoftware):
@@ -42,9 +44,6 @@ class UpgradePackages(UpgradeSoftware):
 
 
 class Packages(SoftwareType):
-    def __init__(self, compatibility: InternalCompatibility, upgrade_config: UpgradeConfig):
-        super().__init__(compatibility, upgrade_config)
-
     @property
     def name(self) -> str:
         return 'packages'

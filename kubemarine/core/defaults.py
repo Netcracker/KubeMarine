@@ -129,8 +129,8 @@ def calculate_nodegroups(cluster: KubernetesCluster) -> None:
                 if role not in ('remove_node', 'add_node'):
                     ips.setdefault(role, []).append(address)
 
-        for role in ips.keys():
-            nodes[role] = cluster.make_group(ips[role])
+        for role, hosts in ips.items():
+            nodes[role] = cluster.make_group(hosts)
 
 
 @enrichment(EnrichmentStage.FULL)
@@ -280,7 +280,8 @@ def _append_controlplain(inventory: dict, logger: log.EnhancedLogger) -> None:
                     external_address_source = 'vrrp_ip[%s]' % i
 
     if internal_address is not None and external_address is None:
-        logger.warning('VRRP_IPs has an internal address, but do not have an external one. Your configuration may be incorrect. Trying to handle this problem automatically...')
+        logger.warning('VRRP_IPs has an internal address, but do not have an external one. '
+                       'Your configuration may be incorrect. Trying to handle this problem automatically...')
 
     if internal_address is None or external_address is None:
         # 'master' role is not deleted due to unit tests are not refactored
@@ -299,7 +300,8 @@ def _append_controlplain(inventory: dict, logger: log.EnhancedLogger) -> None:
         logger.warning('Failed to detect external control plain. Something may work incorrect!')
         external_address = internal_address
 
-    logger.debug('Control plains:\n   Internal: %s (%s)\n   External: %s (%s)' % (internal_address, internal_address_source, external_address, external_address_source))
+    logger.debug('Control plains:\n   Internal: %s (%s)\n   External: %s (%s)'
+                 % (internal_address, internal_address_source, external_address, external_address_source))
 
     # apply controlplain ips
     if not inventory.get('control_plain'):
@@ -333,7 +335,7 @@ def recursive_apply_defaults(defaults: dict, section: dict) -> None:
 @enrichment(EnrichmentStage.ALL)
 def calculate_node_names(cluster: KubernetesCluster) -> None:
     roles_iterators: Dict[str, int] = {}
-    for i, node in enumerate(cluster.inventory['nodes']):
+    for node in cluster.inventory['nodes']:
         # 'master' role is not deleted because calculate_node_names() can be run over initial inventory,
         # that still supports the old role.
         for role_name in ['control-plane', 'master', 'worker', 'balancer']:
@@ -575,7 +577,7 @@ def _convert_primitive_value_section(struct: Union[dict, list], section: Union[s
             try:
                 struct[section] = func(value)  # type: ignore[index]
             except ValueError as e:
-                raise ValueError(f"{str(e)} in section [{']['.join(repr(p) for p in path)}]")
+                raise ValueError(f"{str(e)} in section [{']['.join(repr(p) for p in path)}]") from None
 
     path.pop()
 

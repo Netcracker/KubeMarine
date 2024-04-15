@@ -37,8 +37,8 @@ class SummaryItem(enum.Enum):
         return self.order < other.order
 
 
-def schedule_report(context: dict, property: SummaryItem, value: str) -> None:
-    context.setdefault('summary_report', {})[property] = value
+def schedule_report(context: dict, property_: SummaryItem, value: str) -> None:
+    context.setdefault('summary_report', {})[property_] = value
 
 
 def schedule_delayed_report(cluster: KubernetesCluster, call: Callable[[KubernetesCluster], None]) -> None:

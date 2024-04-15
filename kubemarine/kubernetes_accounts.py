@@ -56,7 +56,8 @@ def enrich_inventory(cluster: KubernetesCluster) -> None:
            # This part is applicable for Kubernetes v1.24 and higher
            # It has 'Secret' in addition 
             if account['configs'][2]['metadata'].get('name') is None:
-                rbac["accounts"][i]['configs'][2]['metadata']['annotations']['kubernetes.io/service-account.name'] = account['name']
+                rbac["accounts"][i]['configs'][2]['metadata']['annotations']['kubernetes.io/service-account.name'] \
+                    = account['name']
                 rbac["accounts"][i]['configs'][2]['metadata']['name'] = f"{account['name']}-token"
                 rbac["accounts"][i]['configs'][0]['secrets'].append({})
                 rbac["accounts"][i]['configs'][0]['secrets'][0]['name'] = f"{account['name']}-token"

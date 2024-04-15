@@ -14,15 +14,17 @@
 
 import unittest
 from copy import deepcopy
+from test.unit import utils as test_utils
 
 from kubemarine import demo
 from kubemarine.core import errors
-from test.unit import utils as test_utils
 
 
 class EnrichmentValidation(unittest.TestCase):
-    def _inventory(self, admission):
+    def setUp(self):
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
+
+    def _inventory(self, admission):
         self.inventory['rbac'] = {
             'admission': admission,
             admission: {
@@ -124,6 +126,7 @@ class EnrichmentValidation(unittest.TestCase):
     def test_conditional_enrich_pss_extra_args_feature_gates(self):
         for k8s_version, feature_gates_enriched in (('v1.27.8', True), ('v1.28.4', False)):
             with self.subTest(f"Kubernetes: {k8s_version}"):
+                self.setUp()
                 self._inventory('pss')
                 self.inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = k8s_version
 

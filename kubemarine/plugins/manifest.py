@@ -306,7 +306,7 @@ class Processor(ABC):
         key = f"Namespace_{namespace}"
         rbac = self.inventory['rbac']
         if rbac['admission'] == 'pss' and rbac['pss']['pod-security'] == 'enabled':
-            from kubemarine import admission
+            from kubemarine import admission  # pylint: disable=cyclic-import
 
             profile = self.get_namespace_to_necessary_pss_profiles()[namespace]
             target_labels = admission.get_labels_to_ensure_profile(self.inventory, profile)
@@ -457,7 +457,8 @@ class Processor(ABC):
         container['resources'] = plugin_service_section['resources']
 
         self.log.verbose(f"The {key} has been patched in "
-                         f"'spec.template.spec.containers.[{container_pos}].resources' with {plugin_service_section['resources']!r}")
+                         f"'spec.template.spec.containers.[{container_pos}].resources' "
+                         f"with {plugin_service_section['resources']!r}")
 
     def enrich_args_for_container(self, manifest: Manifest, key: str,
                                   *,
@@ -507,10 +508,10 @@ class Processor(ABC):
                     raise Exception(
                         f"{extra_arg_key!r} argument is already defined in "
                         f"'spec.template.spec.containers.[{container_pos}].args' for the {key}.")
-            else:
-                container_args.append(extra_arg)
-                self.log.verbose(f"The {extra_arg!r} argument has been added to "
-                                 f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
+
+            container_args.append(extra_arg)
+            self.log.verbose(f"The {extra_arg!r} argument has been added to "
+                             f"'spec.template.spec.containers.[{container_pos}].args' in the {key}")
 
     def enrich_env_for_container(self, manifest: Manifest, key: str,
                                  *,
@@ -548,9 +549,9 @@ class Processor(ABC):
         env_update: Dict[str, dict] = {}
 
         def update_env(name: str, value: Union[str, dict]) -> None:
-            if type(value) is str:
+            if isinstance(value, str):
                 env_update[name] = {'value': value}
-            elif type(value) is dict:
+            elif isinstance(value, dict):
                 env_update[name] = {'valueFrom': value}
             self.log.verbose(f"The {key} has been patched in "
                              f"'spec.template.spec.containers.[{container_pos}].env.{name}' with '{value}'")
@@ -579,9 +580,9 @@ class Processor(ABC):
 
             value = env_update.pop(name)
             keys = list(env.keys())
-            for key in keys:
-                if key != 'name' and key not in value:
-                    del env[key]
+            for k in keys:
+                if k != 'name' and k not in value:
+                    del env[k]
 
             env.update(value)
 

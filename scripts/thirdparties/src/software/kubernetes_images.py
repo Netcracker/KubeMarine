@@ -19,6 +19,8 @@ from . import thirdparties, SoftwareType, InternalCompatibility, CompatibilityMa
 from ..shell import run
 from ..tracker import SummaryTracker, ComposedTracker
 
+# pylint: disable=bad-builtin
+
 
 class KubernetesImagesResolver:
     def resolve(self, k8s_version: str) -> List[str]:

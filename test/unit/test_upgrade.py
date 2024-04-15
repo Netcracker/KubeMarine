@@ -16,11 +16,11 @@ import itertools
 import json
 import os
 import re
-import tempfile
 import unittest
 from copy import deepcopy
 from typing import List, Set
 from unittest import mock
+from test.unit import utils
 
 import yaml
 from ordered_set import OrderedSet
@@ -30,7 +30,6 @@ from kubemarine.core import errors, utils as kutils, static, log, flow, schema
 from kubemarine.core.cluster import KubernetesCluster, EnrichmentStage
 from kubemarine.procedures import upgrade, install
 from kubemarine import demo
-from test.unit import utils
 
 
 def get_kubernetes_versions() -> List[str]:
@@ -127,6 +126,8 @@ def set_cri(inventory: dict, cri: str):
 
 class _AbstractUpgradeEnrichmentTest(unittest.TestCase):
     def setUpVersions(self, old: str, _new: List[str]):
+        # pylint: disable=attribute-defined-outside-init
+
         self.old = old
         self.upgrade_plan = _new
         self.inventory = demo.generate_inventory(**demo.MINIHA_KEEPALIVED)
@@ -211,7 +212,8 @@ class UpgradeDefaultsEnrichment(_AbstractUpgradeEnrichmentTest):
         new_kubernetes_version = 'v1.24.11'
         self.setUpVersions(old_kubernetes_version, [new_kubernetes_version])
         self.upgrade['unexpected-property'] = {}
-        with self.assertRaisesRegex(Exception, re.escape(kubernetes.ERROR_UPGRADE_UNEXPECTED_PROPERTY % ("'unexpected-property'",))):
+        with self.assertRaisesRegex(Exception, re.escape(kubernetes.ERROR_UPGRADE_UNEXPECTED_PROPERTY % (
+                "'unexpected-property'",))):
             self.new_cluster()
 
     def test_version_upgrade_not_possible_template(self):
@@ -270,6 +272,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
         set_cri(self.inventory, 'containerd')
 
     def setUpNodesContext(self, os_name: str, os_version: str):
+        # pylint: disable-next=attribute-defined-outside-init
         self.nodes_context = demo.generate_nodes_context(self.inventory, os_name=os_name, os_version=os_version)
 
         associations = {}
@@ -306,7 +309,8 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
         cluster = self.new_cluster()
         self.assertEqual(['curl'], cluster.inventory['services']['packages']['install']['include'],
                          "Custom packages are enriched incorrectly")
-        self.assertEqual('docker-ce', cluster.inventory['services']['packages']['associations']['debian']['docker']['package_name'],
+        actual_package = cluster.inventory['services']['packages']['associations']['debian']['docker']['package_name']
+        self.assertEqual('docker-ce', actual_package,
                          "Associations packages are enriched incorrectly")
 
     def test_final_inventory_enrich_global(self):
@@ -367,8 +371,10 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                 if template:
                     self.inventory['values']['after'] = after
                 self.inventory['services']['packages']['associations']['containerd']['package_name'] = 'containerd-redefined'
-                self.upgrade['{{ values.through1 }}']['packages']['associations']['containerd']['package_name'] = 'containerd-upgrade1'
-                self.upgrade['{{ values.through2 }}']['packages']['associations']['containerd']['package_name'] = 'containerd-upgrade2'
+                self.upgrade['{{ values.through1 }}']['packages']['associations']\
+                    ['containerd']['package_name'] = 'containerd-upgrade1'
+                self.upgrade['{{ values.through2 }}']['packages']['associations']\
+                    ['containerd']['package_name'] = 'containerd-upgrade2'
 
                 self.run_actions()
 
@@ -403,9 +409,10 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
                         set_cri(self.inventory, cri)
 
                         cluster = self.new_cluster()
-                        self.assertEqual(expected_upgrade_required,
-                                         cri in cluster.context["upgrade"]["required"]['packages'],
-                                         f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
+                        self.assertEqual(
+                            expected_upgrade_required,
+                            cri in cluster.context["upgrade"]["required"]['packages'],
+                            f"CRI was {'not' if expected_upgrade_required else 'unexpectedly'} scheduled for upgrade")
 
     def _packages_for_cri_os_family(self, cri: str, os_family: str) -> List[str]:
         if cri == 'containerd':
@@ -512,7 +519,7 @@ class UpgradePackagesEnrichment(_AbstractUpgradeEnrichmentTest):
         self.assertIsNone(final_inventory['services']['packages']['upgrade'].get('include'))
 
 
-class UpgradePluginsEnrichment(_AbstractUpgradeEnrichmentTest):
+class UpgradePluginsEnrichment(utils.CommonTest, _AbstractUpgradeEnrichmentTest):
     def setUp(self):
         self.setUpVersions('v1.24.2', ['v1.24.11'])
 
@@ -521,11 +528,6 @@ class UpgradePluginsEnrichment(_AbstractUpgradeEnrichmentTest):
         self.inventory['plugins'] = {}
         for new in _new:
             self.upgrade[new]['plugins'] = {}
-
-        self.tmpdir = tempfile.TemporaryDirectory()
-
-    def tearDown(self) -> None:
-        self.tmpdir.cleanup()
 
     def _patch_globals(self, plugin: str, *, equal=False, real=False):
         plugin_versions = get_plugin_versions(plugin)
@@ -597,16 +599,21 @@ class UpgradePluginsEnrichment(_AbstractUpgradeEnrichmentTest):
                 if template:
                     self.inventory['values']['after'] = after
 
-                self.inventory['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'dashboard-redefined'
-                self.upgrade['{{ values.through1 }}']['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'dashboard-upgrade1'
-                self.upgrade['{{ values.through2 }}']['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'dashboard-upgrade2'
+                self.inventory['plugins'].setdefault('kubernetes-dashboard', {})\
+                    .setdefault('dashboard', {})['image'] = 'dashboard-redefined'
+                self.upgrade['{{ values.through1 }}']['plugins'].setdefault('kubernetes-dashboard', {})\
+                    .setdefault('dashboard', {})['image'] = 'dashboard-upgrade1'
+                self.upgrade['{{ values.through2 }}']['plugins'].setdefault('kubernetes-dashboard', {})\
+                    .setdefault('dashboard', {})['image'] = 'dashboard-upgrade2'
 
                 self.run_actions()
 
     def test_require_image_redefinition_first_step(self):
         self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
-        self.inventory['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'dashboard-redefined'
-        self.upgrade[self.upgrade_plan[0]]['plugins'].setdefault('kubernetes-dashboard', {}).setdefault('dashboard', {})['image'] = 'dashboard-upgrade1'
+        self.inventory['plugins'].setdefault('kubernetes-dashboard', {})\
+            .setdefault('dashboard', {})['image'] = 'dashboard-redefined'
+        self.upgrade[self.upgrade_plan[0]]['plugins'].setdefault('kubernetes-dashboard', {})\
+            .setdefault('dashboard', {})['image'] = 'dashboard-upgrade1'
 
         with utils.assert_raises_kme(
                 self, "KME0009", escape=True,
@@ -686,9 +693,10 @@ class UpgradePluginsEnrichment(_AbstractUpgradeEnrichmentTest):
         self.assertEqual('changed-hostname', ingress_spec['tls'][0]['hosts'][0])
         self.assertEqual('changed-hostname', ingress_spec['rules'][0]['host'])
 
+    @utils.temporary_directory
     def test_list_merge_strategy_ansible(self):
         args = self.context['execution_arguments']
-        ansible_inventory_location = os.path.join(self.tmpdir.name, 'ansible-inventory.ini')
+        ansible_inventory_location = os.path.join(self.tmpdir, 'ansible-inventory.ini')
         args['ansible_inventory_location'] = ansible_inventory_location
 
         plugin = 'custom-plugin'
@@ -714,8 +722,8 @@ class UpgradePluginsEnrichment(_AbstractUpgradeEnrichmentTest):
         for plugin in ('calico', 'nginx-ingress-controller', 'kubernetes-dashboard', 'local-path-provisioner'):
             if len(get_plugin_versions(plugin)) > 1:
                 return plugin
-        else:
-            self.skipTest("All plugins have the only version")
+
+        self.skipTest("All plugins have the only version")
 
     def _run_and_check(self, plugin: str, called: bool):
         args = self.context['execution_arguments']
@@ -831,7 +839,8 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
         set_cri(self.inventory, 'containerd')
         self.inventory['services']['thirdparties']['/usr/bin/kubelet'] = 'kubelet-{{ services.kubeadm.kubernetesVersion }}'
         self.inventory['services']['thirdparties']['/usr/bin/calicoctl'] = 'calicoctl-{{ plugins.calico.version }}'
-        self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
+        self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
+            = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
         with utils.backup_globals():
             self._patch_globals('crictl', equal=False)
 
@@ -852,7 +861,8 @@ class ThirdpartiesEnrichment(_AbstractUpgradeEnrichmentTest):
     def test_dont_require_redefinition_source_template_defaults_changed_second_step(self):
         self.setUpVersions('v1.26.3', ['v1.26.11', 'v1.27.8'])
         set_cri(self.inventory, 'containerd')
-        self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
+        self.inventory['services']['thirdparties']['/usr/bin/crictl.tar.gz'] \
+            = 'crictl-{{ globals.compatibility_map.software.crictl[services.kubeadm.kubernetesVersion].version }}'
 
         with utils.backup_globals():
             fake_version = 'v1.2.3'
@@ -1064,8 +1074,10 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
 
     def test_plugins_iterative_image_redefinition(self):
         self.setUpVersions('v1.24.2', ['v1.24.11', 'v1.25.7', 'v1.26.11'])
-        self.upgrade[self.upgrade_plan[1]].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
-        self.upgrade[self.upgrade_plan[2]].setdefault('plugins', {}).setdefault('calico', {}).setdefault('cni', {})['image'] = 'B'
+        self.upgrade[self.upgrade_plan[1]].setdefault('plugins', {})\
+            .setdefault('calico', {}).setdefault('cni', {})['image'] = 'A'
+        self.upgrade[self.upgrade_plan[2]].setdefault('plugins', {})\
+            .setdefault('calico', {}).setdefault('cni', {})['image'] = 'B'
 
         resources = self.run_actions()
 
@@ -1129,6 +1141,7 @@ class InventoryRecreation(_AbstractUpgradeEnrichmentTest):
 
 class RunTasks(_AbstractUpgradeEnrichmentTest):
     def _run_tasks(self, tasks_filter: str) -> demo.FakeResources:
+        # pylint: disable-next=attribute-defined-outside-init
         self.context = demo.create_silent_context(['fake_path.yaml', '--tasks', tasks_filter], procedure='upgrade')
 
         kubernetes_nodes = [node['name'] for node in self._get_nodes({'worker', 'master', 'control-plane'})]
@@ -1181,6 +1194,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                                  "Unexpected apiserver extra args")
 
     def test_kubernetes_preconfigure_apiserver_feature_gates_edit_func(self):
+        # pylint: disable=protected-access
+
         for custom_feature_gates in ('ServiceAccountIssuerDiscovery=true', None):
             with self.subTest(f"custom feature-gates: {bool(custom_feature_gates)}"), \
                     utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
@@ -1192,7 +1207,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                 })
                 initial_feature_gates = 'PodSecurity=true'
                 if custom_feature_gates:
-                    self.inventory['services']['kubeadm'].update({'apiServer': {'extraArgs': {'feature-gates': custom_feature_gates}}})
+                    self.inventory['services']['kubeadm'].update(
+                        {'apiServer': {'extraArgs': {'feature-gates': custom_feature_gates}}})
                     initial_feature_gates = custom_feature_gates + ',' + initial_feature_gates
 
                 self._stub_load_configmap('kubeadm-config', {'data': {'ClusterConfiguration': yaml.dump({
@@ -1203,7 +1219,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                 self._run_kubernetes_task()
 
                 upload_config = self.fake_fs.read(self._first_control_plane()['address'], '/etc/kubernetes/upload-config.yaml')
-                cluster_config = next(filter(lambda cfg: cfg['kind'] == 'ClusterConfiguration', yaml.safe_load_all(upload_config)))
+                cluster_config = next(filter(lambda cfg: cfg['kind'] == 'ClusterConfiguration',
+                                             yaml.safe_load_all(upload_config)))
 
                 actual_extra_args = cluster_config['apiServer']['extraArgs']
                 self.assertEqual(custom_feature_gates, actual_extra_args.get('feature-gates'),
@@ -1234,6 +1251,8 @@ class RunTasks(_AbstractUpgradeEnrichmentTest):
                                  "Unexpected kubeadm_kube-proxy.conntrack.min")
 
     def test_kubernetes_preconfigure_kube_proxy_conntrack_min_edit_func(self):
+        # pylint: disable=protected-access
+
         with utils.mock_call(kubernetes.components._prepare_nodes_to_reconfigure_components), \
                 utils.mock_call(kubernetes.components._reconfigure_node_components), \
                 utils.mock_call(kubernetes.components._update_configmap, return_value=True), \

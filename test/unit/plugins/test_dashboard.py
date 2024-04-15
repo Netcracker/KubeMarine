@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import unittest
+from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 from kubemarine import demo
 from kubemarine.plugins.manifest import Manifest, Identity
-from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 
 class ManifestEnrichment(_AbstractManifestEnrichmentTest):

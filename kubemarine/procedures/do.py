@@ -42,13 +42,13 @@ class CLIAction(Action):
         cluster = res.cluster()
         executors_group = get_executors_group(cluster, self.do_args)
         if executors_group.is_empty():
-            print('Failed to find any of specified nodes or groups')
+            print('Failed to find any of specified nodes or groups')  # pylint: disable=bad-builtin
             sys.exit(1)
 
         no_stream: bool = self.do_args['no_stream']
         result = executors_group.sudo(" ".join(self.remote_args), hide=no_stream, warn=True)
         if no_stream:
-            print(result)
+            print(result)  # pylint: disable=bad-builtin
 
         if result.is_any_failed():
             sys.exit(1)
@@ -108,19 +108,19 @@ def create_context(cli_arguments: List[str] = None) -> dict:
 
 def get_executors_group(cluster: KubernetesCluster, arguments: dict) -> NodeGroup:
     if arguments.get('node', None) is not None or arguments.get('group', None) is not None:
-        executor_lists: Dict[str, List[str]] = {
+        executors: Dict[str, List[str]] = {
             'node': [],
             'group': []
         }
-        for executors_type in executor_lists.keys():
+        for executors_type, executor_lists in executors.items():
             executors_str = arguments.get(executors_type)
             if executors_str:
                 if "," in executors_str:
                     for executor_name in executors_str.split(','):
-                        executor_lists[executors_type].append(executor_name.strip())
+                        executor_lists.append(executor_name.strip())
                 else:
-                    executor_lists[executors_type].append(executors_str.strip())
-        return cluster.create_group_from_groups_nodes_names(executor_lists['group'], executor_lists['node'])
+                    executor_lists.append(executors_str.strip())
+        return cluster.create_group_from_groups_nodes_names(executors['group'], executors['node'])
     else:
         return cluster.nodes['control-plane'].get_any_member()
 

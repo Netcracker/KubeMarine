@@ -42,6 +42,8 @@ def missing_or_empty(file: str) -> bool:
 
 
 def replace_config_from_backup_if_needed(procedure_inventory_filepath: str, config: str) -> None:
+    # pylint: disable=bad-builtin
+
     if missing_or_empty(config):
         print('Config is missing or empty - retrieving config from backup archive...')
         procedure = utils.load_yaml(procedure_inventory_filepath)
@@ -237,14 +239,18 @@ def import_etcd(cluster: KubernetesCluster) -> None:
 
     # Check DB size is correct
     backup_source = cluster.context['backup_descriptor'].get('etcd', {}).get('source')
-    etcd_statuses_from_descriptor = cluster.context['backup_descriptor'].get('etcd', {}).get('status', {})
-    if backup_source and etcd_statuses_from_descriptor and etcd_statuses_from_descriptor.get(backup_source, {}).get('status', {}).get('dbsize'):
-        expected_dbsize = int(etcd_statuses_from_descriptor.get(backup_source, {}).get('status', {}).get('dbsize'))
+    backup_descriptor_dbsize = None
+    if backup_source:
+        backup_descriptor_dbsize = cluster.context['backup_descriptor'].get('etcd', {}).get('status', {}) \
+            .get(backup_source, {}).get('status', {}).get('dbsize')
+    if backup_descriptor_dbsize:
+        expected_dbsize = int(backup_descriptor_dbsize)
         for item in cluster_status:
             real_dbsize = int(item.get('status', {}).get('dbsize'))
             if not real_dbsize:
                 raise Exception('ETCD member "%s" do not have DB size' % item.get('endpoint'))
-            cluster.log.verbose('Endpoint "%s" DB real size %s, expected size %s' % (item.get('endpoint'), expected_dbsize, real_dbsize))
+            cluster.log.verbose('Endpoint "%s" DB real size %s, expected size %s'
+                                % (item.get('endpoint'), expected_dbsize, real_dbsize))
             # restored db should have equal or greater DB size
             if expected_dbsize > real_dbsize:
                 raise Exception('ETCD member "%s" has invalid DB size' % item.get('endpoint'))

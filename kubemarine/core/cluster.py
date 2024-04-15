@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import dataclasses
+import functools
 from copy import deepcopy
 from enum import Flag, auto, IntFlag
 from types import FunctionType
@@ -20,7 +21,8 @@ from typing import Dict, List, Union, Iterable, Tuple, Optional, Any, Callable, 
 from ordered_set import OrderedSet
 from typing_extensions import Protocol
 
-from kubemarine.core import log, utils, static
+from kubemarine.core import log  # pylint: disable=unused-import
+from kubemarine.core import utils, static
 from kubemarine.core.connections import ConnectionPool
 from kubemarine.core.environment import Environment
 from kubemarine.core.errors import KME0006
@@ -134,7 +136,7 @@ def enrichment(stages: EnrichmentStage, procedures: List[str] = None) -> Callabl
     :param stages: `EnrichmentStage` stages to run this function at.
     :param procedures: list of procedures for which the function is applicable.
     """
-    return lambda fn: EnrichmentFunction(fn, stages, procedures)
+    return lambda fn: functools.wraps(fn)(EnrichmentFunction(fn, stages, procedures))
 
 
 @dataclasses.dataclass(repr=False)
@@ -193,7 +195,7 @@ class KubernetesCluster(Environment):
         if stage == EnrichmentStage.DEFAULT:
             self._products.procedure_inventory = None
         if stage == EnrichmentStage.PROCEDURE and previous_cluster is not None:
-            self._previous_products = previous_cluster._products
+            self._previous_products = previous_cluster._products  # pylint: disable=protected-access
 
             # Previous nodes refer to previous cluster. Create new group to surely refer to this cluster.
             self._products.nodes['previous'] = {
@@ -254,9 +256,9 @@ class KubernetesCluster(Environment):
                 ips[role] = OrderedSet(group.get_hosts())
 
         self.log.debug("Inventory file loaded:")
-        for role in ips.keys():
-            self.log.debug("  %s %i" % (role, len(ips[role])))
-            for ip in ips[role]:
+        for role, hosts in ips.items():
+            self.log.debug("  %s %i" % (role, len(hosts)))
+            for ip in hosts:
                 self.log.debug("    %s" % ip)
 
     @property
@@ -485,12 +487,35 @@ class KubernetesCluster(Environment):
         return common_group
 
     def schedule_cumulative_point(self, point_method: Callable) -> None:
-        from kubemarine.core import flow
-        flow.schedule_cumulative_point(self, point_method)
+        self._check_within_flow()
+
+        func = cast(FunctionType, point_method)
+        point_fullname = func.__module__ + '.' + func.__qualname__
+
+        if self.context['execution_arguments'].get('disable_cumulative_points', False):
+            self.log.verbose('Method %s not scheduled - cumulative points disabled' % point_fullname)
+            return
+
+        if point_fullname in self.context['execution_arguments']['exclude_cumulative_points_methods']:
+            self.log.verbose('Method %s not scheduled - it set to be excluded' % point_fullname)
+            return
+
+        scheduled_points = self.context.get('scheduled_cumulative_points', [])
+
+        if point_method not in scheduled_points:
+            scheduled_points.append(point_method)
+            self.context['scheduled_cumulative_points'] = scheduled_points
+            self.log.verbose('Method %s scheduled' % point_fullname)
+        else:
+            self.log.verbose('Method %s already scheduled' % point_fullname)
 
     def is_task_completed(self, task_path: str) -> bool:
-        from kubemarine.core import flow
-        return flow.is_task_completed(self, task_path)
+        self._check_within_flow()
+        return task_path in self.context['proceeded_tasks']
+
+    def _check_within_flow(self, check: bool = True) -> None:
+        if check != ('proceeded_tasks' in self.context):
+            raise NotImplementedError(f"The method is called {'not ' if check else ''}within tasks flow execution")
 
     def check_nodes_accessibility(self, skip_check_iaas: bool = True) -> None:
         """Check nodes access statuses"""

@@ -273,7 +273,7 @@ GROUP_SELF = TypeVar('GROUP_SELF', bound='AbstractGroup[Union[RunnersGroupResult
 
 class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
     def __init__(self, ips: Iterable[Union[str, GROUP_SELF]], cluster: object):
-        from kubemarine.core.cluster import KubernetesCluster
+        from kubemarine.core.cluster import KubernetesCluster  # pylint: disable=cyclic-import
 
         self.cluster = cast(KubernetesCluster, cluster)
         self.nodes: Set[str] = set()
@@ -372,6 +372,7 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             local_stream = local_file
             group_to_upload = self._make_group(hosts_to_upload)
 
+        # pylint: disable-next=protected-access
         group_to_upload._put_with_mv(local_stream, remote_file,
                                      backup=backup, sudo=sudo, mkdir=mkdir, immutable=immutable)
 
@@ -494,29 +495,32 @@ class AbstractGroup(Generic[GROUP_RUN_TYPE], ABC):
             if host not in self.nodes:
                 continue
 
+            if apply_filter is None:
+                result[host] = node
+                continue
+
             # apply filters
             suitable = True
-            if apply_filter is not None:
-                if callable(apply_filter):
-                    if not apply_filter(node):
+            if callable(apply_filter):
+                if not apply_filter(node):
+                    suitable = False
+            else:
+                # here intentionally there is no way to filter by values in lists field,
+                # for this you need to use custom functions.
+                # Current solution implemented in this way because the filtering strategy is
+                # unclear - do I need to include when everything matches or is partial matching enough?
+                for key, value in apply_filter.items():
+                    if node.get(key) is None:
                         suitable = False
-                else:
-                    # here intentionally there is no way to filter by values in lists field,
-                    # for this you need to use custom functions.
-                    # Current solution implemented in this way because the filtering strategy is
-                    # unclear - do I need to include when everything matches or is partial matching enough?
-                    for key, value in apply_filter.items():
-                        if node.get(key) is None:
+                        break
+                    if isinstance(value, list):
+                        if node[key] not in value:
                             suitable = False
                             break
-                        if isinstance(value, list):
-                            if node[key] not in value:
-                                suitable = False
-                                break
-                        # elif should definitely be here, not if
-                        elif node[key] != value:
-                            suitable = False
-                            break
+                    # elif should definitely be here, not if
+                    elif node[key] != value:
+                        suitable = False
+                        break
 
             # if not filtered
             if suitable:
@@ -753,7 +757,7 @@ class NodeGroup(AbstractGroup[RunnersGroupResult]):
                     if isinstance(result, UnexpectedExit):
                         logger.debug(result.result.stderr)
                         break
-                    elif isinstance(result, Exception):
+                    if isinstance(result, Exception):
                         raise
 
                     del remained_commands[0]
@@ -820,7 +824,7 @@ class DeferredGroup(AbstractGroup[Token]):
         return AbstractGroup.intersection_group(self, group)
 
     def _check_same_bound_executor(self, group: DeferredGroup) -> None:
-        if self._executor is not group._executor:
+        if self._executor is not group._executor:  # pylint: disable=protected-access
             raise ValueError("Trying to apply set operation on deferred groups bound to different executors")
 
 
@@ -839,7 +843,7 @@ class RemoteExecutor(RawExecutor):
         """
         super().flush()
 
-        for host, results in self._last_results.items():
+        for results in self._last_results.values():
             if any(isinstance(result, Exception) for _, result in results.items()):
                 raise RemoteGroupException(self.cluster, self._last_results)
 

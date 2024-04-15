@@ -35,7 +35,6 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
                     schema = demo.new_scheme(schema, 'haproxy_mntc', 1)
 
                 inventory = demo.generate_inventory(**schema)
-                print("Inventory: " + str(inventory))
                 # enrichment should not fail
                 demo.new_cluster(inventory)
 
@@ -49,7 +48,6 @@ class HAProxyDefaultsEnrichment(unittest.TestCase):
                 if try_mntc:
                     schema = demo.new_scheme(schema, 'haproxy_mntc', 1)
                 inventory = demo.generate_inventory(**schema)
-                print("Inventory: " + str(inventory))
 
                 with self.assertRaises(Exception) as cm:
                     demo.new_cluster(inventory)

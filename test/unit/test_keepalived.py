@@ -16,12 +16,12 @@
 
 import unittest
 from typing import List
+from test.unit import utils
 
 import yaml
 
 from kubemarine import demo, keepalived, yum
 from kubemarine.procedures import install
-from test.unit import utils
 
 
 class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
@@ -261,7 +261,7 @@ class TestKeepalivedDefaultsEnrichment(unittest.TestCase):
 
     def test_password_enrich_exponential_float(self):
         # Make sure to execute global patches of environment / libraries
-        from kubemarine import __main__
+        from kubemarine import __main__  # pylint: disable=unused-import
 
         inventory = demo.generate_inventory(**demo.FULLHA_KEEPALIVED)
         ip = inventory['vrrp_ips'][0]

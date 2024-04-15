@@ -11,32 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
 import unittest
 from unittest import mock
+from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 from kubemarine import demo, plugins
 from kubemarine.core import errors, flow
 from kubemarine.plugins.manifest import Manifest, Identity
 from kubemarine.procedures import add_node, remove_node
-from test.unit.plugins import _AbstractManifestEnrichmentTest
 
 
 class EnrichmentValidation(unittest.TestCase):
     def install(self):
+        # pylint: disable=attribute-defined-outside-init
+
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context()
-        self.cert_renew = None
+        self.procedure_inventory = None
         self.cert_config = self.inventory.setdefault('plugins', {}).setdefault('nginx-ingress-controller', {})\
             .setdefault('controller', {}).setdefault('ssl', {}).setdefault('default-certificate', {})
 
     def cert_renew(self):
+        # pylint: disable=attribute-defined-outside-init
+
         self.inventory = demo.generate_inventory(**demo.ALLINONE)
         self.context = demo.create_silent_context(['fake.yaml'], procedure='cert_renew')
-        self.cert_renew = demo.generate_procedure_inventory('cert_renew')
-        self.cert_config = self.cert_renew.setdefault('nginx-ingress-controller', {})
+        self.procedure_inventory = demo.generate_procedure_inventory('cert_renew')
+        self.cert_config = self.procedure_inventory.setdefault('nginx-ingress-controller', {})
 
     def _new_cluster(self):
-        return demo.new_cluster(self.inventory, procedure_inventory=self.cert_renew, context=self.context)
+        return demo.new_cluster(self.inventory, procedure_inventory=self.procedure_inventory, context=self.context)
 
     def test_cert_both_data_paths_not_specified(self):
         for procedure in (self.install, self.cert_renew):
@@ -52,7 +57,9 @@ class EnrichmentValidation(unittest.TestCase):
                 procedure()
                 self.cert_config['data'] = {'cert': 'c', 'key': 'k'}
                 self.cert_config['paths'] = {'cert': 'c', 'key': 'k'}
-                with self.assertRaisesRegex(errors.FailException, r"Number of properties is greater than the maximum of 1\. Property names: \['data', 'paths']"):
+                with self.assertRaisesRegex(
+                        errors.FailException,
+                        re.escape("Number of properties is greater than the maximum of 1. Property names: ['data', 'paths']")):
                     self._new_cluster()
 
     def test_cert_missed_cert(self):

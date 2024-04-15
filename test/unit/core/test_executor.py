@@ -16,7 +16,6 @@ import os
 import tempfile
 import unittest
 
-from concurrent.futures import TimeoutError
 from typing import Union, List
 
 import fabric
@@ -240,7 +239,7 @@ class RemoteExecutorTest(unittest.TestCase):
         with self.assertRaises(GroupException):
             group.flush()
 
-        for i, host in enumerate(group.get_hosts()):
+        for host in group.get_hosts():
             result = callback.results.get(host, [])
             self.assertEqual(1, len(result), "Result should be partially collected")
             self.assertEqual("foo\n", result[0].stdout, "Result was not collected")
@@ -355,7 +354,7 @@ class RemoteExecutorTest(unittest.TestCase):
         self.cluster.fake_fs.emulate_latency = True
         with tempfile.TemporaryDirectory() as tempdir:
             file = os.path.join(tempdir, 'file.txt')
-            with open(file, 'w') as f:
+            with open(file, 'w', encoding='utf-8') as f:
                 f.write('a' * 100000)
 
             with self.cluster.nodes["all"].new_executor() as exe:
@@ -366,6 +365,8 @@ class RemoteExecutorTest(unittest.TestCase):
 
 
 class ReparseFabricResultTest(unittest.TestCase):
+    # pylint: disable=protected-access
+
     @classmethod
     def setUpClass(cls):
         cls.cluster = cluster = demo.new_cluster(demo.generate_inventory(**demo.ALLINONE))

@@ -14,6 +14,7 @@
 import re
 import unittest
 from copy import deepcopy
+from test.unit import utils as test_utils
 
 import yaml
 
@@ -21,7 +22,6 @@ from kubemarine import demo, plugins, admission
 from kubemarine.core import errors, flow
 from kubemarine.kubernetes import components
 from kubemarine.procedures import manage_psp
-from test.unit import utils as test_utils
 
 
 def stub_resource(kind: str, name: str = 'custom'):
@@ -161,13 +161,14 @@ class EnrichmentAndFinalization(unittest.TestCase):
         psp = cluster.formatted_inventory['rbac']['psp']
         self._test_enrich_and_finalize_inventory_check(psp, False)
 
-        psp_list_add = {item["metadata"]["name"] for item in cluster.procedure_inventory['psp']['add-policies']['psp-list']}
+        procedure_psp = cluster.procedure_inventory['psp']
+        psp_list_add = {item["metadata"]["name"] for item in procedure_psp['add-policies']['psp-list']}
         self.assertEqual({'psp3-old', 'psp4-new'}, psp_list_add)
 
-        bindings_list_add = {item["metadata"]["name"] for item in cluster.procedure_inventory['psp']['add-policies']['bindings-list']}
+        bindings_list_add = {item["metadata"]["name"] for item in procedure_psp['add-policies']['bindings-list']}
         self.assertEqual({'rb1-new'}, bindings_list_add)
 
-        psp_list_delete = {item["metadata"]["name"] for item in cluster.procedure_inventory['psp']['delete-policies']['psp-list']}
+        psp_list_delete = {item["metadata"]["name"] for item in procedure_psp['delete-policies']['psp-list']}
         self.assertEqual({'psp2-old'}, psp_list_delete)
 
     def _test_enrich_and_finalize_inventory_check(self, psp: dict, enriched: bool):
@@ -251,18 +252,20 @@ class RunTasks(unittest.TestCase):
         self._run_tasks('reconfigure_psp')
 
     def test_reconfigure_plugin_disable_psp(self):
+        # pylint: disable=protected-access
+
         self.inventory['rbac']['psp']['pod-security'] = 'enabled'
         self.manage_psp['psp']['pod-security'] = 'disabled'
         with test_utils.mock_call(components._prepare_nodes_to_reconfigure_components), \
                 test_utils.mock_call(admission.delete_privileged_policy), \
                 test_utils.mock_call(admission.manage_policies), \
-                test_utils.mock_call(components._reconfigure_control_plane_component, return_value=True) as reconfigure_control_plane, \
+                test_utils.mock_call(components._reconfigure_control_plane_component, return_value=True) as cfg_ctrl_plane, \
                 test_utils.mock_call(components._update_configmap, return_value=True), \
                 test_utils.mock_call(components._restart_containers) as restart_containers, \
                 test_utils.mock_call(plugins.expect_pods) as expect_pods:
             res = self._run_tasks('reconfigure_psp')
 
-            self.assertTrue(reconfigure_control_plane.called,
+            self.assertTrue(cfg_ctrl_plane.called,
                             "There should be a successful attempt to reconfigure kube-apiserver")
 
             self.assertTrue(restart_containers.called)
@@ -313,8 +316,10 @@ class RunTasks(unittest.TestCase):
 
             self.assertEqual(
                 [
-                    ('PodSecurityPolicy', 'oob-default-psp'), ('PodSecurityPolicy', 'oob-host-network-psp'), ('PodSecurityPolicy', 'oob-anyuid-psp'),
-                    ('ClusterRole', 'oob-default-psp-cr'), ('ClusterRole', 'oob-host-network-psp-cr'), ('ClusterRole', 'oob-anyuid-psp-cr'),
+                    ('PodSecurityPolicy', 'oob-default-psp'), ('PodSecurityPolicy', 'oob-host-network-psp'),
+                    ('PodSecurityPolicy', 'oob-anyuid-psp'),
+                    ('ClusterRole', 'oob-default-psp-cr'), ('ClusterRole', 'oob-host-network-psp-cr'),
+                    ('ClusterRole', 'oob-anyuid-psp-cr'),
                     ('ClusterRoleBinding', 'oob-default-psp-crb'),
                 ],
                 deleted_resources

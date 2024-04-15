@@ -81,7 +81,7 @@ class TestFakeFS(unittest.TestCase):
     def test_put_file(self):
         with tempfile.TemporaryDirectory() as tempdir:
             file = os.path.join(tempdir, 'file.txt')
-            with open(file, 'w') as f:
+            with open(file, 'w', encoding='utf-8') as f:
                 f.write('hello\nworld')
             with open(file, 'rb') as f:
                 expected_data = f.read().decode('utf-8')
