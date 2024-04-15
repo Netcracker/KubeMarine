@@ -220,7 +220,7 @@ class RunActionsTest(unittest.TestCase):
         self.assertFalse(os.path.isfile(os.path.join(self.tmpdir.name, 'dump', 'cluster_finalized.yaml')))
 
     def test_upgrade_templates_two_versions(self):
-        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.7'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -251,7 +251,7 @@ class RunActionsTest(unittest.TestCase):
             self.assertEqual([f'upgrade to {version}'], procedure_parameters.get('successfully_performed', []))
 
     def test_upgrade_templates_second_version_failed_task(self):
-        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.6'
+        before, through, after = 'v1.26.11', 'v1.27.8', 'v1.28.7'
         self.inventory['values'] = {
             'before': before, 'through': through, 'after': after,
         }
@@ -646,7 +646,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
                     procedure_inventory['backup_location'] = 'fake.tar.gz'
                     context['backup_descriptor'] = {}
                 elif procedure == 'upgrade':
-                    procedure_inventory['upgrade_plan'] = ['v1.28.6']
+                    procedure_inventory['upgrade_plan'] = ['v1.28.7']
                     context['upgrade_step'] = 0
 
                 with self._expected_calls(expected_calls):
@@ -657,7 +657,7 @@ class ClusterEnrichOptimization(unittest.TestCase):
         inventory['services'].setdefault('kubeadm', {})['kubernetesVersion'] = 'v1.27.1'
 
         procedure_inventory = demo.generate_procedure_inventory('upgrade')
-        upgrade_plan = ['v1.27.8', 'v1.28.6']
+        upgrade_plan = ['v1.27.8', 'v1.28.7']
         procedure_inventory['upgrade_plan'] = upgrade_plan
 
         context = demo.create_silent_context(['fake.yaml', '--without-act'], procedure='upgrade')
