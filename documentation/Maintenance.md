@@ -834,9 +834,9 @@ nodes:
   * And the section to the main `cluster.yaml`.
   * If you already have balancers without VRRP IPs, reconfigure the balancers and DNS,
     for example, using `kubemarine install --tasks prepare.dns.etc_hosts,deploy.loadbalancer.haproxy.configure,deploy.loadbalancer.keepalived,deploy.coredns`.
-* If you intend to add a new `balancer` node with VRRP IP, and have previously configured the `vrrp_ips` section in the `cluster.yaml` with `hosts` subsection, you should add the new balancer node to the `vrrp_ips.*.hosts` section in the `cluster.yaml` the same way as the old balancer nodes, if this new node has to share the same VRRP IP address.
+* If you intend to add a new `balancer` node with VRRP IP, and have previously configured the `vrrp_ips` section in the `cluster.yaml` with the `hosts` subsection, then add the new balancer node to the `vrrp_ips.*.hosts` section in the `cluster.yaml` in the same way as the old balancer nodes if this new node has to share the same VRRP IP address.
 
-For example, if you want the `new-balancer-node-1` to be added to a subset of balancer nodes who share VRRP IP `192.168.0.100`:
+For example, if you want `new-balancer-node-1` to be added to a subset of balancer nodes that share VRRP IP `192.168.0.100`:
 
 ```
 vrrp_ips:
@@ -849,7 +849,7 @@ vrrp_ips:
   ip: 192.168.0.100
 ```
 
-It may be useful, if you have some VRRP IPs working at different subsets of balancer nodes. If you have one VRRP IP and all the balancer nodes must share it, just remove `hosts` section from `vrrp_ips`.
+It may be useful, if you have some VRRP IPs working at different subsets of balancer nodes. If you have one VRRP IP and all the balancer nodes must share it, just remove the `hosts` section from `vrrp_ips`.
 
 ### Add Node Tasks Tree
 
